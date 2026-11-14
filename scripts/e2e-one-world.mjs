@@ -642,6 +642,20 @@ try {
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
+  // ——— 5b. The aim bar (PRD §69.2): on a wide screen the aim is a bar under the map, and only there ———
+  console.log("5b. the aim bar");
+  {
+    const aims = page.getByRole("textbox", { name: "aim", exact: true });
+    const visible = await aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
+    check(visible === 1, `one aim on screen at 1280 px (${visible})`);
+    const bar = await page
+      .getByLabel("fungus aim")
+      .filter({ has: page.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const cv = await page.locator("canvas").first().boundingBox();
+    check(bar !== null && cv !== null && bar.y + bar.height > cv.height - 70, "the aim bar sits along the map's bottom");
+  }
+
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
   console.log("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
@@ -690,7 +704,10 @@ try {
   await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
   await page.getByRole("button", { name: "Go to ▾" }).click();
   await page.locator("canvas").first().focus();
-  check((await page.evaluate(() => window.jevAnts.followed())) !== null, "an ant followed, Go to open");
+  check(
+    (await page.evaluate(() => window.jevAnts.followed())) !== null && (await page.getByRole("group", { name: "go to" }).count()) === 1,
+    "an ant followed, Go to open",
+  );
   await page.keyboard.press("Escape");
   check(
     (await page.getByRole("group", { name: "go to" }).count()) === 0 && (await page.evaluate(() => window.jevAnts.followed())) !== null,
@@ -711,6 +728,19 @@ try {
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
   );
+  // The aim on a phone: no bar; it is in The fungus drawer.
+  check(
+    !(await tpage.getByRole("textbox", { name: "aim", exact: true }).isVisible()),
+    "on a phone there is no aim bar while the drawers are shut",
+  );
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
+  const inDrawer = await tpage.evaluate(() =>
+    [...document.querySelectorAll('textarea[aria-label="aim"]')].map(
+      (t) => `${t.closest("section")?.getAttribute("aria-label") ?? "-"}:${t.offsetParent !== null}`,
+    ),
+  );
+  check(inDrawer.includes("the fungus:true") && inDrawer.length === 2, `it is in The fungus drawer instead (${inDrawer.join(", ")})`);
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
   // A phone (PRD §69): the map fills the screen, the rail is a tab bar along the bottom, and a drawer opens as a sheet
   // above it.
   const phone = await tpage.evaluate(() => {

@@ -5590,3 +5590,15 @@ They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the 
 - **Carrying the camera:** a followed ant that goes through a hole now asks the field to keep the follow (`centreOn` `keepFollow`). Before, a crossing could re-centre the view still shown and drop the follow.
 - **Unchanged:** the simulation; the golden masters are bit-exact.
 
+
+### 69.2 S2a: on the map (ja-mvo9.2, first half)
+Stage 2 goes out in two PRs. This first half carries what the map says; the palette, the "?" lens and the shortcuts sheet follow in S2b.
+- **Nest badges:** the name over each hole on the top view is now a badge: the colony's name, the share of its living ants carrying the fungus (once any does, at least 1 %), and its queen (a dim crown when clean, a spore crown when infected, "no queen" when dead). Drawn on the canvas, so it moves with the camera. The words come from the pure `ui/badges.ts` (`nestBadge`, `badgeParts`).
+- **Ant tag:** the followed ant's ring carries a tag with its number and mode (`antTag`).
+- **The aim bar:**
+  - From 1024 px wide, the aim is a bar along the bottom of the map: the presets and the player's words. The field is one unwrapped line until it has focus, then four lines.
+  - It spans the free width, clear of the rail, of an open drawer and of the inspector, at most 46 rem.
+  - Narrower than 1024 px it stays in The fungus drawer, and the tutorial's aim card opens that drawer only there.
+  - Learn → Policy now shows the aim read-only, so the aim has one home.
+- **Toasts** sit above the aim bar on every width.
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.

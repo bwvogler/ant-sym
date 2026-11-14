@@ -62,6 +62,7 @@ import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
+import { antTag, badgeParts, nestBadge } from "./badges.ts";
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -815,6 +816,32 @@ export default function ColonyField({
     };
 
     /** Text with a paper halo, centred at screen (x, y). */
+    /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
+    const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
+      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+      const gap = px * 0.45;
+      const widths = parts.map((p) => ctx.measureText(p.text).width);
+      const w = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1) + px;
+      const h = px * 1.6;
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = theme.paper;
+      ctx.strokeStyle = theme.line;
+      ctx.lineWidth = Math.max(1, px / 12);
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "start";
+      let at = x - w / 2 + px / 2;
+      parts.forEach((p, n) => {
+        ctx.fillStyle = p.fill;
+        ctx.fillText(p.text, at, y);
+        at += widths[n]! + gap;
+      });
+      ctx.textBaseline = "alphabetic";
+    };
     const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
@@ -885,7 +912,19 @@ export default function ColonyField({
         let k = -1;
         for (let n = 0; n < holes.length && k < 0; n++) if (holes[n]!.px === h.x && holes[n]!.py === h.y) k = n;
         const [x, y] = toScreen(c, v, wx, wy);
-        label(k >= 0 && colonies[k] ? colonyName(k) : "empty hole", x, y - Math.max(12 * d, 4.5 * c.zoom), px);
+        const above = y - Math.max(12 * d, 4.5 * c.zoom);
+        const col = k >= 0 ? colonies[k] : undefined;
+        if (!col) {
+          label("empty hole", x, above, px);
+          continue;
+        }
+        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.line };
+        pill(
+          badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+          x,
+          above - px * 0.2,
+          px,
+        );
       }
     };
 
@@ -1399,10 +1438,13 @@ export default function ColonyField({
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
-        ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
+        const r = Math.max(9 * d, c.zoom * 1.6);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
+        const tpx = Math.round(11 * d);
+        pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);

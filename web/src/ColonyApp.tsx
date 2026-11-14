@@ -26,6 +26,7 @@ import { seg } from "./ui/styles.ts";
 import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
+import AimBar from "./ui/AimBar.tsx";
 import { SensedMap } from "./ui/fungusSight.ts";
 import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
@@ -126,7 +127,7 @@ export default function ColonyApp() {
   const pointsAt = tut.card?.highlight;
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
-    else if (pointsAt === "aim") setDrawer("fungus");
+    else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus"); // from lg the aim is the bar
   }, [pointsAt]);
   // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
@@ -528,6 +529,16 @@ export default function ColonyApp() {
         </div>
       )}
 
+      <AimBar
+        aim={jev.aim}
+        setAim={jev.setAim}
+        draftAim={jev.draftAim}
+        lock={jev.lock}
+        tokens={TOKENS_PER_FUNGAL_SITUATION}
+        leftOpen={drawer !== null}
+        rightOpen={!!(penCard || followed)}
+      />
+
       {tut.tutorial && tut.card && (
         <TutorialCard
           step={tut.tutorial.step}
@@ -545,8 +556,6 @@ export default function ColonyApp() {
         followed={followed}
         doctrines={jev.doctrines}
         aim={jev.aim}
-        setAim={jev.setAim}
-        draftAim={jev.draftAim}
         lock={jev.lock}
         game={game}
         fungusAnswers={jev.fungusAnswers}
@@ -701,7 +710,7 @@ function FungusStatus({ stats }: { stats: ColonyStats | null }) {
 function Aim({ jev }: { jev: ReturnType<typeof useColonyJev> }) {
   const locked = jev.lock !== null;
   return (
-    <div className="mt-5" aria-label="fungus aim">
+    <div className="mt-5 lg:hidden" aria-label="fungus aim">
       <div className="flex items-center justify-between">
         <SectionHead>
           Aim <Help to={{ tab: "policy", id: "fungus" }} label="how the fungus decides" />
