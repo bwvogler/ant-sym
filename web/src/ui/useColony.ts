@@ -42,7 +42,7 @@ export interface ColonyControls {
   playing: boolean;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
-  /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
+  /** the fungus's menu: the levers the player has on (fungus-policy.md §5.1, lever 3; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
   hide: boolean;
@@ -128,7 +128,7 @@ export interface ColonyStats {
   /** the colony that is gone, by index, or −1 */
   fallen: number;
   outcome: Outcome;
-  /** cells of ground holding spores */
+  /** cells of ground holding spores enough to see (Fungus.shownSporeCells) */
   sporeCells: number;
   /** how far the fungus has come toward one colony */
   unity: Unity;
@@ -341,7 +341,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           sides: game.colonies.map((c) => side(c, game.fungus)),
           fallen: game.fallen(),
           outcome: game.outcome(),
-          sporeCells: game.fungus.sporeCells,
+          sporeCells: game.fungus.shownSporeCells,
           unity: game.unity(),
           pace,
           chapter: chapterFor(game),

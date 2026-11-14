@@ -8,6 +8,8 @@ import {
   keyY,
   moundRadius,
   PLANE,
+  groundHeat,
+  sunDown,
   CELL,
   cellOf,
   centreX,
@@ -15,6 +17,8 @@ import {
   R,
   SIDE,
   INFECTED,
+  SPORE_FULL,
+  SPORE_SHOWN,
   type Fungus,
   type Hyphae,
   hyphaCell,
@@ -498,8 +502,9 @@ export default function ColonyField({
             continue;
           }
           // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
-          const sp = sporeC ? Math.min(1, sporeC[i] / 3) : 0;
-          if (sp > 0.02) {
+          const sv = sporeC ? sporeC[i] : 0;
+          if (sv >= SPORE_SHOWN) {
+            const sp = Math.min(1, sv / SPORE_FULL);
             px[o] = theme.sporeRgb[0];
             px[o + 1] = theme.sporeRgb[1];
             px[o + 2] = theme.sporeRgb[2];
@@ -579,10 +584,17 @@ export default function ColonyField({
       c.ctx.putImageData(c.img, 0, 0);
     };
 
-    /** The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground); ants as dots. */
+    /**
+     * The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground), washed with the
+     * fungus's colour where it has spores the field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
+     */
     const paintMini = () => {
       const px = miniImg.data;
       const food = theme.accentRgb;
+      const spore = theme.sporeRgb;
+      // Infected ants: the spore colour halfway to ink, so a host stands out on the spore wash as on bare ground, in
+      // either theme (ink is light in dark mode) (ja-25sb).
+      const host = [0, 1, 2].map((j) => Math.round((spore[j]! + theme.inkRgb[j]!) / 2)) as [number, number, number];
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
@@ -609,26 +621,31 @@ export default function ColonyField({
                     : heap > 0
                       ? theme.spoil
                       : theme.paperRgb);
-          px[o] = c[0];
-          px[o + 1] = c[1];
-          px[o + 2] = c[2];
+          // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
+          const sv = off || cut ? 0 : spores.get(x, y);
+          const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
+          px[o] = Math.round(c[0] + (spore[0] - c[0]) * a);
+          px[o + 1] = Math.round(c[1] + (spore[1] - c[1]) * a);
+          px[o + 2] = Math.round(c[2] + (spore[2] - c[2]) * a);
           px[o + 3] = 255;
         }
-      for (let k = colonies.length - 1; k >= 0; k--) {
-        const col = colonies[k] as Colony;
-        // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-        const tone = odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
-          const mx = Math.floor((col.x[i] - gx0) / 2);
-          const my = Math.floor(col.y[i] / 2);
-          if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
-          const o = (my * mini.width + mx) * 4;
-          px[o] = tone[0];
-          px[o + 1] = tone[1];
-          px[o + 2] = tone[2];
+      // Every colony's ants, then the infected over them, so a healthy nestmate on the same pixel doesn't hide one.
+      for (const sick of [false, true])
+        for (let k = colonies.length - 1; k >= 0; k--) {
+          const col = colonies[k] as Colony;
+          // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
+          const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          for (let i = 0; i < col.n; i++) {
+            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || col.load[i] >= INFECTED !== sick) continue;
+            const mx = Math.floor((col.x[i] - gx0) / 2);
+            const my = Math.floor(col.y[i] / 2);
+            if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
+            const o = (my * mini.width + mx) * 4;
+            px[o] = tone[0];
+            px[o + 1] = tone[1];
+            px[o + 2] = tone[2];
+          }
         }
-      }
       miniCtx.putImageData(miniImg, 0, 0);
     };
 
@@ -757,6 +774,17 @@ export default function ColonyField({
         const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y));
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Knots (ja-2bw.9): a hard, dark lump on the hypha, a little larger than a tip.
+      ctx.fillStyle = theme.ink;
+      ctx.globalAlpha = under ? 0.5 : 0.85;
+      for (const k of h.knots.keys()) {
+        const [kx, ky] = hyphaCell(k);
+        if (!inView(kx, ky)) continue;
+        const [x, y] = toScreen(c, v, centreX(kx, ky), centreY(ky));
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
@@ -1049,6 +1077,21 @@ export default function ColonyField({
           }
         }
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
+      // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
+      const hp = colonies[0]?.params;
+      if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
+        const k = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
+        ctx.globalAlpha = 0.28 * k;
+        ctx.fillStyle = theme.warn;
+        ctx.fillRect(0, 0, v.w, v.h);
+        // Night (the sun down): a dark wash; the desert ants are in. Black in both themes: the ink is pale in dark mode (review of #155, S1).
+        if (sunDown(hp, colonies[0]!.time)) {
+          ctx.globalAlpha = 0.3;
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, v.w, v.h);
+        }
+        ctx.globalAlpha = 1;
+      }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
 

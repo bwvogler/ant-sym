@@ -2,7 +2,7 @@
 import { NO_KEY } from "./ants.ts";
 import type { Colony, HoleCell } from "./colony.ts";
 import { backfill, enterStale, staleStep } from "./dig.ts";
-import { avoid, choose, climb, handOnWall, NO_CELL, SOIL_FILL, tunnel, turnToward } from "./grid.ts";
+import { avoid, choose, climb, handOnWall, inReach, NO_CELL, SOIL_FILL, tunnel, turnToward } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, SIDE, nx as stepX, ny as stepY } from "./hex.ts";
 import { believe, homeScentNear, routeFail, searchOn } from "./homing.ts";
 import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
@@ -21,7 +21,7 @@ import {
   WAIT_RIM,
   WALL_LOST,
 } from "./tuning.ts";
-import { walkTunnel } from "./tunnel.ts";
+import { fetches, walkTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
 
@@ -441,7 +441,22 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
     if (seen && !(col.hugT[i] > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
     else if (walkTunnel(col, i, EXPLORE, p.speed * dt)) h = col.towardTarget(i);
-    else if (col.queen?.alive && col.band(i) === 0 && col.under[i])
+    else if (p.restFetch > 0 && col.queen && col.under[i] && !carrying && !pellet && !col.broodHeld[i] && fetches(col, i)) {
+      // Fetching in a chamber (ja-4rfr): toward the stores' marks its antennae meet (as toFood in a tunnel), through
+      // open ground; none in reach, it searches the nest (it is not leaving: a hungry old forager headed for the hole).
+      const x = col.x[i];
+      const y = col.y[i];
+      const d = p.sensorDistance;
+      const read = (b: number) => {
+        const sx = x + Math.cos(b) * d;
+        const sy = y + Math.sin(b) * d;
+        return inReach(map, x, y, sx, sy) ? col.ph.read("store", sx, sy) : 0;
+      };
+      const l = read(h - a);
+      const f = read(h);
+      const r = read(h + a);
+      h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
+    } else if (col.queen?.alive && col.band(i) === 0 && col.under[i])
       h = turnToward(h, Math.atan2(col.queen.y - col.y[i], col.queen.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
     else if (col.entrance && col.outbound(i) && col.under[i])
       h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;

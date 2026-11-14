@@ -67,7 +67,10 @@ function perChannel<T>(make: (ch: Channel) => T): Record<Channel, T> {
 
 /** No cell holds more than this, so a crowded trail does not drown the gradient. */
 export const MAX_LEVEL = 20;
-/** A chunk whose every cell is below this is asleep: zeroed and not stepped. Far under any level a sensor acts on (FAINT = 0.05). */
+/** The fewest spare chunk arrays a field keeps for its double buffer and for chunks that wake. */
+const POOL_MIN = 16;
+
+/** A chunk whose every cell is below this is asleep: dropped (it reads 0) and not stepped. Far under any level a sensor acts on (FAINT = 0.05). */
 export const SLEEP = 1e-4;
 
 const EDGE = CHUNK - 1;
@@ -107,6 +110,8 @@ export class Pheromones {
   #fed = new Set<number>();
   /** spare chunk arrays for the double buffer */
   #pool: Float32Array[] = [];
+  /** how many spare arrays the pool keeps: the most awake chunks of any channel at its last step (#spare) */
+  #poolCap = POOL_MIN;
   /** the 3×3 block of chunks round the one being stepped, (dy + 1) * 3 + (dx + 1): rock and field arrays, undefined where there are none */
   #nbRock: (Uint8Array | undefined)[] = new Array(9);
   #nbField: (Float32Array | undefined)[] = new Array(9);
@@ -119,7 +124,8 @@ export class Pheromones {
     this.map = map;
     this.params = { ...DEFAULT_CHANNELS, ...params };
     this.#absent = has ? new Set(CHANNELS.filter((ch) => !has.includes(ch))) : null;
-    this.fields = perChannel(() => new ChunkLayer((n) => new Float32Array(n), 0));
+    // A chunk that wakes takes a spare array if there is one (zeroed: a fresh chunk reads 0), else a new one.
+    this.fields = perChannel(() => new ChunkLayer((n) => this.#pool.pop()?.fill(0) ?? new Float32Array(n), 0));
     this.#awake = perChannel(() => new Set<number>());
   }
 
@@ -313,15 +319,32 @@ export class Pheromones {
       next.push({ cx, cy, out, max });
     }
 
-    // Commit: swap the buffers in; a chunk with nothing left above SLEEP, and no neighbour feeding it, goes to sleep, zeroed.
+    let cap = POOL_MIN;
+    for (const c of CHANNELS) cap = Math.max(cap, this.#awake[c].size);
+    this.#poolCap = cap;
+    // Commit: swap the buffers in. A chunk with nothing left above SLEEP, and no neighbour feeding it, goes to sleep: it is
+    // dropped and both its buffers go back to the pool, so ground scent has left holds no memory (endless-world §2). A
+    // missing chunk reads 0 everywhere (get, across), as the zeroed chunk it replaces did.
     for (const { cx, cy, out, max } of next) {
       if (max < SLEEP && !fed.has(chunkKey(cx, cy))) {
-        out.fill(0);
         awake.delete(chunkKey(cx, cy));
+        const old = layer.drop(cx, cy);
+        if (old) this.#spare(old);
+        this.#spare(out);
+        continue;
       }
       const old = layer.put(cx, cy, out);
-      if (old) this.#pool.push(old);
+      if (old) this.#spare(old);
     }
+  }
+
+  /**
+   * Keep a chunk array for reuse. A step takes one per awake chunk of the channel it steps and hands them back, so the
+   * pool keeps as many as the most awake channel has (at least POOL_MIN); past that an array is let go, so scent that
+   * has left the ground frees its memory.
+   */
+  #spare(a: Float32Array): void {
+    if (this.#pool.length < this.#poolCap) this.#pool.push(a);
   }
 
   /** Step one border cell (lx, ly) of a chunk into `out`, reading across into the chunks round it; returns its new level. */

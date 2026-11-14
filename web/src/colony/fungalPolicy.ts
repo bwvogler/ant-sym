@@ -82,7 +82,7 @@ export const STRAIN_DEFAULT = "default";
  * The local rule: free, the default, and the baseline Jev is measured against. It answers with presets:
  *   groomed, and hiding → dormant (a dormant host shows a quarter as much to its groomers)
  *   culling, a host fighting a foreigner → cull
- *   otherwise → the strain's own default (Lockpick soothes, Bloom shares, Garden blends)
+ *   otherwise → the strain's own default (Garden, the game's strain, blends; the lab strains Lockpick soothes and Bloom shares)
  * Levers the menu has off are left as they are (Fungus.choose).
  *
  * Why so little (PRD §19): four situational rules were built and measured against each strain's default; none beat
