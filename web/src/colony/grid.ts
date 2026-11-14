@@ -23,7 +23,6 @@ import { AIR, OPEN, SOIL, rockAt, type WorldMap } from "./world.ts";
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
 export const NO_CELL = NO_KEY;
 
-/** No cell: a key no cell takes (it would be row −32768). −1 was the old "none", but that is cell (−1, 0). */
 /** What a pellet is (Colony soil): soil an ant dug; loose soil off the mound going out; loose soil going down to fill. */
 export const SOIL_DUG = 0;
 

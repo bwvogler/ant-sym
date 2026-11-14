@@ -1171,8 +1171,6 @@ export class Fungus {
       if (!h || h.knots.size === 0) return;
       const L = this.#layers[l] as SporeLayer;
       const g = this.#ground(l);
-      const { w } = L.map.size;
-      const { x0 } = L.map;
       for (const [k, knot] of h.knots) {
         knot.age += dt;
         if (knot.store <= 0 || g.topsoil) continue;
@@ -1186,7 +1184,7 @@ export class Fungus {
         knot.store -= put;
         L.spores.set(at[0], at[1], v + put / BODY.sporeMass);
         L.sporeStrain.set(at[0], at[1], e.strain);
-        L.sporeCells.add(at[1] * w + at[0] - x0);
+        L.sporeCells.add(cellKey(at[0], at[1]));
       }
     });
     // The corpses fruit, free: paid by the cadaver, not the mycelium.

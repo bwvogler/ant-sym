@@ -3,7 +3,7 @@
 // and other modules read them as `colony.<name>` (docs/refactor.md S3). Index i is ant i. Only per-ant arrays belong here: what is
 // per colony or per layer stays a field of the Colony.
 
-/** An empty cell key: no cell (colony.ts NO_CELL). */
+/** An empty cell key: no cell (colony.ts NO_CELL). Every cellKey (hex.ts) is ≥ 0, so −2^31 is never a cell. */
 export const NO_KEY = -0x80000000;
 
 /** The colony parameters the table reads: a fill that starts as a parameter, and the one array whose length depends on one. */
@@ -282,9 +282,9 @@ export const ANT_FIELDS = {
    * puts the pellet and all its state down at once.
    */
   soil: { type: Uint8Array, reset: "spawn" },
-  /** the cell it looked from before that (packed; −1 none): the way it came, which is never a stale branch */
+  /** the cell it looked from before that (cellKey; NO_KEY none): the way it came, which is never a stale branch */
   cameFrom: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
-  /** the cell (packed) this ant last dug: its pellet never goes straight back in there */
+  /** the cell (cellKey; NO_KEY none) this ant last dug: its pellet never goes straight back in there */
   lastDug: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
   /** releases from a soil wall this trip that made no progress home (see NO_GAIN) */
   noGain: { type: Uint8Array },

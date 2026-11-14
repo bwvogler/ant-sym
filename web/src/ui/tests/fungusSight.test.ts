@@ -125,4 +125,10 @@ test("a chunk faded right out is dropped and leaves a revealed bit; a fresh pass
   assert.equal(s.revealedCount(PLANE), 2);
   s.stamp([colony([{ x: 20, y: 20, load: INFECTED }])], 100 + SENSED_FADE + 1);
   assert.equal(at(s, PLANE, 20, 20), 1, "sensed again");
+  // Time gone back (a restart, a load) forgets everything, the revealed bits and what is fading included.
+  s.stamp([], 1);
+  assert.equal(s.revealedCount(PLANE), 0, "a restart reveals nothing");
+  // Past every pre-restart stamp's fade: a chunk still listed from before would be dropped from a layer that's gone.
+  assert.doesNotThrow(() => s.stamp([], 200), "nothing left over from before the restart to drop");
+  assert.ok((s.layer(PLANE)?.count ?? 0) === 0, "and holds nothing");
 });
