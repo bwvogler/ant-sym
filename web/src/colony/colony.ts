@@ -387,6 +387,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
   "plumeTurn", // smellsFood's answer, read in the same tick
   "policyDrew", // set and read within one ask (policyDraw)
+  "policyDraw", // code: the draw handed to the mode policy
   "rng",
   "own",
   "map",

@@ -22,7 +22,7 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
-import { DESERT_ANT, type Species } from "../../colony/index.ts";
+import { DESERT_ANT, weightedValid, type Species } from "../../colony/index.ts";
 
 /** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
 const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT };
@@ -89,7 +89,9 @@ test("every preset doctrine ships mode and stance answers, each situation once, 
       assert.equal(pairs.length, b.answers);
       assert.ok(pairs.length > 0 && pairs.length <= SIZE[lane]!, `${b.file}: ${pairs.length} answers`);
       assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
-      for (const [, a] of pairs) assert.ok(VALID[lane]!.includes(a), `${b.file}: ${a}`);
+      // A mode answer keeps Jev's probabilities over the modes (weighted.ts, staging ja-nan3): every option must be a mode.
+      for (const [, a] of pairs)
+        assert.ok(lane === "mode" ? weightedValid(a, (m) => VALID.mode!.includes(m)) : VALID[lane]!.includes(a), `${b.file}: ${a}`);
     }
 });
 
@@ -175,7 +177,10 @@ test("a species' own bundles: under its own context, every situation of its sche
     assert.equal(pairs.length, words.schema!.size, `${b.file}: every situation of its schema (review of #140, S1)`);
     for (const [k, a] of pairs) {
       assert.ok(keys.has(k), `${b.file}: ${k} is none of its situations`);
-      assert.ok(Object.keys(words.criteria).includes(a), `${b.file}: ${a} is not one of its choices`);
+      assert.ok(
+        weightedValid(a, (m) => Object.keys(words.criteria).includes(m)),
+        `${b.file}: ${a} is not one of its choices`,
+      );
     }
   }
 });

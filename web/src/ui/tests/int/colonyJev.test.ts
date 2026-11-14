@@ -533,7 +533,7 @@ test("explain says who decides a situation, without counting or queuing it", asy
     enemy: "none",
     stance: "forage",
   } as const;
-  assert.deepEqual(j.explain(s), { mode: "explore", by: "local" }, "off: the local rule");
+  assert.deepEqual(j.explain(s), { mode: "explore", by: "local", weights: [["explore", 1]] }, "off: the local rule");
   await j.start();
   const before = { hits: j.state.hits, misses: j.state.misses };
   assert.equal(j.explain(s).by, "local", "running, never met: the local rule, and nothing queued");
@@ -541,7 +541,7 @@ test("explain says who decides a situation, without counting or queuing it", asy
   j.policy(s); // the colony meets it: queued for Jev
   assert.equal(j.explain(s).by, "waiting");
   await tick(60);
-  assert.deepEqual(j.explain(s), { mode: "return", by: "jev" }, "answered: Jev's cached answer");
+  assert.deepEqual(j.explain(s), { mode: "return", by: "jev", weights: [["return", 1]] }, "answered: Jev's cached answer");
 });
 
 test("explain alone never asks Jev", async () => {
