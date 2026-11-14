@@ -4,8 +4,8 @@ import { BUILD, Builder, crayonLevel, guarded, RAIN_CHANNELS, strokeCells, type 
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
-import { mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
-import { smallOne } from "../builders.ts";
+import { generateSideWorld, mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
+import { SMALL_SIDE, smallOne } from "../builders.ts";
 
 // The builder (docs/builder.md, PRD §71, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
@@ -132,7 +132,10 @@ test("a crayon lays one colony's food trail, kept topped up as it fades at the h
   // After one half-life the line still reads half its first level (it is topped up, not left to the food channel's faster fade).
   for (let k = 0; k < 30 * BUILD.crayonHalfLife; k++) g.tick(1 / 30);
   assert.ok(Math.abs(crayonLevel(g.crayons[0]!.age) - BUILD.crayonLevel / 2) < 0.05);
-  assert.ok(mine.fields.food.get(x + 4, y) >= BUILD.crayonLevel / 2 - 0.05);
+  // Topped up to the level, not past it: within a tick's diffusion below it (review of #204, S3).
+  const on = mine.fields.food.get(x + 4, y);
+  const level = crayonLevel(g.crayons[0]!.age);
+  assert.ok(on <= level + 0.05 && on >= level - 0.2, `field ${on} against level ${level}`);
   // Gone once it would read below faint.
   const fade = BUILD.crayonHalfLife * Math.log2(BUILD.crayonLevel / FAINT);
   for (let k = 0; k < 30 * (fade - BUILD.crayonHalfLife + 2); k++) g.tick(1 / 30);
@@ -247,13 +250,104 @@ test("a crayon drag is one line: its pieces extend it, and undo takes the whole 
   b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(x, y), pt(x + 2, y)] }, true);
   const n = g.crayons[0]!.cells.length;
   b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(x + 2, y), pt(x + 5, y)] }, true);
-  assert.equal(g.crayons.length, 1, "one line");
+  b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(x + 5, y), pt(x + 7, y)] }, true);
+  b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(x + 7, y), pt(x + 9, y)] }, true);
+  assert.equal(g.crayons.length, 1, "one line, however many pieces (review of #204, S1)");
   assert.ok(g.crayons[0]!.cells.length > n, "extended");
+  const cells = g.crayons[0]!.cells;
+  const distinct = new Set<number>();
+  for (let k = 0; k < cells.length; k += 2) distinct.add(key(cells[k]!, cells[k + 1]!));
+  assert.equal(distinct.size * 2, cells.length, "each cell once");
   b.begin();
   b.apply({ tool: "crayon", layer: PLANE, colony: 1, points: [pt(x, y + 4)] }, true);
   assert.equal(g.crayons.length, 2, "a new drag is a new line");
   assert.ok(b.undo());
   assert.equal(g.crayons.length, 1);
   assert.ok(b.undo());
-  assert.equal(g.crayons.length, 0, "the whole first drag, both pieces");
+  assert.equal(g.crayons.length, 0, "the whole first drag, every piece");
+  const f = g.colonies[0]!.layers[PLANE]!.ph.fields.food;
+  for (let d = 0; d <= 9; d++) assert.ok(f.get(x + d, y) < 1e-6, `no trail left at ${x + d} (review of #204, S3)`);
+});
+
+test("undo never fills soil back onto an ant or over food that came since (review of #204, S2)", () => {
+  const g = game(20);
+  const b = new Builder(g);
+  const below = g.layers[CURTAIN] as WorldMap;
+  const [x, y] = find(g, CURTAIN, SOIL);
+  const [fx, fy] = find(g, CURTAIN, SOIL, [0, y + 8]);
+  b.begin();
+  b.apply({ tool: "dig", layer: CURTAIN, points: [pt(x, y)] }, true);
+  b.apply({ tool: "dig", layer: CURTAIN, points: [pt(fx, fy)] }, true);
+  assert.equal(rockAt(below, x, y), OPEN);
+  // An ant walks into the first hole; food is put down in the second.
+  const c = g.colonies[0]!;
+  const i = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === CURTAIN)!;
+  c.x[i] = centreX(x, y);
+  c.y[i] = centreY(y);
+  below.food.set(fx, fy, 5);
+  below.foodLeft += 5;
+  assert.ok(b.undo());
+  assert.equal(rockAt(below, x, y), OPEN, "the ant's cell stays open");
+  assert.equal(rockAt(below, fx, fy), OPEN, "the food stays on open ground");
+});
+
+test("a rock tap straight on the queen, with no ant by her, leaves her cell open (review of #204, S2)", () => {
+  const g = game(20);
+  const b = new Builder(g);
+  const below = g.layers[CURTAIN] as WorldMap;
+  for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.layer[i] === CURTAIN) c.alive[i] = 0; // no ant guards her
+  for (const c of g.colonies) {
+    const q = c.queen!;
+    b.apply({ tool: "rock", layer: CURTAIN, points: [{ x: q.x, y: q.y }] });
+    cellOf(q.x, q.y);
+    assert.equal(rockAt(below, CELL[0], CELL[1]), OPEN, `colony ${c.params.nest}'s queen`);
+  }
+});
+
+test("a rock ring round a hole leaves every open cell within BUILD.holeGuard of it open (review of #204, S2)", () => {
+  const g = game(1);
+  const b = new Builder(g);
+  const above = g.layers[PLANE] as WorldMap;
+  for (const c of g.colonies) {
+    const h = c.holeCells[c.params.nest]!;
+    const o = pt(h.px, h.py);
+    const near: [number, number][] = [];
+    for (let y = h.py - 4; y <= h.py + 4; y++)
+      for (let x = h.px - 4; x <= h.px + 4; x++)
+        if (Math.hypot(centreX(x, y) - o.x, centreY(y) - o.y) <= BUILD.holeGuard && rockAt(above, x, y) === OPEN) near.push([x, y]);
+    assert.ok(near.length > 1);
+    const ring = Array.from({ length: 25 }, (_, k) => ({
+      x: o.x + 1.5 * Math.cos((k * Math.PI) / 12),
+      y: o.y + 1.5 * Math.sin((k * Math.PI) / 12),
+    }));
+    b.apply({ tool: "rock", layer: PLANE, points: ring });
+    for (const [x, y] of near) assert.equal(rockAt(above, x, y), OPEN, `cell ${x},${y} by colony ${c.params.nest}'s hole`);
+  }
+});
+
+test("on one map (the scripts' and assays' side view) the nest's entrance is guarded too (review of #204, N3)", () => {
+  const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 5, rival: false }, mulberry32(1));
+  const b = new Builder(g);
+  const map = g.layers[0] as WorldMap;
+  const e = g.colonies[0]!.nest.entrance!;
+  cellOf(e.x, e.y);
+  const [ex, ey] = [CELL[0], CELL[1]];
+  const was = rockAt(map, ex, ey);
+  b.apply({ tool: "dirt", layer: 0, points: [e] });
+  assert.equal(rockAt(map, ex, ey), was, "the entrance is left as it was");
+  assert.ok(guarded(g, 0).has(key(ex, ey)));
+});
+
+test("builder food counts in the map's total, so a share of it stays a share; undo takes it back off (review of #204, S4)", () => {
+  const g = game(1);
+  const b = new Builder(g);
+  const above = g.layers[PLANE] as WorldMap;
+  const [x, y] = find(g, PLANE, OPEN);
+  const total = above.foodTotal;
+  const left = above.foodLeft;
+  b.apply({ tool: "sugar", layer: PLANE, points: [pt(x, y)] });
+  assert.ok(above.foodTotal > total);
+  assert.equal(above.foodTotal - total, above.foodLeft - left, "the total rises by what was put down");
+  assert.ok(b.undo());
+  assert.equal(above.foodTotal, total);
 });

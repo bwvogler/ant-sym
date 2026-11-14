@@ -1253,7 +1253,7 @@ try {
     await tool("Trail crayon, Amber");
     await drag(mx - 90, my + 40, mx + 90, my + 40);
     const lines = await g(() => window.jevAnts.game.crayons.length);
-    check(lines >= 1, `a crayon drag draws a line (${lines} piece${lines === 1 ? "" : "s"})`);
+    check(lines === 1, `a crayon drag draws one line (${lines})`);
     await tool("Undo");
     check((await g(() => window.jevAnts.game.crayons.length)) === 0, "one undo takes the whole crayon drag back");
     const cam0 = await g(() => window.jevAnts.camera("above"));

@@ -201,7 +201,7 @@ Still to measure: B1–B6 on seeds 1–10; the tick cost of a sugar flood; the c
 
 Later notes: floods and rafts (real water), cooperative carrying, aphids, labelling rooms with floor marks, and tweezers (displacement and homing).
 
-## What the builder built (PRD §71.1–70.2)
+## What the builder built (PRD §71.1–71.2)
 
 - **Tools:**
   - pure tools in `colony/builder.ts`, with guards, undo and crayon lines that are saved;

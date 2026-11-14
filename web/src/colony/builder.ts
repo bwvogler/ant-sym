@@ -216,7 +216,7 @@ export class Builder {
     // A crayon drag goes on as one line: its pieces extend the line the drag began.
     const tail = join && this.#joinable ? last?.[last.length - 1] : undefined;
     const extend =
-      tail?.kind === "crayon" &&
+      (tail?.kind === "crayon" || tail?.kind === "crayonMore") &&
       tail.line.colony === (stroke.colony ?? 0) &&
       tail.line.layer === stroke.layer &&
       this.game.crayons.includes(tail.line)
@@ -266,6 +266,7 @@ export class Builder {
         if (add <= 0) continue;
         const q = qualityAt(map, x, y);
         dropFood(map, centreX(x, y), centreY(y), add, quality);
+        map.foodTotal += add; // counted, as regrowth's food is (game.ts), so the stats' share stays a share
         out.push({ kind: "food", map, x, y, added: add, quality: q });
       }
     } else if (tool === "crayon") {
@@ -359,6 +360,7 @@ export class Builder {
         if (take <= 0) continue;
         c.map.food.set(c.x, c.y, v - take);
         c.map.foodLeft -= take;
+        c.map.foodTotal -= take;
         if (c.map.quality && v - take <= 0) c.map.quality.set(c.x, c.y, c.quality);
       } else if (c.kind === "crayon") {
         const at = game.crayons.indexOf(c.line);

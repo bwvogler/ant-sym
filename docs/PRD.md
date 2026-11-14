@@ -5901,7 +5901,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - One-finger Move as the main way to move the map, with two-finger pan kept for adults (proposed, from Yadav et al. 2020).
 - Rock and dirt never cover a hole, an ant or brood (proposed).
 
-**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
+**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. (As built, §71.1: rock is set beside `fillCell` in `setTerrain`, and rain clears each channel's field in place; neither became a new function.) Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
 - **Off:** no stroke means main bit for bit.
 - **What it retires or adds:** no ant choice changes. The ants answer through senses already in vision.md's table (trail, taste, soil faces). No gap row is added or closed.
 
@@ -5954,7 +5954,7 @@ Merging is not delegated: PRs wait for the owner.
 - **Crayon lines** are `Game.crayons`. They are topped up each tick to 4 × ½^(age/35 s) and dropped below FAINT, about 3.7 min. They are saved with the game.
 - **Rain** zeroes food, home, alarm, no-entry and raid for every colony under the cloud, and the crayon cells there.
 - **Undo** keeps 20 strokes and puts back what is still the stroke's own: soil an ant has dug since stays dug, and sugar eaten stays eaten. So it is not bit-exact, by design (the bead's acceptance is updated to match).
-- **Tests:** `tests/int/builder.test.ts`, 10 tests (3.4 s, too slow for the unit tier). Mutations caught: dropping the guard, and dropping the "never bury food" check.
+- **Tests:** `tests/int/builder.test.ts`, 17 tests (too slow for the unit tier). Mutations caught: dropping the guard, dropping the "never bury food" check, and (review of #204) undo onto an ant or over food, an unguarded queen, `holeGuard` 0, a crayon not topped up but piled on, a crayon undo that leaves its trail, a crayon drag split into lines, and builder food left out of `foodTotal`.
 - **Bit-exact:** with no stroke, `Game.tick` only checks an empty list, and the golden masters are unchanged.
 
 **Assays** (`colony/builderAssays.ts`, in `ONE_ASSAYS`; `npm run exp -- <id> --one`), seeds 1–10:
@@ -6006,14 +6006,14 @@ Merging is not delegated: PRs wait for the owner.
 - **Learn:** five entries (crayon, sugar and crumbs, rocks and walls, digging and filling, rain), each in the guide's shape and citing builder.md. The crayon's is hidden for a species with no food trail. builder.md is in the guide's notes.
 
 **Checks.**
-- `npm run e2e` step 10, at 390 and 768 px on a touch page:
+- `npm run e2e` step 11, at 390 and 768 px on a touch page:
   - the tray is on the bottom edge in the tab bar's place, every button ≥ 64 px, and there is no sideways scroll;
   - sugar by a tap, a rock wall and a crayon line by drags, one undo for the whole crayon drag;
   - Move pans and builds nothing, and digging works below;
   - Done gives the tab bar back;
   - saved to a slot, reloaded and continued, the wall is still there.
 - `ui/tests/build.test.ts`: the tray's lists, its sizes and the palm rule.
-- `tests/int/builder.test.ts`: 12 tests.
+- `tests/int/builder.test.ts`: 17 tests.
 - `tests/soak/save.test.ts`: the save's keys now include `crayons`.
 
 **Not done:**
