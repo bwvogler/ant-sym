@@ -313,6 +313,9 @@ export const ANT_FIELDS = {
   // ——— the desert ant's invitation (ja-rf5.6), last for the same reason as the heat's ———
   /** its pace (cm/s), waiting at the top of its shaft: what a finder passing raises, and what its leave response reads; 0 at birth */
   pace: { type: Float32Array, reset: "spawn" },
+  // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
+  /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
+  digBout: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

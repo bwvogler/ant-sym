@@ -383,6 +383,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
   {
+    note: "foraging-tunnels",
+    title: "Foraging tunnels",
+    covers: "Whether ants dig to reach food, and why old foragers who come home empty dig for a while.",
+  },
+  {
     note: "activation",
     title: "Activation",
     covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake.",

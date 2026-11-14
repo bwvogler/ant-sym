@@ -1462,6 +1462,69 @@ export const nestFlow: Assay = {
   }),
 };
 
+/** Food lying below the ground (not sky) on `map`, and the open cells there (the nest's and its tunnels' ground, net of fills). */
+function underground(map: WorldMap): { food: number; open: number } {
+  let food = 0;
+  let open = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+      if (isSky(map, x, y)) continue;
+      food += map.food.get(x, y);
+      if (rockAt(map, x, y) === OPEN) open++;
+    }
+  return { food, open };
+}
+
+/**
+ * P1 (ja-16rp.1, docs/foraging-tunnels.md): how much of the soil's buried food a colony takes, and what its digging
+ * costs. At the start and the end: the food lying below the ground and the open cells there. `buriedTaken` is the food
+ * gone from below the ground (carried home, eaten in passing or dropped elsewhere), `buriedShare` its share of what
+ * lay there, `opened` the open cells gained underground (tunnels and chambers, net of fills), `soilOut` the pellets
+ * brought out.
+ */
+export function buriedProbe(): Probe {
+  let start: { food: number; open: number } | null = null;
+  return {
+    tick(game) {
+      start ??= underground(game.map);
+    },
+    summary(game) {
+      const end = underground(game.map);
+      const s = start ?? end;
+      return {
+        buriedStart: s.food,
+        buriedTaken: s.food - end.food,
+        buriedShare: s.food > 0 ? (s.food - end.food) / s.food : 0,
+        opened: end.open - s.open,
+        soilOut: game.player.soilOut,
+      };
+    },
+  };
+}
+
+/**
+ * P1: foraging the buried food (ja-16rp, PRD §70). One colony of 600 on the app's side map for an hour, on the local
+ * rule. Fire ants keep a standing network of foraging tunnels under their territory (Tschinkel 2011), but no paper
+ * gives a share of soil food an ant colony takes, so the target is design: a measurable share within the hour, by the
+ * worst seed. The guards (food home, workers alive, cells opened, spoil out, ms per tick) must not worsen.
+ */
+export const pockets: Assay = {
+  id: "pockets",
+  title: "P1 buried food: the share of the soil's food taken in an hour",
+  target:
+    "design (docs/foraging-tunnels.md): a measurable share of the buried food within 3,600 s, by the worst seed; food home, workers alive, cells opened and ms per tick not worse",
+  seconds: 3600,
+  spec: (seed) => ({ seed, seconds: 3600, game: { antCount: 600, rival: false }, probes: [buriedProbe()] }),
+  score: (r) => ({
+    buriedShare: r.metrics.buriedShare as number,
+    buriedTaken: r.metrics.buriedTaken as number,
+    stored: r.metrics["you.stored"] as number,
+    ants: r.metrics["you.ants"] as number,
+    opened: r.metrics.opened as number,
+    soilOut: r.metrics.soilOut as number,
+  }),
+};
+
 /**
  * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
  * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
@@ -1563,6 +1626,7 @@ export const ASSAYS: Assay[] = [
   game,
   gameTop,
   nestFlow,
+  pockets,
   lifecycle,
   lifecycleSignal,
   lifecycleScent,

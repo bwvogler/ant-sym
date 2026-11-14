@@ -893,7 +893,7 @@ export class Colony {
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
-    return this.queen !== null && this.band(i) === 2;
+    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i);
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
@@ -903,7 +903,16 @@ export class Colony {
 
   /** Whether ant i digs: in the side view with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
   digs(i: number): boolean {
-    return !this.queen || this.band(i) === 1;
+    return !this.queen || this.band(i) === 1 || this.forageDigs(i);
+  }
+
+  /**
+   * Whether ant i is on a foraging dig (forageDig, ja-16rp, docs/foraging-tunnels.md): an old forager home from a trip
+   * with nothing, digging out from the nest at tunnels' ends while its bout lasts. It digs alone and whatever the
+   * nest's room, and builds no chambers.
+   */
+  forageDigs(i: number): boolean {
+    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2;
   }
 
   /** Whether the colony has lost its queen (the side view; the top-down maps have none to lose). */
