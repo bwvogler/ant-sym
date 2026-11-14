@@ -151,7 +151,7 @@ export interface FungusParams {
   /**
    * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
    * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
-   * paired test gives a ratio, so this is a design number, chosen on the progression (PRD §63.11)
+   * paired test gives a ratio, so this is a design number, chosen on the progression (PRD §63.12)
    */
   sun: number;
   /** spores a cell holds at most */
