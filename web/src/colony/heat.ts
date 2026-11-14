@@ -3,7 +3,9 @@
 // row, as hunger and fatigue), and its policy chooses to come back (desertAnt.ts `hot`); past its critical heat it dies, a body rule like hunger.
 // Every number is design or a labelled borrowing: the papers give windows and critical points, not rates (desert-ant.md §4).
 
+import type { Colony } from "./colony.ts";
 import type { ColonyParams } from "./params.ts";
+import { PLANE } from "./vocab.ts";
 
 /**
  * Where game time t falls in the day, 0 to 1 (a game starts heatStart seconds after sunrise): the sun rises at 0, stands highest at half the daylight
@@ -58,4 +60,24 @@ export function feelsHot(p: ColonyParams, body: number, was: boolean): boolean {
 /** Whether a body `body` °C above the nest's is past the critical heat. */
 export function pastCritical(p: ColonyParams, body: number): boolean {
   return p.heatNest + body >= p.heatDeath;
+}
+
+/**
+ * Heat (ja-rf5.5, heat.ts): every ant's body heat moves toward the ground's out on one world's plane (on a map with no plane, anywhere outside
+ * its nest's disc) and toward the nest's inside; one past the critical heat dies of it.
+ */
+export function heatStep(c: Colony, dt: number): void {
+  const p = c.params;
+  const ground = groundHeat(p, c.time) - p.heatNest;
+  const { nest } = c;
+  for (let i = 0; i < c.n; i++) {
+    if (!c.alive[i]) continue;
+    const open = c.line !== null ? c.layer[i] === PLANE : Math.hypot(c.x[i] - nest.x, c.y[i] - nest.y) >= nest.r;
+    c.bodyHeat[i] = bodyHeatAfter(p, c.bodyHeat[i], open ? ground : 0, dt);
+    c.hot[i] = feelsHot(p, c.bodyHeat[i], c.hot[i] === 1) ? 1 : 0;
+    if (pastCritical(p, c.bodyHeat[i])) {
+      c.kill(i, false);
+      c.diedHot++;
+    }
+  }
 }
