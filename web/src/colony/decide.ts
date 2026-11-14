@@ -115,7 +115,14 @@ export function decide(col: Colony, i: number, s: AntStep): void {
         col.asked[i] = -1;
       }
     }
+    // A drawn mode is drawn afresh after `reroll` seconds in the same situation (ja-nan3): its question is
+    // forgotten, so the policy is asked again below. Only an ant whose last answer was drawn has a clock (else −1).
+    if (col.redraw[i] > 0 && (col.redraw[i] -= dt) <= 0) {
+      col.redraw[i] = -1;
+      col.asked[i] = -1;
+    }
     if (before !== col.asked[i] && !waiting) {
+      col.policyDrew = false;
       mode = MODES.indexOf(
         col.policy(
           asks ?? {
@@ -127,8 +134,10 @@ export function decide(col: Colony, i: number, s: AntStep): void {
             enemy: enemy ? "near" : "none",
             stance: col.stanceOf(i),
           },
+          col.policyDraw,
         ),
       );
+      col.redraw[i] = col.policyDrew && p.reroll > 0 ? p.reroll : -1;
       if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
       if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
       // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put

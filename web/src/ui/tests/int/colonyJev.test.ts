@@ -533,7 +533,7 @@ test("explain says who decides a situation, without counting or queuing it", asy
     enemy: "none",
     stance: "forage",
   } as const;
-  assert.deepEqual(j.explain(s), { mode: "explore", by: "local" }, "off: the local rule");
+  assert.deepEqual(j.explain(s), { mode: "explore", by: "local", weights: [["explore", 1]] }, "off: the local rule");
   await j.start();
   const before = { hits: j.state.hits, misses: j.state.misses };
   assert.equal(j.explain(s).by, "local", "running, never met: the local rule, and nothing queued");
@@ -541,7 +541,39 @@ test("explain says who decides a situation, without counting or queuing it", asy
   j.policy(s); // the colony meets it: queued for Jev
   assert.equal(j.explain(s).by, "waiting");
   await tick(60);
-  assert.deepEqual(j.explain(s), { mode: "return", by: "jev" }, "answered: Jev's cached answer");
+  assert.deepEqual(j.explain(s), { mode: "return", by: "jev", weights: [["return", 1]] }, "answered: Jev's cached answer");
+});
+
+test("the page's mode policy draws from a weighted answer with the colony's draw, once, and explain shows its weights", () => {
+  // Review of #169, S2: dropping the draw in ColonyJev's mode policy, or explain's weights, passed every test before this one.
+  scriptFetch(answerAll("return"));
+  const j = make();
+  const c = colony();
+  j.setDoctrine(DOCTRINES[0]!.text);
+  j.attach(c);
+  const s: Situation = {
+    mode: "explore",
+    tired: false,
+    foodTrail: "faint",
+    homeTrail: "none",
+    alarm: "none",
+    enemy: "near",
+    stance: "forage",
+  };
+  assert.equal(j.seed(policyContext(DOCTRINES[0]!.text), [[situationKey(s), "follow=0.5,fight=0.5"]]), 1);
+  let calls = 0;
+  const draw = Object.assign(() => (calls++, 0.9), { temperature: 1 });
+  assert.equal(c.policy(s, draw), "fight", "drawn: the second option at 0.9");
+  assert.equal(calls, 1, "one draw");
+  assert.equal(c.policy(s), "follow", "no draw: Jev's choice");
+  assert.deepEqual(j.explain(s), {
+    mode: "follow",
+    by: "jev",
+    weights: [
+      ["follow", 0.5],
+      ["fight", 0.5],
+    ],
+  });
 });
 
 test("explain alone never asks Jev", async () => {

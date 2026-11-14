@@ -1,7 +1,7 @@
 # Every pull request runs lint, format, typecheck and every test tier but slow, and pages.yml calls this
 # same workflow before it deploys main, so a failure shows on the PR instead of blocking the deploy
 # afterwards (ja-6mj). Only pull_request: a push trigger too would run each PR branch twice.
-# test:slow is not here; it runs nightly, and on a colony PR's branch before it merges (slow.yml, the steward skill).
+# test:slow is not here; it runs nightly, and on a colony PR labelled slow-guards (slow.yml, the steward skill).
 #
 # Wall time is the longest job, so the int, golden and soak files are spread over four shards instead
 # of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13, before

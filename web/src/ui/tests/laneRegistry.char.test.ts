@@ -172,7 +172,10 @@ test("a doctrine or aim is trimmed in its context, so stray spaces are not a new
 });
 
 test("each lane's local answer, and how each lane reads a reply, a bad one and none", () => {
-  assert.deepEqual(MODE_SITUATIONS.map(localPolicy), ["explore", "return", "follow"]);
+  assert.deepEqual(
+    MODE_SITUATIONS.map((s) => localPolicy(s)),
+    ["explore", "return", "follow"],
+  );
   assert.deepEqual(STANCE_SITUATIONS.map(localStance), ["forage", "defend", "forage"]);
   assert.deepEqual(
     [
