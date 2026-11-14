@@ -25,6 +25,23 @@ import { fetches, walkTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
 import { mill, onMLine, siteAim } from "./plane.ts";
+import type { Mark } from "./pheromone.ts";
+
+const STORE_MARKS: readonly Mark[] = ["store"];
+const BROOD_MARKS: readonly Mark[] = ["royal", "brood"];
+
+/** The floor marks `marks`, summed, at ant i's antenna on bearing b: read through open ground only (inReach), else 0. */
+function marksAt(col: Colony, i: number, b: number, marks: readonly Mark[]): number {
+  const x = col.x[i];
+  const y = col.y[i];
+  const d = col.params.sensorDistance;
+  const sx = x + Math.cos(b) * d;
+  const sy = y + Math.sin(b) * d;
+  if (!inReach(col.map, x, y, sx, sy)) return 0;
+  let v = 0;
+  for (const m of marks) v += col.ph.read(m, sx, sy);
+  return v;
+}
 
 export function steer(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
@@ -445,22 +462,23 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     else if (p.restFetch > 0 && col.queen && col.under[i] && !carrying && !pellet && !col.broodHeld[i] && fetches(col, i)) {
       // Fetching in a chamber (ja-4rfr): toward the stores' marks its antennae meet (as toFood in a tunnel), through
       // open ground; none in reach, it searches the nest (it is not leaving: a hungry old forager headed for the hole).
-      const x = col.x[i];
-      const y = col.y[i];
-      const d = p.sensorDistance;
-      const read = (b: number) => {
-        const sx = x + Math.cos(b) * d;
-        const sy = y + Math.sin(b) * d;
-        return inReach(map, x, y, sx, sy) ? col.ph.read("store", sx, sy) : 0;
-      };
-      const l = read(h - a);
-      const f = read(h);
-      const r = read(h + a);
+      const l = marksAt(col, i, h - a, STORE_MARKS);
+      const f = marksAt(col, i, h, STORE_MARKS);
+      const r = marksAt(col, i, h + a, STORE_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if (col.queen?.alive && col.band(i) === 0 && col.under[i])
-      h = turnToward(h, Math.atan2(col.queen.y - col.y[i], col.queen.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
-    else if (col.entrance && col.outbound(i) && col.under[i])
-      h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
+    } else if (col.queen?.alive && col.band(i) === 0 && col.under[i]) {
+      // A young ant in a chamber goes toward the queen by her scent and the brood's (the royal and brood marks its
+      // antennae meet, as toBrood reads them in a tunnel), not her position (ja-k4k.2.1); none in reach, it searches.
+      const l = marksAt(col, i, h - a, BROOD_MARKS);
+      const f = marksAt(col, i, h, BROOD_MARKS);
+      const r = marksAt(col, i, h + a, BROOD_MARKS);
+      h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * 0.3) + noise * p.wander * 0.5 : noise * p.wander;
+    } else if (col.entrance && col.outbound(i) && col.under[i]) {
+      // An old forager in a chamber heads out by its own vector: up (gravity), and across by where its drifting nest
+      // vector puts the hole (believe), not the hole's position (ja-k4k.2.2).
+      const b = believe(col, i, col.entrance);
+      h = turnToward(h, Math.atan2(b.y - col.y[i], b.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
+    }
     else if (
       p.foodPlume > 0 &&
       !carrying &&
