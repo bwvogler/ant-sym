@@ -233,7 +233,7 @@
      "stored": 77,
      "births": 0,
      "losses": 0,
-     "decisions": 13999,
+     "decisions": 14001,
      "population": 150,
      "ants": "ca23f87d",
      "fields": [
@@ -270,7 +270,7 @@
      "stored": 101,
      "births": 1,
      "losses": 1,
-     "decisions": 16045,
+     "decisions": 16051,
      "population": 150,
      "ants": "f4d18094",
      "fields": [
@@ -284,7 +284,7 @@
      "stored": 271,
      "births": 4,
      "losses": 3,
-     "decisions": 21209,
+     "decisions": 21213,
      "population": 151,
      "ants": "b15475e2",
      "fields": [
@@ -307,7 +307,7 @@
      "stored": 130,
      "births": 3,
      "losses": 1,
-     "decisions": 17834,
+     "decisions": 17840,
      "population": 152,
      "ants": "16de87f1",
      "fields": [
@@ -321,7 +321,7 @@
      "stored": 298,
      "births": 17,
      "losses": 3,
-     "decisions": 23949,
+     "decisions": 23957,
      "population": 164,
      "ants": "91b1ab6d",
      "fields": [

@@ -203,6 +203,11 @@ export function believe(c: Colony, i: number, goal: Nest): Nest {
   return b;
 }
 
+/** Whether an ant at (x, y), `d` from its hole `goal`, knows it by sight: within HOLE_SIGHT (seen, and the entrance's smell), or within NEST_SIGHT with a clear line to it. */
+function seesHole(c: Colony, x: number, y: number, goal: Nest, d: number): boolean {
+  return d < HOLE_SIGHT || (d < NEST_SIGHT && c.clearTo(x, y, goal.x, goal.y));
+}
+
 /**
  * One world's plane (U3b, docs/one-world.md §4): where ant i believes its hole (`goal`, the plane nest) is. Its vector,
  * started afresh up out of that hole (crossUp), puts it odoSurf × (driftSurf, driftSurfY) off, plus the search's point
@@ -213,7 +218,7 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   const x = c.x[i];
   const y = c.y[i];
   const d = Math.hypot(x - goal.x, y - goal.y);
-  if (d < HOLE_SIGHT || (d < NEST_SIGHT && c.clearTo(x, y, goal.x, goal.y))) return goal;
+  if (seesHole(c, x, y, goal, d)) return goal;
   if (c.params.moundSmell > 0 && c.search[i] !== 0 && c.onOwnMound(x, y, d)) return goal;
   if (c.routeState[i] === 1) {
     const place = routeBelief(c, i, goal);
@@ -452,6 +457,17 @@ export function fromHomePlane(c: Colony, i: number): number {
   const bx = c.nest.x + odo * c.driftSurf[i];
   const by = c.nest.y + odo * c.driftSurfY[i];
   return Math.hypot(c.x[i] - bx, c.y[i] - by);
+}
+
+/**
+ * How far ant i is from home as it knows it, on the plane bound: by sight where it sees its hole (as believePlane), else
+ * by its own vector (fromHomePlane). What `homeGround` is measured by (stance.ts, ja-k4k.6.2).
+ */
+export function homeDistPlane(c: Colony, i: number): number {
+  const x = c.x[i];
+  const y = c.y[i];
+  const d = Math.hypot(x - c.nest.x, y - c.nest.y);
+  return seesHole(c, x, y, c.nest, d) ? d : fromHomePlane(c, i);
 }
 
 /** Whether any open neighbour of cell (x, y) holds home scent an ant would notice (FAINT or more). */
