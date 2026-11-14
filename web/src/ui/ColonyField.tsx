@@ -1118,6 +1118,29 @@ export default function ColonyField({
       }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
+      // Stalks (ja-2bw.10): a short upright stroke on each colonised corpse that has grown one.
+      const stalks = fungus.stalksOn(lv < 0 ? 0 : lv);
+      if (stalks.length) {
+        ctx.save();
+        ctx.strokeStyle = theme.ink;
+        ctx.lineCap = "round";
+        ctx.globalAlpha = 0.8;
+        ctx.lineWidth = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
+        const tall = Math.max(6 * d, Math.min(24 * d, c.zoom * 1.2));
+        for (const k of stalks) {
+          const [sx, sy] = hyphaCell(k);
+          if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
+          const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y - tall);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x, y - tall, tall * 0.18, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
 
       // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
       // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
