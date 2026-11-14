@@ -13,6 +13,7 @@ import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
+import { seeHoles } from "./layers.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -434,7 +435,7 @@ export class Game {
     this.colonies.forEach((c, k) => {
       // One world: the line as it stands (it grows with every founding), before the holes are read off it.
       if (this.world) c.line = this.world.line;
-      c.seeHoles();
+      seeHoles(c);
       this.layers.forEach((m, l) => {
         if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
       });
@@ -468,6 +469,18 @@ export class Game {
 
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
+
+  /** How every colony's ants draw their mode from Jev's probabilities (the Lab, ja-nan3): set by setChoice, given to colonies founded later too. */
+  #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">> = {};
+
+  /**
+   * How every colony's ants draw their mode from Jev's probabilities (ja-nan3): `sampleTemp` and `reroll`
+   * (ColonyParams), now on every colony and on every colony founded after. A lab setting, not saved with the game.
+   */
+  setChoice(choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">>): void {
+    this.#choice = { ...choice };
+    for (const c of this.colonies) Object.assign(c.params, this.#choice);
+  }
 
   /** Alates that have flown (ja-lo8.9) and wait for the page to found or lose them (GameParams.autoFound off). */
   flights: Flight[] = [];
@@ -662,6 +675,7 @@ export class Game {
         nest: at,
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
+        ...this.#choice,
       },
       this.#rng,
       this.params.species.policy ?? localPolicy,

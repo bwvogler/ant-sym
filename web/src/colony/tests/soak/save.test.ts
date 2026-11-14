@@ -279,7 +279,12 @@ test("the game's save holds every private field it declares, or the field is bui
   // The occupancy grids and every layer's recognition bands are GameSave.grids (layer 0's recognition is `recognition` too).
   const inGrids = ["grids", "recs"];
   const derived = ["piles"]; // the food piles as the world began: from the fresh world
-  assert.deepEqual([...declared].sort(), [...inPrivate, ...inGrids, ...derived].sort(), "every declared #field is accounted for");
+  const fromPage = ["choice"]; // the Lab's setChoice (ja-nan3): not saved, the page sets it again on every game, a load included
+  assert.deepEqual(
+    [...declared].sort(),
+    [...inPrivate, ...inGrids, ...derived, ...fromPage].sort(),
+    "every declared #field is accounted for",
+  );
   const s = build("top", 2).save();
   assert.deepEqual(Object.keys(s.private).sort(), [...inPrivate].sort());
   assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
@@ -309,6 +314,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
   const fungus = [
     "base",
     "clock",
+    "corpseAges",
     "corpses",
     "evolution",
     "hosts",

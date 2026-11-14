@@ -28,7 +28,7 @@
       "prompt": "Merge main into my PR #<n>; it conflicts.",
       "expect": [
         "Merges origin/main into the PR branch (no rebase, no force-push)",
-        "Resolves a conflict in .beads/issues.jsonl by scripts/beads-sync.sh start and bd export -o, not by editing the file",
+        "On a branch that still tracks .beads/issues.jsonl, takes main's deletion with git rm --cached, not by editing the file",
         "Runs the fast checks before pushing when anything else conflicted"
       ]
     },
@@ -53,7 +53,8 @@
       "prompt": "My PR #<n> changes web/src/colony/; the review says Approve, CI is green. The owner hasn't said anything about merging this session.",
       "expect": [
         "Asks the owner once whether to merge the PRs it looks after this session, and does not merge without a yes",
-        "With a yes: dispatches slow.yml on the PR's branch, checks the run's head sha, and waits for it to pass before merging",
+        "Once the review approves, adds the slow-guards label (keeping the PR's other labels), waits for the slow (n) checks to pass, then removes the label before merging",
+        "If main moved, updates the branch (update_pull_request_branch) before adding the slow-guards label, and waits for CI on the new head before merging",
         "Merges by squash with the ` (#<n>)` title and expectedHeadSha, then closes the PR's beads and syncs"
       ]
     }

@@ -75,6 +75,18 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
+   * How an ant draws its mode from Jev's probabilities (ja-nan3; colony/weighted.ts): p^(1/T), so 1 as Jev
+   * gave them, under 1 toward the mode Jev chose (0: always it, as before), over 1 toward even. A policy with no
+   * probabilities (the local rule, a bare cached answer) is never drawn from.
+   */
+  sampleTemp: number;
+  /**
+   * Seconds after an ant drew its mode before it draws again in the same situation (ja-nan3): without it an ant
+   * is asked only when its situation changes, so a draw would hold for as long as nothing round it changed. 0 = never
+   * again until the situation changes. Only an ant whose last answer was drawn is re-asked: a game on the local rule is unchanged.
+   */
+  reroll: number;
+  /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
    * is raised instead: foodCapTop.)
@@ -176,6 +188,25 @@ export interface ColonyParams {
   heatNight: number;
   /** seconds after sunrise at which a game starts: the desert ant's nest opens as the sun turns high, so a game opens then */
   heatStart: number;
+  /**
+   * The invitation (ja-rf5.6, docs/desert-ant.md §1, Razin et al. 2013, full text): the pace (cm/s) of a finder coming down the shaft with food.
+   * Each nestmate waiting at the top of the shaft that it passes is pulled toward its pace; an ant's pace relaxes to paceRest, the faster the
+   * more crowded the shaft feels, and its own pace is what its `leave` response reads (returns few from paceFew, many from paceMany). 0 = no
+   * invitation: the generic ant's encounter count of returns (activation.md), main bit for bit.
+   */
+  invitePace: number;
+  /** a waiting ant's pace at rest (cm/s; C. niger idle ants about 1–2 cm/s, the crossing at about 2: Razin 2013) */
+  paceRest: number;
+  /** seconds for a pace to fall back by e toward paceRest */
+  paceTau: number;
+  /** how far one finder passing pulls a waiting ant's pace toward its own (0–1) */
+  paceGain: number;
+  /** how much each nestmate round a waiting ant speeds its pace's fall back to rest: paceTau / (1 + paceCrowd × crowd) (crowding lowers exits) */
+  paceCrowd: number;
+  /** the pace from which an ant's leave response reads its returns as few (cm/s) */
+  paceFew: number;
+  /** the pace from which it reads them as many: the soft threshold for leaving, about 8 cm/s (Razin 2013) */
+  paceMany: number;
   /** the critical body heat (°C): past it, the ant dies */
   heatDeath: number;
   /**
@@ -310,6 +341,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
+  sampleTemp: 1,
+  reroll: 10,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,
@@ -337,6 +370,13 @@ export const DEFAULT_COLONY: ColonyParams = {
   heatSunHigh: 0.2,
   heatNight: 1 / 3,
   heatStart: 0,
+  invitePace: 0,
+  paceRest: 1,
+  paceTau: 20,
+  paceGain: 0.5,
+  paceCrowd: 0.25,
+  paceFew: 4,
+  paceMany: 8,
   heatDeath: 53.6,
   routeMemory: 1,
   scentReach: 1,
