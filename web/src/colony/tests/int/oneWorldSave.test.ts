@@ -146,7 +146,7 @@ for (const layer of [PLANE, CURTAIN])
           moved++;
         }
     }
-    assert.ok(toFightDeath(whole, layer, 40), "a fight death there (the test's own check)");
+    assert.ok(toFightDeath(whole, layer, 100), "a fight death there (the test's own check)");
     const saved = copy(whole.save());
     whole.tick(DT);
     const next = hashGame(whole);

@@ -478,8 +478,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       // vector puts the hole (believe), not the hole's position (ja-k4k.2.2).
       const b = believe(col, i, col.entrance);
       h = turnToward(h, Math.atan2(b.y - col.y[i], b.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
-    }
-    else if (
+    } else if (
       p.foodPlume > 0 &&
       !carrying &&
       (col.entrance === null || (col.line !== null && col.cur === PLANE)) &&

@@ -242,7 +242,7 @@ export interface ColonyParams {
   stanceGate: number;
   /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
   defendAt: number;
-  /** how far from its nest an ant is on home ground, by its home vector (world units) */
+  /** how far from its nest an ant is on home ground: by sight of its hole where it sees it, else by its home vector (world units) */
   homeGround: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;

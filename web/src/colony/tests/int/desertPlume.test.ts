@@ -87,8 +87,9 @@ const desert = (plume = PLUME): Game =>
 test("a desert game's plume is saved: a save made between rebuilds runs on exactly as the unbroken game", () => {
   const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
   const whole = desert();
-  run(whole, 2 * PLUME_EVERY + 1.5); // a plume built, and the food taken since (the next build differs)
   const c = whole.player;
+  // To the first tick in the third period with a plume built in it and food taken since (the next build differs).
+  run(whole, 3 * PLUME_EVERY, undefined, () => c.plumeEpoch === 2 && c.plumeFood !== whole.map.foodLeft);
   assert.ok(c.plume !== null && c.plumeEpoch === 2, `built in the period now (${c.plumeEpoch})`);
   assert.notEqual(c.plumeFood, whole.map.foodLeft, "food taken since it was built (the test's own check)");
   const saved = copy(whole.save());
