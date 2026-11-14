@@ -125,3 +125,12 @@ test("a policy that never draws leaves every ant without a clock (the local rule
   ticks(g, 30);
   for (let i = 0; i < c.params.antCount; i++) assert.equal(c.redraw[i], -1);
 });
+
+test("the Lab's setChoice reaches every colony, and colonies founded after it", () => {
+  const g = game();
+  g.setChoice({ sampleTemp: 0.5, reroll: 4 });
+  for (const c of g.colonies) assert.deepEqual([c.params.sampleTemp, c.params.reroll], [0.5, 4]);
+  const later = g.colonies[g.addColony({ x: 80, y: 50, antCount: 5, odour: 0.5 })]!;
+  assert.deepEqual([later.params.sampleTemp, later.params.reroll], [0.5, 4]);
+  assert.equal(later.policyDraw.temperature, 0.5, "the draw a colony hands its policy carries its temperature");
+});

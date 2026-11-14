@@ -469,6 +469,18 @@ export class Game {
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
 
+  /** How every colony's ants draw their mode from Jev's probabilities (the Lab, staging ja-nan3): set by setChoice, given to colonies founded later too. */
+  #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">> = {};
+
+  /**
+   * How every colony's ants draw their mode from Jev's probabilities (staging, ja-nan3): `sampleTemp` and `reroll`
+   * (ColonyParams), now on every colony and on every colony founded after. A lab setting, not saved with the game.
+   */
+  setChoice(choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">>): void {
+    this.#choice = { ...choice };
+    for (const c of this.colonies) Object.assign(c.params, this.#choice);
+  }
+
   /** Alates that have flown (ja-lo8.9) and wait for the page to found or lose them (GameParams.autoFound off). */
   flights: Flight[] = [];
 
@@ -665,6 +677,7 @@ export class Game {
         nest: at,
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
+        ...this.#choice,
       },
       this.#rng,
       this.params.species.policy ?? localPolicy,

@@ -442,6 +442,39 @@ function Lab({ game, controls, update, stats, jev }: Props) {
           </p>
         </div>
       </div>
+      <div className="mt-4" aria-label="how ants choose">
+        <span className="flex items-center gap-1.5">
+          How ants choose <Help to={{ tab: "policy", id: "mode" }} label="the ants' policy" />
+        </span>
+        <p className="mt-1 text-xs text-fg-3">
+          Jev answers each situation with a probability for every mode, and each ant draws its own. Temperature 1 draws as Jev gave them;
+          lower leans toward Jev's top choice (0: always it, every ant alike); higher evens them out. Local-rule ants never draw.
+        </p>
+        <div className="mt-2 grid gap-x-6 sm:grid-cols-2">
+          <div>
+            <Slider
+              label="Draw temperature"
+              value={controls.sampleTemp}
+              min={0}
+              max={2}
+              step={0.1}
+              format={(v) => (v === 0 ? "0 · Jev's choice" : v.toFixed(1))}
+              onChange={(sampleTemp) => update({ sampleTemp })}
+            />
+          </div>
+          <div>
+            <Slider
+              label="Draw again after"
+              value={controls.reroll}
+              min={0}
+              max={30}
+              step={1}
+              format={(v) => (v === 0 ? "a new situation" : `${v} s`)}
+              onChange={(reroll) => update({ reroll })}
+            />
+          </div>
+        </div>
+      </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         {game.world ? (
           // One world (U4a): a colony may be founded only beyond an end of the line (docs/one-world.md §3).

@@ -4,6 +4,7 @@ import {
   type Mode,
   type Stance,
   DEFAULT_MENU,
+  DEFAULT_COLONY,
   STRAINS,
   type Fungus,
   Game,
@@ -53,6 +54,9 @@ export interface ColonyControls {
   view: View;
   /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
   started: boolean;
+  /** the Lab (staging, ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
+  sampleTemp: number;
+  reroll: number;
 }
 
 /** One world's two views (docs/one-world.md §5): "above" the plane, "below" the curtain under the line. */
@@ -80,6 +84,8 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   cull: false,
   rival: true,
   view: "above",
+  sampleTemp: DEFAULT_COLONY.sampleTemp,
+  reroll: DEFAULT_COLONY.reroll,
 };
 
 /** One colony's line in the panel. */
@@ -285,6 +291,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
   }, [game, controls.hide, controls.cull, controls.menu]);
+  // So do the Lab's settings for how ants draw their mode (staging, ja-nan3), on every colony, founded later or not.
+  useEffect(() => {
+    game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll });
+  }, [game, controls.sampleTemp, controls.reroll]);
   const [stats, setStats] = useState<ColonyStats | null>(null);
   const [fps, setFps] = useState(0);
   const frameListeners = useRef(new Set<() => void>());
