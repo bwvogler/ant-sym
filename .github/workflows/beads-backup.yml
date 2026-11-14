@@ -1,9 +1,10 @@
 # The beads (bd's Dolt database) live on the beads-dolt branch, and since #174 nowhere else in git (ja-w7ef.1; owner,
 # 2026-11-14: keep a copy off the branch). Each night this saves that branch as a git bundle artifact, so a lost or
-# damaged branch can be put back:
-#   gh run download <run-id> -n beads-dolt-bundle && git fetch beads-dolt.bundle beads-dolt:beads-dolt-restored
-# then push it as beads-dolt (scripts/beads-sync.sh reads the branch). The bundle is the Dolt data itself; making it
-# needs no bd on the runner.
+# damaged branch can be put back (download the artifact from the run's page, or with gh run download <run-id> -n
+# beads-dolt-bundle), then:
+#   git fetch beads-dolt.bundle refs/heads/beads-dolt:refs/heads/beads-dolt-restored
+#   git push --force origin beads-dolt-restored:beads-dolt    # --force only when replacing a damaged branch
+# scripts/beads-sync.sh reads the branch. The bundle is the Dolt data itself; making it needs no bd on the runner.
 name: Beads backup
 
 on:

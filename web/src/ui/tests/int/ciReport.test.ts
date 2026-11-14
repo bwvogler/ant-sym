@@ -19,7 +19,10 @@ test("ci-report: a failing test and a file cut off at its limit reach the step s
   const dir = mkdtempSync(join(tmpdir(), "ci-report-"));
   writeFileSync(
     join(dir, "fails.test.ts"),
-    'import { test } from "node:test";\nimport assert from "node:assert";\ntest("passes", () => {});\ntest("adds up", () => { assert.equal(1 + 1, 3, "one and one"); });\ntest("group", async (t) => { await t.test("inner", () => assert.fail("inner broke")); });\n',
+    'import { test } from "node:test";\nimport assert from "node:assert";\ntest("passes", () => {});\ntest("adds up", () => { assert.equal(1 + 1, 3, "one and one"); });\ntest("group", async (t) => { await t.test("inner", () => assert.fail("inner broke")); });\n' +
+      'test("not yet", { todo: true }, () => assert.fail("todo"));\n' +
+      'test("own limit", { timeout: 50 }, async () => { await new Promise((r) => setTimeout(r, 400)); });\n' +
+      'test("outer", { timeout: 50 }, async (t) => { await t.test("cut short", async () => { await new Promise((r) => setTimeout(r, 400)); }); });\n',
   );
   writeFileSync(
     join(dir, "slow.test.ts"),
@@ -33,7 +36,6 @@ test("ci-report: a failing test and a file cut off at its limit reach the step s
     GITHUB_WORKSPACE: dir,
     GITHUB_STEP_SUMMARY: summary,
     TEST_DURATIONS_FILE: durations,
-    TEST_FILE_LIMIT_MS: "1500",
     TEST_REPORT_TITLE: "fixture",
   };
   writeFileSync(summary, "");
@@ -54,11 +56,16 @@ test("ci-report: a failing test and a file cut off at its limit reach the step s
   assert.match(md, /\| slow\.test\.ts \| \(the whole file\) \| cancelled at the limit \|/);
   assert.match(md, /\| fails\.test\.ts:\d+ \| inner \| failed \| inner broke \|/, "a failing subtest is reported");
   assert.doesNotMatch(md, /\| group \|/, "its parent, failed only through it, is not a second row");
-  assert.match(md, /- slow\.test\.ts: 1\.5 s \(\d+ % of 1\.5 s\) ⚠/);
+  assert.doesNotMatch(md, /not yet/, "a todo test that fails is not a failure");
+  assert.match(md, /\| fails\.test\.ts:\d+ \| own limit \| timed out \|/, "a test's own timeout is 'timed out', not the file's");
+  assert.match(md, /\| fails\.test\.ts:\d+ \| outer \| timed out \|/);
+  assert.doesNotMatch(md, /cut short/, "a subtest cancelled with its parent is not a second row");
+  // The limit is read from --test-timeout (no TEST_FILE_LIMIT_MS here); times are the whole file's, so a few ms over.
+  assert.match(md, /- slow\.test\.ts: 1\.\d s \(\d+ % of 1\.5 s\) ⚠/);
 
   assert.match(out, /^::error file=fails\.test\.ts,line=\d+,title=failed%3A adds up::one and one$/m);
   assert.match(out, /^::error file=slow\.test\.ts,title=cancelled at the limit%3A \(the whole file\)::/m);
-  assert.match(out, /^::warning file=slow\.test\.ts,title=near its time limit::slow\.test\.ts took 1\.5 s of its 1\.5 s limit/m);
+  assert.match(out, /^::warning file=slow\.test\.ts,title=near its time limit::slow\.test\.ts took 1\.\d s of its 1\.5 s limit/m);
   assert.doesNotMatch(out, /fails\.test\.ts,title=near/, "a quick file gets no warning");
 
   const ms = JSON.parse(readFileSync(durations, "utf8")) as Record<string, number>;

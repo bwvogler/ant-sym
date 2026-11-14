@@ -9,7 +9,8 @@
 //                         the slowest files with their share of the limit
 //   GITHUB_ACTIONS=true   prints one ::error annotation per failure and one ::warning per file at or over WARN_SHARE of
 //                         the limit, so they show on the PR's Files tab and in the check's summary
-//   TEST_FILE_LIMIT_MS    the per-file limit the step gives --test-timeout (a file runs as one test with that timeout)
+//   TEST_FILE_LIMIT_MS    the per-file limit, if not the --test-timeout node --test was started with (a file runs as one
+//                         test with that timeout)
 //   TEST_REPORT_TITLE     the summary's heading (default: the tests)
 //   TEST_DURATIONS_FILE   writes { "<file>": ms } as JSON, for an artifact that tracks durations from run to run
 //
@@ -46,23 +47,23 @@ export function summarise(events) {
   const durations = new Map();
   const failures = [];
   let totals = null;
+  /** The top-level test node --test makes of each file (process isolation) is named by the path it was given. */
+  const isFile = (data) => data.nesting === 0 && !!data.file && (data.file === data.name || data.file.endsWith(`/${data.name}`));
   for (const { type, data } of events) {
     if (type === "test:summary") {
-      if (data.file) durations.set(data.file, data.duration_ms);
-      else totals = data.counts;
+      if (!data.file) totals = data.counts;
+    } else if (type === "test:complete") {
+      // The file's whole run, module loading included: what its limit counts (test:summary's per-file time leaves the
+      // loading out; review of #175, S1).
+      if (isFile(data)) durations.set(data.file, data.details.duration_ms);
     } else if (type === "test:fail") {
       if (data.todo || data.skip) continue;
       const error = data.details?.error;
       const kind = error?.failureType;
       // A parent fails because a subtest did, or is cancelled with it: the subtest's own event carries the cause.
       if (kind === "subtestsFailed" || kind === "cancelledByParent") continue;
-      // A file stopped at its limit is one top-level test named by the path it was given (relative), where data.file is absolute.
-      const wholeFile =
-        kind === "testTimeoutFailure" &&
-        data.nesting === 0 &&
-        !!data.file &&
-        (data.file === data.name || data.file.endsWith(`/${data.name}`));
-      if (wholeFile) durations.set(data.file, data.details.duration_ms);
+      // A file stopped at its limit is that top-level test timing out.
+      const wholeFile = kind === "testTimeoutFailure" && isFile(data);
       failures.push({
         file: data.file,
         line: wholeFile ? undefined : data.line,
@@ -115,6 +116,14 @@ export function render(s, { limitMs, title, root }) {
   return { markdown: md.join("\n") + "\n", annotations: notes };
 }
 
+/** The per-file limit: TEST_FILE_LIMIT_MS, or else the --test-timeout this node --test was started with (the reporter runs in it). */
+function limitMs() {
+  const fromEnv = Number(process.env.TEST_FILE_LIMIT_MS);
+  if (fromEnv > 0) return fromEnv;
+  const flag = process.execArgv.find((a) => a.startsWith("--test-timeout="));
+  return flag ? Number(flag.slice("--test-timeout=".length)) || 0 : 0;
+}
+
 /** The reporter: collects every event, then writes the summary, the durations and the annotations once at the end. */
 export default async function* ciReport(source) {
   const events = [];
@@ -122,7 +131,7 @@ export default async function* ciReport(source) {
   const s = summarise(events);
   const env = process.env;
   const root = env.GITHUB_WORKSPACE ?? process.cwd();
-  const out = render(s, { limitMs: Number(env.TEST_FILE_LIMIT_MS) || 0, title: env.TEST_REPORT_TITLE || "Tests", root });
+  const out = render(s, { limitMs: limitMs(), title: env.TEST_REPORT_TITLE || "Tests", root });
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, out.markdown);
   if (env.TEST_DURATIONS_FILE)
     writeFileSync(
