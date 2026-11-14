@@ -52,8 +52,8 @@ test(
   { timeout: 600_000 },
   () => {
     const { ants, c, stranded } = hour(2, 0);
-    // At most 5 again (ja-xu6.2): with energy and hunger (ja-xu6.1) 6 larvae once waited here, in brood chambers one or two
-    // cells wide, and the bound was 8. Nurses now put brood only in brood chambers of BROOD_MIN cells: 0 here.
+    // At most 5 again (ja-xu6.2). With energy and hunger (ja-xu6.1) 6 larvae once waited here and the bound was 8; this world
+    // now strands 0 with or without BROOD_MIN, so this bound does not test the nurses' brood-chamber rule.
     // The turnover happened inside the hour: most founders (born up to half a lifespan before the start) are dead.
     assert.ok(LIFESPAN <= 3600, `a lifespan within the hour (${LIFESPAN} s)`);
     assert.ok(c.diedOld >= 0.6 * ants, `died of age: ${c.diedOld} of ${ants} founders`);
