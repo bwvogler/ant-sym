@@ -5595,6 +5595,15 @@ M1 counts only foragers whose spot is at least 60° from the trail: a median 25.
 - Food over 5 seeds swings too widely to call (round 4's +25 % for Forage did not hold); held carriers stay at 0–1.
 - Spent on the lane so far: $0.0156.
 
+**Seeds 1–20** (`lockstep --one --seeds 1-20 --policy precache:<d> --set both.steerLane=0,1`; the first colony, paired by seed):
+
+| | Food on ÷ off, median per seed | Worst seed | Seeds on stored more | Lost, median off → on | Held > 120 s |
+|---|---|---|---|---|---|
+| Forage | 0.89 | 0.51 | 6 / 20 | 9.5 → 3 | 0 |
+| Warlike | 0.99 | 0.49 | 7 / 20 | 5 → 4 | 0 |
+
+By the worst seed (CLAUDE.md), steering as shipped costs food: half on the worst seed of each doctrine, while fewer ants die. Next: which weight costs it (one weight acting at a time, Forage, the same seeds).
+
 **Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
 
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
