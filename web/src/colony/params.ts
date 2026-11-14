@@ -201,9 +201,10 @@ export interface ColonyParams {
    */
   restFetch: number;
   /**
-   * ja-16rp (docs/foraging-tunnels.md, PRD §68): seconds an old forager home from a trip with nothing spends digging out
-   * from the nest instead of climbing straight back out: it stays in, digs on at tunnels' ends and forks whatever the
-   * nest's room and with no nestmates by, and stops when the time is up or it picks up food. 0 = off (main before ja-16rp).
+   * ja-16rp (docs/foraging-tunnels.md, PRD §68): seconds an old forager home from a trip with nothing spends digging in
+   * the nest instead of climbing straight back out: it stays in, digs on at tunnels' ends and forks whatever the nest's
+   * room and with no nestmates by, and stops when the time is up or it picks up food. 0 = off (main before ja-16rp).
+   * 120 s nearly doubled the soil's buried food taken in an hour (Assay P1, seeds 1-20); longer bouts dug more for little more.
    */
   forageDig: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
@@ -347,7 +348,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
-  forageDig: 0,
+  forageDig: 120,
   routeStep: 4,
   routeSee: 3,
   routeMax: 64,

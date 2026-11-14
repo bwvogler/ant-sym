@@ -5510,6 +5510,19 @@ Five seeds take none of the buried food in the hour; the best takes 3.6 %.
 - Two refinements were tried and dropped (`86be58e`): aiming the dig away from the nest (home vector), and following the most recently dug cells to the working face (Pielström & Roces 2013, `dugAt`, cells dug within 120 s). Together they took less food and two colonies fell under 400 workers.
 - The journal's dig category (seed 4) shows why the ceiling is low: most bouts end within 30 cells of the nest, while the map's 44–48 pockets lie 24–54 cells out for the nearest and 60–130+ for the rest. Even the best setting takes about 5 % of the buried food in an hour.
 
+**Confirmed on seeds 11–20 and turned on (`forageDig: 120`).**
+
+| Bout | Buried taken (sum) | Worst seed | Food home (worst) | Workers (worst) | Cells opened (median) | ms/tick (median) |
+|---|---|---|---|---|---|---|
+| none | 2,262 | 0 (four seeds) | 3,320 | 504 | 1,671 | 4.96 |
+| 120 s | 3,636 | 0 (seeds 13, 20) | 3,573 | 618 | 3,058 | 5.23 |
+| 480 s | 4,764 | 0 (seed 13) | 3,231 | 608 | 3,783 | 5.36 |
+
+- 120 s is chosen by the guards' worst seed. Over seeds 1–20 it takes 8,858 buried food against 5,162 with no bout (+72 %). Its worst food home is better than with no bout on both seed sets (3,927 vs 3,464; 3,573 vs 3,320), and so are its worst workers alive (613 vs 603; 618 vs 504).
+- 480 s takes more (9,530 over seeds 1–20), but its worst food home falls below no bout on seeds 11–20 (3,231 vs 3,320), and it digs about a quarter more cells than 120 s.
+- The cost is digging and CPU: cells opened up about 60–80 %, ms per tick up 5–10 % (4.89 to 5.40 on seeds 1–10, 4.96 to 5.23 on 11–20; runs share four threads, so this is rough).
+- Owner (2026-11-14): accept the reach. The far pockets stay mostly untouched; no map change and no soil odour for now.
+
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
 
 **Still open.** Option 2 (after option 1's results); how deep and how far the network should run; whether two colonies' networks meeting needs handling.

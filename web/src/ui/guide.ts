@@ -385,7 +385,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   {
     note: "foraging-tunnels",
     title: "Foraging tunnels",
-    covers: "Whether ants dig to reach food, and what could steer the dig (not built yet).",
+    covers: "Whether ants dig to reach food, and why old foragers who come home empty dig for a while.",
   },
   {
     note: "activation",
