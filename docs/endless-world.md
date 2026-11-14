@@ -174,7 +174,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 
 **`ChunkLayer`** (`chunks.ts`) gains three things:
 - **A generator on miss** for layers that have one (rock, food, quality). It fills a chunk on its first read, so `rockAt`'s explicit bounds go.
-- **Eviction:** `drop` with a delta kept by the layer's owner.
+- **Eviction:** `drop` with a delta kept by the layer's owner. A region left with no chunk is freed with its last one (`ja-qpv.1.5`).
 - **A table that doesn't grow with the square of the spread.** Built in E1.2: a dense box of regions of 16 × 16 chunks, each a dense array of chunk slots, with no map and no cache, so a read is still two array indexes. Chosen by `scripts/lab/chunk-table-bench.mjs` and `colony-bench` (PRD §66): on today's plane it reads about as fast as the dense bounding box it replaced, where a `Map<chunkKey, A>` was 20–30 % slower and a map of regions with a last-region cache lost 4–8 % of the game's tick; two places 100 × 60 chunks apart cost 1,584 slots a layer in the bench against the box's 7,659.
 
 **Pheromones:** a chunk that falls asleep is dropped back to the pool, not kept zeroed. The rule pheromone.ts uses for a missing rock chunk ("no ground, holds nothing", and a missing neighbour reads as rock) changes to ask the generator.

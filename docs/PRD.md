@@ -5267,6 +5267,67 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **In its place in the order** the script buys it at 265–590 s, mostly after a quarter: every time is unchanged on seeds 1–20, so P1 stands as in §63.10.
 - **At landing it is a gamble:** faster on seeds 1, 6 and 10, slower on most (seed 8 +57 %, seeds 2 and 5 +35 %). Early on supply is often short, and a starved tip that hardens no longer waits for mass to come back, so the mycelium has fewer growing tips until its knots sprout. It is the player's choice; nothing is tuned here. `progression.mjs --grant <ids>` gives upgrades at landing for such worst cases (the order can't force one: a cheaper upgrade is bought while a dearer one waits).
 
+### 63.12 Stalks: a colonised corpse outside raises its spores over a ring (ja-2bw.10, 2026-11-14)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Ophiocordyceps unilateralis* hyphae leave a dead ant 2–3 days after death and a stalk grows from it to release spores; ants remove their dead fast, so a death in the nest leaves no time for one (Hughes et al. 2011, full text). *Metarhizium* fruits as a flat mat on the cadaver; stalks (synnemata) belong to some relatives, so this is a licence. Owner (2026-11-14): *Stalks*, two levels, 600 then 2000.
+
+**Design.**
+- **The upgrade.** *Stalks*, a spread upgrade: *none* → *a stalk* (600) → *a tall stalk* (2000).
+- **When.** A corpse the fungus has colonised (ja-2bw.7: buried on the midden, or a host dead on the plane) that lies outside (the plane, topsoil) grows a stalk `STALK.delay` seconds after it was colonised (20 at *a stalk*, 10 at *a tall stalk*, standing in for days; well inside a lone corpse's 60 s of spores, owner 2026-11-14 on review of #178: first built at 60 and 30, the first level's stalk grew just as a lone corpse ran dry). A corpse that is carried is not colonised yet, and one in the nest (a layer that is not topsoil) never grows one.
+- **What.** From then on the corpse's free spores, still paid by the cadaver at `CORPSE.rate`, go each step to the emptiest open cell within `STALK.radius` (2, then 4) instead of its one cell, so the ring fills evenly over a few seconds and more passing foragers pick some up, each less. (Split over every cell each step, as first built, a share at radius 4 fell under the fade's floor `SPORE_GONE` and vanished the next step: 45 % fewer spore-seconds on the ground than without a stalk, review of #178.)
+- **Seen.** A stalk draws as a short upright stroke on the corpse's cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** No lane changes; nothing is spent.
+
+**Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then fill the ring to its edge and no further, with about what the cadaver paid on the ground (within 25 % below, 5 % above: foragers take more from a wider ring), at both levels; a spent corpse's stalk is gone; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, with the review's fix: the emptiest-cell rule and delays 20 and 10; on main after #174; seconds to a quarter of the hosts):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 416 | 310 | 143 | 150 | 536 | 272 | 492 | 394 | 262 |
+| Hyphae | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* in the order (after *senses*) | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* at landing (`--grant stalks`) | 249 | 418 | 270 | 152 | 110 | 322 | 263 | 531 | 181 | 261 |
+
+- **In the buying order** *Stalks* comes at 323–583 s, after every seed's quarter, so the quarter, half and queen times are the hyphae's. P1 holds: no seed is more than 10 % slower than without hyphae (worst seed 1, +8 %), and the worst seed (418 against 536) and the median are better. The earlier run's seed-9 miss is gone on this main.
+- **Granted at landing** it is a gamble, as knots were (§63.11): faster on seeds 5, 6 and 9 (235 → 181 s), slower on seeds 2 (+16 %) and 8 (+27 %, 531 s, worse than without hyphae). Spread thinner, a corpse's spores reach more foragers but each takes a smaller dose. Not a P1 configuration; recorded under the owner's ship-and-record rule.
+- First built (spores split over every cell, delays 60 and 30), *Stalks* left every seed unchanged even at landing: the top level lost its spores to the fade, and the first level's stalk came as a lone corpse ran dry (review of #178).
+
+### 63.13 Spores lying out in the sun fade faster (ja-6ip, 2026-11-14)
+
+**Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
+
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
+
+| | median, seeds 1–10 | worst, 1–10 | median, 11–20 | worst, 11–20 |
+|---|---|---|---|---|
+| `main` | 275 | 559 | 293 | 431 |
+| flat ×2 | 332 | 477 | 293 | never (seed 20) |
+| flat ×4 | 357 | never | | |
+| flat ×8 | 411 | never (2 seeds) | | |
+
+The flat rule hits the patch, the game's main early source of spores, so it was dropped for the shaded one. Then, re-measured on `main` at `88b5269` (route memory on, #168; knots, #161):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 250 | 337 | 293 | 146 | 116 | 365 | 265 | 552 | 217 | 240 |
+| sun ×4, patch shaded (s) | 250 | 291 | 293 | 146 | 129 | 363 | 265 | 504 | 232 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 418 | 231 | 203 | 18 | 276 | 352 | 235 | 306 | 269 | 341 |
+| sun ×4, patch shaded (s) | 581 | 231 | 203 | 18 | 283 | 352 | 235 | 332 | 276 | 347 |
+
+- Medians: 258 → 258 s (seeds 1–10), 273 → 280 s (11–20). The worst of seeds 1–10 is faster (552 → 504 s); the worst of 11–20 is slower (418 → 581 s, seed 11). **P1 (§63.4) is not met:** seed 5 is 11 % slower and seed 11 39 %, and on seeds 11–20 both the worst seed and the median are worse. No sun above ×1 keeps seed 11 within 10 % (below).
+- **Seed 11 is slower at any sun:** 418 s at ×1 (bit-exact with `main`), 540, 582, 581, 486 and 486 s at ×2–×6. Traced: a ×1 and a ×4 game on seed 11 run identically until 181.6 s, when the first spores of a host dead on the plane appear off the patch; seed 11's later spread runs through them. That is the mechanic's purpose; whether it is worth the cost is chosen with Stalks in (below). Seed 5 is +11 %, seed 18 +8.5 %, the rest within 7 %.
+- The runs are deterministic: seed 11 at ×4 twice gave 581 s both times.
+
+**Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
+
+**Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
@@ -5493,6 +5554,13 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.76, 17.17 and 17.65 ms mean, E1.3 17.03, 16.57 and 17.10 ms; within noise. Keys above 2^31 are doubles in V8, but no slow-down shows.
 - **Cost:** none. No situation, legend or question changed.
 
+**Regions freed (`ja-qpv.1.5`, review of #160 D1, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page --hash`'s whole-game hash equals main's).
+- **What changed.** `ChunkLayer` counts the chunks in each region. When `drop` takes the last one, the region's slot array is freed (`regions` falls), and the next write there makes it again. Before, every region a chunk had ever been written in kept its array for the rest of the game. Since E1.1 drops faded scent and E1.3 drops faded `SensedMap` chunks, that was every region an ant or a host ever reached.
+- **What it doesn't change.** The box of regions (`regionSlots`) still never shrinks. It grows by whole regions, 256 times slower than a box of chunks would (E1.2).
+- **Why now.** Today's plane is one region a layer, so nothing is saved yet. On an endless plane, memory would otherwise grow with every region ever visited. E4's memory soak is meant to rule that out.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
@@ -5534,3 +5602,44 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 - The three unguarded games with 9–19 larvae waiting: ja-mprr.
 - Jev cost: none. No legend, question, schema or brain version changed.
+
+## 68. Ants draw their mode from Jev's probabilities (ja-nan3, 2026-11-14)
+
+*Tried first on the long-lived `staging` branch (deployed at `/ant-sym/pr-preview/staging/`; experiments there are numbered S1, S2, … in its PRD); the owner played it and kept it.*
+
+**Why.** Every ant in one situation took Jev's choice, so whole groups switched mode together. Jev's `choice` answers already come with a probability for every option (§4); nothing kept them.
+
+**What changed.**
+- A mode answer is kept with its probabilities: `follow=0.49,fight=0.3,explore=0.17,return=0.04`, Jev's choice first (`colony/weighted.ts`). A bare mode still reads everywhere, as certain.
+- The colony hands its mode policy a draw from its own seeded rng (`Colony.policyDraw`). A weighted answer is drawn from at `sampleTemp` (p^(1/T); default 1, as Jev gave it; 0 = always Jev's choice). The local rule and bare answers never draw, so the golden masters stay bit-exact.
+- An ant whose mode was drawn draws again after `reroll` seconds (default 10) in the same situation (`redraw`, a per-ant clock); without it a draw would hold until the situation changed.
+- The follow card shows what an ant drew from. Details → Lab → "How ants choose" sets the temperature (0–2) and the draw-again seconds (0–30) for every colony while a game runs (`Game.setChoice`; a lab setting, not saved).
+- `scripts/precache.mjs --reweigh` re-asks only the situations a bundle holds as a bare mode. Run once: $0.0039 for the three doctrines (453 situations); the desert ant's bundles again after main re-shipped them with the sun (192 situations, $0.0027).
+
+**How sharp Jev's answers are.** Probability of Jev's choice, over the shipped situations:
+
+| Bundle | Mean | Under 0.9 | Under 0.7 |
+|---|---|---|---|
+| Forage | 0.73 | 74 % | 44 % |
+| Cautious | 0.81 | 46 % | 31 % |
+| Warlike | 0.69 | 85 % | 54 % |
+| Desert (3 doctrines) | 0.85–0.86 | 45–48 % | 13–22 % |
+
+Asked again, Jev kept its earlier choice in 81–87 % of situations; where it changed, the call was close (Warlike: follow 0.39 against fight 0.35). A top choice that close was a coin toss before.
+
+**Offline, one world** (shipped answers for both colonies, 300 + 300 ants, 300 s, seeds 1–3; the first colony; a scratch script, not an assay):
+
+| | Food stored | Lost | Mode entropy |
+|---|---|---|---|
+| Forage, Jev's choice | 854, 530, 1,142 | 16, 54, 25 | 1.06–1.15 bits |
+| Forage, drawn (T 1) | 687, 519, 646 (−27 %) | 6, 31, 8 | 1.11–1.21 |
+| Forage, T 0.5 | 757, 575, 637 (−22 %) | 10, 27, 5 | 1.12–1.14 |
+| Warlike, Jev's choice | 1,173, 465, 1,000 | 12, 62, 6 | 1.10–1.30 |
+| Warlike, drawn (T 1) | 627, 385, 617 (−38 %) | 11, 15, 0 | 1.27–1.32 |
+| Warlike, T 0.5 | 774, 499, 764 (−23 %) | 9, 33, 4 | 1.22–1.33 |
+
+- Drawn colonies lose fewer ants and bring home less food; T 0.5 keeps most of the variety for about two thirds of the food cost. The worst seed (Forage 3) loses 44 % at T 1 and 44 % at T 0.5.
+- The doctrines' wordings were tuned against Jev's choice (§54.4), not its probabilities; some of the loss may be that.
+- The largest share of ants switching mode within one second did not fall (22–41 % either way): that metric is driven by events (alarm, trails meeting), not by lockstep answers alone. A better lockstep measure is open.
+
+**Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.

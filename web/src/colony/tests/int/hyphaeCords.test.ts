@@ -7,7 +7,7 @@ import { HYPHA_MASS, keyCell as hyphaCell } from "../../hyphae.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 
 // Cords in a one-world game (ja-2bw.8, docs/hyphal-growth.md §7): at a web the hyphae feeding many tips thicken. Its own
-// file: the games run 150 s, which would push hyphaeGame.test.ts past the int tier's budget.
+// file: the games run 150 s, which would push hyphaeGame.test.ts past its file's time budget.
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 

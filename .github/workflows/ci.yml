@@ -1,11 +1,11 @@
 # Every pull request runs lint, format, typecheck and every test tier but slow, and pages.yml calls this
 # same workflow before it deploys main, so a failure shows on the PR instead of blocking the deploy
 # afterwards (ja-6mj). Only pull_request: a push trigger too would run each PR branch twice.
-# test:slow is not here; it runs nightly, and on a colony PR's branch before it merges (slow.yml, the steward skill).
+# test:slow is not here; it runs nightly, and on a colony PR labelled slow-guards (slow.yml, the steward skill).
 #
 # Wall time is the longest job, so the int, golden and soak files are spread over four shards instead
-# of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13: int and
-# golden ~585 s of file time, soak ~474 s; `check` used to take ~4.5 min (int alone 3m19s) while each
+# of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13, before
+# #165 and #172 moved seven slow files to soak: int and golden ~585 s of file time, soak ~474 s; `check` used to take ~4.5 min (int alone 3m19s) while each
 # soak shard finished in under 1.5 min. node --test shards by file index, not by duration: if one
 # shard grows much longer than the others, split its biggest file or raise the shard count.
 name: CI
@@ -58,10 +58,27 @@ jobs:
       # So the globs are copies of web/package.json's test:int, test:golden and test:soak; ui/tests/ciShards.test.ts holds them equal.
       # Each tier keeps its own per-file limit: 60 s for int and golden, 120 s for soak (a soak file was
       # cancelled at 60 s on a small runner, #78).
+      # scripts/ci-report.mjs, beside spec (ja-w7ef.2, .3): failures and files near their limit go to the step summary
+      # and as annotations, and each file's time to a durations artifact. It reads the limit from --test-timeout.
       - name: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
-        run: node --test --test-timeout=60000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
+        env:
+          TEST_REPORT_TITLE: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/int-golden-${{ matrix.shard }}.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
         working-directory: web
       - name: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
         if: ${{ !cancelled() }}
-        run: node --test --test-timeout=120000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
+        env:
+          TEST_REPORT_TITLE: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/soak-${{ matrix.shard }}.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/soak/*.test.ts
         working-directory: web
+      - name: durations artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-durations-${{ matrix.shard }}
+          path: ${{ runner.temp }}/durations/
+          retention-days: 30
+          if-no-files-found: ignore
+          overwrite: true

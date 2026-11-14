@@ -93,8 +93,8 @@ else
 fi
 
 # 4. Committed before code.
-dirty=$(git status --porcelain -- docs .beads/issues.jsonl)
-[ -z "$dirty" ] && ok "docs and beads export committed" || bad "uncommitted docs or beads export (commit them before code):
+dirty=$(git status --porcelain -- docs)
+[ -z "$dirty" ] && ok "docs committed" || bad "uncommitted docs (commit them before code; beads are shared by scripts/beads-sync.sh push):
 $(sed 's/^/          /' <<<"$dirty")"
 
 echo

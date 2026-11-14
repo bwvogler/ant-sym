@@ -30,7 +30,7 @@
 import { LEVERS, type Reach } from "./levers.ts";
 
 /** A spread trait an upgrade sets. */
-export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots";
+export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks";
 
 export interface Upgrade {
   id: string;
@@ -101,6 +101,17 @@ export const UPGRADES: readonly Upgrade[] = [
     steps: ["none", "a few", "many"],
     costs: [400, 1500],
     trait: "knots",
+    values: [0, 1, 2],
+  },
+  {
+    // Stalks (ja-2bw.10, PRD §63.12): its value is the level fungus.ts STALK reads (0 none, 1 a stalk, 2 a tall stalk).
+    id: "stalks",
+    kind: "spread",
+    name: "Stalks",
+    blurb: "whether a corpse it has colonised outside grows a stalk that spreads its spores over a ring round it",
+    steps: ["none", "a stalk", "a tall stalk"],
+    costs: [600, 2000],
+    trait: "stalks",
     values: [0, 1, 2],
   },
   {
@@ -226,6 +237,8 @@ export interface Traits {
   capacity: number;
   /** the Knots level (hyphae.ts KNOT): 0 none, 1 a few, 2 many */
   knots: number;
+  /** the Stalks level (fungus.ts STALK): 0 none, 1 a stalk, 2 a tall stalk */
+  stalks: number;
 }
 
 export interface EvolutionSave {
@@ -345,7 +358,7 @@ export class Evolution {
 
   /** The spread traits at the levels chosen. */
   traits(): Traits {
-    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0 };
+    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0 };
     for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }

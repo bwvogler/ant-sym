@@ -12,9 +12,10 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
-//          [--grant knots,...]
+//          [--grant knots,...] [--sun 4]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
+// --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -43,6 +44,7 @@ if (isMainThread) {
     hyphae: flag("hyphae"),
     growth: flag("growth"),
     grant: opt("grant", "").split(",").filter(Boolean),
+    sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -65,7 +67,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -83,7 +85,7 @@ if (isMainThread) {
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun } = workerData;
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
@@ -95,7 +97,7 @@ if (isMainThread) {
             rival: true,
             regrow: GAME_REGROW,
             autoFound: false,
-            fungus: { hyphae },
+            fungus: { hyphae, ...(sun === null ? {} : { sun }) },
           },
           gameRng(seed, 0),
         )
