@@ -1005,6 +1005,103 @@ try {
   await kp.keyboard.press("Escape");
   check(!(await focused()), "Escape gives the keys back to the map");
   await kctx.close();
+
+  // ——— 10. The palette, the page's keys, the shortcuts sheet and the lens (PRD §69.3) ———
+  console.log("10. the palette, the keys and the lens");
+  const lctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lp = await lctx.newPage();
+  lp.on("pageerror", (e) => errors.push(String(e)));
+  await lp.goto(url);
+  await lp.getByLabel("world seed").fill(String(SEED));
+  await lp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lp.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "a game for the palette");
+  const rail = (name) => lp.getByRole("navigation", { name: "panels" }).getByRole("button", { name, exact: true });
+  const pal = lp.getByRole("dialog", { name: "command palette" });
+  const speedOn = (v) =>
+    lp
+      .getByRole("group", { name: "speed" })
+      .getByRole("button", { name: `${v}×`, exact: true })
+      .getAttribute("aria-pressed");
+  await lp.locator("canvas").first().focus();
+  // ⌘K / Ctrl+K: type part of a name, Enter runs the first.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  check(
+    await lp.getByRole("combobox", { name: "command" }).evaluate((e) => document.activeElement === e),
+    "Ctrl+K opens the palette, its field focused",
+  );
+  await lp.keyboard.type("mutat");
+  check(/^Mutations/.test((await pal.getByRole("option", { selected: true }).textContent()) ?? ""), "typing “mutat” puts Mutations first");
+  await lp.keyboard.press("Enter");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Enter runs it: the Mutations drawer",
+  );
+  // Escape closes the palette first and leaves the drawer under it.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Escape closes the palette, not the drawer",
+  );
+  await lp.keyboard.press("Escape"); // and then the drawer
+  // The keys: speeds, Space, the sheet.
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("1");
+  check((await speedOn(1)) === "true", "the key 1: 1×");
+  const playing = () => lp.getByRole("button", { name: "Pause", exact: true }).count();
+  const was = await playing();
+  await lp.keyboard.press(" ");
+  check((await playing()) !== was, "Space plays or pauses");
+  await lp.keyboard.press(" ");
+  await lp.keyboard.press("3");
+  check((await speedOn(4)) === "true", "the key 3: 4×");
+  await lp.keyboard.press("?");
+  const sheetD = lp.getByRole("dialog", { name: "keyboard shortcuts" });
+  await sheetD.waitFor({ timeout: 3000 });
+  check(/command palette/.test((await sheetD.textContent()) ?? ""), "? opens the shortcuts sheet");
+  await lp.keyboard.press("1");
+  check((await speedOn(4)) === "true", "the game's keys wait while the sheet is open");
+  await lp.keyboard.press("Escape");
+  check((await sheetD.count()) === 0, "Escape closes it");
+  // The lens: i turns it on; over Ink's hole it says so; a click pins it and follows nothing; "more" opens the guide.
+  await lp.keyboard.press("i");
+  const lensBtn = lp.getByRole("button", { name: "Lens: say what is under the pointer (i)" });
+  check((await lensBtn.getAttribute("aria-pressed")) === "true", "i turns the lens on");
+  await lp.evaluate(() => window.jevAnts.goNest(0));
+  await lp.waitForTimeout(200);
+  const hole = await lp.evaluate(() => {
+    const g = window.jevAnts.game;
+    const n = g.colonies[0].layers[0].nest;
+    const c = window.jevAnts.camera("above");
+    const cv = document.querySelector("canvas");
+    const k = cv.getBoundingClientRect().width / cv.width;
+    return { x: ((n.x - c.x) * c.zoom + cv.width / 2) * k, y: ((n.y - c.y) * c.zoom + cv.height / 2) * k };
+  });
+  await lp.mouse.move(hole.x, hole.y);
+  const lensCard = lp.getByRole("region", { name: "lens" });
+  await until(async () => (await lensCard.count()) === 1, "the lens card under the pointer", 3000, 50);
+  const said = (await lensCard.textContent()) ?? "";
+  check(/Ink's hole/.test(said), `over Ink's hole it says so${/Ink's hole/.test(said) ? "" : ` (${said.slice(0, 120)})`}`);
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check((await lp.evaluate(() => window.jevAnts.followed())) === null, "a click with the lens on pins the card and follows nothing");
+  await lp.mouse.move(hole.x + 300, hole.y + 200);
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "pinned, it stays while the pointer wanders");
+  await lensCard.getByRole("button", { name: "More on ink's hole" }).click();
+  await lp.getByRole("dialog", { name: "Learn" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "“more” opens the guide, and the card goes");
+  await lp.keyboard.press("Escape");
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Escape");
+  check((await lensCard.count()) === 0, "Escape closes a pinned card");
+  await lp.keyboard.press("i");
+  await lp.mouse.move(hole.x + 2, hole.y + 2);
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0 && (await lensBtn.getAttribute("aria-pressed")) === "false", "i again: the lens off, no card");
+  await lctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
