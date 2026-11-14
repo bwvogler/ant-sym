@@ -112,6 +112,8 @@ interface Props {
   api?: RefObject<FieldApi | null>;
   /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */
   pen?: FieldPen | null;
+  /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
+  toolsAt?: string;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -121,7 +123,7 @@ export interface FieldApi {
    * with. At the shown view's zoom; `close`: at least LINK_ZOOM, so the place shows; `span`: zoomed so that many world
    * units fit across the box's shorter side.
    */
-  centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number }) => void;
+  centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number; keepFollow?: boolean }) => void;
   /** view `view`'s camera as last drawn (null before it was shown or centred) */
   camera: (view: number) => Camera | null;
 }
@@ -217,6 +219,7 @@ export default function ColonyField({
   onCross,
   api,
   pen = null,
+  toolsAt = "top-2 left-2",
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -224,6 +227,27 @@ export default function ColonyField({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
   const [labels, setLabels] = useState(false);
+  const [goOpen, setGoOpen] = useState(false);
+  const goRef = useRef<HTMLDivElement>(null);
+  // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
+  // press anywhere outside it.
+  useEffect(() => {
+    if (!goOpen) return;
+    const key = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      setGoOpen(false);
+    };
+    const outside = (e: globalThis.PointerEvent) => {
+      if (!goRef.current?.contains(e.target as Node)) setGoOpen(false);
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", outside, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", outside, true);
+    };
+  }, [goOpen]);
   const labelsOn = useRef(labels);
   useEffect(() => {
     labelsOn.current = labels;
@@ -1463,7 +1487,9 @@ export default function ColonyField({
     api.current = {
       centreOn: (v, x, y, how = {}) => {
         // Looking elsewhere in the view shown ends a follow (as a drag does); a follow carried to the other view goes on.
-        if (v === shown.current && follow.current) unfollow();
+        // `keepFollow`: the page carrying the followed ant itself (an ant that pops up a hole and straight back down asks
+        // for the view still shown), which must not drop it.
+        if (v === shown.current && follow.current && !how.keepFollow) unfollow();
         let s = cams.current.get(v);
         if (!s) cams.current.set(v, (s = NEW_CAM()));
         const we = extentOf(mapOf(v));
@@ -1650,7 +1676,8 @@ export default function ColonyField({
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
     else if (key === "n") goNest((nestTurn.current + 1) % colonies.length);
-    else if (e.key === "Escape") unfollow();
+    // Escape drops a follow; with nothing followed it is left for the drawer (review of #182, S7).
+    else if (e.key === "Escape" && follow.current && !e.defaultPrevented) unfollow();
     else return;
     e.preventDefault();
   };
@@ -1673,13 +1700,15 @@ export default function ColonyField({
     setCamera({ x: hx, y: hy, zoom: Math.max(camera().zoom, 8 * dpr()) });
   };
 
-  const button = "pointer-events-auto rounded-md border border-line bg-panel/90 px-2 py-1 text-xs text-fg-2 shadow-sm hover:bg-raised";
+  const button =
+    "pointer-events-auto rounded-md border border-line bg-panel/90 px-2.5 py-1 text-xs text-fg-2 shadow-sm backdrop-blur-sm hover:bg-raised";
+  const item = "rounded-md px-3 py-1.5 text-left text-xs text-fg-2 hover:bg-raised";
   return (
     <>
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className="absolute inset-0 block h-full w-full cursor-grab touch-none rounded-lg border border-line outline-none focus-visible:ring-2 focus-visible:ring-accent active:cursor-grabbing"
+        className="absolute inset-0 block h-full w-full cursor-grab touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset active:cursor-grabbing"
         role="application"
         aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
@@ -1690,31 +1719,49 @@ export default function ColonyField({
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
-      <div className="pointer-events-none absolute top-2 left-2 flex gap-1.5">
-        <button type="button" className={button} onClick={showAll} title="Show the whole map (0)">
-          Whole map
+      {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
+      <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
+        <button
+          type="button"
+          className={button}
+          aria-expanded={goOpen}
+          onClick={() => setGoOpen((o) => !o)}
+          title="Whole map, a colony's nest, chamber labels"
+        >
+          Go to ▾
         </button>
-        {colonies.map((_, k) => (
-          <button
-            key={k}
-            type="button"
-            className={button}
-            onClick={() => goNest(k)}
-            title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+        {goOpen && (
+          <div
+            className="pointer-events-auto flex flex-col gap-1 rounded-lg border border-line bg-panel/95 p-1 shadow-lg"
+            role="group"
+            aria-label="go to"
           >
-            {colonyName(k)} nest
-          </button>
-        ))}
-        {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
-          <button
-            type="button"
-            className={labels ? button.replace("border-line", "border-accent").replace("text-fg-2", "text-accent") : button}
-            aria-pressed={labels}
-            onClick={() => setLabels((on) => !on)}
-            title="Name each chamber by its role; click a chamber to inspect it in Learn"
-          >
-            Labels
-          </button>
+            <button type="button" className={item} onClick={() => (showAll(), setGoOpen(false))} title="Show the whole map (0)">
+              Whole map
+            </button>
+            {colonies.map((_, k) => (
+              <button
+                key={k}
+                type="button"
+                className={item}
+                onClick={() => (goNest(k), setGoOpen(false))}
+                title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+              >
+                {colonyName(k)} nest
+              </button>
+            ))}
+            {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
+              <button
+                type="button"
+                className={labels ? `${item} text-accent` : item}
+                aria-pressed={labels}
+                onClick={() => setLabels((on) => !on)}
+                title="Name each chamber by its role; click a chamber to inspect it in Learn"
+              >
+                {labels ? "✓ " : ""}Chamber labels
+              </button>
+            )}
+          </div>
         )}
       </div>
     </>

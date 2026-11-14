@@ -1,4 +1,4 @@
-// What each thing a mutation buys means, in words, for the Fungus panel's tooltips. Built from the upgrade table
+// What each thing a mutation buys means, in words, for the Mutations drawer's tooltips. Built from the upgrade table
 // (colony/evolution.ts UPGRADES) and the lever table (colony/levers.ts LEVERS), so a level's numbers and a lever's name
 // can't drift from what the game does; only the "why it matters" lines are written here. `ui/tests/upgradeText.test.ts`
 // fails when an upgrade, a level or a lever has no explanation.

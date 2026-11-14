@@ -12,7 +12,7 @@ export default function Toasts() {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 sm:bottom-4"
       role="status"
       aria-live="polite"
     >
@@ -31,7 +31,7 @@ function Item({ t }: { t: Toast }) {
   return (
     <button
       type="button"
-      className={`pointer-events-auto max-w-xl rounded-md border px-3 py-2 text-left text-sm shadow-lg ${TONE[t.tone]}`}
+      className={`pointer-events-auto max-w-xl rounded-md border px-3 py-2 text-left text-sm shadow-lg max-sm:pointer-events-none ${TONE[t.tone]}`}
       onClick={() => dismissToast(t.id)}
       title="Dismiss"
     >
