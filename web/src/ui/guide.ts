@@ -31,6 +31,8 @@ export interface GuideEntry {
   inGame: string;
   /** the trail this entry is about: a species that lays no such trail (the desert ant) doesn't see the entry (owner, ja-rf5.11) */
   trail?: Channel;
+  /** a species' own entry: shown only to a game of that species (Species.id); every species' when absent */
+  species?: string;
   /** still scripted: a vision gap (docs/vision.md "Where the code is today"), its bead and what the script reads */
   scripted?: { bead: string; reads: string };
   sources: Source[];
@@ -67,6 +69,26 @@ export const GUIDE: GuideEntry[] = [
     inGame:
       "Ants walking out lay the home trail; on the surface a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
     sources: [{ note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" }],
+  },
+  {
+    // The desert ant's own (ja-rf5.8): shown only in a desert game.
+    id: "desert-ant",
+    species: "desert",
+    title: "Desert ants",
+    onScreen:
+      "Lone runners: no trails on the ground, each ant out on its own. A warm wash deepens over the ground toward noon and a dark one covers the night; the HUD shows the sun as they see it and the ground's heat. They pour out as the sun climbs, come in to cool, and stay in at a low sun and at night; when a finder comes home with food, the ants waiting at the top of the shaft go out soon after.",
+    realAnts:
+      "Cataglyphis forage alone in the hottest hours, close to the heat that kills them, steering home by step-counting and the sky. They find food by its smell in the air. The sun's height, seen at the nest's entrance, sets when the nest opens and closes. A finder coming home fast speeds up the ants it meets inside, and an ant leaves by its own speed (C. niger): no trail, no location.",
+    inGame:
+      "Each ant senses its own heat and sees the sun from the open ground or the top of its shaft; it comes home when hot, or when the sun is low or down. Its body heat follows the ground's out there and cools in the nest. It climbs the smell of food within about 21 cells. A finder coming down the shaft raises the pace of the ants waiting at the top; a crowd damps it; each leaves by its own pace.",
+    sources: [
+      { note: "desert-ant", anchor: "1-foragers-work-alone-no-trail-no-recruitment-to-a-place", label: "Foragers work alone" },
+      {
+        note: "desert-heat",
+        anchor: "2-the-suns-height-seen-at-the-entrance-sets-when-the-nest-opens-and-closes",
+        label: "The sun's height sets the day",
+      },
+    ],
   },
   {
     // Every species' (owner, ja-rf5.11): how a forager gets home without a trail, which is all a desert ant has.
@@ -507,13 +529,13 @@ export function guideEntry(id: string): GuideEntry | undefined {
 }
 
 /** The guide's entries for a species whose colonies lay the trails `has` says: one about a trail it lacks is left out (owner, ja-rf5.11). */
-export function guideFor(has: (channel: Channel) => boolean): GuideEntry[] {
-  return GUIDE.filter((e) => e.trail === undefined || has(e.trail));
+export function guideFor(has: (channel: Channel) => boolean, species?: string): GuideEntry[] {
+  return GUIDE.filter((e) => (e.trail === undefined || has(e.trail)) && (e.species === undefined || e.species === species));
 }
 
 /** The line above the guide's entries for a species that lays no trails of some kinds (ja-rf5.11); null when it sees every entry. */
 export function guideNote(has: (channel: Channel) => boolean, species: string): string | null {
-  return guideFor(has).length < GUIDE.length
+  return guideFor(has).length < GUIDE.filter((e) => e.species === undefined).length
     ? `The ${species.toLowerCase()} lays no trails of some kinds: the entries about them are left out.`
     : null;
 }
