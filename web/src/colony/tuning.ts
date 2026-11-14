@@ -59,6 +59,15 @@ export const INTAKE_PLENTY = 0.01;
 /** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
 export const MET_HALF = 20;
 
+/**
+ * Task reversion (ja-7r7x, docs/task-reversion.md): seconds over which an ant's sense of meeting young nestmates
+ * (`youngMet`, the share of recent time a young one was within a cell of it) settles. Design: no paper measures how
+ * long an old ant goes without meeting young before it reverts (in ants "within 24 h"; in fire ants within minutes).
+ */
+export const YOUNG_TAU = 60;
+/** An old ant at home reverts to nursing while its `youngMet` is below this (design). */
+export const REVERT_BELOW = 0.05;
+
 /** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
 export const FOES_HALF = 20;
 

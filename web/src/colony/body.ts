@@ -20,7 +20,7 @@ import {
   feel,
 } from "./hunger.ts";
 import { SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY } from "./royal.ts";
-import { EGG_FOOD, QUEEN_STOCK } from "./tuning.ts";
+import { EGG_FOOD, QUEEN_STOCK, YOUNG_TAU } from "./tuning.ts";
 import { EXPLORE } from "./vocab.ts";
 import { dropFood } from "./world.ts";
 import { clearPellet } from "./pellets.ts";
@@ -166,7 +166,10 @@ export function dropBrood(col: Colony, i: number, atX = NaN, atY = NaN): void {
  */
 export function body(col: Colony, dt: number): void {
   const ch = col.map.chambers;
-  const { felt, donors, energy, scent, scentSum, perceived } = col;
+  const { felt, donors, energy, scent, scentSum, perceived, youngs } = col;
+  // Task reversion (ja-7r7x): where the young are, so each old ant at home senses whether it meets any.
+  const revert = col.params.revert > 0 && col.queen !== null;
+  if (revert) youngs.reset();
   felt.reset();
   donors.reset();
   scentSum.reset();
@@ -223,6 +226,7 @@ export function body(col: Colony, dt: number): void {
     }
     energy[i] = e;
     if (!under) continue;
+    if (revert && col.band(i) === 0) youngs.put(cx, cy, 1);
     scentSum.add(cx, cy, scent[i]);
     if (queenHere && hexDistance(cx, cy, qx, qy) <= 1) touching++;
     felt.put(cx, cy, Math.max(PASS * col.feltLast[i], adultBegOf(e)));
@@ -231,6 +235,7 @@ export function body(col: Colony, dt: number): void {
   // The queen's scent (ja-lo8.9, royal.ts): it fades; underground it moves toward the mean the ants within one cell
   // carry, and the ants touching her share her supply, × her signal.
   const fade = Math.exp(-dt / SCENT_FADE);
+  const youngStep = 1 - Math.exp(-dt / YOUNG_TAU);
   const share = 1 - Math.exp(-dt / SCENT_SHARE);
   let supply = 0;
   if (q && q.alive && queenHere) {
@@ -265,6 +270,8 @@ export function body(col: Colony, dt: number): void {
         }
       }
       now = felt.near(cx, cy);
+      // Meeting young nestmates (ja-7r7x): the share of recent time one was within a cell, read by the old only.
+      if (revert && col.band(i) === 2) col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
     }
     scent[i] = sc;
     col.feltLast[i] = now;

@@ -240,6 +240,13 @@ export interface ColonyParams {
    */
   owedBeg: number;
   /**
+   * ja-7r7x (docs/task-reversion.md, PRD §71): the share of old ants that revert to nursing when they meet no young
+   * nestmates at home (each by its own draw: individual thresholds). A reverted ant stays in, keeps to the queen and
+   * brood as the young do, works inside at the young's threshold and takes no foraging dig; it goes back to foraging
+   * once it meets young again. 0 = off.
+   */
+  revert: number;
+  /**
    * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds of digging (counted while it explores in the nest) an old forager
    * home from a trip with nothing takes before it climbs back out. At tunnels' dead ends and forks (walkTunnel) it digs
    * without the ROOMY_DIG damping and without nestmates by; starting a face or meeting a tunnel's end head-on (move.ts)
@@ -423,6 +430,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   restFetch: 1,
   forageDig: 0,
   owedBeg: 0,
+  revert: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,

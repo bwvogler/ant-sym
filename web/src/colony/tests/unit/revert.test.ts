@@ -1,0 +1,112 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { Colony } from "../../colony.ts";
+import { NEED_FETCH } from "../../hunger.ts";
+import { worksInside } from "../../nestWork.ts";
+import { fetches } from "../../tunnel.ts";
+import { REVERT_BELOW } from "../../tuning.ts";
+import { EXPLORE } from "../../vocab.ts";
+import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { SMALL_SIDE, ageOf } from "../builders.ts";
+
+// Task reversion (ja-7r7x, docs/task-reversion.md, PRD §71): an old ant at home that meets no young nestmates nurses as
+// the young do, if it is among the share `revert` of the old that can. World 2 of SMALL_SIDE, a fixed "explore" policy.
+
+const colony = (revert: number, n: number) =>
+  new Colony(generateSideWorld(2, SMALL_SIDE), { antCount: n, maxAnts: n, revert }, mulberry32(7), (() => "explore") as never);
+
+/** Ant i of age band `band` at the nest's centre, exploring, empty-jawed. */
+function home(c: Colony, i: number, band: 0 | 1 | 2) {
+  c.age[i] = ageOf(band);
+  c.x[i] = c.nest.x;
+  c.y[i] = c.nest.y;
+  c.mode[i] = EXPLORE;
+  c.carrying[i] = 0;
+}
+
+/** Hold ants in place (the test is the sense, not where they walk) and step `secs` seconds. */
+function hold(c: Colony, secs: number, place: () => void) {
+  for (let t = 0; t < 30 * secs; t++) {
+    place();
+    c.tick(1 / 30);
+  }
+}
+
+test("youngMet: an old ant at home beside a young one keeps meeting it; alone, the sense fades over YOUNG_TAU and it reverts", () => {
+  const c = colony(1, 2);
+  hold(c, 120, () => {
+    home(c, 0, 2);
+    home(c, 1, 0); // a young nestmate on the same cell
+  });
+  assert.ok(c.youngMet[0] > 0.9, `beside a young one: ${c.youngMet[0]}`);
+  assert.equal(c.reverts(0), false);
+  const alone = colony(1, 1);
+  assert.equal(alone.youngMet[0], 1, "born as if among the young");
+  hold(alone, 240, () => home(alone, 0, 2));
+  assert.ok(alone.youngMet[0] < REVERT_BELOW, `alone for 240 s: ${alone.youngMet[0]}`);
+  assert.equal(alone.reverts(0), true, "an old ant meeting no young reverts");
+});
+
+test("revert 0: the sense is not kept and nobody reverts (main)", () => {
+  const c = colony(0, 1);
+  hold(c, 240, () => home(c, 0, 2));
+  assert.equal(c.youngMet[0], 1, "never updated");
+  c.youngMet[0] = 0;
+  assert.equal(c.reverts(0), false);
+});
+
+test("a reverted old ant stays in and works inside at the young's threshold; the young, the middle-aged and a forager outside never revert", () => {
+  const c = colony(1, 1);
+  home(c, 0, 2);
+  c.under[0] = 1;
+  c.youngMet[0] = 0;
+  assert.equal(c.reverts(0), true);
+  assert.equal(c.mayGoOut(0), false, "it stays in like the young");
+  assert.equal(c.outbound(0), false, "not a forager on its way out");
+  assert.equal(worksInside(c, 0), true, "it works inside whatever its felt need");
+  c.need[0] = NEED_FETCH;
+  assert.equal(fetches(c, 0), true, "it fetches at the young's threshold");
+  c.need[0] = 0;
+  for (const band of [0, 1] as const) {
+    c.age[0] = ageOf(band);
+    assert.equal(c.reverts(0), false, `band ${band} doesn't revert`);
+  }
+  c.age[0] = ageOf(2);
+  c.under[0] = 0;
+  assert.equal(c.reverts(0), false, "out on the ground it is a forager");
+});
+
+test("only the share `revert` of the old can revert, each by its own draw", () => {
+  const n = 200;
+  const count = (share: number) => {
+    const c = colony(share, n);
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      c.age[i] = ageOf(2);
+      c.under[i] = 1;
+      c.youngMet[i] = 0;
+      if (c.reverts(i)) k++;
+    }
+    return k;
+  };
+  const quarter = count(0.25);
+  assert.ok(Math.abs(quarter - 50) <= 4, `about a quarter of 200: ${quarter}`);
+  assert.equal(count(1), n, "all");
+  assert.equal(count(0), 0, "none");
+});
+
+test("a reverted ant goes back once it meets young again", () => {
+  const c = colony(1, 2);
+  hold(c, 240, () => {
+    home(c, 0, 2);
+    home(c, 1, 0);
+    c.x[1] = c.nest.x + 400; // the young one far off
+  });
+  assert.equal(c.reverts(0), true, "reverted while alone");
+  hold(c, 30, () => {
+    home(c, 0, 2);
+    home(c, 1, 0); // the young one back beside it
+  });
+  assert.ok(c.youngMet[0] >= REVERT_BELOW, `met young again: ${c.youngMet[0]}`);
+  assert.equal(c.reverts(0), false, "back to foraging");
+});
