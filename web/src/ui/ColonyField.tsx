@@ -776,6 +776,17 @@ export default function ColonyField({
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Knots (ja-2bw.9): a hard, dark lump on the hypha, a little larger than a tip.
+      ctx.fillStyle = theme.ink;
+      ctx.globalAlpha = under ? 0.5 : 0.85;
+      for (const k of h.knots.keys()) {
+        const [kx, ky] = hyphaCell(k);
+        if (!inView(kx, ky)) continue;
+        const [x, y] = toScreen(c, v, centreX(kx, ky), centreY(ky));
+        ctx.beginPath();
+        ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.restore();
     };
 

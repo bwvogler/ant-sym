@@ -3,7 +3,7 @@
 // and other modules read them as `colony.<name>` (docs/refactor.md S3). Index i is ant i. Only per-ant arrays belong here: what is
 // per colony or per layer stays a field of the Colony.
 
-/** An empty cell key: no cell (colony.ts NO_CELL). */
+/** An empty cell key: no cell (colony.ts NO_CELL). Every cellKey (hex.ts) is ≥ 0, so −2^31 is never a cell. */
 export const NO_KEY = -0x80000000;
 
 /** The colony parameters the table reads: a fill that starts as a parameter, and the one array whose length depends on one. */
@@ -224,11 +224,11 @@ export const ANT_FIELDS = {
   cellAtX: { type: Float32Array, fill: NaN },
   cellAtY: { type: Float32Array, fill: NaN },
   /** a cell where this free-walking ant last found no tunnel (cellKey; NO_KEY none): it needn't look again until it moves on */
-  noTunnel: { type: Int32Array, fill: NO_KEY },
+  noTunnel: { type: Float64Array, fill: NO_KEY },
   /** 1 while a pellet carrier is walking a stale branch to fill its end (see BACKFILL.enterStale) */
   staleWalk: { type: Uint8Array, reset: "spawn" },
   /** the cell (cellKey) where this pellet carrier last looked for space to fill, this trip: once a cell is enough */
-  looked: { type: Int32Array, fill: NO_KEY, reset: "spawn" },
+  looked: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
   /** the side view: what each homing ant is heading for (0 the chamber, 1 the entrance); a change drops the wall it was following */
   goalKind: { type: Uint8Array, reset: "spawn" },
   /** 1 while the ant is underground (the last tick), so coming up out of the hole is seen */
@@ -241,7 +241,7 @@ export const ANT_FIELDS = {
   groundRef: { type: Float64Array, fill: NaN },
   // Chambers (nest slice 2): the side view's nest is dug, not given.
   /** the face this ant is digging for a chamber (cellKey; NO_KEY none), and for which: chamber id + 1, or 0 for a new one */
-  chamberCell: { type: Int32Array, fill: NO_KEY, reset: "spawn" },
+  chamberCell: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
   chamberFor: { type: Int16Array },
   // Floor marks (nest slice 3): the role of the last chamber each ant was in (MARKS index + 1; 0 none), and seconds since.
   lastRole: { type: Uint8Array, reset: "spawn" },
@@ -264,7 +264,7 @@ export const ANT_FIELDS = {
   /** 1 while an ant carried a load at its last step (what ends its trip when the load is put down: `arrive`) */
   loaded: { type: Uint8Array, reset: "spawn" },
   /** the cell (cellKey) where ant i last put a load down, while it still stands there; else NO_KEY */
-  putAt: { type: Int32Array, fill: NO_KEY, reset: "spawn" },
+  putAt: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
   /**
    * The side view: a pellet carrier carrying its pellet out along the ground: it drops it once it is this many
    * columns from the hole (NaN: not carrying one out), on side #spoilSide, having walked #spoilT seconds. One world's
@@ -282,10 +282,10 @@ export const ANT_FIELDS = {
    * puts the pellet and all its state down at once.
    */
   soil: { type: Uint8Array, reset: "spawn" },
-  /** the cell it looked from before that (packed; −1 none): the way it came, which is never a stale branch */
-  cameFrom: { type: Int32Array, fill: NO_KEY, reset: "spawn" },
-  /** the cell (packed) this ant last dug: its pellet never goes straight back in there */
-  lastDug: { type: Int32Array, fill: NO_KEY, reset: "spawn" },
+  /** the cell it looked from before that (cellKey; NO_KEY none): the way it came, which is never a stale branch */
+  cameFrom: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
+  /** the cell (cellKey; NO_KEY none) this ant last dug: its pellet never goes straight back in there */
+  lastDug: { type: Float64Array, fill: NO_KEY, reset: "spawn" },
   /** releases from a soil wall this trip that made no progress home (see NO_GAIN) */
   noGain: { type: Uint8Array },
   /** 1 once a recruited ant has been away from the nest: coming home then ends its raid */

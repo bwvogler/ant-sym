@@ -36,7 +36,7 @@
         "Posts exactly one GitHub review with event COMMENT (pending review, inline comments, submit_pending), whose body has a verdict line, numbered items with file:line, Merge mechanics, Not re-measured and the Claude Code footer",
         "Uses inline suggestion blocks only for one-line fixes, each numbered and also listed in the body",
         "Does not submit a GitHub approval review and does not merge",
-        "Ends with worktrees removed, .beads/issues.jsonl reverted and git status clean",
+        "Ends with the worktrees it made removed, its own change to .beads/issues.jsonl reverted, and git status as it was at stage 0",
         "Gives the owner a short plain-language summary naming the one decision that is theirs"
       ]
     },

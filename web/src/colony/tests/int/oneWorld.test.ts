@@ -71,7 +71,7 @@ test("the curtain's x origin: every column s from sMin to sMax is on the map and
   }
 });
 
-test("cellKey round-trips negative columns (−32768 … 32767), and keyY is the row for them too", () => {
+test("cellKey round-trips the curtain's negative columns, and keyY is the row for them too (the full range: hex.test)", () => {
   for (const [x, y] of [
     [0, 0],
     [5, 7],
