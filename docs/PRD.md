@@ -5567,6 +5567,12 @@ M1 counts only foragers whose spot is at least 60° from the trail: a median 25.
 - M1's foragers start far from their spot, where Jev reads "memory" as a pull to a spot it is not at and mostly ignores it (P(lead) 0.03 far): the question's wording, not only Jev, is at fault there; the biology's "memory beats the trail" is a choice made setting out, far from the spot.
 - The doctrines say nothing about searching or remembering. What a doctrine that does would get from Jev is not measured yet.
 
+**Round 4 (owner, 2026-11-14: "1 then 2").**
+- Doctrine probe, $0.0001 (the same 10 situations; a doctrine saying "Range wide and straight when exploring away from food, but search tightly around any spot where you found food. Always go back to where you last found food, even if a food trail leads elsewhere."): far, P(wide) 0.48; near, P(tight) 0.60; memory P(lead) 0.61 far, 0.77 near. **When the words ask for it, the lane gives the policy control.**
+- Better questions (brain v4): memory as "set out for that spot and keep to it, even over a food scent that leads elsewhere"; the levels low, medium, high (not "usual"); a legend line on what real foragers do. Re-asked, $0.0031. Answers spread out (P(tight) 0.25–0.29, P(wide) 0.31–0.34) but search still barely tells near from far, and far from a find memory is mostly ignored (P(ignore) 0.56–0.59, P(lead) 0.09).
+- Measured (Forage, `steerLane` 1): food 875 (427–1,173) against 702 off, lost 7, held ≤ 1; lockAgree 0.89; T1 1.02; M1 memory 0.03 (seeds 1–10).
+- Likely cause for memory: `far` lumps "remembers a find elsewhere" with "has found none", and Jev answers for the second. Proposed: three values, `none`, `far`, `near` (×1.5 situations).
+
 **Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
 
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
