@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { E, NE, nx, ny, SE, W } from "../../hex.ts";
 import { localGrowthChoice } from "../../growthBrain.ts";
-import type { Ground } from "../../hyphae.ts";
+import type { Ground, Tip } from "../../hyphae.ts";
 import {
   cellKey,
   growthUnit,
@@ -11,6 +11,7 @@ import {
   CORD_DIGS,
   CORD_FLOW,
   ENTER_GAP,
+  KNOT,
   REGROW_ROUNDS,
   sideFor,
   FRUIT_RUN,
@@ -782,4 +783,136 @@ test("a cut drops the fusions that name the dug cell, so the partner's dead end 
   assert.deepEqual(h.fusions, [], "a fusion pair kept the dug cell");
   for (let r = 0; r < 20; r++) h.regress();
   assert.ok(!h.parent.has(partner), "the partner's dead end never faded");
+});
+
+/** A hypha east from (0, 30): a root and `n` grown cells, its tip at the end, starved for `starved` rounds. */
+function starvedLine(n: number, starved: number): Hyphae {
+  const h = new Hyphae();
+  h.root(0, 30, E);
+  const t = h.tips[0]!;
+  for (let k = 0; k < n; k++) assert.ok(h.extend(t, E, 0));
+  t.starved = starved;
+  return h;
+}
+
+test("a tip starved KNOT.rounds rounds hardens into a knot, drawing in its cell and up to KNOT.pull behind it; their mass is its store (ja-2bw.9)", () => {
+  // Not yet starved long enough, or no knots bought: nothing.
+  assert.equal(starvedLine(6, KNOT.rounds[1] - 1).harden(1), 0);
+  assert.equal(starvedLine(6, 99).harden(0), 0);
+  const h = starvedLine(6, KNOT.rounds[1]);
+  const cells = h.length;
+  const stored = h.harden(1);
+  assert.equal(stored, (KNOT.pull + 1) * HYPHA_MASS);
+  assert.equal(h.length, cells - (KNOT.pull + 1), "the drawn-in cells left the hyphae");
+  assert.equal(h.tips.length, 0, "the tip ended");
+  assert.deepEqual([...h.knots.keys()].map(keyCell), [[6 - KNOT.pull - 1, 30]], "the knot sits behind the cells drawn in");
+  assert.equal(h.knots.get(cellKey(6 - KNOT.pull - 1, 30))!.store, stored);
+  // At *many* it hardens sooner.
+  assert.ok(starvedLine(6, KNOT.rounds[2]).harden(2) > 0);
+  assert.ok(KNOT.rounds[2] < KNOT.rounds[1]);
+  // Never onto a root: a tip one cell from its root draws in nothing and stays a tip.
+  const short = starvedLine(1, 99);
+  assert.equal(short.harden(1), 0);
+  assert.equal(short.tips.length, 1);
+  assert.equal(short.tips[0]!.starved, 0, "its count starts again");
+});
+
+test("stepping counts a tip's starved rounds: short supply and nothing grown adds one, a step that grows resets it (ja-2bw.9)", () => {
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const tip = h.tips[0]!;
+  for (let r = 0; r < 3; r++) stepTips(h, plane(), 0, { free: 0, tips: 1 });
+  assert.equal(tip.starved, 3);
+  stepTips(h, plane(), 0, { free: 1e9, tips: 1 });
+  assert.equal(tip.starved, 0);
+});
+
+test("a knot is hard: digging its cell doesn't cut it, and it never fades; knots save and load (ja-2bw.9)", () => {
+  const h = starvedLine(8, 99);
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  const [kx, ky] = keyCell(k!);
+  for (const c of h.parent.keys()) h.soil.add(c);
+  const g: Ground = { topsoil: false, kind: (x, y) => (x === kx && y === ky ? "open" : "soil") };
+  assert.equal(h.cutDug(g), 0, "the knot was cut");
+  assert.ok(h.has(kx, ky));
+  for (let r = 0; r < 30; r++) h.regress();
+  assert.ok(h.has(kx, ky), "the knot faded");
+  h.knots.get(k!)!.age = 12.5;
+  const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
+  assert.deepEqual([...back.knots], [...h.knots]);
+});
+
+test("a knot sprouts one tip KNOT.sprout seconds after forming, onward from where it was fed, when supply is ample (ja-2bw.9)", () => {
+  const h = starvedLine(8, 99);
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  const knot = h.knots.get(k!)!;
+  const g = plane();
+  knot.age = KNOT.sprout[1] - 1;
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 0 }), 0, "too young");
+  knot.age = KNOT.sprout[1];
+  assert.equal(h.sproutKnots(g, 1, { free: 0, tips: 0 }), 0, "short of mass");
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 0 }), 1);
+  assert.deepEqual(
+    h.tips.map((t) => [...keyCell(cellKey(t.x, t.y)), t.heading]),
+    [[...keyCell(k!), E]],
+  );
+  assert.equal(h.sproutKnots(g, 1, { free: 1e9, tips: 1 }), 0, "it sprouts once");
+});
+
+test("hardening leaves no orphan: a cell feeding a branch, grown or a bare tip, stops the draw, and a spot no hypha touches goes (review of #161 S2)", () => {
+  // A line east from (0, 30), its tip at (6, 30), and a branch from (4, 30): grown one cell, or a bare tip on (4, 30).
+  for (const grown of [true, false]) {
+    const h = starvedLine(6, 99);
+    const tip = h.tips[0]!;
+    const b: Tip = { x: 4, y: 30, heading: SE, first: SE, run: 0 };
+    h.tips.push(b);
+    if (grown) assert.ok(h.extend(b, SE, 0));
+    // A spot touched only by the tip's cell.
+    const spot = cellKey(nx(6, 30, NE), ny(30, NE));
+    h.fruits.push(spot);
+    assert.ok(h.harden(1) > 0);
+    assert.ok(!h.tips.includes(tip));
+    assert.deepEqual([...h.knots.keys()].map(keyCell), [[4, 30]], `grown ${grown}: the knot sits at the branch point`);
+    for (const [c, p] of h.parent) if (p !== ROOT) assert.ok(h.parent.has(p), `grown ${grown}: ${keyCell(c)} left with a deleted parent`);
+    for (const t of h.tips) assert.ok(h.has(t.x, t.y), `grown ${grown}: a tip left on a deleted cell`);
+    assert.ok(!h.fruits.includes(spot), "a spot no hypha touches was kept");
+  }
+});
+
+test("a knot sprouts onward from where it was fed, also off the east heading; a starved count is saved (review of #161 S3, N2)", () => {
+  const h = new Hyphae();
+  h.root(0, 30, SE);
+  const t = h.tips[0]!;
+  for (let k = 0; k < 6; k++) assert.ok(h.extend(t, SE, 0));
+  t.starved = 99;
+  h.harden(1);
+  const [k] = [...h.knots.keys()];
+  h.knots.get(k!)!.age = KNOT.sprout[1];
+  assert.equal(h.sproutKnots(plane(), 1, { free: 1e9, tips: 0 }), 1);
+  assert.equal(h.tips[0]!.heading, SE);
+  h.tips[0]!.starved = 3;
+  assert.equal(Hyphae.load(JSON.parse(JSON.stringify(h.save()))).tips[0]!.starved, 3);
+});
+
+test("on the plane a knot is a reserve: sprouting gives its store back; underground it keeps it (review of #161 D1)", () => {
+  for (const topsoil of [true, false]) {
+    const h = starvedLine(8, 99);
+    h.harden(1);
+    const [k] = [...h.knots.keys()];
+    const knot = h.knots.get(k!)!;
+    const store = knot.store;
+    knot.age = KNOT.sprout[1];
+    const g: Ground = { topsoil, kind: () => "soil" };
+    const budget = { free: 1e9, tips: 0 };
+    let back = 0;
+    assert.equal(
+      h.sproutKnots(g, 1, budget, 1, (m) => (back += m)),
+      1,
+    );
+    assert.equal(back, topsoil ? store : 0);
+    assert.equal(knot.store, topsoil ? 0 : store);
+    assert.equal(budget.free, 1e9 + back);
+  }
 });

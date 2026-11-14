@@ -1,4 +1,17 @@
-import { CELL, cellOf, centreX, centreY, ChunkLayer, CHUNK, CHUNK_BITS, INFECTED, R, type Colony } from "../colony/index.ts";
+import {
+  CELL,
+  cellOf,
+  centreX,
+  centreY,
+  ChunkLayer,
+  CHUNK,
+  CHUNK_BITS,
+  chunkKey,
+  chunkOf,
+  INFECTED,
+  R,
+  type Colony,
+} from "../colony/index.ts";
 
 // What the field shows of the colonies' scent (PRD §65, ja-pc72.1): only what the fungus's hosts have sensed. Every frame,
 // each infected ant of any colony marks the cells within its antennae's reach with the time; a cell's trails and alarm
@@ -15,11 +28,29 @@ export function sightOf(t: number, now: number): number {
   return t === -Infinity ? 0 : Math.max(0, Math.min(1, 1 - (now - t) / SENSED_FADE));
 }
 
-/** The sim time each cell was last sensed by a host, per layer (0: the plane or the one map; 1: one world's curtain). */
+/**
+ * The sim time each cell was last sensed by a host, per layer (0: the plane or the one map; 1: one world's curtain). A
+ * chunk no host has sensed for SENSED_FADE shows nothing, so it is dropped and leaves one bit: revealed (the fog of
+ * war's, endless-world §8). What it holds then grows with the ground hosts sense now, not all they ever sensed (§7).
+ */
 export class SensedMap {
   #layers = new Map<number, ChunkLayer<Float32Array>>();
+  /** per layer: each chunk kept, by chunkKey, and the last time a host sensed any cell of it */
+  #fresh = new Map<number, Map<number, number>>();
+  /** per layer: every chunk a host has ever sensed (chunkKey) */
+  #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
+
+  /** Whether a host has ever sensed any cell of chunk (cx, cy) on layer `l`. */
+  revealed(l: number, cx: number, cy: number): boolean {
+    return this.#revealed.get(l)?.has(chunkKey(cx, cy)) ?? false;
+  }
+
+  /** Chunks a host has ever sensed on layer `l`. */
+  revealedCount(l: number): number {
+    return this.#revealed.get(l)?.size ?? 0;
+  }
 
   /** The layer's grid, or null before any host has sensed there. */
   layer(l: number): ChunkLayer<Float32Array> | null {
@@ -34,11 +65,29 @@ export class SensedMap {
 
   /** Mark what every host of `colonies` senses at sim time `now`. Time gone back (a restart, a load) forgets everything. */
   stamp(colonies: readonly Colony[], now: number): void {
-    if (now < this.now) this.#layers.clear();
+    if (now < this.now) {
+      this.#layers.clear();
+      this.#fresh.clear();
+      this.#revealed.clear();
+    }
     this.now = now;
     for (const c of colonies) {
       const r = c.params.sensorDistance + REACH_MARGIN;
       for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= INFECTED) this.mark(c.layer[i] ?? 0, c.x[i], c.y[i], r);
+    }
+    this.#forget();
+  }
+
+  /** Drop every chunk faded right out: it shows nothing now, and its revealed bit stays. */
+  #forget(): void {
+    for (const [l, fresh] of this.#fresh) {
+      const grid = this.#layers.get(l)!;
+      for (const [key, t] of fresh)
+        if (this.now - t >= SENSED_FADE) {
+          fresh.delete(key);
+          const [cx, cy] = chunkOf(key);
+          grid.drop(cx, cy);
+        }
     }
   }
 
@@ -46,6 +95,10 @@ export class SensedMap {
   mark(l: number, x: number, y: number, r: number): void {
     let grid = this.#layers.get(l);
     if (!grid) this.#layers.set(l, (grid = new ChunkLayer((n) => new Float32Array(n), -Infinity)));
+    let fresh = this.#fresh.get(l);
+    if (!fresh) this.#fresh.set(l, (fresh = new Map()));
+    let revealed = this.#revealed.get(l);
+    if (!revealed) this.#revealed.set(l, (revealed = new Set()));
     cellOf(x, y);
     const gx0 = CELL[0];
     const gy0 = CELL[1];
@@ -60,6 +113,11 @@ export class SensedMap {
         if (dx * dx + dy * dy > r2) continue;
         const a = grid.ensure(gx >> CHUNK_BITS, gy >> CHUNK_BITS);
         a[((gy & (CHUNK - 1)) << CHUNK_BITS) | (gx & (CHUNK - 1))] = this.now;
+        const key = chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS);
+        if (fresh.get(key) !== this.now) {
+          fresh.set(key, this.now);
+          revealed.add(key);
+        }
       }
     }
   }

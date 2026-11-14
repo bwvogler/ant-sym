@@ -75,6 +75,18 @@ export interface ColonyParams {
    */
   followChoice: number;
   /**
+   * How an ant draws its mode from Jev's probabilities (ja-nan3; colony/weighted.ts): p^(1/T), so 1 as Jev
+   * gave them, under 1 toward the mode Jev chose (0: always it, as before), over 1 toward even. A policy with no
+   * probabilities (the local rule, a bare cached answer) is never drawn from.
+   */
+  sampleTemp: number;
+  /**
+   * Seconds after an ant drew its mode before it draws again in the same situation (ja-nan3): without it an ant
+   * is asked only when its situation changes, so a draw would hold for as long as nothing round it changed. 0 = never
+   * again until the situation changes. Only an ant whose last answer was drawn is re-asked: a game on the local rule is unchanged.
+   */
+  reroll: number;
+  /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
    * is raised instead: foodCapTop.)
@@ -310,6 +322,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
+  sampleTemp: 1,
+  reroll: 10,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,
@@ -338,11 +352,11 @@ export const DEFAULT_COLONY: ColonyParams = {
   heatNight: 1 / 3,
   heatStart: 0,
   heatDeath: 53.6,
-  routeMemory: 0,
+  routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
-  routeStep: 8,
-  routeSee: 5,
+  routeStep: 4,
+  routeSee: 3,
   routeMax: 64,
   raidGate: 1,
   raidLay: 1,
