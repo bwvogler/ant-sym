@@ -353,6 +353,7 @@ test("the fungus's save holds every private field it declares, or the field is d
     hyphae: "hyphae",
     corpses: "corpses",
     corpseAge: "corpseAges",
+    links: "links",
   } as Record<string, string>;
   // menuSeq counts menu changes for readers caching the menu (ja-d87): a load sets the menu, which bumps it.
   const derived = ["reach", "evade", "listed", "menuSeq"];

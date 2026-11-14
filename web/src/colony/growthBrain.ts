@@ -11,7 +11,7 @@ import { AHEADS, EXPOSURES, RUNS, SUPPLIES, type GrowthSituation } from "./hypha
 // (its run since branching, its first heading, the spots near it).
 
 /** Bump when the growth situation, the legend or the question changes: old cached answers no longer apply. */
-export const GROWTH_BRAIN_VERSION = 3;
+export const GROWTH_BRAIN_VERSION = 4;
 
 /** The growth situation's fields in the order a code and a cache key read them: 4 × 3 × 2 × 2 = 48 (run since ja-2bw.18). */
 export const GROWTH_SCHEMA = defineSchema<GrowthSituation>([
@@ -32,7 +32,7 @@ export const GROWTH_CRITERIA: Record<GrowthChoice, string> = {
   branch:
     "branch: put out a second tip beside it, both growing on (against a wall met head on, split both ways): the only way the mycelium gains tips, and what a real hypha does after a long run",
   rest: "rest: grow nothing this time, and keep the mass",
-  fuse: "fuse: join its own hypha ahead, closing a loop (only when ahead is own), and end this tip: a loop keeps the far part fed if ants cut the hypha",
+  fuse: "fuse: join its own hypha ahead, closing a loop (only when ahead is own), and end this tip: a loop is a second, often shorter way for mass to reach the tips beyond it",
   fruit:
     "fruit: end this tip for good as a spore spot on the dug cell it touches (only on a wall or in a dug cell): ants walking there pick up spores, but the tip grows no more",
 };
@@ -54,7 +54,7 @@ export const GROWTH_LEGEND = legendOf(GROWTH_SCHEMA, {
     ],
     [
       "supply",
-      "supply is the mass the mycelium can spare for it now: short (growing would spend the last reserve) or ample. Mass grown into hyphae is the fungus's body; spores come from the same mass. ",
+      "supply is the mass that has reached this tip along its hyphae: short (not yet a step's worth) or ample. Mass enters where the fungus feeds (its patch, a corpse) and flows out along the hyphae to the tips that are growing, slowly through thin hyphae and fast along cords. Mass grown into hyphae is the fungus's body; spores come from the same mass. ",
     ],
     [
       "run",

@@ -319,6 +319,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
     "evolution",
     "hosts",
     "hyphae",
+    "links",
     "menu",
     "params",
     "rule",
