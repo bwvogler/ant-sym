@@ -475,12 +475,11 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const f = marksAt(col, i, h, ROYAL_MARKS);
       const r = marksAt(col, i, h + a, ROYAL_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * 0.3) + noise * p.wander * 0.5 : noise * p.wander;
-    } else if (col.entrance && col.outbound(i) && col.under[i]) {
-      // An old forager in a chamber heads out by its own vector: across by where its drifting nest vector puts the hole
-      // (believe), not the hole's position (ja-k4k.2.2); its row is still the hole's true row ("Exact depth", docs/vision.md).
-      const b = believe(col, i, col.entrance);
-      h = turnToward(h, Math.atan2(b.y - col.y[i], b.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
-    } else if (
+    } else if (col.entrance && col.outbound(i) && col.under[i])
+      // An old forager in a chamber: at the hole's position (ja-k4k.2.2). Aimed where its drifting nest vector puts the
+      // hole instead, a few units off, it pressed on the wall beside the chamber's way out (#192: economy.test collapsed).
+      h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
+    else if (
       p.foodPlume > 0 &&
       !carrying &&
       (col.entrance === null || (col.line !== null && col.cur === PLANE)) &&
