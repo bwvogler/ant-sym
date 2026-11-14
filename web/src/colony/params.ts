@@ -220,9 +220,11 @@ export interface ColonyParams {
   routeMax: number;
   /**
    * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where a retrace joins the stored way out. 0 = at
-   * its newest place (back where it picked up: a carrier whose vector had already brought it near home walked the whole trip
-   * out and in again); 1 = at the nearest stored place it can see (a clear straight line), else its newest: a route is taken
-   * up at the stage reached (Freas & Spetch 2024), at the place recognised (Kohler & Wehner 2005). Steering only.
+   * its newest place (back where it picked up). 1 = once its vector has run out near home (it reached its belief, found no hole
+   * and is searching there), at the nearest stored place it can see (a clear straight line), else its newest; a stall before
+   * that, at or near the pickup, still starts from its newest place. A route is taken up at the stage reached (Freas & Spetch
+   * 2024), and a zero-vector ant backtracks only a short way before it searches (Wystrach et al. 2013). 2 = the nearest place in
+   * view at every retrace (the first build: A2b lost seeds 9, 23 and 24 of 30). Steering only.
    */
   routeJoin: number;
   /**

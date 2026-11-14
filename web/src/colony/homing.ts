@@ -296,7 +296,10 @@ export function routeFail(c: Colony, i: number, stalled: boolean): boolean {
   if (c.routeState[i] !== 0 || c.routeN[i] === 0 || c.carrying[i] !== 1 || c.pellet[i] === 1 || (!stalled && p.routeMemory < 2))
     return false;
   c.routeState[i] = 1;
-  return routeTo(c, i, p.routeJoin > 0 ? routeNearest(c, i) : c.routeN[i] - 1);
+  // routeJoin 1: only once its vector has run out (it reached its belief, found no hole, and is searching: its own search
+  // state, reset when it picks up); a stall before that, at or near the pickup, starts from its newest place. 2: always.
+  const join = p.routeJoin >= 2 || (p.routeJoin > 0 && c.search[i] !== 0);
+  return routeTo(c, i, join ? routeNearest(c, i) : c.routeN[i] - 1);
 }
 
 /**
