@@ -1,11 +1,11 @@
-// The builder (docs/builder.md, PRD §72, ja-kjj8): a child's tools that change the world. Each one writes only to state the
+// The builder (docs/builder.md, PRD §73, ja-kjj8): a child's tools that change the world. Each one writes only to state the
 // ants already sense (terrain, food and its quality, a colony's food trail) or takes trail away (rain); none tells an ant
 // what to do. A stroke is applied between ticks and draws no random numbers, so a game no stroke touches runs bit for bit
 // as before.
 //
 // Tools: dig (open ground), dirt (soil below; rock on the plane, which has no soil), rock, sugar and crumb (food of quality
 // 1.5 and 0.5, assay A2b's), a crayon per colony (its food trail, kept topped up as it fades at the home trail's rate:
-// the owner's call, PRD §72), and rain (every colony's trails and alarm under the cloud cleared). Guards keep the world
+// the owner's call, PRD §73), and rain (every colony's trails and alarm under the cloud cleared). Guards keep the world
 // sound: no dirt or rock on a nest's hole, on an ant or on brood.
 //
 // Undo is the Builder's, per page session: each stroke records what it changed, and undo puts back what is still its own
@@ -16,7 +16,7 @@ import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import type { Game } from "./game.ts";
 import type { Channel } from "./pheromone.ts";
 import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
-import { digCell, disc, dropFood, fillCell, inBounds, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
+import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
 
 export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "crayon" | "rain";
 export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "crayon", "rain"];
@@ -34,7 +34,7 @@ export const BUILD = {
   crumb: 0.5,
   /** a crayon line's food trail at first (STRONG is 1; a busy trail by the nest runs a few) */
   crayonLevel: 4,
-  /** its half-life, seconds: the home trail's (evaporation 0.02/s, t½ ≈ 35 s), the owner's call (PRD §72) */
+  /** its half-life, seconds: the home trail's (evaporation 0.02/s, t½ ≈ 35 s), the owner's call (PRD §73) */
   crayonHalfLife: 35,
   /** cells round a nest's hole no dirt or rock may cover */
   holeGuard: 2,
@@ -158,7 +158,7 @@ export function guarded(game: Game, layer: number): Set<number> {
 
 /** What one stroke changed, for undo. */
 type Change =
-  | { kind: "terrain"; map: WorldMap; x: number; y: number; was: number; now: number }
+  | { kind: "terrain"; map: WorldMap; x: number; y: number; was: number; now: number; chamber: number }
   | { kind: "food"; map: WorldMap; x: number; y: number; added: number; quality: number }
   | { kind: "crayon"; line: CrayonLine }
   | { kind: "crayonMore"; line: CrayonLine; cells: number[] }
@@ -253,7 +253,9 @@ export class Builder {
         if (!buildable(map, x, y) || guard?.has((y + 0x8000) * 0x10000 + (x + 0x8000))) continue;
         if (to !== OPEN && map.food.get(x, y) > 0) continue; // food is never buried
         const was = rockAt(map, x, y);
-        if (setTerrain(map, x, y, to)) out.push({ kind: "terrain", map, x, y, was, now: to });
+        // The chamber the cell belonged to, so undo can give it back (fillCell releases it; review of #204, N7).
+        const chamber = map.chambers?.at(x, y) ?? -1;
+        if (setTerrain(map, x, y, to)) out.push({ kind: "terrain", map, x, y, was, now: to, chamber });
       }
     } else if (tool === "sugar" || tool === "crumb") {
       const quality = tool === "sugar" ? BUILD.sugar : BUILD.crumb;
@@ -353,7 +355,9 @@ export class Builder {
         if (rockAt(c.map, c.x, c.y) !== c.now) continue;
         if (c.was !== OPEN && guardOf(c.map).has((c.y + 0x8000) * 0x10000 + (c.x + 0x8000))) continue;
         if (c.was !== OPEN && c.map.food.get(c.x, c.y) > 0) continue;
-        setTerrain(c.map, c.x, c.y, c.was);
+        // Reopened, a chamber cell goes back to its chamber: only an ant digging a chamber face claims one otherwise.
+        if (setTerrain(c.map, c.x, c.y, c.was) && c.was === OPEN && c.chamber >= 0)
+          c.map.chambers?.claim(c.chamber, c.x, c.y, openCell(c.map));
       } else if (c.kind === "food") {
         const v = c.map.food.get(c.x, c.y);
         const take = Math.min(v, c.added);

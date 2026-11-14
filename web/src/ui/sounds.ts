@@ -1,4 +1,4 @@
-// The builder's sounds (PRD §72, ja-kjj8.5): each tool's own, made in the browser with WebAudio (no files, no dependency),
+// The builder's sounds (PRD §73, ja-kjj8.5): each tool's own, made in the browser with WebAudio (no files, no dependency),
 // and its name spoken with speechSynthesis where the device has a voice (Hiniker et al. 2015: pre-readers follow audio).
 // Nothing plays before the player's first touch (the context is made in a gesture's handler) or while sound is off.
 

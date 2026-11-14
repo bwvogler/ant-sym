@@ -7,7 +7,7 @@ import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
 import { generateSideWorld, mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
 import { SMALL_SIDE, smallOne } from "../builders.ts";
 
-// The builder (docs/builder.md, PRD §72, ja-kjj8.2): a child's tools over the world, guarded, undoable.
+// The builder (docs/builder.md, PRD §73, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
 const game = (ants = 20) => new Game(smallOne(7), { antCount: ants, rivalAnts: ants, regrow: 0 }, mulberry32(3));
 const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
@@ -358,4 +358,19 @@ test("builder food counts in the map's total, so a share of it stays a share; un
   assert.equal(above.foodTotal - total, above.foodLeft - left, "the total rises by what was put down");
   assert.ok(b.undo());
   assert.equal(above.foodTotal, total);
+});
+
+test("undo gives refilled chamber cells back to their chamber (review of #204, N7)", () => {
+  const g = game(20);
+  const b = new Builder(g);
+  const below = g.layers[CURTAIN] as WorldMap;
+  const ch = below.chambers!;
+  const room = ch.list.find((c) => c.colony === g.colonies[0]!.params.nest)!;
+  const before = room.cells;
+  const points: { x: number; y: number }[] = [];
+  for (let y = room.y0; y <= room.y1; y++) for (let x = room.x0; x <= room.x1; x++) if (ch.at(x, y) === room.id) points.push(pt(x, y));
+  assert.ok(b.apply({ tool: "dirt", layer: CURTAIN, points }) > 0);
+  assert.ok(room.cells < before, "dirt shrinks the chamber");
+  assert.ok(b.undo());
+  assert.equal(room.cells, before, "undo gives every cell back");
 });
