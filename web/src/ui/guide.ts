@@ -380,6 +380,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "Finding home outside and inside, the queen, nest architecture, jobs by place and age.",
   },
   { note: "trails", title: "Trails", covers: "The double bridge, trail amount by food quality, the “no entry” mark." },
+  {
+    note: "steering",
+    title: "Steering",
+    covers: "How a forager weighs trail, home vector, last find, alarm and random search; what the policy may set (staging).",
+  },
   { note: "combat", title: "Combat", covers: "Narrow ground and the few against the many, graded alarm, meeting a stranger." },
   { note: "tiredness", title: "Tiredness", covers: "When a forager gives up a search and how it recovers." },
   {

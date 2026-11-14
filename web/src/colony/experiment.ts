@@ -13,7 +13,7 @@ import {
   PLANE,
   planeMoundReach,
 } from "./colony.ts";
-import { FAINT, MODES, RETURN, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
+import { EXPLORE, FAINT, MODES, RETURN, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
@@ -1774,6 +1774,115 @@ export const lockstep1: Assay = {
   score: () => ({}),
 };
 
+/** The angle between two headings, 0 to π. */
+const angleBetween = (a: number, b: number): number => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+
+/** T1: within this of its last find an explorer counts as searching where it found food; beyond T1_FAR (or with no find yet), as ranging. */
+export const T1_NEAR = 8;
+export const T1_FAR = 25;
+/** T1's pass mark: near ÷ far turning at least this (design: today's ants measure 1.00, 0.98–1.04 on seeds 1–10, and noise round 1 must not pass). */
+export const T1_PASS = 1.5;
+
+/**
+ * How sharply the first colony's explorers turn near their last find and away from it (staging, ja-ykmu.1; docs/steering.md
+ * §7): an observer. It notes where each ant picks food up on the plane (its last find; a newborn in a slot has none), and over
+ * every tick an empty-jawed explorer on the plane walks, the turning (radians) and the distance it covers, near its last find
+ * (within T1_NEAR) or away (beyond T1_FAR, or no find). `turnNear` and `turnFar` are radians per unit walked; `ratio`
+ * = near ÷ far; `nearWalk` and `farWalk` the distance each is measured over.
+ */
+export function searchTurnProbe(): Probe {
+  let pickX = new Float64Array(0);
+  let pickY = new Float64Array(0);
+  let prevH = new Float64Array(0);
+  let prevX = new Float64Array(0);
+  let prevY = new Float64Array(0);
+  let had = new Uint8Array(0);
+  let gen = new Uint32Array(0);
+  let turnNear = 0;
+  let walkNear = 0;
+  let turnFar = 0;
+  let walkFar = 0;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (pickX.length < c.n) {
+        const grow = <T extends Float64Array | Uint8Array | Uint32Array>(a: T, make: (n: number) => T, fill?: number): T => {
+          const b = make(c.n);
+          if (fill !== undefined) (b as Float64Array).fill(fill);
+          b.set(a as never);
+          return b;
+        };
+        pickX = grow(pickX, (k) => new Float64Array(k), NaN);
+        pickY = grow(pickY, (k) => new Float64Array(k), NaN);
+        prevH = grow(prevH, (k) => new Float64Array(k), NaN);
+        prevX = grow(prevX, (k) => new Float64Array(k), NaN);
+        prevY = grow(prevY, (k) => new Float64Array(k), NaN);
+        had = grow(had, (k) => new Uint8Array(k));
+        gen = grow(gen, (k) => new Uint32Array(k));
+      }
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.gen[i] !== gen[i]) {
+          gen[i] = c.gen[i];
+          pickX[i] = pickY[i] = prevH[i] = NaN;
+          had[i] = 0;
+          continue;
+        }
+        const onPlane = c.layer[i] === PLANE;
+        if (c.carrying[i] && !had[i] && onPlane) {
+          pickX[i] = c.x[i];
+          pickY[i] = c.y[i];
+        }
+        had[i] = c.carrying[i];
+        const exploring = onPlane && !c.carrying[i] && !c.pellet[i] && c.mode[i] === EXPLORE && c.question[i] >= 0;
+        if (exploring && !Number.isNaN(prevH[i])) {
+          const walk = Math.hypot(c.x[i] - prevX[i], c.y[i] - prevY[i]);
+          if (walk > 0) {
+            const turn = angleBetween(c.heading[i], prevH[i]);
+            const d = Number.isNaN(pickX[i]) ? Infinity : Math.hypot(c.x[i] - pickX[i], c.y[i] - pickY[i]);
+            if (d <= T1_NEAR) {
+              turnNear += turn;
+              walkNear += walk;
+            } else if (d >= T1_FAR) {
+              turnFar += turn;
+              walkFar += walk;
+            }
+          }
+        }
+        prevH[i] = exploring ? c.heading[i] : NaN;
+        prevX[i] = c.x[i];
+        prevY[i] = c.y[i];
+      }
+    },
+    summary() {
+      const near = walkNear > 0 ? turnNear / walkNear : NaN;
+      const far = walkFar > 0 ? turnFar / walkFar : NaN;
+      return { turnNear: near, turnFar: far, ratio: near / far, nearWalk: walkNear, farWalk: walkFar };
+    },
+  };
+}
+
+/**
+ * T1 — search turns tight where an ant found food (staging, ja-ykmu.1; docs/steering.md §7: *Formica schaufussi* search with a high
+ * turning rate at the find, Fourcassié & Traniello 1993–94, unverified): the page's one-world game, 300 + 300 ants, 300 s, with
+ * searchTurnProbe. Target: explorers turn more per unit walked near their last find than away from it, `ratio` ≥ T1_PASS (a
+ * design mark: no number from the papers is used).
+ */
+export const searchTight1: Assay = {
+  id: "t1",
+  title: "T1 search turns tight near the last find (one world)",
+  target:
+    "explorers turn more per unit walked within T1_NEAR of their last find than beyond T1_FAR: ratio > 1 (design mark; Fourcassié & Traniello, unverified)",
+  seconds: 300,
+  spec: (seed) => ({
+    seed,
+    seconds: 300,
+    map: (s) => generateOneWorld(s),
+    game: { antCount: 300, rivalAnts: 300 },
+    probes: [searchTurnProbe()],
+  }),
+  score: (r): Record<string, number> => (Number.isFinite(r.metrics.ratio) ? { pass: (r.metrics.ratio as number) >= T1_PASS ? 1 : 0 } : {}),
+};
+
 /**
  * G1 — the one-world game (docs/one-world.md §6, U6): generateOneWorld(seed), 600 + 600 ants, 10 minutes, as G is for
  * the side view, with its bound (A7): no colony with more than 2 foragers holding food over 120 s at any 10-s sample,
@@ -2027,151 +2136,267 @@ export const F1_SECONDS = 30;
  * spot, at the end, of those that did not reach it).
  * Target: reach ≥ 80 % with ratio under 1.5 (design marks).
  */
+/**
+ * F1's run (forage1), with hooks for an assay built on it (M1, memory1): `after` runs once F1's foragers are set down, with their
+ * spots and the hole; `probes` are added beside F1's own. F1 itself passes none, so its run is as it was.
+ */
+function f1Spec(
+  seed: number,
+  hooks: {
+    after?(game: Game, spotX: Float64Array, spotY: Float64Array, hx: number, hy: number): void;
+    probes?(spotX: Float64Array, spotY: Float64Array): Probe[];
+    events?: Event[];
+  } = {},
+): RunSpec {
+  const n = F1_ANTS;
+  const spotX = new Float64Array(n);
+  const spotY = new Float64Array(n);
+  const startX = new Float64Array(n);
+  const startY = new Float64Array(n);
+  const lastX = new Float64Array(n);
+  const lastY = new Float64Array(n);
+  const walked = new Float64Array(n);
+  const reachT = new Float64Array(n).fill(Infinity);
+  const reachPath = new Float64Array(n);
+  const fed = new Uint8Array(n);
+  const setUp = (game: Game): void => {
+    const rng = mulberry32(seed * 6101 + 17);
+    const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+    const plane = game.world!.plane;
+    const c = game.player;
+    const hc = c.holeCells[c.params.nest] as HoleCell;
+    const hx = centreX(hc.px, hc.py);
+    const hy = centreY(hc.py);
+    const { w } = plane.size;
+    const joined = joinedOpen(plane, hc);
+    const xMax = plane.size.w - 2;
+    const yMax = plane.size.h * R - 2;
+    const holes = game.colonies.flatMap((k) => k.holeCells.map((h) => ({ x: centreX(h.px, h.py), y: centreY(h.py) })));
+    for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
+    // No food on the plane: the walk to the spot is not cut short by food met on the way (a pile within 80 cells of the hole took 43 % of the foragers' trips).
+    for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) plane.food.set(x, y, 0);
+    plane.foodLeft = 0;
+    for (let i = 0; i < n; i++) {
+      let sx = 0;
+      let sy = 0;
+      let a = 0;
+      for (;;) {
+        a = rng() * 2 * Math.PI;
+        const d = F1_NEAR + rng() * (F1_FAR - F1_NEAR);
+        sx = hx + d * Math.cos(a);
+        sy = hy + d * Math.sin(a);
+        if (sx < 2 || sy < 2 || sx > xMax || sy > yMax) continue;
+        if (holes.some((h) => Math.hypot(sx - h.x, sy - h.y) < 2 * HOLE_SIGHT)) continue;
+        cellOf(sx, sy);
+        if (!joined[CELL[0] + CELL[1] * w]) continue;
+        // And the straight line out to it is open ground: a forager that found it walked there; F1 asks about its memory, not
+        // about getting round rock (an explorer follows no wall).
+        let clear = true;
+        for (let t = 0; t < 1 && clear; t += 0.5 / Math.hypot(sx - hx, sy - hy)) {
+          cellOf(hx + t * (sx - hx), hy + t * (sy - hy));
+          clear = rockAt(plane, CELL[0], CELL[1]) === OPEN;
+        }
+        if (clear) break;
+      }
+      spotX[i] = sx;
+      spotY[i] = sy;
+      // Set down a few cells out of the hole, on the way to the spot's side if that ground is open (else at the hole).
+      let px = hx + 3 * Math.cos(a);
+      let py = hy + 3 * Math.sin(a);
+      cellOf(px, py);
+      if (!joined[CELL[0] + CELL[1] * w]) {
+        px = hx;
+        py = hy;
+      }
+      startX[i] = px;
+      startY[i] = py;
+      lastX[i] = px;
+      lastY[i] = py;
+      c.age[i] = 0.5 * LIFESPAN;
+      c.putAnt(i, PLANE, px, py);
+      c.carrying[i] = 0;
+      c.mode[i] = MODES.indexOf("explore");
+      c.heading[i] = rng() * 2 * Math.PI;
+      c.odoSurf[i] = 3;
+      c.driftSurf[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
+      c.driftSurfY[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
+      // The find: a straight walk out to the spot, with a drift of its own, as the game draws one at the hole.
+      const dx = (gauss() * PI_DRIFT) / Math.SQRT2;
+      const dy = (gauss() * PI_DRIFT) / Math.SQRT2;
+      // Where its hole was believed to be on that trip, the plane's nest plus its drift: the find's offset from it.
+      const nest = plane.nests[c.params.nest] as Nest;
+      const odo = Math.hypot(sx - hx, sy - hy);
+      rememberAt(c, i, sx - (nest.x + odo * dx), sy - (nest.y + odo * dy));
+    }
+    hooks.after?.(game, spotX, spotY, hx, hy);
+  };
+  const probe: Probe = {
+    tick(game) {
+      const c = game.player;
+      for (let i = 0; i < n; i++) {
+        if (c.layer[i] !== PLANE) continue;
+        const x = c.x[i];
+        const y = c.y[i];
+        if (c.carrying[i]) fed[i] = 1;
+        if (reachT[i] === Infinity) {
+          walked[i] = walked[i] + Math.hypot(x - lastX[i], y - lastY[i]);
+          if (Math.hypot(x - spotX[i], y - spotY[i]) < HOLE_SIGHT) {
+            reachT[i] = game.time;
+            reachPath[i] = walked[i];
+          }
+        }
+        lastX[i] = x;
+        lastY[i] = y;
+      }
+    },
+    summary(game) {
+      const m: Record<string, number> = {};
+      const c = game.player;
+      const left: number[] = [];
+      for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot(c.x[i] - spotX[i], c.y[i] - spotY[i]));
+      left.sort((a, b) => a - b);
+      const times: number[] = [];
+      const ratios: number[] = [];
+      const paths: number[] = [];
+      for (let i = 0; i < n; i++) {
+        if (reachT[i] === Infinity) continue;
+        times.push(reachT[i]);
+        // To its sight: the straight line is the distance from where it was set down to the spot, less the sight.
+        ratios.push(reachPath[i] / Math.max(1, Math.hypot(spotX[i] - startX[i], spotY[i] - startY[i]) - HOLE_SIGHT));
+        paths.push(reachPath[i]);
+      }
+      const med = (v: number[]): number => (v.length ? v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)] : NaN);
+      m.reach = times.length / n;
+      m.median = med(times);
+      m.ratio = med(ratios);
+      m.walked = med(paths);
+      // Those that did not get there: how many picked up food on the way (other food on the plane), and how far from the spot the rest were at the end.
+      m.fed = fed.reduce((a, b) => a + b, 0) / n;
+      m.short = left.length ? left[Math.floor((left.length - 1) / 2)] : NaN;
+      m.pass = m.reach >= 0.8 && m.ratio < 1.5 ? 1 : 0;
+      return m;
+    },
+  };
+  return {
+    seed,
+    seconds: F1_SECONDS,
+    map: (s) => generateOneWorld(s),
+    game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
+    sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+    events: [{ at: 0, kind: "call", run: setUp }, ...(hooks.events ?? [])],
+    probes: [probe, ...(hooks.probes?.(spotX, spotY) ?? [])],
+  };
+}
+
 export const forage1: Assay = {
   id: "f1",
   title: "F1 foragers go back to their last find (one world)",
   target: "≥ 80 % of foragers within sight of their spot in 30 s, walking under 1.5 times the straight line",
   seconds: F1_SECONDS,
+  spec: (seed) => f1Spec(seed),
+  score: () => ({}),
+};
+
+/** M1: the trail's length (cells, from 3 out of the hole), the level it is kept at, and the least angle between it and a counted ant's spot. */
+export const M1_TRAIL = 60;
+export const M1_LEVEL = 2;
+export const M1_APART = Math.PI / 3;
+
+/**
+ * M1 — memory over trail (staging, ja-ykmu.1; docs/steering.md §3: *Lasius niger* foragers that have visited a feeder once follow
+ * their memory over a conflicting trail, 82–100 % in Grüter, Czaczkes & Ratnieks 2011, unverified). F1's foragers, each with
+ * its own remembered spot (with `siteFidelity` on; off, they know nothing of it), and a strong food trail (kept at M1_LEVEL)
+ * running M1_TRAIL cells out of the hole the way farthest from their spots, along open ground; no food anywhere. Counted: the
+ * foragers whose spot is at least M1_APART from the trail's direction. Reported: `memory`, the share that reach their spot's
+ * sight first; `trail`, the share the trail takes first (to its end, or 20 cells along it within 3 of it); `counted`.
+ * Target: with memory on, `memory` ≥ 0.8 (Grüter et al. 2011, unverified).
+ */
+export const memory1: Assay = {
+  id: "m1",
+  title: "M1 memory over trail: foragers with a remembered find, a strong trail the other way (one world)",
+  target:
+    "with memory on: ≥ 80 % reach their own spot before the trail takes them (Grüter et al. 2011: 82–100 %, unverified); memory and trail shares reported",
+  seconds: F1_SECONDS,
   spec: (seed) => {
     const n = F1_ANTS;
-    const spotX = new Float64Array(n);
-    const spotY = new Float64Array(n);
-    const startX = new Float64Array(n);
-    const startY = new Float64Array(n);
-    const lastX = new Float64Array(n);
-    const lastY = new Float64Array(n);
-    const walked = new Float64Array(n);
-    const reachT = new Float64Array(n).fill(Infinity);
-    const reachPath = new Float64Array(n);
-    const fed = new Uint8Array(n);
-    const setUp = (game: Game): void => {
-      const rng = mulberry32(seed * 6101 + 17);
-      const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
-      const plane = game.world!.plane;
-      const c = game.player;
-      const hc = c.holeCells[c.params.nest] as HoleCell;
-      const hx = centreX(hc.px, hc.py);
-      const hy = centreY(hc.py);
-      const { w } = plane.size;
-      const joined = joinedOpen(plane, hc);
-      const xMax = plane.size.w - 2;
-      const yMax = plane.size.h * R - 2;
-      const holes = game.colonies.flatMap((k) => k.holeCells.map((h) => ({ x: centreX(h.px, h.py), y: centreY(h.py) })));
-      for (const k of game.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-      // No food on the plane: the walk to the spot is not cut short by food met on the way (a pile within 80 cells of the hole took 43 % of the foragers' trips).
-      for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) plane.food.set(x, y, 0);
-      plane.foodLeft = 0;
-      for (let i = 0; i < n; i++) {
-        let sx = 0;
-        let sy = 0;
-        let a = 0;
-        for (;;) {
-          a = rng() * 2 * Math.PI;
-          const d = F1_NEAR + rng() * (F1_FAR - F1_NEAR);
-          sx = hx + d * Math.cos(a);
-          sy = hy + d * Math.sin(a);
-          if (sx < 2 || sy < 2 || sx > xMax || sy > yMax) continue;
-          if (holes.some((h) => Math.hypot(sx - h.x, sy - h.y) < 2 * HOLE_SIGHT)) continue;
-          cellOf(sx, sy);
-          if (!joined[CELL[0] + CELL[1] * w]) continue;
-          // And the straight line out to it is open ground: a forager that found it walked there; F1 asks about its memory, not
-          // about getting round rock (an explorer follows no wall).
-          let clear = true;
-          for (let t = 0; t < 1 && clear; t += 0.5 / Math.hypot(sx - hx, sy - hy)) {
-            cellOf(hx + t * (sx - hx), hy + t * (sy - hy));
-            clear = rockAt(plane, CELL[0], CELL[1]) === OPEN;
-          }
-          if (clear) break;
-        }
-        spotX[i] = sx;
-        spotY[i] = sy;
-        // Set down a few cells out of the hole, on the way to the spot's side if that ground is open (else at the hole).
-        let px = hx + 3 * Math.cos(a);
-        let py = hy + 3 * Math.sin(a);
-        cellOf(px, py);
-        if (!joined[CELL[0] + CELL[1] * w]) {
-          px = hx;
-          py = hy;
-        }
-        startX[i] = px;
-        startY[i] = py;
-        lastX[i] = px;
-        lastY[i] = py;
-        c.age[i] = 0.5 * LIFESPAN;
-        c.putAnt(i, PLANE, px, py);
-        c.carrying[i] = 0;
-        c.mode[i] = MODES.indexOf("explore");
-        c.heading[i] = rng() * 2 * Math.PI;
-        c.odoSurf[i] = 3;
-        c.driftSurf[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
-        c.driftSurfY[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
-        // The find: a straight walk out to the spot, with a drift of its own, as the game draws one at the hole.
-        const dx = (gauss() * PI_DRIFT) / Math.SQRT2;
-        const dy = (gauss() * PI_DRIFT) / Math.SQRT2;
-        // Where its hole was believed to be on that trip, the plane's nest plus its drift: the find's offset from it.
-        const nest = plane.nests[c.params.nest] as Nest;
-        const odo = Math.hypot(sx - hx, sy - hy);
-        rememberAt(c, i, sx - (nest.x + odo * dx), sy - (nest.y + odo * dy));
+    const counted = new Uint8Array(n);
+    const first = new Uint8Array(n); // 0 neither yet, 1 its spot, 2 the trail
+    const cells: number[] = [];
+    let hx = 0;
+    let hy = 0;
+    let ux = 1;
+    let uy = 0;
+    const keep = (game: Game): void => {
+      const ph = (game.player.layers[PLANE] as Layer).ph;
+      for (let k = 0; k < cells.length; k += 2) {
+        const now = ph.fields.food.get(cells[k] as number, cells[k + 1] as number);
+        if (now < M1_LEVEL) ph.depositCell("food", cells[k] as number, cells[k + 1] as number, M1_LEVEL - now);
       }
     };
-    const probe: Probe = {
-      tick(game) {
-        const c = game.player;
-        for (let i = 0; i < n; i++) {
-          if (c.layer[i] !== PLANE) continue;
-          const x = c.x[i];
-          const y = c.y[i];
-          if (c.carrying[i]) fed[i] = 1;
-          if (reachT[i] === Infinity) {
-            walked[i] = walked[i] + Math.hypot(x - lastX[i], y - lastY[i]);
-            if (Math.hypot(x - spotX[i], y - spotY[i]) < HOLE_SIGHT) {
-              reachT[i] = game.time;
-              reachPath[i] = walked[i];
+    const after = (game: Game, spotX: Float64Array, spotY: Float64Array, x0: number, y0: number): void => {
+      hx = x0;
+      hy = y0;
+      const plane = game.world!.plane;
+      const spots = Array.from({ length: n }, (_, i) => Math.atan2((spotY[i] as number) - y0, (spotX[i] as number) - x0));
+      let best = -1;
+      let bestA = 0;
+      for (let k = 0; k < 72; k++) {
+        const a = (k / 72) * 2 * Math.PI;
+        let open = true;
+        for (let d = 3; d <= M1_TRAIL && open; d += 0.5) {
+          const x = x0 + d * Math.cos(a);
+          const y = y0 + d * Math.sin(a);
+          if (x < 2 || y < 2 || x > plane.size.w - 2 || y > plane.size.h * R - 2) open = false;
+          else {
+            cellOf(x, y);
+            open = rockAt(plane, CELL[0], CELL[1]) === OPEN;
+          }
+        }
+        if (!open) continue;
+        const apart = Math.min(...spots.map((s) => angleBetween(s, a)));
+        if (apart > best) {
+          best = apart;
+          bestA = a;
+        }
+      }
+      ux = Math.cos(bestA);
+      uy = Math.sin(bestA);
+      for (let d = 3; d <= M1_TRAIL; d += 0.5) {
+        cellOf(x0 + d * ux, y0 + d * uy);
+        if (cells.at(-2) !== CELL[0] || cells.at(-1) !== CELL[1]) cells.push(CELL[0], CELL[1]);
+      }
+      for (let i = 0; i < n; i++) counted[i] = best >= 0 && angleBetween(spots[i] as number, bestA) >= M1_APART ? 1 : 0;
+      keep(game);
+    };
+    const events: Event[] = Array.from({ length: F1_SECONDS }, (_, k) => ({ at: k + 1, kind: "call" as const, run: keep }));
+    const probes = (spotX: Float64Array, spotY: Float64Array): Probe[] => [
+      {
+        tick(game) {
+          const c = game.player;
+          for (let i = 0; i < n; i++) {
+            if (!counted[i] || first[i] || c.layer[i] !== PLANE) continue;
+            const x = c.x[i];
+            const y = c.y[i];
+            if (Math.hypot(x - (spotX[i] as number), y - (spotY[i] as number)) < HOLE_SIGHT) first[i] = 1;
+            else {
+              const along = (x - hx) * ux + (y - hy) * uy;
+              const off = Math.abs((x - hx) * uy - (y - hy) * ux);
+              if ((along >= 20 && off <= 3) || Math.hypot(x - (hx + M1_TRAIL * ux), y - (hy + M1_TRAIL * uy)) < HOLE_SIGHT) first[i] = 2;
             }
           }
-          lastX[i] = x;
-          lastY[i] = y;
-        }
+        },
+        summary() {
+          const k = counted.reduce((a, b) => a + b, 0);
+          let mem = 0;
+          let trail = 0;
+          for (let i = 0; i < n; i++) if (counted[i]) first[i] === 1 ? mem++ : first[i] === 2 ? trail++ : 0;
+          return { counted: k, memory: k ? mem / k : NaN, trail: k ? trail / k : NaN };
+        },
       },
-      summary(game) {
-        const m: Record<string, number> = {};
-        const c = game.player;
-        const left: number[] = [];
-        for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot(c.x[i] - spotX[i], c.y[i] - spotY[i]));
-        left.sort((a, b) => a - b);
-        const times: number[] = [];
-        const ratios: number[] = [];
-        const paths: number[] = [];
-        for (let i = 0; i < n; i++) {
-          if (reachT[i] === Infinity) continue;
-          times.push(reachT[i]);
-          // To its sight: the straight line is the distance from where it was set down to the spot, less the sight.
-          ratios.push(reachPath[i] / Math.max(1, Math.hypot(spotX[i] - startX[i], spotY[i] - startY[i]) - HOLE_SIGHT));
-          paths.push(reachPath[i]);
-        }
-        const med = (v: number[]): number => (v.length ? v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)] : NaN);
-        m.reach = times.length / n;
-        m.median = med(times);
-        m.ratio = med(ratios);
-        m.walked = med(paths);
-        // Those that did not get there: how many picked up food on the way (other food on the plane), and how far from the spot the rest were at the end.
-        m.fed = fed.reduce((a, b) => a + b, 0) / n;
-        m.short = left.length ? left[Math.floor((left.length - 1) / 2)] : NaN;
-        m.pass = m.reach >= 0.8 && m.ratio < 1.5 ? 1 : 0;
-        return m;
-      },
-    };
-    return {
-      seed,
-      seconds: F1_SECONDS,
-      map: (s) => generateOneWorld(s),
-      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
-      events: [{ at: 0, kind: "call", run: setUp }],
-      probes: [probe],
-    };
+    ];
+    return f1Spec(seed, { after, probes, events });
   },
-  score: () => ({}),
+  score: (r): Record<string, number> => (Number.isFinite(r.metrics.memory) ? { pass: (r.metrics.memory as number) >= 0.8 ? 1 : 0 } : {}),
 };
 
 /** R1: foragers that walk out to the pile in a pocket, per seed. */
@@ -2775,6 +3000,8 @@ export const ONE_ASSAYS: Assay[] = [
   nestFlowOne,
   game1,
   lockstep1,
+  searchTight1,
+  memory1,
   search1,
   forage1,
   route1,

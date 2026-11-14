@@ -5532,6 +5532,16 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 
 **Assays and targets.** First, with no behaviour change: search tightness after a find (ratio > 1) and memory over trail (share to the remembered side); then `lockstep` and G1 (food, losses, held carriers) against main, seeds 1–10, confirmed on 11–20.
 
+**Baselines (ja-ykmu.1; `npm run exp -- t1 m1 --one --seeds 1-10`; median and range).**
+
+| Assay | Setting | Result |
+|---|---|---|
+| T1 search tightness, near ÷ far turning (pass ≥ 1.5, design) | main's steering | 1.00 (0.98–1.04): explorers turn alike near a find and away; 0/10 pass |
+| M1 memory over trail (pass: memory ≥ 0.8) | `siteFidelity` 0 (main) | memory 0.12 (0–0.25), trail 0.37 (0.20–0.61); 0/10 |
+| M1 | `siteFidelity` 1 | memory 0.74 (0.50–0.90), trail 0.07 (0–0.33); 4/10 |
+
+M1 counts only foragers whose spot is at least 60° from the trail: a median 25.5 of 40 (4–40). T1's near sample is small beside its far one (a median 697 units walked near a find, 111,381 away).
+
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
 
 **Beads.** `ja-ykmu` (this); `ja-ykmu.1` assays, `ja-ykmu.2` steer response and plumbing, `ja-ykmu.3` the policy lane for search and memory, `ja-ykmu.4` design weights in the Lab, `ja-ykmu.5` play, results and the owner's decision. Found on the way: `ja-w8ys` (a species name in two notes).
