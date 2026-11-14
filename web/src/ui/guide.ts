@@ -500,6 +500,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Playable (PRD §60).",
   },
   {
+    note: "rouse",
+    title: "Rouse",
+    covers:
+      "The fungus's rouse lever on a desert-ant host: an infected host invites the nestmates waiting at its hole out, as a finder does. Design, against the biology: infected ants are usually less social (PRD §60.8).",
+  },
+  {
     note: "desert-heat",
     title: "Desert heat",
     covers:

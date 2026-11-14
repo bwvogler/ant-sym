@@ -28,6 +28,10 @@
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
+//        node scripts/precache.mjs --lanes fungus --fungus-also <fungus-bundle.json> [...] [--budget …] [--dry]
+//
+// --fungus-also: the fungus lane also asks every situation the given (older) fungus bundles hold, beside the ones the recorded game meets,
+// so a re-ship after a legend change keeps all an earlier ship had (save the old bundles first, e.g. with git show).
 //
 // --reweigh (ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
@@ -44,6 +48,8 @@ import {
   FUNGUS_BRAIN_VERSION,
   encodeFungal,
   decodeFungal,
+  FUNGAL_SCHEMA,
+  FUNGAL_SITUATIONS,
   DEFAULT_MENU,
   STRAINS,
   Game,
@@ -76,6 +82,7 @@ const opts = {
   import: [],
   species: null,
   reweigh: false,
+  fungusAlso: [],
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -87,6 +94,7 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else if (a === "--species") opts.species = args[++k];
   else if (a === "--reweigh") opts.reweigh = true;
+  else if (a === "--fungus-also") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.fungusAlso.push(args[++k]);
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
@@ -112,7 +120,21 @@ function fungalSituations() {
       g.paintSpores(c.nest.entrance.x, c.nest.entrance.y, 3, 2, 0.3, strain("lockpick"));
     }
   }
+  const also = fungusAlso();
+  for (let n = 0; n < FUNGAL_SITUATIONS; n++) if (also.has(FUNGAL_SCHEMA.key(decodeFungal(n)))) met.add(n);
   return [...met].sort((a, b) => a - b).map(decodeFungal);
+}
+
+/**
+ * --fungus-also: the situation part of every key in the given fungus bundles (a key is `<situation>|<levers asked>`; the situation has bars of its own), so a re-ship after a
+ * legend change also asks what an earlier ship held but this recording didn't meet (ja-rf5.18: main's bundles held 130 an aim, a fresh
+ * recording 96).
+ */
+function fungusAlso() {
+  const keys = new Set();
+  for (const path of opts.fungusAlso)
+    for (const [key] of JSON.parse(readFileSync(path, "utf8"))) keys.add(key.slice(0, key.lastIndexOf("|")));
+  return keys;
 }
 
 // One row a lane, from the lane registry (colony/lanes.ts): the situations it is asked in (the fungus's are the ones a recorded game meets),
