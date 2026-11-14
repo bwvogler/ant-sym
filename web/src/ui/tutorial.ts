@@ -205,7 +205,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Grooming took you off it, and your strain clears fast on its own: it starts weak, as every strain does here.",
           passed,
-          "Mutations come as your body grows. Spend them in the fungus panel: Persistence makes you clear slowly, Stealth hides you from groomers.",
+          "Mutations come as your body grows. Spend them in the Mutations drawer: Persistence makes you clear slowly, Stealth hides you from groomers.",
         ],
         next: "Next",
         highlight: "evolution",
@@ -224,7 +224,7 @@ export function cardFor(t: Tutorial, landing = 0): Card {
         body: [
           "Its nestmates keep grooming it; as long as some of you is left, it passes you on to the ants it touches.",
           passed,
-          "Mutations come as your body grows. Spend them in the fungus panel: Persistence makes you clear slowly, Stealth hides you from groomers.",
+          "Mutations come as your body grows. Spend them in the Mutations drawer: Persistence makes you clear slowly, Stealth hides you from groomers.",
         ],
         next: "Next",
         highlight: "evolution",

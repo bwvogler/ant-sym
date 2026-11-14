@@ -446,6 +446,7 @@ export default function ColonyApp() {
           label="Mutations"
           active={drawer === "evolve"}
           badge={affordable ? "!" : undefined}
+          badgeLabel="mutations to keep"
           onClick={() => toggle("evolve")}
         />
         <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
@@ -456,6 +457,7 @@ export default function ColonyApp() {
           label="Settings"
           active={drawer === "settings"}
           badge={backend?.needsPass ? "!" : undefined}
+          badgeLabel="Jev needs the passphrase"
           onClick={() => toggle("settings")}
         />
       </nav>

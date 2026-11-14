@@ -5510,7 +5510,7 @@ The owner asked for the map to fill the screen, with drawers and panels for the 
 They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the Codex, S4 Lab, S5 polish. Each stage is one PR, under the epic `ja-mvo9`.
 
 ### 69.1 S1: the kit and the full-bleed shell (ja-mvo9.1)
-- **`ui/kit.tsx`:** `Panel`, `SectionHead`, `Button`, `IconButton`, inline-SVG `Icon`s (no dependency), the floating surface style `FLOAT`, and `Drawer`.
+- **`ui/kit.tsx`:** `SectionHead`, `Button`, `IconButton` (its badge read out as a description), inline-SVG `Icon`s (no dependency), the floating surface style `FLOAT`, and `Drawer`.
   - A `Drawer` is a column under the HUD on a desktop, and a bottom sheet above the tab bar on a phone.
   - Escape closes it, unless a tooltip, Learn or Details is above it.
 - **The layout:**
@@ -5522,7 +5522,7 @@ They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the 
     - Colonies: the Details card;
     - Saved games: the Details card;
     - Learn;
-    - Settings: trails drawn, "Lab and numbers" (the Details screen until S4), and the GitHub link.
+    - Settings: trails drawn, "Lab and numbers" (the Details screen until S4), the GitHub link, and on the hosted page the Jev passphrase (owner, 2026-11-14: in Settings, with a badge on its tab until it is unlocked, rather than over the map).
   - **The inspector,** at the right (a sheet on a phone), shows the followed ant, or the queen's pen while she flies.
   - **The field's Whole map, nest and Labels buttons** fold into one "Go to" menu centred under the HUD.
   - **The tutorial card** moves to the lower right (above the tabs on a phone). A card that points at the mutations or the aim opens that drawer.

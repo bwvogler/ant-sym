@@ -1653,7 +1653,8 @@ export default function ColonyField({
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
     else if (key === "n") goNest((nestTurn.current + 1) % colonies.length);
-    else if (e.key === "Escape") unfollow();
+    // Escape drops a follow; with nothing followed it is left for the drawer (review of #182, S7).
+    else if (e.key === "Escape" && follow.current && !e.defaultPrevented) unfollow();
     else return;
     e.preventDefault();
   };

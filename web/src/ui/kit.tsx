@@ -1,4 +1,4 @@
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 // The page's building blocks (PRD §69, ja-mvo9.1): one section head, one set of buttons and icons, and the drawer that
 // holds a surface beside the map (a bottom sheet on a phone). Components use these rather than hand-rolling the
@@ -37,14 +37,25 @@ export function IconButton({
   label,
   active,
   badge,
+  badgeLabel,
   className = "",
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon: IconName; label: string; active?: boolean; badge?: ReactNode }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: IconName;
+  label: string;
+  active?: boolean;
+  badge?: ReactNode;
+  /** what the badge means, read out as the button's description (its name stays `label`) */
+  badgeLabel?: string;
+}) {
+  const said = useId();
+  const shown = badge !== undefined;
   return (
     <button
       type="button"
       aria-label={label}
-      title={label}
+      title={shown && badgeLabel ? `${label}: ${badgeLabel}` : label}
+      aria-describedby={shown && badgeLabel ? said : undefined}
       aria-pressed={active}
       className={`relative grid size-10 shrink-0 place-items-center rounded-lg transition-colors ${
         active ? "bg-accent text-accent-ink" : "text-fg-2 hover:bg-raised hover:text-fg"
@@ -52,9 +63,17 @@ export function IconButton({
       {...rest}
     >
       <Icon name={icon} />
-      {badge !== undefined && (
-        <span className="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-spore px-1 text-[10px] leading-4 text-white">
+      {shown && (
+        <span
+          aria-hidden
+          className="absolute -top-0.5 -right-0.5 grid min-w-4 place-items-center rounded-full bg-spore px-1 text-[10px] leading-4 text-white"
+        >
           {badge}
+        </span>
+      )}
+      {shown && badgeLabel && (
+        <span id={said} hidden>
+          {badgeLabel}
         </span>
       )}
     </button>
