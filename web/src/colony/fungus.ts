@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import { CURTAIN, type Colony, type Layer } from "./colony.ts";
+import { CURTAIN, PLANE, type Colony, type Layer } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -145,8 +145,14 @@ export const STRAINS: readonly Strain[] = [
 export interface FungusParams {
   /** load an ant takes per second per unit of spores on its cell */
   pickup: number;
-  /** share of ground spores lost per second (sun, rain) */
+  /** share of ground spores lost per second underground (rain, soil microbes; the curtain, the side and top-down maps) */
   sporeDecay: number;
+  /**
+   * how many times faster spores fade on ground open to the sun: one world's plane (ja-6ip). Full sun kills
+   * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
+   * paired test gives a ratio, so this is a design number, tuned on the progression (PRD §63.11)
+   */
+  sun: number;
   /** spores a cell holds at most */
   maxSpores: number;
   /** load groomed off per second, per groomer, per unit of a host's visible share */
@@ -184,6 +190,7 @@ export interface FungusParams {
 export const DEFAULT_FUNGUS: FungusParams = {
   pickup: 0.3,
   sporeDecay: 0.03,
+  sun: 4,
   maxSpores: 6,
   grooming: 0.12,
   groomers: 4,
@@ -748,7 +755,9 @@ export class Fungus {
       const y = taken[k + 1];
       L.spores.set(x, y, Math.max(0, L.spores.get(x, y) - taken[k + 2]));
     }
-    const keep = Math.exp(-p.sporeDecay * dt);
+    // One world's plane is the sunlit surface (ja-6ip); on one map (layer −1) and in the curtain the soil shades them.
+    const sunlit = layer === PLANE && this.#layers.length > 1;
+    const keep = Math.exp(-p.sporeDecay * (sunlit ? p.sun : 1) * dt);
     let shown = 0;
     for (const key of L.sporeCells) {
       const col = key % w;

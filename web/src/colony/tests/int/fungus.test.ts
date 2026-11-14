@@ -257,6 +257,25 @@ test("one world: the panel's count takes in the spores on every map, after a ste
   assert.equal(back.shownSporeCells, 1, "and after a load");
 });
 
+test("one world: spores on the sunlit plane fade `sun` times faster than in the curtain; one map fades as underground (ja-6ip)", () => {
+  const f = new Fungus([arena(), arena()]);
+  const { x, y } = at(15, 6);
+  f.paint([], x, y, 0.5, 4, 0, BLOOM, 0);
+  f.paint([], x, y, 0.5, 4, 0, BLOOM, 1);
+  for (let k = 0; k < 30; k++) f.stepLayers([], [[], []], 1 / 30);
+  const { sporeDecay, sun } = f.params;
+  assert.ok(sun > 1);
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-4;
+  const plane = f.sporesOn(0)!.spores.get(15, 6);
+  const curtain = f.sporesOn(1)!.spores.get(15, 6);
+  assert.ok(near(plane, 4 * Math.exp(-sporeDecay * sun)), `the plane: ${plane}`);
+  assert.ok(near(curtain, 4 * Math.exp(-sporeDecay)), `the curtain: ${curtain}`);
+  const one = new Fungus(arena());
+  one.paint([], x, y, 0.5, 4, 0, BLOOM);
+  run(one, [], 1);
+  assert.ok(near(one.spores.get(15, 6), 4 * Math.exp(-sporeDecay)), "a map of its own fades as underground");
+});
+
 test("spores on the ground: an ant walking onto them picks up load and takes some away; untouched spores fade", () => {
   const map = arena();
   const f = new Fungus(map);
@@ -268,7 +287,7 @@ test("spores on the ground: an ant walking onto them picks up load and takes som
   assert.equal(c.strain[0], BLOOM, "the ground's strain");
   assert.ok(f.spores.get(15, 6) < f.spores.get(30, 6), "the trodden cell lost more than the fade");
   const left = f.spores.get(30, 6);
-  assert.ok(left < 4 && left > 3.5, `a second of sun: ${left}`);
+  assert.ok(left < 4 && left > 3.5, `a second's fade: ${left}`);
   const fresh = new Fungus(map, { sporeDecay: 1 });
   fresh.paint([], at(30, 6).x, at(30, 6).y, 0.5, 4, 0, BLOOM);
   run(fresh, [], 10);
