@@ -4863,6 +4863,13 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Tests:** `tests/int/desertInvite.test.ts` (the rule; D2c on seeds 1–2 and its one-minute window; the ablation; a finder raising waiting ants' pace in a game; a pace rising only for an ant held at the gate; a crowd damping it in a game with a rival; the leave response reading the pace). Mutations, each failing it: no pull in the game; the touch ignoring the pace; the crowd ignored in the game; the pull reaching ants not held at the gate; the time constant back to 20 s; the window back to 10 s.
 - **Next:** the fungus's contact lever on this host (`ja-rf5.7`) acts at this contact.
 
+### 60.7 The fungus's levers on the desert-ant host (ja-rf5.7, decided 2026-11-14)
+
+- **What already reaches it.** The levers that act through a channel the desert ant lacks do nothing (`inertLevers`, the Details screen greys them): food scent, rival trails as food, alarm, the trail leaked to rivals, alarm laid. Home scent and trail laid act through its floor marks only. The rest act on it as on the generic ant: time out, stranger scent, floor marks, queen scent and signal, the calming cue, fungal odour, the fungus showing, and the lethal odour weapon and crown.
+- **Host odour first** (owner, 2026-11-11): already built. The fungal-odour lever, stranger scent and the odour weapon act through colony recognition (`recognition.ts`), which the desert ant has; between desert-ant colonies aggression is at its stranger setting (§60.2), so a host made to smell like nobody's is fought.
+- **Contact at an invitation** (owner, 2026-11-14): a new lever, **rouse**. An infected host coming down the shaft raises the pace of the nestmates waiting at the top as a finder does (`invite.ts`), whether or not it carries food: they go out on a false invitation, and the host meets more of them. It acts through the ants' own sense (their pace, §60.6), as the fungus's other levers do. **Design:** no paper shows a fungus doing this; no fungal record in *Cataglyphis* was found at all (desert-ant.md, reading 2026-11-14). Its build is `ja-rf5.18`.
+- **Heat felt by the host:** deferred (owner, 2026-11-11).
+
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
 The owner asked (2026-11-12) for a tutorial in which the game slows to 1× and the first ant the fungus gets into is paused, followed until the infection goes away, and explained. Decisions, by the owner:
