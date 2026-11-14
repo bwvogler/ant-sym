@@ -349,6 +349,9 @@ test("ChunkLayer: growing the table in every direction keeps what was written; d
   assert.equal(l.count, 4, "and leaves the count alone");
   l.dropAll();
   assert.deepEqual([l.count, l.regions, l.get(1, 1)], [0, 0, 0], "dropAll forgets every chunk and region");
+  l.set(1, 1, 1);
+  l.drop(0, 0);
+  assert.equal(l.regions, 0, "a region written and emptied after dropAll is freed (its count started afresh)");
 });
 
 test("ChunkLayer: two far places cost two regions, not the slots between; forEach walks chunks row by row", () => {
@@ -375,6 +378,40 @@ test("ChunkLayer: two far places cost two regions, not the slots between; forEac
     seen,
     [...at].sort((a, b) => a[1] - b[1] || a[0] - b[0]),
   );
+});
+
+test("ChunkLayer: a region is freed with its last chunk, and made again by the next write there", () => {
+  const l = new ChunkLayer((n) => new Float32Array(n), 0);
+  const far = 40 * CHUNK; // another region (16 chunks a side)
+  l.set(5, 5, 1);
+  l.set(CHUNK + 5, 5, 2); // a second chunk in the same region
+  l.set(far, 5, 3);
+  assert.deepEqual([l.count, l.regions], [3, 2]);
+  l.put(0, 0, l.chunk(0, 0)!.slice()); // replacing a chunk adds nothing to its region's count
+  l.drop(2, 0); // nor does dropping one that isn't there take anything away
+  assert.deepEqual([l.count, l.regions], [3, 2]);
+  const box = l.regionSlots;
+  l.drop(0, 0);
+  assert.deepEqual([l.count, l.regions], [2, 2], "one chunk still in the first region: it stays");
+  l.drop(1, 0);
+  assert.deepEqual([l.count, l.regions], [1, 1], "its last chunk dropped: the region is freed");
+  assert.equal(l.get(CHUNK + 5, 5), 0, "and reads as empty");
+  assert.equal(l.get(far, 5), 3, "the other region is untouched");
+  assert.equal(l.regionSlots, box, "the box of regions doesn't shrink");
+  l.set(7, 7, 4);
+  assert.deepEqual([l.count, l.regions, l.get(7, 7)], [2, 2, 4], "a write there makes the region again");
+  l.drop(0, 0);
+  l.drop(far >> 6, 0);
+  assert.deepEqual([l.count, l.regions], [0, 0], "every chunk gone: every region freed");
+  const seen: number[] = [];
+  l.forEach((cx) => seen.push(cx));
+  assert.deepEqual(seen, []);
+  // Growing the box keeps each region's count: a region made before the box grew is still freed with its last chunk.
+  const g = new ChunkLayer((n) => new Uint8Array(n), 0);
+  g.set(0, 0, 1);
+  g.set(-200 * CHUNK, -200 * CHUNK, 1); // the box grows left and up, so the first region moves in it
+  g.drop(0, 0);
+  assert.deepEqual([g.count, g.regions], [1, 1], "the moved region was freed");
 });
 
 test("ChunkLayer: a generator fills a chunk on its first read or write, once; a dropped chunk is generated afresh", () => {
