@@ -23,3 +23,7 @@ experiments/out/
 # Cloudflare Worker (web/worker): wrangler state and local secrets
 .wrangler/
 .dev.vars
+
+# bd's export of the beads database: local only. The Dolt database on the beads-dolt branch is the record
+# (CLAUDE.md); tracked here it conflicted in ~4 of 10 merges and a conflicted PR gets no CI (ja-w7ef.1).
+.beads/issues.jsonl

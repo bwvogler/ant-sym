@@ -93,10 +93,10 @@ check "worktree: unguarded chain" deny "$(guard Bash "$(bash_ 'S="$T/scratch"; W
 
 # --- stop-check.sh --------------------------------------------------------------------------------------
 repo="$tmp/repo"
-mkdir -p "$repo/.beads"
+mkdir -p "$repo"
 git -C "$repo" init -q
 git -C "$repo" config user.email t@t && git -C "$repo" config user.name t
-echo '{}' >"$repo/.beads/issues.jsonl" && git -C "$repo" add -A && git -C "$repo" commit -qm init
+echo x >"$repo/README" && git -C "$repo" add -A && git -C "$repo" commit -qm init
 stop() { # stop_hook_active -> block | allow
   out=$(jq -n --arg c "$repo" --argjson a "$1" '{cwd: $c, stop_hook_active: $a}' | CLAUDE_PROJECT_DIR="$repo" "$here/stop-check.sh")
   [ "$(jq -r '.decision // empty' <<<"$out" 2>/dev/null)" = block ] && echo block || echo allow
@@ -106,9 +106,6 @@ git -C "$repo" worktree add -q --detach "$tmp/wt" HEAD
 check "left worktree blocks" block "$(stop false)"
 check "never twice in a row" allow "$(stop true)"
 git -C "$repo" worktree remove --force "$tmp/wt"
-echo '{"x":1}' >"$repo/.beads/issues.jsonl"
-check "jsonl export blocks" block "$(stop false)"
-git -C "$repo" checkout -q -- .beads/issues.jsonl
 git -C "$repo" worktree add -q -b side "$tmp/wt2" HEAD
 check "a named-branch worktree is not ours" allow "$(stop false)"
 git -C "$repo" worktree remove --force "$tmp/wt2"
