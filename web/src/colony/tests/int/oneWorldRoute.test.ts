@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Colony, CURTAIN, DEFAULT_COLONY, LIFESPAN, PLANE, type HoleCell } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
 import { route1, runAssay } from "../../experiment.ts";
+import { routeFail, routeRecord } from "../../homing.ts";
 import { Game, gameRng, SAVE_VERSION } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -144,7 +145,11 @@ test("route memory records a place every routeStep cells on the way out, from th
 });
 
 test("route memory off (routeMemory 0) records nothing, and a place set by hand changes nothing", () => {
-  assert.equal(DEFAULT_COLONY.routeMemory, 0);
+  assert.deepEqual(
+    [DEFAULT_COLONY.routeMemory, DEFAULT_COLONY.routeStep, DEFAULT_COLONY.routeSee],
+    [1, 4, 3],
+    "the shipped defaults: on a stall, every 4 cells, a place seen within 3",
+  );
   const run = (mem: boolean): number[] => {
     const w = plane({ routeMemory: 0 });
     const { g, c, hx, hy } = w;
@@ -561,9 +566,108 @@ test("route memory: a save carries the places and the retrace, and the game runs
     assert.deepEqual(Array.from(fresh.player[k]), Array.from(c[k]), `after running on: ${k}`);
 });
 
-test("R1: pocket carriers get home with route memory 2 (seed 4: 45 % home within 300 s without it)", { timeout: 120_000 }, () => {
-  const off = runAssay(route1, 4, {});
-  const on = runAssay(route1, 4, { colony: { routeMemory: 2 } });
+test("route memory records in FOLLOW mode too, and not with food in the jaws", () => {
+  const FOLLOW = MODES.indexOf("follow");
+  // One tick of ant 0 in `mode`, a place due (its last stored place is far behind on its odometer): how many places it holds after.
+  const stored = (mode: number, carrying: 0 | 1): number => {
+    const w = plane({ routeMemory: 1, routeStep: 8 });
+    const { g, c, hx, hy } = w;
+    c.bindPolicy("mode", () => MODES[mode]!);
+    c.putAnt(0, PLANE, hx + 12, hy);
+    c.mode[0] = mode;
+    c.carrying[0] = carrying;
+    c.heading[0] = 0;
+    c.odoSurf[0] = 12;
+    c.routeAt[0] = 0;
+    g.tick(DT);
+    // (A carrier is turned for home by the tick before the place is due, so the food gate is a second guard: the carrying cases hold either way.)
+    return c.routeN[0];
+  };
+  assert.equal(stored(EXPLORE, 0), 1, "exploring: it records");
+  assert.equal(stored(FOLLOW, 0), 1, "following: it records");
+  assert.equal(stored(RETURN, 0), 0, "homing: it does not");
+  assert.equal(stored(EXPLORE, 1), 0, "with food in its jaws it records nothing");
+  assert.equal(stored(FOLLOW, 1), 0, "following, with food in its jaws, nothing either");
+});
+
+test("route memory: the plane's own guard: not on another layer, not with a pellet, and the once-a-trip state", () => {
+  const w = plane({ routeMemory: 2 });
+  const { c, hx, hy } = w;
+  const pts: [number, number][] = [
+    [hx + 8, hy],
+    [hx + 16, hy],
+    [hx + 24, hy],
+  ];
+  const start = (): void => {
+    carrier(w, hx + 24, hy, 24);
+    store(c, pts);
+    c.routeState[0] = 0;
+    c.routeGoal[0] = -1;
+    c.pellet[0] = 0;
+  };
+  // The curtain (or the side view): c.cur is not PLANE, so the failure is not route memory's.
+  start();
+  c.cur = CURTAIN;
+  assert.equal(routeFail(c, 0, true), false, "off the plane: not taken");
+  assert.equal(c.routeState[0], 0);
+  c.cur = PLANE;
+  assert.equal(routeFail(c, 0, true), true, "on the plane: taken");
+  assert.equal(c.routeState[0], 1);
+  assert.equal(c.routeGoal[0], 2, "from its newest place");
+  // A pellet (mound material, not food) is not a carrier's food: it does not retrace.
+  start();
+  c.pellet[0] = 1;
+  assert.equal(routeFail(c, 0, true), false, "a pellet carrier: not taken");
+  assert.equal(c.routeState[0], 0);
+  // routeMemory 1 does not take the vector's end, only a stall.
+  start();
+  c.params.routeMemory = 1;
+  assert.equal(routeFail(c, 0, false), false, "routeMemory 1, not a stall: not taken");
+  assert.equal(c.routeState[0], 0);
+  assert.equal(routeFail(c, 0, true), true, "routeMemory 1, a stall: taken");
+  c.params.routeMemory = 2;
+  // Retracing, a stall gives up the place for the one before, and starts its progress afresh.
+  c.stallT[0] = 7;
+  c.bestD[0] = 3;
+  c.wall[0] = 1;
+  assert.equal(routeFail(c, 0, true), true);
+  assert.equal(c.routeGoal[0], 1, "the one before");
+  assert.equal(c.stallT[0], 0, "its stall clock starts afresh");
+  assert.equal(c.bestD[0], Infinity, "so does its best distance");
+  assert.equal(c.wall[0], 0, "and its wall-follow");
+  // Retracing, the vector's end only keeps it where it is.
+  assert.equal(routeFail(c, 0, false), true);
+  assert.equal(c.routeGoal[0], 1, "unchanged");
+});
+
+test("route memory: an odd routeMax keeps the first, third, fifth ... place when full: (n + 1) / 2 of them, and the spacing doubles", () => {
+  const w = plane({ routeMemory: 1, routeStep: 2, routeMax: 5 });
+  const { c, hx, hy } = w;
+  const cap = c.routePlaces.length / c.n / 2;
+  assert.equal(cap, 5);
+  c.putAnt(0, PLANE, hx + 40, hy);
+  for (let k = 0; k < 5; k++) {
+    c.routePlaces[2 * k] = 10 * k;
+    c.routePlaces[2 * k + 1] = 100 + k;
+  }
+  c.routeN[0] = 5;
+  c.routeAt[0] = 0;
+  c.routeGap[0] = 2;
+  c.odoSurf[0] = 3;
+  routeRecord(c, 0);
+  assert.equal(c.routeN[0], 4, "3 kept of 5, and the new place");
+  assert.deepEqual(
+    [0, 1, 2].map((k) => c.routePlaces[2 * k]),
+    [0, 20, 40],
+    "places 0, 2 and 4",
+  );
+  assert.equal(c.routePlaces[6], c.x[0], "then where it stands");
+  assert.equal(c.routeGap[0], 4);
+});
+
+test("R1: pocket carriers get home with the shipped route memory (seed 4: 45 % home within 300 s without it)", { timeout: 120_000 }, () => {
+  const off = runAssay(route1, 4, { colony: { routeMemory: 0 } });
+  const on = runAssay(route1, 4, {});
   assert.ok((off.metrics.home300 as number) < 0.95, `off: ${off.metrics.home300}`);
   assert.ok((on.metrics.home300 as number) >= 0.95, `on: ${on.metrics.home300}`);
   assert.ok((on.metrics.ratio as number) <= 4, `walked ÷ way round ${on.metrics.ratio}`);

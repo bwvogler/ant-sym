@@ -14,7 +14,9 @@ type Slot = Record<string, (number | string)[]>;
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/antReset.json", import.meta.url), "utf8")) as { spawn: Slot; asIs: Slot };
 
 const make = () =>
-  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 10, rivalAnts: 10, rival: false }, gameRng(7)).player;
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 10, rivalAnts: 10, rival: false }, gameRng(7), {
+    colony: { routeStep: 8 }, // the fixture was recorded at routeStep 8; a newborn's routeGap is the colony's routeStep
+  }).player;
 const names = Object.keys(ANT_FIELDS);
 type Arrays = Record<string, { length: number; [i: number]: number }>;
 const arrays = (c: Colony) => c as unknown as Arrays;
