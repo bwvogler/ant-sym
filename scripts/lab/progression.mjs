@@ -12,6 +12,9 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
+//          [--grant knots,...]
+// --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
+// worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -39,6 +42,7 @@ if (isMainThread) {
     map: opt("map", "side"),
     hyphae: flag("hyphae"),
     growth: flag("growth"),
+    grant: opt("grant", "").split(",").filter(Boolean),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -49,7 +53,10 @@ if (isMainThread) {
       if (next >= seeds.length) return running === 0 && done();
       const seed = seeds[next++];
       running++;
-      const w = new Worker(fileURLToPath(import.meta.url), { workerData: { ...job, seed }, argv: [] });
+      const w = new Worker(fileURLToPath(import.meta.url), {
+        workerData: { ...job, seed },
+        argv: [],
+      });
       w.on("message", (r) => results.push(r));
       w.on("error", (e) => console.error(`seed ${seed}:`, e));
       w.on("exit", () => (running--, launch()));
@@ -76,13 +83,20 @@ if (isMainThread) {
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant } = workerData;
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
       ? new Game(
           generateOneWorld(seed),
-          { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae } },
+          {
+            antCount: 600,
+            rivalAnts: 600,
+            rival: true,
+            regrow: GAME_REGROW,
+            autoFound: false,
+            fungus: { hyphae },
+          },
           gameRng(seed, 0),
         )
       : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
@@ -98,6 +112,14 @@ if (isMainThread) {
     STRAINS.findIndex((s) => s.id === strain),
     { evolve },
   );
+  const { MUTATION } = await import("../../web/src/colony/evolution.ts");
+  for (const id of grant) {
+    const e = g.fungus.evolution;
+    const cost = e?.cost(id);
+    if (!e || cost === null || cost === undefined) continue;
+    e.growth += cost / MUTATION;
+    g.fungus.upgrade(id);
+  }
   const DT = 1 / 30;
   const r = {
     seed,
@@ -115,7 +137,11 @@ if (isMainThread) {
   };
   const share = (c) => {
     const f = g.fungus.census(c);
-    return { s: f.living ? f.infected / f.living : 0, n: f.infected, resist: f.meanResist };
+    return {
+      s: f.living ? f.infected / f.living : 0,
+      n: f.infected,
+      resist: f.meanResist,
+    };
   };
   const queue = [...order];
   for (let k = 0; g.time < seconds; k++) {

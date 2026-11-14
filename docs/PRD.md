@@ -5071,6 +5071,36 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **P1 holds on seeds 1–10:** no seed more than 10 % slower (seed 10 +6.5 %, seeds 1 and 3 +1 %), the median 283 → 270 s, the worst seed never → 475 s. Seed 7 is now faster with hyphae (277 → 261 s).
 - Held out, seeds 11–20 (no hyphae → hyphae): 11 353 → 391, 12 242 → 244, 13 259 → 218, 14 165 → 150, 15 343 → 274, 16 324 → 279, 17 252 → 254, 18 252 → 219, 19 315 → 305, 20 475 → 297 s. Median 287 → 264 s, worst seed 475 → 391 s; only seed 11 misses P1, by a hair (+10.8 %, against +13 % in §63.9). `ja-2bw.6` keeps it.
 
+### 63.11 Knots: starved tips harden into microsclerotia (ja-2bw.9, 2026-11-13)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Metarhizium* microsclerotia are hard, pigmented aggregates of hyphae that form under nutrient and oxidative stress, tolerate drying and UV, sporulate from their own reserves with no outside carbon (Paixão et al. 2021), and in soil put out hyphae again after 3–5 days and persist for most of a year (Marciano et al. 2021). Owner (2026-11-13): the trigger and effects most fitting with that; *Knots*, two levels.
+
+**Design.**
+- **The upgrade.** *Knots*, a spread upgrade: *none* → *a few* (400) → *many* (1500).
+- **Forming (starvation).** A tip that has rested on short supply for `KNOT.rounds` rounds in a row (10 at *a few*, 5 at *many*) hardens where it stands: the tip ends, and its cell and up to `KNOT.pull` (2) dead-end cells behind it (cells nothing else grew from) are drawn in. Their mass becomes the knot's store; the pulled cells leave the mycelium, so no mass is made. A knot never forms on the plane's landing patch base or a root.
+- **Hard.** Digging a knot's cell open does not cut it: it stays in the tunnel, a hard lump.
+- **Spores from its store.** While a dug cell touches it, a knot turns its store into spores on that cell at `KNOT.rate` a second, paid by the store, not the mycelium. A buried knot keeps its store until a tunnel reaches it, so a colony digging into one releases its spores on the diggers.
+- **On the plane** (topsoil: never exposed, never dug) a knot can't fruit or be dug into: it is a dormant reserve, and as it sprouts its store goes back to the mycelium (owner, review of #161, D1; measured before: on seed 1 with *many* at landing, 4 plane knots locked 1.5 mass away for good by 180 s).
+- **Sprouting.** `KNOT.sprout` seconds after it formed (60 at *a few*, 30 at *many*, standing in for days), when the supply is ample, a knot puts out one tip on its far side from where it was fed, and is then spent as a sprouter (it stays hard, and keeps fruiting what is left of its store).
+- **Seen.** A knot draws as a dark dot on its cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** Knots form by the body's state (starvation), not by a growth answer; no lane changes and nothing is spent.
+
+**Assays.** A starved tip hardens after `KNOT.rounds`; a knot survives its cell being dug; a dug cell beside a knot gets spores from its store and none from the mycelium; a knot sprouts after `KNOT.sprout`; mass is conserved; P1 (seeds 1–10, 11–20) with *Knots* bought in the progression order.
+
+**Built (2026-11-14)** as designed: `KNOT = { rounds: [0, 10, 5], sprout: [0, 60, 30], pull: 2, rate: 0.05 }` in `colony/hyphae.ts` (`Hyphae.harden`, `sproutKnots`, `knots`; a tip's `starved` count), the upgrade in `colony/evolution.ts` (trait `knots`), wiring in `Fungus.#growHyphae` (forming after the rounds, the store's mass taken out of the body with `Evolution.lose` so the free mass is unchanged; sprouting beside stump regrowth; ageing and fruiting each tick), and a dark dot per knot in `ui/ColonyField.tsx`. On the page with *many* bought at landing, by 180 s seed 1 had 11 knots on the plane and 2 in the side view.
+
+**Measured** (`progression.mjs --map one --evolve --hyphae --growth`, 600 s, time to a quarter):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| no hyphae (§63.10) (s) | 357 | 363 | 289 | 173 | 228 | never | 277 | never | 240 | 216 |
+| hyphae, no knots (§63.10) (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+| *Knots* in the order after *Senses* (s) | 361 | 278 | 293 | 162 | 205 | 475 | 261 | 355 | 241 | 230 |
+| *Knots* at landing (`--grant knots`) (s) | 282 | 374 | 297 | 188 | 277 | 411 | 280 | 559 | 273 | 221 |
+
+- **In its place in the order** the script buys it at 265–590 s, mostly after a quarter: every time is unchanged on seeds 1–20, so P1 stands as in §63.10.
+- **At landing it is a gamble:** faster on seeds 1, 6 and 10, slower on most (seed 8 +57 %, seeds 2 and 5 +35 %). Early on supply is often short, and a starved tip that hardens no longer waits for mass to come back, so the mycelium has fewer growing tips until its knots sprout. It is the player's choice; nothing is tuned here. `progression.mjs --grant <ids>` gives upgrades at landing for such worst cases (the order can't force one: a cheaper upgrade is bought while a dearer one waits).
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
