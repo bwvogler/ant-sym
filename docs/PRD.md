@@ -5895,6 +5895,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 
 **Decisions.**
 - Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
+- The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
 
 **The mechanic (planned).**
 - *Cue:* an old ant at home whose count of young nestmates met by contact (`youngMet`, leaky, like activation's `met`) is low, near brood (the brood and royal marks).
