@@ -19,7 +19,7 @@ import {
 // switches them on (ja-ykmu.4), and the weights asked are part of the key, as the fungus's levers are.
 
 /** Bump when the legend, the questions or what an answer means changes: old cached answers no longer apply. */
-export const STEER_BRAIN_VERSION = 2;
+export const STEER_BRAIN_VERSION = 3;
 
 /** The weights asked unless the Lab adds design ones: the two the biology lets a situation set (docs/steering.md §3, §7). */
 export const STEER_ASKED: readonly SteerWeight[] = ["search", "memory"];
@@ -79,36 +79,68 @@ export function packSteerRequest(items: { id: string; key: string; situation: St
   return { state: { legend: STEER_LEGEND, doctrine, ants }, questions };
 }
 
-/** An answer as the cache keeps it: each asked weight's level (−1, 0, 1), in the key's order, comma-joined. */
+/**
+ * An answer as the cache keeps it: for each asked weight, in the key's order, Jev's probabilities of low, usual and high
+ * (`0.34/0.59/0.07`), comma-joined. A score's expected level, rounded, lost every lean: Jev answered near a find search 0.70–0.88 and
+ * memory 1.06–1.25, all "usual" once rounded (PRD S3). Each ant draws its level from them. With no probabilities, the rounded score, certain.
+ */
 export function readSteer(answers: Record<string, JevAnswer>, id: string, asked: readonly SteerWeight[]): string | null {
-  const levels: number[] = [];
+  const parts: string[] = [];
   for (const w of asked) {
     const a = answers[`${id}_${w}`];
     if (!a || a.type !== "score" || !Number.isFinite(a.score)) return null;
-    levels.push(Math.max(-1, Math.min(1, Math.round(a.score) - 1)));
+    const p = [0, 1, 2].map((k) => a.probabilities?.[String(k)] ?? NaN);
+    const total = p.reduce((x, y) => x + y, 0);
+    if (p.every((x) => Number.isFinite(x) && x >= 0) && total > 0) parts.push(p.map((x) => Number((x / total).toFixed(3))).join("/"));
+    else parts.push(["1/0/0", "0/1/0", "0/0/1"][Math.max(0, Math.min(2, Math.round(a.score)))] as string);
   }
-  return levels.join(",");
+  return parts.join(",");
+}
+
+/** Each asked weight's probabilities of low, usual and high in an answer, or null when it does not parse. */
+export function steerOdds(answer: string): number[][] | null {
+  const out: number[][] = [];
+  for (const part of answer.split(",")) {
+    const p = part.split("/").map(Number);
+    if (p.length !== 3 || !p.every((x) => Number.isFinite(x) && x >= 0 && x <= 1)) return null;
+    out.push(p);
+  }
+  return out;
 }
 
 /** Whether a stored answer is one the questions under `key` could have given. */
 export function validSteer(key: string, answer: string): boolean {
-  const n = askedOf(key).length;
-  const parts = answer.split(",");
-  return parts.length === n && parts.every((p) => p === "-1" || p === "0" || p === "1");
+  return steerOdds(answer)?.length === askedOf(key).length;
 }
 
-/** The steering an answer gives: its asked weights at their levels, every other weight neutral. */
-export function steeringOf(key: string, answer: string): Steering {
+/**
+ * The steering an answer gives: each asked weight's level drawn from its probabilities with `draw` (once a weight), or with no draw
+ * its likeliest level; every other weight neutral. A certain answer (a level at 1) never draws.
+ */
+export function steeringOf(key: string, answer: string, draw?: () => number): Steering {
   const out: Record<string, SteerLevel> = { ...NEUTRAL_STEERING };
-  const levels = answer.split(",");
-  askedOf(key).forEach((w, k) => (out[w] = Number(levels[k]) as SteerLevel));
+  const odds = steerOdds(answer) ?? [];
+  askedOf(key).forEach((w, k) => {
+    const p = odds[k] ?? [0, 1, 0];
+    let level = p.indexOf(Math.max(...p));
+    if (draw && !p.includes(1)) {
+      let u = draw() * p.reduce((x, y) => x + y, 0);
+      level = 2;
+      for (let j = 0; j < 3; j++)
+        if ((u -= p[j] as number) < 0) {
+          level = j;
+          break;
+        }
+    }
+    out[w] = (level - 1) as SteerLevel;
+  });
   return out as Steering;
 }
 
-/** The local rule's answer for a key: every asked weight usual. */
+/** The local rule's answer for a key: every asked weight usual, for certain. */
 export function localSteerAnswer(key: string): string {
   return askedOf(key)
-    .map(() => "0")
+    .map(() => "0/1/0")
     .join(",");
 }
 

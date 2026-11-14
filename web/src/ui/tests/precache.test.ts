@@ -22,7 +22,7 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
-import { DESERT_ANT, STEER_ASKED, steerContext, weightedValid, type Species } from "../../colony/index.ts";
+import { DESERT_ANT, STEER_ASKED, steerContext, validSteer, weightedValid, type Species } from "../../colony/index.ts";
 
 /** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
 const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT };
@@ -46,7 +46,13 @@ const VALID: Record<string, readonly string[]> = {
   mode: MODES,
   stance: STANCES,
   growth: GROWTH_CHOICES,
-  steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)),
+  // The steer lane's answers are probabilities (checked by validSteer below): its certain answers stand for the row.
+  steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)).map((x) =>
+    x
+      .split(",")
+      .map((l) => ["1/0/0", "0/1/0", "0/0/1"][Number(l) + 1])
+      .join(","),
+  ),
 };
 // The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), far from and near a last find.
 const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: SITUATIONS };
@@ -197,6 +203,9 @@ test("a species' own bundles: under its own context, every situation of its sche
 test("the steer lane's bundles ask the lane's own weights (staging, ja-ykmu.3: not the fungus's lever menu)", () => {
   for (const b of index.bundles.filter((x) => x.lane === "steer")) {
     const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
-    for (const [k] of pairs) assert.ok(k.endsWith(`|${STEER_ASKED.join(",")}`), `${b.file}: ${k}`);
+    for (const [k, a] of pairs) {
+      assert.ok(k.endsWith(`|${STEER_ASKED.join(",")}`), `${b.file}: ${k}`);
+      assert.ok(validSteer(k, a), `${b.file}: ${a}`);
+    }
   }
 });

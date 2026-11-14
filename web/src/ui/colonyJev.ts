@@ -710,7 +710,7 @@ export class ColonyJev {
       const { modes, stances, steers } = d;
       if (modes) colony.bindPolicy("mode", this.#modePolicy(modes));
       if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
-      if (steers) colony.bindPolicy("steer", (s) => steeringOf(steers.key(s), this.#lookup(steers, s)));
+      if (steers) colony.bindPolicy("steer", (s, draw) => steeringOf(steers.key(s), this.#lookup(steers, s), draw));
       colony.reconsider();
       return d;
     });

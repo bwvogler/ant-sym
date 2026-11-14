@@ -188,5 +188,5 @@ export const FINDS = ["far", "near"] as const;
 export type Find = (typeof FINDS)[number];
 /** The steer lane's situation: the mode lane's, with the mode the ant now has, and where it is relative to its last find. */
 export type SteerSituation = Situation & { readonly find: Find };
-/** The steer policy: the weights for an ant whose mode policy sent it exploring or following, in situation `s`. */
-export type SteerPolicy = (s: SteerSituation) => Steering;
+/** The steer policy: the weights for an ant whose mode policy sent it exploring or following, in situation `s`; `draw` draws a weight's level from Jev's probabilities. */
+export type SteerPolicy = (s: SteerSituation, draw?: () => number) => Steering;

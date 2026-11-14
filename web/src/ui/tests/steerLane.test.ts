@@ -94,22 +94,29 @@ test("a request asks a score per default weight; a reply reads as levels, and on
   assert.notEqual(steerKey({ ...out, find: "near" }), key, "near its last find is another situation");
   const req = packSteerRequest([{ id: "w0", key, situation: out }], DOCTRINES[0]!.text);
   assert.deepEqual(Object.keys(req.questions), ["w0_search", "w0_memory"]);
+  // Jev's probabilities are kept (a rounded score lost every lean, PRD S3); without them, the rounded score, certain.
   assert.equal(
     readSteer(
       {
-        w0_search: { type: "score", score: 2 },
+        w0_search: { type: "score", score: 0.7, probabilities: { "0": 0.34, "1": 0.59, "2": 0.07 } },
         w0_memory: { type: "score", score: 0.4 },
       },
       "w0",
       ["search", "memory"],
     ),
-    "1,-1",
+    "0.34/0.59/0.07,1/0/0",
   );
   assert.equal(readSteer({ w0_search: { type: "score", score: 1 } }, "w0", ["search", "memory"]), null, "a weight unanswered: no answer");
-  assert.ok(validSteer(key, "1,-1"));
-  assert.ok(!validSteer(key, "1"));
-  assert.ok(!validSteer(key, "2,0"));
-  assert.deepEqual(steeringOf(key, "1,-1"), { ...NEUTRAL_STEERING, search: 1, memory: -1 });
+  assert.ok(validSteer(key, "0.34/0.59/0.07,1/0/0"));
+  assert.ok(!validSteer(key, "0/1/0"), "one weight short");
+  assert.ok(!validSteer(key, "1,-1"), "levels are not probabilities");
+  // With no draw, the likeliest level; with one, a level drawn by its probability; a certain level never draws.
+  assert.deepEqual(steeringOf(key, "0.34/0.59/0.07,1/0/0"), { ...NEUTRAL_STEERING, search: 0, memory: -1 });
+  let draws = 0;
+  const at = (u: number) => () => (draws++, u);
+  assert.deepEqual(steeringOf(key, "0.34/0.59/0.07,1/0/0", at(0.1)), { ...NEUTRAL_STEERING, search: -1, memory: -1 });
+  assert.deepEqual(steeringOf(key, "0.34/0.59/0.07,1/0/0", at(0.95)), { ...NEUTRAL_STEERING, search: 1, memory: -1 });
+  assert.equal(draws, 2, "one draw a weight that is not certain");
 });
 
 test("shipped answers reach the colony's steer policy; a situation with none plays every weight neutral", () => {
@@ -120,7 +127,7 @@ test("shipped answers reach the colony's steer policy; a situation with none pla
   j.setDoctrine(doctrine);
   j.attach(c);
   assert.deepEqual(c.steerPolicy(out), NEUTRAL_STEERING, "nothing cached: neutral");
-  assert.equal(j.seed(steerContext(doctrine), [[steerKey(out), "1,1"]]), 1);
+  assert.equal(j.seed(steerContext(doctrine), [[steerKey(out), "0/0/1,0/0/1"]]), 1);
   assert.deepEqual(c.steerPolicy(out), { ...NEUTRAL_STEERING, search: 1, memory: 1 });
   assert.equal(j.state.steerCached, 1);
   assert.deepEqual(c.steerPolicy({ ...out, mode: "return" }), NEUTRAL_STEERING, "a homing ant is not asked: neutral");

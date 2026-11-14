@@ -111,21 +111,21 @@
     {
       "lane": "steer",
       "doctrine": "cautious",
-      "context": "steer-v2-b92e1072",
+      "context": "steer-v3-b92e1072",
       "file": "steer-cautious.json",
       "answers": 145
     },
     {
       "lane": "steer",
       "doctrine": "forage",
-      "context": "steer-v2-600e643f",
+      "context": "steer-v3-600e643f",
       "file": "steer-forage.json",
       "answers": 145
     },
     {
       "lane": "steer",
       "doctrine": "warlike",
-      "context": "steer-v2-1b250abf",
+      "context": "steer-v3-1b250abf",
       "file": "steer-warlike.json",
       "answers": 145
     }

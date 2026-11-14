@@ -310,11 +310,11 @@ async function work() {
     if (existsSync(steerFile)) {
       const { steerKey, steeringOf, localSteer } = await import("../web/src/colony/index.ts");
       const steers = new Map(JSON.parse(readFileSync(steerFile, "utf8")));
-      brains.steer = (s) => {
+      brains.steer = (s, draw) => {
         const key = steerKey(s);
         const a = steers.get(key);
         count("steer", a !== undefined);
-        return a === undefined ? localSteer(s) : steeringOf(key, a);
+        return a === undefined ? localSteer(s) : steeringOf(key, a, draw);
       };
     }
   } else if (policy) {
