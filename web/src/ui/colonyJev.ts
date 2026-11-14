@@ -50,6 +50,9 @@ import {
   type GrowthSituation,
   type Journal,
   PolicyCache,
+  pick,
+  topOf,
+  weightsOf,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -180,7 +183,8 @@ function lane<S, A extends string>(
 /** A colony this client drives: its lanes, null for a lane its species does not have (Species.lanes): nothing is asked or counted there. */
 interface Driven {
   colony: Colony;
-  modes: Lane<Situation, Mode> | null;
+  /** answers are weighted (Jev's mode with its probabilities, colony/weighted.ts): the colony's policy draws from them */
+  modes: Lane<Situation, string> | null;
   stances: Lane<StanceSituation, Stance> | null;
 }
 
@@ -212,7 +216,7 @@ function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
   const { mode, stance } = species.lanes;
   return {
     // the stand-in while a situation is unanswered is the species' own local rule (ja-fnd.5.9)
-    modes: mode ? antLane(LANES.mode, words, mode, species.policy ?? LANES.mode.local) : null,
+    modes: mode ? antLane<Situation, string>(LANES.mode, words, mode, species.policy ?? LANES.mode.local) : null,
     stances: stance ? antLane(LANES.stance, words, stance) : null,
   };
 }
@@ -453,18 +457,29 @@ export class ColonyJev {
     return { answer: local, by: l.queue.has(key) || this.#asking.has(askKey(l.context, key)) ? "waiting" : "local" };
   }
 
-  /** Who decides an ant of colony k in situation `s` right now (the follow card). */
-  explain(s: Situation, k = 0): { mode: Mode; by: DecidedBy } {
+  /**
+   * Who decides an ant of colony k in situation `s` right now (the follow card): the mode Jev chose, and its probabilities
+   * over the modes (weighted.ts; [[mode, 1]] for a bare or local answer), which the ant draws from.
+   */
+  explain(s: Situation, k = 0): { mode: Mode; by: DecidedBy; weights: [Mode, number][] } {
     const d = this.#driven[k];
-    if (!d?.modes) return { mode: (this.#species.policy ?? localPolicy)(s), by: "local" };
+    if (!d?.modes) {
+      const mode = (this.#species.policy ?? localPolicy)(s);
+      return { mode, by: "local", weights: [[mode, 1]] };
+    }
     const e = this.#explain(d.modes, s);
-    return { mode: e.answer, by: e.by };
+    return { mode: topOf(e.answer) as Mode, by: e.by, weights: (weightsOf(e.answer) ?? [[topOf(e.answer), 1]]) as [Mode, number][] };
+  }
+
+  /** A colony's mode policy over its lane: the answer looked up, and a mode drawn from it when the colony gives a `draw` (weighted.ts). */
+  #modePolicy(modes: Lane<Situation, string>): Policy {
+    return (s, draw) => pick(this.#lookup(modes, s), draw) as Mode;
   }
 
   /** The first colony's ants' policy (kept for a single colony; each attached colony is given its own). */
-  readonly policy: Policy = (s) => {
+  readonly policy: Policy = (s, draw) => {
     const d = this.#driven[0];
-    return d?.modes ? this.#lookup(d.modes, s) : (this.#species.policy ?? localPolicy)(s);
+    return d?.modes ? this.#modePolicy(d.modes)(s, draw) : (this.#species.policy ?? localPolicy)(s);
   };
   /** The first colony's strategist's policy, the same way. */
   readonly stancePolicy: StancePolicy = (s) => {
@@ -607,7 +622,7 @@ export class ColonyJev {
       const d: Driven = { colony, ...colonyLanes(words, species) };
       // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
       const { modes, stances } = d;
-      if (modes) colony.bindPolicy("mode", (s) => this.#lookup(modes, s));
+      if (modes) colony.bindPolicy("mode", this.#modePolicy(modes));
       if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
       colony.reconsider();
       return d;
