@@ -1,4 +1,6 @@
-import { hexDistance, nx, ny } from "./hex.ts";
+import { cellKey, hexDistance, keyCell, nx, ny } from "./hex.ts";
+
+export { cellKey, keyCell };
 
 // The mycelium as hyphae (docs/hyphal-growth.md, PRD §63, ja-2bw), pure. A hypha is a chain of cells, each with its
 // parent, so the mycelium is a tree; its tips are where it grows. Every TIP_STEP seconds each tip senses its situation
@@ -22,11 +24,6 @@ export interface Tip {
   /** rounds in a row it has rested on short supply, growing nothing (knots, ja-2bw.9) */
   starved?: number;
 }
-
-/** A cell as one number (columns may be negative: one world's curtain). */
-export const cellKey = (x: number, y: number): number => (y + 32768) * 131072 + (x + 32768);
-/** A key's cell. */
-export const keyCell = (k: number): [number, number] => [(k % 131072) - 32768, Math.floor(k / 131072) - 32768];
 
 /** No parent: a cell the mycelium rooted in. */
 export const ROOT = -1;
