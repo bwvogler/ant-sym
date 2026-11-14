@@ -5681,3 +5681,54 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
   - Learn → Policy now shows the aim read-only, so the aim has one home.
 - **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+## 70. Builder mode: a child changes the world, and the ants answer from their senses (design, ja-kjj8, 2026-11-14)
+
+**Research basis:** [builder.md](builder.md):
+- Drawn trails are followed for a while and then fade: an Argentine ant line with the full blend drew 5.0 ± 0.6 ants along its whole length in 2 min, against 0.2 ± 0.1 with one compound alone (Choe et al. 2012). A drawn circle is left after about half of it (*Lasius flavus*, Butterfield et al. 2025). Mills are an army-ant failure (Delsuc 2003).
+- A blocked route is rerouted: 18 of 21 *Pheidole* colonies moved to the long branch (Dussutour et al. 2009), and 73–93 % of Argentine ant colonies found the shortest remaining path (Reid et al. 2011). An established trail can hold against a better source added later (Beckers et al. 1990, **unverified**).
+- Young children: 7–8-year-olds pinch-zoomed successfully 13 % of the time under strict scoring (Yadav et al. 2020, full text). Pre-readers follow audio and demonstrations rather than symbols (Hiniker et al. 2015, 2016, **unverified**). No study shows rain removing trail pheromone, so the rain tool is **design**.
+
+**The problem.** The player has no way to change the world. The lure and alarm brushes went in §50.1 (they painted only the first colony's fields), and the spore brush went in §50.15 (it skipped the fungus's progression). The owner wants a creative mode for their children, like Minecraft's creative mode, that can be turned on or off at any point in a normal game.
+
+**Decisions.**
+- A separate mode, on or off at any point in a normal game (owner, 2026-11-14).
+- Players: a 7-year-old who reads and a younger sibling who can't, on a phone or tablet (owner).
+- Ants can die (owner).
+- What the child builds carries into the normal game's save (owner).
+- No fungus powers in the builder, and it spends no Jev of its own (owner).
+- The first slice of tools: Move, Dig, Dirt, Rock, Sugar, Crumb, a trail crayon per colony, Rain, Undo and Smell vision, plus a little-hands tray and sounds (owner said go, 2026-11-14).
+- One-finger Move as the main way to move the map, with two-finger pan kept for adults (proposed, from Yadav et al. 2020).
+- Rock and dirt never cover a hole, an ant or brood (proposed).
+
+**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
+- **Off:** no stroke means main bit for bit.
+- **What it retires or adds:** no ant choice changes. The ants answer through senses already in vision.md's table (trail, taste, soil faces). No gap row is added or closed.
+
+**Play.** The child sees each tool at once and the ants' answer within seconds at 4×: followers on a crayon line, a crowd at the sugar, a detour round a rock, a stall after rain. The builder grows no mycelium, doses no ant and unlocks nothing, so it can't skip the fungus's progression as the spore brush did. It changes the world the fungus works in. Chapter goals keep counting (proposed).
+
+**Assays and targets.** Assays B1–B6 land first, with no behaviour change:
+- B1, a crayon line followed: design mark ≥ 3× the no-pheromone ablation, after Choe et al.
+- B2, a rock wall across a trail: food comes home again by another way in ≥ 8 of 10 seeds, after Dussutour et al.
+- B3 (rain), B4 (late sugar), B5 (crayon circle) and B6 (filled tunnel) are report only.
+- A2b already covers sugar against crumb placed together (≥ 70 % to the rich side).
+
+**Cost (estimated).** No new lane, situation field, legend or question, so tokens per question are unchanged and a cached game spends nothing. Edited worlds may reach situations a plain game seldom does. A run that is on asks for them under the daily budget. The figure is measured once the tools exist (`npm run colony-cost` on a scripted builder session).
+
+**Beads.** `ja-kjj8` (this), then in build order:
+- `ja-kjj8.1` assays B1–B6;
+- `ja-kjj8.2` the pure tools;
+- `ja-kjj8.3` the tray and gestures;
+- `ja-kjj8.4` smell vision;
+- `ja-kjj8.5` little hands and sounds;
+- `ja-kjj8.6` Learn entries.
+
+**Still open.**
+- Owner's calls (builder.md "Open questions"):
+  - smell vision against §65 (proposed: every trail, only while building);
+  - how long a crayon line lasts (proposed: the home trail's rate, t½ ≈ 35 s);
+  - holes protected (proposed: yes);
+  - chapter goals and the tutorial while building;
+  - the little-hands tray as a switch or a start-screen button;
+  - sounds by WebAudio and speechSynthesis.
+- To measure: B1–B6 on seeds 1–10, the tick cost of a sugar flood, and the gesture rules on a real phone and tablet.
