@@ -14,6 +14,7 @@ import {
   cellOf,
   GENERIC_ANT,
 } from "./colony/index.ts";
+import { sunChip } from "./ui/sun.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
@@ -51,7 +52,7 @@ import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
-import { REPO } from "./ui/guide.ts";
+import { GUIDE, REPO } from "./ui/guide.ts";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import { pushToast } from "./ui/toasts.ts";
@@ -124,6 +125,8 @@ export default function ColonyApp() {
   );
   // The first game's tutorial (ja-7x4, PRD §61). A card that points at a drawer's panel opens that drawer.
   const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
+  // The species' own guide entry, if it has one (the HUD's sun chip links to it).
+  const ownEntry = GUIDE.find((e) => e.species === game.params.species.id)?.id;
   const pointsAt = tut.card?.highlight;
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
@@ -413,6 +416,24 @@ export default function ColonyApp() {
           <span className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" title="sim time">
             {clock(stats?.time ?? 0)}
           </span>
+          {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
+          {game.player.params.heatDay > 0 && (
+            <>
+              <span
+                className="flex items-center gap-1 px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden"
+                aria-label="sun"
+                title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
+              >
+                {sunChip(game.player.params, stats?.time ?? 0)}
+                {/* Only where the species has its own guide entry (review of #194, N2). */}
+                {ownEntry && <Help to={{ tab: "guide", id: ownEntry }} label={game.params.species.name.toLowerCase()} />}
+              </span>
+              {/* On a phone, short (owner, review of #194 D1). */}
+              <span className="px-1.5 font-mono text-[12px] text-fg-2 tabular-nums sm:hidden" aria-label="sun, short">
+                {sunChip(game.player.params, stats?.time ?? 0, true)}
+              </span>
+            </>
+          )}
           {slow && stats && (
             <span
               className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
