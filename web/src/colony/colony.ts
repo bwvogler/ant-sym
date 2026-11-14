@@ -1,3 +1,4 @@
+import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
@@ -40,8 +41,6 @@ import {
   FLOOR_PER_ANT,
   HOLE_SIGHT,
   INTAKE_WINDOW,
-  LEAVE_NOW,
-  LEAVE_SOON,
   MIDDEN_AT,
   RECEPTION_MIN,
 } from "./tuning.ts";
@@ -1195,7 +1194,6 @@ export class Colony {
    * `leave` response says how soon, from the returns it has felt; "wait" still lets a scout go at `scoutRate`.
    */
   leaves(i: number, dt: number, enemy: boolean): boolean {
-    const scout = this.params.scoutRate;
     const mode = RETURN;
     // On a raid stance, where the colony recruits by trail, every ant at home is a raider to be: asked in mode fight, so its
     // answer rests on the raid trail and not on food returns (review of #41).
@@ -1204,7 +1202,7 @@ export class Colony {
     const asked = this.params.raidGate > 0 && own && this.stanceOf(i) === "raid" ? FIGHT : mode;
     const answer = this.responses.leave(touch(this, i, enemy, asked, "none"));
     // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
-    const rate = answer === "now" ? LEAVE_NOW : answer === "soon" ? LEAVE_SOON : answer === "raid" ? this.params.raidScout : scout;
+    const rate = leaveRate(this.params, answer);
     if (!(this.rng() < 1 - Math.exp(-rate * dt))) return false;
     // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one (it
     // starts exploring: see the callers). Where it can't be recruited (the side view, raidGate

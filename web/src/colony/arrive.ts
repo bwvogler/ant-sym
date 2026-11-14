@@ -1,4 +1,5 @@
 // Arrive (docs/refactor.md S3.4): the last stage of an ant's step in tick. Where the step landed it: food picked up, spoil or a corpse carried out and dropped, a pellet onto the mound or back as fill, a loose pellet or the plane's spoil taken up, home at the nest (food stored, a hand chosen, rest), tiredness, home and leaving again, and the bookkeeping of its home vector, floor marks, nest work and route on the plane. Moved out of Colony.tick verbatim but for `this` becoming `colony` (the moved code has its own `col` and `c`); a pellet carrier crossing up at its hole, or an ant on the plane going down a hole (its own, or a raided foe's), ends its step here (returns true).
+import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
 import { crossDown, crossUp } from "./crossing.ts";
@@ -55,7 +56,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   // for a tick: the count stayed under the threshold, and only scouts went out.
   // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (holeSeen): each
   // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
-  if (leak) {
+  // The invitation (ja-rf5.6, Razin et al. 2013): for a species whose finders invite by pace, a waiting ant's own pace instead: each finder
+  // that came down the shaft past it last tick pulls it toward the finder's pace; a crowded shaft top damps it back faster (invite.ts).
+  if (leak && colony.params.invitePace > 0) {
+    colony.pace[i] = paceAfter(colony.params, colony.pace[i], held ? colony.holeSeen : 0, colony.crowd[i], dt);
+  } else if (leak) {
     let m = colony.met[i] * metLeak;
     if (gate ? atNest && !carrying : held) m += gate ? returnsAround(colony, CELL[0], CELL[1]) : colony.holeSeen;
     colony.met[i] = m;
