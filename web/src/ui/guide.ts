@@ -318,6 +318,24 @@ export const GUIDE: GuideEntry[] = [
     ],
   },
   {
+    id: "mass-flow",
+    title: "How the mycelium feeds its tips",
+    swatch: ["var(--spore)"],
+    onScreen:
+      "A soft glow along the purple hyphae is mass on its way out to the growing tips: bright near where the fungus feeds (its patch by the hole, a colonised corpse) and along the thick cords, dim out at the far tips. A front the ants have cut off goes dim and stops once it has used what it held.",
+    realAnts:
+      "A growing mycelium draws its mass toward its tips: each tip is a sink, and the flow in a hypha follows the tips it feeds (Heaton et al. 2010; Roper et al. 2013). Cords carry it 10 to 100 times faster than thin hyphae (up to 13 mm an hour in Serpula, Tlalka et al. 2008), and fusion is what brings it to the edge: a Neurospora that cannot fuse kept its tracer by the inoculum (Simonin et al. 2012).",
+    inGame:
+      "Mass enters at the patch and at colonised corpses and moves along the hyphae, 3 cells a round through thin hypha and 30 along a cord, split by the tips each branch feeds; a loop is a second way round. A tip grows only from what has reached it, so a web of cords feeds a far front, and a cut cord starves what lies beyond it.",
+    sources: [
+      {
+        note: "mycelial-transport",
+        anchor: "cords-carry-mass-10100-faster-than-thin-hyphae",
+        label: "Cords carry mass faster than thin hyphae",
+      },
+    ],
+  },
+  {
     id: "evolution",
     title: "The fungus's body, and its mutations",
     swatch: ["var(--spore)"],
@@ -412,7 +430,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   {
     note: "mycelial-transport",
     title: "Mass flow in a mycelium",
-    covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge (not built).",
+    covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge.",
   },
   {
     note: "queens-and-merging",
