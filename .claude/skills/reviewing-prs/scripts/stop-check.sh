@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Stop / SubagentStop hook for the reviewing-prs skill: before a reviewer finishes, the tree is back as it
-# was. It blocks the stop once, with the reason, when
-#   - a detached worktree is left (the skill's scratch checkouts are all --detach), or
-#   - .beads/issues.jsonl has uncommitted changes (bd's export: revert it if your work changed it, never commit it).
+# was. It blocks the stop once, with the reason, when a detached worktree is left (the skill's scratch
+# checkouts are all --detach). (.beads/issues.jsonl, bd's export, is no longer in git: ja-w7ef.1.)
 # It never blocks twice in a row (stop_hook_active), so a worktree a running helper still needs, or one
 # the user keeps on purpose, costs one reminder, not a loop.
 # Fails open: without jq, git or readable input it allows the stop.
@@ -21,10 +20,6 @@ left=$(git -C "$top" worktree list --porcelain 2>/dev/null |
 if [ -n "$left" ]; then
   problems="Scratch worktrees are still there (remove each one you made with git worktree remove --force <path>, then check git worktree list; leave one a helper you started still uses, or one that isn't yours):
 $(printf '%s\n' "$left" | sed 's/^/  /')"
-fi
-if ! git -C "$top" diff --quiet -- .beads/issues.jsonl 2>/dev/null; then
-  problems="${problems:+$problems
-}.beads/issues.jsonl has changes: it is bd's export. If your work changed it (a bd pull or sync), revert it (git checkout -- .beads/issues.jsonl); if it was already changed when you started, it is the author's: leave it. Never commit it."
 fi
 [ -n "$problems" ] || exit 0
 
