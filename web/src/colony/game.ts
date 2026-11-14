@@ -10,7 +10,7 @@ import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
-import { cellOf, CELL, hexDistance } from "./hex.ts";
+import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 
@@ -78,9 +78,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -331,8 +331,8 @@ export class Game {
   #haveMet = false;
   #nextStrategy = 0;
   #rng: () => number;
-  /** the ground's food piles as the world began (cell index, units), for regrowth; null when food does not regrow */
-  #piles: { cells: Int32Array; full: Float32Array } | null = null;
+  /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
+  #piles: { cells: Float64Array; full: Float32Array } | null = null;
   /** regrowth's own random numbers: the game's stream is never drawn from for it */
   #regrowRng: Rng | null = null;
   #regrowClock = 0;
@@ -637,10 +637,7 @@ export class Game {
         spot = { cell: s.cell, end: s.end };
       }
       if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-      const was = { x0: world.curtain.x0, w: world.curtain.size.w };
       at = growWorld(world, spot.end, spot.cell);
-      // The fungus keeps the curtain's spore cells as flat indices: re-keyed to its new columns.
-      this.fungus.regrid(CURTAIN, was);
       // A save's nest is the one dug then, as the side view's (growWorld digs the same one: from the stream keyed by its hole).
       if (f.nest) world.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
       nest = world.curtain.nests[at] as Nest;
@@ -761,11 +758,11 @@ export class Game {
       for (let x = x0; x < x0 + w; x++) {
         const v = this.map.food.get(x, y);
         if (v > 0 && (!this.map.sky || isSky(this.map, x, y))) {
-          cells.push(y * w + x - x0);
+          cells.push(cellKey(x, y));
           full.push(v);
         }
       }
-    this.#piles = { cells: Int32Array.from(cells), full: Float32Array.from(full) };
+    this.#piles = { cells: Float64Array.from(cells), full: Float32Array.from(full) };
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
   }
 
@@ -777,14 +774,11 @@ export class Game {
     if (this.#regrowClock < 1) return;
     const owed = this.#regrowClock;
     this.#regrowClock = 0;
-    const { w } = this.map.size;
-    const { x0 } = this.map;
     const rate = owed / this.params.regrow;
     for (let k = 0; k < piles.cells.length; k++) {
       const c = piles.cells[k];
-      const col = c % w;
-      const y = (c - col) / w;
-      const x = col + x0;
+      const x = keyX(c);
+      const y = keyY(c);
       const v = this.map.food.get(x, y);
       const short = piles.full[k] - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
