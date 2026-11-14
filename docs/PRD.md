@@ -5183,6 +5183,32 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **In its place in the order** the script buys it at 265–590 s, mostly after a quarter: every time is unchanged on seeds 1–20, so P1 stands as in §63.10.
 - **At landing it is a gamble:** faster on seeds 1, 6 and 10, slower on most (seed 8 +57 %, seeds 2 and 5 +35 %). Early on supply is often short, and a starved tip that hardens no longer waits for mass to come back, so the mycelium has fewer growing tips until its knots sprout. It is the player's choice; nothing is tuned here. `progression.mjs --grant <ids>` gives upgrades at landing for such worst cases (the order can't force one: a cheaper upgrade is bought while a dearer one waits).
 
+### 63.12 Stalks: a colonised corpse outside raises its spores over a ring (ja-2bw.10, 2026-11-14)
+
+**Basis.** [hyphal-growth §7](hyphal-growth.md#7-structures-cords-knots-stalks-and-fusion): *Ophiocordyceps unilateralis* hyphae leave a dead ant 2–3 days after death and a stalk grows from it to release spores; ants remove their dead fast, so a death in the nest leaves no time for one (Hughes et al. 2011, full text). *Metarhizium* fruits as a flat mat on the cadaver; stalks (synnemata) belong to some relatives, so this is a licence. Owner (2026-11-14): *Stalks*, two levels, 600 then 2000.
+
+**Design.**
+- **The upgrade.** *Stalks*, a spread upgrade: *none* → *a stalk* (600) → *a tall stalk* (2000).
+- **When.** A corpse the fungus has colonised (ja-2bw.7: buried on the midden, or a host dead on the plane) that lies outside (the plane, topsoil) grows a stalk `STALK.delay` seconds after it was colonised (20 at *a stalk*, 10 at *a tall stalk*, standing in for days; well inside a lone corpse's 60 s of spores, owner 2026-11-14 on review of #178: first built at 60 and 30, the first level's stalk grew just as a lone corpse ran dry). A corpse that is carried is not colonised yet, and one in the nest (a layer that is not topsoil) never grows one.
+- **What.** From then on the corpse's free spores, still paid by the cadaver at `CORPSE.rate`, go each step to the emptiest open cell within `STALK.radius` (2, then 4) instead of its one cell, so the ring fills evenly over a few seconds and more passing foragers pick some up, each less. (Split over every cell each step, as first built, a share at radius 4 fell under the fade's floor `SPORE_GONE` and vanished the next step: 45 % fewer spore-seconds on the ground than without a stalk, review of #178.)
+- **Seen.** A stalk draws as a short upright stroke on the corpse's cell; the panel's line and Learn text explain it.
+- **Not asked of Jev.** No lane changes; nothing is spent.
+
+**Assays.** A corpse outside grows its stalk after `STALK.delay` and its spores then fill the ring to its edge and no further, with about what the cadaver paid on the ground (within 25 % below, 5 % above: foragers take more from a wider ring), at both levels; a spent corpse's stalk is gone; no stalk without the upgrade, before the delay, or in a layer that is not topsoil; the cadaver pays the same spores either way; corpse ages save and load; P1 with *Stalks* bought (in the order, and at landing with `--grant stalks`).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, seeds 1–10, with the review's fix: the emptiest-cell rule and delays 20 and 10; on main after #174; seconds to a quarter of the hosts):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 416 | 310 | 143 | 150 | 536 | 272 | 492 | 394 | 262 |
+| Hyphae | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* in the order (after *senses*) | 249 | 360 | 270 | 152 | 116 | 341 | 263 | 418 | 235 | 261 |
+| Hyphae, *Stalks* at landing (`--grant stalks`) | 249 | 418 | 270 | 152 | 110 | 322 | 263 | 531 | 181 | 261 |
+
+- **In the buying order** *Stalks* comes at 323–583 s, after every seed's quarter, so the quarter, half and queen times are the hyphae's. P1 holds: no seed is more than 10 % slower than without hyphae (worst seed 1, +8 %), and the worst seed (418 against 536) and the median are better. The earlier run's seed-9 miss is gone on this main.
+- **Granted at landing** it is a gamble, as knots were (§63.11): faster on seeds 5, 6 and 9 (235 → 181 s), slower on seeds 2 (+16 %) and 8 (+27 %, 531 s, worse than without hyphae). Spread thinner, a corpse's spores reach more foragers but each takes a smaller dose. Not a P1 configuration; recorded under the owner's ship-and-record rule.
+- First built (spores split over every cell, delays 60 and 30), *Stalks* left every seed unchanged even at landing: the top level lost its spores to the fade, and the first level's stalk came as a lone corpse ran dry (review of #178).
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.

@@ -314,6 +314,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
   const fungus = [
     "base",
     "clock",
+    "corpseAges",
     "corpses",
     "evolution",
     "hosts",
