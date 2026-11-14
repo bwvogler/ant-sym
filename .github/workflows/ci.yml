@@ -4,8 +4,8 @@
 # test:slow is not here; it runs nightly (slow.yml).
 #
 # Wall time is the longest job, so the int, golden and soak files are spread over four shards instead
-# of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13: int and
-# golden ~585 s of file time, soak ~474 s; `check` used to take ~4.5 min (int alone 3m19s) while each
+# of int and golden running in series after the quick checks (ja-zyi5). Measured 2026-11-13, before
+# #165 and #172 moved seven slow files to soak: int and golden ~585 s of file time, soak ~474 s; `check` used to take ~4.5 min (int alone 3m19s) while each
 # soak shard finished in under 1.5 min. node --test shards by file index, not by duration: if one
 # shard grows much longer than the others, split its biggest file or raise the shard count.
 name: CI

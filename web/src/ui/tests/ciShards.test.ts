@@ -62,8 +62,9 @@ const testFiles = (dir: string): string[] =>
 
 test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
   const web = join(ROOT, "web");
-  const dirs = new Set([...globs(script("test")), ...globs(script("test:slow"))].map((g) => dirname(g)));
-  for (const g of dirs) assert.ok(!g.includes("*"), `${g}: only <dir>/*.test.ts globs are understood here`);
+  const all = [...globs(script("test")), ...globs(script("test:slow"))];
+  for (const g of all) assert.match(g, /^[^*]+\/\*\.test\.ts$/, `${g}: only <dir>/*.test.ts globs are understood here`);
+  const dirs = new Set(all.map((g) => dirname(g)));
   const missed = testFiles(web)
     .map((f) => relative(web, f))
     .filter((f) => !dirs.has(dirname(f)));
