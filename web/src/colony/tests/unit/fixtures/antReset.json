@@ -496,6 +496,12 @@
   "question": [
    -1
   ],
+  "bodyHeat": [
+   0
+  ],
+  "hot": [
+   0
+  ],
   "redraw": [
    -1
   ]
@@ -997,8 +1003,14 @@
   "question": [
    37
   ],
-  "redraw": [
+  "bodyHeat": [
    37.75
+  ],
+  "hot": [
+   38
+  ],
+  "redraw": [
+   38.25
   ]
  }
 }
