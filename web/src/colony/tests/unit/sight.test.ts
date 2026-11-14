@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, inReach } from "../../colony.ts";
-import { mulberry32, OPEN, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
+import { sense } from "../../sense.ts";
+import { CELL, cellOf, nx, ny, R } from "../../hex.ts";
+import { mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
 
 // ja-juiu: food is sensed only through open ground. Sensed through soil, a buried pocket turned explorers off their tunnels
@@ -32,6 +34,30 @@ test("inReach: SENSE_STEPS is 5, round a hairpin; rock seals a pocket as soil do
   assert.equal(reach(hairpin, [3, 1], [3, 3]), false, "six steps round it");
   const rock = hexMap(["#####", "#.#.#", "#####"]);
   assert.equal(reach(rock, [1, 1], [3, 1]), false, "(3, 1) is sealed off by the rock at (2, 1)");
+});
+
+// ja-uvhw: scent, like food, is read only where the sensor's tip can be reached through open ground. Read through the
+// soil, a trail in the next tunnel over drew ants at a wall.
+test("sense: a food trail in the next tunnel, one cell of soil away, reads nothing with scentReach; without it, the trail", () => {
+  const map = hexMap([
+    "ssssssssss", //
+    "sN.......s",
+    "ssssssssss",
+    "s........s",
+    "ssssssssss",
+  ]);
+  const read = (scentReach: number) => {
+    const from = at(5, 1);
+    const to = at(5, 3);
+    const d = Math.hypot(to.x - from.x, to.y - from.y);
+    const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, scentReach, sensorDistance: d }, mulberry32(1));
+    for (let x = 1; x <= 8; x++) c.ph.depositCell("food", x, 3, 5);
+    put(c, 0, 5, 1);
+    sense(c, 0, (to.x - from.x) / d, (to.y - from.y) / d, 0);
+    return c.s[0];
+  };
+  assert.equal(read(1), 0, "out of reach: nothing");
+  assert.ok(read(0) > 1, `read through the soil: ${read(0)}`);
 });
 
 const W = 26;
@@ -69,4 +95,52 @@ test("an explorer at a tunnel's end near buried food digs on and reaches it on s
     if (map.foodLeft < map.foodTotal) reached++;
   }
   assert.ok(reached >= 2, `took food from the pocket on ${reached} of ${seeds.length} seeds`);
+});
+
+test("inReach: the straight-line fast path answers as the search alone would, on random soil maps", () => {
+  // A plain breadth-first search over open cells, at most `steps` moves: what inReach must agree with.
+  const search = (map: WorldMap, ax: number, ay: number, bx: number, by: number, steps: number): boolean => {
+    if (ax === bx && ay === by) return true;
+    let front = [[ax, ay]];
+    const seen = new Set([ay * 1000 + ax]);
+    for (let d = 0; d < steps; d++) {
+      const next: number[][] = [];
+      for (const [x, y] of front)
+        for (let k = 0; k < 6; k++) {
+          const tx = nx(x!, y!, k);
+          const ty = ny(y!, k);
+          if (seen.has(ty * 1000 + tx)) continue;
+          seen.add(ty * 1000 + tx);
+          if (rockAt(map, tx, ty) !== OPEN) continue;
+          if (tx === bx && ty === by) return true;
+          next.push([tx, ty]);
+        }
+      front = next;
+    }
+    return false;
+  };
+  const rng = mulberry32(7);
+  let checked = 0;
+  for (let m = 0; m < 40; m++) {
+    const W2 = 16;
+    const H2 = 14;
+    const share = 0.1 + 0.5 * rng();
+    const rock = new Uint8Array(W2 * H2).map(() => (rng() < share ? SOIL : OPEN));
+    const map = worldFromArrays({ w: W2, h: H2 }, [nestAt(1, 1, 1)], { rock });
+    for (let t = 0; t < 200; t++) {
+      const x0 = 4 + rng() * 8;
+      const y0 = (4 + rng() * 6) * R;
+      const a = rng() * 2 * Math.PI;
+      const x1 = x0 + Math.cos(a) * 3;
+      const y1 = y0 + Math.sin(a) * 3;
+      cellOf(x0, y0);
+      const [ax, ay] = [CELL[0], CELL[1]];
+      cellOf(x1, y1);
+      const [bx, by] = [CELL[0], CELL[1]];
+      if (rockAt(map, ax, ay) !== OPEN || rockAt(map, bx, by) !== OPEN) continue;
+      assert.equal(inReach(map, x0, y0, x1, y1), search(map, ax, ay, bx, by, 5), `map ${m}, (${ax}, ${ay}) to (${bx}, ${by})`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 2000, `${checked} pairs checked`);
 });
