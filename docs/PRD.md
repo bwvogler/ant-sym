@@ -5685,10 +5685,11 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 ### 69.3 S2b: the palette, the lens and the keys (ja-mvo9.2, second half)
 The second half of stage 2: ways to find any action and to learn what anything on the map is, without a panel open.
 - **The command palette:**
-  - ⌘K or Ctrl+K (from anywhere, even a text field), or the HUD's search button (from 640 px wide).
+  - ⌘K or Ctrl+K (from anywhere, even a text field), or the HUD's search button (from 640 px wide). The page names the key as the machine does: ⌘K on a Mac or an iPhone, Ctrl+K elsewhere.
   - It lists every action by name: play, the speeds, the views, following a host, the whole map, each nest, each drawer, Learn, Lab and numbers, the lens, the shortcuts sheet, and every guide entry the game's species sees.
   - Typing narrows the list, ranked by the pure `ui/commands.ts`: the start of a label beats the start of a word in it, which beats a match inside one, which beats the letters in order. Every typed word must match, and a label counts double over its group and extra words.
-  - Arrows choose, Enter runs, Escape closes. Entries that can't run now are greyed with why: the speed in use, the view shown.
+  - Arrows choose (wrapping, the choice kept in sight), Enter runs, Escape closes. Entries that can't run now are greyed with why: the speed in use, the view shown. The list's groups are listbox groups.
+  - Running a command closes a pinned lens card, which would otherwise stay over what the command opens.
 - **The lens:**
   - Toggled with the key i or the HUD's ⓘ button. With it on, a mouse over the map has a card beside it saying what is there, each thing with a "more" link to its guide entry.
   - What it says, in drawing order:
@@ -5701,7 +5702,9 @@ The second half of stage 2: ways to find any action and to learn what anything o
     - the ground (ground, tunnel, soil, rock, sky).
   - **It says only what the field shows.** Scent shows only where a host sensed it lately (§65), at the field's own thresholds, which are now constants shared by `ColonyField` and `ui/lens.ts`. Where no host sensed lately, the card says so, linking the guide's "what the fungus senses".
   - A click (a tap on a phone, which has no hover) pins the card and follows nothing. Pinned, its links work, an ant on it can be followed, and it stays while the pointer wanders. Escape or its × closes it.
-  - The card says it afresh four times a second, so ants walking under a still pointer show.
+  - The card says it afresh four times a second, so ants walking under a still pointer show. Where the lens looks lives in a small store (`ui/lensStore.ts`) that the map reports to and `LensLayer` reads, so only the card re-renders as the pointer moves, not the page.
+  - A card pinned on one view hides on the other and takes no Escape there; it is back when its view is.
+  - The ground's "no host has smelled here lately" line is said on open ground only: the sky, rock and soil never carry scent.
   - `probe` reads the game at a point and `lensLines` says it: both pure, both tested, one test on a built game.
   - The queen's pen keeps its click.
 - **The page's keys:** one table, `ui/keys.ts`, read by the page's key handler (`pageKey`, tested) and by the shortcuts sheet, so the two can't drift.
@@ -5716,6 +5719,7 @@ The second half of stage 2: ways to find any action and to learn what anything o
   - The game's keys wait while a dialog has the page (the palette, the sheet, Details, Learn, the start, the queen's pen); ⌘K still works.
   - **Changed from the plan:** S2's plan put the lens on ?. The key ? is the shortcuts sheet's, as on most sites, and the lens is i. The owner can overrule.
 - **The shortcuts sheet:** the key ?, the palette, or Settings → Keyboard shortcuts.
-- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu, then the followed ant, then the drawer.
+- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu, then the followed ant, then the drawer. The Go to menu leaves an Escape that something above it took.
+- **The phone's HUD:** the speed and view buttons are tighter below 640 px, so the lens button fits from 360 px wide.
 - **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.

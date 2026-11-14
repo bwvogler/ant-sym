@@ -64,6 +64,9 @@ import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
 import { antTag, badgeParts, nestBadge } from "./badges.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
+import type { FieldProbe } from "./lensStore.ts";
+
+export type { FieldProbe };
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -120,20 +123,6 @@ interface Props {
   lens?: boolean;
   /** what is under the pointer, with the lens on (null: the pointer left the map) */
   onProbe?: (p: FieldProbe | null) => void;
-}
-
-/** A point of the map under the pointer, for the lens: where on screen, where in the world, and the ant there. */
-export interface FieldProbe {
-  /** the pointer, in the page's (client) pixels */
-  sx: number;
-  sy: number;
-  /** the layer shown (PLANE or CURTAIN; −1 on a game of one map) and the world point */
-  lv: number;
-  x: number;
-  y: number;
-  ant: Followed | null;
-  /** a click: the card stays until closed */
-  pinned: boolean;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -256,11 +245,12 @@ export default function ColonyField({
   const [goOpen, setGoOpen] = useState(false);
   const goRef = useRef<HTMLDivElement>(null);
   // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
-  // press anywhere outside it.
+  // press anywhere outside it. An Escape something above it took (a pinned lens card) or one a dialog over it will take
+  // (the palette) is not its own: one Escape closes one thing (review of #196, S1).
   useEffect(() => {
     if (!goOpen) return;
     const key = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
       setGoOpen(false);
     };

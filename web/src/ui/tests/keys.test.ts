@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type KeyPress, pageKey, SHORTCUTS } from "../keys.ts";
+import { type KeyPress, modK, pageKey, shortcuts } from "../keys.ts";
 
 // The page's keys (PRD §69.3): one table for the handler and the shortcuts sheet.
 
@@ -43,6 +43,7 @@ test("the browser's shortcuts pass, and Space on a button presses the button", (
 });
 
 test("the sheet lists every page key, and every key it lists away from the map is one the page answers", () => {
+  const SHORTCUTS = shortcuts(SPEEDS);
   const anywhere = SHORTCUTS.find((g) => g.group === "Anywhere")!.rows.flatMap((r) => r.keys);
   const asKey: Record<string, KeyPress> = {
     "⌘K": press("k", { meta: true }),
@@ -59,4 +60,17 @@ test("the sheet lists every page key, and every key it lists away from the map i
     SHORTCUTS.filter((g) => g.group !== "Anywhere").every((g) => g.rows.every((r) => r.map)),
     "the map's keys are marked as the map's",
   );
+});
+
+test("the sheet's speed row is the HUD's speeds, whatever they are (review of #196, N7)", () => {
+  const row = (speeds: number[]) => shortcuts(speeds)[0]!.rows.find((r) => r.does.startsWith("speed"))!;
+  assert.deepEqual(row(SPEEDS), { keys: ["1", "2", "3", "4"], does: "speed: 1×, 2×, 4×, 8×" });
+  assert.deepEqual(row([1, 3, 9]), { keys: ["1", "2", "3"], does: "speed: 1×, 3×, 9×" });
+});
+
+test("the palette's key as the machine names it (review of #196, N5)", () => {
+  assert.equal(modK("MacIntel"), "⌘K");
+  assert.equal(modK("iPhone"), "⌘K");
+  assert.equal(modK("Win32"), "Ctrl+K");
+  assert.equal(modK("Linux x86_64"), "Ctrl+K");
 });

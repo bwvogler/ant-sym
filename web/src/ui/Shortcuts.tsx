@@ -1,10 +1,10 @@
-import { SHORTCUTS } from "./keys.ts";
+import { shortcuts } from "./keys.ts";
 import { Icon, Kbd, Modal } from "./kit.tsx";
 
 // The shortcuts sheet (PRD §69.3, ja-mvo9.2): the key ?, the palette, or Settings. Read from keys.ts's table, the one the
 // page's key handler answers, so the two can't drift apart.
 
-export default function Shortcuts({ onClose }: { onClose: () => void }) {
+export default function Shortcuts({ speeds, onClose }: { speeds: readonly number[]; onClose: () => void }) {
   return (
     <Modal label="keyboard shortcuts" onClose={onClose} className="max-w-md">
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
@@ -19,7 +19,7 @@ export default function Shortcuts({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <div className="overflow-y-auto px-4 py-3">
-        {SHORTCUTS.map((g) => (
+        {shortcuts(speeds).map((g) => (
           <section key={g.group} className="mb-3 last:mb-0" aria-label={g.group}>
             <h3 className="text-[11px] font-medium tracking-wide text-fg-3 uppercase">{g.group}</h3>
             {g.rows.some((r) => r.map) && <p className="text-xs text-fg-3">Click the map first, so it has the keys.</p>}

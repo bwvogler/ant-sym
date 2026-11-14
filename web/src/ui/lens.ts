@@ -158,7 +158,6 @@ const ROLE_ENTRY: Record<Role, string> = {
 };
 
 const strength = (v: number) => (v >= 0.66 ? "strong" : v >= 0.33 ? "fair" : "faint");
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /** What the lens says of a point and the ant there (if any): the ant first, then the place, top to bottom as drawn. */
 export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
@@ -178,10 +177,7 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
     });
   if (p.chamber) {
     const c = p.chamber;
-    const lying = [
-      ...(c.brood > 0 ? [`${plural(Math.round(c.brood), "brood")}`] : []),
-      ...(c.food > 0 ? [`${Math.round(c.food)} food`] : []),
-    ];
+    const lying = [...(c.brood > 0 ? [`${Math.round(c.brood)} brood`] : []), ...(c.food > 0 ? [`${Math.round(c.food)} food`] : [])];
     out.push({
       what: `${ROLE_NAME[c.role]} of ${colonyName(c.k)}`,
       says: `${ROLE_TEXT[c.role]}${lying.length ? ` · ${lying.join(", ")}` : ""}`,
@@ -209,7 +205,8 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
   if (p.mound > 0) out.push({ what: "Mound", says: "soil carried up out of the nest as the ants dig", entry: "midden" });
   out.push(groundLine(p));
   // Scent shows only where a host sensed it lately (PRD §65): say so where the map shows none.
-  if (p.sight === 0 && p.ground !== "rock" && p.ground !== "soil")
+  // Only open ground carries scent: the sky, rock and soil never show any, sensed or not (review of #196, N2).
+  if (p.sight === 0 && p.ground === "open")
     out.push({ what: "Unsensed", says: "no host of yours has smelled here lately, so no trail or alarm shows", entry: "fungus-senses" });
   return out;
 }

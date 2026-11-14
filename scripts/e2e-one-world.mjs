@@ -1046,6 +1046,18 @@ try {
     "Escape closes the palette, not the drawer",
   );
   await lp.keyboard.press("Escape"); // and then the drawer
+  // The arrows wrap, and the chosen command stays in sight (review of #196, S3): ↑ from the first is the last.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("ArrowUp");
+  await lp.waitForTimeout(100);
+  const inSight = await pal.evaluate((d) => {
+    const box = d.querySelector('[role="listbox"]').getBoundingClientRect();
+    const o = d.querySelector('[role="option"][aria-selected="true"]').getBoundingClientRect();
+    return o.top >= box.top - 1 && o.bottom <= box.bottom + 1;
+  });
+  check(inSight, "↑ from the first command chooses the last, and scrolls it into sight");
+  await lp.keyboard.press("Escape");
   // The keys: speeds, Space, the sheet.
   await lp.locator("canvas").first().focus();
   await lp.keyboard.press("1");
@@ -1055,6 +1067,12 @@ try {
   await lp.keyboard.press(" ");
   check((await playing()) !== was, "Space plays or pauses");
   await lp.keyboard.press(" ");
+  // Space on a focused button presses that button, not play (review of #196, S5).
+  const playedBefore = await playing();
+  await lp.getByRole("group", { name: "speed" }).getByRole("button", { name: "2×", exact: true }).focus();
+  await lp.keyboard.press(" ");
+  check((await speedOn(2)) === "true" && (await playing()) === playedBefore, "Space on the focused 2× button: 2×, and play as it was");
+  await lp.locator("canvas").first().focus();
   await lp.keyboard.press("3");
   check((await speedOn(4)) === "true", "the key 3: 4×");
   await lp.keyboard.press("?");
@@ -1097,11 +1115,55 @@ try {
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   await lp.keyboard.press("Escape");
   check((await lensCard.count()) === 0, "Escape closes a pinned card");
+  // One Escape closes one thing (review of #196, S1): a pinned card over the Go to menu, then the menu; and the palette
+  // over the menu, then the menu.
+  const goBtn = lp.getByRole("button", { name: "Go to ▾" });
+  const goMenu = lp.getByRole("group", { name: "go to" });
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await goBtn.click();
+  await lp.keyboard.press("Escape");
+  check((await lensCard.count()) === 0 && (await goMenu.count()) === 1, "a pinned card and Go to: the first Escape closes the card only");
+  await lp.keyboard.press("Escape");
+  check((await goMenu.count()) === 0, "and the second the menu");
+  await goBtn.click();
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check((await pal.count()) === 0 && (await goMenu.count()) === 1, "the palette over Go to: the first Escape closes the palette only");
+  await lp.keyboard.press("Escape");
+  // A card pinned on the other view is hidden and doesn't take Escape (review of #196, S2): it waits for its view.
+  await rail("Mutations").click();
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("v");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "pinned above, it hides below");
+  await lp.keyboard.press("Escape");
+  check((await rail("Mutations").getAttribute("aria-pressed")) === "false", "below, Escape closes the drawer, not the hidden card");
+  await lp.keyboard.press("v");
+  await lensCard.waitFor({ timeout: 2000 });
+  check(true, "above again, the card is back");
+  await lp.keyboard.press("Escape");
   await lp.keyboard.press("i");
   await lp.mouse.move(hole.x + 2, hole.y + 2);
   await lp.waitForTimeout(100);
   check((await lensCard.count()) === 0 && (await lensBtn.getAttribute("aria-pressed")) === "false", "i again: the lens off, no card");
   await lctx.close();
+  // The lens button fits the phone's HUD from 360 px wide (review of #196, S4).
+  const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const np = await nctx.newPage();
+  np.on("pageerror", (e) => errors.push(String(e)));
+  await np.goto(url);
+  await np.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  const lb = await np.getByRole("button", { name: "Lens: say what is under the pointer (i)" }).boundingBox();
+  const hudBar = await np.getByLabel("game bar").boundingBox();
+  check(
+    lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
+    `at 360 px the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
+  );
+  await nctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

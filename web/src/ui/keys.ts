@@ -59,15 +59,24 @@ export interface Shortcut {
   map?: true;
 }
 
-/** Every key the page and the map answer, for the sheet (keys.test checks each page key here is one `pageKey` knows). */
-export const SHORTCUTS: { group: string; rows: Shortcut[] }[] = [
+/** The palette's key as this machine names it: ⌘K on a Mac (or an iPhone, iPad), Ctrl+K elsewhere (review of #196, N5). */
+export function modK(platform: string): string {
+  return /Mac|iPhone|iPad|iPod/i.test(platform) ? "⌘K" : "Ctrl+K";
+}
+export const MOD_K = modK(typeof navigator === "undefined" ? "" : navigator.platform || navigator.userAgent);
+
+/**
+ * Every key the page and the map answer, for the sheet (keys.test checks each page key here is one `pageKey` knows); the
+ * speed row from the HUD's speeds, so the two can't drift (review of #196, N7).
+ */
+export const shortcuts = (speeds: readonly number[]): { group: string; rows: Shortcut[] }[] => [
   {
     group: "Anywhere",
     rows: [
       { keys: ["⌘K", "Ctrl+K"], does: "the command palette: every action, by name" },
       { keys: ["?"], does: "this sheet" },
       { keys: ["Space"], does: "play or pause" },
-      { keys: ["1", "2", "3", "4"], does: "speed: 1×, 2×, 4×, 8×" },
+      { keys: speeds.map((_, j) => String(j + 1)), does: `speed: ${speeds.map((s) => `${s}×`).join(", ")}` },
       { keys: ["v"], does: "switch the view: above or below" },
       { keys: ["f"], does: "follow a host of yours" },
       { keys: ["i"], does: "the lens: say what is under the pointer" },

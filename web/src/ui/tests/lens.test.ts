@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { centreX, centreY, CURTAIN, INFECTED, PLANE } from "../../colony/index.ts";
+import { CELL, cellOf, centreX, centreY, ChunkLayer, CURTAIN, type Fungus, INFECTED, PLANE } from "../../colony/index.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { lensAnt, lensLines, type LensProbe, probe } from "../lens.ts";
 import { buildGame } from "../useColony.ts";
@@ -21,6 +21,10 @@ const bare: LensProbe = {
   hole: -1,
   chamber: null,
 };
+// One game for the tests that read a real one (each touches its own cells and ants).
+let built: ReturnType<typeof buildGame> | null = null;
+const aGame = () => (built ??= buildGame({ species: "generic", seed: 3, antCount: 50, rival: true, generation: 0 }));
+
 const whats = (p: Partial<LensProbe>, ant = null as Parameters<typeof lensLines>[1]) =>
   lensLines({ ...bare, ...p }, ant).map((l) => l.what);
 
@@ -40,7 +44,7 @@ test("the ant first, then the place: the hole, a chamber, what lies on the groun
 test("a chamber says its role, what it is for and what lies in it, and links the role's entry", () => {
   const [line] = lensLines({ ...bare, view: "below", ground: "open", chamber: { k: 0, role: "brood", brood: 4, food: 2.4 } }, null);
   assert.equal(line!.what, "Brood chamber of Ink");
-  assert.equal(line!.says, "where larvae are fed and pupae lie · 4 broods, 2 food");
+  assert.equal(line!.says, "where larvae are fed and pupae lie · 4 brood, 2 food", "brood is a mass noun (review of #196, N1)");
   assert.equal(line!.entry, "brood");
   const royal = lensLines({ ...bare, view: "below", chamber: { k: 1, role: "royal", brood: 0, food: 0 } }, null)[0]!;
   assert.equal(royal.entry, "queen");
@@ -61,13 +65,35 @@ test("scent shows past the field's own thresholds, and the stronger trail of the
   );
   assert.match(lensLines({ ...bare, foodTrail: 0.7 }, null)[0]!.says, /^strong:/);
   assert.match(lensLines({ ...bare, foodTrail: 0.1 }, null)[0]!.says, /^faint:/);
+  assert.match(lensLines({ ...bare, foodTrail: 0.5 }, null)[0]!.says, /^fair:/);
 });
 
-test("where no host sensed lately, the lens says why no scent shows; never on rock or soil", () => {
+test("a tie between the trails is the food trail's, as the field paints it", () => {
+  // Wherever both are saturated and freshly sensed, both are 1: the field paints food over home (f >= h).
+  assert.deepEqual(
+    whats({ foodTrail: 0.5, homeTrail: 0.5 }).filter((w) => w.endsWith("trail")),
+    ["Food trail"],
+  );
+});
+
+test("the mycelium and the mound are said, each with its entry", () => {
+  const lines = lensLines({ ...bare, hypha: true, mound: 2 }, null);
+  assert.deepEqual(
+    lines.map((l) => [l.what, l.entry]),
+    [
+      ["Mycelium", "evolution"],
+      ["Mound", "midden"],
+      ["Ground", null],
+    ],
+  );
+});
+
+test("where no host sensed lately, the lens says why no scent shows; only on open ground", () => {
   assert.deepEqual(whats({ sight: 0 }), ["Ground", "Unsensed"]);
   assert.equal(lensLines({ ...bare, sight: 0 }, null)[1]!.entry, "fungus-senses");
   assert.deepEqual(whats({ sight: 0, ground: "rock" }), ["Rock"]);
   assert.deepEqual(whats({ sight: 0, ground: "soil" }), ["Soil"]);
+  assert.deepEqual(whats({ sight: 0, ground: "air" }), ["Sky"], "no scent ever shows in the sky (review of #196, N2)");
   assert.deepEqual(whats({ sight: 0.5 }), ["Ground"], "sensed: nothing to excuse");
 });
 
@@ -75,10 +101,12 @@ test("the ground by view: open ground above is a tunnel below; rock and sky link
   assert.equal(lensLines({ ...bare, view: "below" }, null)[0]!.what, "Tunnel");
   assert.equal(lensLines({ ...bare, ground: "rock" }, null)[0]!.entry, null);
   assert.equal(lensLines({ ...bare, ground: "air" }, null)[0]!.what, "Sky");
+  assert.equal(lensLines({ ...bare, ground: "soil" }, null)[0]!.entry, "midden", "soil above: the mound's");
+  assert.equal(lensLines({ ...bare, ground: "soil", view: "below" }, null)[0]!.entry, "chambers", "soil below: the nest's");
 });
 
 test("probe reads a real game: a hole on both views, a chamber below, and scent only where a host sensed it", () => {
-  const g = buildGame({ species: "generic", seed: 3, antCount: 50, rival: true, generation: 0 });
+  const g = aGame();
   const w = g.world!;
   const sensed = new SensedMap();
   const lw = { colonies: g.colonies, fungus: g.fungus, world: w };
@@ -117,4 +145,42 @@ test("probe reads a real game: a hole on both views, a chamber below, and scent 
   assert.equal(p0.sight, 0);
   assert.deepEqual(lensAnt(g.colonies, 0, i)?.infected, true);
   assert.equal(lensAnt(g.colonies, 0, c.n + 5), null, "no such ant");
+});
+
+test("below, the lens reads the curtain's own scent, sensing, spores and mycelium (review of #196, S5)", () => {
+  const g = aGame();
+  const w = g.world!;
+  const sensed = new SensedMap();
+  const lw = { colonies: g.colonies, fungus: g.fungus, world: w };
+  // An Amber ant underground, where the colony starts, and a food trail in its cell of the curtain.
+  const c = g.colonies[1]!;
+  const i = [...c.alive.keys()].find((j) => c.alive[j] && c.layer[j] === CURTAIN)!;
+  const [x, y] = [c.x[i]!, c.y[i]!];
+  cellOf(x, y);
+  const [gx, gy] = [CELL[0], CELL[1]];
+  c.layers[CURTAIN]!.ph.fields.food.set(gx, gy, 8);
+  sensed.stamp(g.colonies, g.time);
+  assert.equal(probe(lw, sensed, CURTAIN, x, y).foodTrail, 0, "before it is a host: no trail below");
+  c.load[i] = INFECTED;
+  sensed.stamp(g.colonies, g.time);
+  const below = probe(lw, sensed, CURTAIN, x, y);
+  assert.equal(below.view, "below");
+  assert.equal(below.sight, 1, "the curtain's sensing, not the plane's");
+  assert.equal(below.foodTrail, 1, "the curtain's trail, not the plane's");
+  assert.equal(probe(lw, sensed, PLANE, x, y).foodTrail, 0, "the same point above: the plane's, none");
+
+  // Spores and hyphae on the curtain only: the lens below finds them, above it doesn't.
+  const curtainSpores = new ChunkLayer((n) => new Float32Array(n), 0);
+  curtainSpores.set(gx, gy, 1e6);
+  const planeSpores = new ChunkLayer((n) => new Float32Array(n), 0);
+  const fungus = {
+    spores: planeSpores,
+    sporesOn: (l: number) => ({ spores: l === CURTAIN ? curtainSpores : planeSpores }),
+    hyphaeOn: (l: number) => (l === CURTAIN ? { has: (hx: number, hy: number) => hx === gx && hy === gy } : null),
+  } as unknown as Fungus;
+  const fake = { ...lw, fungus };
+  const f = probe(fake, sensed, CURTAIN, x, y);
+  assert.deepEqual([f.spores, f.hypha], [true, true]);
+  const up = probe(fake, sensed, PLANE, x, y);
+  assert.deepEqual([up.spores, up.hypha], [false, false]);
 });
