@@ -23,6 +23,7 @@ import { SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY } from "./royal.ts";
 import { EGG_FOOD, QUEEN_STOCK } from "./tuning.ts";
 import { EXPLORE } from "./vocab.ts";
 import { dropFood } from "./world.ts";
+import { clearPellet } from "./pellets.ts";
 
 /** The newborn's resets for one colony's parameters (ants.ts antResets), worked out once: a parameter a reset reads (tolerance, routeStep) is read at the first birth, so a colony does not change it afterwards (asIs reads tolerance live). */
 const SPAWN_RESETS = new WeakMap<object, [string, number][]>();
@@ -110,7 +111,7 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
       strain: col.strain[i],
       layer: col.home,
     });
-  col.clearPellet(i);
+  clearPellet(col, i);
   col.alive[i] = 0;
   col.carrying[i] = 0;
   col.digT[i] = 0;

@@ -5,7 +5,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { bodyHeatAfter, feelsHot, groundHeat, pastCritical } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance, nx as stepX, ny as stepY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
   MODES,
@@ -27,7 +27,7 @@ import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
 import { type Item, localResponses, type Odds, type Responses, type Where, type Touch } from "./responses.ts";
-import { blocked, groundTop, isSky, OPEN, takeLoose, rockAt, type Nest, type WorldMap } from "./world.ts";
+import { blocked, groundTop, isSky, rockAt, type Nest, type WorldMap } from "./world.ts";
 import { cellAt, type Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
@@ -44,16 +44,12 @@ import {
   INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
-  LOOSE_FILL_PICK,
-  LOOSE_SPREAD,
-  LOOSE_SPREAD_PICK,
   MET_HALF,
   MIDDEN_AT,
-  MIDDEN_SPREAD,
   RECEPTION_MIN,
   THREAT_HALF,
 } from "./tuning.ts";
-import { NO_CELL, SOIL_DUG, SOIL_FILL, SOIL_LOOSE, cellKey, climb, planeMoundReach } from "./grid.ts";
+import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
@@ -1177,31 +1173,6 @@ export class Colony {
   }
 
   /**
-   * One world's plane (U3c): lay `amount` of midden mark on plane cell (x, y), and tapering over MIDDEN_SPREAD cells round
-   * it (the side view's taper along the ground, in 2D), on the plane's scent whichever layer is bound. Rock takes none.
-   */
-  markMiddenPlane(x: number, y: number, amount: number): void {
-    const { map, ph } = this.layers[PLANE] as Layer;
-    const offs = discOffsets(MIDDEN_SPREAD)[y & 1] as Int16Array;
-    for (let k = 0; k < offs.length; k += 2) {
-      const tx = x + offs[k];
-      const ty = y + offs[k + 1];
-      if (rockAt(map, tx, ty) !== OPEN) continue;
-      ph.depositCell("midden", tx, ty, (amount * (MIDDEN_SPREAD + 1 - hexDistance(x, y, tx, ty))) / (MIDDEN_SPREAD + 1));
-    }
-  }
-
-  /** Lay `amount` of midden mark on the ground at column `col`, and tapering over MIDDEN_SPREAD columns either side. */
-  markMidden(col: number, amount: number): void {
-    if (this.map.surfaceRows !== undefined) return; // one world's curtain: the midden is the plane's (U3c), never its ground strip
-    for (let dx = -MIDDEN_SPREAD; dx <= MIDDEN_SPREAD; dx++) {
-      const x = col + dx;
-      if (x < this.map.x0 || x >= this.map.x0 + this.map.size.w) continue;
-      this.ph.depositCell("midden", x, groundTop(this.map, x) - 1, (amount * (MIDDEN_SPREAD + 1 - Math.abs(dx))) / (MIDDEN_SPREAD + 1));
-    }
-  }
-
-  /**
    * Whether the nest is crowded (the side view, nest slice 2): fewer floor cells in the colony's chambers than
    * FLOOR_PER_ANT for each ant underground. A crowded nest digs (chambers first); a roomy one barely digs at all
    * (Odontomachus keeps ~2 cm² of floor per worker whatever its size; Rasse & Deneubourg's digging that stops with room).
@@ -1274,63 +1245,6 @@ export class Colony {
     this.cameFrom[i] = this.looked[i];
     this.looked[i] = packed;
     return true;
-  }
-
-  /** Ant i carries no pellet (or corpse) any more: the pellet, what it was, and where it was taking it, all at once. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
-  clearPellet(i: number): void {
-    this.pellet[i] = 0;
-    this.soil[i] = SOIL_DUG;
-    this.corpse[i] = 0;
-    this.spoilTo[i] = NaN;
-    this.staleWalk[i] = 0;
-  }
-
-  /**
-   * The side view: an explorer on the ground beside loose soil now and then picks up a pellet of it (it comes up
-   * easily). From a steep flank (LOOSE_SPREAD_PICK a cell) it carries it a little farther out and drops it again, so
-   * the mound spreads and smooths itself as ants rework their spoil; from anywhere on it (LOOSE_FILL_PICK) it takes
-   * it down into the nest to refill unused space, as leaf-cutting ants refill excess space (Pielström & Roces).
-   * True if it picked one up.
-   */
-  pickLoose(i: number, cx: number, cy: number, enemy: boolean): boolean {
-    const { map } = this;
-    if (!map.loose) return false;
-    const u = this.rng();
-    if (u >= LOOSE_SPREAD_PICK + LOOSE_FILL_PICK) return false;
-    for (let d = 0; d < 6; d++) {
-      const tx = stepX(cx, cy, d);
-      const ty = stepY(cy, d);
-      if (map.loose.get(tx, ty) !== 1 || groundTop(map, tx) !== ty) continue; // only off the top: the mound's surface
-      if (this.byAnEntrance(tx, ty)) continue;
-      // Spread from a slope standing at its angle of repose (the next column out a row lower): the steep flanks.
-      const out = tx >= this.entranceCol ? 1 : -1;
-      const steep = groundTop(map, tx + out) - ty >= 1;
-      const fill = u < LOOSE_FILL_PICK;
-      if (!fill && !steep) continue;
-      if (!this.responses.get(touch(this, i, enemy, this.mode[i], "none", "soil"))) return false;
-      if (!takeLoose(map, tx, ty)) continue;
-      this.takeUpLoose(i, tx, fill);
-      return true;
-    }
-    return false;
-  }
-
-  /** Ant i takes up a loose pellet from column `col` (off the mound's top): down to fill, or spreading it farther out. */
-  takeUpLoose(i: number, col: number, fill: boolean): void {
-    this.pellet[i] = 1;
-    this.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;
-    this.loosePicked++;
-    this.since[i] = 0;
-    this.wall[i] = 0;
-    this.mx[i] = NaN;
-    this.gx[i] = NO_CELL;
-    const out = col >= this.entranceCol ? 1 : -1;
-    if (fill) this.looseDown++;
-    else {
-      this.spoilSide[i] = out;
-      this.spoilTo[i] = Math.abs(col - this.entranceCol) + LOOSE_SPREAD * (0.5 + this.rng());
-      this.spoilT[i] = 0;
-    }
   }
 
   /** The side view: whether cell (x, y) is within ENTRANCE_ZONE of any nest's entrance (a rival's hole is no space to fill either). */
