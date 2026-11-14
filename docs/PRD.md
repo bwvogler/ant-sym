@@ -5378,7 +5378,7 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 | Forage | 0.73 | 74 % | 44 % |
 | Cautious | 0.81 | 46 % | 31 % |
 | Warlike | 0.69 | 85 % | 54 % |
-| Desert (3 doctrines) | 0.79–0.87 | 31–75 % | 19–25 % |
+| Desert (3 doctrines) | 0.85–0.86 | 45–48 % | 13–22 % |
 
 Asked again, Jev kept its earlier choice in 81–87 % of situations; where it changed, the call was close (Warlike: follow 0.39 against fight 0.35). A top choice that close was a coin toss before.
 
