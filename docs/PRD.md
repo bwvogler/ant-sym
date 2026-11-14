@@ -4746,6 +4746,16 @@ A1 stays at or above 8/10 (10/10). A2b and A4 each lose one seed (one seed in te
 - **Goldens:** the one-world golden is re-recorded; `golden.json` and `slow/golden.json` are bit-exact (route memory acts only on one world's plane). **Cost:** none (steering only).
 - **The lesson:** the guard's seeds sit near the bound, so any change to one world's foraging can move them. A PR that changes plane behaviour runs the slow guards on its merged head (`slow.yml`, the steward skill) rather than on the branch it was measured on.
 
+**G1 judged on a share of seeds (ja-ysco, owner 2026-11-14).** Two days, two plane changes, two failures of the three-seed guard: #153 took seeds 4 and 9 to 4 / 2 and 3 / 1 (the re-tune above), then #180 (defence on home ground by the ant's own vector) took them to 6 / 2 and 3 / 0 at step 3, with route memory untouched. A seed's figure is the worst of ~60 samples over two colonies in one game; any setting meets the bound on about half the seeds, so three fixed seeds re-roll with every change to one world's play. The bound of 2 stays; the guard now runs seeds 1-10 and asks for **at least 4 within 2, and no seed at 10 or more** (a carrier jam). Measured on `main` with #180 (seeds 1-10 / 11-20, worst colony per seed):
+
+| | seeds 1-10 | within 2 | seeds 11-20 | within 2 | worst | food 1-10 | births 1-10 |
+|---|---|---|---|---|---|---|---|
+| step 3 (shipped) | 2 2 2 6 1 2 3 4 3 1 | 6 | 1 4 2 2 2 4 4 6 3 3 | 4 | 6 | 46,645 | 7,162 |
+| step 4 | 27 2 2 3 2 4 4 2 3 2 | 5 | 2 2 3 8 1 2 3 4 4 5 | 4 | 27 | 50,057 | 7,343 |
+| no route memory (§59's sweep, before §67) | 12 15 24 33 7 25 29 18 11 19 | 0 | | | 33 | | |
+
+Step 3 passes with two seeds to spare; step 4 fails it on seed 1's jam (27); route memory off fails both parts. The ten games run in worker threads in one file (`tests/slow/oneWorldG1.test.ts`, games in `oneWorldG1Game.ts`), replacing the three per-seed files.
+
 **Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: at `routeStep` 3, seeds 3 and 7 reach 3 at the worst sample (at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 one seed down each, and A9 one more at step 3, to watch; the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)

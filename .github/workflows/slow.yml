@@ -1,6 +1,6 @@
 # The whole-game guards (web/src/colony/tests/slow): about 16 minutes locally on 4 cores; on runners about 4 minutes in 4
-# shards, against 17 in one job (2026-11-14). --test-shard deals out whole files, so A11, A12 and each of G1's seeds have
-# a file of their own and no file holds a shard much past 4 minutes (ja-jkc9).
+# shards, against 17 in one job (2026-11-14). --test-shard deals out whole files, so A11 and A12 have a file of their own
+# and no file holds a shard much past 4 minutes (ja-jkc9); G1 (oneWorldG1.test.ts) runs its ten seeds in worker threads (ja-ysco).
 # - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
