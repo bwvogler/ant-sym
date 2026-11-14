@@ -82,7 +82,7 @@ The goal: a sense, a channel, a lane, a species, a nest kind and a renderer laye
 The top-down and side maps are retired.
 
 **Blocked by:**
-- ~~`ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.~~ Closed 2026-11-14: all four run on the plane, measured by their assays (`one-world.md`, U6a and `ja-web` as built).
+- ~~`ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.~~ Closed 2026-11-14: all four of the bead's mechanics (these three and activation) run on the plane and are measured there by their assays (`one-world.md`, U6a and `ja-web` as built); A5 0/10 and A10 0/10 are tracked by ja-lp4.6.8 and ja-je8.
 - `ja-lp4.6`: guards and assays on one world.
 
 1. **Inventory.** Each test file that builds an open or side map, each assay in `ASSAYS` and each slow guard, as one of:
@@ -94,7 +94,7 @@ The top-down and side maps are retired.
 2. **Port the assays that carry PRD baselines** to one world. Record the new baselines in the PRD, choose by the worst seed, and confirm on seeds 11–20.
 3. **Re-record the golden masters on one world only:** fast and slow.
 4. **Delete:**
-   - `generateSideWorld`'s own surface, walkway and ground line, the side mound, the top-down soil map (`generateWorld` without `OPEN_WORLD`), and whatever of `transect.ts` the curtain does not use. Not `generateWorld(seed, OPEN_WORLD)` itself: it is one world's plane (`oneWorld.ts`), so it moves into one world as the plane's generator (the endless world's E2 replaces it later). Likewise the curtain reads `SIDE_WORLD.rockiness`, `.soil` and `buryPockets(…, SIDE_WORLD, …)`: those values move into the curtain before `SIDE_WORLD` goes.
+   - first fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane options (one world's plane is `generateWorld(seed, OPEN_WORLD)`, which the endless world's E2 later replaces), and move `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell` and `foodMinDist`, and `groundCell`, into the curtain; then delete `generateSideWorld`'s surface, walkway, ground line and mound, and whatever of `transect.ts` the curtain does not use
    - the view proxies: `#entrance === null`, `map.sky`, and `this.queen` read as "side view"
    - the colony-wide strategist (`StanceSituation`)
    - the side-only and top-only params
