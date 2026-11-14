@@ -858,7 +858,7 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   const couldAfford = useRef(affordable);
   useEffect(() => {
     if (affordable && !couldAfford.current)
-      pushToast("The fungus has mutations to keep: choose where they go, in the Fungus panel.", "good");
+      pushToast("The fungus has mutations to keep: choose where they go, in the Mutations drawer.", "good");
     couldAfford.current = affordable;
   }, [affordable]);
   // Losing Jev mid-game (the cap, a stop) is worth a notice; the lock at page load is in the panel already.

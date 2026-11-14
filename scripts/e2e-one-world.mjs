@@ -672,7 +672,6 @@ try {
   );
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes it");
-  // A finger: a tap opens, a second tap or a tap elsewhere closes, and a tap inside the bubble leaves it open.
   // Escape closes one thing at a time (review of #182, S1 and S7): with an ant followed and the map focused, the first
   // drops the ant and leaves the drawer; the second, with nothing followed, closes the drawer.
   await page.mouse.move(2, 2);
@@ -686,6 +685,19 @@ try {
   );
   await page.keyboard.press("Escape");
   check((await mutations(page).getAttribute("aria-pressed")) === "false", "the second closes the drawer");
+  // With Go to open and an ant followed, Escape closes the menu only and keeps the follow (review of #182, S8): Go to's
+  // capture listener takes the key first, and the map leaves an Escape already taken.
+  await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+  await page.getByRole("button", { name: "Go to ▾" }).click();
+  await page.locator("canvas").first().focus();
+  check((await page.evaluate(() => window.jevAnts.followed())) !== null, "an ant followed, Go to open");
+  await page.keyboard.press("Escape");
+  check(
+    (await page.getByRole("group", { name: "go to" }).count()) === 0 && (await page.evaluate(() => window.jevAnts.followed())) !== null,
+    "with Go to open, Escape closes the menu and keeps the ant followed",
+  );
+  await page.keyboard.press("Escape"); // and drops the follow, before the touch context
+  // A finger: a tap opens, a second tap or a tap elsewhere closes, and a tap inside the bubble leaves it open.
   const touch = await browser.newContext({
     viewport: { width: 390, height: 844 },
     hasTouch: true,

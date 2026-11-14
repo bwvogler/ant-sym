@@ -692,7 +692,7 @@ export function LeverChips({
                     : nothing
                       ? `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
                       : heldOff
-                        ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).`
+                        ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Mutations).`
                         : v.blurb
                 }
                 onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}
