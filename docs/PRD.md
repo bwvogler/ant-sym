@@ -5409,6 +5409,13 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.76, 17.17 and 17.65 ms mean, E1.3 17.03, 16.57 and 17.10 ms; within noise. Keys above 2^31 are doubles in V8, but no slow-down shows.
 - **Cost:** none. No situation, legend or question changed.
 
+**Regions freed (`ja-qpv.1.5`, review of #160 D1, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and `colony-bench --one --page --hash`'s whole-game hash equals main's).
+- **What changed.** `ChunkLayer` counts the chunks in each region. When `drop` takes the last one, the region's slot array is freed (`regions` falls), and the next write there makes it again. Before, every region a chunk had ever been written in kept its array for the rest of the game. Since E1.1 drops faded scent and E1.3 drops faded `SensedMap` chunks, that was every region an ant or a host ever reached.
+- **What it doesn't change.** The box of regions (`regionSlots`) still never shrinks. It grows by whole regions, 256 times slower than a box of chunks would (E1.2).
+- **Why now.** Today's plane is one region a layer, so nothing is saved yet. On an endless plane, memory would otherwise grow with every region ever visited. E4's memory soak is meant to rule that out.
+- **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).

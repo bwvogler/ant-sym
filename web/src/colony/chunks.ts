@@ -59,6 +59,8 @@ export class ChunkLayer<A extends Cells> {
   #rw = 0;
   #rh = 0;
   #table: ((A | undefined)[] | undefined)[] = [];
+  // Chunks held in each slot's region, beside #table: a region whose last chunk is dropped is freed.
+  #live: number[] = [];
   #regions = 0;
   #count = 0;
 
@@ -80,12 +82,12 @@ export class ChunkLayer<A extends Cells> {
     return this.#count;
   }
 
-  /** Regions allocated (each 16 × 16 chunk slots): what the chunks' slots cost, which grows with the places touched and, for now, never shrinks. */
+  /** Regions allocated (each 16 × 16 chunk slots), each holding at least one chunk: a region is freed with its last chunk. */
   get regions(): number {
     return this.#regions;
   }
 
-  /** Slots in the box of regions: the one part that grows with the spread between places, by whole regions. */
+  /** Slots in the box of regions: the one part that grows with the spread between places, by whole regions, and never shrinks. */
   get regionSlots(): number {
     return this.#rw * this.#rh;
   }
@@ -131,22 +133,35 @@ export class ChunkLayer<A extends Cells> {
     const i = ((cy & REGION_MASK) << REGION_BITS) | (cx & REGION_MASK);
     const old = r[i];
     r[i] = a;
-    if (old === undefined) this.#count++;
+    if (old === undefined) {
+      this.#count++;
+      this.#live[ti] = (this.#live[ti] ?? 0) + 1;
+    }
     return old;
   }
 
-  /** Forget chunk (cx, cy), returning its array: it reads as `empty` again (or is generated afresh on its next read). */
+  /**
+   * Forget chunk (cx, cy), returning its array: it reads as `empty` again (or is generated afresh on its next read). A
+   * region left with no chunk is freed too, so memory follows the ground held now, not all the ground ever held.
+   */
   drop(cx: number, cy: number): A | undefined {
     const tx = (cx >> REGION_BITS) - this.#rx0;
     const ty = (cy >> REGION_BITS) - this.#ry0;
     if (tx < 0 || ty < 0 || tx >= this.#rw || ty >= this.#rh) return undefined;
-    const r = this.#table[ty * this.#rw + tx];
+    const ti = ty * this.#rw + tx;
+    const r = this.#table[ti];
     if (r === undefined) return undefined;
     const i = ((cy & REGION_MASK) << REGION_BITS) | (cx & REGION_MASK);
     const old = r[i];
     if (old !== undefined) {
       this.#count--;
       r[i] = undefined;
+      const live = (this.#live[ti] ?? 1) - 1;
+      this.#live[ti] = live;
+      if (live === 0) {
+        this.#table[ti] = undefined;
+        this.#regions--;
+      }
     }
     return old;
   }
@@ -192,6 +207,7 @@ export class ChunkLayer<A extends Cells> {
   /** Forget every chunk: the layer reads as `empty` everywhere and holds nothing (a save's restore, save.ts). */
   dropAll(): void {
     this.#table.fill(undefined);
+    this.#live.fill(0);
     this.#regions = 0;
     this.#count = 0;
   }
@@ -222,12 +238,17 @@ export class ChunkLayer<A extends Cells> {
     const nw = nx1 - nx0;
     const nh = ny1 - ny0;
     const table: ((A | undefined)[] | undefined)[] = new Array(nw * nh);
+    const live: number[] = new Array<number>(nw * nh).fill(0);
     for (let ty = 0; ty < this.#rh; ty++)
       for (let tx = 0; tx < this.#rw; tx++) {
         const r = this.#table[ty * this.#rw + tx];
-        if (r !== undefined) table[(ty + this.#ry0 - ny0) * nw + (tx + this.#rx0 - nx0)] = r;
+        if (r === undefined) continue;
+        const ni = (ty + this.#ry0 - ny0) * nw + (tx + this.#rx0 - nx0);
+        table[ni] = r;
+        live[ni] = this.#live[ty * this.#rw + tx]!;
       }
     this.#table = table;
+    this.#live = live;
     this.#rx0 = nx0;
     this.#ry0 = ny0;
     this.#rw = nw;
