@@ -188,6 +188,25 @@ export const GUIDE: GuideEntry[] = [
     ],
   },
   {
+    id: "route-memory",
+    title: "Route memory",
+    onScreen:
+      "A forager with food whose way home is blocked by rock stops pushing at the rock face: it turns and walks back out along its own way out, round the band's end, and then in to its hole. Fewer sit against a wall with food in their jaws for minutes.",
+    realAnts:
+      "Desert ants keep route memories beside their path integrator, and a local memory can override the vector. Lost ants, displaced onto unfamiliar ground, backtrack opposite to the path they had just travelled, which raises the chance of reaching familiar ground. Their route memories are one way, and detours round an obstacle are learnt slowly and by trial. No paper shows an ant reversing a whole outward walk point by point after one trip.",
+    inGame:
+      "On the plane a forager stores its own position every 4 cells on its way out (at most 64 places; it keeps every second one and doubles the spacing when full) and forgets them at its next trip. A carrier whose home vector stalls (no nearer its belief for 3 s) walks back through them, taking the earliest place it comes within 3 cells of, as a stand-in for a familiar view, and the one before as its next goal; the hole's sight or smell takes over at any moment. It retraces once a trip, and searches as before when the places run out. One trip, its own past only: it holds no coordinate of the hole or a map. Steering only: Jev's cost is unchanged. A design: stronger than the biology shows.",
+    sources: [
+      { note: "route-memory", anchor: "1-ants-have-route-memories-beside-path-integration-and-they-cooperate", label: "Route memories beside path integration" },
+      {
+        note: "route-memory",
+        anchor: "3-a-blocked-ant-walks-along-the-barrier-and-a-lost-ant-goes-back-the-way-it-was-going",
+        label: "A lost ant goes back the way it was going",
+      },
+      { note: "route-memory", anchor: "what-was-built", label: "What was built" },
+    ],
+  },
+  {
     id: "chambers",
     title: "Chambers",
     swatch: (["royal", "brood", "store", "reception"] as const).map((r) => css(ROLE_RGB[r]!)),
@@ -418,7 +437,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "route-memory",
     title: "Route memory",
     covers:
-      "What a carrier does when its home vector points through rock: route memories beside path integration, and backtracking when lost. Planned for one world (not built, PRD §59).",
+      "What a carrier does when its home vector points through rock: route memories beside path integration, and backtracking when lost. Built and on for one world (PRD §59).",
   },
   {
     note: "desert-ant",

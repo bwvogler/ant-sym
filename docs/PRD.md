@@ -4590,7 +4590,7 @@ The owner asked for a review of the work needed before the game grows: species w
 - **Cost.** No legend, question or schema changed. S2 changes the Jev contexts that name a view, so its PR re-ships precache from a live check and gives each lane's hourly cost.
 
 
-## 59. A carrier whose home vector points through rock walks back the way it came (design, ja-lp4.16, ja-lp4.6.3, 2026-11-11)
+## 59. A carrier whose home vector points through rock walks back the way it came (built and on, ja-lp4.16, ja-lp4.6.3, 2026-11-14)
 
 **Research basis:** [route-memory.md](route-memory.md). No full text could be fetched (network policy), so every figure is **unverified**.
 - **Route memories beside path integration.** Insects keep several memory-based guidance systems (path integration and image matching) that cooperate and train one another; local vectors from a route memory are dominant over the global vector, and a route is recalled without the vector or against it (Collett, Chittka & Collett 2013; Collett et al. 1998; Mangan & Webb 2012).
@@ -4724,7 +4724,7 @@ A1 stays at or above 8/10 (10/10). A2b and A4 each lose one seed (one seed in te
 
 **Beads.** `ja-lp4.16` (epic, blocks `ja-lp4.6.3`), children in build order: `.1` read the full texts (research, does not block); `.2` assay R1 and its baseline (no behaviour change); `.3` route memory behind `routeMemory`; `.4` tune, turn on, G1 and the one-world assays; `.5` docs as built.
 
-**Still open.** The owner's calls above; R1's baseline; the tick; whether the bound of 2 is reachable on seeds 5 and 9 with this alone, or needs `ja-lp4.15`'s shorter search; the full texts to read when the network allows.
+**Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: seeds 6, 7 and 8 reach 4, 5 and 4 at the worst sample, and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 one seed down each, to watch; the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
