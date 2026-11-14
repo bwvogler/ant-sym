@@ -51,15 +51,7 @@ import {
   validSteer,
 } from "./steerBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import {
-  type LaneWords,
-  STANCE_SCHEMA,
-  STEER_WEIGHTS,
-  type Situation,
-  type SpeciesSituation,
-  type Stance,
-  type StanceSituation,
-} from "./vocab.ts";
+import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, type Stance, type StanceSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -306,7 +298,7 @@ const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local
 export const SAMPLE_STEER: Situation = { ...SAMPLE_SITUATION, mode: "explore" };
 
 // The steer lane (staging, ja-ykmu.3; docs/steering.md): an ant out exploring or following, asked how strongly it weighs each cue, under
-// its colony's doctrine. `ctx` is the set of weights asked (absent: STEER_ASKED; the Lab adds design ones, ja-ykmu.4): they are in the key.
+// its colony's doctrine. The weights asked (STEER_ASKED; the Lab's design ones come with ja-ykmu.4) are in the key.
 const steerLane: Has<LaneSpec<Situation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
   name: "steer",
   kind: LANE_KINDS.steer,
@@ -317,7 +309,9 @@ const steerLane: Has<LaneSpec<Situation, string, ReadonlySet<string> | undefined
   presets: DOCTRINES,
   gather: false,
   batch: null,
-  key: (s, asked) => steerKey(s, asked ? STEER_WEIGHTS.filter((w) => asked.has(w)) : STEER_ASKED),
+  // The weights asked are the lane's own (STEER_ASKED): a caller's context is not read. The scripts hand every lane the fungus's lever
+  // menu, whose "trail" and "home" levers once turned this lane's question into one about those weights (ja-ykmu.3).
+  key: (s) => steerKey(s, STEER_ASKED),
   pack: (items, words) => packSteerRequest(items, words),
   read: (answers, id, _situation, key) => readSteer(answers, id, askedOf(key)),
   valid: validSteer,
