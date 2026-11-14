@@ -164,6 +164,9 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.bestD[i] = Infinity;
     colony.stallT[i] = 0;
     if (colony.since[i] > 0) colony.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
+    // Home from a trip with nothing (ja-16rp): an old forager digs out from the nest for a while before it goes out again.
+    if (p.forageDig > 0 && colony.since[i] > 0 && mode === RETURN && !carrying && !pellet && colony.queen && colony.band(i) === 2)
+      colony.digBout[i] = p.forageDig;
     if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item))) {
       colony.carrying[i] = 0;
       colony.stored++;
@@ -198,6 +201,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     }
   } else colony.since[i] = colony.since[i] + dt;
   if (!atNest) colony.restT[i] = 0;
+  // A foraging dig (ja-16rp) runs down while the ant explores underground, and ends when it has food in its jaws.
+  if (colony.digBout[i] > 0) {
+    if (colony.carrying[i]) colony.digBout[i] = 0;
+    else if (colony.mode[i] === EXPLORE && colony.under[i] === 1) colony.digBout[i] = Math.max(0, colony.digBout[i] - dt);
+  }
   // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
   // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
   // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
