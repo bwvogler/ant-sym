@@ -28,7 +28,7 @@ const firstAlive = (c: Game["colonies"][number]) => {
 
 test("spec: levels expand to categories, categories add, colony= and ant= narrow, a typo throws", () => {
   assert.deepEqual([...parseJournalSpec("summary").categories], ["colony", "queen", "stance", "jev"]);
-  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "stance", "jev", "birth", "death", "infection", "dig"]);
+  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "stance", "jev", "birth", "death", "infection"]);
   assert.deepEqual([...parseJournalSpec("verbose").categories], [...JOURNAL_CATEGORIES]);
   assert.deepEqual([...parseJournalSpec("summary,death").categories], ["colony", "queen", "stance", "jev", "death"]);
   assert.equal(parseJournalSpec("").categories.size, 0);

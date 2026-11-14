@@ -1,6 +1,6 @@
 # Foraging tunnels: ants that dig to reach food, and what tells them where
 
-*Research note for bead `ja-p0k` (PRD §70). Written 2026-11-14, against code at `158d4b5`. Read in full: Tschinkel 2011 (PMC, about 60 % verbatim, the rest as a summary, marked) and Ni et al. 2025 (PMC, in full). Not reached (network allowlist or paywall): Markin, O'Neal & Dillier 1975 (JSTOR), Bernklau et al. 2005 (OUP), the termite tunnelling papers and the leaf-cutting ant CO₂ digging paper; their numbers come from citing papers or search abstracts and are marked **unverified**.*
+*Research note for bead `ja-16rp` (supersedes `ja-p0k`; PRD §70). Written 2026-11-14, against code at `158d4b5`. Read in full: Tschinkel 2011 (PMC, about 60 % verbatim, the rest as a summary, marked) and Ni et al. 2025 (PMC, in full). Not reached (network allowlist or paywall): Markin, O'Neal & Dillier 1975 (JSTOR), Bernklau et al. 2005 (OUP), the termite tunnelling papers and the leaf-cutting ant CO₂ digging paper; their numbers come from citing papers or search abstracts and are marked **unverified**.*
 
 In the side view about three quarters of the map's food lies in buried pockets (20,760 of 27,840 on seed 1, PRD §41). Over an hour, one colony of 600 on the app's map takes about 560 of it on seed 1 and none on seed 2 (`scripts/lab/economy-bench.mjs 1|2 3600 600 1 900`, main at `158d4b5`), while the ground's piles fall from about 4,400 to 2,600. Only middle-aged ants dig, and a nest with room digs 15 % as often (`ROOMY_DIG`, gated by `crowded()`, a colony-wide count). So tunnels are dug for room and stop where the nest stops needing it. Food is sensed only through open ground (ja-juiu, ja-uvhw), so a pocket a few cells into the soil is invisible. The question: **do ants dig to reach food, and if so, what tells a digger which way?**
 
@@ -33,6 +33,8 @@ In the side view about three quarters of the map's food lies in buried pockets (
 
 **In the game:** what keeps a tunnel growing is a cue at its face: fresh spoil, or nestmates digging there. A forager on a foraging dig would choose the end where digging is freshest (the game already stamps each cell with when it was dug, `dugAt`), so each bout extends the arms others extended a moment ago, rather than a random dead end near home. That is grounded (Pielström & Roces 2013, Toffin et al. 2010). A laid "foraging tunnel" floor mark followed outward would be **design**: no trail inside fire ants' tunnels is known (Tschinkel 2011), and no digging pheromone is identified.
 
+**Measured (2026-11-14, PRD §70):** built as a setting and dropped; the plain foraging dig without it (option 1, `forageDig: 120`) is on. Following the freshest dug cells (within 120 s) took less buried food than a plain digging bout (3,935 against 5,222 summed over seeds 1–10 at a 120 s bout) and two colonies fell under 400 workers. The cue is grounded, but in this map the fresh ends are the nest's own, not arms toward food.
+
 ## What was not found
 
 - No measurement of ants digging toward buried food, or of ants detecting food through soil at any distance.
@@ -40,13 +42,11 @@ In the side view about three quarters of the map's food lies in buried pockets (
 - No depth distribution of fire-ant foraging tunnels beyond "1–3 cm" (casts) and the cited "3–10 cm".
 - Full text of Markin et al. 1975, Bernklau et al. 2005, Campora & Grace 2001, Hedlund & Henderson 1999 (out of reach this session).
 
-**Measured (2026-11-14, PRD §70):** built as a setting and dropped; the plain foraging dig without it (option 1, `forageDig: 120`) is on. Following the freshest dug cells (within 120 s) took less buried food than a plain digging bout (3,935 against 5,222 summed over seeds 1–10 at a 120 s bout) and two colonies fell under 400 workers. The cue is grounded, but in this map the fresh ends are the nest's own, not arms toward food.
-
 ## The mechanic
 
 Cheapest first. Each is a setting whose 0 is main bit for bit; all are steering or body rules, no new situation field, so **no Jev cost**.
 
-1. **Foraging tunnels (the network).** A forager whose search outside has failed (fatigue past patience, sensed), or that feels the colony's hunger (felt need ≥ its threshold, sensed), digs on at a tunnel's dead end in its own nest instead of turning back, whatever the nest's room: it is exempt from the `ROOMY_DIG` damping and from the middle-aged-only rule for that dig. It digs outward and level or slightly down (gravity is sensed), away from the nest (its home vector, sensed). Food is found by contact: once a tunnel opens a pocket, the open-ground food sensing (ja-juiu), trails and STORE_AFTER take it home. Local rule: the above, under a new setting. Retires nothing; adds no global read (it does not use `crowded()`).
+1. **Foraging tunnels (the network). As built (`forageDig`, PRD §70):** an old forager (age band 2) that comes home from a trip with nothing in its jaws (its own failed search, sensed) takes a digging bout of `forageDig` seconds, counted while it explores in the nest. In the bout it stays in and digs on at tunnels' dead ends and forks without the `ROOMY_DIG` damping, without nestmates by (`digChance`) and outside the middle-aged-only rule; it builds and widens no chambers. The bout ends when the time is up or the ant picks up food. Food is found by contact: once a tunnel opens a pocket, the open-ground food sensing (ja-juiu), trails and STORE_AFTER take it home. *Planned and not built:* the felt-hunger trigger, and digging outward and level or down (home vector, gravity: measured worse with fresh-end following, above). Retires nothing; adds no global read (it does not use `crowded()`).
 2. **Food smelt through a little soil (design, owner's call).** Buried food gives off an odour that spreads a few cells through soil (a soil plume, range about 3 cells, fading faster than in air), read only by a digger at its face: it digs toward the stronger side. A new row in the sense table, marked design.
 3. **Only if 1 and 2 leave the pockets untouched:** deeper or more frequent nest digging. Not proposed now.
 
@@ -54,9 +54,9 @@ Cheapest first. Each is a setting whose 0 is main bit for bit; all are steering 
 
 ## Play
 
-- **What the player sees:** when the ground's piles thin out, the nest grows arms: tunnels running out under the ground, and pockets emptied as they open. Today the side view's tunnels are only the nest; with this, the colony visibly reaches for food. The Learn drawer can say why: foragers who come home empty-handed, or feel the colony hungry, dig.
+- **What the player sees:** when the ground's piles thin out, the nest grows arms: tunnels running out under the ground, and pockets emptied as they open. Today the side view's tunnels are only the nest; with this, the colony visibly reaches for food. The Learn drawer can say why: foragers who come home empty-handed dig.
 - **Choices it makes matter:** the fungus's hyphae grow along tunnels (PRD §63.9, ja-2bw.15), so a foraging network is a road for the fungus toward pockets and toward other colonies; and food in the soil keeps a colony alive in long games, which is what the player's fungus lives on. A colony's digging is its nature, not a new lever for the player.
-- **Progression:** colonies start on the ground's piles as now; the network only starts when foraging fails, so the early game is unchanged and long games no longer depend only on regrowth.
+- **Progression:** colonies start on the ground's piles as now; the bouts start only when searches fail, so the early game is unchanged and long games no longer depend only on regrowth.
 - **Cost:** none in Jev (steering and body rules). CPU: more dug cells (the map's layers grow), measured by P1's ms per tick.
 - **Risks to play:** a runaway (every tired forager digging, the mound swelling, ticks slowing), tunnels meeting the rival's and opening an underground front (ja-war's fights moved underground), or colonies so fed they reach their cap and raid sooner (ja-ccej's mechanism). P1's guards and the side-view game assay (fight losses) would show each.
 

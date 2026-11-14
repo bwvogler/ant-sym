@@ -6,7 +6,7 @@
 // own events with `note`.
 //
 // Levels pick categories: "summary" is what happens to colonies (founded, fallen, stance, queen, Jev batches),
-// "detail" adds what happens to each ant's life (births, deaths, infections), "verbose" adds every mode change, with
+// "detail" adds what happens to each ant's life (births, deaths, infections), "verbose" adds every mode change and foraging digs (dig), with
 // the situation its policy was asked. A filter can name categories instead, and narrow to one colony or one ant.
 // Mode changes are many: the 1200-ant side game writes ~1500 a second (885k in 600 s, 300 MB of JSONL), so read them
 // with ant=<i>.
@@ -26,7 +26,7 @@ export type JournalLevel = (typeof JOURNAL_LEVELS)[number];
 const LEVEL_CATEGORIES: Record<JournalLevel, readonly JournalCategory[]> = {
   off: [],
   summary: ["colony", "queen", "stance", "jev"],
-  detail: ["colony", "queen", "stance", "jev", "birth", "death", "infection", "dig"],
+  detail: ["colony", "queen", "stance", "jev", "birth", "death", "infection"],
   verbose: JOURNAL_CATEGORIES,
 };
 
