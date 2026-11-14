@@ -10,7 +10,7 @@ import { R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateWorld, OPEN_WORLD } from "./world.ts";
+import { isSky, takeFoodCell, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
