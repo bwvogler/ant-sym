@@ -27,6 +27,11 @@
 //        [--in-flight 4] [--dry]
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
+//        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
+//
+// --reweigh (staging, ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
+// it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
+// the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
 //
 // --species <id> (ja-rf5.9): ask every situation of that species' own mode lane (its lane words and schema: the desert ant's 16) under each
 // preset doctrine, and ship them as mode-<species>-<doctrine>.json, marked with the species in index.json. Its lanes are small, so the live
@@ -52,6 +57,8 @@ import {
   STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
   DESERT_ANT,
+  isWeighted,
+  weightsOf,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -68,6 +75,7 @@ const opts = {
   dry: false,
   import: [],
   species: null,
+  reweigh: false,
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -78,6 +86,7 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--dry") opts.dry = true;
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else if (a === "--species") opts.species = args[++k];
+  else if (a === "--reweigh") opts.reweigh = true;
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
@@ -146,6 +155,10 @@ if (species) {
   };
   opts.lanes = "mode";
 }
+if (opts.reweigh) {
+  if (opts.import.length) throw new Error("--reweigh and --import do not go together");
+  opts.lanes = "mode";
+}
 const prefix = species ? `-${species.id}` : "";
 
 const lanes = opts.lanes.split(",").map((l) => {
@@ -192,7 +205,10 @@ for (const lane of lanes) {
       file,
       answers: have,
     });
-    const todo = all.filter((s) => !have.has(L.key(s)));
+    // --reweigh: only what the bundle holds as a bare mode; otherwise only what it lacks.
+    const todo = opts.reweigh
+      ? all.filter((s) => have.has(L.key(s)) && !isWeighted(have.get(L.key(s))))
+      : all.filter((s) => !have.has(L.key(s)));
     const batch = L.batch;
     for (let k = 0; k < todo.length; k += batch) {
       const items = todo.slice(k, k + batch).map((situation, n) => ({
@@ -299,3 +315,14 @@ const answeredNow = [...bundles.values()].reduce((n, b) => n + b.answers.size, 0
 if (answeredNow > 0)
   console.log(`real ≈ ${Math.round(spent / USD_PER_INPUT_TOKEN / answeredNow)} input tokens a question over ${answeredNow} answered`);
 for (const b of bundles.values()) console.log(`  ${b.file}: ${b.answers.size} answers`);
+// How sharp the mode answers are: the ants draw from them, so near-certain answers change little (staging, ja-nan3).
+for (const b of bundles.values()) {
+  if (b.lane !== "mode") continue;
+  const tops = [...b.answers.values()].map((a) => weightsOf(a)?.[0]?.[1] ?? 1);
+  if (!tops.length) continue;
+  const share = (f) => `${Math.round((100 * tops.filter(f).length) / tops.length)} %`;
+  const mean = tops.reduce((x, y) => x + y, 0) / tops.length;
+  console.log(
+    `  ${b.file}: Jev's choice at mean p ${mean.toFixed(2)}; under 0.9 in ${share((p) => p < 0.9)}, under 0.7 in ${share((p) => p < 0.7)}, bare ${share((p) => p === 1)}`,
+  );
+}

@@ -300,6 +300,11 @@ export const ANT_FIELDS = {
   asked: { type: Int16Array, fill: -1, reset: "spawn" },
   /** the question behind each ant's current mode: its situation (with the mode it had) when last asked; −1 = never */
   question: { type: Int16Array, fill: -1, reset: "spawn" },
+  /**
+   * seconds until an ant whose mode was drawn from Jev's probabilities draws again in the same situation (params.reroll;
+   * staging, ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
+   */
+  redraw: { type: Float32Array, fill: -1, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

@@ -3,6 +3,7 @@
 // battle.ts and the brains can all use it without importing each other (docs/refactor.md S1).
 import { MARKS } from "./pheromone.ts";
 import { defineSchema, type Schema } from "./schema.ts";
+import type { Draw } from "./weighted.ts";
 
 export const MODES = ["explore", "follow", "return", "fight"] as const;
 export type Mode = (typeof MODES)[number];
@@ -82,7 +83,12 @@ export const SITUATION_SCHEMA = defineSchema<Situation>([
   { name: "stance", values: STANCES },
 ]);
 
-export type Policy = (s: Situation) => Mode;
+/**
+ * A mode policy. `draw` (uniform in [0, 1), the colony's own rng, with the temperature it draws at) is for a policy whose answer is a distribution (Jev's
+ * probabilities, weighted.ts): it draws once to pick the mode, and the colony re-asks that ant later (`reroll`). A policy
+ * that never calls it answers as before, and the game draws nothing more (staging, ja-nan3).
+ */
+export type Policy = (s: Situation, draw?: Draw) => Mode;
 
 /**
  * A mode-lane situation as a species asks it (ja-fnd.5.10): every generic field (the tick always senses them; a species' schema may leave some out of

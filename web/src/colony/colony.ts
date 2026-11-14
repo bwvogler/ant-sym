@@ -22,6 +22,7 @@ import {
   PLANE,
   CURTAIN,
 } from "./vocab.ts";
+import type { Draw } from "./weighted.ts";
 import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
@@ -385,6 +386,7 @@ export const COLONY_STATE = [
 export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
   "plumeTurn", // smellsFood's answer, read in the same tick
+  "policyDrew", // set and read within one ask (policyDraw)
   "rng",
   "own",
   "map",
@@ -663,6 +665,20 @@ export class Colony {
     allowed: ReadonlyMap<string, readonly unknown[]>;
   } | null = null;
   rng: () => number;
+  /** whether the mode policy drew its answer just now (policyDraw): set in the call, read by decide right after it */
+  policyDrew = false;
+  /**
+   * The `draw` decide hands the mode policy (staging, ja-nan3): the colony's own rng, noting that it was used. A policy
+   * draws only from an answer with Jev's probabilities (weighted.ts), so a game that never meets one draws as before.
+   */
+  readonly policyDraw: Draw = Object.defineProperty(
+    (): number => {
+      this.policyDrew = true;
+      return this.rng();
+    },
+    "temperature",
+    { get: () => this.params.sampleTemp },
+  ) as Draw;
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   s = new Float64Array(9);
 

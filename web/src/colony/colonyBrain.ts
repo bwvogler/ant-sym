@@ -1,6 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { legendOf } from "./schema.ts";
+import { weigh } from "./weighted.ts";
 import {
   type LaneWords,
   MODES,
@@ -173,11 +174,15 @@ export function packModeRequest(
   return { state: { legend: words.legend, doctrine, ants }, questions };
 }
 
-/** A situation's mode from a reply, or null when it is missing or not a mode (not cached; the local rule covers it). */
-export function readMode(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = MODES): Mode | null {
+/**
+ * A situation's mode from a reply, or null when it is missing or not a mode (not cached; the local rule covers it): Jev's
+ * choice with its probabilities over the modes `allowed` (weighted.ts, staging ja-nan3), so an ant can draw its mode.
+ */
+export function readMode(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = MODES): string | null {
   const a = answers[`${id}_mode`];
   if (!a || a.type !== "choice") return null;
-  return allowed.includes(a.choice) && (MODES as readonly string[]).includes(a.choice) ? (a.choice as Mode) : null;
+  const ok = allowed.filter((m) => (MODES as readonly string[]).includes(m));
+  return ok.includes(a.choice) ? weigh(a.choice, a.probabilities, ok) : null;
 }
 
 /** The cache key for the strategist's view. */
