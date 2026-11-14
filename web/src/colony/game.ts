@@ -4,7 +4,7 @@ import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE
 import { type Policy, SITUATION_SCHEMA, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
-import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
+import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
@@ -394,6 +394,8 @@ export class Game {
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // A species whose finders invite starts with rouse on its menu (owner, review of #202 D2).
+    if (this.#speciesParams().invitePace ?? 0) this.fungus.menu = menuFor(DEFAULT_MENU, true);
     // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
     const middenLayer = one ? PLANE : 0;
     // One world: a plane tip that comes to a hole crosses down it (ja-2bw.14).

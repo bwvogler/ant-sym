@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
+import { Colony, PLANE } from "../../colony.ts";
+import { crossDown } from "../../crossing.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 import { DEFAULT_MENU, Fungus, STRAINS } from "../../fungus.ts";
 import { Game, gameRng } from "../../game.ts";
@@ -28,6 +29,8 @@ test("rouse: none, some, strong set the host's share of a finder; off the defaul
     f.expressLevels(c, 0, { rouse: level }, 1);
     assert.equal(c.rouse[0], share, `level ${level}`);
   }
+  f.expressLevels(c, 0, { rouse: 2 }, 0.5);
+  assert.equal(c.rouse[0], 0.5, "scaled by how far the fungus has grown in the host (review of #202, S2)");
   assert.ok(!DEFAULT_MENU.includes("rouse"), "the player puts it on the menu");
   assert.ok(inertLevers(null).includes("rouse") && !inertLevers(null, true).includes("rouse"));
 });
@@ -55,4 +58,24 @@ test("a roused desert host coming down its shaft counts as a finder to the ants 
 test("on the generic ant (no invitation) rouse does nothing", () => {
   const generic = { ...DESERT_ANT, id: "generic-like", params: { ...DESERT_ANT.params, invitePace: 0 } } as Species;
   assert.equal(passes(generic, 2), passes(generic, 0));
+});
+
+test("at its hole a roused host adds its share only with nothing found; a carrier is one finder, rouse or not (review of #202, S2)", () => {
+  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
+  const c = g.player;
+  const i = c.alive.indexOf(1); // set on the plane at its hole below, as one coming home is
+  const down = (carrying: number) => {
+    const was = c.cur;
+    c.bind(PLANE);
+    c.layer[i] = PLANE;
+    c.carrying[i] = carrying;
+    c.rouse[i] = 1;
+    const before = c.holeIn;
+    crossDown(c, i, c.params.nest);
+    const added = c.holeIn - before;
+    c.bind(was);
+    return added;
+  };
+  assert.equal(down(0), 1, "an empty roused host: its whole share");
+  assert.equal(down(1), 1, "a carrier: one finder, not one and its rouse");
 });

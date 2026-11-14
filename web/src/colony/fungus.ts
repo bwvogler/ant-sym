@@ -91,6 +91,15 @@ export function askedLevers(menu: ReadonlySet<string>, queen: boolean): string[]
  */
 export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id) && !v.invite).map((v) => v.id);
 
+/**
+ * A menu for a game of a species: the levers that need an invitation (rouse) on where its finders invite (the desert ant: owner, review of
+ * #202 D2) and off where they don't, the rest as given.
+ */
+export function menuFor(menu: readonly string[], invites: boolean): string[] {
+  const rest = menu.filter((id) => !LEVERS.find((v) => v.id === id)?.invite);
+  return invites ? [...rest, ...LEVERS.filter((v) => v.invite).map((v) => v.id)] : rest;
+}
+
 /** A strain: one trait set of the fungus. A landing or paint lays one; later organisms are other trait sets (§5.1). */
 export interface Strain {
   id: string;
