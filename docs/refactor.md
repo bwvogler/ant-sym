@@ -96,7 +96,7 @@ The top-down and side maps are retired.
 4. **Delete:**
    - first fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane options (one world's plane is `generateWorld(seed, OPEN_WORLD)`, which the endless world's E2 later replaces), and move `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell`, `foodMinDist` and `chamberDepth` (`foundNest`'s default depth), and `groundCell`, into the curtain; then delete `generateSideWorld`'s surface, walkway, ground line and mound, and whatever of `transect.ts` the curtain does not use
    - the single-map `Game` (owner, #181 D1): tests on hand-made fields that build a `Game` run on `oneArena(field, seed)` (`experiment.ts:1583`); the queenless grow-from-stores path (`colony.ts:2128-2134`) goes. Bare-`Colony` tests on a field keep: a layer with no entrance stays the plane (owner, 2026-11-14), and only the top-down leave gate (`colony.ts:332`) goes
-   - the view proxies: `#entrance === null`, `map.sky`, and `this.queen` read as "side view"
+   - the view proxies: `#entrance === null` read as "top-down" (a layer with no entrance stays the plane; only the view reading goes), `map.sky`, and `this.queen` read as "side view"
    - the colony-wide strategist, all of it (owner, 2026-11-14): `StanceSituation`, `localStance`, the stance lane `c0`, `strategyChoices`, `stanceGate: 0`'s broadcast and the colony-level `stance` field
    - the side-only and top-only params
    - `fungusContext(view)`
