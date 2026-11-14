@@ -176,6 +176,7 @@ try {
   check((await page.evaluate(() => window.jevAnts.game.landed.colony)) === 1, "and the fungus lands there");
   check((await page.evaluate(() => window.jevAnts.view())) === "above", "a one-world game opens above");
   check((await page.getByRole("button", { name: "above", exact: true }).getAttribute("aria-pressed")) === "true", "the switch shows above");
+  check((await page.getByLabel("sun", { exact: true }).count()) === 0, "a generic game has no sun in the HUD (it has no day)");
   const canvas = page.locator("canvas").first();
   check(/click the line to look below/.test((await canvas.getAttribute("aria-label")) ?? ""), "the field's label is the top view's");
   await sleep(1500); // mid-game
@@ -948,6 +949,22 @@ try {
       (await learn.getByText("lays no trails of some kinds").count()) === 1,
     "the field guide leaves out the trail entries, and says so",
   );
+  check(
+    (await learn.getByRole("heading", { name: "Desert ants", exact: true }).count()) === 1,
+    "and has the desert ant's own entry (ja-rf5.8)",
+  );
+  check(
+    /^sun (high|low|down) · \d+ °C/.test(((await dp.getByLabel("sun", { exact: true }).textContent()) ?? "").trim()),
+    "the HUD shows the sun as the desert ants see it, and the ground's heat",
+  );
+  // On a phone the chip is short (owner, review of #194 D1).
+  await dp.setViewportSize({ width: 390, height: 844 });
+  check(
+    /^(high|low|down) · \d+°$/.test(((await dp.getByLabel("sun, short", { exact: true }).textContent()) ?? "").trim()) &&
+      (await dp.getByLabel("sun, short", { exact: true }).isVisible()),
+    "on a phone the HUD shows the sun short",
+  );
+  await dp.setViewportSize({ width: 1280, height: 900 });
   await dp.reload();
   await dp
     .getByRole("button", { name: "Start the tutorial", exact: true })

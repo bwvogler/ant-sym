@@ -289,7 +289,7 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 **Status (2026-11-01).** 1a–1e are built (PRD §15–19). The local rule is each strain's default plus the player's settings: four situational rules were measured and none beat it (PRD §19). As built, B3 is a *fungal share* of the host's odour (the fungus's own odour, 0.5, carried home by Garden hosts; B7-style). Contact blending as written above was tried first and moved nothing measurable: contacts with strangers are brief fights, and the nest's gestalt undoes them (PRD §17).
 
 **Overlap with the plan.**
-- MR 7 (`ja-2iq`) makes footprints readable across colonies and adds graded alarm. That is the groundwork for A3, A5 and A6, so it should land first.
+- MR 7 (`ja-2iq`, closed 2026-11-14) planned footprints readable across colonies and graded alarm. Graded alarm is built (PRD §46.3); footprints are now planned between species only (`ja-j6g1`, [ant-communication §4](ant-communication.md#4-implications-for-the-game-cheapest-first) item 3).
 - MR 8 (`ja-8fd`) brings N colonies and alliance ids.
 - MR 13 (`ja-azo`) lists "fungus powers" (propaganda, decoy food, spore wall); W3 and the interventions fit there or replace it.
 
