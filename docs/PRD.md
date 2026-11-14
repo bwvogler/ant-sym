@@ -4760,6 +4760,50 @@ Step 3 passes with two seeds to spare; step 4 fails it on seed 1's jam (27); rou
 
 **Still open.** The bound of 2 is not met on every seed: with #180 in, 6 of seeds 1-10 meet it at `routeStep` 3 and seed 4 reaches 6 (the table above; before #180, seeds 4, 5 and 9 met it and seeds 3 and 7 reached 3; at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 settled as seed flips at step 4 (¹ above), and A9 one down at step 3, to watch; the full texts to read when the network allows.
 
+### 59.1 Where a retrace joins, and where the search goes after it (ja-lp4.6.3.1, 2026-11-14)
+
+**Diagnosis** (scratch probe, `main` at `88b5269`, routeStep 4, G1 seeds 6-8, 36 held trips; route-memory.md §5): **C**, most retraces: a carrier's vector brings it 11-40 cells from its hole, the search there stalls, and the retrace starts at its **newest** place, back at the pickup, so it walks 90-190 cells out and the whole trip in again (home 127-172 s after pickup). **B**, the long holds: it had walked home empty in `return` (no places), picked up far from its newest place, and skipped stale places behind rock for 300 s. **D**: the retrace ends near the hole, then the search goes back round the vector's end 30-55 cells off. **A**: it walked out in `fight` and stored nothing.
+
+**Research basis** ([route-memory.md §5](route-memory.md); two papers read in full, the rest unverified):
+- Backtracking is about 2 m along the last leg, then a systematic search, and only on unfamiliar ground with the vector run down and the nest's surroundings just seen (*Melophorus bagoti*, Wystrach, Schwarz, Baniel & Cheng 2013, full text). No ant walks back to its food once near home.
+- A trail-following harvester (*Veromessor pergandei*) retraces its column leg by leg, and caught at the elbow it takes up the **next** leg, not the first: the route is joined at the stage reached (Freas & Spetch 2024, full text).
+- Near the nest remembered places outweigh a run-down vector, and a search starts at the shifted nest mark (Bregy, Sommer & Wehner 2008: unverified, authors from memory).
+
+**Built** (all on one world's plane, steering only; 0 is `main` bit for bit):
+- `routeEnd` 1: a retrace over, the search starts afresh (`SEARCH_START`) round the ant's first stored place, not on round its vector's end (case D). Supported in kind (nest marks near the nest); the place is design. **On by default.**
+- `routeJoin`: where a retrace joins the stored way out. 1 = at the nearest stored place the carrier can see (a clear straight line), else its newest, but only once its vector has run out near home (it is searching at its belief: its own search state, reset at pickup); 2 = that join at every retrace (the first build). By straight distance alone, without the clear line, G1 seed 4 rose to 44 held (a pocket carrier went back to the place across its wall). Supported in kind (Freas & Spetch 2024; Kohler & Wehner 2005). **Off** (0): see the decision.
+- `routeFight` 1: a fighter walking out stores its places too (case A). The literature is silent; at step 4 it moved seed 7's rival to 8. **Off.**
+- Not built: recording places while homing empty (a homeward walk retraced backwards leads away from home; done properly it is a second, forward-followed memory, a new mechanic), and clearing the route on turning home (no basis).
+- No new sense: the settings read only the ant's own places (the "Route memory" row), its own search state and the line to a place; no Jev lane, legend or question changes, so the hourly cost is unchanged.
+
+**At routeStep 4 (before §59's re-tune and #180; superseded).** Broad join + end took G1 seeds 1-10 from worst 4 / sum 26 / 5 within 2 to 4 / 14 / 9 (food +4.5 %), but A2b from 50 to 44 of 60 (paired 7 lost / 1 won, p 0.07); narrowed join + end held A2b at 50 but had a worst seed of 6. The owner chose to narrow and then to measure more seeds; main then moved to routeStep 3 with #180, and every figure was re-measured.
+
+**Measured at main's routeStep 3** (merged tree, `g1-retrace` at `44929a1`; the four settings set on both colonies; G1 600 + 600 ants, 600 s, the most held over 120 s at any 10-s sample per colony, you / rival; food carried down and births against off; #183's guard: at least 4 of seeds 1-10 within 2, none at 10 or more):
+
+| setting (routeJoin, routeEnd) | G1 seeds 1-20, per seed | worst | sum | within 2 | food | births | #183 guard |
+|---|---|---|---|---|---|---|---|
+| off (0, 0), `main` | 2/0 1/2 2/1 6/2 1/1 1/2 1/3 3/4 3/0 1/0 · 1/1 1/4 2/1 2/2 1/2 0/4 4/1 6/1 3/3 3/3 | 6 | 57 | 10/20 | 97,369 | 14,620 | pass (6 of 10) |
+| **routeEnd alone (0, 1), shipped** | 2/1 1/2 1/2 2/1 0/2 0/2 1/6 2/3 3/0 2/1 · 2/4 1/1 2/3 2/3 1/1 2/2 2/1 2/1 2/2 2/2 | **6** | **48** | **14/20** | **+2.5 %** | **+0.5 %** | pass (7 of 10) |
+| narrowed join + end (1, 1) | 0/0 1/0 1/4 4/1 1/5 1/1 1/4 2/1 0/0 1/0 · 1/8 2/1 2/0 1/1 1/0 1/2 2/1 2/1 2/1 3/2 | 8 | 47 | 14/20 | +1.7 % | -0.3 % | pass (6 of 10) |
+| broad join + end (2, 1) | 0/1 0/2 1/3 1/2 1/0 0/2 1/3 0/1 1/0 1/0 · 1/3 1/2 1/1 1/1 0/1 2/2 2/0 3/0 5/0 0/3 | 5 | 40 | 14/20 | +3.7 % | -1.0 % | pass (8 of 10) |
+
+| setting | A2b passes, seeds 1-60 (mark 0.7) | mean / median rich share | Fisher p vs off | paired (exact McNemar) vs off |
+|---|---|---|---|---|
+| off | 51 | 0.791 / 0.908 | – | – |
+| **routeEnd alone** | **51** (the same nine seeds fail) | 0.787 / 0.907 | 1.00 | 0 lost / 0 won |
+| narrowed join + end | 47 | 0.749 / 0.907 | 0.48 | 5 lost / 1 won, p 0.22 |
+| broad join + end | 43 | 0.706 / 0.910 | 0.12 | **9 lost / 1 won, p 0.021** |
+
+A2b's failures are flips: the colony settles on the poor source (rich share 0.06-0.24), whatever the setting.
+
+**Decision (owner, 2026-11-14).** Ship rule: worst seed over 1-20 no higher than off's 6, at least as many seeds within 2 (10), #183's guard passed, and A2b passes no fewer than off's 51 (or one fewer with paired p > 0.5). **routeEnd alone meets it** (6, 14, pass, 51 with no seed changed) and ships: `routeEnd` 1, `routeJoin` 0, `routeFight` 0. Narrowed join + end was not shipped: its worst seed is 8 (seed 11's rival) and A2b falls 4 (not significant, but not nothing). Broad join + end was not shipped: best on G1 (worst 5, sum 40) but its A2b cost is significant on the paired test. At step 3 the join adds little to G1 beyond what routeEnd and the re-tune already give.
+
+- **Goldens.** The legacy goldens are `main`'s byte for byte; the one-world golden is re-recorded once (with all three settings 0 it is `main`'s).
+- **Tests** (`tests/int/oneWorldRouteJoin.test.ts`), each failing under a mutant: the join at the nearest place (mutant: newest), the newer of equals, the clear line, the narrowing to a searching ant (gate removed, inverted, 2 not always), a game where a carrier near home walks in rather than out, the search restarted and centred on the first place, and only once the retrace is over; `routeFight`'s gate and clause. Not covered: the carrying guard on route recording in `arrive.ts` (the "with food, never" case never reaches it; only the one-world golden holds it, `ja-lp4.6.3.3`).
+- **Not re-run at step 3:** the full one-world assays and the tick bench. At step 4 the join and end together left the assays as they were but A2b (9 → 7 of 10) and A5b (8 → 9), and the tick within noise (16.19 / 15.73 / 15.84 ms on against 15.47 / 15.66 / 15.91 off); routeEnd reads the first stored place on each tick of the search that follows a retrace (one array read).
+
+**Still open.** The bound of 2 on every seed (`ja-lp4.6.3`): with routeEnd on, 14 of seeds 1-20 meet it and seed 7's rival reaches 6. The owner may tighten #183's guard to track this (it passes with 7 of 10 within, against its 4). A narrower `routeFight` (only a fighter that then picks up food far from home) is next.
+
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
 **Research basis:** [desert-ant.md](desert-ant.md). Four papers were read in full text (Razin 2013, Dillier & Wehner 2004, Buehlmann 2012 and 2013); the rest is from abstracts or summaries (**unverified**):
@@ -5269,7 +5313,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5299,6 +5343,20 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 **Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 250 | 518 | 293 | 146 | 110 | 336 | 265 | 442 | 189 | 240 |
+| sun ×4 (s) | 250 | 318 | 293 | 146 | 136 | 414 | 265 | 585 | 379 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| sun ×1 (s) | 331 | 238 | 199 | 18 | 278 | 352 | 233 | 243 | 244 | 342 |
+| sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
+
+With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off; a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
@@ -5554,6 +5612,12 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **Tick** (`colony-bench --one --page`, 1,200 + 1,200 ants, 60 s, alternating): main 16.99, 17.27 and 16.99 ms mean, this change 17.85, 17.22 and 17.22 ms; within noise. Counting happens only in `put` and `drop`, off the read path.
 - **Cost:** none. No situation, legend or question changed.
 
+**E1.4 built (`ja-qpv.1.4`, 2026-11-14).** Storage only; behaviour is bit-exact (the goldens pass unchanged, and three 120 s one-world games, 300 + 300 ants, hash every ant's position and mode and each colony's counts equal to main's).
+- **What changed.** A colony's way out of its nest (`outField`, `homing.ts`) was an `Int32Array` over the whole curtain, per colony. It is now an `OutField`: the same steps, over a window of columns round the colony's hole, 193 wide when the curtain allows. A walk that would step onto open ground outside the window widens it (twice as wide, within the map) and walks again, so the field holds every cell the hole reaches, as the walk over the whole curtain did. Tests: `unit/outField.test.ts` checks every cell against a walk over the whole curtain, inside the window and past either edge.
+- **Measured.** In three 600 s one-world games (600 + 600 ants) the window never widened: 161 columns of curtains 277–291 wide (both holes sit near an end, so their windows are clipped). On a curtain founding has grown, each colony's field stays 193 columns, not the curtain's width.
+- **Tick** (`colony-bench --one`, 1,200 + 1,200 ants, 60 s, alternating): main 11.10, 11.17 and 11.18 ms mean, this change 11.23, 11.35 and 11.10 ms; within noise.
+- **Cost:** none. No situation, legend or question changed.
+
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
 Two behaviour changes, each behind a colony setting whose 0 is the game before them (#153).
@@ -5681,6 +5745,48 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
   - Learn → Policy now shows the aim read-only, so the aim has one home.
 - **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+### 69.3 S2b: the palette, the lens and the keys (ja-mvo9.2, second half)
+The second half of stage 2: ways to find any action and to learn what anything on the map is, without a panel open.
+- **The command palette:**
+  - ⌘K or Ctrl+K (from anywhere, even a text field), or the HUD's search button (from 640 px wide). The page names the key as the machine does: ⌘K on a Mac or an iPhone, Ctrl+K elsewhere.
+  - It lists every action by name: play, the speeds, the views, following a host, the whole map, each nest, each drawer, Learn, Lab and numbers, the lens, the shortcuts sheet, and every guide entry the game's species sees.
+  - Typing narrows the list, ranked by the pure `ui/commands.ts`: the start of a label beats the start of a word in it, which beats a match inside one, which beats the letters in order. Every typed word must match, and a label counts double over its group and extra words.
+  - Arrows choose (wrapping, the choice kept in sight), Enter runs, Escape closes. Entries that can't run now are greyed with why: the speed in use, the view shown. The list's groups are listbox groups.
+  - Running a command closes a pinned lens card, which would otherwise stay over what the command opens.
+- **The lens:**
+  - Toggled with the key i or the HUD's ⓘ button. With it on, a mouse over the map has a card beside it saying what is there, each thing with a "more" link to its guide entry.
+  - What it says, in drawing order:
+    - the ant (its colony, number and mode, whether it carries food, whether it is a host);
+    - a hole;
+    - a chamber (its role, what it is for, and the brood and food in it);
+    - food, alarm, spores, mycelium;
+    - the food or home trail, whichever is stronger;
+    - the mound;
+    - the ground (ground, tunnel, soil, rock, sky).
+  - **It says only what the field shows.** Scent shows only where a host sensed it lately (§65), at the field's own thresholds, which are now constants shared by `ColonyField` and `ui/lens.ts`. Where no host sensed lately, the card says so, linking the guide's "what the fungus senses".
+  - A click (a tap on a phone, which has no hover) pins the card and follows nothing. Pinned, its links work, an ant on it can be followed, and it stays while the pointer wanders. Escape or its × closes it.
+  - The card says it afresh four times a second, so ants walking under a still pointer show. Where the lens looks lives in a small store (`ui/lensStore.ts`) that the map reports to and `LensLayer` reads, so only the card re-renders as the pointer moves, not the page.
+  - A card pinned on one view hides on the other and takes no Escape there; it is back when its view is. Meanwhile the lens follows the pointer on the view shown: the store keeps the pinned card and the pointer's point apart (`shownOn`).
+  - The ground's "no host has smelled here lately" line is said on open ground only: the sky, rock and soil never carry scent.
+  - `probe` reads the game at a point and `lensLines` says it: both pure, both tested, one test on a built game.
+  - The queen's pen keeps its click.
+- **The page's keys:** one table, `ui/keys.ts`, read by the page's key handler (`pageKey`, tested) and by the shortcuts sheet, so the two can't drift.
+  - The keys anywhere:
+    - Space plays or pauses (not on a focused button);
+    - 1–4 set the HUD's speeds;
+    - v switches the view;
+    - f follows the next host, switching the view to it;
+    - i toggles the lens;
+    - ? opens the sheet.
+  - The map's own keys (pan, zoom, 0, n) still need the map focused, and the sheet says so.
+  - The game's keys wait while a dialog has the page (the palette, the sheet, Details, Learn, the start, the queen's pen); ⌘K still works.
+  - **Changed from the plan:** S2's plan put the lens on ?. The key ? is the shortcuts sheet's, as on most sites, and the lens is i. The owner can overrule.
+- **The shortcuts sheet:** the key ?, the palette, or Settings → Keyboard shortcuts.
+- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu, then the followed ant, then the drawer. The Go to menu leaves an Escape that something above it took.
+- **The phone's HUD:** the speed and view buttons are tighter below 640 px, so the lens button fits from 360 px wide.
+- **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 

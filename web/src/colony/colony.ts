@@ -1,5 +1,6 @@
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
+import type { OutField } from "./homing.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -212,7 +213,7 @@ export interface Layer {
   readonly entranceCol: number;
   readonly entranceRow: number;
   holes: number[];
-  outDist: Int32Array | null;
+  outDist: OutField | null;
   outCells: number[];
   outVersion: number;
   outAt: number;
@@ -314,7 +315,7 @@ export class Colony {
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   /** the side view: steps to this colony's hole through its tunnels, per cell (see outField), the cells it reached, and the ground's version and time it was built at */
-  outDist: Int32Array | null = null;
+  outDist: OutField | null = null;
   outCells: number[] = [];
   outVersion = -1;
   outAt = -Infinity;
