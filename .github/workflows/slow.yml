@@ -21,7 +21,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: slow-${{ github.event.pull_request.number || github.ref }}
+  # A labeled event for another label gets a group of its own: concurrency applies before the job's if:, so it would
+  # otherwise cancel a running slow-guards run and then skip itself (review of #176, S1).
+  group: slow-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'slow-guards' && format('-{0}', github.run_id) || '' }}
   # A new push to a labelled PR replaces its run; the nightly run is never cancelled.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 

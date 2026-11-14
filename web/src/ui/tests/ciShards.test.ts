@@ -74,7 +74,9 @@ test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
 // slow.yml runs test:slow sharded, on a schedule and on labelled colony PRs (ja-w7ef.4), with the same kind of copied globs.
 test("slow.yml's step runs test:slow's files at its per-file limit, sharded by the matrix", () => {
   const slow = readFileSync(join(ROOT, ".github/workflows/slow.yml"), "utf8");
-  const run = /- name: slow guards[^\n]*\n\s+run: (.+)$/m.exec(slow)?.[1] ?? assert.fail("slow.yml has no 'slow guards' step with a run:");
+  const run =
+    /- name: slow guards[^\n]*\n\s+run: (.+)\n\s+working-directory: web$/m.exec(slow)?.[1] ??
+    assert.fail("slow.yml has no 'slow guards' step running in web/");
   assert.deepEqual(globs(run), globs(script("test:slow")));
   assert.equal(timeout(run), timeout(script("test:slow")));
   assert.match(run, /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /);
