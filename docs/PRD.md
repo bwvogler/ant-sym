@@ -4896,8 +4896,15 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 
 - **What already reaches it.** The levers that act through a channel the desert ant lacks do nothing (`inertLevers`, the Details screen greys them): food scent, rival trails as food, alarm, the trail leaked to rivals, alarm laid. Home scent and trail laid act through its floor marks only. The rest act on it as on the generic ant: time out, stranger scent, floor marks, queen scent and signal, the calming cue, fungal odour, the fungus showing, and the lethal odour weapon and crown.
 - **Host odour first** (owner, 2026-11-11): already built. The fungal-odour lever, stranger scent and the odour weapon act through colony recognition (`recognition.ts`), which the desert ant has; between desert-ant colonies aggression is at its stranger setting (§60.2), so a host made to smell like nobody's is fought.
-- **Contact at an invitation** (owner, 2026-11-14): a new lever, **rouse**. An infected host coming down the shaft raises the pace of the nestmates waiting at the top as a finder does (`invite.ts`), whether or not it carries food: they go out on a false invitation, and the host meets more of them. It acts through the ants' own sense (their pace, §60.6), as the fungus's other levers do. **Design:** no paper shows a fungus doing this; no fungal record in *Cataglyphis* was found at all (desert-ant.md, reading 2026-11-14). Its build is `ja-rf5.18`.
+- **Contact at an invitation** (owner, 2026-11-14): a new lever, **rouse**. An infected host coming down the shaft raises the pace of the nestmates waiting at the top as a finder does (`invite.ts`), whether or not it carries food: they go out on a false invitation, and the host meets more of them. It acts through the ants' own sense (their pace, §60.6), as the fungus's other levers do. **Design:** no paper shows a fungus doing this; no fungal record in *Cataglyphis* was found at all (desert-ant.md, reading 2026-11-14). Its build is `ja-rf5.18`; plan in [rouse.md](rouse.md) (§60.8).
 - **Heat felt by the host:** deferred (owner, 2026-11-11).
+
+### 60.8 Rouse, the plan (ja-rf5.18, 2026-11-14)
+
+- **Research** ([rouse.md](rouse.md)): infected ants are less social, not more (*Metarhizium*: Bos et al. 2012, Heinze & Walter 2010, abstracts only); *Ophiocordyceps* makes its own host hyperactive but its hosts communicate less. No parasite is known to rouse the host's nestmates. Rouse is **design**, chosen by the owner.
+- **Plan:** a lever `rouse` (emit; none, some, strong) setting a per-ant `rouse`; a host going down its own hole adds it to the passes the ants waiting at the top meet (`holeIn`), as a finder adds 1. Inert where the species has no invitation (`invitePace` 0): the generic ant bit-exact.
+- **Cost:** the lever joins the fungus's legend, so the fungus lane's shipped answers are asked again, about $0.013 (owner to approve).
+- **Assays:** the staged chamber with a roused host against none; in a game, more departures from the waiting pool with a roused host (seeds 1–5); D5 watched for a colony starved by rouse.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
 
