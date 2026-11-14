@@ -9,6 +9,8 @@ export interface PrecacheBundle {
   /** the preset doctrine (mode, stance) or aim (fungus) it was asked under */
   doctrine?: string;
   aim?: string;
+  /** the species whose own lane words it was asked under (ja-rf5.9); absent: the generic ant's */
+  species?: string;
   context: string;
   file: string;
   answers: number;
@@ -33,7 +35,8 @@ function isPairs(v: unknown): v is [string, string][] {
  * the page plays on without it. Returns the answers seeded.
  */
 export async function loadPrecache(
-  seed: (context: string, entries: [string, string][]) => number,
+  /** `species`: the bundle's own (PrecacheBundle.species; absent: the generic ant's), whose words its answers are checked against */
+  seed: (context: string, entries: [string, string][], species?: string) => number,
   fetchFn: typeof fetch = fetch,
   base?: string,
 ): Promise<number> {
@@ -52,7 +55,7 @@ export async function loadPrecache(
         const res = await fetchFn(precacheUrl(b.file, base));
         if (!res.ok) return 0;
         const entries = (await res.json()) as unknown;
-        return isPairs(entries) ? seed(b.context, entries) : 0;
+        return isPairs(entries) ? seed(b.context, entries, b.species) : 0;
       } catch {
         return 0;
       }

@@ -27,11 +27,12 @@ import {
   type Game,
   upgradeFor,
   AIMS,
+  type LaneWords,
 } from "../colony/index.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
-import { docUrl, GUIDE, NOTES, type GuideEntry } from "./guide.ts";
+import { docUrl, guideFor, guideNote, NOTES, type GuideEntry } from "./guide.ts";
 import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
@@ -155,7 +156,7 @@ export default function LearnDrawer(props: Props) {
         </button>
       </div>
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-sm text-fg-2">
-        {target.tab === "guide" && <GuideTab focus={target.id} />}
+        {target.tab === "guide" && <GuideTab focus={target.id} game={props.game} />}
         {target.tab === "policy" && <PolicyTab {...props} focus={target.id} ping={target} />}
         {target.tab === "nest" && <NestTab {...props} focus={target.id} />}
       </div>
@@ -165,14 +166,18 @@ export default function LearnDrawer(props: Props) {
 
 // ——— field guide ———
 
-function GuideTab({ focus }: { focus?: string }) {
+function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
+  // A species that lays no trail of a kind doesn't see the entries about it (owner, ja-rf5.11): its colonies' scent says which it lays.
+  const ph = game.player.ph;
+  const entries = guideFor((c) => ph.has(c));
+  const note = guideNote((c) => ph.has(c), game.params.species.name);
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-fg-3">
         What you see on the field, what real ants do, and how the game models it. Each claim comes from a research note in the repository,
-        linked under <em>Sources</em>.
+        linked under <em>Sources</em>.{note && <> {note}</>}
       </p>
-      {GUIDE.map((e) => (
+      {entries.map((e) => (
         <Entry key={e.id} e={e} hot={focus === e.id} />
       ))}
       <section className={card} id="learn-notes">
@@ -422,7 +427,7 @@ function Choices({ items }: { items: [string, string][] }) {
   );
 }
 
-function RuleTable({ rows, otherwise, live }: { rows: { when: string; then: string }[]; otherwise: string; live?: number }) {
+function RuleTable({ rows, otherwise, live }: { rows: readonly { when: string; then: string }[]; otherwise: string; live?: number }) {
   return (
     <div>
       <h4 className={h3}>The local rule</h4>
@@ -460,43 +465,76 @@ function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: n
   return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
 
+/** What the generic senses rows say about each mode-lane field, by name: a species' own schema reuses them for the fields it keeps. */
+const MODE_SENSES: Record<string, [values: string, about: string]> = {
+  mode: [MODES.join(" · "), "what it is doing now"],
+  tired: ["true · false", "it searched long outside without finding food"],
+  foodTrail: [TRAILS.join(" · "), "food scent just ahead"],
+  homeTrail: [HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
+  alarm: [TRAILS.join(" · "), "alarm scent just ahead"],
+  enemy: ["none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
+  stance: [STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
+};
+
 function ModeExplainer(props: Props) {
   const fol = followedSituation(props.colonies, props.followed);
   const s = fol?.s ?? SAMPLE_SITUATION;
-  const live = LOCAL_MODE_RULES.findIndex((r) => r.test(s));
+  // The game's species (ja-fnd.5.13): its own fields, choices and local rule where it has them; the generic ant's otherwise.
+  const species = props.game.params.species;
+  const words = species.lanes.mode;
+  const rules = species.ruleText
+    ? { rows: species.ruleText.rows, otherwise: species.ruleText.otherwise, fn: species.ruleText.otherwiseMode }
+    : species.policy
+      ? null
+      : { rows: LOCAL_MODE_RULES, otherwise: LOCAL_MODE_OTHERWISE, fn: localModeOtherwise };
+  const fields = words?.schema ? words.schema.fields.map((f) => String(f.name)) : Object.keys(MODE_SENSES);
+  const senses: [string, string, string][] = fields.map((name) => {
+    const own = words?.schema?.fields.find((f) => String(f.name) === name);
+    const [values, about] = MODE_SENSES[name] ?? ["", "one of its own senses"];
+    return [name, own ? own.values.map(String).join(" · ") : values, about];
+  });
+  const choices = Object.entries(words?.criteria ?? MODE_CRITERIA) as [string, string][];
+  // The last question an ant keeps is the generic situation (S1 of #122): a species with fields of its own can't be read from it, so no row is lit.
+  const readable = fields.every((f) => f in MODE_SENSES);
+  const live = rules && readable ? rules.rows.findIndex((r) => r.test(s)) : -1;
+  const generic = rules?.rows === LOCAL_MODE_RULES;
   return (
     <>
       <Senses
-        rows={[
-          ["mode", MODES.join(" · "), "what it is doing now"],
-          ["tired", "true · false", "it searched long outside without finding food"],
-          ["foodTrail", TRAILS.join(" · "), "food scent just ahead"],
-          ["homeTrail", HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
-          ["alarm", TRAILS.join(" · "), "alarm scent just ahead"],
-          [
-            "enemy",
-            "none · near",
-            "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)",
-          ],
-          ["stance", STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
-        ]}
+        rows={senses}
         note={
           <>
-            Stance is the ant's own, from what it senses (
-            <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
-              docs/stance.md
-            </a>
-            ). An ant carrying something is not asked: it answers its load's responses instead.
+            {fields.includes("stance") ? (
+              <>
+                Stance is the ant's own, from what it senses (
+                <a className="underline" href={docUrl("stance")} target="_blank" rel="noreferrer">
+                  docs/stance.md
+                </a>
+                ).{" "}
+              </>
+            ) : null}
+            An ant carrying something is not asked: it answers its load's responses instead.
           </>
         }
       />
-      <Choices items={MODES.map((m) => [m, MODE_CRITERIA[m].replace(/^\w+: /, "")])} />
-      <RuleTable rows={LOCAL_MODE_RULES} otherwise={LOCAL_MODE_OTHERWISE} live={live >= 0 ? live : LOCAL_MODE_RULES.length} />
-      <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p>
-      <p className="-mt-1 text-xs text-fg-3">
-        Highlighted: the line that decides {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}
-        : {byRows(LOCAL_MODE_RULES, localModeOtherwise, s)}.
-      </p>
+      <Choices items={choices.map(([m, c]) => [m, c.replace(/^\w+: /, "")])} />
+      {rules ? (
+        <>
+          <RuleTable rows={rules.rows} otherwise={rules.otherwise} live={live >= 0 ? live : rules.rows.length} />
+          {generic ? <p className="-mt-1 text-xs text-fg-3">{LOCAL_MODE_STRANGERS}</p> : null}
+          {readable ? (
+            <p className="-mt-1 text-xs text-fg-3">
+              Highlighted: the line that decides{" "}
+              {fol?.s ? `ant #${fol.i}'s last situation` : "a sample situation (follow an ant to see its own)"}:{" "}
+              {byRows(rules.rows, rules.fn, s)}.
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="text-xs text-fg-3">
+          {species.name} plays a local rule of its own while Jev has no answer; it is not written out here yet.
+        </p>
+      )}
     </>
   );
 }
@@ -644,13 +682,17 @@ function SentExplainer(props: Props) {
   const k = fol?.k ?? 0;
   // A colony's doctrine is closed until its queen is reached (ja-lo8.7): the request is shown with the words hidden.
   const doctrine = props.game.revealed[k] ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
-  const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number }[] = [
+  // The game's species asks in its own words, over its own fields (ja-fnd.5.13): a field of its own an ant was not last asked takes its first value.
+  const own = props.game.params.species.lanes.mode;
+  const modeSituation = own?.schema ? { ...own.schema.decode(0), ...(fol?.s ?? SAMPLE_SITUATION) } : (fol?.s ?? SAMPLE_SITUATION);
+  const lanes: { name: string; sample: Sample; words: string; about: string; tokens: number; laneWords?: LaneWords }[] = [
     {
       name: "An ant's mode",
-      sample: { lane: "mode", situation: fol?.s ?? SAMPLE_SITUATION },
+      sample: { lane: "mode", situation: modeSituation },
       words: doctrine,
+      laneWords: own,
       about: fol?.s ? `ant #${fol.i}, as last asked` : "a sample situation",
-      tokens: tokensPerQuestion("mode", doctrine),
+      tokens: tokensPerQuestion("mode", doctrine, own),
     },
     {
       name: "The fungus, in one host",
@@ -675,7 +717,7 @@ function SentExplainer(props: Props) {
             </span>
           </summary>
           <pre className="max-h-80 overflow-auto border-t border-line bg-raised p-2 font-mono text-[11px] leading-snug break-words whitespace-pre-wrap text-fg-2">
-            {JSON.stringify(requestFor(l.sample, l.words), null, 2)}
+            {JSON.stringify(requestFor(l.sample, l.words, 1, l.laneWords), null, 2)}
           </pre>
         </details>
       ))}

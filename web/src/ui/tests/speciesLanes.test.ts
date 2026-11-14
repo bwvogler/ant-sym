@@ -80,8 +80,8 @@ test("a species asks under its own lane words: its own context, and only its own
   assert.equal(g.player.policy(sit), LANES.mode.local(sit), "but the species' lane does not read the generic context");
   const own = policyContext(DOCTRINE, LONE_MODE);
   assert.notEqual(own, policyContext(DOCTRINE));
-  assert.equal(jev.seed(own, [[key, "follow"]]), 0, "follow is not among the species' answers");
-  assert.equal(jev.seed(own, [[key, answer]]), 1);
+  assert.equal(jev.seed(own, [[key, "follow"]], LONE), 0, "follow is not among the species' answers");
+  assert.equal(jev.seed(own, [[key, answer]], LONE), 1);
   assert.equal(g.player.policy(sit), answer, "the species' lane reads its own context");
   assert.equal(jev.state.cached, 1);
 });
@@ -89,7 +89,7 @@ test("a species asks under its own lane words: its own context, and only its own
 test("a species with no stance lane has none in the client: nothing seeded, counted or asked there", () => {
   let before: Game["player"]["stancePolicy"] | undefined;
   const { g, jev } = setup(LONE, (game) => (before = game.player.stancePolicy)); // read before the client attaches
-  assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]]), 0);
+  assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]], LONE), 0);
   assert.equal(jev.state.stancesCached, 0);
   assert.equal(g.player.stancePolicy, before, "the colony keeps the stance policy the Game gave it");
   assert.equal(jev.stancePolicy(stanceSit), localStance(stanceSit));
@@ -126,4 +126,15 @@ test("a species with its own situation schema is cached under its own keys (ja-f
   assert.equal(jev.seed(policyContext(DOCTRINE, words), [[schema.key(s), answer]]), 1);
   assert.equal(g.player.policy(s), answer, "looked up by the species' own key");
   assert.equal(schema.key(s), "explore|none|old");
+});
+
+test("a bundle is checked against its own species' words, not the game's (ja-fnd.5.15)", () => {
+  // A page playing the lone forager (no follow) still keeps the generic ant's follow answers for a later generic game.
+  const { jev } = setup(LONE);
+  const key = situationKey(sit);
+  assert.equal(jev.seed(policyContext(DOCTRINE), [[key, "follow"]]), 1, "a generic bundle, seeded while the lone forager plays");
+  assert.equal(jev.seed(policyContext(DOCTRINE, LONE_MODE), [[key, "follow"]], LONE), 0, "the lone forager's own: follow refused");
+  const g2 = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false }, mulberry32(1));
+  jev.attachColonies(g2.colonies);
+  assert.equal(g2.player.policy(sit), "follow", "the later generic game plays the shipped follow answer");
 });

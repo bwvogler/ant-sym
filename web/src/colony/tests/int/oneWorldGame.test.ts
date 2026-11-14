@@ -334,7 +334,12 @@ test("one world: the landing is on the plane by the hole, its spores dose only t
   ages(c, 0);
   const nest = (c.layers[PLANE] as Layer).nest;
   const landed = g.land(0, GARDEN);
-  assert.ok(Math.abs(landed.x - (nest.x + nest.r + 3)) < 1e-9 && landed.y === nest.y, "by the rim of the disc round the hole");
+  // By the rim of the disc round the hole, on its inner side: toward the other holes on the line, never into the margin
+  // past an end hole (ja-2bw.14).
+  assert.ok(Math.abs(Math.hypot(landed.x - nest.x, landed.y - nest.y) - (nest.r + 3)) < 1e-9, "by the rim of the disc round the hole");
+  const others = g.colonies.filter((o) => o !== c).map((o) => (o.layers[PLANE] as Layer).nest);
+  const nearest = Math.min(...others.map((o) => Math.hypot(o.x - nest.x, o.y - nest.y)));
+  assert.ok(Math.min(...others.map((o) => Math.hypot(o.x - landed.x, o.y - landed.y))) < nearest, "on the side toward the other holes");
   cellOf(landed.x, landed.y);
   assert.ok(g.fungus.spores.get(CELL[0], CELL[1]) > 0, "spores on the plane");
   // A brush on the plane at a spot where one ant stands on the plane, another under it in the curtain.
@@ -486,7 +491,7 @@ const royalOf = (g: Game, c: Colony): number =>
   g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
 
 test("one world: an old ant holding brood, and an old porter, at the top of a shaft are turned back down it", () => {
-  // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (#goal),
+  // At the top of the rival's shaft: lost in another nest's tunnels, a homing ant heads for the hole and climbs out (homeGoal),
   // so only this guard keeps brood and moved food in. (At its own, it homes to its chamber and is turned back for that.)
   const g = game();
   const c = g.player;

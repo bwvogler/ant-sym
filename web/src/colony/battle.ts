@@ -4,6 +4,7 @@ import { ENEMY } from "./vocab.ts";
 import { CELL, discOffsets } from "./hex.ts";
 import type { Recognition } from "./recognition.ts";
 import { clampCol, inBounds, type Bounds } from "./world.ts";
+import { touch } from "./sense.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
 // it lays alarm in its own colony's field (so allies smell it and, by stance
@@ -167,7 +168,7 @@ export function resolveFights(
       // A quiet ant (the fungus's, C3) lays (1 − quiet) of it: a skirmish need not recruit the colony.
       // How loudly is its raiseAlarm response (locally: always, × 1).
       if (enemies >= ENEMY) {
-        const loud = (1 - c.quiet[i]) * c.responses.raiseAlarm(c.touch(i, true));
+        const loud = (1 - c.quiet[i]) * c.responses.raiseAlarm(touch(c, i, true));
         if (loud > 0) ph.deposit("alarm", c.x[i], c.y[i], p.alarm * dt * loud);
       }
       if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);

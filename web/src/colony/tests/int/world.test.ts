@@ -27,7 +27,7 @@ import {
   worldFromArrays,
   type WorldMap,
 } from "../../world.ts";
-import { MAX_LEVEL, Pheromones, SLEEP, type ChannelParams, type Channel } from "../../pheromone.ts";
+import { MAX_LEVEL, Pheromones, type ChannelParams, type Channel } from "../../pheromone.ts";
 
 const SMALL = { w: 160, h: 100 };
 
@@ -292,8 +292,11 @@ test("asleep costs nothing: untouched chunks never wake, and faded ones go back 
   assert.equal(ph.awakeChunks(), 1);
   for (let s = 0; s < 30 * 10; s++) ph.step(1 / 30);
   assert.equal(ph.awakeChunks(), 0, "faded below SLEEP: asleep again");
-  assert.ok(ph.read("food", m.nest.x, m.nest.y) < SLEEP);
-  assert.ok(ph.fields.food.count <= 9, `only the chunk and its neighbours were ever touched (${ph.fields.food.count})`);
+  assert.equal(ph.read("food", m.nest.x, m.nest.y), 0, "a chunk asleep reads 0");
+  assert.equal(ph.fields.food.count, 0, "a chunk that falls asleep is dropped: faded ground holds no memory (endless-world §2)");
+  ph.deposit("food", m.nest.x, m.nest.y, 5);
+  assert.equal(ph.fields.food.count, 1, "laying scent again wakes it");
+  assert.equal(ph.read("food", m.nest.x, m.nest.y), 5);
 });
 
 test("advance steps each channel on its own clock: 1/6 s means every 5 ticks at 30 Hz, and a phased start never steps time that did not pass", () => {
@@ -337,10 +340,70 @@ test("ChunkLayer: growing the table in every direction keeps what was written; d
   for (const [x, y, v] of cells) l.set(x, y, v);
   for (const [x, y, v] of cells) assert.equal(l.get(x, y), v, `(${x}, ${y}) survived the table growing`);
   assert.equal(l.count, 5);
-  l.drop(700 >> 6, 2 >> 6);
+  const dropped = l.drop(700 >> 6, 2 >> 6);
+  assert.equal(dropped?.[(2 << 6) | (700 & 63)], 2, "drop hands back the chunk's array");
   assert.equal(l.get(700, 2), 0);
   assert.equal(l.count, 4);
   assert.equal(l.get(1, 1), 1);
+  assert.equal(l.drop(700 >> 6, 2 >> 6), undefined, "dropping a chunk that isn't there is a no-op");
+  assert.equal(l.count, 4, "and leaves the count alone");
+  l.dropAll();
+  assert.deepEqual([l.count, l.regions, l.get(1, 1)], [0, 0, 0], "dropAll forgets every chunk and region");
+});
+
+test("ChunkLayer: two far places cost two regions, not the slots between; forEach walks chunks row by row", () => {
+  const l = new ChunkLayer((n) => new Float32Array(n), 0);
+  l.set(1, 1, 1);
+  l.set(1000 * CHUNK + 5, -800 * CHUNK + 5, 2);
+  assert.equal(l.count, 2);
+  assert.equal(l.regions, 2, "two regions of chunk slots, not the 1001 × 801 chunk slots between");
+  assert.ok(l.regionSlots < 64 * 52 * 2, `the box of regions is ~1/256 of a box of chunks (${l.regionSlots} slots)`);
+  assert.equal(l.get(1000 * CHUNK + 5, -800 * CHUNK + 5), 2);
+  // (cy, cx) order across regions and signs, as the old dense table walked them.
+  const at: [number, number][] = [
+    [3, 0],
+    [-40, 2],
+    [17, -1],
+    [-1, -1],
+    [0, 2],
+  ];
+  const m = new ChunkLayer((n) => new Uint8Array(n), 0);
+  for (const [cx, cy] of at) m.set(cx * CHUNK, cy * CHUNK, 1);
+  const seen: [number, number][] = [];
+  m.forEach((cx, cy) => seen.push([cx, cy]));
+  assert.deepEqual(
+    seen,
+    [...at].sort((a, b) => a[1] - b[1] || a[0] - b[0]),
+  );
+});
+
+test("ChunkLayer: a generator fills a chunk on its first read or write, once; a dropped chunk is generated afresh", () => {
+  const made: string[] = [];
+  const l = new ChunkLayer(
+    (n) => new Uint8Array(n),
+    1,
+    (cx, cy, a) => {
+      made.push(`${cx},${cy}`);
+      assert.equal(a[0], 1, "it starts filled with empty");
+      a.fill(cx === 0 ? 0 : 2);
+    },
+  );
+  assert.equal(l.get(5, 5), 0, "a read generates the chunk");
+  assert.equal(l.get(6, 5), 0);
+  assert.deepEqual(made, ["0,0"], "once per chunk");
+  assert.equal(l.chunk(1, 0)?.[0], 2, "chunk() generates too");
+  l.set(-1, 0, 7);
+  assert.deepEqual(made, ["0,0", "1,0", "-1,0"], "a write generates first, then writes");
+  assert.equal(l.get(-1, 0), 7);
+  l.set(5, 5, 9);
+  l.drop(0, 0);
+  assert.equal(l.get(5, 5), 0, "dropped: what was written is gone, the generated ground is back");
+  assert.deepEqual(made, ["0,0", "1,0", "-1,0", "0,0"]);
+  l.clear();
+  assert.equal(l.get(-1, 0), 2, "clear() puts generated ground back, not empty");
+  const plain = new ChunkLayer((n) => new Uint8Array(n), 1);
+  assert.equal(plain.chunk(0, 0), undefined, "without a generator a missing chunk stays missing");
+  assert.equal(plain.count, 0);
 });
 
 test("chunkRock is exactly the height threshold at each hexagon's centre, cell for cell", () => {

@@ -78,7 +78,7 @@ test("the registry lists the four lanes, each with its flags, counters, variants
       [false, null],
       [false, null],
       [true, 50],
-      [true, 24],
+      [true, 48],
     ],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
@@ -303,11 +303,11 @@ test("the fungus row takes no species words yet: a lane argument changes nothing
   assert.equal(l.contextOf(A[0]!, "top", other), l.contextOf(A[0]!, "top"));
 });
 
-test("the growth lane is the growth brain (ja-2bw.5): its 24 situations, its local rule, asked under the fungus's aim", () => {
+test("the growth lane is the growth brain (ja-2bw.5): its 48 situations, its local rule, asked under the fungus's aim", () => {
   const l = LANES.growth;
   const all = l.all();
-  assert.equal(all.length, 24);
-  assert.equal(new Set(all.map((s) => l.key(s, undefined))).size, 24, "every situation has its own key");
+  assert.equal(all.length, 48);
+  assert.equal(new Set(all.map((s) => l.key(s, undefined))).size, 48, "every situation has its own key");
   const items = all.slice(0, 5).map((situation, i) => ({ id: `g${i}`, key: growthKey(situation), situation }));
   for (const aim of AIMS.map((a) => a.text)) {
     assert.deepEqual(l.pack(items, aim), packGrowthRequest(items, aim));

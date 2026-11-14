@@ -83,6 +83,8 @@ The species is an **agent kind the one-policy shape must carry**. Cheapest slice
 
 **Assays.** Targets for `experiment.ts` (offline): (a) foragers do **not** form a trail (A3-style mill check passes trivially, and no channel is deposited); (b) trips are bursts at the cool end of the heat window and no forager survives a trip longer than its heat budget; (c) a forager whose vector fails finds home by search loops (existing assay); (d) a forager steered by food odour finds a patch faster than a blind search on the same seeds. Targets from the papers read: (b) forager loss about 16 % a day and a life of about 4–6 days (*C. bicolor*, **a borrowing**, summary only); (c)/(d) a forager turns in to food odour up to about 6 m and reaches nest odour within about 0.3 m (*C. fortis*; odour 2014 figures from a draft); a colony of about 200 workers with about 3 nests a hectare and nests about 40 m apart (*C. fortis*, full text); (e) an idle ant's exit chance rises past a speed threshold of about 8 cm/s and a recruiter's entry raises exits sevenfold in a minute, falling as density rises (*C. niger*, lab, full text). The heat-window figures are for *C. bombycina* and stay unset until the 1992 letter is read.
 
+**Built (ja-rf5.2, PRD §60.1, 2026-11-13):** D1 (a), D2 (e), D3 (the baseline for d) and D4 (the baseline for b) are one-world assays in `experiment.ts`; (c) is S1. The generic ant's baselines are in PRD §60.1. By the owner's decision the unread targets stay marked unverified rather than waiting for the paywalled texts.
+
 **Cost (estimated, from request size, not measured).** A new lane with a smaller legend and a four-field situation (`mode`, `tired`, `heat`, `enemy`; no trails): fewer states than the generic ant's, so fewer distinct questions. The tokens per question come from `npm run colony-cost` once the legend exists; the PRD estimate is below the generic ant's lane. No stance lane means no stance calls. A cached game spends nothing.
 
 ## Play
@@ -111,6 +113,18 @@ Still to read (`ja-rf5.1`; the papers are paywalled, so the routes are interlibr
 6. Wehner, Marsh & Wehner 1992 (burst length, ant-height emergence temperatures, how fast released ants were killed); Schmid-Hempel & Schmid-Hempel 1984 (trips per day, forager fraction, other causes of death); the published Buehlmann et al. 2014 (wind speeds, running speed, crosswind width); Gehring & Wehner 1995 (CTmax, for *C. fortis* if reported).
 
 Leads not yet followed: Knaden & Wehner 2003 (*J Insect Behav* 16:717) and 2004 (*Science* 305:60) on aggression near the nest; Wehner, Meier & Zollikofer 2004 (*Ecol Entomol* 29:240) on forager lifetime; Schmid-Hempel 1984 (*Behav Ecol Sociobiol* 14:263), cited for returning successful foragers (context unread); Pinter-Wollman et al. 2013 (*Anim Behav*) for the nearest analogue of entrance contact (harvester ants, not *Cataglyphis*). No field follow-up of Razin et al. 2013 was found, and no field record of fungal infection or corpse removal in *Cataglyphis*.
+
+## What ja-rf5.3 built from this (PRD §60.2)
+
+The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situation lane (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, its own local rule with rule text, no corpse removal, about 200 workers. On one world it lays no trail (D1 passes), asks only its own fields, and finds and stores food on its own (less than the generic ant, without recruitment), so it needs no food sense to live; the plume (`ja-rf5.4`) is for finding food sooner. Its Jev lane costs about $0.004 an hour while a doctrine is new; its shipped answers wait on a live check at the owner's say.
+
+## What ja-rf5.4 built (PRD §60.4)
+
+Food odour in the air (`colony/plume.ts`, `foodPlume`): every food cell on the plane is a source, and the odour falls step by step through open ground (rock stops it) to nothing at the range, a radial gradient with no wind (Open questions 3). An outside forager with empty jaws and no food in sight climbs it with its three sensors, ahead of its search and of its vector to a remembered spot. The range is **21 cells**: the turn-in distance of about 6 m (Buehlmann et al. 2014, draft) at one world's scale, whose nests are 140 cells apart against *C. fortis*'s about 40 m. The plume is rebuilt at most every 4 s of game time, when the food has changed: odour lags its source, and a rebuild costs about 10 ms. D3: the first find comes sooner than the same seed's blind search on all of seeds 1–20, and about 4.5× as much food is home after 120 s.
+
+## What ja-rf5.5 and ja-rf5.12 built
+
+Heat, the sun's height and a night: [desert-heat.md](desert-heat.md), PRD §60.5.
 
 ## Sources
 

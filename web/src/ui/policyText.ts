@@ -1,4 +1,4 @@
-import type { Mode, Situation } from "../colony/index.ts";
+import { modeSchema, type Mode, type Situation, type Species } from "../colony/index.ts";
 
 // The local rules in words, for the Learn drawer's Policy tab. Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it
@@ -52,7 +52,7 @@ export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], othe
 export const LOCAL_FUNGUS_RULES: string[] = [
   "Groomed, with “groomed hosts hide” on (Details → Lab): hide the fungus (fungus showing: hidden).",
   "With “cull” on, a host fighting a foreigner: the odour weapon (lethal; only if it is on the menu and, in the game, your fungus has kept the Odour weapon upgrade).",
-  "Otherwise: what the strain was bred for: Garden carries the fungus's odour and tolerates strangers a little (blend); Lockpick calms (soothe); Bloom shares trails (share). Levers off the menu stay as they are.",
+  "Otherwise: what your strain, Garden, does by default: hosts carry the fungus's odour and tolerate strangers a little (blend), as far as your Recognition upgrade reaches. Levers off the menu stay as they are.",
 ];
 
 /** The ant's small responses on this page: decided by the local rule (responses.ts localResponses), never asked live here. */
@@ -77,3 +77,24 @@ export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
     "Rested and waiting at home: many nestmates coming home with food, go now; a few, go soon; none, and home crowded, now and then go out as a raid scout; none, wait, and only now and then go out to scout. An ant that defends goes out whatever comes back. A raider waits for a scout's raid trail, and goes on it.",
   ],
 ];
+
+/**
+ * Where a species' rule text (Species.ruleText, ja-fnd.5.13) disagrees with its own local rule: every situation its mode schema has, read
+ * through the rows as the drawer shows them, against what its policy answers. Empty when the words match the code; the test of each species
+ * that ships its own rule asserts it, as policyText.test.ts does for the generic ant.
+ */
+export function ruleTextAgrees(species: Species): string[] {
+  const text = species.ruleText;
+  const rule = species.policy;
+  if (!text || !rule) return [];
+  const schema = modeSchema(species.lanes.mode);
+  const out: string[] = [];
+  for (let code = 0; code < schema.size; code++) {
+    const own = schema.decode(code);
+    const s = own as Situation;
+    const said = byRows(text.rows, text.otherwiseMode, s);
+    const did = rule(s);
+    if (said !== did) out.push(`${schema.key(own)}: the words say ${said}, the rule ${did}`);
+  }
+  return out;
+}

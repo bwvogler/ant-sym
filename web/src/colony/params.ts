@@ -147,6 +147,38 @@ export interface ColonyParams {
    */
   siteGive: number;
   /**
+   * Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): an outside forager with empty jaws and no food in sight climbs the
+   * smell of food within this many cells of it (a gradient through open ground; plume.ts), ahead of its search and of its vector
+   * to a remembered spot. 0 = no food odour (the generic ant: main bit for bit).
+   */
+  foodPlume: number;
+  /**
+   * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
+   * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
+   * field) and dies past heatDeath. 0 = no heat (the generic ant: main bit for bit).
+   */
+  heatDay: number;
+  /** the ground's heat at dawn (°C) */
+  heatDawn: number;
+  /** the ground's heat at noon (°C) */
+  heatNoon: number;
+  /** the nest's heat underground (°C): a body's heat is kept as degrees above it */
+  heatNest: number;
+  /** seconds for a body's heat to close 63 % of the way to its surroundings' */
+  heatTau: number;
+  /** the body heat at which an ant feels hot (°C) */
+  heatFelt: number;
+  /** once hot, an ant feels hot until its body is back below this (°C): it rests to cool, as a tired ant rests until fully rested */
+  heatCool: number;
+  /** the sun's height (0 at dawn, 1 at noon) from which an ant that can see the sky sees it stand high (desert-heat.md §2: design) */
+  heatSunHigh: number;
+  /** the share of each day the sun is down: the night, cool and dark, after the daylight (owner, 2026-11-13) */
+  heatNight: number;
+  /** seconds after sunrise at which a game starts: the desert ant's nest opens as the sun turns high, so a game opens then */
+  heatStart: number;
+  /** the critical body heat (°C): past it, the ant dies */
+  heatDeath: number;
+  /**
    * One world's plane (ja-lp4.16, docs/route-memory.md, PRD §59): a forager keeps its own way out, places stored every
    * `routeStep` cells while it walks out (at most `routeMax`), and a carrier whose home vector fails walks back through
    * them, recognising a place within `routeSee` cells (a stand-in, by design, for a familiar view; Collett et al. 2013;
@@ -154,6 +186,20 @@ export interface ColonyParams {
    * reaching its belief with no hole there; 0 = nothing recorded, main bit for bit. Once a trip. Steering only.
    */
   routeMemory: number;
+  /**
+   * ja-uvhw: 1 = a sensor reads scent (food, home and alarm trails, and the nest in sight) only where its tip can be reached
+   * through open ground within SENSE_STEPS (inReach), as food itself is (ja-juiu); out of reach (another tunnel, behind a
+   * wall), it reads none. 0 = scent is read at the tip whatever lies between (main before ja-uvhw; kept for ablation).
+   */
+  scentReach: number;
+  /**
+   * ja-4rfr: 1 = hunger gets an ant to the stores. Its own hunger (below ADULT_BEG_BELOW) counts as well as what it feels
+   * from others; in a chamber, hungry, it steers by the stores' marks its sensors reach, and stays in; hunger ends a tired
+   * ant's rest; and an ant in "return" by a store takes food on from it (port), as an explorer does. 0 = only explorers
+   * fetch, by felt need, and only in tunnels (main before ja-4rfr): the old sat in the royal chamber, or climbed out,
+   * while the colony starved beside a full store.
+   */
+  restFetch: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
   routeStep: number;
   /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
@@ -280,7 +326,21 @@ export const DEFAULT_COLONY: ColonyParams = {
   moundSmell: 1,
   siteFidelity: 0,
   siteGive: 0,
+  foodPlume: 0,
+  heatDay: 0,
+  heatDawn: 25,
+  heatNoon: 52,
+  heatNest: 30,
+  heatTau: 30,
+  heatFelt: 45,
+  heatCool: 34,
+  heatSunHigh: 0.2,
+  heatNight: 1 / 3,
+  heatStart: 0,
+  heatDeath: 53.6,
   routeMemory: 0,
+  scentReach: 1,
+  restFetch: 1,
   routeStep: 8,
   routeSee: 5,
   routeMax: 64,

@@ -1,3 +1,4 @@
+import type { Channel } from "../colony/index.ts";
 import { BROOD_RGB, css, HOME_RGB, ROLE_RGB } from "./palette.ts";
 
 // The Learn drawer's field guide: one entry per thing on screen, in three
@@ -28,6 +29,8 @@ export interface GuideEntry {
   onScreen: string;
   realAnts: string;
   inGame: string;
+  /** the trail this entry is about: a species that lays no such trail (the desert ant) doesn't see the entry (owner, ja-rf5.11) */
+  trail?: Channel;
   /** still scripted: a vision gap (docs/vision.md "Where the code is today"), its bead and what the script reads */
   scripted?: { bead: string; reads: string };
   sources: Source[];
@@ -38,6 +41,7 @@ const HEAT = "rgb(var(--heat))";
 export const GUIDE: GuideEntry[] = [
   {
     id: "food-trail",
+    trail: "food",
     title: "Food trail",
     swatch: [HEAT],
     onScreen:
@@ -53,21 +57,38 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "home-trail",
-    title: "Home trail and the way home",
+    trail: "home",
+    title: "Home trail",
     swatch: [css(HOME_RGB)],
     onScreen:
       "The orange wash (Trails: “to home”). Ants walking out lay it, so it leads carriers back. Like the food trail, it shows only where your hosts have smelled it lately.",
     realAnts:
-      "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
+      "Some ants mark the ground while exploring as well as on the way home with food (Argentine ants; unverified). Whatever the trail, a forager also has its own sense of where home is (see The way home).",
     inGame:
       "Ants walking out lay the home trail; on the surface a carrier follows the food trail where it agrees with its home vector, and the vector otherwise.",
+    sources: [{ note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" }],
+  },
+  {
+    // Every species' (owner, ja-rf5.11): how a forager gets home without a trail, which is all a desert ant has.
+    id: "way-home",
+    title: "The way home",
+    onScreen: "A forager heading back with food walks a fairly straight line toward its hole, whether or not any trail is there.",
+    realAnts:
+      "Outside, home is a small hole. A forager keeps a running home vector from its steps and a sky compass, with an error of roughly 10 % of the distance walked; landmarks and an odour at the entrance correct it near home, and the vector resets only inside the nest.",
+    inGame:
+      "On the surface each ant keeps its own home vector, which drifts with the distance it walks. Where the vector runs out with no hole in sight, it searches in a widening spiral round that point; on its own mound's spoil it steers for its hole.",
     sources: [
       { note: "nest-and-home", anchor: "outside-home-is-the-hole", label: "Outside: home is the hole" },
-      { note: "trails", anchor: "which-journeys-lay-trail", label: "Which journeys lay trail" },
+      {
+        note: "nest-search",
+        anchor: "near-the-nest-an-ant-whose-vector-has-run-out-follows-the-nests-own-smell",
+        label: "Near the nest, the nest's own smell",
+      },
     ],
   },
   {
     id: "food-quality",
+    trail: "food",
     title: "Tasting food",
     swatch: ["var(--accent)"],
     onScreen: "A jade crumb at an ant's head: it is carrying food. Food on the map varies in how good it is.",
@@ -78,6 +99,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "double-bridge",
+    trail: "food",
     title: "Choosing a branch",
     onScreen: "Where trails fork, traffic piles onto one branch.",
     realAnts:
@@ -88,6 +110,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "no-entry",
+    trail: "noEntry",
     title: "The “no entry” mark",
     onScreen: "Not drawn: the mark is built, but switched off.",
     realAnts:
@@ -98,6 +121,7 @@ export const GUIDE: GuideEntry[] = [
   },
   {
     id: "alarm",
+    trail: "alarm",
     title: "Alarm",
     swatch: ["var(--warn)"],
     onScreen: "Brown haze where ants fight, shown, like the trails, only where your hosts have smelled it lately.",
@@ -400,7 +424,13 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "desert-ant",
     title: "Desert ants",
     covers:
-      "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Planned (not built, PRD §60).",
+      "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Playable (PRD §60).",
+  },
+  {
+    note: "desert-heat",
+    title: "Desert heat",
+    covers:
+      "The desert ant's heat: its limit is its own body, and the sun's height seen at the entrance sets when the nest opens and closes; it forages under the high sun, comes home to cool, and stays in at a low sun and at night (PRD §60.5).",
   },
   {
     note: "lasius-neglectus",
@@ -451,4 +481,16 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
 
 export function guideEntry(id: string): GuideEntry | undefined {
   return GUIDE.find((e) => e.id === id);
+}
+
+/** The guide's entries for a species whose colonies lay the trails `has` says: one about a trail it lacks is left out (owner, ja-rf5.11). */
+export function guideFor(has: (channel: Channel) => boolean): GuideEntry[] {
+  return GUIDE.filter((e) => e.trail === undefined || has(e.trail));
+}
+
+/** The line above the guide's entries for a species that lays no trails of some kinds (ja-rf5.11); null when it sees every entry. */
+export function guideNote(has: (channel: Channel) => boolean, species: string): string | null {
+  return guideFor(has).length < GUIDE.length
+    ? `The ${species.toLowerCase()} lays no trails of some kinds: the entries about them are left out.`
+    : null;
 }

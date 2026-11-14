@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  SPECIES,
   type Colony,
   type Situation,
   DOCTRINES,
@@ -49,7 +50,6 @@ const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINE
 export function useColonyJev(
   colonies: readonly Colony[],
   fungus: Fungus,
-  menu: readonly string[],
   backend: Backend | null = null,
   journal: Journal | null = null,
   species: Species = GENERIC_ANT,
@@ -85,15 +85,18 @@ export function useColonyJev(
   useEffect(() => {
     if (seeded.current) return; // once per page: StrictMode runs effects twice
     seeded.current = true;
-    void loadPrecache((context, entries) => jev.seed(context, entries));
+    // Each bundle against its own species' words (ja-fnd.5.15); one this build doesn't know is skipped.
+    void loadPrecache((context, entries, id) => {
+      const sp = id === undefined ? GENERIC_ANT : SPECIES[id];
+      return sp ? jev.seed(context, entries, sp) : 0;
+    });
   }, [jev]);
   // A colony founded mid-game is pushed onto the same array (Game.addColony): its length drives a re-attach too.
   const count = colonies.length;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => jev.attachColonies(colonies, species), [jev, colonies, count, species]);
-  // The fungus spans the game: the lane drives each new game's, under the player's menu.
+  // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
-  useEffect(() => jev.setMenu(new Set(menu)), [jev, menu]);
 
   // A run starts at the first miss where Jev can run (shouldStart), or by hand (Details → Resume).
   const [starting, setStarting] = useState(false);

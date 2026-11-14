@@ -1,6 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bridge, contact, faintAlarm, raidFind, raidStop, regulate, regulateStop, richPoor, runAssay, twin } from "../../experiment.ts";
+import {
+  bridge,
+  contact,
+  desertFirstFind,
+  desertInvitation,
+  desertNoTrail,
+  faintAlarm,
+  raidFind,
+  raidStop,
+  regulate,
+  regulateStop,
+  richPoor,
+  runAssay,
+  twin,
+} from "../../experiment.ts";
+import { DESERT_ANT } from "../../desertAnt.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
 // don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
@@ -76,4 +91,31 @@ test("A12 a raid no one can find doesn't starve the colony", () => {
 test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
   const m = runAssay(faintAlarm, 1).metrics;
   assert.equal(m.pass, 1, `draw ${m.draw}`);
+});
+
+// The desert ant's assays (ja-rf5.2, PRD §60.1): landed before the species, so today they measure the generic ant, which fails both.
+// Baselines, seeds 1–10: D1 lays food trail on a median 2,036 cells and home trail on 7,530; D2's ratio is a median 0.97 (0.88–1.05).
+// ja-rf5.3: D1 passes with the desert ant (tests/int/desertAnt.test.ts runs it on seeds 1–2); the generic ant, the baseline above, still fails it.
+test("D1 a desert ant lays no trail", () => {
+  for (const seed of [1, 2, 3]) {
+    const m = runAssay(desertNoTrail, seed, { game: { species: DESERT_ANT } }).metrics;
+    assert.equal(m.pass, 1, `seed ${seed}: food trail on ${m.foodCells} cells, home trail on ${m.homeCells}`);
+  }
+});
+
+// ja-rf5.4 (PRD §60.4): the desert ant climbs food odour in the air. Seeds 1–20 all find sooner than its blind search (foodPlume 0):
+// worst seed of 1–10 13.2 → 11.6 s, of 11–20 12.9 → 12.1 s.
+test("D3 food odour brings the first find sooner than a blind search", () => {
+  for (const seed of [1, 2, 3]) {
+    const first = (blind: boolean) =>
+      runAssay(desertFirstFind, seed, { game: { species: DESERT_ANT }, ...(blind ? { colony: { foodPlume: 0 } } : {}) }).metrics.firstFind;
+    const smelt = first(false);
+    const blind = first(true);
+    assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the plume, ${blind} s blind`);
+  }
+});
+
+test("D2 a returning finder invites nestmates out", { todo: "ja-rf5.6: the invitation (speed passed on by contact)" }, () => {
+  const m = runAssay(desertInvitation, 1).metrics;
+  assert.equal(m.pass, 1, `ratio ${m.ratio}`);
 });

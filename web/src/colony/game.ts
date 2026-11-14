@@ -10,7 +10,7 @@ import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
-import { cellOf, CELL } from "./hex.ts";
+import { cellOf, CELL, hexDistance } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 
@@ -395,6 +395,8 @@ export class Game {
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
     // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
     const middenLayer = one ? PLANE : 0;
+    // One world: a plane tip that comes to a hole crosses down it (ja-2bw.14).
+    if (one) this.fungus.crossAt = (x, y) => this.#holeAt(x, y);
     this.fungus.corpseAt = (layer, x, y) => {
       if (layer !== middenLayer) return 0;
       let n = 0;
@@ -696,8 +698,7 @@ export class Game {
       this.fungus.hosts++;
       if (this.fungus.evolution?.strain === f.fungus.strain) {
         const at = this.#byHole(c);
-        this.fungus.root(at.x, at.y, LANDING.radius);
-        this.#rootShaft(c);
+        this.fungus.root(at.x, at.y, LANDING.radius, 0, at.toward);
       }
     }
     return k;
@@ -1057,6 +1058,12 @@ export class Game {
         this.#aimRaids(k);
         // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.
         if (c.ownStances) return;
+        // A species with no stance lane (the desert ant) has no stance to choose: it forages, and no colony-wide count (intake, larder,
+        // head count, enemies by the nest: nothing an ant senses) picks one for it (review of #138, S1).
+        if (!this.params.species.lanes.stance) {
+          c.stance = "forage";
+          return;
+        }
         // A stance is part of every ant's situation: a change re-asks the ants by itself.
         c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
         this.strategyChoices++;
@@ -1078,28 +1085,54 @@ export class Game {
     { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {},
   ): { x: number; y: number } {
     if (this.landed) return this.landed;
-    const { x, y } = this.#byHole(this.colonies[k] ?? this.player);
+    const { x, y, toward } = this.#byHole(this.colonies[k] ?? this.player);
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
-    this.fungus.root(x, y, LANDING.radius);
-    this.#rootShaft(this.colonies[k] ?? this.player);
+    this.fungus.root(x, y, LANDING.radius, 0, toward);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
   }
 
-  /** One world, with hyphae (ja-2bw.2): the fungus also roots on the walls of the shaft under colony c's hole, in the curtain. */
-  #rootShaft(c: Colony): void {
-    const e = this.world ? (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance : undefined;
-    if (e) this.fungus.rootShaft(CURTAIN, e.x, e.y);
+  /**
+   * Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim).
+   * One world (ja-2bw.14, owner 2026-11-12): on the plane, the same distance from the hole (the disc's rim and
+   * LANDING.offset) but on its inner side, along the line toward the neighbouring hole: the line's margin past an end
+   * hole is re-aimed when a colony founds beyond it, the stretch between holes is not. `toward` is the hole, which the
+   * patch's first tip heads for (its hyphae reach the curtain by growing down the hole: Fungus.crossAt).
+   */
+  #byHole(c: Colony): { x: number; y: number; toward: { x: number; y: number } | null } {
+    const nest = this.world ? (c.layers[PLANE] as Layer).nest : c.nest;
+    if (this.world) {
+      const holes = this.world.line.holes.map((h) => ({ x: centreX(h.x, h.y), y: centreY(h.y) }));
+      let i = 0;
+      for (let j = 1; j < holes.length; j++)
+        if (Math.hypot(holes[j]!.x - nest.x, holes[j]!.y - nest.y) < Math.hypot(holes[i]!.x - nest.x, holes[i]!.y - nest.y)) i = j;
+      const other = holes[i + 1] ?? holes[i - 1];
+      if (other) {
+        const dx = other.x - nest.x;
+        const dy = other.y - nest.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const reach = nest.r + LANDING.offset;
+        return { x: nest.x + (dx / len) * reach, y: nest.y + (dy / len) * reach, toward: { x: nest.x, y: nest.y } };
+      }
+    }
+    const e = nest.entrance ?? { x: nest.x + nest.r, y: nest.y };
+    return { x: e.x + LANDING.offset, y: e.y - (nest.entrance ? 0.5 : 0), toward: null };
   }
 
-  /** Where the fungus falls or roots by colony c: just past its hole along the ground (the top-down maps: its nest's rim). */
-  #byHole(c: Colony): { x: number; y: number } {
-    // One world: on the plane, by the rim of the disc round its hole (layer 0's nest), as top-down.
-    const nest = this.world ? (c.layers[PLANE] as Layer).nest : c.nest;
-    const e = nest.entrance ?? { x: nest.x + nest.r, y: nest.y };
-    return { x: e.x + LANDING.offset, y: e.y - (nest.entrance ? 0.5 : 0) };
+  /** One world: the curtain entrance of the hole whose mouth plane cell (x, y) is in (a colony's plane disc's centre), or null (Fungus.crossAt). */
+  #holeAt(x: number, y: number): { x: number; y: number } | null {
+    for (const c of this.colonies) {
+      const plane = c.layers[PLANE] as Layer | undefined;
+      const down = (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance;
+      if (!plane || !down) continue;
+      cellOf(plane.nest.x, plane.nest.y);
+      // The hole's mouth: its disc (the colony's ground round the hole on the plane), where the ground runs down into the
+      // shaft. A tip set off toward the hole passes within a cell or two of it, not through it.
+      if (hexDistance(x, y, CELL[0], CELL[1]) <= Math.round(plane.nest.r)) return { x: down.x, y: down.y };
+    }
+    return null;
   }
 
   /**

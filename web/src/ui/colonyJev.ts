@@ -104,6 +104,8 @@ export interface ColonyJevState {
   /** answers cached under every colony's doctrine (modes, stances): a doctrine two colonies share counts once */
   cached: number;
   stancesCached: number;
+  /** whether the colonies driven have a stance lane at all (a species may not: Species.lanes, ja-fnd.5.12): the panel says so rather than "0 stances" */
+  stanceLane: boolean;
   /** mode answers cached for each colony's doctrine */
   doctrineCached: number[];
   /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
@@ -226,8 +228,10 @@ export class ColonyJev {
   #doctrines: string[] = [];
   #store: CacheStore | null;
   #fungus: Fungus | null = null;
-  /** the menu the fungus lane asks under: the attached fungus's, or every non-lethal lever */
+  /** the menu the fungus lane asks under: a copy of the attached fungus's (one source, ja-d87), or before one, every non-lethal lever */
   #menu: Set<string> = new Set(DEFAULT_MENU);
+  /** the fungus's menuSeq when #menu was copied from it */
+  #menuSeq = -1;
   // The levers asked (the menu's, in table order) are in each key, so a question is packed and its answer read and
   // kept against the levers it asked, whatever the menu is by the time it lands.
   #fungal = lane<FungalSituation, string>({
@@ -263,7 +267,19 @@ export class ColonyJev {
   });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
+    this.#followMenu();
     return askedLevers(this.#menu, s?.task === "queen");
+  }
+  /**
+   * Copy the fungus's menu if it changed since (whoever set it: setMenu, Fungus.configure, a load). Queued questions were
+   * keyed under the old menu: dropped, the hosts ask again. Questions in flight are read against the levers they asked.
+   */
+  #followMenu(): void {
+    const f = this.#fungus;
+    if (!f || f.menuSeq === this.#menuSeq) return;
+    this.#menuSeq = f.menuSeq;
+    this.#menu = f.menu; // the fungus drops what its map can't run (NEST_ONLY on top-down maps)
+    this.#fungal.queue.clear();
   }
   /** caches by context, shared by every lane asking under it */
   #caches = new Map<string, PolicyCache<string>>();
@@ -298,6 +314,7 @@ export class ColonyJev {
     misses: 0,
     cached: 0,
     stancesCached: 0,
+    stanceLane: true,
     doctrineCached: [],
     fungusAsked: 0,
     fungusCached: 0,
@@ -370,7 +387,7 @@ export class ColonyJev {
   }
 
   /** The cache sizes the panel shows. */
-  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "doctrineCached" | "fungusCached" | "growthCached"> {
+  #counts(): Pick<ColonyJevState, "cached" | "stancesCached" | "stanceLane" | "doctrineCached" | "fungusCached" | "growthCached"> {
     // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
@@ -382,6 +399,7 @@ export class ColonyJev {
     return {
       cached: sum(modes),
       stancesCached: sum(stances),
+      stanceLane: this.#species.lanes.stance !== undefined,
       doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
       fungusCached: this.#cache(this.#fungal).size,
       growthCached: this.#cache(this.#growth).size,
@@ -494,7 +512,8 @@ export class ColonyJev {
     this.#fungus = fungus;
     fungus.bindPolicy("fungus", this.fungusPolicy);
     fungus.bindPolicy("growth", this.growthPolicy);
-    this.setMenu(fungus.menu);
+    this.#menuSeq = -1;
+    this.#followMenu();
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
 
@@ -505,17 +524,18 @@ export class ColonyJev {
   }
 
   /**
-   * The player's menu: the levers the fungus may pull. Which levers are asked is part of every question, so it is in
-   * the key: answers under a menu used before still hold. Queued questions were keyed under the old menu: dropped, the
-   * hosts ask again. Questions in flight are read against the levers they asked.
+   * The player's menu: the levers the fungus may pull, set on the attached fungus (the one source: Fungus.configure
+   * changes it as well). Which levers are asked is part of every question, so it is in the key: answers under a menu
+   * used before still hold.
    */
   setMenu(menu: Set<string>): void {
-    this.#menu = new Set(menu);
     if (this.#fungus) {
       this.#fungus.menu = menu;
-      this.#menu = new Set(this.#fungus.menu); // the fungus drops what its map can't run (NEST_ONLY on top-down maps)
+      this.#followMenu();
+    } else {
+      this.#menu = new Set(menu);
+      this.#fungal.queue.clear();
     }
-    this.#fungal.queue.clear();
   }
 
   /**
@@ -539,8 +559,10 @@ export class ColonyJev {
    * so answers this browser got from Jev win. Only answers this lane's question could give are kept (`valid`). The
    * colonies reconsider, so shipped answers take hold at once.
    */
-  seed(context: string, entries: readonly [string, string][]): number {
-    const l = this.#laneFor(context);
+  seed(context: string, entries: readonly [string, string][], species: Species = GENERIC_ANT): number {
+    // Checked against the bundle's own species' words, not the game's (ja-fnd.5.15): a page that seeds while playing one species keeps
+    // every other species' answers for a later game.
+    const l = this.#laneFor(context, species);
     if (!l) return 0;
     const cache = this.#cache(l, context);
     let added = 0;
@@ -557,11 +579,11 @@ export class ColonyJev {
   }
 
   /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
-  #laneFor(context: string): Lane<unknown, string> | null {
+  #laneFor(context: string, species: Species): Lane<unknown, string> | null {
     const kind = laneOfContext(context);
     if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
     if (kind === "growth") return this.#growth as Lane<unknown, string>;
-    const d = this.#driven[0] ?? colonyLanes("", this.#species);
+    const d = colonyLanes("", species);
     return kind === "mode"
       ? (d.modes as Lane<unknown, string> | null)
       : kind === "stance"
@@ -747,6 +769,7 @@ export class ColonyJev {
 
   #cycle(): void {
     if (this.#state.phase !== "running") return;
+    this.#followMenu(); // a menu changed since the last lookup: drop the questions queued under the old one before sending
     if (this.#cooldown > 0) {
       this.#cooldown--;
       return;

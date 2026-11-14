@@ -14,6 +14,7 @@ import {
   type Flight,
   CELL,
   cellOf,
+  GENERIC_ANT,
 } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -73,7 +74,7 @@ const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 export default function ColonyApp() {
   const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } = useColony();
   const backend = useBackend();
-  const jev = useColonyJev(game.colonies, game.fungus, controls.menu, backend, journal, game.params.species);
+  const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
   const [details, setDetails] = useState(false);
   const closeDetails = useCallback(() => setDetails(false), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -117,10 +118,11 @@ export default function ColonyApp() {
   const sensed = useMemo(() => new SensedMap(), [game]);
   useEffect(() => onFrame(() => sensed.stamp(game.colonies, game.time)), [onFrame, game, sensed]);
   const onStart = useCallback(
-    (seed: number, withTutorial: boolean) => {
-      start(seed, withTutorial);
+    (seed: number, withTutorial: boolean, species?: string) => {
+      start(seed, withTutorial, species);
       if (withTutorial) tut.run();
-      else skipTutorial();
+      // The tutorial is the generic ant's: only a generic start without it marks it done (review of #142, S1).
+      else if ((species ?? GENERIC_ANT.id) === GENERIC_ANT.id) skipTutorial();
     },
     [start, tut],
   );
@@ -480,6 +482,7 @@ export default function ColonyApp() {
               explain={jev.explain}
               explainFungus={jev.explainFungus}
               onClose={() => setFollowed(null)}
+              fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
             />
           ) : (
             <p className="text-xs text-fg-3">

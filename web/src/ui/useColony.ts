@@ -34,13 +34,15 @@ import { landingOf } from "./landing.ts";
 // fungus and a free stroke skipped its progression. Game.paintSpores (and its BRUSH stroke) stays for tests and scripts.
 
 export interface ColonyControls {
+  /** the species both colonies are (Species.id: colony/species.ts SPECIES); chosen on the start screen (ja-rf5) */
+  species: string;
   seed: number;
   antCount: number;
   speed: number;
   playing: boolean;
   showFoodTrail: boolean;
   showHomeTrail: boolean;
-  /** the fungus's menu: the levers the player has on (§5.1, lever 4; levers.ts) */
+  /** the fungus's menu: the levers the player has on (fungus-policy.md §5.1, lever 3; levers.ts) */
   menu: string[];
   /** the local rule's settings: hide groomed hosts; cull high-load fighters among strangers */
   hide: boolean;
@@ -65,6 +67,7 @@ export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 export { landingColony, landingOf } from "./landing.ts";
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
+  species: GENERIC_ANT.id,
   seed: 1,
   antCount: 600,
   speed: GAME_SPEED,
@@ -118,12 +121,14 @@ export interface ColonyStats {
   /** policy mode choices per second, over the last second */
   choicesPerSecond: number;
   situationsSeen: number;
+  /** every situation the colonies' mode lane can be asked in: the species' own schema's size, or SITUATIONS (ja-fnd.5.12) */
+  situations: number;
   /** every colony's line: Game.colonies order (Ink, then Amber; ui/names.ts) */
   sides: SideStats[];
   /** the colony that is gone, by index, or −1 */
   fallen: number;
   outcome: Outcome;
-  /** cells of ground holding spores */
+  /** cells of ground holding spores enough to see (Fungus.shownSporeCells) */
   sporeCells: number;
   /** how far the fungus has come toward one colony */
   unity: Unity;
@@ -173,6 +178,11 @@ function sumCounts(colonies: readonly Colony[]): Record<Mode, number> {
   const out = { explore: 0, follow: 0, return: 0, fight: 0 } as Record<Mode, number>;
   for (const c of colonies) for (const [m, n] of Object.entries(c.counts()) as [Mode, number][]) out[m] += n;
   return out;
+}
+
+/** Every situation the colonies' mode lane can be asked in: the species' own schema's size (Colony.seen is sized by it), or SITUATIONS. */
+export function situationsOf(colonies: readonly Colony[]): number {
+  return colonies[0]?.seen.length ?? 0;
 }
 
 /** Situations any colony has been asked in: what one shared doctrine would pay for (the caches are shared by context). */
@@ -240,11 +250,12 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
     const build = () =>
-      buildGame({ species: GENERIC_ANT.id, seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
+      buildGame({ species: controls.species, seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
     const g = build();
     const r = pending.current;
     if (
       r &&
+      r.settings.species === controls.species &&
       r.settings.seed === controls.seed &&
       r.settings.antCount === controls.antCount &&
       r.settings.rival === controls.rival &&
@@ -269,7 +280,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.seed, controls.antCount, controls.rival, generation, loads]);
+  }, [controls.species, controls.seed, controls.antCount, controls.rival, generation, loads]);
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
@@ -326,10 +337,11 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
           counts: sumCounts(game.colonies),
           choicesPerSecond: rate,
           situationsSeen: seenTogether(game.colonies),
+          situations: situationsOf(game.colonies),
           sides: game.colonies.map((c) => side(c, game.fungus)),
           fallen: game.fallen(),
           outcome: game.outcome(),
-          sporeCells: game.fungus.sporeCells,
+          sporeCells: game.fungus.shownSporeCells,
           unity: game.unity(),
           pace,
           chapter: chapterFor(game),
@@ -362,6 +374,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     setGeneration(r.settings.generation);
     setControls((c) => ({
       ...c,
+      species: r.settings.species,
       seed: r.settings.seed,
       antCount: r.settings.antCount,
       rival: r.settings.rival,
@@ -372,7 +385,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   }, []);
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = {
-    species: GENERIC_ANT.id,
+    species: controls.species,
     seed: controls.seed,
     antCount: controls.antCount,
     rival: controls.rival,
@@ -381,9 +394,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
 
   /** The start screen's Start: this seed, the fungus lands; playing at the game's speed, or paused at 1× for the tutorial (PRD §61). */
   const start = useCallback(
-    (seed: number, tutorial = false) =>
+    (seed: number, tutorial = false, species: string = GENERIC_ANT.id) =>
       setControls((c) => ({
         ...c,
+        species,
         seed: Math.max(1, Math.floor(seed) || 1),
         started: true,
         playing: !tutorial,
