@@ -590,6 +590,9 @@ export default function ColonyField({
       const px = miniImg.data;
       const food = theme.accentRgb;
       const spore = theme.sporeRgb;
+      // Infected ants: the spore colour halfway to ink, so a host stands out on the spore wash as on bare ground, in
+      // either theme (ink is light in dark mode) (ja-25sb).
+      const host = [0, 1, 2].map((j) => Math.round((spore[j]! + theme.inkRgb[j]!) / 2)) as [number, number, number];
       for (let my = 0; my < mini.height; my++)
         for (let mx = 0; mx < mini.width; mx++) {
           cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
@@ -629,7 +632,7 @@ export default function ColonyField({
         for (let k = colonies.length - 1; k >= 0; k--) {
           const col = colonies[k] as Colony;
           // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-          const tone = sick ? spore : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+          const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
           for (let i = 0; i < col.n; i++) {
             if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || col.load[i] >= INFECTED !== sick) continue;
             const mx = Math.floor((col.x[i] - gx0) / 2);

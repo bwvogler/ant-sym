@@ -437,7 +437,7 @@ The 512×320 map is now something to move around in, not a picture squeezed into
   - Only the ants in view are drawn. Cells past a ragged map edge are transparent.
 - **Minimap.**
   - Zoomed in, a corner inset shows the whole map: ground, food, both colonies' ants, and the view's rectangle. It is redrawn twice a second.
-  - The fungus shows on it too (ja-hcq): cells with spores the field draws (`SPORE_SHOWN`) are washed in the spore colour, and infected ants are dots in it, over their nestmates.
+  - The fungus shows on it too (ja-hcq): cells with spores the field draws (`SPORE_SHOWN`) are washed in the spore colour, and infected ants are dots in the spore colour halfway to ink (so they show on the wash too, ja-25sb), over their nestmates.
   - Click or drag on it to jump.
 - **Following an ant.**
   - Click an ant (yours or the rival's) to follow it: the camera tracks it, with a jade ring around it.
