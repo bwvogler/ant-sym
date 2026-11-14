@@ -124,7 +124,14 @@ export const DESERT_ANT: Species = {
   // It senses its own heat (the sense table's own-body row): hot near the heat that kills it.
   // It sees the sun's height where the sky is in view: out on the plane, or at the top of its own shaft; deeper in, unseen (desert-heat.md §2).
   sense: (c, i) => ({ hot: c.hot[i] === 1, sun: c.layer[i] === PLANE || atGate(c, i) ? sunSeen(c.params, c.time) : "unseen" }),
-  responses: { ...localResponses, contact: (t) => (t.carrying === "none" ? "fight" : "flee") },
+  responses: {
+    ...localResponses,
+    contact: (t) => (t.carrying === "none" ? "fight" : "flee"),
+    // The invitation (ja-rf5.6, Razin et al. 2013, full text): a waiting ant leaves by its own pace, which the finders passing it raise (its
+    // returns, sense.ts); with none, it waits and only the odd scout goes. Not the generic ant's crowd rule: a crowded shaft with no returns
+    // sent it out as a raid scout, and this species doesn't raid (it was most of its departures: 252 of 328 on seed 1).
+    leave: (t) => (t.returns === "many" ? "now" : t.returns === "few" ? "soon" : "wait"),
+  },
   lanes: { mode: DESERT_MODE_WORDS },
   policy: desertPolicy,
   ruleText: DESERT_RULE_TEXT,

@@ -1,5 +1,6 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { dayPhase, sunHigh } from "./heat.ts";
+import { holdsAt } from "./crossing.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
 import {
   type Colony,
@@ -2409,8 +2410,8 @@ function crossingsProbe(
 export const D2_WINDOW = 10;
 
 /**
- * D2 — a returning finder invites nestmates out. For each forager that comes home with food, the departures in the D2_WINDOW seconds
- * after it against the D2_WINDOW seconds before it, summed over every such return: about 1 when returns invite nobody. Target: at least 7.
+ * D2 — a returning finder invites nestmates out. For each forager that comes home with food, the idle ants' departures (not a finder's
+ * going back out) in the D2_WINDOW seconds after it against the D2_WINDOW seconds before it, summed over every such return: about 1 when returns invite nobody. Target: at least 7.
  * Razin, Eckmann & Feinerman 2013 (full text): a recruiter's entry raises the idle ants leaving in the next minute sevenfold over a
  * spontaneous mover (*C. niger*, lab nests of 4–8 ants). The game's returns come every second or so, so a minute on either side would
  * overlap every other return's: the window is shorter, and the mark is provisional; meeting it is the invitation's (ja-rf5.6).
@@ -2418,31 +2419,78 @@ export const D2_WINDOW = 10;
 export const desertInvitation: Assay = {
   id: "d2",
   title: "D2 a returning finder invites nestmates out (one world)",
-  target: "departures in the 10 s after a return with food ≥ 7× those in the 10 s before (Razin 2013, full text; provisional window)",
+  target:
+    "the leaving rate of ants waiting at the top of the shaft in the 10 s after a finder comes down ≥ 7× that in the 10 s before (Razin 2013, full text; provisional window)",
   seconds: D_SECONDS,
-  spec: (seed) =>
-    desertSpec(
-      seed,
-      crossingsProbe((game, out, back) => {
-        // A returner's own trip back out is not one it invited (review of #134, S1); one in the return's own tick counts as after (N2).
-        const count = (lo: number, hi: number, self: number): number => {
-          let n = 0;
-          for (const o of out) if (o.ant !== self && o.t >= lo && o.t < hi) n++;
-          return n;
-        };
+  spec: (seed) => {
+    // Each tick: how many of the player's ants wait at the gate (held), and which of last tick's waiting ants climbed out (a departure from
+    // the waiting pool). Each finder that comes down the hole with food is a return. The rate is per waiting-ant-second, as Razin's sevenfold
+    // is a rate for the idle ants of the chamber (ja-rf5.6): counted whole, the finders cycling straight back out swamped the few that wait.
+    const exposure: { t: number; held: number }[] = [];
+    const leftAt: number[] = [];
+    const returns: number[] = [];
+    let wasHeld = new Uint8Array(0);
+    let wasLayer = new Int8Array(0);
+    let wasCarrying = new Uint8Array(0);
+    return desertSpec(seed, {
+      tick(game) {
+        const c = game.player;
+        if (wasHeld.length < c.n) {
+          const grow = <T extends Uint8Array | Int8Array>(a: T, make: (n: number) => T) => {
+            const b = make(Math.max(c.n, 64));
+            b.set(a);
+            return b;
+          };
+          wasHeld = grow(wasHeld, (n) => new Uint8Array(n));
+          wasLayer = grow(wasLayer, (n) => new Int8Array(n).fill(-1));
+          wasCarrying = grow(wasCarrying, (n) => new Uint8Array(n));
+        }
+        let held = 0;
+        for (let i = 0; i < c.n; i++) {
+          const alive = c.alive[i] === 1;
+          const layer = alive ? c.layer[i] : -1;
+          if (alive && wasLayer[i] === PLANE && layer !== PLANE && wasCarrying[i] === 1) returns.push(game.time);
+          // It waited since it last came in: its climb out after its pass (several ticks, no longer held) is a departure from the pool.
+          if (alive && wasHeld[i] === 1 && layer === PLANE) leftAt.push(game.time);
+          let h = 0;
+          if (alive && layer !== PLANE) {
+            const was = c.cur;
+            c.bind(layer);
+            h = holdsAt(c, i) ? 1 : 0;
+            c.bind(was);
+          }
+          wasHeld[i] = !alive || layer === PLANE ? 0 : wasHeld[i] === 1 || h === 1 ? 1 : 0;
+          held += h;
+          wasLayer[i] = layer;
+          wasCarrying[i] = alive ? c.carrying[i] : 0;
+        }
+        exposure.push({ t: game.time, held });
+      },
+      summary(game) {
+        const dt = exposure.length > 1 ? exposure[1]!.t - exposure[0]!.t : 1 / 30;
+        const heldIn = (lo: number, hi: number) => exposure.reduce((sum, e) => (e.t > lo && e.t <= hi ? sum + e.held * dt : sum), 0);
+        const leftIn = (lo: number, hi: number) => leftAt.reduce((n, t) => (t > lo && t <= hi ? n + 1 : n), 0);
         let after = 0;
         let before = 0;
-        let returns = 0;
-        for (const b of back) {
-          if (!b.food || b.t < D2_WINDOW || b.t > game.time - D2_WINDOW) continue;
-          returns++;
-          after += count(b.t, b.t + D2_WINDOW, b.ant);
-          before += count(b.t - D2_WINDOW, b.t, b.ant);
+        let expAfter = 0;
+        let expBefore = 0;
+        let used = 0;
+        for (const r of returns) {
+          if (r < D2_WINDOW || r > game.time - D2_WINDOW) continue;
+          used++;
+          after += leftIn(r, r + D2_WINDOW);
+          before += leftIn(r - D2_WINDOW, r);
+          expAfter += heldIn(r, r + D2_WINDOW);
+          expBefore += heldIn(r - D2_WINDOW, r);
         }
-        const ratio = before > 0 ? after / before : after > 0 ? Infinity : NaN;
-        return { departures: out.length, returnsWithFood: returns, after, before, ratio, pass: ratio >= 7 ? 1 : 0 };
-      }),
-    ),
+        const rateAfter = expAfter > 0 ? after / expAfter : NaN;
+        const rateBefore = expBefore > 0 ? before / expBefore : NaN;
+        const ratio = rateBefore > 0 ? rateAfter / rateBefore : rateAfter > 0 ? Infinity : NaN;
+        const meanHeld = exposure.length ? exposure.reduce((s2, e) => s2 + e.held, 0) / exposure.length : NaN;
+        return { returnsWithFood: used, leftWaiting: leftAt.length, meanHeld, rateAfter, rateBefore, ratio, pass: ratio >= 7 ? 1 : 0 };
+      },
+    });
+  },
   score: () => ({}),
 };
 

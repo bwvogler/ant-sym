@@ -54,6 +54,11 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   const few = c.params.leaveGate;
   const met = c.met[i];
   t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
+  // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
+  if (c.params.invitePace > 0) {
+    const v = c.pace[i];
+    t.returns = v >= c.params.paceMany ? "many" : v >= c.params.paceFew ? "few" : "none";
+  }
   t.raid = raidSmelt(c, i);
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;

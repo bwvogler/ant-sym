@@ -305,6 +305,9 @@ export const ANT_FIELDS = {
   bodyHeat: { type: Float32Array, reset: "spawn" },
   /** 1 while it feels hot: from heatFelt until its body is back below heatCool */
   hot: { type: Uint8Array, reset: "spawn" },
+  // ——— the desert ant's invitation (ja-rf5.6), last for the same reason ———
+  /** its pace (cm/s), waiting at the top of its shaft: what a finder passing raises, and what its leave response reads; 0 at birth */
+  pace: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

@@ -53,7 +53,19 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   // for a tick: the count stayed under the threshold, and only scouts went out.
   // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (holeSeen): each
   // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
-  if (leak) {
+  // The invitation (ja-rf5.6, Razin et al. 2013): for a species whose finders invite by pace, a waiting ant's own pace instead: each finder
+  // that came down the shaft past it last tick pulls it toward the finder's pace, the pull shared by how crowded the shaft top feels.
+  if (leak && colony.params.invitePace > 0) {
+    const p = colony.params;
+    let v = p.paceRest + (colony.pace[i] - p.paceRest) * Math.exp(-dt / p.paceTau);
+    if (held && colony.holeSeen > 0) {
+      // The crowd it feels can dip under 0 as it leaks (nobody near): floored, so the shared pull stays within 0–1.
+      const share = p.paceGain / (1 + Math.max(0, colony.crowd[i]));
+      const pull = 1 - (1 - Math.min(1, share)) ** colony.holeSeen;
+      v += (p.invitePace - v) * pull;
+    }
+    colony.pace[i] = v;
+  } else if (leak) {
     let m = colony.met[i] * metLeak;
     if (gate ? atNest && !carrying : held) m += gate ? returnsAround(colony, CELL[0], CELL[1]) : colony.holeSeen;
     colony.met[i] = m;
