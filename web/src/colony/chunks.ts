@@ -65,6 +65,9 @@ export class ChunkLayer<A extends Cells> {
   /**
    * `make` allocates a chunk's array; `empty` is what a cell no one wrote reads as. `generate`, if given, fills a new
    * chunk (already set to `empty`) the first time any read or write touches it, so a missing chunk never reads as empty.
+   * It must be a pure function of (cx, cy) that writes only `a`: the chunk is installed before it runs, so if it throws the
+   * chunk stays as `empty`, and if it reads a neighbour of this layer it generates that one first (inputs that need
+   * neighbours read their pure source, as world generation's `chunkRock`, not the layer).
    */
   constructor(make: (n: number) => A, empty = 0, generate: ((cx: number, cy: number, a: A) => void) | null = null) {
     this.#make = make;
@@ -77,7 +80,7 @@ export class ChunkLayer<A extends Cells> {
     return this.#count;
   }
 
-  /** Regions allocated (each 16 × 16 chunk slots): what the chunks' slots cost, which grows with the places touched. */
+  /** Regions allocated (each 16 × 16 chunk slots): what the chunks' slots cost, which grows with the places touched and, for now, never shrinks. */
   get regions(): number {
     return this.#regions;
   }
@@ -173,20 +176,17 @@ export class ChunkLayer<A extends Cells> {
 
   /** Every allocated chunk, in (cy, cx) order: row by row, as a save and a sum must see them whatever the table's layout. */
   forEach(fn: (cx: number, cy: number, a: A) => void): void {
-    const all: [number, number, A][] = [];
+    // Rows of regions, then the chunk rows within them, then the regions across, then the chunks across: (cy, cx) order.
     for (let ty = 0; ty < this.#rh; ty++)
-      for (let tx = 0; tx < this.#rw; tx++) {
-        const r = this.#table[ty * this.#rw + tx];
-        if (r === undefined) continue;
-        const bx = (tx + this.#rx0) << REGION_BITS;
-        const by = (ty + this.#ry0) << REGION_BITS;
-        for (let i = 0; i < r.length; i++) {
-          const a = r[i];
-          if (a !== undefined) all.push([bx | (i & REGION_MASK), by | (i >> REGION_BITS), a]);
+      for (let ly = 0; ly < REGION; ly++)
+        for (let tx = 0; tx < this.#rw; tx++) {
+          const r = this.#table[ty * this.#rw + tx];
+          if (r === undefined) continue;
+          for (let lx = 0; lx < REGION; lx++) {
+            const a = r[(ly << REGION_BITS) | lx];
+            if (a !== undefined) fn(((tx + this.#rx0) << REGION_BITS) | lx, ((ty + this.#ry0) << REGION_BITS) | ly, a);
+          }
         }
-      }
-    all.sort((p, q) => p[1] - q[1] || p[0] - q[0]);
-    for (const [cx, cy, a] of all) fn(cx, cy, a);
   }
 
   /** Forget every chunk: the layer reads as `empty` everywhere and holds nothing (a save's restore, save.ts). */
@@ -196,9 +196,13 @@ export class ChunkLayer<A extends Cells> {
     this.#count = 0;
   }
 
-  /** Every cell, zeroed (or set to `empty`), keeping the chunks allocated. */
+  /** Every cell back to what it was made as (`empty`, or generated afresh), keeping the chunks allocated. */
   clear(): void {
-    this.forEach((_, __, a) => a.fill(this.empty));
+    const generate = this.#generate;
+    this.forEach((cx, cy, a) => {
+      a.fill(this.empty);
+      if (generate !== null) generate(cx, cy, a);
+    });
   }
 
   /** Grow the box of regions (never the regions) so it covers region (rx, ry), with room to spare. */

@@ -346,6 +346,9 @@ test("ChunkLayer: growing the table in every direction keeps what was written; d
   assert.equal(l.count, 4);
   assert.equal(l.get(1, 1), 1);
   assert.equal(l.drop(700 >> 6, 2 >> 6), undefined, "dropping a chunk that isn't there is a no-op");
+  assert.equal(l.count, 4, "and leaves the count alone");
+  l.dropAll();
+  assert.deepEqual([l.count, l.regions, l.get(1, 1)], [0, 0, 0], "dropAll forgets every chunk and region");
 });
 
 test("ChunkLayer: two far places cost two regions, not the slots between; forEach walks chunks row by row", () => {
@@ -396,6 +399,8 @@ test("ChunkLayer: a generator fills a chunk on its first read or write, once; a 
   l.drop(0, 0);
   assert.equal(l.get(5, 5), 0, "dropped: what was written is gone, the generated ground is back");
   assert.deepEqual(made, ["0,0", "1,0", "-1,0", "0,0"]);
+  l.clear();
+  assert.equal(l.get(-1, 0), 2, "clear() puts generated ground back, not empty");
   const plain = new ChunkLayer((n) => new Uint8Array(n), 1);
   assert.equal(plain.chunk(0, 0), undefined, "without a generator a missing chunk stays missing");
   assert.equal(plain.count, 0);

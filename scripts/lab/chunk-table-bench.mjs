@@ -188,8 +188,8 @@ const far = [
   [256, 184],
   [256 + 100 * CHUNK, 184 + 60 * CHUNK],
 ];
-// One kind per process (--kind=dense|map|region), so the reads stay monomorphic as they are in the game; without
-// --kind, this script runs itself once per kind (--kind=dense|map|region|box).
+// One kind per process (--kind=dense|map|region|box), so the reads stay monomorphic as they are in the game; without
+// --kind, this script runs itself once per kind.
 const KINDS = { dense: Dense, map: Keyed, region: Region, box: Box };
 const only = process.argv.find((a) => a.startsWith("--kind="))?.slice(7);
 if (only) {
