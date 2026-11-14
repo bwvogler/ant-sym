@@ -39,15 +39,18 @@ const list = (s) =>
     return Array.from({ length: b - a + 1 }, (_, k) => a + k);
   });
 
-/** Arguments by position, in `names`' order, unless written name=value. */
+/** Arguments by position into the slots in `names`' order not given as name=value; an unknown name or a leftover throws. */
 function named(args, names) {
   const out = {};
-  let k = 0;
+  const rest = [];
   for (const arg of args) {
     const m = /^([a-z]+)=(.*)$/s.exec(arg);
-    if (m && names.includes(m[1])) out[m[1]] = m[2];
-    else out[names[k++]] = arg;
+    if (!m) rest.push(arg);
+    else if (names.includes(m[1])) out[m[1]] = m[2];
+    else throw new Error(`unknown argument ${m[1]}= (takes ${names.join(", ")})`);
   }
+  for (const name of names) if (!(name in out) && rest.length) out[name] = rest.shift();
+  if (rest.length) throw new Error(`extra arguments: ${rest.join(" ")} (takes ${names.join(", ")})`);
   return out;
 }
 
@@ -158,12 +161,16 @@ if (!isMainThread) {
   const a = named(tracing ? argv.slice(1) : argv, tracing ? ["game", "params", "every", "root"] : ["games", "params", "root"]);
   const root = resolve(a.root ?? dirname(dirname(dirname(HERE))));
   const params = JSON.parse(a.params ?? "{}");
+  if (params === null || typeof params !== "object" || Array.isArray(params))
+    throw new Error(`params "${a.params}" is not a JSON object (e.g. '{"owedBeg":0.3}')`);
   if (tracing) {
     const [w, nudge] = (a.game ?? "3:1").split(":").map(Number);
+    if (!Number.isInteger(w) || !Number.isInteger(nudge)) throw new Error(`game "${a.game}" is not W:N (e.g. 3:1)`);
     await trace(root, w, nudge, params, Number(a.every ?? 300));
   } else {
     const [ws, ns = "0"] = (a.games ?? "1-4x0-3").split("x");
     const jobs = list(ws).flatMap((w) => list(ns).map((nudge) => ({ root, w, nudge, params })));
+    if (!jobs.length) throw new Error(`no games in "${a.games}" (worlds x nudges, e.g. 1-4x0-3)`);
     const width = Math.max(1, Math.min(jobs.length, availableParallelism() - 1));
     const rows = [];
     const failed = [];
