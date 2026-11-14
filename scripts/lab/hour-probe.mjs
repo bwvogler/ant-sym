@@ -15,12 +15,15 @@
 // starved brood, and each chamber's food/brood by role; then where each worker that died of hunger was when it died
 // (out, tunnel, or its chamber's role).
 //
-// Usage, from the repo root:
-//   node scripts/lab/hour-probe.mjs [games=1-4x0-3] [params={}] [root=.]
-//   node scripts/lab/hour-probe.mjs trace W:N [params={}] [every=300] [root=.]
-//   games: worlds × nudges as ranges or lists (1-4x0-3, 3x1, 1,3x0-1). params: JSON merged into the colony's params
-//   (e.g. '{"owedBeg":0.3}'). root: another checkout to measure (its web/src/colony is imported, so the same probe
+// Usage (arguments in this order, each optional; any may also be written name=value, e.g. root=../other):
+//   node scripts/lab/hour-probe.mjs [games] [params] [root]
+//   node scripts/lab/hour-probe.mjs trace [game] [params] [every] [root]
+//   games: worlds × nudges as ranges or lists (default 1-4x0-3; 3x1, 1,3x0-1). game: W:N (default 3:1). params: JSON
+//   given to the colony's params (default {}; e.g. '{"owedBeg":0.3}'). every: seconds between trace lines (default
+//   300). root: the checkout to measure (default this script's; its web/src/colony is imported, so the same probe
 //   measures before and after a change; give the other checkout its own `npm --prefix web ci`).
+//   A game that fails (an older root missing an export, say) is named on stderr and counted on the last line, and the
+//   run exits 1.
 //
 // Measured with it (ja-097s): before #201 (64d4b62) peaks 0 0 3 6 0 0 1 2 5 19 6 2 11 9 2 4, nobody starved; after
 // (74a3d82) 0 0 0 0 0 0 9 1 0 83 0 2 5 9 2 4, world 3 nudge 1 collapsing (26 starved, population 41, 246 food stored).
@@ -35,6 +38,18 @@ const list = (s) =>
     const [a, b = a] = p.split("-").map(Number);
     return Array.from({ length: b - a + 1 }, (_, k) => a + k);
   });
+
+/** Arguments by position, in `names`' order, unless written name=value. */
+function named(args, names) {
+  const out = {};
+  let k = 0;
+  for (const arg of args) {
+    const m = /^([a-z]+)=(.*)$/s.exec(arg);
+    if (m && names.includes(m[1])) out[m[1]] = m[2];
+    else out[names[k++]] = arg;
+  }
+  return out;
+}
 
 /** Load the colony modules from a checkout's root. */
 async function colony(root) {
@@ -56,9 +71,8 @@ function setup(m, w, nudge, params) {
       total += v;
     }
   map.foodTotal = map.foodLeft = total;
-  const g = new m.Game(map, { antCount: 110, rival: false }, m.mulberry32(w * 7919 + nudge));
-  Object.assign(g.player.params, params);
-  return g;
+  // Through the constructor, so what the colony reads while it is built (maxAnts, antCount, channels…) takes them too.
+  return new m.Game(map, { antCount: 110, rival: false }, m.mulberry32(w * 7919 + nudge), { colony: params });
 }
 
 /** Larvae unfed over two minutes, as economy.test counts them. */
@@ -139,17 +153,20 @@ async function trace(root, w, nudge, params, every) {
 if (!isMainThread) {
   parentPort.postMessage(await oneGame(workerData));
 } else {
-  const args = process.argv.slice(2);
-  if (args[0] === "trace") {
-    const [w, nudge] = (args[1] ?? "3:1").split(":").map(Number);
-    await trace(resolve(args[4] ?? "."), w, nudge, JSON.parse(args[2] ?? "{}"), Number(args[3] ?? 300));
+  const argv = process.argv.slice(2);
+  const tracing = argv[0] === "trace";
+  const a = named(tracing ? argv.slice(1) : argv, tracing ? ["game", "params", "every", "root"] : ["games", "params", "root"]);
+  const root = resolve(a.root ?? dirname(dirname(dirname(HERE))));
+  const params = JSON.parse(a.params ?? "{}");
+  if (tracing) {
+    const [w, nudge] = (a.game ?? "3:1").split(":").map(Number);
+    await trace(root, w, nudge, params, Number(a.every ?? 300));
   } else {
-    const [ws, ns = "0"] = (args[0] ?? "1-4x0-3").split("x");
-    const params = JSON.parse(args[1] ?? "{}");
-    const root = resolve(args[2] ?? dirname(dirname(dirname(HERE))));
+    const [ws, ns = "0"] = (a.games ?? "1-4x0-3").split("x");
     const jobs = list(ws).flatMap((w) => list(ns).map((nudge) => ({ root, w, nudge, params })));
     const width = Math.max(1, Math.min(jobs.length, availableParallelism() - 1));
     const rows = [];
+    const failed = [];
     let next = 0;
     await new Promise((done) => {
       let running = 0;
@@ -162,7 +179,10 @@ if (!isMainThread) {
           rows.push(r);
           console.log(JSON.stringify(r));
         });
-        worker.on("error", (e) => console.error(`world ${job.w} nudge ${job.nudge}:`, e));
+        worker.on("error", (e) => {
+          failed.push(job);
+          console.error(`world ${job.w} nudge ${job.nudge} failed:`, e);
+        });
         worker.on("exit", () => {
           running--;
           launch();
@@ -170,10 +190,12 @@ if (!isMainThread) {
       };
       for (let k = 0; k < width; k++) launch();
     });
-    rows.sort((a, b) => a.w - b.w || a.nudge - b.nudge);
-    const max = Math.max(...rows.map((r) => r.stranded));
+    rows.sort((x, y) => x.w - y.w || x.nudge - y.nudge);
+    const max = rows.length ? Math.max(...rows.map((r) => r.stranded)) : "-";
+    const lowest = rows.length ? Math.min(...rows.map((r) => r.pop)) : "-";
     console.log(
-      `peaks (world-major): ${rows.map((r) => r.stranded).join(" ")} | over 8: ${rows.filter((r) => r.stranded > 8).length} | max ${max} | starved ${rows.reduce((s, r) => s + r.hungry, 0)} | lowest pop ${Math.min(...rows.map((r) => r.pop))}`,
+      `peaks (world-major): ${rows.map((r) => r.stranded).join(" ")} | over 8: ${rows.filter((r) => r.stranded > 8).length} | max ${max} | starved ${rows.reduce((s, r) => s + r.hungry, 0)} | lowest pop ${lowest}${failed.length ? ` | failed ${failed.length} of ${jobs.length}` : ""}`,
     );
+    if (failed.length) process.exitCode = 1;
   }
 }
