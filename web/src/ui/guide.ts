@@ -443,7 +443,13 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "desert-ant",
     title: "Desert ants",
     covers:
-      "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Planned (not built, PRD §60).",
+      "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Playable (PRD §60).",
+  },
+  {
+    note: "desert-heat",
+    title: "Desert heat",
+    covers:
+      "The desert ant's heat: its limit is its own body, and the sun's height seen at the entrance sets when the nest opens and closes; it forages under the high sun, comes home to cool, and stays in at a low sun and at night (PRD §60.5).",
   },
   {
     note: "lasius-neglectus",

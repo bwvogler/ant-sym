@@ -279,6 +279,9 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
   const picked = c.loosePicked;
   const down = c.looseDown;
   let onTop = 0;
+  // Spread pickups made on the top itself: an explorer that walks off the plateau may spread from its rim or beyond,
+  // a real flank (restFetch shifted one there: ant 2, 15 cells out, ja-4rfr), and the colony-wide counters count it.
+  let spreadOnTop = 0;
   for (let k = 0; k < Math.round(120 / DT); k++) {
     if (k % 15 === 0)
       for (let i = 0; i < 16; i++) {
@@ -289,7 +292,15 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
         c.mode[i] = EXPLORE;
       }
     flatten();
+    const held = Array.from({ length: 16 }, (_, i) => c.pellet[i]);
+    const loose = c.loosePicked - c.looseDown;
     g.tick(DT);
+    if (c.loosePicked - c.looseDown > loose)
+      for (let i = 0; i < 16; i++) {
+        if (held[i] || !c.pellet[i] || c.layer[i] !== PLANE) continue;
+        const [x, y] = cellOfAnt(c, i);
+        if (hexDistance(x, y, mid[0], mid[1]) < PLATEAU) spreadOnTop++;
+      }
     for (let i = 0; i < 16; i++) {
       if (c.layer[i] !== PLANE) continue;
       const [x, y] = cellOfAnt(c, i);
@@ -297,10 +308,10 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
     }
   }
   const fills = c.looseDown - down;
-  const spreads = c.loosePicked - picked - fills;
+  const spreads = spreadOnTop;
   assert.ok(onTop > 30000, `explorers walked the plateau (${onTop} ant-ticks)`);
   assert.ok(fills >= 3, `${fills} pellets taken off it to backfill: they were asking`);
-  assert.equal(spreads, 0, `${spreads} picked up to spread off a flat top`);
+  assert.equal(spreads, 0, `${spreads} picked up to spread off a flat top (${c.loosePicked - picked - fills} spread anywhere)`);
 });
 
 test("one world: a corpse the ant puts down at will (carry 'put down') goes on the midden only out on its ring; near its hole it lies there", () => {
