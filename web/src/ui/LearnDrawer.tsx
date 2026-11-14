@@ -126,11 +126,11 @@ export default function LearnDrawer(props: Props) {
       ref={panel}
       tabIndex={-1}
       role="dialog"
-      aria-label="Learn"
+      aria-label="Codex"
       className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
     >
       <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
-        <h2 className="font-semibold text-fg">Learn</h2>
+        <h2 className="font-semibold text-fg">Codex</h2>
         <div className="ml-2 flex overflow-hidden rounded-md border border-line text-sm" role="tablist">
           {TABS.map(([t, name]) => (
             <button
@@ -149,7 +149,7 @@ export default function LearnDrawer(props: Props) {
           type="button"
           className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
           onClick={closeLearn}
-          aria-label="Close Learn"
+          aria-label="Close the Codex"
         >
           Close
         </button>
@@ -220,7 +220,7 @@ function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
         className="self-start text-xs text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline"
         onClick={forgetSeen}
       >
-        Start the notebook afresh (lock every entry you have seen)
+        Start the notebook afresh (every entry you have seen locks again, from the next game)
       </button>
     </div>
   );
@@ -267,7 +267,7 @@ function Entry({ e, n, hot, fresh }: { e: GuideEntry; n: number; hot: boolean; f
           </span>
         )}
         <h3 className="font-serif text-[15px] font-medium text-fg">{e.title}</h3>
-        {fresh && <span className="ml-auto rounded-full bg-spore px-1.5 text-[10px] leading-4 text-white">new</span>}
+        {fresh && <span className="ml-auto rounded-full bg-spore px-1.5 text-[10px] leading-4 text-paper">new</span>}
       </div>
       <dl className="mt-2 flex flex-col gap-1.5 text-[13px] leading-snug">
         <Row k="On screen">{e.onScreen}</Row>

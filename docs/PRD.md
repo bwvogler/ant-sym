@@ -5799,18 +5799,19 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
     - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.
     - A host underground opens chambers, finding the way inside, the queen and brood.
     - Alarm where a host stands, at the field's own threshold, opens alarm.
-    - A host in a fight opens strangers and battles; a tired host opens tiredness and rest.
-    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`), one colony.
+    - A host meeting strangers (its own contact, `foes`: not the policy's fight mode, which a host may never take) opens strangers and battles; a tired host opens tiredness and rest.
+    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand), one colony.
+  - A dead host shows nothing: a dead slot keeps its load.
   - `codex.test` holds every guide entry in `UNLOCK`, so a new entry must say how it opens.
 - **What the player sees:**
   - one notice naming what opened together;
-  - a badge on the rail's Learn, cleared once the guide has been looked at;
+  - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
   - a "new" mark on those entries;
   - the count, "Seen 11 of 22".
 - **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
-- **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty). "Start the notebook afresh" locks everything again.
+- **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
 - **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
-- **Changed from the plan:** Learn keeps its name; the field guide inside it is the Codex. Renaming the drawer would touch every "Learn:" link for no gain in play.
+- **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)

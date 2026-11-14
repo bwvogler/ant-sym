@@ -1,4 +1,4 @@
-import { type Colony, CURTAIN, INFECTED, MODES, PLANE } from "../colony/index.ts";
+import { type Colony, CURTAIN, INFECTED, PLANE } from "../colony/index.ts";
 import { ALARM_FULL, ALARM_SHOWN } from "./lens.ts";
 
 // The Codex (PRD §69.4, ja-mvo9.3): the field guide's entries open as the player first sees what each is about, through
@@ -29,7 +29,7 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
   queen: { cue: "hostBelow", hint: "a host underground" },
   brood: { cue: "hostBelow", hint: "a host underground" },
   alarm: { cue: "alarm", hint: "alarm where a host is" },
-  strangers: { cue: "hostFighting", hint: "a host in a fight" },
+  strangers: { cue: "hostFighting", hint: "a host meeting strangers" },
   fatigue: { cue: "hostTired", hint: "a host tired out" },
   midden: { cue: "death", hint: "the first ant to die" },
   evolution: { cue: "mutation", hint: "your first mutation to keep" },
@@ -45,7 +45,6 @@ export function cues(colonies: readonly Colony[], g: { deaths: number; unityGap:
   if (g.deaths > 0) out.add("death");
   if (g.unityGap <= UNITY_SEEN) out.add("unity");
   if (g.mutations > 0) out.add("mutation");
-  const fight = MODES.indexOf("fight");
   for (const c of colonies) {
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.load[i]! < INFECTED) continue;
@@ -54,7 +53,9 @@ export function cues(colonies: readonly Colony[], g: { deaths: number; unityGap:
       if (c.carrying[i] === 1) out.add("hostCarrying");
       if (l === CURTAIN) out.add("hostBelow");
       else out.add("hostOut");
-      if (c.mode[i] === fight) out.add("hostFighting");
+      // Strangers met, whatever the ant's mode (its own contact, battle.ts: a raid or defence mode is the policy's, and the
+      // desert ant's rule never fights): review of #206, S1.
+      if (c.foes[i]! > 0) out.add("hostFighting");
       if (c.tired[i]) out.add("hostTired");
       // Alarm the field would show at the host's cell: a host senses its own cell, so it shows at full sight there.
       if (!out.has("alarm"))

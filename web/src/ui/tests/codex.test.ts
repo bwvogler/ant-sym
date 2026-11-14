@@ -52,6 +52,8 @@ test("a host's cues: where it is, what it carries, what it does, the alarm where
   c.putAnt(i, PLANE, centreX(h.px + 3, h.py), centreY(h.py));
   c.carrying[i] = 0;
   c.mode[i] = MODES.indexOf("fight");
+  assert.ok(!cues(g.colonies, calm).has("hostFighting"), "the policy's fight mode is not a fight (review of #206, S1)");
+  c.foes[i] = 1; // strangers met (battle.ts)
   c.tired[i] = 1;
   const out = cues(g.colonies, calm);
   for (const k of ["hostOut", "hostFighting", "hostTired"] as const) assert.ok(out.has(k), k);
@@ -61,6 +63,24 @@ test("a host's cues: where it is, what it carries, what it does, the alarm where
   other.set(c.cellX[i]!, c.cellY[i]!, 0.17);
   assert.ok(!cues(g.colonies, calm).has("alarm"), "under the field's threshold (0.18): not shown, not seen");
   other.set(c.cellX[i]!, c.cellY[i]!, 0.5);
+  assert.ok(cues(g.colonies, calm).has("alarm"));
+  other.set(c.cellX[i]!, c.cellY[i]!, 0);
+
+  // A dead host shows nothing: a dead slot keeps its load (review of #206, S2).
+  c.alive[i] = 0;
+  assert.deepEqual([...cues(g.colonies, calm)], ["start"]);
+});
+
+test("below, the alarm is the curtain's at the host's cell, not the plane's (review of #206, S2)", () => {
+  const g = buildGame({ species: "generic", seed: 3, antCount: 30, rival: true, generation: 0 });
+  const c = g.colonies[0]!;
+  const i = c.alive.indexOf(1);
+  c.load[i] = INFECTED;
+  assert.equal(c.layer[i], CURTAIN);
+  const [x, y] = [c.cellX[i]!, c.cellY[i]!];
+  g.colonies[1]!.layers[PLANE]!.ph.fields.alarm.set(x, y, 5);
+  assert.ok(!cues(g.colonies, calm).has("alarm"), "alarm on the plane at the same cell numbers: not where the host is");
+  g.colonies[1]!.layers[CURTAIN]!.ph.fields.alarm.set(x, y, 5);
   assert.ok(cues(g.colonies, calm).has("alarm"));
 });
 

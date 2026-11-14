@@ -937,12 +937,12 @@ try {
   const det = dp.getByRole("dialog", { name: "Details" });
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(
-    (await det.getByRole("button", { name: "Learn: trails" }).count()) === 0,
+    (await det.getByRole("button", { name: "Codex: trails" }).count()) === 0,
     "Details: no link to the trail entries it lacks (review of #144, S1)",
   );
   await det.getByRole("button", { name: "Close Details" }).click();
-  await dp.getByRole("button", { name: "Learn", exact: true }).click();
-  const learn = dp.getByRole("dialog", { name: "Learn" });
+  await dp.getByRole("button", { name: "Codex", exact: true }).click();
+  const learn = dp.getByRole("dialog", { name: "Codex" });
   await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });
   check(
     (await learn.getByRole("heading", { name: "Food trail", exact: true }).count()) === 0 &&
@@ -1108,7 +1108,7 @@ try {
   await lp.mouse.move(hole.x + 300, hole.y + 200);
   check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "pinned, it stays while the pointer wanders");
   await lensCard.getByRole("button", { name: "More on ink's hole" }).click();
-  await lp.getByRole("dialog", { name: "Learn" }).waitFor({ timeout: 3000 });
+  await lp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
   check((await lensCard.count()) === 0, "“more” opens the guide, and the card goes");
   await lp.keyboard.press("Escape");
   await lp.mouse.click(hole.x, hole.y);
@@ -1198,8 +1198,8 @@ try {
   await cp.getByLabel("world seed").fill(String(SEED));
   await cp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => cp.evaluate(() => window.jevAnts?.game.landed !== null), "a game for the Codex");
-  const learnBtn = cp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Learn", exact: true });
-  const guide = cp.getByRole("dialog", { name: "Learn" });
+  const learnBtn = cp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true });
+  const guide = cp.getByRole("dialog", { name: "Codex" });
   const locked = (title) => guide.getByRole("region", { name: `${title}, not yet seen` });
   await learnBtn.click();
   await guide.waitFor({ timeout: 3000 });
@@ -1208,7 +1208,7 @@ try {
     (await locked("The fungus").count()) === 0 && (await guide.getByRole("heading", { name: "The fungus", exact: true }).count()) === 1,
     "the fungus's own entry is open from the start",
   );
-  await guide.getByRole("button", { name: "Close Learn" }).click();
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
   // The first host: Jobs by age opens, with a notice and the rail's badge.
   await cp.evaluate(() => {
     const c = window.jevAnts.game.colonies[0];
@@ -1222,14 +1222,27 @@ try {
   );
   await until(
     async () => /new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""),
-    "the rail's Learn carries a badge",
+    "the rail's Codex carries a badge",
     2000,
     50,
   );
-  check(true, "the rail's Learn carries a badge");
+  check(true, "the rail's Codex carries a badge");
+  // A first host opens Jobs by age with the entries for where it stands: one notice names them together (review of #206,
+  // S3). A cue that shows half a second later gets its own notice, so count the names in the one that has Jobs by age.
+  const jobsNotice =
+    (await cp
+      .getByText(/^New in the field guide: .*Jobs by age/)
+      .first()
+      .textContent()) ?? "";
+  check(/ and /.test(jobsNotice), `one notice for everything that opened together (${jobsNotice.slice(0, 90)})`);
   await learnBtn.click();
   await guide.waitFor({ timeout: 3000 });
   check((await locked("Jobs by age").count()) === 0, "Jobs by age is open now");
+  check(
+    (await guide.getByRole("region", { name: "Jobs by age, not yet seen" }).count()) === 0 &&
+      (await guide.locator("#learn-jobs").getByText("new", { exact: true }).count()) === 1,
+    "and marked new (N6)",
+  );
   check(!/new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""), "looked at: the badge goes");
   // Read it anyway, and show every entry.
   await locked("Alarm").getByRole("button", { name: "Read it anyway" }).click();
@@ -1238,15 +1251,15 @@ try {
   await guide.getByLabel("Show every entry").check();
   check((await guide.getByRole("region", { name: /not yet seen$/ }).count()) === 0, "Show every entry opens them all");
   await guide.getByLabel("Show every entry").uncheck();
-  await guide.getByRole("button", { name: "Close Learn" }).click();
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
   // A link straight to an entry opens it, seen or not.
   await cp.locator("canvas").first().focus();
   await cp.keyboard.press("Control+k");
-  await cp.keyboard.type("learn tiredness");
+  await cp.keyboard.type("codex tiredness");
   await cp.keyboard.press("Enter");
   await guide.waitFor({ timeout: 3000 });
-  check((await locked("Tiredness and rest").count()) === 0, "the palette's Learn: Tiredness and rest opens it though not yet seen");
-  await guide.getByRole("button", { name: "Close Learn" }).click();
+  check((await locked("Tiredness and rest").count()) === 0, "the palette's Codex: Tiredness and rest opens it though not yet seen");
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
   // The notebook outlives the page.
   await cp.reload();
   await cp.getByRole("button", { name: "Start", exact: true }).click();
@@ -1256,6 +1269,27 @@ try {
     (await locked("Jobs by age").count()) === 0 && (await locked("Tiredness and rest").count()) === 1,
     "after a reload: Jobs by age still seen, Tiredness and rest not",
   );
+  // Show every entry outlives the page too (N6).
+  await guide.getByLabel("Show every entry").check();
+  await cp.reload();
+  await cp.getByRole("button", { name: "Start", exact: true }).click();
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check(
+    (await guide.getByLabel("Show every entry").isChecked()) && (await locked("Tiredness and rest").count()) === 0,
+    "Show every entry, kept after a reload",
+  );
+  await guide.getByLabel("Show every entry").uncheck();
+  // Starting afresh locks what was seen, and keeps it locked through this game though a host is there now (N3, N6).
+  await cp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[0];
+    c.load[c.alive.indexOf(1)] = 1;
+  });
+  await until(async () => (await locked("Jobs by age").count()) === 0, "a host: Jobs by age open", 3000, 50);
+  await guide.getByRole("button", { name: /^Start the notebook afresh/ }).click();
+  check((await locked("Jobs by age").count()) === 1, "started afresh: Jobs by age is locked again");
+  await cp.waitForTimeout(1200);
+  check((await locked("Jobs by age").count()) === 1, "and stays locked through this game, though a host is there");
   await cctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

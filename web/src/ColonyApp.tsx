@@ -86,7 +86,7 @@ const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 /** A dialog that has the page: the game's keys wait while one is open (the palette's key still works). */
 const BLOCKING = [
   '[aria-modal="true"]',
-  ...["Details", "Learn", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`),
+  ...["Details", "Codex", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`),
 ].join(", ");
 
 export default function ColonyApp() {
@@ -462,7 +462,7 @@ export default function ColonyApp() {
           ["settings", "Settings", "trails passphrase"],
         ] as const
       ).map(([d, label, words]) => ({ id: `drawer-${d}`, label, group: "Panels", words, run: () => setDrawer(d) })),
-      { id: "learn", label: "Learn: the field guide", group: "Panels", words: "help guide", run: () => openLearn({ tab: "guide" }) },
+      { id: "learn", label: "Codex: the field guide", group: "Panels", words: "help guide learn", run: () => openLearn({ tab: "guide" }) },
       {
         id: "lab",
         label: "Lab and numbers",
@@ -481,8 +481,9 @@ export default function ColonyApp() {
       { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
       ...guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => ({
         id: `learn-${e.id}`,
-        label: `Learn: ${e.title}`,
-        group: "Learn",
+        label: `Codex: ${e.title}`,
+        group: "Codex",
+        words: "learn guide",
         run: () => openLearn({ tab: "guide", id: e.id }),
       })),
     ].map((c) => ({ ...c, run: () => (clearProbe(), c.run()) }));
@@ -604,7 +605,7 @@ export default function ColonyApp() {
         </div>
       </div>
 
-      {/* The rail: each drawer, Learn, Settings. A tab bar along the bottom on a phone. */}
+      {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. */}
       <nav
         aria-label="panels"
         className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:flex-col sm:gap-1 ${FLOAT}`}
@@ -622,9 +623,9 @@ export default function ColonyApp() {
         <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
         <IconButton
           icon="learn"
-          label="Learn"
+          label="Codex"
           badge={codex.fresh.length || undefined}
-          badgeLabel="new in the field guide"
+          badgeLabel={`${codex.fresh.length} new in the field guide`}
           onClick={() => openLearn({ tab: "guide" })}
         />
         <IconButton

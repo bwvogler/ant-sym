@@ -23,9 +23,11 @@ interface CodexState {
   fresh: readonly string[];
   /** the player's "show every entry" */
   all: boolean;
+  /** the notebook was started afresh during a game: the watch waits for the next game (review of #206, N3) */
+  held: boolean;
 }
 
-let state: CodexState = { seen: loadSeen(storage), fresh: [], all: loadAll(storage) };
+let state: CodexState = { seen: loadSeen(storage), fresh: [], all: loadAll(storage), held: false };
 const listeners = new Set<() => void>();
 function set(s: CodexState): void {
   state = s;
@@ -49,10 +51,13 @@ export const setShowAll = (all: boolean): void => {
   saveAll(storage, all);
   set({ ...state, all });
 };
-/** Start the notebook afresh: every entry but the starting ones is locked again. */
+/**
+ * Start the notebook afresh: every entry but the starting ones is locked again, and stays so till the next game (else the
+ * cues showing now would open their entries again at once).
+ */
 export const forgetSeen = (): void => {
   saveSeen(storage, new Set());
-  set({ ...state, seen: new Set(), fresh: [] });
+  set({ ...state, seen: new Set(), fresh: [], held: true });
 };
 
 /** How often the watch reads the game, in milliseconds of the page's time. */
@@ -69,27 +74,30 @@ export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => voi
     now.current = stats;
   }, [stats]);
   useEffect(() => {
+    if (state.held) set({ ...state, held: false }); // a new game: the watch reads again
     let last = -Infinity;
     const ids = guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => e.id);
     const titles = new Map(guideFor(() => true).map((e) => [e.id, e.title]));
     return onFrame(() => {
       const t = performance.now();
-      if (t - last < EVERY_MS) return;
+      if (t - last < EVERY_MS || state.held) return;
       last = t;
       const st = now.current;
       const g = {
         deaths: st ? st.sides.reduce((n, s) => n + s.losses, 0) : 0,
-        unityGap: st?.unity.gap ?? 1,
+        // Unity's gap is 0 once fewer than two colonies stand (Game.unity): a wipe-out is not the odours drawing together (N4).
+        unityGap: st && st.sides.filter((s) => s.population > 0).length >= 2 ? st.unity.gap : 1,
         mutations: st?.evolution?.mutations ?? 0,
       };
       const open = newlyOpen(ids, state.seen, cues(game.colonies, g));
       if (!open.length) return;
-      const seen = new Set([...state.seen, ...open]);
+      // With what another tab has saved since (N5): each tab adds to the notebook, none overwrites it.
+      const seen = new Set([...loadSeen(storage), ...state.seen, ...open]);
       saveSeen(storage, seen);
       const told = open.filter((id) => (UNLOCK[id]?.cue ?? "start") !== "start");
       set({ ...state, seen, fresh: [...state.fresh, ...told] });
       // One notice for what opened together (one cue often opens several entries).
-      if (told.length) pushToast(`New in the field guide: ${listed(told.map((id) => titles.get(id) ?? id))}. Learn has it.`, "good");
+      if (told.length) pushToast(`New in the field guide: ${listed(told.map((id) => titles.get(id) ?? id))}. The Codex has it.`, "good");
     });
   }, [game, onFrame]);
 }

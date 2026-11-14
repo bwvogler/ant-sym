@@ -1842,7 +1842,7 @@ export default function ColonyField({
                 className={labels ? `${item} text-accent` : item}
                 aria-pressed={labels}
                 onClick={() => setLabels((on) => !on)}
-                title="Name each chamber by its role; click a chamber to inspect it in Learn"
+                title="Name each chamber by its role; click a chamber to inspect it in the Codex"
               >
                 {labels ? "✓ " : ""}Chamber labels
               </button>
