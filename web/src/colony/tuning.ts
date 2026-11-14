@@ -86,7 +86,7 @@ export const WAIT_RIM = 0.9;
  */
 export const WAIT_STEPS = 3;
 
-/** #mill's scratch: the ways open from a cell (no allocation per step) */
+/** mill's scratch: the ways open from a cell (no allocation per step) */
 export const MILL_WAYS = new Int8Array(6);
 
 // The queen and brood (nest slice 4): see nestLife, nurse. Food per worker is EGG_FOOD + LARVA_FOOD = foodPerAnt (4).
@@ -109,7 +109,7 @@ export const CROWN_RATE = 0.05;
 /** Food a larva takes per second with two nurses or more by it. */
 export const FEED_RATE = 0.5;
 
-// The midden (nest slice 7): see #undertake, #dropOut, #middenSmell.
+// The midden (nest slice 7): see undertake, dropOut, middenSmell.
 /** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
 export const PICK_CORPSE = 1;
 
@@ -138,7 +138,7 @@ export const MIDDEN_AVOID = 1.5;
 /**
  * A raider on the ground turns back from a cell of the rival's midden with chance 1 − exp(−mark / MIDDEN_SCALE), times
  * MIDDEN_CROWD / (its own colony's ants within two cells, itself included) once they are more than MIDDEN_CROWD: a scout
- * or a handful shies, a raid in force presses on (see #middenTurn).
+ * or a handful shies, a raid in force presses on (see middenTurn).
  */
 export const MIDDEN_SCALE = 5;
 
@@ -156,7 +156,7 @@ export const PICK_BROOD = 0.5;
 /** Seconds a nurse holds brood before it puts it down wherever it is; a porter, its food, in whichever of its chambers it is by. */
 export const HOLD_MAX = 30;
 
-/** A forager's food goes to reception only once it is a chamber of this many cells (see #foodTo); until then, to the royal chamber. */
+/** A forager's food goes to reception only once it is a chamber of this many cells (see foodTo); until then, to the royal chamber. */
 export const RECEPTION_MIN = 4;
 
 /**

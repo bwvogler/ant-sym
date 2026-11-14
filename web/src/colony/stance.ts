@@ -4,7 +4,7 @@ import type { Colony } from "./colony.ts";
 import { carryOut, holdsAt } from "./crossing.ts";
 import { putDown } from "./dig.ts";
 import { SOIL_FILL } from "./grid.ts";
-import { fromHomePlane } from "./homing.ts";
+import { homeDistPlane } from "./homing.ts";
 import { localResponses } from "./responses.ts";
 import { raidLevel, raidSmelt, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
@@ -35,13 +35,14 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
     if (col.reporting[i] === 1 && col.line === null && col.atNestTop(i)) col.reporting[i] = 0;
   }
   // Defence is the ant's own (docs/stance.md): alarm smelt or strangers in reach raise its threat, which fades; past defendAt,
-  // on home ground (within homeGround of its hole as its own drifting vector has it: fromHomePlane, ja-k4k.6.2), it
-  // defends. Far out, it forages as before. (Where no vector is kept, as on the open maps, the vector is the hole.)
+  // on home ground (within homeGround of its hole as it knows it: by sight where it sees the hole, else by its own
+  // drifting vector; homeDistPlane, ja-k4k.6.2), it defends. Far out, it forages as before. (Where no vector is kept, as
+  // on the open maps, the vector is the hole.)
   if (sgate) {
     const felt = toEnemy !== null || col.alarmSmelt !== "none";
     const th = col.threat[i] * threatLeak + (felt ? dt : 0);
     col.threat[i] = th;
-    col.defending[i] = th >= p.defendAt && fromHomePlane(col, i) <= p.homeGround ? 1 : 0;
+    col.defending[i] = th >= p.defendAt && homeDistPlane(col, i) <= p.homeGround ? 1 : 0;
   }
   // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
   // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home

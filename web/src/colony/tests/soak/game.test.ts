@@ -355,7 +355,10 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   };
   assert.equal(threatened(8), "defend", "near home");
   assert.equal(threatened(34), "forage", "far out");
-  assert.equal(threatened(8, 30), "forage", "by the hole, but its vector says home is 30 cells off");
+  // By sight where it sees its hole, else by its vector (ja-k4k.6.2, review of #180 S1).
+  assert.equal(threatened(8, 30), "defend", "it sees its hole: its vector doesn't matter");
+  assert.equal(threatened(13, 0), "defend", "out of sight, inside home ground by its vector");
+  assert.equal(threatened(13, 30), "forage", "out of sight, its vector says home is 30 cells off");
   // The colony's own stance is not read: a defend broadcast makes no one defend (review of #53, N2).
   const b = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(14));
   b.stance = "defend";
