@@ -178,8 +178,8 @@ export interface ColonyParams {
   heatStart: number;
   /**
    * The invitation (ja-rf5.6, docs/desert-ant.md §1, Razin et al. 2013, full text): the pace (cm/s) of a finder coming down the shaft with food.
-   * Each nestmate waiting at the top of the shaft that it passes is pulled toward its pace, the pull shared by how crowded the shaft feels; an
-   * ant's pace relaxes to paceRest, and its own pace is what its `leave` response reads (returns few from paceFew, many from paceMany). 0 = no
+   * Each nestmate waiting at the top of the shaft that it passes is pulled toward its pace; an ant's pace relaxes to paceRest, the faster the
+   * more crowded the shaft feels, and its own pace is what its `leave` response reads (returns few from paceFew, many from paceMany). 0 = no
    * invitation: the generic ant's encounter count of returns (activation.md), main bit for bit.
    */
   invitePace: number;
@@ -187,8 +187,10 @@ export interface ColonyParams {
   paceRest: number;
   /** seconds for a pace to fall back by e toward paceRest */
   paceTau: number;
-  /** how far one finder passing pulls a waiting ant's pace toward its own (0–1), before the crowd shares it */
+  /** how far one finder passing pulls a waiting ant's pace toward its own (0–1) */
   paceGain: number;
+  /** how much each nestmate round a waiting ant speeds its pace's fall back to rest: paceTau / (1 + paceCrowd × crowd) (crowding lowers exits) */
+  paceCrowd: number;
   /** the pace from which an ant's leave response reads its returns as few (cm/s) */
   paceFew: number;
   /** the pace from which it reads them as many: the soft threshold for leaving, about 8 cm/s (Razin 2013) */
@@ -358,6 +360,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   paceRest: 1,
   paceTau: 20,
   paceGain: 0.5,
+  paceCrowd: 0.25,
   paceFew: 4,
   paceMany: 8,
   heatDeath: 53.6,

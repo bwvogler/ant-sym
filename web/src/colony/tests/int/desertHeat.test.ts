@@ -55,7 +55,7 @@ const desert = (over: Partial<ColonyParams> = {}): Game =>
 
 test("a desert ant sees the sun high only where the sky is in view: out on the plane or at the top of its own shaft", () => {
   const g = desert();
-  run(g, 150); // the high sun of the morning: ants out on the plane
+  run(g, 80); // the high sun of the morning: ants out on the plane (by noon they come in to cool)
   const c = g.player;
   (c.params as { heatSunHigh: number }).heatSunHigh = 0.1; // the sun counts as high from here, for the sense alone
   assert.ok(sunHigh(c.params, c.time), "the test's own check");
@@ -97,7 +97,7 @@ test("the local rule sends a hot ant home, whatever else it senses (review of #1
 });
 
 test("heat kills an ant past its critical heat, and it is counted", () => {
-  const g = desert({ heatNoon: 70 }); // a scorching noon, under which the desert ant still goes out
+  const g = desert({ heatNoon: 70, heatFelt: 60, heatCool: 50 }); // a scorching noon, and an ant that feels hot only past its death: it stays out
   run(g, P.heatDay / 2);
   assert.ok(g.player.diedHot > 0, `died of heat: ${g.player.diedHot}`);
 });

@@ -1,4 +1,5 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
+import { leaveRate, paceAfter, paceReturns } from "./invite.ts";
 import { dayPhase, sunHigh } from "./heat.ts";
 import { holdsAt } from "./crossing.ts";
 import { DESERT_ANT } from "./desertAnt.ts";
@@ -21,7 +22,7 @@ import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import type { Journal } from "./journal.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
-import { localResponses, responses, type Responses } from "./responses.ts";
+import { localResponses, responses, type Responses, type Touch } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
 import { encode } from "./save.ts";
 import {
@@ -2497,6 +2498,89 @@ export const desertInvitation: Assay = {
   score: () => ({}),
 };
 
+/** D2c's group sizes: Razin's entrance chambers held 2–13 ants. */
+export const CHAMBER_SIZES = [2, 4, 8, 13] as const;
+
+/**
+ * Razin's chamber, staged (ja-rf5.6): `n` ants waiting at the top of the shaft, at rest; for D2_WINDOW seconds no finder comes (spontaneous
+ * leaving), then one finder comes down past them and the next D2_WINDOW seconds are counted. The same rule as the game (invite.ts: the pace a
+ * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. An ant that leaves is gone for the trial.
+ */
+export function invitationChamber(
+  p: ColonyParams,
+  leave: Responses["leave"],
+  n: number,
+  trials: number,
+  rng: () => number,
+): { before: number; after: number; expBefore: number; expAfter: number } {
+  const dt = 1 / 30;
+  const steps = Math.round(D2_WINDOW / dt);
+  let before = 0;
+  let after = 0;
+  let expBefore = 0;
+  let expAfter = 0;
+  const pace = new Float64Array(n);
+  const waiting = new Uint8Array(n);
+  for (let k = 0; k < trials; k++) {
+    pace.fill(p.paceRest);
+    waiting.fill(1);
+    for (let step = 0; step < 2 * steps; step++) {
+      const second = step >= steps;
+      const left = waiting.reduce((a, w) => a + w, 0);
+      for (let i = 0; i < n; i++) {
+        if (!waiting[i]) continue;
+        pace[i] = paceAfter(p, pace[i]!, step === steps ? 1 : 0, left - 1, dt);
+        if (second) expAfter += dt;
+        else expBefore += dt;
+        const answer = leave({ returns: paceReturns(p, pace[i]!) } as Touch);
+        if (rng() < 1 - Math.exp(-leaveRate(p, answer) * dt)) {
+          waiting[i] = 0;
+          if (second) after++;
+          else before++;
+        }
+      }
+    }
+  }
+  return { before, after, expBefore, expAfter };
+}
+
+/**
+ * D2c — the invitation, staged as Razin's chamber (ja-rf5.6; Razin, Eckmann & Feinerman 2013, full text, C. niger: a recruiter's entry raised
+ * the idle ants leaving in the next minute sevenfold, in nests of 4–8; more ants in the nest lowered exits). For each group size in
+ * CHAMBER_SIZES, 400 trials (invitationChamber) on the colony's own rule and params: the leaving rate in the 10 s after a finder comes down
+ * against the 10 s before. Pass: at least 7× for groups of 4 and 8, and the rate after a finder lower in a group of 13 than of 4 (crowding).
+ * The game's own measure, D2, stays beside it (noisy: few isolated returns in a game).
+ */
+export const desertChamber: Assay = {
+  id: "d2c",
+  title: "D2c the invitation, staged as Razin's chamber: one finder, groups of 2–13 waiting",
+  target: "leaving ≥ 7× after a finder for groups of 4 and 8; lower after-rate at 13 than at 4 (Razin 2013, full text)",
+  seconds: 0.1,
+  spec: (seed) => {
+    const spec = desertSpec(seed, {
+      tick() {},
+      summary(game) {
+        const c = game.player;
+        const rng = mulberry32(seed * 7919 + 17);
+        const out: Record<string, number> = {};
+        const rateAfter: Record<number, number> = {};
+        for (const n of CHAMBER_SIZES) {
+          const r = invitationChamber(c.params, c.responses.leave, n, 400, rng);
+          const ra = r.after / r.expAfter;
+          const rb = r.before / r.expBefore;
+          rateAfter[n] = ra;
+          out[`ratio${n}`] = rb > 0 ? ra / rb : ra > 0 ? Infinity : NaN;
+          out[`after${n}`] = ra;
+        }
+        const pass = out.ratio4! >= 7 && out.ratio8! >= 7 && rateAfter[13]! < rateAfter[4]! ? 1 : 0;
+        return { ...out, pass };
+      },
+    });
+    return { ...spec, seconds: 0.1, game: { ...spec.game, species: DESERT_ANT } };
+  },
+  score: () => ({}),
+};
+
 /**
  * D3 — the first find. With no pass mark of its own: the plume (ja-rf5.4) is to bring it sooner than the same seed's blind search
  * (`colony: { foodPlume: 0 }`), as tests/slow/assays.test.ts checks with the desert ant. The first finder is otherwise blind whatever the
@@ -2708,6 +2792,7 @@ export const ONE_ASSAYS: Assay[] = [
   route1,
   desertNoTrail,
   desertInvitation,
+  desertChamber,
   desertFirstFind,
   desertTrips,
   desertHeat,

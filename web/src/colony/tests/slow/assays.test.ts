@@ -115,7 +115,11 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
   }
 });
 
-test("D2 a returning finder invites nestmates out", { todo: "ja-rf5.6: the invitation (speed passed on by contact)" }, () => {
-  const m = runAssay(desertInvitation, 1).metrics;
-  assert.equal(m.pass, 1, `ratio ${m.ratio}`);
-});
+test(
+  "D2 a returning finder invites nestmates out (in the game: reported; the gate is D2c, the staged chamber, tests/int/desertInvite)",
+  { todo: "ja-rf5.6: few isolated returns a game, so it swings (median 7.2x, pass 5/10)" },
+  () => {
+    const m = runAssay(desertInvitation, 1).metrics;
+    assert.equal(m.pass, 1, `ratio ${m.ratio}`);
+  },
+);

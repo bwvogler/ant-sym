@@ -117,6 +117,13 @@ export const DESERT_ANT: Species = {
     heatTau: 30,
     heatFelt: 45,
     heatSunHigh: 0.2,
+    // The invitation (ja-rf5.6, PRD §60.6; Razin, Eckmann & Feinerman 2013, full text, C. niger): a finder coming down the shaft at 12 cm/s pulls
+    // each nestmate waiting at the top 40 % of the way to its pace, and a crowd damps it back (paceCrowd); its own pace is what it leaves by
+    // (the leave response below). Staged as Razin's chamber (D2c, seeds 1–20): at least 11× more leaving after a finder in a group of 4 and 8×
+    // in 8 (sevenfold in the paper's nests of 4–8), and half the rate in 13 as in 4 (fewer exits as density rises). 0.5 cost D5 2 seeds. paceGain and paceCrowd are design; 8 cm/s and the pace at rest are the paper's.
+    invitePace: 12,
+    paceGain: 0.4,
+    paceCrowd: 0.25,
   },
   // Its channel set already keeps it from laying trail or alarm (review of #138: overriding those responses changed nothing). What differs is
   // contact: between Cataglyphis colonies aggression is at its maximum (C. iberica, C. niger: desert-ant.md §5, unverified), so an ant with
