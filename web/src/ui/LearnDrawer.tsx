@@ -166,7 +166,7 @@ export default function LearnDrawer(props: Props) {
 function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
   // A species that lays no trail of a kind doesn't see the entries about it (owner, ja-rf5.11): its colonies' scent says which it lays.
   const ph = game.player.ph;
-  const entries = guideFor((c) => ph.has(c));
+  const entries = guideFor((c) => ph.has(c), game.params.species.id);
   const note = guideNote((c) => ph.has(c), game.params.species.name);
   return (
     <div className="flex flex-col gap-3">

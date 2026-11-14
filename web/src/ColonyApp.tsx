@@ -13,6 +13,8 @@ import {
   CELL,
   cellOf,
   GENERIC_ANT,
+  groundHeat,
+  sunSeen,
 } from "./colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -413,6 +415,17 @@ export default function ColonyApp() {
           <span className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" title="sim time">
             {clock(stats?.time ?? 0)}
           </span>
+          {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
+          {game.player.params.heatDay > 0 && (
+            <span
+              className="flex items-center gap-1 px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden"
+              aria-label="sun"
+              title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
+            >
+              sun {sunSeen(game.player.params, stats?.time ?? 0)} · {groundHeat(game.player.params, stats?.time ?? 0).toFixed(0)} °C
+              <Help to={{ tab: "guide", id: "desert-ant" }} label="the desert ant" />
+            </span>
+          )}
           {slow && stats && (
             <span
               className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
