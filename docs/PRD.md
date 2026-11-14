@@ -5658,3 +5658,48 @@ They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the 
 - **Carrying the camera:** a followed ant that goes through a hole now asks the field to keep the follow (`centreOn` `keepFollow`). Before, a crossing could re-centre the view still shown and drop the follow.
 - **Unchanged:** the simulation; the golden masters are bit-exact.
 
+
+## 72. Young ants keep to the brood by its odour, not the queen's position (design, ja-k4k.15, 2026-11-14)
+
+**Research basis:** [brood-odour.md](brood-odour.md).
+- **Ant queen pheromones are mostly non-volatile contact signals,** fertility signals that suppress workers' laying (Holman et al. 2010, *Lasius niger*). A queen volatile attracts workers only in the fire ant, with no measured range (Lofgren et al. 1983, **unverified**); the pharaoh ant's is weak (Oliveira et al. 2020).
+- **Workers go toward air from larvae** (Glancey & Dickens 1988, *S. invicta*, **unverified**), and the young answer brood cues more than the old (Kohlmeier et al. 2018).
+- **The brood pile holds nurses.** Care follows how far a worker's zone overlaps the brood (Sendova-Franks & Franks 1995, **unverified**). Climate, not odour, sets where brood should lie.
+
+**The problem (measured).** A young ant in a chamber turns toward the queen's exact x,y (`steer.ts`; gap row "Steering in a chamber: to the queen", `ja-k4k.2.1`). PR #192 replaced it with a climb of floor marks every ant lays. Over 20 seeds of `economy.test`'s setup (world 1 n = 1–7, 9–12; world 2 n = 0, 2–9):
+
+| `economy.test` setup, 20 seeds | collapses | worst stranded | seeds over 5 |
+|---|---|---|---|
+| `BROOD_MIN` alone | 0 | 10 | 2 |
+| `BROOD_MIN` + #192's royal-mark climb | 1 (5 workers, all old) | 25 | 4 |
+
+#192 also failed `side.test` #16's guard: rival held foragers 3 against a bound of 2.
+- The royal and brood marks summed failed `chambers.test`: game 6's floor growth was ×1.25 against a bound of ×1.5.
+
+**Decisions.**
+- **The cue is brood odour** (owner, 2026-11-14), chosen over the queen's carried scent and a queen volatile.
+- **The queen's carried scent stays as built** (`ja-lo8.9`), for caste, not steering (proposed).
+- **First build only band-0 ants, as today's zoning** (proposed). Age-graded thresholds go to `ja-k4k.1`.
+
+**The mechanic.** Brood items lay a short-range `broodOdour` field on their cells: fast evaporation, a little diffusion, about two or three cells of reach (**design**). A young ant in a chamber climbs it at its three antennae through open ground, and searches where it smells none.
+- **Off:** `broodClimb` 0 keeps the queen's x,y, main bit for bit.
+- **Retires:** the queen's x,y read (`ja-k4k.2.1`), and #192's royal-mark climb.
+
+**Play.** The youngest ants gather on the brood piles rather than ringing the queen. There is no new player lever: a fungus lever on brood-odour perception is an open design question (`ja-k4k.15.4`). No Jev cost.
+
+**Assays and targets.**
+- A new nurse-zone assay (`ja-k4k.15.1`) lands first with no behaviour change. It measures underground ants' mean distance to the nearest brood item by band, and to the queen. Target: the young nearer the brood than the middle-aged, by at least main's margin, on seeds 1–10 by the worst seed and confirmed on 11–20.
+- **Guards:**
+  - `economy.test`'s setup over 20 seeds no worse than main: no collapse, seeds over 5 no more than main's.
+  - `chambers.test`, `side.test` and `economy.test` in `slow.yml`.
+  - The side `game` assay.
+
+**Cost (estimated).** Steering only: no new situation field, $0 an hour. One deposit per brood item and three reads per young ant in a chamber; the bench target is under 2% of the side-view tick.
+
+**Beads.** `ja-k4k.15` (this):
+- `ja-k4k.15.1`: the assay.
+- `ja-k4k.15.2`: the field, off by default.
+- `ja-k4k.15.3`: the climb, which depends on .1 and .2; `ja-k4k.2.1` closes with it.
+- `ja-k4k.15.4`: the fungus lever question, P4.
+
+**Still open.** The field's reach and rates (design). Whether nurses should drop brood where the odour is strongest (piles by positive feedback; `ja-k4k.4`). A fire-ant-like queen volatile as a species option. #192's branch carries this plan; its code is replaced at `ja-k4k.15.3`.
