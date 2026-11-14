@@ -5491,3 +5491,23 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 - The largest share of ants switching mode within one second did not fall (22–41 % either way): that metric is driven by events (alarm, trails meeting), not by lockstep answers alone. A better lockstep measure is open.
 
 **Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.
+
+## S2. Staging only: measuring lockstep (ja-0kys, 2026-11-14)
+
+**What.** `lockstepProbe` (experiment.ts), sampled each second over the ants in the mode their policy chose (carriers left out): `lockAgree`, the share of ants in their situation's commonest mode (1 = every ant in a situation does the same); `lockSwing`, how far the colony's mode mix moves second to second (total variation); `lockBurst`, the Fano factor of mode switches a second (about 1 when ants switch independently); `switchesPerS`. The one-world assay `lockstep` reports them; `--policy precache:<doctrine>` plays the shipped mode answers for both colonies, and `--set both.<param>` sets a parameter on both.
+
+**Measured** (`npm run exp -- lockstep --one --seeds 1-5 --policy precache:<d> --set both.sampleTemp=0,0.5,1`; one world, 300 + 300 ants, 300 s; the first colony, median of seeds 1–5):
+
+| | Food | Lost | lockAgree | lockSwing | lockBurst | Switches/s |
+|---|---|---|---|---|---|---|
+| Local rule | 1,162 | 11 | 1.00 | 0.02 | 5.43 | 32 |
+| Forage, Jev's choice (T 0) | 1,156 | 11 | 1.00 | 0.02 | 1.61 | 35 |
+| Forage, T 0.5 | 826 | 9 | 0.98 | 0.03 | 1.84 | 43 |
+| Forage, T 1 | 702 | 9 | 0.90 | 0.02 | 2.50 | 48 |
+| Warlike, T 0 | 963 | 29 | 1.00 | 0.02 | 2.03 | 31 |
+| Warlike, T 0.5 | 1,027 | 11 | 0.95 | 0.03 | 2.81 | 39 |
+| Warlike, T 1 | 622 | 4 | 0.89 | 0.03 | 2.03 | 55 |
+
+- **Drawing does what it says, within a situation:** agreement falls from 1.00 to 0.89–0.90 at T 1.
+- **The colony as a whole does not swing.** Its mode mix moves 2–3 % a second whatever the policy, and switching is moderately bunched (Fano 1.6–5.4, wide across seeds) under every policy, the local rule included: bursts come from events (alarm, finds, trails meeting), not from shared answers. What reads as "flipping between a few big states" is more likely the four coarse modes themselves than ants switching together.
+- **Only 21–32 % of mode decisions met a shipped answer** offline (`Jev's answers (cache hits)`); the rest played the local rule, which never draws. The bundles hold the 151 situations one top-down live check met; one world meets more. On the page those misses are asked live, so play there is more Jev's than these runs. A one-world live check (`colony-live`) would ship more situations and make these runs closer to play: an owner's call on spend.
