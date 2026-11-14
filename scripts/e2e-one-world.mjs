@@ -646,14 +646,43 @@ try {
   console.log("5b. the aim bar");
   {
     const aims = page.getByRole("textbox", { name: "aim", exact: true });
-    const visible = await aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
-    check(visible === 1, `one aim on screen at 1280 px (${visible})`);
+    const shown = () => aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
+    check((await shown()) === 1, `one aim on screen at 1280 px (${await shown()})`);
+    // The fungus drawer open: still only the bar's (the drawer's copy is for narrower screens), and the drawer says
+    // why the aim is locked, the reason the bar keeps in its "locked" tooltip.
+    const fungusTab = page.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true });
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    check((await shown()) === 1, `one aim on screen at 1280 px with The fungus drawer open (${await shown()})`);
+    const locked = await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled));
+    if (locked) check(await page.getByText("The aim is locked:").isVisible(), "the drawer says why the aim is locked");
+    await fungusTab.click();
+    await page.waitForTimeout(150);
     const bar = await page
       .getByLabel("fungus aim")
       .filter({ has: page.getByRole("group", { name: "aim presets" }) })
       .boundingBox();
     const cv = await page.locator("canvas").first().boundingBox();
     check(bar !== null && cv !== null && bar.y + bar.height > cv.height - 70, "the aim bar sits along the map's bottom");
+    // With an ant followed, the ant panel stops above the bar, the bar opened to four rows included (owner, review of
+    // #189: D1 b): the bar keeps its full width and the panel scrolls.
+    await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+    await page.getByRole("region", { name: "followed ant" }).waitFor();
+    // Opened if it can be (a locked aim can't take focus: then the three rows it would add, 13 px at 1.375, are counted).
+    if (!(await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled)))) await aims.first().focus();
+    const gap = await page.evaluate(() => {
+      const panel = document.querySelector('[aria-label="followed ant"]')?.closest(".overflow-y-auto");
+      const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
+      if (!panel || bars.length !== 1) return null;
+      const b = bars[0].getBoundingClientRect();
+      return {
+        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
+      };
+    });
+    check(gap !== null && gap.panelBottom < gap.barTop, `the ant panel, at its longest, stops above the aim bar (${JSON.stringify(gap)})`);
+    await page.locator("canvas").first().focus();
+    if (await page.evaluate(() => window.jevAnts.followed() !== null)) await page.keyboard.press("Escape");
   }
 
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———

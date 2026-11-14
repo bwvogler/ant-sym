@@ -388,6 +388,7 @@ export default function ColonyField({
       accent: "",
       warn: "",
       line: "",
+      fg3: "",
       rock: rgb("#c9c2b5"),
       soil: rgb("#e3d5bf"),
       sky: rgb("#e4edf1"),
@@ -410,6 +411,7 @@ export default function ColonyField({
         accent: cssVar("--accent"),
         warn: cssVar("--warn"),
         line: cssVar("--line-strong"),
+        fg3: cssVar("--fg-3"),
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
         sky: rgb(cssVar("--sky")),
@@ -815,7 +817,6 @@ export default function ColonyField({
       ctx.restore();
     };
 
-    /** Text with a paper halo, centred at screen (x, y). */
     /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
     const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -842,6 +843,7 @@ export default function ColonyField({
       });
       ctx.textBaseline = "alphabetic";
     };
+    /** Text with a paper halo, centred at screen (x, y). */
     const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
       ctx.textAlign = "center";
@@ -918,7 +920,7 @@ export default function ColonyField({
           label("empty hole", x, above, px);
           continue;
         }
-        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.line };
+        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
         pill(
           badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
           x,
@@ -1401,7 +1403,6 @@ export default function ColonyField({
         ctx.stroke();
       }
       if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
-      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       if (labelsOn.current && m.chambers) {
@@ -1446,6 +1447,8 @@ export default function ColonyField({
         const tpx = Math.round(11 * d);
         pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
+      // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
+      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
 

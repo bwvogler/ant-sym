@@ -127,7 +127,9 @@ export default function ColonyApp() {
   const pointsAt = tut.card?.highlight;
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
-    else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus"); // from lg the aim is the bar
+    // From lg (1024 px) the aim is the bar under the map, outlined where it is; narrower it is in The fungus drawer, opened
+    // for it (PRD §69.2; checked by hand at 1280 and 900 in the review of #189).
+    else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus");
   }, [pointsAt]);
   // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
@@ -467,6 +469,7 @@ export default function ColonyApp() {
         <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
           <FungusStatus stats={stats} />
           <Aim jev={jev} />
+          {jev.lock && <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {jev.lock}</p>}
         </Drawer>
       )}
       {drawer === "evolve" && (
@@ -503,7 +506,7 @@ export default function ColonyApp() {
           while a drawer is open, so the two never overlap. */}
       {(penCard || followed) && (
         <div
-          className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] ${drawer ? "max-lg:hidden" : ""}`}
+          className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
         >
           {penCard ? (
             <QueenPen
@@ -536,7 +539,6 @@ export default function ColonyApp() {
         lock={jev.lock}
         tokens={TOKENS_PER_FUNGAL_SITUATION}
         leftOpen={drawer !== null}
-        rightOpen={!!(penCard || followed)}
       />
 
       {tut.tutorial && tut.card && (

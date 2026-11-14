@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AIMS } from "../colony/index.ts";
+import { aimKey } from "./aimKey.ts";
 import Help from "./Help.tsx";
+import Tip from "./Tip.tsx";
 import { FLOAT } from "./kit.tsx";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
@@ -15,7 +17,6 @@ export default function AimBar({
   lock,
   tokens,
   leftOpen,
-  rightOpen,
 }: {
   aim: DoctrineChoice;
   setAim: (a: DoctrineChoice) => void;
@@ -24,16 +25,16 @@ export default function AimBar({
   lock: string | null;
   /** tokens per situation asked, for the field's tooltip */
   tokens: number;
-  /** a drawer is open at the left, or the inspector at the right: the bar keeps clear of it */
+  /** a drawer is open at the left: the bar keeps clear of it (the inspector stops above the bar instead) */
   leftOpen: boolean;
-  rightOpen: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const locked = lock !== null;
   return (
-    // The free width along the map's bottom: past the rail (and an open drawer), short of the inspector; at most 46 rem.
+    // The free width along the map's bottom: past the rail (and an open drawer), at most 46 rem. The inspector stops
+    // above it (owner, review of #189: D1 b).
     <div
-      className={`pointer-events-none absolute bottom-3 z-10 hidden justify-center lg:flex ${leftOpen ? "left-[27rem]" : "left-16"} ${rightOpen ? "right-[27.5rem]" : "right-3"}`}
+      className={`pointer-events-none absolute bottom-3 z-10 hidden justify-center lg:flex ${leftOpen ? "left-[27rem]" : "left-16"} right-3`}
     >
       <div aria-label="fungus aim" className={`pointer-events-auto flex w-full max-w-[46rem] items-end gap-2 px-2 py-1.5 ${FLOAT}`}>
         <span className="flex shrink-0 items-center gap-1 self-center pl-1 text-[11px] font-medium tracking-wide text-spore uppercase">
@@ -71,14 +72,18 @@ export default function AimBar({
           }}
           onKeyDown={(e) => {
             // Enter commits (blur), Shift+Enter is a new line; Escape leaves the words as typed and gives the map the keys.
-            if ((e.key === "Enter" && !e.shiftKey) || e.key === "Escape") {
+            if (aimKey(e.key, e.shiftKey, e.nativeEvent.isComposing) === "done") {
               e.preventDefault();
               e.currentTarget.blur();
             }
           }}
           aria-label="aim"
         />
-        {locked && <span className="shrink-0 self-center text-xs text-warn">locked</span>}
+        {locked && (
+          <Tip tip={lock} className="shrink-0 self-center text-xs text-warn">
+            locked
+          </Tip>
+        )}
       </div>
     </div>
   );

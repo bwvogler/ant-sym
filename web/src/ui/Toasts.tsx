@@ -12,7 +12,7 @@ export default function Toasts() {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:bottom-32"
       role="status"
       aria-live="polite"
     >

@@ -40,7 +40,7 @@ test("its parts: the share as a percent (at least 1 once any ant carries it), th
 });
 
 test("the followed ant's tag: its number and its mode", () => {
-  const c = colony(null, [0, 1, 2, 3]);
-  assert.equal(antTag(c, 1), "#1 · follow");
-  assert.equal(antTag(c, 3), "#3 · fight");
+  const c = colony(null, [2, 3, 0, 1]); // shuffled, so a tag read by the ant's index rather than its mode fails
+  assert.equal(antTag(c, 1), "#1 · fight");
+  assert.equal(antTag(c, 3), "#3 · follow");
 });
