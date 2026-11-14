@@ -210,7 +210,8 @@ export const DEFAULT_FUNGUS: FungusParams = {
   groomedAt: 0.05,
   borderRatio: 2,
   hyphae: false,
-  flow: false,
+  // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §70).
+  flow: true,
 };
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
