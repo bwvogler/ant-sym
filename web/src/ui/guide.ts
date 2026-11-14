@@ -78,9 +78,9 @@ export const GUIDE: GuideEntry[] = [
     onScreen:
       "Lone runners: no trails on the ground, each ant out on its own. A warm wash deepens over the ground toward noon and a dark one covers the night; the HUD shows the sun as they see it and the ground's heat. They pour out as the sun climbs, come in to cool, and stay in at a low sun and at night; when a finder comes home with food, the ants waiting at the top of the shaft go out soon after.",
     realAnts:
-      "Cataglyphis forage alone in the hottest hours, close to the heat that kills them, steering home by step-counting and the sky. They find food by its smell in the air. The sun's height, seen at the nest's entrance, sets when the nest opens and closes. A finder coming home fast speeds up the ants it meets inside, and an ant leaves by its own speed (C. niger): no trail, no location.",
+      "Cataglyphis forage alone in the hottest hours, close to the heat that kills them, steering home by step-counting and the sky. They find food by its smell in the air. In one species (C. floricola) the sun's height seen at the nest's entrance, not the ground's heat, set when the nest opened and closed (unverified: abstract only). A finder coming home fast speeds up the ants it meets inside, and an ant leaves by its own speed (C. niger): no trail, no location.",
     inGame:
-      "Each ant senses its own heat and sees the sun from the open ground or the top of its shaft; it comes home when hot, or when the sun is low or down. Its body heat follows the ground's out there and cools in the nest. It climbs the smell of food within about 21 cells. A finder coming down the shaft raises the pace of the ants waiting at the top; a crowd damps it; each leaves by its own pace.",
+      "Each ant senses its own heat and sees the sun from the open ground or the top of its shaft; it comes home when hot, or when the sun is low or down (that a low sun keeps it in is the game's design). Its body heat follows the ground's out there and cools in the nest. It climbs the smell of food within about 21 cells. A finder coming down the shaft raises the pace of the ants waiting at the top; a crowd damps it; each leaves by its own pace.",
     sources: [
       { note: "desert-ant", anchor: "1-foragers-work-alone-no-trail-no-recruitment-to-a-place", label: "Foragers work alone" },
       {

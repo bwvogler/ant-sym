@@ -124,8 +124,8 @@ Food odour in the air (`colony/plume.ts`, `foodPlume`): every food cell on the p
 
 ## Reading for ja-rf5.1, 2026-11-14 (what could be read in full)
 
-The session's network reached only PubMed Central's article pages: Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984, the published Buehlmann et al. 2014, Gehring & Wehner 1995 (beyond its abstract), Amor et al. 2011 and Wehner & Wehner 2011 stay **unread** (publishers and repositories refused; free PDFs were found for Buehlmann 2014 at sussex.ac.uk and pure.mpg.de, and Amor's 2011 thesis at dictionnaire-amoureux-des-fourmis.fr, if those hosts are opened). Read in full on PMC, from papers that measured or cite:
-- *C. fortis* running speed: 4.5–619 mm/s over 388 runs at Maharès, none over 0.62 m/s, the fastest around noon (Wahl et al. 2015, *J Comp Physiol A*, [PMC4439428](https://pmc.ncbi.nlm.nih.gov/articles/PMC4439428/)).
+The session's network reached only PubMed Central's article pages, so these stay **unread**: Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984, the published Buehlmann et al. 2014, Gehring & Wehner 1995 (beyond its abstract), Amor et al. 2011 and Wehner & Wehner 2011 (publishers and repositories refused; free PDFs were found for Buehlmann 2014 at sussex.ac.uk and pure.mpg.de, and Amor's 2011 thesis at dictionnaire-amoureux-des-fourmis.fr, if those hosts are opened). Read in full on PMC, from papers that measured or cite:
+- *C. fortis* running speed: 4.5–619 mm/s over 388 runs (field runs at Maharès and lab recordings pooled), none over 0.62 m/s, the fastest around noon (Wahl et al. 2015, *J Comp Physiol A*, [PMC4439428](https://pmc.ncbi.nlm.nih.gov/articles/PMC4439428/)).
 - Lethal temperature over 3 hours (not CTmax, and lower): *C. bombycina* LT50 44.8 °C, *C. holgerseni* 46.0 °C (de Souza Araujo et al. 2023, [PMC10500329](https://pmc.ncbi.nlm.nih.gov/articles/PMC10500329/)). Gehring & Wehner 1995's abstract gives CTmax 53.6 ± 0.8 °C (*C. bombycina*) and 55.1 ± 1.1 °C (*C. bicolor*), none for *C. fortis* (**unverified** beyond the abstract).
 - *C. bombycina*'s foraging window is "48–51 °C", with the lizard *Acanthodactylus dumerili* its main predator; air and ground reach 50 °C and 70 °C (Willot et al. 2016, [PMC4830450](https://pmc.ncbi.nlm.nih.gov/articles/PMC4830450/), and 2018, [PMC6003908](https://pmc.ncbi.nlm.nih.gov/articles/PMC6003908/), both citing the 1992 letter: secondary, **unverified** against it).
 - Worker life: *C. bicolor* life expectancy 6.1 days, cited from Schmid-Hempel 1984 (Gilad et al. 2021, *Curr Zool*, [PMC9450180](https://pmc.ncbi.nlm.nih.gov/articles/PMC9450180/): secondary); *C. niger* in the lab lived 13.0 ± 14.0 days uninjured, 6.8 with a leg removed, 5.3 with two, and 8.8 % of field workers were injured (Gilad 2021, full text).
@@ -140,6 +140,10 @@ The invitation (PRD §60.6, `invite.ts`): an ant waiting at the top of its shaft
 Heat, the sun's height and a night: [desert-heat.md](desert-heat.md), PRD §60.5.
 
 ## Sources
+- Wahl et al. (2015). *J Comp Physiol A* (*C. fortis* running speeds). [PMC4439428](https://pmc.ncbi.nlm.nih.gov/articles/PMC4439428/)
+- Willot et al. (2016). *PLoS ONE*. [PMC4830450](https://pmc.ncbi.nlm.nih.gov/articles/PMC4830450/) (citing Wehner, Marsh & Wehner 1992)
+- Willot et al. (2018). *Sci Rep*. [PMC6003908](https://pmc.ncbi.nlm.nih.gov/articles/PMC6003908/) (citing Wehner, Marsh & Wehner 1992; not opened beyond the citation)
+- Gilad et al. (2021). *Curr Zool*. [PMC9450180](https://pmc.ncbi.nlm.nih.gov/articles/PMC9450180/) (worker survival with injuries; citing Schmid-Hempel & Schmid-Hempel 1984)
 
 - Razin N, Eckmann J-P, Feinerman O (2013). Desert ants achieve reliable recruitment across noisy interactions. *J R Soc Interface* 10:20130079. [doi:10.1098/rsif.2013.0079](https://doi.org/10.1098/rsif.2013.0079), [PMC3627090](https://pmc.ncbi.nlm.nih.gov/articles/PMC3627090/) (full text read 2026-11-11)
 - Wehner R, Marsh AC, Wehner S (1992). Desert ants on a thermal tightrope. *Nature* 357:586–587. [doi:10.1038/357586a0](https://doi.org/10.1038/357586a0)
