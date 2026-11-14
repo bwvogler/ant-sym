@@ -193,11 +193,11 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
 | slow/golden.test.ts | S | "side view war, seed 6" golden | re-record on one world | S2 step 3 |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
-| slow/oneWorldG1Seed4/5/9.test.ts (via oneWorldG1.ts) | O | G1 held-food bound | keep | |
+| slow/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
 | slow/raidFind.test.ts | arena | A11, seeds 1–10 | port | `ONE_PENDING` |
 | slow/raidStop.test.ts | arena | A12, seeds 1–2 | port | `ONE_PENDING` |
-| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | covered | G1 slow guard (`oneWorldG1Seed4/5/9`), same bound of 2. Delete it once G1 stays green |
+| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | covered | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
 
 ### Golden masters
 

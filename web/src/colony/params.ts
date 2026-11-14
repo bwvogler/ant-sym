@@ -381,7 +381,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
-  routeStep: 4,
+  routeStep: 3,
   routeSee: 3,
   routeMax: 64,
   raidGate: 1,
