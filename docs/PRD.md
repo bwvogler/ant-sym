@@ -5722,3 +5722,67 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
 - Back-flow and pulsing, left out.
 - How long a cut-off piece's reserves should last: nothing measured, so as long as its loads.
 
+### 70.1 Built, measured, and turned on with a P1 miss (ja-tgw9.1–.4, 2026-11-14)
+
+**Built** (`fungus.flow`, now on by default; off plays as before):
+- **Loads and sources.** Hypha cells hold loads (`Hyphae.loads`). The body's free mass enters each round at the patch, gathered on the patch cells a growing tip leads back to. A colonised corpse pays `CORPSE.mass` in at its own cell, and a knot's store on the plane goes into its cell as it sprouts.
+- **Flow** (`Hyphae.flow`). Each round every load moves along the cheapest path toward the growing tips: a thin cell costs `FLOW_CORD / FLOW_THIN` = 10, a cord cell 1, and a round's reach is 30. At a branch the load splits by the tips each side feeds, and fused pairs are edges.
+  - A tip idle `IDLE_ROUNDS` (3) rounds with mass draws none.
+  - A load with nothing growing beyond it goes back toward the root.
+- **Down the hole.** Mass reaching the plane cell where hyphae crossed a hole (`links`) goes down to the shaft-wall roots that lead to growing tips.
+- **Tips.** A tip senses and pays from its own cell's load, and grows on one step's worth (`FLOW_AMPLE_STEPS`).
+- **Cuts and spores.** A cut cell's load is lost with it. Spores are paid from the patch's loads first.
+- **The growth lane, v4.** *Supply* is "the mass that has reached this tip along its hyphae", and a fuse is "a second, often shorter way for mass to reach the tips beyond it" (`ja-2bw.20`). Re-asked for the three aims: $0.0020, 144 answers, ~333 tokens a question. The answers that changed:
+
+  | Aim | Changed answers |
+  |---|---|
+  | *unite* | 2: open and buried, grow → branch (situations a game can't meet) |
+  | *spread* | fuses in 1 situation (was 4), branches in 17 (was 14), never rests (was 3) |
+  | *peace* | turns in 28 (was 17), rests in 5 (was 17) |
+
+- **Seen.** A glow on each cell holding mass in transit, and a Learn entry ("How the mycelium feeds its tips").
+
+**Bugs a trace of seed 16 found on the way.** Before them, the curtain grew 24 cells with flow on against 52 with flow off, with mass sitting still.
+- Mass placed on patch cells, or shaft-wall roots, that no tip grows from could not move. Gathering it on cells that lead to growing tips fixed this.
+- Gathering pulled mass on its way down the shaft wall back to the top every round. It now takes only from cells that feed nothing.
+- Tips waiting for two steps' worth parked a tenth of the body. Under flow a tip now grows on one step's worth.
+
+**Assays** (unit and soak tests):
+- **F1.** Mass reaches a tip 20 thin cells out in ⌈20/3⌉ = 7 rounds, sooner behind a cord, and splits by tips fed at a branch.
+- **F2.** In a game the hyphae and their loads hold the body's mass within 6 %. Mass reaches the curtain, and under 40 % of the body is in transit.
+- **F3.** A cut-off piece grows only what its own loads pay for.
+- **F4.** A fused loop feeds the far tip sooner than the tree alone.
+- 8 of 9 mutations are caught. The one that survives, gathering stranded patch mass, is nearly equivalent once new mass goes only to feeding cells.
+
+**P1** (§63.4; `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow`, aim *unite*; seconds to a quarter of the hosts, against §63.14's rows):
+
+| Seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 231 | 320 | 310 | 143 | 150 | 543 | 272 | 544 | 411 | 262 |
+| Hyphae, shared mass | 249 | 305 | 270 | 152 | 116 | 394 | 263 | 424 | 220 | 261 |
+| Hyphae, flow | 294 | 300 | 296 | 139 | 156 | 380 | 267 | 363 | 343 | 232 |
+
+| Seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | never | 265 | 208 | 18 | 342 | 381 | 239 | 369 | 328 | 468 |
+| Hyphae, shared mass | 420 | 233 | 195 | 18 | 360 | 372 | 237 | 334 | 310 | 387 |
+| Hyphae, flow | 326 | 229 | 199 | 18 | 303 | 444 | 243 | 274 | 297 | 311 |
+
+- **P1 is not met.**
+  - Seed 1 is +27 % (231 → 294 s) and seed 16 +17 % (381 → 444 s).
+  - The median of seeds 1–10 is 295 s, against 291 s without hyphae.
+  - The worst times improve on both sets (544 → 380 s; never → 444 s), and the median of seeds 11–20 improves from 335 to 286 s.
+- **Speed is not the cause.** `FLOW_THIN` 3, 5 and 8 gave the same times on seeds 1 and 16 (284 and 449 s, before the fixes above).
+- **The cause is how mass is shared.** Flow gives every growing tip an equal share, and the plane's tips sit nearer the patch, so the curtain, where spores meet the ants, grows less. On seed 16 at 300 s:
+
+  | Seed 16 at 300 s | Plane | Curtain |
+  |---|---|---|
+  | Flow | 56 cells | 35 cells |
+  | Shared mass | 43 cells | 52 cells |
+
+  Shared mass favoured the curtain through the order in which tips took turns.
+- **The re-asked answers** leave every time unchanged (identical runs before and after): under *unite* only the two unreachable situations changed.
+- **Owner (2026-11-14): turn flow on and record the miss.** Favouring the hole (curtain tips weighing more) was offered and not chosen; it stays open as `ja-tgw9.5`.
+
+**Cost.** The growth lane's question is the same size: ~333 tokens, 48 situations an aim. Re-shipped for $0.0020. No other lane is touched, and cached games spend nothing.
+
