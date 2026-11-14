@@ -11,6 +11,7 @@ import {
   CORD_DIGS,
   CORD_FLOW,
   ENTER_GAP,
+  IDLE_ROUNDS,
   FLOW_CORD,
   FLOW_THIN,
   KNOT,
@@ -1026,8 +1027,75 @@ test("flow (ja-tgw9): a tip senses its own cell's load and pays its steps from i
   const x0 = tip.x;
   stepTips(h, g, 0, budget);
   assert.equal(tip.x, x0, "no load at the tip: it rests, whatever the shared budget");
-  h.addLoad(cellKey(tip.x, tip.y), HYPHA_MASS * AMPLE_STEPS);
+  h.addLoad(cellKey(tip.x, tip.y), HYPHA_MASS); // one step's worth: under flow a tip grows on it (FLOW_AMPLE_STEPS)
   stepTips(h, g, 0, budget);
   assert.equal(tip.x, x0 + 1, "fed: it grows");
   assert.equal(budget.free, 1e9, "the shared budget is untouched");
+});
+
+test("flow (ja-tgw9): a tip idle IDLE_ROUNDS rounds with mass draws no more; the mass goes to a tip still growing", () => {
+  // Two tips from one root: one east, one north-east. The east tip is held still (ample but idle).
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const a = h.tips[0]!;
+  assert.ok(h.extend(a, E, 0));
+  const b = h.branch(a, NE);
+  assert.ok(h.extend(b, NE, 0));
+  assert.ok(h.extend(a, E, 0));
+  const at = (t: Tip) => h.loads.get(cellKey(t.x, t.y)) ?? 0;
+  h.addLoad(cellKey(0, 10), 2);
+  h.flow();
+  assert.ok(Math.abs(at(a) - 1) < 1e-9 && Math.abs(at(b) - 1) < 1e-9, "both draw while growing");
+  a.idle = IDLE_ROUNDS;
+  h.addLoad(cellKey(0, 10), 2);
+  h.flow();
+  // The new mass, and what the idle tip held (back toward the root and down the other branch), all go to the growing tip.
+  assert.ok(Math.abs(at(b) - 4) < 1e-9, `the growing tip took the mass: ${at(b)}`);
+  assert.equal(at(a), 0);
+  // An idle tip counts its rounds: ample, growing nothing.
+  const { h: one, tip } = line(2);
+  tip.run = 0;
+  const blocked = plane((x, y) => !one.has(x, y)); // walled in: rock all round its hypha
+  one.addLoad(cellKey(tip.x, tip.y), 10 * HYPHA_MASS);
+  const budget = { free: 1e9, tips: 1, flow: true };
+  for (let r = 0; r < IDLE_ROUNDS; r++) stepTips(one, blocked, 0, budget);
+  assert.ok((tip.idle ?? 0) >= IDLE_ROUNDS, `idle ${tip.idle}`);
+});
+
+test("flow (ja-tgw9): mass on a branch with nothing growing beyond goes back and on down the growing branch in a round", () => {
+  // Root, two cells east, then a dead branch north-east (no tip) and a tip going on east.
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const a = h.tips[0]!;
+  assert.ok(h.extend(a, E, 0));
+  const dead = h.branch(a, NE);
+  assert.ok(h.extend(dead, NE, 0));
+  const deadCell = cellKey(dead.x, dead.y);
+  h.tips = h.tips.filter((t) => t !== dead);
+  assert.ok(h.extend(a, E, 0));
+  h.addLoad(deadCell, 1);
+  h.flow();
+  assert.equal(h.loads.get(deadCell) ?? 0, 0, "the dead end kept its mass");
+  assert.ok(Math.abs((h.loads.get(cellKey(a.x, a.y)) ?? 0) - 1) < 1e-9, "the growing tip got it");
+});
+
+test("flow (ja-tgw9): a faded or hardened cell hands its load to the cell it grew from; nothing is lost", () => {
+  // regress: a dead end at a web fades, its load to its parent.
+  const { h } = line(4);
+  h.tips = [];
+  h.cords = new Set([cellKey(1, 10)]);
+  h.addLoad(cellKey(4, 10), 1);
+  const before = h.loaded;
+  assert.ok(h.regress() > 0);
+  assert.ok(Math.abs(h.loaded - before) < 1e-9, `loaded ${h.loaded}, was ${before}`);
+  assert.equal(h.takeLost(), 0);
+  // harden: a starved tip draws in its cells; their loads stay on the knot's cell.
+  const k = line(6);
+  k.tip.starved = KNOT.rounds[1]!;
+  k.h.addLoad(cellKey(6, 10), 1);
+  k.h.addLoad(cellKey(5, 10), 0.5);
+  const was = k.h.loaded;
+  assert.ok(k.h.harden(1) > 0);
+  assert.ok(Math.abs(k.h.loaded - was) < 1e-9, `loaded ${k.h.loaded}, was ${was}`);
+  assert.equal(k.h.takeLost(), 0);
 });

@@ -112,6 +112,21 @@ test("a game with hyphae saves and loads as it was", () => {
   assert.deepEqual(back.fungus.hyphaeOn(CURTAIN)!.save(), g.fungus.hyphaeOn(CURTAIN)!.save());
 });
 
+test("with mass flow on (the default), a game saves, loads and plays on as it would have (ja-tgw9)", () => {
+  const g = game(true, true);
+  crossDown(g);
+  runFor(g, 20);
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true, true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
+  assert.ok(g.fungus.hyphaeOn(PLANE)!.loaded > 0, "nothing in transit to save");
+  // Played on, the loaded game's hyphae match the unbroken game's: loads, links and idle rounds all came back.
+  runFor(g, 60);
+  runFor(back, 60);
+  for (const l of [PLANE, CURTAIN]) assert.deepEqual(back.fungus.hyphaeOn(l)!.save(), g.fungus.hyphaeOn(l)!.save(), `layer ${l}`);
+});
+
 test("with hyphae off, the fungus grows none", () => {
   const g = game(false);
   runFor(g, 10);

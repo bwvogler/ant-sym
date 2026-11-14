@@ -5882,7 +5882,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 
 **Still open.** Feeding larvae owed their growth food (ja-rvli), then option 1 on (ja-16rp.5); option 2; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
 
-## 71. Mass flows along the hyphae to the tips that grow (design, ja-tgw9, 2026-11-14)
+## 71. Mass flows along the hyphae to the tips that grow (built, on, ja-tgw9, 2026-11-14)
 
 **Research basis:** [mycelial-transport.md](mycelial-transport.md):
 - Growth draws mass toward the tips: each tip is a sink, and flow in a hypha scales with the tips it feeds (Heaton et al. 2010; Roper et al. 2013, full text). Flow also runs back and pulses in some fungi (Schmieder et al. 2019, **unverified**).
@@ -5948,6 +5948,8 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
   | *peace* | turns in 28 (was 17), rests in 5 (was 17) |
 
 - **Seen.** A glow on each cell holding mass in transit, and a Learn entry ("How the mycelium feeds its tips").
+- **Knots and stumps.** Under flow a knot sprouts once it is old enough, and a cut stump puts out its tip at once. Neither waits for mass: the new tip waits for mass to reach it, like any tip, and a plane knot hands its store to its own cell as it sprouts. Before flow both waited until the shared pool could pay (owner, review of #203, D1: keep it, and say so here).
+- **Saves.** `SAVE_VERSION` 12: loads, the patch's sources, the hole's links and each tip's idle rounds. A version-11 save would load with flow on and no patch to feed, so it is refused (review of #203, S1).
 
 **Bugs a trace of seed 16 found on the way.** Before them, the curtain grew 24 cells with flow on against 52 with flow off, with mass sitting still.
 - Mass placed on patch cells, or shaft-wall roots, that no tip grows from could not move. Gathering it on cells that lead to growing tips fixed this.
@@ -5991,5 +5993,5 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - **The re-asked answers** leave every time unchanged (identical runs before and after): under *unite* only the two unreachable situations changed.
 - **Owner (2026-11-14): turn flow on and record the miss.** Favouring the hole (curtain tips weighing more) was offered and not chosen; it stays open as `ja-tgw9.5`.
 
-**Cost.** The growth lane's question is the same size: ~333 tokens, 48 situations an aim. Re-shipped for $0.0020. No other lane is touched, and cached games spend nothing.
+**Cost.** The growth legend grew by about 185 characters (~46 tokens), sent once a request. Over a precache request's 48 situations that is about 1 token a question (~333 measured), but a small in-game request carries all of it. Re-shipped for $0.0020. No other lane is touched, and cached games spend nothing.
 

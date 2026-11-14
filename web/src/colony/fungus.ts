@@ -1496,6 +1496,8 @@ export class Fungus {
       }
       gap += total * share;
     };
+    // The patch first (owner, 2026-11-14: spores from the patch). Not reached in seed 7's first 200 s, where the patch
+    // always holds enough; review of #203, N2.
     take(patch);
     const rest: { h: Hyphae; k: number }[] = [];
     for (const h of this.#hyphae) if (h) for (const k of h.loads.keys()) if (!h.sources.has(k)) rest.push({ h, k });
