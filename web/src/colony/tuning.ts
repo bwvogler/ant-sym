@@ -220,13 +220,6 @@ export const CHAMBER_GAP_GROWTH = 0.15;
 
 export const CHAMBER_SPREAD = 10;
 
-/**
- * Seconds a dug cell smells of fresh digging to a forager on a foraging dig (ja-16rp): it walks toward the cell dug most
- * recently within this, so it reaches the face others were just digging (fresh spoil draws digging: Pielström & Roces
- * 2013, where pellets an hour old no longer did; docs/foraging-tunnels.md).
- */
-export const FRESH_DIG = 120;
-
 /** A roomy nest digs this share as often as before (tunnels at dead ends, starts off walls, head-on). */
 export const ROOMY_DIG = 0.15;
 

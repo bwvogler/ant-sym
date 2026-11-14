@@ -30,7 +30,6 @@ import {
   MIDDEN_CROWD,
   MIDDEN_SCALE,
   NEW_CHAMBER,
-  FRESH_DIG,
   ROOMY_DIG,
   SIGN_WEIGHT,
   START_HUG,
@@ -67,28 +66,6 @@ export function toBrood(col: Colony, cx: number, cy: number, dir: number): numbe
     if (rockAt(col.map, tx, ty) !== OPEN || isSky(col.map, tx, ty)) continue;
     const v = royal.get(tx, ty) + brood.get(tx, ty);
     if (v > bestV) ((bestV = v), (best = d));
-  }
-  return best;
-}
-
-/**
- * The way from cell (cx, cy), not back, into the open underground cell dug most recently within FRESH_DIG seconds and
- * more recently than this one (a tunnel's newest cells are at its working face), or −1 if none (ja-16rp).
- */
-export function freshWay(col: Colony, cx: number, cy: number, dir: number): number {
-  const map = col.map;
-  let best = -1;
-  let bestT = Math.max(map.dugAt.get(cx, cy), col.time - FRESH_DIG);
-  for (const turn of [0, 1, -1, 2, -2]) {
-    const d = (dir + turn + 6) % 6;
-    const tx = stepX(cx, cy, d);
-    const ty = stepY(cy, d);
-    if (rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
-    const t = map.dugAt.get(tx, ty);
-    if (t > bestT) {
-      bestT = t;
-      best = d;
-    }
   }
   return best;
 }
@@ -356,9 +333,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     col.digAim[i] = NaN;
   } else {
     const side = col.hand[i];
-    // On a foraging dig (ja-16rp): toward the freshest digging, so it reaches the face nestmates were just digging.
-    const fresh = col.forageDigs(i) ? freshWay(col, cx, cy, dir) : -1;
-    let next = fresh >= 0 ? fresh : handOnWall(map, cx, cy, dir, side);
+    let next = handOnWall(map, cx, cy, dir, side);
     // An inside worker at the top of the shaft turns back down rather than step out onto the ground (zoned by age).
     if (
       col.staysIn(i) &&
@@ -386,16 +361,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // little each cell: the end cell nearest that heading is dug, so tunnels wander at any angle
       // rather than run straight along the grid. Now and then it forks, 60° to one side.
       const run = tunnelHeading(map, cx, cy);
-      // A foraging dig (ja-16rp) runs out from the nest, level or down: away from home along its vector (path
-      // integration), never up toward the ground's surface (fire ants' foraging tunnels radiate from the mound).
-      const foraging = col.forageDigs(i);
-      let base = Number.isNaN(run) ? DIR_ANGLE[dir] : run;
-      if (foraging) {
-        const ox = centreX(cx, cy) - col.nest.x;
-        const oy = centreY(cy) - col.nest.y;
-        base = oy < 0 ? (ox < 0 ? Math.PI : 0) : Math.atan2(oy, ox);
-      }
-      let aim = base + gauss(col.rng) * col.params.tunnelDrift;
+      let aim = (Number.isNaN(run) ? DIR_ANGLE[dir] : run) + gauss(col.rng) * col.params.tunnelDrift;
       // A fork is a Y: this arm 60° to one side, the other 60° to the other, dug by the next digger to pass.
       let forkSide = 0;
       if (col.rng() < FORK) {
@@ -412,6 +378,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       // grows roomy and they spread out, the less). That is how real colonies stop excavating once
       // they have room (Rasse & Deneubourg 2001); a lone ant at a far tunnel's end still digs now and then.
       // A forager on a foraging dig digs on alone and whatever the room (ja-16rp): its tunnels run out to the soil's food.
+      const foraging = col.forageDigs(i);
       if (dug >= 0 && !foraging && col.friends && col.rng() > digChance(col.friends, cx, cy)) dug = -1;
       // A roomy nest (the side view's chambers have floor enough) barely digs on (ja-wii: digging stops with room).
       if (dug >= 0 && !foraging && !col.crowded() && col.rng() > ROOMY_DIG) dug = -1;
