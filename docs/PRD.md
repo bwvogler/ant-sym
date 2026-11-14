@@ -5338,8 +5338,8 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 - A mode answer is kept with its probabilities: `follow=0.49,fight=0.3,explore=0.17,return=0.04`, Jev's choice first (`colony/weighted.ts`). A bare mode still reads everywhere, as certain.
 - The colony hands its mode policy a draw from its own seeded rng (`Colony.policyDraw`). A weighted answer is drawn from at `sampleTemp` (p^(1/T); default 1, as Jev gave it; 0 = always Jev's choice). The local rule and bare answers never draw, so the golden masters stay bit-exact.
 - An ant whose mode was drawn draws again after `reroll` seconds (default 10) in the same situation (`redraw`, a per-ant clock); without it a draw would hold until the situation changed.
-- The follow card shows what an ant drew from.
-- `scripts/precache.mjs --reweigh` re-asks only the situations a bundle holds as a bare mode. Run once: $0.0039 for the three doctrines (453 situations), and the desert ant's 48.
+- The follow card shows what an ant drew from. Details → Lab → "How ants choose" sets the temperature (0–2) and the draw-again seconds (0–30) for every colony while a game runs (`Game.setChoice`; a lab setting, not saved).
+- `scripts/precache.mjs --reweigh` re-asks only the situations a bundle holds as a bare mode. Run once: $0.0039 for the three doctrines (453 situations); the desert ant's bundles again after main re-shipped them with the sun (192 situations, $0.0027).
 
 **How sharp Jev's answers are.** Probability of Jev's choice, over the shipped situations:
 
