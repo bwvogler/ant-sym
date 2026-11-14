@@ -89,6 +89,13 @@ export const CORD_DIGS = 3;
 export const REGRESS_PER_ROUND = 1;
 /** A tip's supply is ample while the free mass would pay for this many steps of every tip; less is short. */
 export const AMPLE_STEPS = 2;
+/**
+ * Feeding by distance (ja-2bw.13, owner 2026-11-14: far tips go short first): a tip this many thin hypha cells from a
+ * root or a cord needs twice the free mass to feel ample, one twice as far three times, and so on. Cords carry supply
+ * at once (Tlalka et al. 2008: up to 13 mm/h along a cord) and a fused loop is a shorter way round (Simonin et al.
+ * 2012: hyphae that cannot fuse cannot move a nutrient to their edge), so both bring far tips nearer (design).
+ */
+export const FEED_SPAN = 12;
 
 /** What a tip meets ahead. */
 export const AHEADS = ["soil", "open", "rock", "own"] as const;
@@ -457,6 +464,42 @@ export class Hyphae {
   }
 
   /**
+   * Each hypha cell's distance from its feed (ja-2bw.13): thin cells along the hyphae to the nearest root or cord, a
+   * fused pair counting as joined (a loop is a shorter way round). Roots and cords are 0.
+   */
+  feedDistance(): Map<number, number> {
+    const next = new Map<number, number[]>();
+    const link = (a: number, b: number) => {
+      (next.get(a) ?? next.set(a, []).get(a)!).push(b);
+      (next.get(b) ?? next.set(b, []).get(b)!).push(a);
+    };
+    for (const [k, p] of this.parent) if (p !== ROOT && this.parent.has(p)) link(k, p);
+    for (let i = 0; i + 1 < this.fusions.length; i += 2) {
+      const [a, b] = [this.fusions[i]!, this.fusions[i + 1]!];
+      if (this.parent.has(a) && this.parent.has(b)) link(a, b);
+    }
+    // Every root and cord starts the search at 0, so a breadth-first walk gives each cell its nearest.
+    const dist = new Map<number, number>();
+    let ring: number[] = [];
+    for (const [k, p] of this.parent)
+      if (p === ROOT || this.cords.has(k)) {
+        dist.set(k, 0);
+        ring.push(k);
+      }
+    for (let d = 1; ring.length; d++) {
+      const out: number[] = [];
+      for (const k of ring)
+        for (const n of next.get(k) ?? [])
+          if (!dist.has(n)) {
+            dist.set(n, d);
+            out.push(n);
+          }
+      ring = out;
+    }
+    return dist;
+  }
+
+  /**
    * Unused hypha fades (Bebber et al. 2007: links that carry nothing are recycled): up to REGRESS_PER_ROUND dead ends a
    * round, a cell no tip stands on and nothing grew from, unless it is a root, a cord, in a fusion, touching a spore spot,
    * or `keep` holds it (a corpse). Its mass is the body's to spend again (it no longer counts in `length`). Returns the cells faded.
@@ -585,15 +628,18 @@ export function enterable(h: Hyphae, g: Ground, x: number, y: number, level: num
   return level >= 1 || isWall(g, x, y);
 }
 
-/** What `tip` senses: the cell ahead, its exposure, and its supply (`free` mass shared among `tips`). */
-export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free: number, tips: number): GrowthSituation {
+/**
+ * What `tip` senses: the cell ahead, its exposure, and its supply (`free` mass shared among `tips`, the bar raised by
+ * `reach`, its thin cells from a root or cord: FEED_SPAN).
+ */
+export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free: number, tips: number, reach = 0): GrowthSituation {
   const [ax, ay] = ahead(tip.x, tip.y, tip.heading);
   const k = g.kind(ax, ay);
   const what: Ahead = h.has(ax, ay) ? "own" : k === "rock" || !enterable(h, g, ax, ay, level) ? "rock" : g.topsoil ? "soil" : k;
   return {
     ahead: what,
     exposed: exposureAt(g, tip.x, tip.y),
-    supply: free >= HYPHA_MASS * AMPLE_STEPS * Math.max(1, tips) ? "ample" : "short",
+    supply: free >= HYPHA_MASS * AMPLE_STEPS * Math.max(1, tips) * (1 + reach / FEED_SPAN) ? "ample" : "short",
     run: tip.run >= BRANCH_RUN ? "long" : "short",
   };
 }
@@ -723,11 +769,13 @@ export function stepRound(
   // Supply is judged once, at the round's start: every tip feels the same share, whoever steps first.
   const start = { free: budget.free, tips: budget.tips };
   const lists = maps.map(({ h }) => h.tips.slice());
+  // How far each cell is from its feed (ja-2bw.13), also judged at the round's start.
+  const feeds = maps.map(({ h }) => h.feedDistance());
   const most = Math.max(0, ...lists.map((l) => l.length));
   for (let i = 0; i < most; i++)
     maps.forEach(({ h, g }, m) => {
       const tip = lists[m]![i];
-      if (tip) grown += stepTip(h, g, tip, level, budget, start, policy);
+      if (tip) grown += stepTip(h, g, tip, level, budget, start, policy, feeds[m]!.get(cellKey(tip.x, tip.y)) ?? 0);
     });
   return { grown };
 }
@@ -752,6 +800,7 @@ function stepTip(
   budget: { free: number; tips: number },
   start: { free: number; tips: number },
   policy: ((s: GrowthSituation) => GrowthAnswer | null) | null,
+  reach: number,
 ): number {
   let grown = 0;
   // A veer the ground blocks turns the tip where it stands, so a wall it slides along is followed over a few steps.
@@ -773,7 +822,7 @@ function stepTip(
     grown++;
     return true;
   };
-  const s = situationOf(h, g, tip, level, start.free, start.tips);
+  const s = situationOf(h, g, tip, level, start.free, start.tips, reach);
   let a = policy?.(s) ?? localGrowth(h, g, tip, s, level);
   // The body spaces fruiting whoever chose it (ja-2bw.16, owner 2026-11-13): an answer to fruit too soon or too near a
   // spot plays the tip's own rule instead, so wall tips under an aim that fruits on every wall still grow down it.

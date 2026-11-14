@@ -11,6 +11,7 @@ import {
   CORD_DIGS,
   CORD_FLOW,
   ENTER_GAP,
+  FEED_SPAN,
   KNOT,
   REGROW_ROUNDS,
   sideFor,
@@ -915,4 +916,50 @@ test("on the plane a knot is a reserve: sprouting gives its store back; undergro
     assert.equal(knot.store, topsoil ? 0 : store);
     assert.equal(budget.free, 1e9 + back);
   }
+});
+
+test("feeding by distance: a cell's feed distance counts thin cells to a root, a cord starts it again, and a fused loop is a shorter way (ja-2bw.13)", () => {
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const tip = h.tips[0]!;
+  for (let i = 0; i < 20; i++) assert.ok(h.extend(tip, E, 0));
+  const at = (x: number) => h.feedDistance().get(cellKey(x, 10));
+  assert.equal(at(0), 0, "a root is fed");
+  assert.equal(at(20), 20, "twenty thin cells out");
+  // A cord halfway: the cells past it count from it.
+  h.cords = new Set([cellKey(10, 10)]);
+  assert.equal(at(10), 0);
+  assert.equal(at(20), 10);
+  h.cords = new Set();
+  // A second root near the far end, joined to it by a fusion: the far end is now two cells from a root.
+  h.root(20, 12, E);
+  h.fusions.push(cellKey(20, 12), cellKey(20, 10));
+  assert.equal(at(20), 1, "the fusion joins the far end to the second root");
+  assert.equal(at(15), 6);
+  // Fusions through a cell that is gone (cut) join nothing.
+  h.fusions = [cellKey(20, 12), cellKey(99, 99), cellKey(99, 99), cellKey(20, 10)];
+  assert.equal(at(20), 20);
+});
+
+test("feeding by distance: a tip FEED_SPAN thin cells out needs twice the free mass to feel ample (ja-2bw.13)", () => {
+  const h = new Hyphae();
+  h.root(0, 10, E);
+  const tip = h.tips[0]!;
+  const g = plane();
+  const bar = HYPHA_MASS * AMPLE_STEPS;
+  assert.equal(situationOf(h, g, tip, 0, bar, 1, 0).supply, "ample");
+  assert.equal(situationOf(h, g, tip, 0, bar, 1, FEED_SPAN).supply, "short");
+  assert.equal(situationOf(h, g, tip, 0, 2 * bar, 1, FEED_SPAN).supply, "ample");
+  assert.equal(situationOf(h, g, tip, 0, 2 * bar - 1e-9, 1, FEED_SPAN).supply, "short");
+  // In a round, the far tip of two rests on a budget the near one grows on.
+  const two = new Hyphae();
+  two.root(0, 10, E);
+  two.root(0, 30, E);
+  const [a, b] = two.tips as [Tip, Tip];
+  for (let i = 0; i < 2 * FEED_SPAN; i++) assert.ok(two.extend(b, E, 0));
+  const budget = { free: 3 * HYPHA_MASS * AMPLE_STEPS, tips: 2 };
+  const [ax, bx] = [a.x, b.x];
+  stepTips(two, g, 0, budget);
+  assert.equal(a.x, ax + 1, "the tip by its root grew");
+  assert.equal(b.x, bx, "the tip two spans out rested");
 });
