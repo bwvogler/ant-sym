@@ -82,24 +82,27 @@ The goal: a sense, a channel, a lane, a species, a nest kind and a renderer laye
 The top-down and side maps are retired.
 
 **Blocked by:**
-- `ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.
+- ~~`ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.~~ Closed 2026-11-14: all four of the bead's mechanics (these three and activation) run on the plane and are measured there by their assays (`one-world.md`, U6a and `ja-web` as built); A5 0/10 and A10 0/10 are tracked by ja-lp4.6.8 and ja-je8.
 - `ja-lp4.6`: guards and assays on one world.
 
-1. **Inventory.** 35 of the 54 colony test files build an open or side map. List each of them, and each assay in `ASSAYS` and each slow guard, as one of:
+1. **Inventory.** Each test file that builds an open or side map, each assay in `ASSAYS` and each slow guard, as one of:
    - port to one world
    - covered by a one-world test
    - delete
+
+   Done (2026-11-14, `ja-fnd.3.1`): [one-world-only.md](one-world-only.md). 61 test files, 20 assays, 12 slow files (G1's three as one guard); its open questions come before steps 2-4.
 2. **Port the assays that carry PRD baselines** to one world. Record the new baselines in the PRD, choose by the worst seed, and confirm on seeds 11–20.
 3. **Re-record the golden masters on one world only:** fast and slow.
 4. **Delete:**
-   - `generateWorld`, `generateSideWorld`, `OPEN_WORLD`, and whatever of `transect.ts` the curtain does not use
+   - first fold `DEFAULT_WORLD` + `OPEN_WORLD` into one set of plane options (one world's plane is `generateWorld(seed, OPEN_WORLD)`, which the endless world's E2 later replaces), and move `SIDE_WORLD`'s `rockiness`, `soil`, `patchesPerChunk`, `foodPerCell`, `foodMinDist` and `chamberDepth` (`foundNest`'s default depth), and `groundCell`, into the curtain; then delete `generateSideWorld`'s surface, walkway, ground line and mound, and whatever of `transect.ts` the curtain does not use
+   - the single-map `Game` (owner, #181 D1): tests on hand-made fields that build a `Game` run on `oneArena(field, seed)` (`experiment.ts:1583`); the queenless grow-from-stores path (`colony.ts:2128-2134`) goes. Bare-`Colony` tests on a field keep, as long as a one-field `Colony` stays a plane layer
    - the view proxies: `#entrance === null`, `map.sky`, and `this.queen` read as "side view"
    - the colony-wide strategist (`StanceSituation`)
    - the side-only and top-only params
    - `fungusContext(view)`
    - the plane/curtain twins, merged into one function each: `#believe`, `#dropOut`, `#markMidden`, `heapMound`, `takeLoose`
 
-   Contexts that name a view change, so ship the answers of a live check (`--import`) and note each lane's hourly cost in the PR.
+   `fungusContext` keeps its `-side` form byte for byte, so the shipped fungus answers keep their keys and need no re-ship ([one-world-only.md](one-world-only.md), `precache` row). If a context's string does change, ship the answers of a live check (`--import`) and note each lane's hourly cost in the PR.
 5. **Docs and beads.** Update CLAUDE.md's commands, `one-world.md` and the vision gap table. Close or supersede the beads that were only about the side view.
 
 ## Stage 3: take `Colony` apart (bit-exact)
