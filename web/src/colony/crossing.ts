@@ -137,6 +137,8 @@ export function crossDown(c: Colony, i: number, k: number): void {
   const hc = c.holeCells[k] as HoleCell;
   const p = c.params;
   const gated = k === p.nest && p.leaveGate > 0;
+  // Rouse (ja-rf5.18, design): a host with nothing found counts as a share of a finder to the ants waiting at the top; only where finders invite.
+  if (!c.carrying[i] && gated && p.invitePace > 0) c.holeIn += c.rouse[i];
   if (c.carrying[i]) {
     c.carriedDown++;
     if (gated) {
