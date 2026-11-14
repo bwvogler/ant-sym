@@ -5674,3 +5674,51 @@ Stage 2 goes out in two PRs. This first half carries what the map says; the pale
   - Learn → Policy now shows the aim read-only, so the aim has one home.
 - **Toasts and the tutorial's card** sit above the aim bar on every width, including when it is opened to four lines (the card from 1024 px: review of #189, S5).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+## 70. Mass flows along the hyphae to the tips that grow (design, ja-tgw9, 2026-11-14)
+
+**Research basis:** [mycelial-transport.md](mycelial-transport.md):
+- Growth draws mass toward the tips: each tip is a sink, and flow in a hypha scales with the tips it feeds (Heaton et al. 2010; Roper et al. 2013, full text). Flow also runs back and pulses in some fungi (Schmieder et al. 2019, **unverified**).
+- Cords carry mass 10–100× faster than thin hyphae: up to 13 mm/h in *Serpula* cords (Tlalka et al. 2008, full text), against µm/s in thin hyphae. *Metarhizium* forms no known cords, so a cord rule is a licence borrowed from wood-decay fungi.
+- Fusion is what brings mass to the edge: non-fusing *Neurospora* kept its tracer by the inoculum (Simonin et al. 2012, full text).
+
+**The problem.** The mycelium's free mass (`Evolution.mass` less its hyphae) is one budget that every tip on both maps shares equally (`hyphae.ts` `stepRound`). A cut-off piece is fed as if it touched the patch, and cords change nothing about feeding (`ja-2bw.13`). Owner (2026-11-14): "I don't think they should all share mass. That seems broken."
+
+**Decisions.**
+- Mass flows along the hyphae, chosen over a pool per piece or one pool with near tips first (owner, 2026-11-14). The distance bar built first (`FEED_SPAN`, commit 7aba688) was never merged and is retired.
+- Proposed (needs the owner):
+  - `FLOW_THIN` 3 and `FLOW_CORD` 30 cells a round.
+  - Sources: the patch's roots and a colonised corpse's cell.
+  - Spores taken from the patch's loads.
+  - The growth lane re-asked for the reworded supply and fuse lines, about $0.005.
+
+**The mechanic.**
+- **Loads.** Hypha cells hold loads. Mass enters at sources, and each round the loads move toward the tips, split by the tips fed: up to `FLOW_THIN` cells on thin hypha and `FLOW_CORD` along cords, with a fused pair as an extra edge.
+- **Tips.** A tip senses `supply` from its own cell's load and pays its steps from it.
+- **Cuts.** A cut cell loses its load. A cut-off piece lives on its own loads, then starves into knots if they are bought.
+- **Off.** Behind `fungus.flow`; off is main bit for bit.
+- **Retires** the shared budget.
+
+**Play.**
+- Cords become supply lines, so *a web* is what feeds a far front, and ants digging a cord starve what lies beyond it.
+- The weak start stays: thin flow only before *a web*.
+- Drawing loads makes this visible.
+
+**Assays and targets.** F1–F4 (flow reaches tips, conservation, a cut piece lives on its store, a loop feeds the edge) land first on hand-built mycelia. Then P1 (§63.4) on seeds 1–10 and 11–20 with flow on, against §63.14. The cliff at *a web* and tips resting per round are measured too.
+
+**Cost (estimated).** No new situation field. One re-ask of the growth lane for the reworded legend: 48 situations × 3 aims × ~770 tokens ≈ $0.005. Cached games spend nothing. Tick cost: one pass over the hypha cells a round.
+
+**Beads.** `ja-tgw9` (this), with children:
+- `ja-tgw9.1`: assays F1–F4.
+- `ja-tgw9.2`: loads and flow behind the setting.
+- `ja-tgw9.3`: tune and turn on.
+- `ja-tgw9.4`: draw loads and a Learn entry.
+
+`ja-2bw.13` is superseded by `ja-tgw9.2`, and `ja-2bw.20` (fusion's effect and the fuse criterion) waits on it.
+
+**Still open.**
+- The flow numbers.
+- Whether a corpse pays its mass in at once.
+- Back-flow and pulsing, left out.
+- How long a cut-off piece's reserves should last: nothing measured, so as long as its loads.
+
