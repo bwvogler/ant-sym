@@ -242,8 +242,9 @@ export interface ColonyParams {
   /**
    * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds of digging (counted while it explores in the nest) an old forager
    * home from a trip with nothing takes before it climbs back out. At tunnels' dead ends and forks (walkTunnel) it digs
-   * without the ROOMY_DIG damping and without nestmates by; starting a face (move.ts) and hug's start still damp it in a
-   * roomy nest. It builds and widens no chambers, and stops when the time is up or it picks up food. 0 = off.
+   * without the ROOMY_DIG damping and without nestmates by; starting a face or meeting a tunnel's end head-on (move.ts)
+   * and hug's start still damp it in a roomy nest. It builds and widens no chambers, and stops when the time is up or it
+   * picks up food. 0 = off.
    * Off by the owner's call (2026-11-14): 120 s nearly doubled the buried food taken in an hour (Assay P1, seeds 1-20),
    * but larvae were left waiting beside food in 15 of 16 hour-long games (ja-rvli); on again once larvae are fed.
    */

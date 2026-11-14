@@ -172,6 +172,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.stallT[i] = 0;
     if (colony.since[i] > 0) colony.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
     // Home from a trip with nothing (ja-16rp): an old forager digs out from the nest for a while before it goes out again.
+    // Only just in (since > 0): an ant resting at home keeps what is left of its bout. No pellet: a spoil carrier isn't
+    // home from a search (not met in practice; a guard).
     if (p.forageDig > 0 && colony.since[i] > 0 && mode === RETURN && !carrying && !pellet && colony.queen && colony.band(i) === 2)
       colony.digBout[i] = p.forageDig;
     if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item))) {

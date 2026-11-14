@@ -888,8 +888,8 @@ export class Colony {
 
   /**
    * Whether ant i is on a foraging dig (forageDig, ja-16rp, docs/foraging-tunnels.md): an old forager home from a trip
-   * with nothing, digging out from the nest at tunnels' ends while its bout lasts. It digs alone and whatever the
-   * nest's room, and builds no chambers.
+   * with nothing, digging out from the nest at tunnels' ends while its bout lasts. At walkTunnel's dead ends and forks it
+   * digs alone and whatever the nest's room (move.ts and hug's start still damp it); it builds no chambers.
    */
   forageDigs(i: number): boolean {
     return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2;

@@ -93,7 +93,7 @@ test("forageDig: a bout starts only for an old forager coming home with nothing,
 });
 
 test('forageDig: the trigger is an old ant\'s: a middle-aged ant home in "return" with nothing gets no bout', () => {
-  const bout = (band: 0 | 1 | 2) => {
+  const bout = (band: 0 | 1 | 2, since = 50, left = 0) => {
     // A "return" policy keeps it in return at home (the local rule would send a rested ant out first).
     const c = new Colony(
       generateSideWorld(2, SMALL_SIDE),
@@ -105,14 +105,17 @@ test('forageDig: the trigger is an old ant\'s: a middle-aged ant home in "return
     c.x[0] = c.nest.x;
     c.y[0] = c.nest.y;
     c.mode[0] = RETURN;
-    c.since[0] = 50; // away 50 s
+    c.since[0] = since; // seconds away: 50, just in; 0, resting at home
     c.carrying[0] = 0;
+    c.digBout[0] = left;
     c.tick(1 / 30);
     return c.digBout[0];
   };
   assert.equal(bout(2), 120, "an old forager home empty starts one");
   assert.equal(bout(1), 0, "a middle-aged one does not");
   assert.equal(bout(0), 0, "nor a young one");
+  // Only just in: an old ant resting at home (since 0) keeps what is left of its bout, not a fresh one.
+  assert.ok(Math.abs(bout(2, 0, 50) - 50) < 0.1, "resting at home, its part-spent bout is not set back");
 });
 
 test("forageDig: a bout runs down only underground: exploring on the ground keeps it", () => {
