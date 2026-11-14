@@ -5573,6 +5573,28 @@ M1 counts only foragers whose spot is at least 60° from the trail: a median 25.
 - Measured (Forage, `steerLane` 1): food 875 (427–1,173) against 702 off, lost 7, held ≤ 1; lockAgree 0.89; T1 1.02; M1 memory 0.03 (seeds 1–10).
 - Likely cause for memory: `far` lumps "remembers a find elsewhere" with "has found none", and Jev answers for the second. Proposed: three values, `none`, `far`, `near` (×1.5 situations).
 
+**Round 5 (owner: "split").** `find` takes three values: `none` (no find remembered), `far` (one remembered, elsewhere), `near` (brain v5). M1's helper planted the foragers' memory only with `siteFidelity` on, so every earlier steering M1 run had ants with no memory at all (my assay's fault, not Jev's); it now plants it with `steerLane` on too (F1 unchanged). Re-asked, $0.0044 (204 situations a doctrine, ~172 tokens a question).
+
+| Answers (mean over situations, all three doctrines alike) | P(tight) | P(wide) | memory P(ignore) | memory P(lead) |
+|---|---|---|---|---|
+| `none` | 0.26–0.28 | 0.26–0.30 | 0.75–0.78 | 0.03 |
+| `far` | 0.25–0.27 | 0.30–0.32 | 0.31–0.33 | 0.41–0.43 |
+| `near` | 0.26–0.28 | 0.27–0.31 | 0.25–0.26 | 0.33–0.36 |
+
+| Measured (first colony; M1 seeds 1–10, the rest 1–5; median, range) | off | on |
+|---|---|---|
+| Forage food | 702 (499–973) | 523 (397–1,254) |
+| Warlike food | 622 (296–1,323) | 603 (319–1,248) |
+| Lost, Forage / Warlike | 9 / 4 | 9 / 2 |
+| T1, Forage / Warlike | 1.00 / 0.99 | 1.07 / 1.05 |
+| M1 memory (trail), Forage | 0.06 (0.16) | 0.29 (0.04) |
+| M1 memory (trail), Warlike | 0.02 (0.22) | 0.15 (0.04) |
+
+- Memory now behaves as the biology says, in direction: remembering a find, an ant mostly sets out for it and the trail takes few (M1 trail share 0.16–0.22 → 0.04); short of the 0.8 target, as P(lead) ≈ 0.4 says it would be.
+- Search does not depend on `find` in the preset doctrines' answers (P(tight) the same near and far), so T1 barely moves; the doctrine probe shows Jev does set it when the words ask.
+- Food over 5 seeds swings too widely to call (round 4's +25 % for Forage did not hold); held carriers stay at 0–1.
+- Spent on the lane so far: $0.0156.
+
 **Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
 
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
