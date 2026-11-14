@@ -106,9 +106,6 @@ git -C "$repo" worktree add -q --detach "$tmp/wt" HEAD
 check "left worktree blocks" block "$(stop false)"
 check "never twice in a row" allow "$(stop true)"
 git -C "$repo" worktree remove --force "$tmp/wt"
-echo '{"x":1}' >"$repo/.beads/issues.jsonl"
-check "jsonl export blocks" block "$(stop false)"
-git -C "$repo" checkout -q -- .beads/issues.jsonl
 git -C "$repo" worktree add -q -b side "$tmp/wt2" HEAD
 check "a named-branch worktree is not ours" allow "$(stop false)"
 git -C "$repo" worktree remove --force "$tmp/wt2"
