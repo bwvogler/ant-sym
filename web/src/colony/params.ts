@@ -231,6 +231,24 @@ export interface ColonyParams {
    * while the colony starved beside a full store.
    */
   restFetch: number;
+  /**
+   * ja-rvli: how strongly a larva begs while it is still owed the food it grows on (felt by touch, as hunger is; hungry
+   * larvae beg by movements nurses feel, Peignier et al. 2019). Without it a larva asked for nothing until hungry, about
+   * two minutes after its last meal, and was fed only when ants hungry themselves happened to fetch food by it. 0 = off.
+   * 0.3, measured over 16 hour-long games (PRD §70): on its own it left more larvae waiting than off (peaks 54, 29, 27 against
+   * at most 19), so it stays off; a fix for ja-rvli needs another cue.
+   */
+  owedBeg: number;
+  /**
+   * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds of digging (counted while it explores in the nest) an old forager
+   * home from a trip with nothing takes before it climbs back out. At tunnels' dead ends and forks (walkTunnel) it digs
+   * without the ROOMY_DIG damping and without nestmates by; starting a face or meeting a tunnel's end head-on (move.ts)
+   * and hug's start still damp it in a roomy nest. It builds and widens no chambers, and stops when the time is up or it
+   * picks up food. 0 = off.
+   * Off by the owner's call (2026-11-14): 120 s nearly doubled the buried food taken in an hour (Assay P1, seeds 1-20),
+   * but larvae were left waiting beside food in 15 of 16 hour-long games (ja-rvli); on again once larvae are fed.
+   */
+  forageDig: number;
   /** One world's plane, with routeMemory: cells walked between two stored places. */
   routeStep: number;
   /** One world's plane, with routeMemory: a stored place this close counts as recognised (0: only the next place in order, within LOOP_AT). */
@@ -403,6 +421,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMemory: 1,
   scentReach: 1,
   restFetch: 1,
+  forageDig: 0,
+  owedBeg: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,
