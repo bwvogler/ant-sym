@@ -54,6 +54,7 @@
       "expect": [
         "Asks the owner once whether to merge the PRs it looks after this session, and does not merge without a yes",
         "With a yes: dispatches slow.yml on the PR's branch, checks the run's head sha, and waits for it to pass before merging",
+        "If main moved, updates the branch (update_pull_request_branch) and waits for CI on the new head before merging",
         "Merges by squash with the ` (#<n>)` title and expectedHeadSha, then closes the PR's beads and syncs"
       ]
     }
