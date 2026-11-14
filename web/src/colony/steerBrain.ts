@@ -19,7 +19,7 @@ import {
 // switches them on (ja-ykmu.4), and the weights asked are part of the key, as the fungus's levers are.
 
 /** Bump when the legend, the questions or what an answer means changes: old cached answers no longer apply. */
-export const STEER_BRAIN_VERSION = 4;
+export const STEER_BRAIN_VERSION = 5;
 
 /** The weights asked unless the Lab adds design ones: the two the biology lets a situation set (docs/steering.md §3, §7). */
 export const STEER_ASKED: readonly SteerWeight[] = ["search", "memory"];
@@ -38,7 +38,7 @@ export const STEER_MEANINGS: Record<SteerWeight, string> = {
 
 export const STEER_LEGEND =
   COLONY_LEGEND +
-  " Each ant here has just set out to explore or to follow (its mode). find is where it is relative to where it last found food, by its own memory of the way there: near (at that spot) or far (elsewhere, or it has found none). Set how strongly it weighs each cue as it steers, for each weight asked: low, medium or high. Real foragers search tightly where they found food and range straighter elsewhere, and after one visit they head back to a find they remember rather than follow a trail to another. " +
+  " Each ant here has just set out to explore or to follow (its mode). find is where it is relative to where it last found food, by its own memory of the way there: none (it remembers no find), far (it remembers one, elsewhere) or near (at that spot). Set how strongly it weighs each cue as it steers, for each weight asked: low, medium or high. Real foragers search tightly where they found food and range straighter elsewhere, and after one visit they head back to a find they remember rather than follow a trail to another. " +
   STEER_WEIGHTS.map((w) => STEER_MEANINGS[w]).join(". ") +
   ".";
 
@@ -149,7 +149,7 @@ export function steerContext(doctrine: string): string {
   return `steer-v${STEER_BRAIN_VERSION}-${hash(STEER_LEGEND + JSON.stringify(steerQuestion("w0", STEER_WEIGHTS)) + "\u0000" + doctrine.trim())}`;
 }
 
-/** Every situation the lane can be asked in: the mode lane's with the mode explore or follow, far from and near its last find. */
+/** Every situation the lane can be asked in: the mode lane's with the mode explore or follow, with no find, far from one and near it. */
 export function steerSituations(): SteerSituation[] {
   const out: SteerSituation[] = [];
   for (let c = 0; c < SITUATION_SCHEMA.size; c++) {

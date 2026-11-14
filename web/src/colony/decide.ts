@@ -157,13 +157,15 @@ export function decide(col: Colony, i: number, s: AntStep): void {
       col.mode[i] = mode;
       // Its steering weights (staging, ja-ykmu; docs/steering.md): asked for the situation with the mode it now has, when that
       // sends it out exploring or following; any other mode steers by its own routine, so its code goes back to none.
-      // Its weights away from its last find, and, when it remembers one, near it: steer.ts takes whichever its memory says it is at.
+      // Its weights with no find remembered, or, remembering one, away from it and near it: steer.ts takes whichever its memory says.
       if (p.steerLane > 0) {
         const out = mode === EXPLORE || mode === FOLLOW;
         const now = { ...sit, mode: MODES[mode] as Mode };
-        col.steerCode[i] = out ? encodeSteering(col.steerPolicy({ ...now, find: "far" }, col.policyDraw)) : STEER_NEUTRAL;
-        col.steerNear[i] =
-          out && !Number.isNaN(col.foodX[i]) ? encodeSteering(col.steerPolicy({ ...now, find: "near" }, col.policyDraw)) : col.steerCode[i];
+        const remembers = !Number.isNaN(col.foodX[i]);
+        col.steerCode[i] = out
+          ? encodeSteering(col.steerPolicy({ ...now, find: remembers ? "far" : "none" }, col.policyDraw))
+          : STEER_NEUTRAL;
+        col.steerNear[i] = out && remembers ? encodeSteering(col.steerPolicy({ ...now, find: "near" }, col.policyDraw)) : col.steerCode[i];
       }
       col.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
       col.seen[before] = 1;

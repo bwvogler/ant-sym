@@ -2660,9 +2660,12 @@ export const route1: Assay = {
   score: () => ({}),
 };
 
-/** F1's find, remembered: ant i's belief of the food relative to its hole, as Colony's pickup would have left it (siteFidelity on; off, none). */
+/**
+ * F1's find, remembered: ant i's belief of the food relative to its hole, as Colony's pickup would have left it (with siteFidelity or,
+ * on staging, steerLane on, as the pickup does: arrive.ts; both off, none).
+ */
 function rememberAt(c: Colony, i: number, rx: number, ry: number): void {
-  if (c.params.siteFidelity <= 0) return;
+  if (c.params.siteFidelity <= 0 && c.params.steerLane <= 0) return;
   c.foodX[i] = rx;
   c.foodY[i] = ry;
 }

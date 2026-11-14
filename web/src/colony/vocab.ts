@@ -180,11 +180,11 @@ export function decodeSteering(code: number): Steering {
   return out as Steering;
 }
 /**
- * Where an ant out steers relative to its last find, by its own memory (the way to it, kept one trip): `near` within FIND_NEAR of
- * where it believes the spot is, `far` elsewhere or with no find remembered (staging, ja-ykmu.3; docs/steering.md §7: search turns
- * tight where food was found).
+ * Where an ant out steers relative to its last find, by its own memory (the way to it, kept one trip): `none`, it remembers no find;
+ * `far`, it remembers one elsewhere; `near`, within params.findNear of where it believes the spot is (staging, ja-ykmu.3;
+ * docs/steering.md §3, §7). `far` once also meant "none": Jev answered for that and ignored the memory (PRD S3, round 4).
  */
-export const FINDS = ["far", "near"] as const;
+export const FINDS = ["none", "far", "near"] as const;
 export type Find = (typeof FINDS)[number];
 /** The steer lane's situation: the mode lane's, with the mode the ant now has, and where it is relative to its last find. */
 export type SteerSituation = Situation & { readonly find: Find };
