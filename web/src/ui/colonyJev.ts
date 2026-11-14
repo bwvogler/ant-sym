@@ -270,8 +270,7 @@ export class ColonyJev {
   });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
-    this.#followMenu();
-    return askedLevers(this.#menu, s?.task === "queen");
+    return askedLevers(this.#menuNow(), s?.task === "queen");
   }
   /** The menu the fungus lane asks under now (after following the fungus's, if it changed). */
   #menuNow(): ReadonlySet<string> {

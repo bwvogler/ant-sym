@@ -1058,6 +1058,49 @@ test("busy after a new game: the situations go back into the new game's lanes, n
   for (const s of asked[0]!) assert.ok(later.has(s), `asked again after busy: ${s}`);
 });
 
+test("a lane's asked counts what it sent, less what came back busy; a new run starts every lane's at 0 and keeps what is cached (review of #208, S1)", async () => {
+  const gate = deferred<void>();
+  const sizes: number[] = []; // situations in each mode request, in order sent
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants?: Record<string, unknown> } };
+    if (req.state.ants) {
+      sizes.push(Object.keys(req.state.ants).length);
+      if (sizes.length === 1) {
+        await gate.promise;
+        return { ok: false, status: 429, json: async () => ({ error: "busy", run: RUN }) } as Response;
+      }
+    }
+    const r = await answerAll("explore")(req);
+    return { ok: true, status: 200, json: async () => r.body } as Response;
+  }) as typeof fetch;
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 2);
+  await tick(30); // the first mode request is out, held
+  assert.equal(sizes.length, 1);
+  assert.equal(j.state.lanes.mode.asked, sizes[0], "counted when sent");
+  gate.resolve(); // busy: its situations are taken back off the count
+  await tick(0);
+  assert.equal(j.state.lanes.mode.asked, 0, "a busy request's situations are not counted as asked");
+  await tick(60); // asked again, answered
+  assert.ok(sizes.length >= 2, "asked again after busy");
+  assert.equal(
+    j.state.lanes.mode.asked,
+    sizes.slice(1).reduce((a, b) => a + b, 0),
+    "every request but the busy one",
+  );
+  const cached = j.state.lanes.mode.cached;
+  assert.ok(cached > 0);
+  await j.stop();
+  await j.start();
+  for (const name of ["mode", "stance", "fungus", "growth"] as const)
+    assert.equal(j.state.lanes[name].asked, 0, `${name}: a new run has asked nothing yet`);
+  assert.equal(j.state.lanes.mode.cached, cached, "what is cached outlives the run");
+});
+
 test("a colony with no doctrine of its own follows the first colony's when it changes (ja-6yj)", () => {
   const store = memoryStore();
   store.data.set(policyContext("Later."), [[situationKey(sit()), "follow"]]);
