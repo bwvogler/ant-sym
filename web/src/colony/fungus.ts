@@ -154,8 +154,8 @@ export interface FungusParams {
   /**
    * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
    * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
-   * paired test gives a ratio, so this is a design number. Off (1) until it is chosen on the progression with Stalks
-   * in (owner, 2026-11-14; PRD §63.13, ja-19oz): at 4 it slowed seed 11 by 39 %
+   * paired test gives a ratio, so this is a design number. Off (1): ×2–×4 missed P1 on the progression, and ×4 with
+   * Stalks given at landing missed it further (PRD §63.13, ja-19oz; seed 9 took twice as long)
    */
   sun: number;
   /** spores a cell holds at most */
@@ -765,7 +765,8 @@ export class Fungus {
     // One world's plane is the sunlit surface (ja-6ip): spores lying out on it fade `sun` times faster, but not on the
     // mycelium's own patch (its base), which fruits in the litter under the surface (docs/hyphal-growth.md §6). On one
     // map (layer −1) and in the curtain the soil shades them all. The length test is defensive: a game of one map steps
-    // through step() (layer −1); only stepLayers on a fungus of one map would pass layer 0.
+    // through step() (layer −1); only stepLayers on a fungus of one map would pass layer 0. The `sun !== 1` term only
+    // skips work: at 1, burn equals keep.
     const sunlit = layer === PLANE && this.#layers.length > 1 && p.sun !== 1;
     const keep = Math.exp(-p.sporeDecay * dt);
     const burn = sunlit ? Math.exp(-p.sporeDecay * p.sun * dt) : keep;

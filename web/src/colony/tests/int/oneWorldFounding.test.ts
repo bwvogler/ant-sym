@@ -354,7 +354,7 @@ test("founding mid-game, 20 s in: every colony's way out (its out-field) is rebu
   const g = game(1, 40);
   const w = g.world!;
   for (let k = 0; k < Math.round(20 / DT); k++) g.tick(DT);
-  const built = g.colonies.map((c) => c.layers[CURTAIN]!.outDist?.length ?? 0);
+  const built = g.colonies.map((c) => c.layers[CURTAIN]!.outDist?.dist.length ?? 0);
   assert.ok(
     built.every((n) => n > 0),
     "every colony has built its out-field before the founding",
@@ -373,9 +373,15 @@ test("founding mid-game, 20 s in: every colony's way out (its out-field) is rebu
     g.colonies.forEach((c, j) => {
       const L = c.layers[CURTAIN]!;
       if (!L.outDist || L.outAt <= at) return;
-      // Cell (x, y) is at y·w + x − x0 of the curtain as it stands: a field kept from before reads every cell wrong.
-      assert.equal(L.outDist.length, cw * h, `colony ${j}'s out-field, rebuilt at ${L.outAt.toFixed(2)} s, covers the grown curtain`);
-      assert.equal(L.outDist[L.entranceRow * cw + L.entranceCol - x0], 0, `colony ${j}'s out-field starts at its hole`);
+      // Built over the curtain as it stands: a field kept from before the growth would be built over the old one.
+      const f = L.outDist;
+      assert.deepEqual(
+        [f.mapX0, f.mapW],
+        [x0, cw],
+        `colony ${j}'s out-field, rebuilt at ${L.outAt.toFixed(2)} s, is over the grown curtain`,
+      );
+      assert.ok(f.x0 >= x0 && f.x0 + f.w <= x0 + cw && f.dist.length === f.w * h, `colony ${j}'s out-field's window lies in the curtain`);
+      assert.equal(f.dist[L.entranceRow * f.w + L.entranceCol - f.x0], 0, `colony ${j}'s out-field starts at its hole`);
       rebuilt.add(j);
     });
   }

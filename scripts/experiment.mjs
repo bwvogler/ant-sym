@@ -28,7 +28,7 @@
 // its own policy or stance (A6's raiders) keeps it.
 //
 // --log <spec> keeps a game journal of each run (colony/journal.ts, ja-8tb): what happened, as events. The spec is
-// a level (summary; detail adds births, deaths, infections; verbose adds every mode change), categories (colony, queen, stance, birth, death, mode, infection) and filters
+// a level (summary; detail adds births, deaths, infections; verbose adds every mode change and foraging digs), categories (colony, queen, stance, jev, birth, death, mode, infection, dig) and filters
 // (colony=<k>, ant=<i>), comma-separated: --log summary, --log death,mode,colony=0, --log verbose,ant=42. Each run
 // writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
 // --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second
