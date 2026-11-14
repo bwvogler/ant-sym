@@ -178,7 +178,7 @@ These levers have direct physical basis. They are not decisions: the host's poli
 
 ## 5. The fungus policy
 
-**The player is the fungus, and nothing else.** No colony, no side, no ant to command. The player never picks an ant's mode, and never picks a host's intervention directly. The player shapes **the policy** that picks interventions, and places the fungus in space. The policy does the rest, host by host. §5.1 is the set of levers the player has on it; §5.2 is the policy itself.
+**The player is the fungus, and nothing else.** No colony, no side, no ant to command. The player never picks an ant's mode, and never picks a host's intervention directly. The player shapes **the policy** that picks interventions. Where the fungus lands is the seed's, not the player's (§5.1). The policy does the rest, host by host. §5.1 is the set of levers the player has on it; §5.2 is the policy itself.
 
 **What the policy decides.** For each host, which **intervention** the fungus inside it runs. An intervention is a preset bundle of levers from §4, so the choice is a small `choice` question, and the levers' numbers live in code where they can be tuned and tested.
 
@@ -192,16 +192,16 @@ Four ways to shape the policy, coarse to fine:
 
 1. **The upgrades — what the fungus can do, and how far.** The fungus's growth earns mutations, which the player spends on upgrades (PRD §50.12–13, §50.16). This is what the strain choice was meant to be: the **action space** the policy chooses from, not the choice.
    - *Spread* upgrades set its traits: Infectivity, Persistence, Mycelium, Fruiting body, Immune evasion.
-   - *Reach* upgrades set how far each lever may go: Stealth, Senses, Recognition, Trails, Royal. A lever with no reach stays "as is", whatever is asked.
+   - *Reach* upgrades set how far each lever may go: Stealth, Senses, Recognition, Trails, Royal. A lever with no reach stays "as is", whatever is asked; the Senses levers start at one step without the upgrade.
    - The *lethal* levers (Odour weapon, Crown) are upgrades too: the fungus may kill only once one is kept.
    - Jev is asked the full range whatever the reach, so an upgrade re-asks nothing.
    "Other organisms, eventually" (§9.2) still lives here: another organism is another trait and upgrade set. Lockpick and Bloom, the first plan's other strains, stay as lab and test strains (`STRAINS`); variety, if wanted, would come as upgrade branches of the evolving fungus (`ja-lo8.17`).
 
 2. **The aim — the policy's goal, in the player's words.** Natural language, the fungus's analogue of a colony's doctrine, with presets (Unite, Spread, Peace) or the player's own words. It rides only in the fungus lanes' requests (the lever lane of §5.2, and the growth lane that steers its hyphae, PRD §63.5), never in an ant's. Changing it re-asks only the fungal situations the game meets, and caches are kept per aim, so an aim used before is free.
 
-3. **The menu — turning the policy's options on and off.** The player turns single levers off for a game, for example every lethal one for a pacifist game. It edits the policy's action space directly. With Jev the levers asked are part of each question's key; with the local rule a lever off the menu is left as it is. A lever on the menu still needs its upgrade to reach anything.
+3. **The menu — turning the policy's options on and off.** The player turns single levers off for a game, for example every lethal one for a pacifist game. It edits the policy's action space directly. With Jev the levers asked are part of each question's key; with the local rule a lever off the menu is left as it is. A lever on the menu still reaches only as far as its upgrade allows (most reach nothing without one).
 
-4. **The local rule's switches — free play without Jev.** The free local rule (§5.2) has two switches (Details → Lab): **groomed hosts hide** (a groomed host goes dormant) and **cull** (a host fighting a foreigner uses the odour weapon, if kept and on the menu). Otherwise the rule plays the strain's default. They are the baseline the Jev policy is measured against. The first plan's sliders were not built: four situational rules were measured against the strain's default and none beat it (PRD §19).
+4. **The local rule's switches — free play without Jev.** The free local rule (§5.2) has two switches (Details → Lab, and the Learn drawer beside the aim and the menu): **groomed hosts hide** (a groomed host goes dormant) and **cull** (a host fighting a foreigner uses the odour weapon, if kept and on the menu). Otherwise the rule plays the strain's default. They are the baseline the Jev policy is measured against. The first plan's sliders were not built: four situational rules were measured against the strain's default and none beat it (PRD §19).
 
 **So: the fungus lands where the seed puts it; the player chooses what it becomes (upgrades), what it wants (aim), what it may do (menu), and how the free rule plays. The policy turns all of that into one intervention per host per situation.**
 
@@ -217,9 +217,9 @@ Four ways to shape the policy, coarse to fine:
 | **blend** | B3 contact blending ↑, B5 diet, A11 template drift, B7 mask at high load | when contact is calm and the colonies are still apart |
 | **share** | A3 rival-trail reading, C2 cross-laying, A1 food gain ↑ | foragers on shared ground: shared routes and food |
 | **roam** | A9 noise, A10 longer clock, A2 home gain ↓, S5 exile | to push hosts out to the frontier, where the colonies meet |
-| **cull** (lethal; strain-gated) | B6 odour weapon, D4 summit | thin a colony's most warlike ants, or raise a spore beacon — costs the host |
+| **cull** (lethal; needs its upgrade and the menu) | B6 odour weapon, D4 summit | thin a colony's most warlike ants, or raise a spore beacon — costs the host |
 
-`cull` exists only in strains whose traits allow killing (§5.1 lever 2); a *Rickia*-like strain omits it and the policy never offers it. Specialization comes from **where** the fungus runs which intervention, together with the thresholds (A7): a colony whose foragers carry *share* and whose border carries *soothe* sorts itself into haulers and peacekeepers.
+`cull` reaches nothing until a lethal upgrade (Odour weapon, Crown) is kept, and is asked only while it is on the menu (§5.1 levers 1 and 3); lethal levers start off the menu. *(First planned as strain-gated: a* Rickia*-like strain would omit it.)* Specialization comes from **where** the fungus runs which intervention, together with the thresholds (A7): a colony whose foragers carry *share* and whose border carries *soothe* sorts itself into haulers and peacekeepers.
 
 **The fungus's own situation.** This is what the fungus in one host can sense. It is coarse, so it caches like the ant situations:
 
@@ -296,8 +296,8 @@ Five pieces. Each is pure TypeScript in `web/src/colony/`, testable with `node -
 ## 9. Decisions (2026-11-01)
 
 1. **The player is only the fungus.** No colony, no side. Both colonies run their own policies (local rule or Jev under their own doctrine). The player acts solely through §5.1.
-2. **Other organisms, eventually.** The fungus is organism #1. A strain is a trait set (§5.1 lever 2), and a later organism — nematode, fluke, bacterium, a parabiotic partner — is another trait set with its own levers and situation fields. The perceived-state architecture (§2) and the two-policy split must stay general enough that adding one touches a trait table, not the engine.
-3. **The fungus may kill.** Lethal levers (`cull`: B6 odour weapon, D4 summit) are allowed, but strain-gated: a strain only offers them if its traits permit killing, so a non-lethal game is a strain choice, not a code path.
+2. **Other organisms, eventually.** The fungus is organism #1. A strain is a trait set (since PRD §50.12, the fungus's upgrades: §5.1 lever 1), and a later organism — nematode, fluke, bacterium, a parabiotic partner — is another trait set with its own levers and situation fields. The perceived-state architecture (§2) and the two-policy split must stay general enough that adding one touches a trait table, not the engine.
+3. **The fungus may kill.** Lethal levers (`cull`: B6 odour weapon, D4 summit) are allowed, but strain-gated: a strain only offers them if its traits permit killing, so a non-lethal game is a strain choice, not a code path. *(As built: a lethal lever needs its upgrade kept and the lever on the menu, where it starts off (§5.1); a non-lethal game is a menu choice.)*
 4. **The policy picks interventions; the player modifies the policy.** Not a brush-per-intervention. The player's levers were five in the first plan — brush (where + strain), strain (what's possible), aim (the goal), menu (options on/off), thresholds (free tuning); since PRD §50.15 they are the four of §5.1 (upgrades, aim, menu, the local rule's switches). The policy (local rule or Jev) turns them into one intervention per host.
 
 **Still open:** the win condition — merged colonies (one alliance) versus lasting peace with exchange (§1). Leaning toward the unity meter as a score and "merged + no deaths for 60 s" as the clean ending, with the merge itself a consequence of perception (§4.B), not a fungus action. Revisit alongside MR 10's lifetime world, where nothing ends.
@@ -459,7 +459,7 @@ Each lever is a gain on one channel. The policy sets a **level** for every lever
 
 ### 11.5 One fungus
 
-- **The game has one fungus, the player's.** The built strains (Lockpick, Bloom, Garden) were three trait sets the player painted. In the game they become lab presets in the Details screen, for the assays.
+- **The game has one fungus, the player's.** The built strains (Lockpick, Bloom, Garden) were three trait sets the player painted. In the game they became lab presets in the Details screen, for the assays; since PRD §50.15 nothing in the app lays Lockpick or Bloom, which stay as lab and test strains for the assays and scripts (§5.1, `ja-lo8.17`).
 - **What a strain gated now has other homes:**
   - *which interventions exist* becomes the lethal switch and the lever table;
   - *how visible and how fast it spreads* become the "fungus showing" lever and the fungus's own fixed traits.
