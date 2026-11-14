@@ -283,7 +283,7 @@ test("one world: spores on the sunlit plane fade `sun` times faster than in the 
   const offPatch = patch.sporesOn(0)!.spores.get(30, 6);
   assert.ok(near(onPatch, 4 * Math.exp(-sporeDecay)), `on the patch: ${onPatch}`);
   assert.ok(near(offPatch, 4 * Math.exp(-sporeDecay * sun)), `off it: ${offPatch}`);
-  const one = new Fungus(arena());
+  const one = new Fungus(arena(), { sun: 4 });
   one.paint([], x, y, 0.5, 4, 0, BLOOM);
   run(one, [], 1);
   assert.ok(near(one.spores.get(15, 6), 4 * Math.exp(-sporeDecay)), "a map of its own fades as underground");
