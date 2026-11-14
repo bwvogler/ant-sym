@@ -145,7 +145,7 @@ test("a menu change while a fungus question is in flight: its answer is kept for
     { answer: "0,0", by: "jev" },
     "paid for under m1, kept under m1 (levels in table order: alarm, calm)",
   );
-  assert.equal(j.state.fungusCached, 1);
+  assert.equal(j.state.lanes.fungus.cached, 1);
 });
 
 test("a 409 ends the run and cancels what is still in flight: Start again asks it once, never alongside the old run's copy", async () => {
