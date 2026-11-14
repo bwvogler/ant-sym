@@ -88,3 +88,18 @@ test("ci-report: outside Actions it prints nothing, even for a failure (local ru
   const stdout = run.stdout;
   assert.equal(stdout, "");
 });
+
+test("ci-report: a file's time is its own test:complete, module loading included, whatever order its tests' events come in", async () => {
+  // In a shard a file's own tests often report after the file-level event (37 of 45 int, golden, ui and server files run
+  // together; review of #175, S4), and the per-file test:summary leaves module loading out. A dynamic import, as tsc has
+  // no types for the .mjs.
+  type Summarise = (events: { type: string; data: unknown }[]) => { durations: Map<string, number> };
+  const { summarise } = (await import(REPORTER)) as { summarise: Summarise };
+  const file = "/w/web/src/a.test.ts";
+  const s = summarise([
+    { type: "test:complete", data: { nesting: 0, file, name: "src/a.test.ts", details: { duration_ms: 9000 } } },
+    { type: "test:complete", data: { nesting: 0, file, name: "quick", details: { duration_ms: 3 } } },
+    { type: "test:summary", data: { file, duration_ms: 40, counts: {} } },
+  ]);
+  assert.equal(s.durations.get(file), 9000);
+});

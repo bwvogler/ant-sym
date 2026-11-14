@@ -31,7 +31,7 @@ Any other conflict: resolve it, then run the fast checks below before pushing.
 
 ## Red CI
 
-Find the cause; a job gets one re-run at most. Each test shard step ends its log with one `::error` line per failure and a `::warning` per file near its limit (`scripts/ci-report.mjs`): read the step's last lines (`mcp__github__get_job_logs` with `tail_lines`), not the whole log. Per-file times are in the run's `test-durations-N` artifacts. This repo's usual causes:
+Find the cause; a job gets one re-run at most. Each test shard step prints one `::error` annotation per failure and one `::warning` per file near its limit (`scripts/ci-report.mjs`), right after that step's `ℹ duration_ms` totals. Read the job's log (`mcp__github__get_job_logs`, ~400 lines when green) and search it for `error` and `warning`: its last ~55 lines are the artifact upload and clean-up, so a short `tail_lines` misses them. Per-file times are in the run's `test-durations-N` artifacts. This repo's usual causes:
 
 | Red check | Cause and fix |
 |---|---|

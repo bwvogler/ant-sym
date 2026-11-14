@@ -120,8 +120,10 @@ export function render(s, { limitMs, title, root }) {
 function limitMs() {
   const fromEnv = Number(process.env.TEST_FILE_LIMIT_MS);
   if (fromEnv > 0) return fromEnv;
-  const flag = process.execArgv.find((a) => a.startsWith("--test-timeout="));
-  return flag ? Number(flag.slice("--test-timeout=".length)) || 0 : 0;
+  // Either spelling: --test-timeout=<ms> or --test-timeout <ms>.
+  const a = process.execArgv;
+  const i = a.findIndex((x) => x === "--test-timeout" || x.startsWith("--test-timeout="));
+  return i < 0 ? 0 : Number(a[i].startsWith("--test-timeout=") ? a[i].slice("--test-timeout=".length) : a[i + 1]) || 0;
 }
 
 /** The reporter: collects every event, then writes the summary, the durations and the annotations once at the end. */
@@ -131,7 +133,11 @@ export default async function* ciReport(source) {
   const s = summarise(events);
   const env = process.env;
   const root = env.GITHUB_WORKSPACE ?? process.cwd();
-  const out = render(s, { limitMs: limitMs(), title: env.TEST_REPORT_TITLE || "Tests", root });
+  const out = render(s, {
+    limitMs: limitMs(),
+    title: env.TEST_REPORT_TITLE || "Tests",
+    root,
+  });
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, out.markdown);
   if (env.TEST_DURATIONS_FILE)
     writeFileSync(
