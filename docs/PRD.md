@@ -5461,9 +5461,8 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 **Decisions.**
 - Build it (owner, §50.5 and 2026-11-14).
-- Option 1 first, the network (proposed: needs the owner).
-- Option 2, a soil food odour, only on the owner's say; it admits a design-only sense (proposed: needs the owner).
-- Who digs: old foragers, or the middle-aged when hungry (proposed: needs the owner).
+- Option 1 first, the network; the soil odour (option 2) is decided later, only if pockets stay untouched (owner, 2026-11-14).
+- Old foragers dig the foraging tunnels; the middle-aged keep digging the nest as now (owner, 2026-11-14).
 
 **The mechanic.**
 - *Option 1:* a forager whose search outside failed (fatigue past patience) or that feels the colony's hunger (felt need at its threshold), at a dead end in its own nest, digs on outward (home vector) and level or down (gravity), exempt from `ROOMY_DIG` and the middle-aged-only rule for that dig. Food is found by contact, then taken home by what is built (open-ground food sensing, trails, STORE_AFTER). Off (0) is main bit for bit. It adds no global read.
@@ -5477,4 +5476,4 @@ The 8 hour-long games (economy.test's `hour()`, worlds 1–4 × seeds 0, 1):
 
 **Beads.** ja-16rp (this; supersedes ja-p0k), ja-16rp.1 (assay P1), ja-16rp.2 (option 1), ja-16rp.3 (option 2, owner's call), ja-16rp.4 (read Markin 1975 and Bernklau 2005 in full).
 
-**Still open.** The owner's calls above; how deep and how far the network should run; whether two colonies' networks meeting needs handling.
+**Still open.** Option 2 (after option 1's results); how deep and how far the network should run; whether two colonies' networks meeting needs handling.

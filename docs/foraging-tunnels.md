@@ -51,8 +51,8 @@ Cheapest first. Each is a setting whose 0 is main bit for bit; all are steering 
 
 ## Open questions
 
-- Owner: build option 1 alone first, or 1 and 2 together? Option 2 admits a new, design-only sense.
-- Owner: who digs foraging tunnels: the old foragers (in fire ants, "as recruits age, they become scouts searching for food on the surface", Tschinkel 2011), or the middle-aged diggers when hungry?
+- Decided (owner, 2026-11-14): option 1 first; option 2 only if pockets stay untouched after it.
+- Decided (owner, 2026-11-14): the old foragers dig the foraging tunnels (in fire ants, "as recruits age, they become scouts searching for food on the surface", Tschinkel 2011); the middle-aged keep digging the nest.
 - How deep and how far: a network level with the pockets' depth, or sloping down? Measured by P1 per setting.
 - Whether two colonies' networks meeting needs its own handling (ja-war).
 
