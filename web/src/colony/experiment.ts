@@ -13,7 +13,7 @@ import {
   PLANE,
   planeMoundReach,
 } from "./colony.ts";
-import { EXPLORE, FAINT, MODES, RETURN, type Mode, type Policy, type Stance, type StancePolicy } from "./vocab.ts";
+import { EXPLORE, FAINT, MODES, RETURN, type Mode, type Policy, type Stance, type StancePolicy, type SteerPolicy } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
@@ -441,6 +441,8 @@ export interface Overrides {
   policy?: Policy;
   /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
   rivalPolicy?: Policy;
+  /** every colony's steer policy (staging, ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
+  steer?: SteerPolicy;
   stance?: StancePolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
@@ -473,12 +475,16 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
   if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
+  const steer = o.steer;
+  const events = steer
+    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
+    : spec.events;
   if (o.stance && !sides.stance) sides.stance = o.stance;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, sides, game };
+  return { ...spec, sides, game, events };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

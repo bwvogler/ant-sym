@@ -304,6 +304,19 @@ async function work() {
       return a === undefined ? localPolicy(s) : pick(a, draw);
     };
     Object.assign(brains, { policy: mode, rivalPolicy: mode });
+    // The doctrine's steering weights too, where a bundle ships (staging, ja-ykmu.3): they act only with --set both.steerLane=1.
+    const { existsSync } = await import("node:fs");
+    const steerFile = `web/public/precache/steer-${policy.slice(9)}.json`;
+    if (existsSync(steerFile)) {
+      const { steerKey, steeringOf, localSteer } = await import("../web/src/colony/index.ts");
+      const steers = new Map(JSON.parse(readFileSync(steerFile, "utf8")));
+      brains.steer = (s) => {
+        const key = steerKey(s);
+        const a = steers.get(key);
+        count("steer", a !== undefined);
+        return a === undefined ? localSteer(s) : steeringOf(key, a);
+      };
+    }
   } else if (policy) {
     const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
     const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/index.ts");
