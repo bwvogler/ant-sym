@@ -316,6 +316,9 @@ export const ANT_FIELDS = {
   // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
   /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
   digBout: { type: Float32Array, reset: "spawn" },
+  // ——— the fungus's rouse (ja-rf5.18), last for the same reason ———
+  /** rouse (ja-rf5.18, the fungus's): coming down its shaft, it counts as this share of a finder to the ants waiting at the top */
+  rouse: { type: Float32Array, reset: "asIs" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

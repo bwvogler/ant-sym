@@ -16,10 +16,10 @@ import { OPEN, rockAt, SOIL } from "../../world.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100), hyphae on, the fungus landed by colony 0's hole and evolving. */
-function game(hyphae: boolean): Game {
+function game(hyphae: boolean, flow = false): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae } },
+    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae, flow } },
     gameRng(7),
     // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
     { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
@@ -110,6 +110,21 @@ test("a game with hyphae saves and loads as it was", () => {
   back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
   assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
   assert.deepEqual(back.fungus.hyphaeOn(CURTAIN)!.save(), g.fungus.hyphaeOn(CURTAIN)!.save());
+});
+
+test("with mass flow on (the default), a game saves, loads and plays on as it would have (ja-tgw9)", () => {
+  const g = game(true, true);
+  crossDown(g);
+  runFor(g, 20);
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true, true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
+  assert.ok(g.fungus.hyphaeOn(PLANE)!.loaded > 0, "nothing in transit to save");
+  // Played on, the loaded game's hyphae match the unbroken game's: loads, links and idle rounds all came back.
+  runFor(g, 60);
+  runFor(back, 60);
+  for (const l of [PLANE, CURTAIN]) assert.deepEqual(back.fungus.hyphaeOn(l)!.save(), g.fungus.hyphaeOn(l)!.save(), `layer ${l}`);
 });
 
 test("with hyphae off, the fungus grows none", () => {
@@ -276,7 +291,7 @@ test("a crossing tip leaves the plane: no plane tip stays in a hole's mouth, so 
   const was = g.fungus.rootShaft.bind(g.fungus);
   g.fungus.rootShaft = (l, x, y) => {
     rooted++;
-    was(l, x, y);
+    return was(l, x, y);
   };
   const plane = g.fungus.hyphaeOn(PLANE)!;
   const end = g.time + 120;
@@ -517,4 +532,31 @@ test("a corpse colonised in the nest (a layer that is not topsoil) never grows a
   g.fungus.colonise(CURTAIN, ...at);
   runFor(g, STALK.delay[2] + 5);
   assert.deepEqual(g.fungus.stalksOn(CURTAIN), []);
+});
+
+test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mass; mass reaches the curtain down the hole, and its tips grow on it", () => {
+  const g = game(true, true);
+  const e = g.fungus.evolution!;
+  let worst = 0;
+  let curtainFed = false;
+  for (let t = 0; t < 150; t++) {
+    runFor(g, 1);
+    let held = 0;
+    for (const l of [PLANE, CURTAIN]) {
+      const h = g.fungus.hyphaeOn(l);
+      if (h) held += h.length * HYPHA_MASS + h.loaded;
+    }
+    // From the first round of tip steps on (the body's mass is placed at each round, TIP_STEP apart).
+    if (t >= 5) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
+    const down = g.fungus.hyphaeOn(CURTAIN);
+    if (down && down.loaded > 0) curtainFed = true;
+  }
+  assert.ok(worst < 0.06, `the hyphae held ${(worst * 100).toFixed(1)} % off the body's mass`);
+  assert.ok(curtainFed, "no mass reached the curtain");
+  const down = g.fungus.hyphaeOn(CURTAIN)!;
+  assert.ok(down.length > 6, `the curtain's hyphae grew to ${down.length} cells`);
+  // Mass flows out to the tips rather than sitting where it entered: most of the body is hypha, not load in transit
+  // (with the patch's mass spread over cells no hypha grows from, two thirds of it sat stuck).
+  const loaded = g.fungus.hyphaeOn(PLANE)!.loaded + down.loaded;
+  assert.ok(loaded < 0.4 * e.mass, `${loaded.toFixed(1)} of ${e.mass.toFixed(1)} in transit`);
 });

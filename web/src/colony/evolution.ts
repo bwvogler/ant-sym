@@ -169,10 +169,10 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "trails",
     kind: "reach",
     name: "Trails",
-    blurb: "how far it bends what a host lays: trail, trail leaked to rivals, alarm in a fight",
+    blurb: "how far it bends what a host lays and how it recruits: trail, trail leaked to rivals, alarm in a fight, rouse (desert ants)",
     steps: ["none", "one step", "the full range"],
     costs: [10, 1500],
-    levers: ["trail", "leak", "alarmLaid"],
+    levers: ["trail", "leak", "alarmLaid", "rouse"],
     reach: [0, 1, 2],
   },
   {

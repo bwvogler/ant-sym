@@ -340,6 +340,24 @@ export const GUIDE: GuideEntry[] = [
     ],
   },
   {
+    id: "mass-flow",
+    title: "How the mycelium feeds its tips",
+    swatch: ["var(--spore)"],
+    onScreen:
+      "A soft glow along the purple hyphae is mass on its way out to the growing tips: bright near where the fungus feeds (its patch by the hole, a colonised corpse) and along the thick cords, dim out at the far tips. A front the ants have cut off goes dim and stops once it has used what it held.",
+    realAnts:
+      "A growing mycelium draws its mass toward its tips: each tip is a sink, and the flow in a hypha follows the tips it feeds (Heaton et al. 2010; Roper et al. 2013). Cords carry it 10 to 100 times faster than thin hyphae (up to 13 mm an hour in Serpula, Tlalka et al. 2008), and fusion is what brings it to the edge: a Neurospora that cannot fuse kept its tracer by the inoculum (Simonin et al. 2012).",
+    inGame:
+      "Mass enters at the patch and at colonised corpses and moves along the hyphae, 3 cells a round through thin hypha and 30 along a cord, split by the tips each branch feeds; a loop is a second way round. A tip grows only from what has reached it, so a web of cords feeds a far front, and a cut cord starves what lies beyond it.",
+    sources: [
+      {
+        note: "mycelial-transport",
+        anchor: "cords-carry-mass-10100-faster-than-thin-hyphae",
+        label: "Cords carry mass faster than thin hyphae",
+      },
+    ],
+  },
+  {
     id: "evolution",
     title: "The fungus's body, and its mutations",
     swatch: ["var(--spore)"],
@@ -384,6 +402,87 @@ export const GUIDE: GuideEntry[] = [
       { note: "nest-and-home", anchor: "nest-structure", label: "Nest structure" },
       { note: "nest-spacing", anchor: "3-how-far-a-founding-queen-flies", label: "How far a founding queen flies" },
       { note: "new-queens", anchor: "3-the-flight-and-founding", label: "The flight and founding" },
+    ],
+  },
+  // The builder's tools (docs/builder.md, PRD §73, ja-kjj8.6): what you see when you change the world, and what real ants do.
+  {
+    id: "builder-crayon",
+    trail: "food",
+    title: "Trail crayon",
+    swatch: ["var(--ink)", "var(--warn)"],
+    onScreen:
+      "A line you draw in a colony's colour (the builder's 🖍️). With smell vision on (👃) you see every trail, each colony's in its own colour. Ants of that colony start walking along your line within seconds.",
+    realAnts:
+      "Scientists draw lines with ants' own trail smell, and ants follow them: Argentine ants followed a drawn line about 25 times as often when it carried the whole smell as when it carried one part of it, and a pencil line alone drew none. Ants follow a drawn circle for about half a lap, then wander off.",
+    inGame:
+      "The crayon lays that colony's food trail, and keeps it topped up as it fades by half every 35 s, so a line lasts about 3½ minutes unless ants find food along it and lay more. Ants crowd a fresh circle, then leave it: no ant gets stuck going round.",
+    sources: [
+      { note: "builder", anchor: "a-drawn-trail-is-followed-for-a-while", label: "A drawn trail is followed, for a while" },
+      {
+        note: "builder",
+        anchor: "a-circle-of-trail-does-not-trap-ants-as-far-as-anyone-has-measured",
+        label: "A circle does not trap ants",
+      },
+    ],
+  },
+  {
+    id: "builder-sugar",
+    title: "Sugar and crumbs",
+    swatch: ["rgb(214, 72, 140)", "rgb(150, 100, 52)"],
+    onScreen: "Pink sugar (🍬) and brown crumbs (🍪) where you put them. Ants that find them carry them home.",
+    realAnts:
+      "Black garden ants lay more trail for sweet sugar than for weak, so a colony picks the sweeter of two dishes put out together. But if the ants already have a busy trail to weak food, many keep using it even after sweeter food turns up.",
+    inGame:
+      "Sugar is rich food and crumbs are poor food, as the game's richer and poorer piles. Put out together, most ants go to the sugar. Dropped later beside crumbs the colony already uses, the sugar is mostly left alone at first, as real ants do, until scouts find it.",
+    sources: [
+      {
+        note: "builder",
+        anchor: "sweeter-food-wins-unless-a-poorer-trail-is-already-strong",
+        label: "Sweeter food wins, unless a poorer trail is already strong",
+      },
+    ],
+  },
+  {
+    id: "builder-wall",
+    title: "Rocks and walls",
+    onScreen:
+      "Rock (🪨) and dirt (🟫) you put down. Above ground, dirt is a wall too: the surface has no soil. Nothing is ever put on a nest's hole, an ant, eggs or food.",
+    realAnts:
+      "When a path is blocked, real ant colonies usually find another way within tens of minutes. Some keep to their old path even after a shorter one opens again.",
+    inGame:
+      "Ants walk round what you build. But a long wall across a busy trail stops most food coming home for minutes: the game's ants are not yet good at finding a way round (a known gap). Dig a gap and they get through.",
+    sources: [
+      {
+        note: "builder",
+        anchor: "a-blocked-route-is-rerouted-but-an-old-trail-can-hold",
+        label: "A blocked route is rerouted, but an old trail can hold",
+      },
+    ],
+  },
+  {
+    id: "builder-dig",
+    title: "Digging and filling",
+    onScreen: "Underground (below), the pickaxe (⛏️) opens soil and dirt (🟫) fills tunnels back in.",
+    realAnts:
+      "When part of a nest caves in, carpenter ants of every age dig it out again, until most of what was lost is back. Ants in flooded places mend broken walls within the hour.",
+    inGame:
+      "Ants walk into new tunnels you dig and dig at dirt you pour in, with the digging they already do: they clear about a third of a filled chamber in four minutes. The all-hands dig after a cave-in is not in the game yet.",
+    sources: [{ note: "builder", anchor: "damaged-nests-are-repaired", label: "Damaged nests are repaired" }],
+  },
+  {
+    id: "builder-rain",
+    title: "Rain",
+    onScreen: "The rain cloud (🌧️) washes every trail and alarm off the ground under it.",
+    realAnts:
+      "Rain is said to wash trails away, but no study has measured it. Leaf-cutting ants walk faster when it starts to rain, and drop leaves that get too heavy and wet.",
+    inGame:
+      "Rain clears the smells under the cloud (this part is made up: no study measured it). The ants hardly slow down: they find their way home by counting their steps and remembering the way, and lay fresh trails as soon as they find food again.",
+    sources: [
+      {
+        note: "builder",
+        anchor: "trails-fade-nothing-measured-shows-rain-washing-them-off",
+        label: "Trails fade; nothing measured shows rain washing them off",
+      },
     ],
   },
 ];
@@ -437,6 +536,17 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
   },
   {
+    note: "mycelial-transport",
+    title: "Mass flow in a mycelium",
+    covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge.",
+  },
+  {
+    note: "builder",
+    title: "Builder mode",
+    covers:
+      "What real ants do when someone changes their world: drawn trails followed for a while, circles left, walls rerouted (or not), sweet food found late, nests dug out again; and how young children use touch screens.",
+  },
+  {
     note: "queens-and-merging",
     title: "Queens and merging",
     covers: "Several queens, adoption, and orphaned colonies merging (not built).",
@@ -475,6 +585,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     title: "Desert ants",
     covers:
       "A third species, the desert ant Cataglyphis: solitary foragers with no trails, who find food by smell and home by path integration, and work in a window between heat and predators. Playable (PRD §60).",
+  },
+  {
+    note: "rouse",
+    title: "Rouse",
+    covers:
+      "The fungus's rouse lever on a desert-ant host: an infected host invites the nestmates waiting at its hole out, as a finder does. Design, against the biology: infected ants are usually less social (PRD §60.8).",
   },
   {
     note: "desert-heat",

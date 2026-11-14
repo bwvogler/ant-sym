@@ -20,7 +20,7 @@ test("its lane is its own: its context, its 128 situations, no follow, no stance
   assert.equal(LANES.mode.valid("k", "follow", DESERT_MODE_WORDS), false);
   assert.equal(DESERT_ANT.lanes.stance, undefined);
   assert.deepEqual(
-    inertLevers(DESERT_ANT.params.channelSet ?? null).sort(),
+    inertLevers(DESERT_ANT.params.channelSet ?? null, true).sort(),
     ["alarm", "alarmLaid", "food", "leak", "rival"],
     "home and trail still reach its road signs",
   );
