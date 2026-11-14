@@ -55,7 +55,9 @@ const desert = (over: Partial<ColonyParams> = {}): Game =>
 
 test("a desert ant sees the sun high only where the sky is in view: out on the plane or at the top of its own shaft", () => {
   const g = desert();
-  run(g, 150); // the high sun of the morning: ants out on the plane
+  // The high sun of the morning, ants out on the plane: at 110 s (about 38 of 91 out). At 150 s, in the heat's trough, only 2 were
+  // out on main and none with routeJoin on (ja-lp4.6.3.1): the sample needs ants on the plane, not that moment.
+  run(g, 110);
   const c = g.player;
   (c.params as { heatSunHigh: number }).heatSunHigh = 0.1; // the sun counts as high from here, for the sense alone
   assert.ok(sunHigh(c.params, c.time), "the test's own check");
