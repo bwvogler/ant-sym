@@ -5209,6 +5209,41 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 - **Granted at landing** it is a gamble, as knots were (§63.11): faster on seeds 5, 6 and 9 (235 → 181 s), slower on seeds 2 (+16 %) and 8 (+27 %, 531 s, worse than without hyphae). Spread thinner, a corpse's spores reach more foragers but each takes a smaller dose. Not a P1 configuration; recorded under the owner's ship-and-record rule.
 - First built (spores split over every cell, delays 60 and 30), *Stalks* left every seed unchanged even at landing: the top level lost its spores to the fade, and the first level's stalk came as a lone corpse ran dry (review of #178).
 
+### 63.13 Spores lying out in the sun fade faster (ja-6ip, 2026-11-14)
+
+**Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
+
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun takes the spores of hosts that die out on the plane and of corpses on the midden (`ja-2bw.7`, §63.2): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
+
+| | median, seeds 1–10 | worst, 1–10 | median, 11–20 | worst, 11–20 |
+|---|---|---|---|---|
+| `main` | 275 | 559 | 293 | 431 |
+| flat ×2 | 332 | 477 | 293 | never (seed 20) |
+| flat ×4 | 357 | never | | |
+| flat ×8 | 411 | never (2 seeds) | | |
+
+The flat rule hits the patch, the game's main early source of spores, so it was dropped for the shaded one. Then, re-measured on `main` at `88b5269` (route memory on, #168; knots, #161):
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 250 | 337 | 293 | 146 | 116 | 365 | 265 | 552 | 217 | 240 |
+| sun ×4, patch shaded (s) | 250 | 291 | 293 | 146 | 129 | 363 | 265 | 504 | 232 | 240 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` (s) | 418 | 231 | 203 | 18 | 276 | 352 | 235 | 306 | 269 | 341 |
+| sun ×4, patch shaded (s) | 581 | 231 | 203 | 18 | 283 | 352 | 235 | 332 | 276 | 347 |
+
+- Medians: 258 → 258 s (seeds 1–10), 273 → 280 s (11–20). The worst of seeds 1–10 is faster (552 → 504 s); the worst of 11–20 is slower (418 → 581 s, seed 11). **P1 (§63.4) is not met:** seed 5 is 11 % slower and seed 11 39 %, and on seeds 11–20 both the worst seed and the median are worse. No sun above ×1 keeps seed 11 within 10 % (below).
+- **Seed 11 is slower at any sun:** 418 s at ×1 (bit-exact with `main`), 540, 582, 581, 486 and 486 s at ×2–×6. Traced: a ×1 and a ×4 game on seed 11 run identically until 181.6 s, when the first spores of a host dead on the plane appear off the patch; seed 11's later spread runs through them. That is the mechanic's purpose; whether it is worth the cost is chosen with Stalks in (below). Seed 5 is +11 %, seed 18 +8.5 %, the rest within 7 %.
+- The runs are deterministic: seed 11 at ×4 twice gave 581 s both times.
+
+**Owner (2026-11-14, review of #171, D1): merge the rule at ×1, bit-exact with `main`, and choose the number once Stalks (#178, `ja-2bw.10`) is in**, since stalks lay their spores on the plane and the two interact (`ja-19oz`). The test sets `sun: 4` itself.
+
+**Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
+
 ## 64. Species after the desert ant: researched, ordered, and what each forces on the code (design, ja-e668, ja-vq14, ja-n70l, ja-328h, ja-ehuv, 2026-11-12)
 
 **Basis.** The owner asked (2026-11-12) for a plan, not code, for the species after the desert ant (`ja-rf5`): the Pharaoh ant, the leafcutter, army ants and termites from the owner's list of 2026-11-11, and others if the research supports them. [species.md](species.md)'s matrix of the candidates had been built from the repo's notes alone. Five research subagents re-sourced it from primary papers, one note each: [lasius-neglectus.md](lasius-neglectus.md), [leafcutter.md](leafcutter.md), [pharaoh-ant.md](pharaoh-ant.md), [termites.md](termites.md), [army-ant.md](army-ant.md). Read in full text, through PMC: about 50 papers (each note's header lists them); everything else from abstracts or snippets, marked **unverified**. Many publisher hosts (`doi.org`, `nature.com`, `pnas.org`, `frontiersin.org`, `elifesciences.org`, Wiley, Springer, bioRxiv) were out of reach from the session; `pmc.ncbi.nlm.nih.gov` was not, so the open-access literature carries the notes. No Jev was asked and no paid script was run: every cost below is an estimate from request size.
