@@ -34,6 +34,7 @@ import {
   localFungusRule,
   type FungalSituation,
   type FungusPolicy,
+  decodeFungal,
   askedIn,
   FUNGUS_BATCH,
   FUNGUS_GATHER_MS,
@@ -433,11 +434,49 @@ export class ColonyJev {
     }
     if (hit) return hit;
     if (!running) this.wantsRun?.();
-    if (running && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key)) {
+    if (running && this.#unasked(l, key)) {
       if (l.queue.size === 0) l.since = Date.now();
       l.queue.set(key, s);
     }
     return (this.#canAsk ? null : this.#earlier(l, key)) ?? l.local(s);
+  }
+
+  /** Whether situation `key` of lane l still needs asking under its words: not cached, not in flight, not queued. */
+  #unasked<S, A extends string>(l: Lane<S, A>, key: string): boolean {
+    return !this.#cache(l).get(key) && !this.#asking.has(askKey(l.context, key)) && !l.queue.has(key);
+  }
+
+  /**
+   * What a player's new aim would have Jev asked now (ja-lo8.21): every situation the fungus's hosts are in this step (each
+   * ant's last fungal situation, Colony.fungal, which Fungus writes as it chooses), and every growth situation, each only
+   * if it still needs asking (#unasked: cached ones, the shipped answers of a preset aim among them, are not). A queen's
+   * situation is not kept per ant: hers is asked at the next step, as any miss is.
+   */
+  #aimQuestions(): { l: Lane<unknown, string>; key: string; s: unknown }[] {
+    const out: { l: Lane<unknown, string>; key: string; s: unknown }[] = [];
+    const add = <S>(l: Lane<S, string>, s: S) => {
+      if (l.asks && !l.asks(s)) return;
+      const key = l.key(s);
+      if (this.#unasked(l, key) && !out.some((q) => q.l === l && q.key === key)) out.push({ l: l as Lane<unknown, string>, key, s });
+    };
+    const seen = new Set<number>();
+    for (const d of this.#driven) {
+      const c = d.colony;
+      for (let i = 0; i < c.n; i++) {
+        const code = c.fungal[i]!;
+        if (!c.alive[i] || code < 0 || seen.has(code)) continue;
+        seen.add(code);
+        add(this.#fungal, decodeFungal(code));
+      }
+    }
+    for (const s of LANES.growth.all()) add(this.#growth, s);
+    return out;
+  }
+
+  /** Queue a new aim's questions (#aimQuestions) and let them go at the next cycle, without the gather wait. */
+  #queueAim(): void {
+    for (const { l, key, s } of this.#aimQuestions()) l.queue.set(key, s);
+    for (const l of [this.#fungal, this.#growth]) if (l.queue.size > 0) l.since = 0;
   }
 
   /** Who decides, in lane l, situation s right now (DecidedBy). Counts and queues nothing. */
@@ -517,11 +556,25 @@ export class ColonyJev {
     this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
 
-  /** The player's aim for the fungus: its own caches (free if used before). */
-  setAim(text: string): void {
-    this.#recontext(this.#fungal, text);
-    this.#recontext(this.#growth, text); // the growth lane asks under the same aim
+  /**
+   * The fungus's aim: its own caches (free if used before). `askNow` (a player's change, ja-lo8.21, owner 2026-11-14): Jev
+   * is asked at once, in one go, what the new aim has no answer for among the situations the hosts are in and every
+   * growth situation, instead of host by host as each meets it; with no run on, a run is wanted and they go when it
+   * starts. Without it (the first aim, a save's coming back) they are asked as they come up.
+   */
+  setAim(text: string, opts: { askNow?: boolean } = {}): void {
+    const a = this.#recontext(this.#fungal, text);
+    const b = this.#recontext(this.#growth, text); // the growth lane asks under the same aim
+    if (!opts.askNow || !(a || b)) return;
+    if (this.#state.phase === "running") this.#queueAim();
+    else if (this.#aimQuestions().length > 0) {
+      this.#askOnStart = true;
+      this.wantsRun?.();
+    }
   }
+
+  /** A player's new aim is waiting for a run to start before its questions go (setAim's askNow). */
+  #askOnStart = false;
 
   /**
    * The player's menu: the levers the fungus may pull, set on the attached fungus (the one source: Fungus.configure
@@ -687,6 +740,10 @@ export class ColonyJev {
       lastError: null,
       ...this.#counts(),
     });
+    if (this.#askOnStart) {
+      this.#askOnStart = false;
+      this.#queueAim();
+    }
     this.#reconsider();
     if (this.#timer === null) this.#timer = setInterval(() => this.#cycle(), this.opts.intervalMs);
   }
@@ -763,6 +820,7 @@ export class ColonyJev {
       this.#timer = null;
     }
     this.#clearQueues();
+    this.#askOnStart = false;
     if (this.#state.phase === "running") this.#set({ phase: "stopped" });
     this.#reconsider(); // back to the local rule at once
   }
