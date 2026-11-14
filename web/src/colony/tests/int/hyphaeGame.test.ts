@@ -21,6 +21,8 @@ function game(hyphae: boolean): Game {
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
     { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae } },
     gameRng(7),
+    // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
+    { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
   );
   g.land(0, GARDEN, { evolve: true });
   return g;

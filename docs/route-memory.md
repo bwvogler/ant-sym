@@ -1,6 +1,6 @@
 # Route memory: a carrier whose home vector points through rock walks back the way it came
 
-*Research note for epic `ja-lp4.16` (one world, for `ja-lp4.6.3`; PRD §59). Written 2026-11-11 against code at `9b03a9e`. **No paper was read in full text.** Every publisher, repository and preprint host tried was refused by this session's network policy (`www.sussex.ac.uk`, `pmc.ncbi.nlm.nih.gov`, `cob.silverchair.com`, `elifesciences.org`, `www.biorxiv.org`: no DNS). Every claim below comes from abstracts, database records and citing papers seen in search results, so all of it is **unverified**. The authors of two older papers are given from memory where a search result did not show them. The rules are **design**. It builds on [nest-search](nest-search.md) (the search at the end of the vector) and [forager-trips](forager-trips.md) (what keeps a trip short) and does not repeat them.*
+*Research note for epic `ja-lp4.16` (one world, for `ja-lp4.6.3`; PRD §59). Written 2026-11-11 against code at `9b03a9e`; built and switched on 2026-11-14 ("What was built"). **No paper was read in full text.** Every publisher, repository and preprint host tried was refused by this session's network policy (`www.sussex.ac.uk`, `pmc.ncbi.nlm.nih.gov`, `cob.silverchair.com`, `elifesciences.org`, `www.biorxiv.org`: no DNS). Every claim below comes from abstracts, database records and citing papers seen in search results, so all of it is **unverified**. The authors of two older papers are given from memory where a search result did not show them. The rules are **design**. It builds on [nest-search](nest-search.md) (the search at the end of the vector) and [forager-trips](forager-trips.md) (what keeps a trip short) and does not repeat them.*
 
 ## The question
 
@@ -127,6 +127,17 @@ On seed 4 the 29 pocket carriers at the worst sample go to 0–1. **The bound of
 - **S1** and the **one-world golden** are unchanged: S1's carriers are set down with no path, so they never retrace; with `routeMemory` 0 nothing is recorded.
 - **G1** (the owner's bound, `ja-lp4.6.3`): at most 2 held over 120 s per colony on seeds 5 and 9 (the guard, which this un-skips if met), and on seed 4; food carried down and births within 5 % of `main`'s PRD §56/§58 numbers summed over seeds 1–10 (the baseline, since §58's levers are off). Judged by the worst seed, then confirmed on seeds 11–20.
 - **The one-world assays** (`exp --one all`) against PRD §56: A1 stays 8/10, the others no worse. An ablation: `routeSee` 0 (no recognition: only the places in order) and `routeStep` 16 and 32 (a sparser memory).
+
+## What was built
+
+*`ja-lp4.16`, PRD §59; measured 2026-11-11 to 2026-11-14.* One world's plane only; built behind `routeMemory` and **on by default** at `routeMemory` 1, `routeStep` 4, `routeSee` 3 (`routeMax` 64). The legacy goldens are bit-exact (0 records nothing); the one-world golden was re-recorded once.
+
+- **Code.** `homing.ts` (`routeClear`, `routeRecord`, `routeFail`, `routeTo`, `routeBelief`, called from `believePlane` and the stall rule and the vector's end in `steer.ts`), recording in `arrive.ts`, the fields in `ants.ts` (`routePlaces`, `routeN`, `routeGap`, `routeAt`, `routeState`, `routeGoal`), the parameters in `params.ts`; `SAVE_VERSION` 9. Memory: 512 bytes an ant plus about 4 bytes of state.
+- **As designed, with these changes.** The recognition radius is 3, not 5, and the spacing 4, not 8: a denser memory with a tighter "familiar view" is what takes the guard's seeds under the bound. `routeMemory` 1 (on a stall only) is on, not 2: 2 had a worse worst seed (7 on seed 4; 15 on seed 7 with step 4) for a little more food.
+- **R1** (`--one r1`): with it on, all six seeds with a pocket pass (100 % home within 300 s, walked ÷ way round at most 1.70); off, 3 of 6 on today's `main` (seeds 3 and 4 at 22.5 and 45 % at the baseline).
+- **G1** (seeds 1-10): worst colony per seed 33 to 5, sum 193 to 27; seeds 4, 5 and 9 at 2 / 1, 2 / 1 and 2 / 1, so the guard is un-skipped; food carried down +3.5 % and births +3.8 % against §58's numbers (seeds 11-20: worst 141 to 7, food -2.2 %, births -3.5 % against `main`). Table and sweep in PRD §59. Seeds 6, 7 and 8 still reach 4, 5 and 4 at the worst sample.
+- **The assays:** A1 10/10 (8 off), A9 5/10 (3 off), A2b and A4 one seed down each (8 and 9 of 10); S1 unchanged. The tick is within noise.
+- **Not built:** a fungus lever over `routeSee`; the direction-only backtrack (Wystrach et al. 2013) as an alternative. The owner's call.
 
 ## Play
 
