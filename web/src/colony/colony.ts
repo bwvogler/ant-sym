@@ -685,6 +685,7 @@ export class Colony {
     this.clock[i] = 1;
     this.tolerance[i] = this.params.tolerance;
     this.calm[i] = 0;
+    this.rouse[i] = 0;
     this.mask[i] = 0;
     this.layGain[i] = 1;
     this.crossLay[i] = 0;

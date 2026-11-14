@@ -85,8 +85,11 @@ export function askedLevers(menu: ReadonlySet<string>, queen: boolean): string[]
   return LEVERS.filter((v) => menu.has(v.id) && leverFor(v, queen)).map((v) => v.id);
 }
 
-/** The menu the fungus starts with: every lever but the lethal ones. */
-export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id)).map((v) => v.id);
+/**
+ * The menu the fungus starts with: every lever but the lethal ones and those that act only on a species whose finders invite (rouse,
+ * ja-rf5.18): the player puts rouse on the menu in a desert-ant game, so a generic game's requests don't ask a lever that does nothing.
+ */
+export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id) && !v.invite).map((v) => v.id);
 
 /** A strain: one trait set of the fungus. A landing or paint lays one; later organisms are other trait sets (§5.1). */
 export interface Strain {
@@ -1545,6 +1548,7 @@ export class Fungus {
     c.foreignFood[i] = v.foreignFood * l;
     c.clock[i] = 1 + (v.clock - 1) * l;
     c.calm[i] = v.calm * l;
+    c.rouse[i] = v.rouse * l;
     c.tolerance[i] = c.params.tolerance + v.tolerance * l;
     c.mask[i] = v.mask * l;
     c.layGain[i] = 1 + (v.lay - 1) * l;

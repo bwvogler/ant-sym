@@ -3,23 +3,23 @@
     {
       "lane": "fungus",
       "aim": "peace",
-      "context": "fungus-v8-side-c7db998c",
+      "context": "fungus-v8-side-153cd1a5",
       "file": "fungus-peace.json",
-      "answers": 130
+      "answers": 96
     },
     {
       "lane": "fungus",
       "aim": "spread",
-      "context": "fungus-v8-side-e1f9d079",
+      "context": "fungus-v8-side-80d1e59a",
       "file": "fungus-spread.json",
-      "answers": 130
+      "answers": 96
     },
     {
       "lane": "fungus",
       "aim": "unite",
-      "context": "fungus-v8-side-ec1a7461",
+      "context": "fungus-v8-side-bb724482",
       "file": "fungus-unite.json",
-      "answers": 130
+      "answers": 96
     },
     {
       "lane": "growth",

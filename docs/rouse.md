@@ -45,6 +45,10 @@ The desert ant has no trails, so the fungus's trail and alarm levers do nothing 
 - **Owner (to decide):** the fungus lane's re-ship (about $0.013).
 - **To measure:** how strong a false invitation is against a true one (the levels), and whether rouse can starve a colony.
 
+## What ja-rf5.18 built (PRD §60.8)
+
+The lever as planned, with one change: it is off the fungus's default menu (the player puts it on in a desert game), so a generic game's requests don't ask a lever that does nothing. In a game it works but weakly: about 5 % more passes reach the waiting ants with the colony's hosts roused (seed 1, 240 s), because a desert ant rarely comes down its shaft with nothing found. Whether rouse should also strengthen a finder's pass is open for the owner.
+
 ## Sources
 
 - Bos et al. (2012). Sick ants become unsociable. *J Evol Biol* (authors, volume and pages from memory; not fetched). [record](https://test01.ku.dk/:obvius/pureproxy/3974268/da/publications/sick-ants-become-unsociable) (abstract only)
