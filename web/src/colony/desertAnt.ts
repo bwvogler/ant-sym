@@ -124,7 +124,7 @@ export const DESERT_ANT: Species = {
     // A pull of 0.5 cost D5 2 seeds. paceGain and paceCrowd are design; 8 cm/s and the pace at rest are the paper's.
     invitePace: 12,
     paceGain: 0.4,
-    // A lift lasting 40 s (not the params.ts 20): Razin counted the minute after an entry (owner, review of #186 D1), and over a minute a
+    // A lift falling back with a 40 s time constant (not the params.ts 20): Razin counted the minute after an entry (owner, review of #186 D1), and over a minute a
     // 20 s lift read 4–5×.
     paceTau: 40,
     paceCrowd: 0.25,

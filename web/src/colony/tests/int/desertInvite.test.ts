@@ -4,7 +4,7 @@ import { DESERT_ANT } from "../../desertAnt.ts";
 import { touch } from "../../sense.ts";
 import { holdsAt } from "../../crossing.ts";
 import { RETURN } from "../../vocab.ts";
-import { desertChamber, invitationChamber, runAssay } from "../../experiment.ts";
+import { CHAMBER_WINDOW, desertChamber, invitationChamber, runAssay } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { leaveRate, paceAfter, paceReturns } from "../../invite.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -29,6 +29,10 @@ test("the rule: a finder's pass pulls a waiting ant's pace toward its own; it re
   assert.equal(paceReturns(P, P.paceMany), "many");
   assert.ok(leaveRate(P, "soon") > 10 * leaveRate(P, "wait"), "a raised pace leaves far sooner than a scout");
   assert.equal(paceAfter({ ...P, paceGain: 0 }, P.paceRest, 3, 0, 1), P.paceRest, "with no pull a pass does nothing");
+});
+
+test("D2c counts the minute either side of a finder, as Razin did (owner, review of #186 D1)", () => {
+  assert.equal(CHAMBER_WINDOW, 60);
 });
 
 test("D2c, Razin's chamber staged: at least sevenfold leaving after a finder in groups of 4 and 8, and fewer exits in a crowd", () => {
