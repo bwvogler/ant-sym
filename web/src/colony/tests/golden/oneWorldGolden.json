@@ -196,7 +196,7 @@
      "stored": 56,
      "births": 0,
      "losses": 0,
-     "decisions": 11516,
+     "decisions": 11517,
      "population": 150,
      "ants": "635f0964",
      "fields": [
@@ -233,7 +233,7 @@
      "stored": 76,
      "births": 0,
      "losses": 0,
-     "decisions": 13625,
+     "decisions": 13626,
      "population": 150,
      "ants": "6243151a",
      "fields": [
@@ -270,7 +270,7 @@
      "stored": 94,
      "births": 1,
      "losses": 1,
-     "decisions": 15543,
+     "decisions": 15548,
      "population": 150,
      "ants": "61549532",
      "fields": [
@@ -307,7 +307,7 @@
      "stored": 117,
      "births": 4,
      "losses": 2,
-     "decisions": 17687,
+     "decisions": 17695,
      "population": 152,
      "ants": "6db73c7d",
      "fields": [
