@@ -10,6 +10,7 @@ import type { AntStep } from "./step.ts";
 import { DIG_FACE, DIG_TIME, GLANCE, HUG_TIME, NO_FACE, ROOMY_DIG, START, START_FACE, WALL_LOST, WALL_PROBE } from "./tuning.ts";
 import { EXPLORE, RETURN } from "./vocab.ts";
 import { digCell, rockAt, setTunnelHeading, SOIL, OPEN } from "./world.ts";
+import { pointDown } from "./plane.ts";
 
 export function moveDig(col: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -200,7 +201,7 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
       cellOf(x0, y0);
       crossUp(col, i, CELL[0], CELL[1]);
     } else {
-      h = col.pointDown(i, x0, y0, h);
+      h = pointDown(col, i, x0, y0, h);
       // It has touched the surface, as the side view's young step onto the ground before they are put back: its floor
       // marks start afresh at the next chamber (layMark). Laying on, the young turned back at the hole marked the
       // shaft's top with brood and royal, which drew more young there (toBrood): in the spike up to 13 were held
