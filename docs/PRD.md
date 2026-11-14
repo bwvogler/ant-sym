@@ -5917,7 +5917,24 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - ja-7r7x.4: tune and turn it on.
 - Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
 
+**Measured (assay `larvae`, seeds 1–16, 2026-11-14).** The most larvae waiting over 120 s beside enough food, per seed. Bound 8.
+
+| `revert` | `owedBeg` | Seeds over 8 | Worst | Workers starved (all seeds) | Food stored (sum) |
+|---|---|---|---|---|---|
+| 0 (main) | 0 | 3 | 38 | 14 | 12,284 |
+| 0.25 | 0 | 4 | 49 | 19 | 12,328 |
+| 0.5 | 0 | 6 | 30 | 1 | 12,337 |
+| 1 | 0 | 6 | 24 | 2 | 12,246 |
+| 0 | 0.15 | 3 | 27 | 0 | 12,319 |
+| 0 | 0.3 | 7 | 30 | 17 | 12,276 |
+| 1 | 0.15 | 9 | 29 | 0 | 12,334 |
+| 1 | 0.3 | 4 | 41 | 10 | 12,276 |
+
+- No setting beats main: every one has 3–9 seeds over the bound, with no trend. Reversion and begging both happen, and the larvae still wait.
+- In a failing seed (10, `revert` 1), 10–15 young ants are alive throughout, so nobody reverts. Larvae wait in three brood chambers with no food in them, while 300+ food lies in the store. Only 1–3 ants are carrying food at a time. The bottleneck is carrying food from the store to the brood chambers, not who is beside the brood.
+
 **Still open.**
+- What limits carrying food to the brood (porters start only beside food; larvae are fed only from food lying in their chamber).
 - The share of old ants that can revert (owner's call; no measured share).
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
