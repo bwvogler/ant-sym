@@ -474,6 +474,12 @@ function Lab({ game, controls, update, stats, jev }: Props) {
             />
           </div>
         </div>
+        <label className="mt-3 flex items-center justify-between text-xs">
+          <span>
+            Steering weights (staging): explorers and followers ask how tightly to search and whether to go back to their last find
+          </span>
+          <input type="checkbox" checked={controls.steerLane} onChange={(e) => update({ steerLane: e.target.checked })} />
+        </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
         {game.world ? (

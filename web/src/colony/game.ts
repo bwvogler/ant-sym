@@ -470,13 +470,13 @@ export class Game {
   founded: Founding[] = [];
 
   /** How every colony's ants draw their mode from Jev's probabilities (the Lab, ja-nan3): set by setChoice, given to colonies founded later too. */
-  #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">> = {};
+  #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll" | "steerLane">> = {};
 
   /**
    * How every colony's ants draw their mode from Jev's probabilities (ja-nan3): `sampleTemp` and `reroll`
    * (ColonyParams), now on every colony and on every colony founded after. A lab setting, not saved with the game.
    */
-  setChoice(choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll">>): void {
+  setChoice(choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll" | "steerLane">>): void {
     this.#choice = { ...choice };
     for (const c of this.colonies) Object.assign(c.params, this.#choice);
   }

@@ -261,6 +261,7 @@ test("each lane's flags: id prefix, counter, context prefix, hits, reconsidering
     stance: { idPrefix: "c", counter: "stancesAsked", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
     fungus: { idPrefix: "h", counter: "fungusAsked", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
     growth: { idPrefix: "g", counter: "growthAsked", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    steer: { idPrefix: "w", counter: "steerAsked", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
   });
 });
 
@@ -281,6 +282,8 @@ test("the client's state carries these fields, in this order (the page shows and
     "fungusCached",
     "growthAsked",
     "growthCached",
+    "steerAsked",
+    "steerCached",
     "failures",
     "lastError",
   ]);

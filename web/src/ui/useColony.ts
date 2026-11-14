@@ -57,6 +57,8 @@ export interface ColonyControls {
   /** the Lab (ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
   sampleTemp: number;
   reroll: number;
+  /** the Lab (staging, ja-ykmu.3): whether ants out exploring or following ask their steering weights (ColonyParams.steerLane) */
+  steerLane: boolean;
 }
 
 /** One world's two views (docs/one-world.md §5): "above" the plane, "below" the curtain under the line. */
@@ -86,6 +88,8 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   view: "above",
   sampleTemp: DEFAULT_COLONY.sampleTemp,
   reroll: DEFAULT_COLONY.reroll,
+  // On staging the steering weights are on by default (the experiment); off is main's steering.
+  steerLane: true,
 };
 
 /** One colony's line in the panel. */
@@ -293,8 +297,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   }, [game, controls.hide, controls.cull, controls.menu]);
   // So do the Lab's settings for how ants draw their mode (ja-nan3), on every colony, founded later or not.
   useEffect(() => {
-    game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll });
-  }, [game, controls.sampleTemp, controls.reroll]);
+    game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll, steerLane: controls.steerLane ? 1 : 0 });
+  }, [game, controls.sampleTemp, controls.reroll, controls.steerLane]);
   const [stats, setStats] = useState<ColonyStats | null>(null);
   const [fps, setFps] = useState(0);
   const frameListeners = useRef(new Set<() => void>());

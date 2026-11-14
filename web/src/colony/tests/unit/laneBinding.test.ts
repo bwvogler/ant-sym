@@ -17,7 +17,17 @@ import {
 import { AIMS, askedIn, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { decodeSituation, localPolicy, localStance, SITUATIONS } from "../../colony.ts";
 import { growthContext, growthKey, localGrowthChoice, packGrowthRequest } from "../../growthBrain.ts";
-import { LANE_KINDS, LANE_LIST, LANES, laneOfContext, SAMPLE_FUNGAL, SAMPLE_GROWTH, SAMPLE_SITUATION, SAMPLE_STANCE } from "../../lanes.ts";
+import {
+  LANE_KINDS,
+  LANE_LIST,
+  LANES,
+  laneOfContext,
+  SAMPLE_FUNGAL,
+  SAMPLE_GROWTH,
+  SAMPLE_STEER,
+  SAMPLE_SITUATION,
+  SAMPLE_STANCE,
+} from "../../lanes.ts";
 import type { FungalSituation } from "../../fungalPolicy.ts";
 import { STANCE_SCHEMA, type LaneWords, type Mode, type Situation, type Stance, type StanceSituation } from "../../vocab.ts";
 
@@ -41,10 +51,10 @@ const FUNGAL_SEEN: FungalSituation[] = [
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the four lanes, each with its flags, counters, variants, words and batching", () => {
+test("the registry lists the five lanes, each with its flags, counters, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
-    ["mode", "stance", "fungus", "growth"],
+    ["mode", "stance", "fungus", "growth", "steer"],
   );
   for (const l of LANE_LIST) {
     assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
@@ -57,20 +67,22 @@ test("the registry lists the four lanes, each with its flags, counters, variants
       ["stancesAsked", "stancesCached"],
       ["fungusAsked", "fungusCached"],
       ["growthAsked", "growthCached"],
+      ["steerAsked", "steerCached"],
     ],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], ["top", "side"], [""]],
+    [[""], [""], ["top", "side"], [""], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
-    ["doctrine", "doctrine", "aim", "aim"],
+    ["doctrine", "doctrine", "aim", "aim", "doctrine"],
   );
   assert.equal(LANES.mode.presets, DOCTRINES);
   assert.equal(LANES.stance.presets, DOCTRINES);
   assert.equal(LANES.fungus.presets, AIMS);
   assert.equal(LANES.growth.presets, AIMS, "the growth lane asks under the fungus's aim");
+  assert.equal(LANES.steer.presets, DOCTRINES, "the steer lane asks under the colony's doctrine (staging, ja-ykmu.3)");
   // Only the fungus's lanes gather a fuller request and have a batch of their own (the ants' lanes take the client's).
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
@@ -79,12 +91,14 @@ test("the registry lists the four lanes, each with its flags, counters, variants
       [false, null],
       [true, 50],
       [true, 48],
+      [false, null],
     ],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
   assert.equal(LANES.stance.sample, SAMPLE_STANCE);
   assert.equal(LANES.fungus.sample, SAMPLE_FUNGAL);
   assert.equal(LANES.growth.sample, SAMPLE_GROWTH);
+  assert.equal(LANES.steer.sample, SAMPLE_STEER);
   // The erased list is the typed rows themselves, not copies.
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),

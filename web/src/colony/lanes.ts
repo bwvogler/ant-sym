@@ -38,8 +38,28 @@ import {
   validGrowth,
   type GrowthChoice,
 } from "./growthBrain.ts";
+import {
+  askedOf,
+  localSteerAnswer,
+  packSteerRequest,
+  readSteer,
+  STEER_ASKED,
+  steerAsks,
+  steerContext,
+  steerKey,
+  steerSituations,
+  validSteer,
+} from "./steerBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  type LaneWords,
+  STANCE_SCHEMA,
+  STEER_WEIGHTS,
+  type Situation,
+  type SpeciesSituation,
+  type Stance,
+  type StanceSituation,
+} from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -47,10 +67,10 @@ import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, t
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
 // colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
-export type LaneName = "mode" | "stance" | "fungus" | "growth";
+export type LaneName = "mode" | "stance" | "fungus" | "growth" | "steer";
 
 /** The counters of ColonyJevState that count situations sent, by lane. */
-export type SentCounter = "asked" | "stancesAsked" | "fungusAsked" | "growthAsked";
+export type SentCounter = "asked" | "stancesAsked" | "fungusAsked" | "growthAsked" | "steerAsked";
 
 export interface LaneKind {
   /** the first character of the ids its situations carry in a request (s0, s1, …) */
@@ -97,6 +117,15 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
     reconsiders: false,
     perRequest: GROWTH_BATCH,
   },
+  // An ant's steering weights (staging, ja-ykmu.3): asked at its mode decisions, so a reply makes the ants reconsider.
+  steer: {
+    idPrefix: "w",
+    counter: "steerAsked",
+    contextPrefix: "steer-",
+    countsHits: false,
+    reconsiders: true,
+    perRequest: PER_REQUEST,
+  },
 };
 
 /** The lane whose cache contexts start this way, if any. */
@@ -114,7 +143,7 @@ export function laneOfContext(context: string): LaneName | null {
 // (laneRegistry.char.test.ts and laneWiring.char.test.ts pin that, laneBinding.test.ts that the rows agree).
 
 /** The counters of ColonyJevState that count answers kept, by lane. */
-export type CachedCounter = "cached" | "stancesCached" | "fungusCached" | "growthCached";
+export type CachedCounter = "cached" | "stancesCached" | "fungusCached" | "growthCached" | "steerCached";
 
 /** A lane spec that is known to have the optional members `K` (the ants' lanes have a local rule and enumerate their situations; the fungus has `asks`). */
 type Has<L, K extends keyof L> = L & { [P in K]-?: NonNullable<L[P]> };
@@ -274,8 +303,32 @@ const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local
   all: () => Array.from({ length: GROWTH_SCHEMA.size }, (_, c) => GROWTH_SCHEMA.decode(c)),
 };
 
+export const SAMPLE_STEER: Situation = { ...SAMPLE_SITUATION, mode: "explore" };
+
+// The steer lane (staging, ja-ykmu.3; docs/steering.md): an ant out exploring or following, asked how strongly it weighs each cue, under
+// its colony's doctrine. `ctx` is the set of weights asked (absent: STEER_ASKED; the Lab adds design ones, ja-ykmu.4): they are in the key.
+const steerLane: Has<LaneSpec<Situation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
+  name: "steer",
+  kind: LANE_KINDS.steer,
+  counters: { asked: "steerAsked", cached: "steerCached" },
+  variants: [""],
+  sample: SAMPLE_STEER,
+  wordsField: "doctrine",
+  presets: DOCTRINES,
+  gather: false,
+  batch: null,
+  key: (s, asked) => steerKey(s, asked ? STEER_WEIGHTS.filter((w) => asked.has(w)) : STEER_ASKED),
+  pack: (items, words) => packSteerRequest(items, words),
+  read: (answers, id, _situation, key) => readSteer(answers, id, askedOf(key)),
+  valid: validSteer,
+  contextOf: (words) => steerContext(words),
+  asks: (s) => steerAsks(s),
+  local: (s) => localSteerAnswer(steerKey(s)),
+  all: () => steerSituations(),
+};
+
 /** Every lane, by name, typed. */
-export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, growth: growthLane } as const;
+export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, growth: growthLane, steer: steerLane } as const;
 
 /**
  * A lane with its situation type forgotten, for code that loops over the lanes (the scripts' tables, the Learn panel): the one place the
@@ -301,4 +354,4 @@ export interface ErasedLane {
   all?(lane?: LaneWords): unknown[];
 }
 /** Every lane, in the order the page asks them. */
-export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth];
+export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth, LANES.steer];

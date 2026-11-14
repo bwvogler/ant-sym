@@ -22,7 +22,7 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
-import { DESERT_ANT, weightedValid, type Species } from "../../colony/index.ts";
+import { DESERT_ANT, steerContext, weightedValid, type Species } from "../../colony/index.ts";
 
 /** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
 const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT };
@@ -38,9 +38,18 @@ const CONTEXT: Record<string, (words: string) => string> = {
   stance: stanceContext,
   fungus: (aim) => fungusContext(aim, "side"),
   growth: growthContext,
+  steer: steerContext,
 };
-const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES, growth: GROWTH_CHOICES };
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48 };
+// The steer lane's answers under its default weights (search, memory: staging, ja-ykmu.3): a level each, −1, 0 or 1.
+const LEVELS = ["-1", "0", "1"];
+const VALID: Record<string, readonly string[]> = {
+  mode: MODES,
+  stance: STANCES,
+  growth: GROWTH_CHOICES,
+  steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)),
+};
+// The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888).
+const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: SITUATIONS / 2 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.

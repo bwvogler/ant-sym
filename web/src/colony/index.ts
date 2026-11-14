@@ -35,4 +35,5 @@ export * from "./desertAnt.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./weighted.ts";
+export * from "./steerBrain.ts";
 export * from "./world.ts";
