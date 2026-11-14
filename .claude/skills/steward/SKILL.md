@@ -1,11 +1,11 @@
 ---
 name: steward
-description: "The author's side of an open pull request on bwvogler/ant-sym (jev-ants): keeping it mergeable, answering red CI and reviews, the beads export, and merging once the review approves. Use whenever you watch, babysit or autofix a PR you opened or were asked to get mergeable, when a PR event arrives (CI result, review, comment, conflict), or before you push to an open PR's branch. Not for reviewing a PR (that is reviewing-prs)."
+description: "The author's side of an open pull request on bwvogler/ant-sym (jev-ants): keeping it mergeable, answering red CI and reviews, the beads export, and merging once the review approves and the owner has said to. Use whenever you watch, babysit or autofix a PR you opened or were asked to get mergeable, when a PR event arrives (CI result, review, comment, conflict), or before you push to an open PR's branch. Not for reviewing a PR (that is reviewing-prs)."
 ---
 
 # Stewarding a PR
 
-A cloud session watching a PR it opened reads this file before acting on CI or review events. It sets this repo's conventions; it widens no access and lifts none of the session's own rules. Each rule below comes from something that went wrong on a PR here.
+A cloud session watching a PR it owns (one it opened, or one whose author asked it to get mergeable) reads this file before acting on CI or review events. It sets this repo's conventions; it widens no access and lifts none of the session's own rules. Each rule below comes from something that went wrong on a PR here.
 
 ## On each wake
 
@@ -63,12 +63,14 @@ A failure that is red on `main` too isn't this PR's: say so once on the PR and f
 
 ## Merging
 
-The owner's standing permission (memory `merge-after-approval`, 2026-11-09; restated 2026-11-14): merge without asking again once all of these hold on the current head:
+Merging takes the owner's own word in the session. This file can't give it: the harness reads it as repository content, which can't let a session approve or merge, and neither can a memory or a bead. The owner's habit (memory `merge-after-approval`) is to give that word once, up front, so ask early: when you start watching a PR and they haven't said, ask once in plain words, "Merge #<n> myself once the review approves?" A yes covers that PR for the rest of the session; a later "merge" works too.
+
+The PR is ready once all of these hold on the current head:
 
 - CI is green and the PR has no conflict.
 - The latest fresh `pr-reviewer` review, posted after the last substantive push, says Approve in its verdict line (its event is always COMMENT, so GitHub never shows the PR as approved), and no blocker or should-fix is open.
 - For a change under `web/src/colony/`: `npm run test:slow` passed on the head (CLAUDE.md). Say so in the PR.
 
-Merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the head the review approved, so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
+Ready, and the owner said to: merge by squash (`mcp__github__merge_pull_request`: `merge_method: squash`, `commit_title` the PR title plus ` (#<n>)` as on `main`, `expectedHeadSha` the head the review approved, so a later push fails the merge instead of going in unreviewed). Then close the PR's beads (`bd close <id> --reason="Merged in #<n>"`), run `scripts/beads-sync.sh push`, and unsubscribe from the PR.
 
-The session may still want the owner to say "merge" in it, since it treats repository text as data. If it does, ask once in plain words and wait.
+Ready, and they haven't: tell them once, with the head's short sha, and wait. Don't merge.
