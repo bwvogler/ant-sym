@@ -17,6 +17,7 @@ import {
   LANE_KINDS,
   LANES,
   laneOfContext,
+  type ErasedLane,
   type LaneSpec,
   type LaneName,
   localPolicy,
@@ -36,14 +37,7 @@ import {
   type FungusPolicy,
   decodeFungal,
   askedIn,
-  FUNGUS_BATCH,
   FUNGUS_GATHER_MS,
-  fungalKey,
-  fungusContext,
-  packFungusRequest,
-  readLevels,
-  validLevels,
-  worthAsking,
   askedLevers,
   DEFAULT_MENU,
   type Fungus,
@@ -237,24 +231,21 @@ export class ColonyJev {
   #menu: Set<string> = new Set(DEFAULT_MENU);
   /** the fungus's menuSeq when #menu was copied from it */
   #menuSeq = -1;
-  // The levers asked (the menu's, in table order) are in each key, so a question is packed and its answer read and
-  // kept against the levers it asked, whatever the menu is by the time it lands.
+  // The fungus's row of the lane registry (colony/lanes.ts), with what only the client knows bound in: the menu it asks under (the levers
+  // asked are in each key, so a question is packed and its answer read and kept against the levers it asked, whatever the menu is by the
+  // time it lands), the view of its context (side, with a nest underground), and the local rule (a method of the attached fungus).
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
-    key: (s) => fungalKey(s, this.#asked(s)),
-    pack: (items, aim) =>
-      packFungusRequest(
-        items.map((it) => ({ ...it, asked: askedIn(it.key) })),
-        aim,
-      ),
-    read: (a, id, _s, key) => readLevels(a, id, askedIn(key)),
-    valid: validLevels,
+    key: (s) => LANES.fungus.key(s, this.#menuNow()),
+    pack: (items, aim) => LANES.fungus.pack(items, aim),
+    read: (a, id, s, key) => LANES.fungus.read(a, id, s, key),
+    valid: LANES.fungus.valid,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
-    asks: (s) => worthAsking(this.#asked(s)),
-    contextOf: (aim) => fungusContext(aim, this.#fungus?.hasNest ? "side" : "top"),
+    asks: (s) => LANES.fungus.asks(s, this.#menuNow()),
+    contextOf: (aim) => LANES.fungus.contextOf(aim, this.#fungus?.hasNest ? "side" : "top"),
     words: "",
-    batch: FUNGUS_BATCH,
-    gather: true,
+    batch: LANES.fungus.batch ?? undefined,
+    gather: LANES.fungus.gather,
   });
   // The growth lane (ja-2bw.5), under the fungus's aim. While a situation has no answer its `local` is NO_ANSWER: the tip then plays its
   // own local rule (hyphae.ts localGrowth), which reads its body as well as its situation.
@@ -268,12 +259,17 @@ export class ColonyJev {
     contextOf: (aim) => LANES.growth.contextOf(aim),
     words: "",
     batch: LANES.growth.batch ?? undefined,
-    gather: true,
+    gather: LANES.growth.gather,
   });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
     this.#followMenu();
     return askedLevers(this.#menu, s?.task === "queen");
+  }
+  /** The menu the fungus lane asks under now (after following the fungus's, if it changed). */
+  #menuNow(): ReadonlySet<string> {
+    this.#followMenu();
+    return this.#menu;
   }
   /**
    * Copy the fungus's menu if it changed since (whoever set it: setMenu, Fungus.configure, a load). Queued questions were
@@ -379,16 +375,21 @@ export class ColonyJev {
   }
 
   #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
+    return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+  }
+
+  /** The cache of a context, loaded from the store on first use, keeping only stored answers `valid` (its lane's question) accepts. */
+  #cacheAt(context: string, valid: (key: string, answer: string) => boolean): PolicyCache<string> {
     let c = this.#caches.get(context);
     if (!c) {
       // Stored answers are kept only if this lane's question could have given them.
       c = new PolicyCache<string>(
         context,
-        (this.#store?.load(context) ?? []).filter(([key, a]) => l.valid(key, a)),
+        (this.#store?.load(context) ?? []).filter(([key, a]) => valid(key, a)),
       );
       this.#caches.set(context, c);
     }
-    return c as unknown as PolicyCache<A>;
+    return c;
   }
 
   /** The cache sizes the panel shows. */
@@ -630,12 +631,12 @@ export class ColonyJev {
   seed(context: string, entries: readonly [string, string][], species: Species = GENERIC_ANT): number {
     // Checked against the bundle's own species' words, not the game's (ja-fnd.5.15): a page that seeds while playing one species keeps
     // every other species' answers for a later game.
-    const l = this.#laneFor(context, species);
-    if (!l) return 0;
-    const cache = this.#cache(l, context);
+    const valid = this.#validFor(context, species);
+    if (!valid) return 0;
+    const cache = this.#cacheAt(context, valid);
     let added = 0;
     for (const [key, a] of entries)
-      if (!cache.get(key) && l.valid(key, a)) {
+      if (!cache.get(key) && valid(key, a)) {
         cache.put(key, a);
         added++;
       }
@@ -646,17 +647,17 @@ export class ColonyJev {
     return added;
   }
 
-  /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
-  #laneFor(context: string, species: Species): Lane<unknown, string> | null {
-    const kind = laneOfContext(context);
-    if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
-    if (kind === "growth") return this.#growth as Lane<unknown, string>;
-    const d = colonyLanes("", species);
-    return kind === "mode"
-      ? (d.modes as Lane<unknown, string> | null)
-      : kind === "stance"
-        ? (d.stances as Lane<unknown, string> | null)
-        : null;
+  /**
+   * What answers a context's lane accepts (its row of the lane registry, by the context's prefix: colony-, stance-, fungus-, growth-), in
+   * `species`' lane words for an ant's lane; null for a context of no lane, or of a lane the species lacks (Species.lanes).
+   */
+  #validFor(context: string, species: Species): ((key: string, answer: string) => boolean) | null {
+    const name = laneOfContext(context);
+    if (!name) return null;
+    const words = name === "mode" || name === "stance" ? species.lanes[name] : undefined;
+    if ((name === "mode" || name === "stance") && !words) return null;
+    const row: ErasedLane = LANES[name];
+    return (key, answer) => row.valid(key, answer, words);
   }
 
   /** Drive this one colony (kept for a single colony; see attachColonies). */
