@@ -4746,7 +4746,7 @@ A1 stays at or above 8/10 (10/10). A2b and A4 each lose one seed (one seed in te
 - **Goldens:** the one-world golden is re-recorded; `golden.json` and `slow/golden.json` are bit-exact (route memory acts only on one world's plane). **Cost:** none (steering only).
 - **The lesson:** the guard's seeds sit near the bound, so any change to one world's foraging can move them. A PR that changes plane behaviour runs the slow guards on its merged head (`slow.yml`, the steward skill) rather than on the branch it was measured on.
 
-**Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: seeds 6, 7 and 8 reach 4, 5 and 4 at the worst sample, and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 one seed down each, to watch; the full texts to read when the network allows.
+**Still open.** The bound of 2 is met on seeds 4, 5 and 9 (the owner's three), not on every seed: at `routeStep` 3, seeds 3 and 7 reach 3 at the worst sample (at step 4, before §67, seeds 6, 7 and 8 reached 4, 5 and 4), and `planePatience` and `siteFidelity` (§58, off, a cost in food) are not needed for the guard. The owner's calls on the stand-in (places recognised within `routeSee`; the whole way out kept for one trip) and on a fungus reach over `routeSee`; A2b and A4 one seed down each, and A9 one more at step 3, to watch; the full texts to read when the network allows.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
