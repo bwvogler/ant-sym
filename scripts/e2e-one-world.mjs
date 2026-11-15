@@ -1766,6 +1766,17 @@ try {
     JSON.stringify(await codexTabs.allTextContents()) === JSON.stringify(["Field guide", "Nest"]),
     "the Codex keeps the field guide and the nest",
   );
+  // Policy's pointer to the moved controls opens the Levers tab and leaves the keyboard on it (review of #237, N2).
+  await lbp.getByRole("button", { name: "Close the Codex" }).click();
+  await bench.getByRole("tab", { name: "Policy" }).click();
+  await bench.getByRole("button", { name: "The menu and the two settings: the Levers tab" }).focus();
+  await lbp.keyboard.press("Enter");
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") === "tab" && document.activeElement.textContent === "Levers"),
+    "Policy's “the Levers tab” opens it and leaves the focus on its tab",
+  );
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  await lbp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
   // One Escape, one thing: with the Codex open over it, Escape in the Lab closes the Codex and leaves the Lab.
   await bench.getByRole("tab", { name: "World" }).focus();
   await lbp.keyboard.press("Escape");
@@ -1787,6 +1798,25 @@ try {
   check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "the Lab's × gives the map the focus");
   await lbp.keyboard.press("l");
   await bench.waitFor({ timeout: 3000 });
+  // Opening the Lab takes no focus: from nowhere (as after Start), l then Space still pauses (review of #237, S1).
+  await lbp.keyboard.press("l");
+  await until(() => bench.count().then((n) => n === 0), "l closes the Lab", 3000, 50);
+  await lbp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") !== "tab"),
+    "opening the Lab from nowhere leaves its tabs unfocused",
+  );
+  const runs = async () => {
+    const a = await lbp.evaluate(() => window.jevAnts.game.time);
+    await lbp.waitForTimeout(300);
+    return (await lbp.evaluate(() => window.jevAnts.game.time)) !== a;
+  };
+  const ranBefore = await runs();
+  await lbp.keyboard.press(" ");
+  await lbp.waitForTimeout(100);
+  check((await runs()) !== ranBefore, "and Space plays or pauses the game");
   await lbp.locator("canvas").first().focus();
   await lbp.keyboard.press("l");
   await until(

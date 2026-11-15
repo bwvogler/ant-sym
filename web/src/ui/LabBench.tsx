@@ -45,6 +45,8 @@ export default function LabBench(
   const tab = target.tab === "journal" && !journal ? "history" : target.tab;
   const setTab = (t: LabTab) => openLab({ tab: t });
   const body = useRef<HTMLDivElement>(null);
+  // The target the Lab opened with: opening takes no focus, so Space still plays and pauses (review of #237, S1).
+  const opened = useRef(target);
   // A target section (a "?" on the policy) is scrolled to once its tab has rendered, and takes the keyboard's focus, so a
   // "?" pressed by key lands where it opened (review of #237, S1); a tab of its own starts at the top.
   useEffect(() => {
@@ -56,7 +58,7 @@ export default function LabBench(
       body.current?.scrollTo({ top: 0 });
       // A button that swapped the tab under it (the Policy tab's "the Levers tab") leaves focus nowhere: the tab takes
       // it, so the keyboard stays in the Lab (review of #237, N2).
-      if (document.activeElement === document.body)
+      if (target !== opened.current && document.activeElement === document.body)
         document.querySelector<HTMLElement>('[aria-label="lab tabs"] [aria-selected="true"]')?.focus({ preventScroll: true });
     }
   }, [target]);

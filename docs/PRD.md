@@ -6015,7 +6015,8 @@ The Codex was the field guide, the nest and the policy. The policy is about how 
 - **The keyboard.**
   - A "?" moves focus to the section it opened, so pressing one by key lands there (review of #237, S1).
   - Escape, with focus in the Lab, closes it and gives the map the focus (the owner, D1 on #237). This replaces the Codex's Escape after a "?".
-  - One Escape closes one thing. A chart's crosshair takes it first, and the Lab leaves it alone while a tooltip or dialog is open.
+  - One Escape closes one thing. A chart's crosshair takes it first, and the Lab leaves it alone while a tooltip or a dialog that takes Escape is open (not the tutorial's coach card, which takes none).
+  - Opening the Lab takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
 - **The Codex** keeps two tabs: the field guide and the nest. Its ids stay `learn-…`, and the Lab's policy sections are `lab-…`, so the two never share one.
 - **Two chart fixes** from #226's re-review (`ja-mvo9.4.1`):
   - Escape on a focused chart is taken only while it puts a crosshair away. Otherwise it passes on, so an open drawer closes (`chartKey`, pure and tested).
