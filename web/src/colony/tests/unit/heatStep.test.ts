@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CURTAIN, PLANE, type Colony } from "../../colony.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 import { Game, gameRng } from "../../game.ts";
-import { dayPhase, groundHeat, heatStep } from "../../heat.ts";
+import { bodyHeatAfter, dayPhase, groundHeat, heatStep } from "../../heat.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import type { ColonyParams } from "../../params.ts";
 
@@ -54,6 +54,7 @@ test("past heatDeath an ant dies of heat, once: it is counted, and a dead ant is
   heatStep(c, 0);
   assert.equal(c.alive[0], 0, "past heatDeath: dead");
   assert.equal(c.diedHot, 1, "counted");
+  assert.equal(c.losses, 0, "a death of heat is not a loss to a fight (review of #254, S1)");
   heatStep(c, 0);
   heatStep(c, 1);
   assert.equal(c.diedHot, 1, "the dead are skipped, so it is counted once");
@@ -73,9 +74,20 @@ test("a body heats toward the plane's ground out in the open and cools toward th
   assert.ok(ground > 0, "a ground hotter than the nest at noon");
   heatStep(out.c, 5);
   assert.ok(out.c.bodyHeat[0]! > 0 && out.c.bodyHeat[0]! < ground, `heated toward the ground: ${out.c.bodyHeat[0]} of ${ground}`);
+  assert.ok(Math.abs(out.c.bodyHeat[0]! - bodyHeatAfter(out.p, 0, ground, 5)) < 1e-3, "by bodyHeatAfter, toward that ground, over dt (N3)");
 
   const inside = setup(CURTAIN, 6);
   inside.c.time = noon(inside.p);
   heatStep(inside.c, 5);
   assert.ok(inside.c.bodyHeat[0]! < 6 && inside.c.bodyHeat[0]! > 0, `cooled toward the nest's: ${inside.c.bodyHeat[0]}`);
+});
+
+test("a body that crosses heatFelt during a step is hot at once, not a tick later (review of #254, N1)", () => {
+  const { c, p } = setup(PLANE, 0);
+  c.time = noon(p);
+  const ground = groundHeat(p, c.time) - p.heatNest;
+  c.bodyHeat[0] = above(p, p.heatFelt - 0.5);
+  assert.ok(bodyHeatAfter(p, c.bodyHeat[0]!, ground, 5) + p.heatNest > p.heatFelt, "five seconds at noon carry it past heatFelt");
+  heatStep(c, 5);
+  assert.equal(c.hot[0], 1, "the flag reads the body as it is after the step");
 });
