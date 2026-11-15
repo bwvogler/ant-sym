@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { APHID, aphidCells, aphidCount, aphidLife, stepAphids, type AphidClump } from "../../aphids.ts";
-import { Builder } from "../../builder.ts";
+import { APHIDS_EATEN_SAID, Builder } from "../../builder.ts";
 import { Game } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { PLANE } from "../../vocab.ts";
@@ -216,3 +216,29 @@ function clumpCellsOf(clump: AphidClump): Set<string> {
   for (let k = 0; k < clump.cells.length; k += 2) s.add(`${clump.cells[k]},${clump.cells[k + 1]}`);
   return s;
 }
+
+test("watch: aphids found, some eaten, all gone, each said once; an undone clump says nothing", () => {
+  const g = game();
+  const c = g.colonies[0]!;
+  const b = new Builder(g);
+  const o = openSpot(g);
+  b.apply({ tool: "aphids", layer: PLANE, points: [o] });
+  const clump = g.aphids[0]!;
+  assert.deepEqual(b.watch(), [], "nothing yet");
+  // An ant of colony 0 carrying food on one of its cells: found.
+  const i = [...Array(c.n).keys()].find((j) => c.alive[j])!;
+  c.putAnt(i, PLANE, centreX(clump.cells[0]!, clump.cells[1]!), centreY(clump.cells[1]!));
+  c.carrying[i] = 1;
+  assert.deepEqual(b.watch(), [{ kind: "aphidsFound", colony: 0 }]);
+  assert.deepEqual(b.watch(), [], "once");
+  clump.eaten = APHIDS_EATEN_SAID;
+  assert.deepEqual(b.watch(), [{ kind: "aphidsEaten" }]);
+  assert.deepEqual(b.watch(), []);
+  g.aphids.length = 0; // its aphids gone (stepAphids drops it)
+  assert.deepEqual(b.watch(), [{ kind: "aphidsGone" }]);
+  assert.deepEqual(b.watch(), []);
+  // Put down and undone: never gone, never found.
+  b.apply({ tool: "aphids", layer: PLANE, points: [o] });
+  assert.ok(b.undo());
+  assert.deepEqual(b.watch(), []);
+});

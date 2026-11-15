@@ -6847,3 +6847,15 @@ Higher at the clump with it on in 10 of 10 held-out seeds. Gaber et al. 2024 fou
 | **0.05** | **0.23** (0.18–0.27) | **0.21** (0.16–0.29) |
 
 Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found with ants and larvae (118 against 147, 20 % fewer, after 7 days). Food home is unchanged within the noise (939 against 914). `tests/slow/assays.test.ts` holds seed 1 between 0.1 and 0.4, and none eaten at 0.
+
+### 78.5 The tray, the map, notices and Learn (ja-nzkg.6)
+
+- **Tray:** 🐛 Aphids in the full tray after the crumbs; hidden for a species that takes no honeydew (`trayItems`' `tends`: aphidPlume, tendDefend or aphidPrey above 0; the desert ant has none). Its sound is three soft rising pips.
+- **Map:** each living clump's cells carry one to four green dots (`--aphid`, light and dark), by its aphids a cell, fading as it crashes; on the top view.
+- **Notices** (`Builder.watch`, once each a clump): "The Amber ants found your aphids!" (an ant carrying food on the clump), "The ants are eating some of your aphids, as real ants do." (3 eaten), "Your aphids are all gone: aphid families grow, then fade away." An undone clump says nothing.
+- **Learn:** the `builder-aphids` entry (what you see, what real ants do, how the game models it, and what is a guess), with its Codex row, open from the start as the other builder tools are.
+- **e2e:** step 11 taps aphids down at 390 and 768 px.
+
+**Cost, the PR's.** No lane, situation field, legend or question changed: no Jev cost. Tick: the plume's rebuild and the honeydew pass show no cost past the noise in B9–B12 (3.0–3.9 ms a tick, as the runs without clumps).
+
+**Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.

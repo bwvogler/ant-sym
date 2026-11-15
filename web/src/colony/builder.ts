@@ -196,7 +196,13 @@ export type BuildEvent =
   | { kind: "foodGone"; tool: "sugar" | "crumb" }
   | { kind: "lineFollowed"; colony: number; ants: number }
   | { kind: "antHome"; colony: number; seconds: number }
-  | { kind: "antLost"; colony: number };
+  | { kind: "antLost"; colony: number }
+  | { kind: "aphidsFound"; colony: number }
+  | { kind: "aphidsEaten" }
+  | { kind: "aphidsGone" };
+
+/** Aphids eaten from a clump before `watch` says the ants are eating them. */
+export const APHIDS_EATEN_SAID = 3;
 
 /** Ants on a crayon line at once for `watch` to say it is followed. */
 export const FOLLOWED_AT = 3;
@@ -254,6 +260,8 @@ export class Builder {
   #food: FoodWatch[] = [];
   #followed = new WeakSet<CrayonLine>();
   #moved: MovedAnt[] = [];
+  /** the clumps a child put down, watched until they are gone: found yet, eaten said yet (docs/aphids.md "Play") */
+  #clumps = new Map<AphidClump, { found: boolean; eaten: boolean }>();
   #moves = 0;
 
   constructor(game: Game) {
@@ -290,6 +298,7 @@ export class Builder {
         : undefined;
     const changes = this.#apply(stroke, extend, clump);
     if (!changes.length) return 0;
+    for (const c of changes) if (c.kind === "aphids") this.#clumps.set(c.clump, { found: false, eaten: false });
     if (stroke.tool === "sugar" || stroke.tool === "crumb") {
       const cells = changes.flatMap((c) =>
         c.kind === "food" ? [{ map: c.map, x: c.x, y: c.y, before: c.map.food.get(c.x, c.y) - c.added, added: c.added }] : [],
@@ -387,6 +396,32 @@ export class Builder {
       if (n >= FOLLOWED_AT) {
         this.#followed.add(line);
         out.push({ kind: "lineFollowed", colony: line.colony, ants: n });
+      }
+    }
+    // Aphids (docs/aphids.md "Play"): found (an ant carrying food on the clump), some eaten, all gone; each said once.
+    for (const [clump, said] of this.#clumps) {
+      if (!game.aphids.includes(clump)) {
+        out.push({ kind: "aphidsGone" });
+        this.#clumps.delete(clump);
+        continue;
+      }
+      if (!said.found) {
+        const on = new Set<number>();
+        for (let k = 0; k < clump.cells.length; k += 2) on.add((clump.cells[k + 1]! + 0x8000) * 0x10000 + (clump.cells[k]! + 0x8000));
+        game.colonies.forEach((c, k) => {
+          for (let i = 0; i < c.n && !said.found; i++) {
+            if (!c.alive[i] || !c.carrying[i] || (game.world && c.layer[i] !== clump.layer)) continue;
+            c.antCell(i);
+            if (on.has((CELL[1] + 0x8000) * 0x10000 + (CELL[0] + 0x8000))) {
+              said.found = true;
+              out.push({ kind: "aphidsFound", colony: k });
+            }
+          }
+        });
+      }
+      if (!said.eaten && clump.eaten >= APHIDS_EATEN_SAID) {
+        said.eaten = true;
+        out.push({ kind: "aphidsEaten" });
       }
     }
     this.#moved = this.#moved.filter((m) => {
@@ -550,6 +585,7 @@ export class Builder {
     const undoneFood = new Set(changes.flatMap((c) => (c.kind === "food" ? [`${c.x},${c.y}`] : [])));
     if (undoneFood.size) this.#food = this.#food.filter((w) => !w.cells.some((c) => undoneFood.has(`${c.x},${c.y}`)));
     for (const c of changes) if (c.kind === "ant") this.#moved = this.#moved.filter((m) => !(m.colony === c.colony && m.i === c.i));
+    for (const c of changes) if (c.kind === "aphids") this.#clumps.delete(c.clump);
     const game = this.game;
     const guards = new Map<number, Set<number>>();
     const guardOf = (map: WorldMap) => {
