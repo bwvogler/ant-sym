@@ -6556,7 +6556,7 @@ Merging is not delegated: PRs wait for the owner.
 | `game` 1–20 (two colonies, 600 s): pass | 17/20 (3, 10, 11) | 17/20 | 17/20 | 17/20 |
 | `nestFlow` 1–10 (900 s): most larvae waiting | 3 | 3 | 3 | 3 |
 
-- Over seeds 1–32, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting), and no worker or larva starves on any seed. Crops of 0.5 add nothing on top and make seeds 17–32 worse; the crop size was swept next (below).
+- Over seeds 1–32 at `4e411b5`, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting) and no larva starves; one seed of 1–16 still has 17 workers starved (above). After main moved, the crop sweep below has it at 30 of 32 (seeds 16 and 22). Crops of 0.5 add nothing on top and make seeds 17–32 worse; the crop size was swept next (below).
 - The two-colony game and the nest flow are unchanged in every metric: their games are short and keep their young, so reversion rarely fires. Every golden master is unchanged with it on, for the same reason.
 - **`revert: 1` is the default now.**
 - Still open: N12, brood smelt through solid soil (`BROOD_SMELL` reads a disc).
