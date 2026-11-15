@@ -4,13 +4,13 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Game } from "../../game.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
-import { ticks } from "../builders.ts";
+import { mulberry32 } from "../../world.ts";
+import { smallOne, ticks } from "../builders.ts";
 
 // The policy API on the sim (docs/refactor.md S4.4, ja-fnd.5.4): a lane's policy is bound to a colony or the fungus through `bindPolicy`, not assigned
 // to a field, so a species' local rule, Jev's cached answers and a test's stub all arrive the same way.
 
-const game = () => new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 20, rivalAnts: 20 }, mulberry32(3));
+const game = () => new Game(smallOne(1), { antCount: 20, rivalAnts: 20 }, mulberry32(3));
 
 test("a colony's mode and stance policies are bound through bindPolicy and are what the tick asks", () => {
   const g = game();

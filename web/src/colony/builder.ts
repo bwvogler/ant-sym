@@ -227,6 +227,16 @@ function buildable(map: WorldMap, x: number, y: number): boolean {
   return inBounds(map, x, y) && y >= (map.surfaceRows ?? 0) && !(map.sky && map.sky.get(x, y) === 1 && rockAt(map, x, y) !== OPEN);
 }
 
+/** An ant the tweezers set down: colony, slot, its generation (a slot reborn is another ant), the game time and the
+ * builder's count of moves at its last set-down (a new count: it was carried again). */
+export interface MovedAnt {
+  colony: number;
+  i: number;
+  gen: number;
+  at: number;
+  move: number;
+}
+
 /**
  * The builder for one game: applies strokes and undoes them. Strokes apply between ticks (the page's loop), never during
  * one. `apply` returns how many cells it changed (0: nothing to undo, and nothing recorded).
@@ -237,7 +247,8 @@ export class Builder {
   #joinable = false;
   #food: FoodWatch[] = [];
   #followed = new WeakSet<CrayonLine>();
-  #moved: { colony: number; i: number; gen: number; at: number }[] = [];
+  #moved: MovedAnt[] = [];
+  #moves = 0;
 
   constructor(game: Game) {
     this.game = game;
@@ -314,8 +325,13 @@ export class Builder {
     }
     this.#joinable = true;
     this.#moved = this.#moved.filter((m) => !(m.colony === k && m.i === i));
-    this.#moved.push({ colony: k, i, gen: c.gen[i]!, at: game.time });
+    this.#moved.push({ colony: k, i, gen: c.gen[i]!, at: game.time, move: ++this.#moves });
     return true;
+  }
+
+  /** The moved ants not home, dead or undone at the last watch() (it prunes them once a second: check). Read only. */
+  moved(): readonly Readonly<MovedAnt>[] {
+    return this.#moved;
   }
 
   /**

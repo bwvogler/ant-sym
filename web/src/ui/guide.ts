@@ -473,7 +473,7 @@ export const GUIDE: GuideEntry[] = [
     id: "builder-tweezers",
     title: "Tweezers",
     onScreen:
-      "Pick an ant up with the tweezers (🤏) and drop it somewhere else on the surface. Watch it walk off, search in loops, and find its way home; the bell tells you how long it took.",
+      "Pick an ant up with the tweezers (🤏) and drop it somewhere else on the surface. A line follows it home: solid while it walks to where it thinks home is, dotted while it searches in loops. The bell tells you how long it took.",
     realAnts:
       "Scientists move desert ants with tweezers to see how they find home. A moved ant walks the same distance and direction it would have walked home from where it was picked up, as if it hadn't been moved, then searches in loops until it finds the nest.",
     inGame:

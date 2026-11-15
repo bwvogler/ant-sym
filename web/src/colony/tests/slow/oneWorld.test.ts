@@ -7,7 +7,7 @@ import { generateOneWorld } from "../../oneWorld.ts";
 
 // Whole-game guards of one world (docs/one-world.md U6a), beside slow/side.test.ts: `npm run test:slow`.
 
-// G1, one world, is its own file (oneWorldG1.test.ts): seeds 1-10 in worker threads, judged on a share of seeds (ja-ysco).
+// G1, one world, is its own file (g1/oneWorldG1.test.ts, its own job in slow.yml): seeds 1-10 in worker threads, judged on a share of seeds (ja-ysco).
 
 // Unity reachable on one world (PRD §53, ja-i0f; docs/one-world.md U6a): Garden painted in both colonies at the start, in
 // the curtain by each royal chamber, and the game as the page plays it (gameRng, regrowth on, autoFound off). The side view never got

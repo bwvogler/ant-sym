@@ -84,7 +84,7 @@ export interface Lever {
   kind: LeverKind;
   /** what it is, in a few words (Jev's question names it; the panel shows it) */
   name: string;
-  /** what pulling it does to the host, for the Learn drawer and the panel */
+  /** what pulling it does to the host, for Lab mode (Policy, Levers) and the panel */
   blurb: string;
   /** the same in a few words, for the legend Jev reads (fungusBrain.FUNGUS_LEGEND: every request carries it) */
   brief: string;

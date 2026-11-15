@@ -4,7 +4,7 @@ import {
   Game,
   GENERIC_ANT,
   LANES,
-  generateWorld,
+  generateOneWorld,
   localResponses,
   localStance,
   mulberry32,
@@ -42,7 +42,7 @@ afterEach(() => {
 
 function setup(species: Species | undefined, before?: (g: Game) => void) {
   const g = new Game(
-    generateWorld(1, { size: { w: 60, h: 40 } }),
+    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
     { antCount: 5, rival: false, species: species ?? GENERIC_ANT },
     mulberry32(1),
   );
@@ -134,7 +134,7 @@ test("a bundle is checked against its own species' words, not the game's (ja-fnd
   const key = situationKey(sit);
   assert.equal(jev.seed(policyContext(DOCTRINE), [[key, "follow"]]), 1, "a generic bundle, seeded while the lone forager plays");
   assert.equal(jev.seed(policyContext(DOCTRINE, LONE_MODE), [[key, "follow"]], LONE), 0, "the lone forager's own: follow refused");
-  const g2 = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false }, mulberry32(1));
+  const g2 = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 5, rival: false }, mulberry32(1));
   jev.attachColonies(g2.colonies);
   assert.equal(g2.player.policy(sit), "follow", "the later generic game plays the shipped follow answer");
 });

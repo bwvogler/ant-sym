@@ -8,7 +8,7 @@ import { localResponses } from "../../responses.ts";
 import { defineSchema, legendOf } from "../../schema.ts";
 import type { Species } from "../../species.ts";
 import { MODES, STANCES, TRAILS, type LaneWords, type Mode, type Policy, type SpeciesSituation } from "../../vocab.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32, worldFromArrays } from "../../world.ts";
 import { smallOne } from "../builders.ts";
 
 // ja-fnd.5.10's acceptance: a species asks its mode lane about its own situation. This one leaves two generic fields out (homeTrail, alarm) and adds one
@@ -107,7 +107,7 @@ test("its ants are asked about their own situation, and keep its codes", () => {
 });
 
 test("a schema without every mode, or too big for an ant's question code, is refused", () => {
-  const c = new Colony(generateWorld(1, { size: { w: 60, h: 40 } }), {}, mulberry32(1));
+  const c = new Colony(worldFromArrays({ w: 60, h: 40 }, [{ x: 30, y: 20, r: 2 }]), {}, mulberry32(1));
   assert.throws(() => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "tired", values: [false, true] }]) }), /mode field/);
   assert.throws(
     () => c.setSituation({ schema: defineSchema<SpeciesSituation>([{ name: "mode", values: ["explore", "return", "fight"] }]) }),
