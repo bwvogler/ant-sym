@@ -94,7 +94,12 @@ export function Colonies({ stats }: Props) {
       </div>
       {stats && (
         // One line per cell: on a phone the table scrolls sideways in its card rather than wrapping "963 / 871 / 1" over three lines.
-        <div className="mt-3 overflow-x-auto border-t border-line pt-3">
+        <div
+          className="mt-3 overflow-x-auto border-t border-line pt-3 focus-visible:outline-2 focus-visible:outline-accent"
+          tabIndex={0}
+          role="region"
+          aria-label="colonies table"
+        >
           <dl className="grid w-max min-w-full grid-cols-[repeat(8,auto)] gap-x-4 gap-y-1 font-mono text-xs whitespace-nowrap text-fg-2">
             <dt className="text-fg-3" />
             {["ants", "food home", "lost", "born", "queen · brood", "dug / mound / filled", "stance"].map((h) => (
@@ -637,7 +642,7 @@ export function LeverChips({
                 type="button"
                 aria-pressed={on}
                 disabled={locked}
-                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through opacity-50" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
                 title={
                   locked
                     ? (lock ?? undefined)
