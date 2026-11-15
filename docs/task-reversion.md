@@ -36,7 +36,7 @@ An old ant at home that has met almost no young nestmates for a while reverts: i
 
 ## The mechanic
 
-One setting whose 0 is main bit for bit. All of it is steering and body rules with no new situation field, so **no Jev cost**.
+One setting whose 0 is the old game bit for bit (on, share 1, since ja-7r7x.4). All of it is steering and body rules with no new situation field, so **no Jev cost**.
 
 - **Cue (sensed; as built):** two per-ant senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells, through soil too):
   - `youngMet`: young nestmates (age band 0) met;

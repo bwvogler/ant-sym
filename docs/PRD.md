@@ -6445,7 +6445,7 @@ Merging is not delegated: PRs wait for the owner.
 
 **Cost:** none. No lane, field, legend or question changes, and `noEntry` was already sensed.
 
-## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
+## 74. Task reversion: old foragers nurse when the young are gone (built, on, ja-7r7x, 2026-11-14)
 
 **Research basis:** [task-reversion.md](task-reversion.md):
 - In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
@@ -6460,7 +6460,7 @@ Merging is not delegated: PRs wait for the owner.
 - Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
 - The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
 
-**The mechanic (built, off, setting `revert`).**
+**The mechanic (built, setting `revert`; on, share 1, since ja-7r7x.4).**
 - *Cue:* two senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells):
   - young nestmates met (`youngMet`) below `REVERT_BELOW`;
   - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
@@ -6524,7 +6524,7 @@ Merging is not delegated: PRs wait for the owner.
 **Decisions.**
 - Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
 
-**The mechanic (built, off, setting `cropFeed`, 0 = main bit for bit).**
+**The mechanic (built, setting `cropFeed`, 0 = off, the default; ja-638i.3).**
 - *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
 - *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
 - *Unchanged:* porters and their table stay for now.
@@ -6576,10 +6576,41 @@ Merging is not delegated: PRs wait for the owner.
 - Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
 - Adding crops ends worker starvation too, but one seed goes over the bound (14).
 - Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
-- Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+
+**Confirmed and turned on (ja-7r7x.4, 2026-11-15).** `assays.yml` on GitHub, branch at `4e411b5`, each run crossing `revert` 0/1 with `cropFeed` 0/0.5 ([larvae](https://github.com/bwvogler/ant-sym/actions/runs/43681296621), [game](https://github.com/bwvogler/ant-sym/actions/runs/43681298553), [nestFlow](https://github.com/bwvogler/ant-sym/actions/runs/43681300400)):
+
+| Assay, seeds | main | `cropFeed` 0.5 | **`revert` 1** | `revert` 1 + `cropFeed` 0.5 |
+|---|---|---|---|---|
+| `larvae` 17–32: pass (failing) | 12/16 (19, 21, 26, 30) | 12/16 (same) | **15/16 (22)** | 14/16 (19, 22) |
+| `larvae` 17–32: worst waiting | 83 | 53 | **10** | 49 |
+| `larvae` 17–32: most workers / larvae starved in a seed | 8 / 8 | 0 / 7 | **0 / 0** | 0 / 0 |
+| `larvae` 17–32: fewest workers | 62 | 58 | **143** | 110 |
+| `game` 1–20 (two colonies, 600 s): pass | 17/20 (3, 10, 11) | 17/20 | 17/20 | 17/20 |
+| `nestFlow` 1–10 (900 s): most larvae waiting | 3 | 3 | 3 | 3 |
+
+- Over seeds 1–32 at `4e411b5`, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting) and no larva starves; one seed of 1–16 still has 17 workers starved (above). After main moved, the crop sweep below has it at 30 of 32 (seeds 16 and 22). Crops of 0.5 add nothing on top and make seeds 17–32 worse; the crop size was swept next (below).
+- The two-colony game and the nest flow are unchanged in every metric: their games are short and keep their young, so reversion rarely fires. Every golden master is unchanged with it on, for the same reason.
+- **`revert: 1` is the default now.**
+- Still open: N12, brood smelt through solid soil (`BROOD_SMELL` reads a disc).
+
+**The crop size, with reversion on (ja-638i.3, 2026-11-15).** The owner asked to tune the crop before deciding. `assays.yml`, `larvae` seeds 1–32, `revert` 1 ([run](https://github.com/bwvogler/ant-sym/actions/runs/43716704767)):
+
+| `cropFeed` | Pass (failing seeds) | Worst waiting | Most workers starved in a seed | Most larvae starved in a seed | Fewest workers |
+|---|---|---|---|---|---|
+| 0 | 30/32 (16, 22) | 10 | 17 | 0 | 125 |
+| **0.1** | **30/32 (19, 22)** | **47** | **0** | **5** | **124** |
+| 0.25 | 27/32 (3, 14, 15, 16, 22) | 60 | 0 | 0 | 83 |
+| 0.5 | 29/32 (5, 19, 22) | 49 | 0 | 0 | 110 |
+
+- Every crop size ends worker starvation, and every one raises the worst seed's waiting larvae; 0.1 keeps the pass count of crops off.
+- By the worst seed, crops off is best for the larvae (10 waiting, none starved); 0.1 trades one seed's 17 starved workers for one seed with 47 larvae waiting and 5 starved.
+- The owner first chose `cropFeed: 0.1` (2026-11-15): the mechanic is grounded (Greenwald et al. 2015; Cassill & Tschinkel 1995, **unverified**), and no worker starves.
+- Guards with `revert` 1, `cropFeed` 0 against 0.1 ([run](https://github.com/bwvogler/ant-sym/actions/runs/43718042882)): the two-colony `game`, seeds 1–20, passes 18/20 either way (seeds 3 and 10 fail), and the medians match except the rival's ants (820 against 829); `nestFlow`, seeds 1–20, is identical in every metric. Every golden master is unchanged: their games are short and no ant there fills a crop.
+- **One world, the map the page plays** (review of #236, S1; `revert` 1, `cropFeed` 0 against 0.1, seeds 1–20, [run](https://github.com/bwvogler/ant-sym/actions/runs/43721254829)): G1 (10/20 either way) and the one-world nest flow are identical. A5, foraging regulation (360 s), is worse with crops: the share out once food flows falls (median 0.25 → 0.22), food stored falls (median 1,383 → 1,241; seed 1 1,069 → 612), and the before ÷ after ratio worsens on 12 of 20 seeds (seed 1 2.64 → 3.20, past #235's A5 guard of 2.91). Why crops slow foraging there was not traced. Crop loads regulating a colony's intake is reported by Greenwald, Eckmann & Feinerman 2018 (eLife; abstract only, **unverified**).
+- **The owner then chose reversion alone (2026-11-15): `cropFeed` stays 0**, the default. Crops come back with ja-638i.4: the one-world foraging cost and seed 19's larval spike (47 waiting, 5 starved).
 
 **Still open.**
-- Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).
+- Crops (ja-638i.4): their one-world foraging cost on A5 and their larval spike on seed 19; seed 22 is over the bound with or without them.
 - How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
 - The design numbers (owner's call after the sweep).
 - Whether to retire the porters' table once crops carry the brood's food.
