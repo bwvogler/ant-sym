@@ -6811,7 +6811,7 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 | Id | Result |
 |---|---|
 | B9 `aphidsFound` (60 ants, a clump 75 units off in a corner) | first find a median 9.1 s after it is put down (7.5–15.4). The plume (`ja-nzkg.3`) is measured against this. |
-| B10 `aphidsRenewable` against `aphidsRenewableSugar` (about 37 cells, 300 ants) | food home over 300 s: a median 1,130 (816–1,225) from the clump against 444 (all of it) from the same cells of sugar; ants on the hole–clump line 68 against 4 on a bare line. Passes. |
+| B10 `aphidsRenewable` against `aphidsRenewableSugar` (about 37 cells, 300 ants) | food home over 300 s: a median 1,130 (816–1,225) from the clump against 444 (all of it) from the same cells of sugar; ants on the hole–clump line 68 against 4 on a bare line. Passes. At the PR's last code (every step in): 1,110 (1,034–1,128), 68 against 4. |
 
 ### 78.2 The aphid plume (ja-nzkg.3)
 
@@ -6827,12 +6827,12 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 
 | tendDefend (both) | at the clump | away from homes and clump | losses a colony (300 s) |
 |---|---|---|---|
-| 0, seeds 1–4 | 0.00 (0–0.05) | 0.04 | 45 |
-| 1, seeds 1–4 | **0.92** (0.90–0.97) | 0.09 | 67 |
-| 0, seeds 11–20 | 0.00 (0–0.08) | 0.10 | 42 |
-| 1, seeds 11–20 | **0.94** (0.82–0.98) | 0.10 | 69 |
+| 0, seeds 1–4 | 0.00 (0–0.12) | 0.07 | 46 |
+| 1, seeds 1–4 | **0.87** (0.79–0.98) | 0.04 | 91 |
+| 0, seeds 11–20 | 0.00 (0–0.08) | 0.08 | 45 |
+| 1, seeds 11–20 | **0.90** (0.85–0.96) | 0.10 | 80 |
 
-Higher at the clump with it on in 10 of 10 held-out seeds. Gaber et al. 2024 found 90 % of caretakers biting. Their "other ants", 76 %, were still on the aphids' plant: the game's away share (a forager meeting a stranger far from anything, which flees) is not that comparison. The cost is the risk the plan named: a clump between nests is fought over, and each colony loses about half as many again in 5 minutes. The fights stay at the clump: the away share does not rise.
+Re-measured at the PR's last code (review of #243, S3). The first figures, taken at step 3, were one draw of a noisy number: step 4's draws in `preyAphid` shift the colonies' random stream, and B11's losses move by tens of ants with it. The fight share at the clump is higher with tending on in 4 of 4 and 10 of 10 seeds. Gaber et al. 2024 found 90 % of caretakers biting. Their "other ants", 76 %, were still on the aphids' plant: the game's away share (a forager meeting a stranger far from anything, which flees) is not that comparison. The cost is the risk the plan named: a clump between nests is fought over. Each colony's losses in 5 minutes rise on every one of the 14 seeds, by about +35 % to +125 % (seed means 46 → 91 and 45 → 80): roughly double. The fights stay at the clump: the away share does not rise.
 
 ### 78.4 A few aphids eaten (ja-nzkg.5)
 
