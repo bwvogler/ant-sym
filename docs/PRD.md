@@ -6276,3 +6276,32 @@ Merging is not delegated: PRs wait for the owner.
   - the young's distance to the brood: median 12.7 (8.7–25.0); to the queen: median 12.2 (9.0–18.2)
 - **Reading:** the young sit about as near the queen as the brood, and barely nearer the brood than the middle-aged. Since #201 the brood lies in brood chambers away from the queen, while the young still steer to her position. That is the gap the climb is meant to close. The build's target: the margin above main's at the worst seed, on seeds 1–10 and 11–20.
 - **The economy guard:** `scripts/lab/economy-strand.mjs` runs `economy.test`'s own hour on any seed. It reports the worst stranding, where those larvae lay and the bands at that moment, and flags a collapse. Main's figures on its 20 seeds are in §71: no collapse, worst 10, 2 seeds over 5.
+
+### 73.2 The field and the climb, built off (ja-k4k.15.2, ja-k4k.15.3)
+
+- **The field** (`broodOdour`, ja-k4k.15.2): each lying brood item lays `broodOdour` a second on its cell. The channel evaporates 0.3 and spreads 0.3, and doesn't cross rock.
+  - Off (0) lays nothing; the goldens hold bit for bit.
+  - At 1, a single egg reads 0.19 one cell out and a pile of 20 reads 0.26 two cells out (`FAINT` is 0.05).
+  - Bench, `nestFlow` seeds 1–4: 3.08 → 3.10 ms a tick at the median with it on.
+- **The climb** (`broodClimb`, ja-k4k.15.3): a young ant in a chamber climbs the odour at its three antennae and searches where it smells none. Off (0) is the queen's position; the goldens hold.
+
+**`nurseZone`, seeds 1–10, with `broodOdour` 1 and `broodClimb` 1** (main: pass 7/10, margin median about 0.2, worst −1.74):
+
+| channel (evaporation, diffusion) | pass | margin median | worst |
+|---|---|---|---|
+| 0.3, 0.3 | 5/10 | −0.24 | |
+| 0.1, 0.5 | 7/10 | 0.79 | |
+| 0.03, 0.5 | 8/10 | 2.43 | −0.90 |
+
+- At 0.3, 0.3, a probe found only 10% of a young ant's exploring ticks underground reach the chamber climb, and in it it smelt brood 10% of the time.
+- At 0.03, 0.5, the young sit 9.8 cells from the brood against main's 12.7.
+
+**The economy guard fails** (0.03, 0.5; `scripts/lab/economy-strand.mjs`, the 20 seeds of §71):
+
+| | collapses | worst stranded | seeds over 5 |
+|---|---|---|---|
+| main | 0 | 10 | 2 |
+| the climb | 2 (world 1 n = 4: 65 workers; n = 2: 68) | 71 | 4 |
+
+- Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
+- #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
