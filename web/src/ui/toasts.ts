@@ -26,6 +26,8 @@ const MAX = 3;
 export const LOG_MAX = 50;
 
 let toasts: readonly Toast[] = [];
+/** The bell's list is open: the field's toasts hide meanwhile, being in it already (review of #219, N2). */
+let logOpen = false;
 let log: readonly Notice[] = [];
 let next = 1;
 const listeners = new Set<() => void>();
@@ -52,6 +54,14 @@ export function dismissToast(id: number): void {
 }
 
 export const currentToasts = (): readonly Toast[] => toasts;
+
+export const noticesOpen = (): boolean => logOpen;
+
+export function setNoticesOpen(open: boolean): void {
+  if (open === logOpen) return;
+  logOpen = open;
+  emit();
+}
 
 /** The log, newest first. */
 export const noticeLog = (): readonly Notice[] => log;
@@ -83,9 +93,11 @@ export function subscribeToasts(fn: () => void): () => void {
  */
 export const SWIPE_PX = 60;
 export const TAP_PX = 6;
-export function swipeOutcome(dx: number, dy: number): "dismiss" | "stay" {
-  const d = Math.hypot(dx, dy);
-  return d <= TAP_PX || Math.abs(dx) >= SWIPE_PX || dy >= SWIPE_PX ? "dismiss" : "stay";
+/** A press held this long (ms) is a hold to read, not a tap: lifting it leaves the notice (review of #219, N1). */
+export const HOLD_MS = 500;
+export function swipeOutcome(dx: number, dy: number, heldMs = 0): "dismiss" | "stay" {
+  const tap = Math.hypot(dx, dy) <= TAP_PX && heldMs < HOLD_MS;
+  return tap || Math.abs(dx) >= SWIPE_PX || dy >= SWIPE_PX ? "dismiss" : "stay";
 }
 
 /** How long ago `at` was, in a few words ("just now", "5 min ago", "2 h ago"). */

@@ -5,10 +5,13 @@ import {
   clearNotices,
   currentToasts,
   dismissToast,
+  HOLD_MS,
   LOG_MAX,
   markNoticesRead,
   noticeLog,
+  noticesOpen,
   pushToast,
+  setNoticesOpen,
   SWIPE_PX,
   swipeOutcome,
   TAP_PX,
@@ -77,10 +80,24 @@ test("a tap or a swipe past SWIPE_PX sideways or down dismisses; a small drag sl
   assert.equal(swipeOutcome(0, SWIPE_PX), "dismiss", "down");
   assert.equal(swipeOutcome(30, 0), "stay");
   assert.equal(swipeOutcome(0, -SWIPE_PX), "stay", "up is not a swipe away");
+  assert.equal(swipeOutcome(0, 0, HOLD_MS), "stay", "a hold to read is not a tap (review of #219, N1)");
+  assert.equal(swipeOutcome(0, 0, HOLD_MS - 1), "dismiss");
+  assert.equal(swipeOutcome(SWIPE_PX, 0, 5 * HOLD_MS), "dismiss", "a slow swipe still swipes");
 });
 
 test("how long ago, in a few words", () => {
   assert.equal(ago(0, 10_000), "just now");
   assert.equal(ago(0, 5 * 60_000), "5 min ago");
   assert.equal(ago(0, 2 * 3_600_000), "2 h ago");
+  assert.equal(ago(0, 44_000), "just now");
+  assert.equal(ago(0, 46_000), "1 min ago");
+  assert.equal(ago(0, 90 * 60_000), "2 h ago");
+});
+
+test("the bell's list open hides the field's toasts: a flag the toasts read", () => {
+  assert.equal(noticesOpen(), false);
+  setNoticesOpen(true);
+  assert.equal(noticesOpen(), true);
+  setNoticesOpen(false);
+  assert.equal(noticesOpen(), false);
 });

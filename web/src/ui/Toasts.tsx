@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
-import { currentToasts, dismissToast, subscribeToasts, swipeOutcome, TOAST_MS, type Toast } from "./toasts.ts";
+import { currentToasts, dismissToast, noticesOpen, subscribeToasts, swipeOutcome, TOAST_MS, type Toast } from "./toasts.ts";
 
 const TONE = {
   info: "border-line bg-panel text-fg",
@@ -9,11 +9,14 @@ const TONE = {
 
 /**
  * The notices raised with pushToast, each gone after TOAST_MS, on a tap, or swiped away (owner, 2026-11-15): sideways
- * or down. A swiped notice is still in the log behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar,
+ * or down. A finger held on one stops its clock, and lifting a hold leaves it. A swiped notice is still in the log behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar,
  * "top" under the HUD (while the builder's tray fills the bottom).
  */
 export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
+  // While the bell's list is open they are in it: none over it.
+  const hidden = useSyncExternalStore(subscribeToasts, noticesOpen, noticesOpen);
+  if (hidden) return null;
   return (
     <div
       className={`pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
@@ -33,7 +36,7 @@ function Item({ t }: { t: Toast }) {
   // Where the finger went (CSS px) while it is down; null when no finger is on it.
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const [leaving, setLeaving] = useState(0);
-  const start = useRef<{ x: number; y: number; id: number } | null>(null);
+  const start = useRef<{ x: number; y: number; id: number; at: number } | null>(null);
   // The timer waits while a finger holds the notice.
   useEffect(() => {
     if (drag) return;
@@ -47,7 +50,7 @@ function Item({ t }: { t: Toast }) {
     return () => clearTimeout(timer);
   }, [leaving, t.id]);
   const down = (e: PointerEvent<HTMLButtonElement>) => {
-    start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    start.current = { x: e.clientX, y: e.clientY, id: e.pointerId, at: performance.now() };
     e.currentTarget.setPointerCapture(e.pointerId);
     setDrag({ dx: 0, dy: 0 });
   };
@@ -63,7 +66,7 @@ function Item({ t }: { t: Toast }) {
     const dx = e.clientX - s.x;
     const dy = e.clientY - s.y;
     setDrag(null);
-    if (e.type === "pointerup" && swipeOutcome(dx, dy) === "dismiss") setLeaving(dx < 0 ? -1 : 1);
+    if (e.type === "pointerup" && swipeOutcome(dx, dy, performance.now() - s.at) === "dismiss") setLeaving(dx < 0 ? -1 : 1);
   };
   const dx = leaving ? leaving * 480 : (drag?.dx ?? 0);
   const dy = leaving ? 0 : Math.abs(drag?.dx ?? 0) > (drag?.dy ?? 0) ? 0 : (drag?.dy ?? 0);

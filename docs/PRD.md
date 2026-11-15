@@ -5850,7 +5850,19 @@ The owner, playing on a phone, found the green notices at the bottom in the way:
   - The list gives each notice's tone, its words and how long ago; Clear empties it.
   - Escape or a press outside closes it.
 - **While building,** the notices show under the HUD instead of over the builder's tray.
-- **Checks:** `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, and the swipe rule. `npm run e2e` step 13 runs it at 390 px.
+- **Review of #219:**
+  - one Escape closes the list and not a dialog opened over it;
+  - a press held past 0.5 s is a hold to read, so lifting it leaves the notice (`HOLD_MS`);
+  - the field's notices hide while the list is open (they are in it);
+  - the bell is announced as opening a list (`aria-expanded`), not as a toggle.
+- **Checks:**
+  - `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, the swipe and hold rule, and `ago`'s boundaries.
+  - `npm run e2e` step 13 runs at 390 px by real touch (CDP touch events):
+    - a swipe and a slide back;
+    - a hold past 7 s;
+    - Escape over a drawer, and a tap outside;
+    - toasts above the builder's tray.
+  - Without `touch-none`, its swipe check fails.
 - **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 

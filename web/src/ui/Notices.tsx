@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FLOAT, IconButton } from "./kit.tsx";
-import { ago, clearNotices, markNoticesRead, noticeLog, subscribeToasts, unreadNotices } from "./toasts.ts";
+import { ago, clearNotices, markNoticesRead, noticeLog, setNoticesOpen, subscribeToasts, unreadNotices } from "./toasts.ts";
 
 // The bell at the top right (owner, 2026-11-15; ja-mvo9.5's notification stack): every notice raised this visit, newest
 // first, so a toast swiped away can be read later. A badge counts those not yet seen; opening the list marks them seen.
@@ -15,12 +15,14 @@ export default function Notices() {
   // Re-read "how long ago" now and then while the list is open.
   const [, tick] = useState(0);
   useEffect(() => {
+    setNoticesOpen(open);
     if (!open) return;
     markNoticesRead();
     const timer = setInterval(() => tick((n) => n + 1), 30_000);
     // Escape closes it (first, so a drawer under it stays open), and so does a press anywhere outside it.
     const key = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      // One Escape closes one thing: not this under a dialog opened over it (the palette, the shortcuts sheet).
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
       e.stopPropagation();
       setOpen(false);
@@ -32,6 +34,7 @@ export default function Notices() {
     window.addEventListener("pointerdown", press, true);
     return () => {
       clearInterval(timer);
+      setNoticesOpen(false);
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", press, true);
     };
@@ -46,6 +49,8 @@ export default function Notices() {
         icon="bell"
         label="Notices"
         active={open}
+        aria-pressed={undefined}
+        aria-expanded={open}
         badge={unread ? (unread > 9 ? "9+" : unread) : undefined}
         badgeLabel={unread ? `${unread} new` : undefined}
         onClick={() => setOpen((o) => !o)}
