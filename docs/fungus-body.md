@@ -44,7 +44,7 @@
 - Mixed: exposed ants groomed themselves more and others less (Theis et al. 2015); *Myrmica rubra* detect diseased nestmates but may not single them out (Leclerc & Detrain 2016).
 - Queens: workers form a retinue around a stationary queen, and *Solenopsis invicta* queen extracts attract workers; stationary *Myrmica rubra* queens were groomed by "a few workers". **Not found:** attendant counts for ant queens, or evidence that queens get more groomers than workers. Whether recognising a nestmate is a prerequisite for grooming it: **not found**.
 
-Read in full for `ja-e668.4` (2026-11-15; [lasius-neglectus.md §Sensed grooming](lasius-neglectus.md#sensed-grooming-what-ja-e668.4-builds-2026-11-15)): the grooming bias towards high load is small and is in whom an ant picks, not how long it grooms, removal saturates, and the pause after being groomed is about half a minute.
+Read in full for `ja-e668.4` (2026-11-15; [lasius-neglectus.md §Sensed grooming](lasius-neglectus.md#sensed-grooming-what-ja-e6684-builds-2026-11-15)): the grooming bias towards high load is small and is in whom an ant picks, not how long it grooms, removal saturates, and the pause after being groomed is about half a minute.
 
 **In the game:** grooming is still scripted (every nestmate within reach, by colony, up to a cap), and the queen's larger cap (`queenGroomers`) is a stop-gap with no source behind its number. Making grooming a sensed response (the pathogen cue, recognition by odour, the retinue drawn by queen pheromone) is `ja-k4k.12`, a row in the [vision gap table](vision.md#where-the-code-is-today).
 
