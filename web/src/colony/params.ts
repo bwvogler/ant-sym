@@ -483,6 +483,12 @@ export const NO_ENTRY_DROP = 0.5;
 /** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
 export const NO_ENTRY_RATE = 4;
 
+/**
+ * How hard a follower shies from "no entry" a child painted (builder.ts), while its colony's own noEntryAvoid is 0: the
+ * value PRD §45 tested (docs/builder.md "Slice 2"; Robinson et al. 2005: 71 % took the unmarked branch).
+ */
+export const NO_ENTRY_PAINTED = 4;
+
 /** Every channel's params: the defaults, with `over` merged in per channel and per field. */
 export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
   const out = { ...DEFAULT_CHANNELS };

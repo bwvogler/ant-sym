@@ -5,7 +5,7 @@ import { backfill, enterStale, staleStep } from "./dig.ts";
 import { avoid, choose, climb, handOnWall, inReach, NO_CELL, SOIL_FILL, tunnel, turnToward } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, SIDE, nx as stepX, ny as stepY } from "./hex.ts";
 import { believe, homeScentNear, routeFail, searchOn } from "./homing.ts";
-import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
+import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_PAINTED, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
 import { touch, touchProbe } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import {
@@ -25,12 +25,6 @@ import { fetches, walkTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
 import { mill, onMLine, siteAim } from "./plane.ts";
-
-/**
- * How hard a follower shies from "no entry" a child painted (builder.ts), while its colony's own noEntryAvoid is 0: the
- * value PRD §45 tested (docs/builder.md "Slice 2"; Robinson et al. 2005: 71 % took the unmarked branch).
- */
-export const NO_ENTRY_PAINTED = 4;
 
 export function steer(col: Colony, i: number, s: AntStep): void {
   const p = s.p;

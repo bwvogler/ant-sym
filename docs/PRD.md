@@ -6320,7 +6320,7 @@ Merging is not delegated: PRs wait for the owner.
 - No entry is the real-ant stop sign: trail followers turn away, wanderers don't (owner, 2026-11-15, over a made-up fence).
 
 **The mechanic.**
-- **Tweezers:** `Builder.moveAnt` sets an ant down elsewhere on the plane, and shifts its belief of home (`driftSurf`) by the same distance, so it runs its old vector.
+- **Tweezers:** `Builder.moveAnt` sets an ant down elsewhere on the plane, and shifts its belief of home (`carriedX`, `carriedY`) by the same distance, so it runs its old vector.
 - **No-entry paint:** every colony's `noEntry` along the stroke, topped up as a crayon line is. Followers read it at `NO_ENTRY_PAINTED` (4) while `noEntryAvoid` is 0, and the ants still lay none. **Off:** with no paint the field never wakes, so nothing changes.
 - **`Builder.watch`:** says, once each, when sugar is found and when it is gone, when a crayon line is followed, and when a moved ant gets home or dies.
 
@@ -6361,7 +6361,7 @@ Merging is not delegated: PRs wait for the owner.
 | Id | Result |
 |---|---|
 | B7 `noEntryFork` | share on the unpainted branch: median **0.75**, 9/10 ≥ 0.70 (seed 1 at 0.69); seeds 11–20 **10/10** (0.76–0.82). Control, no sign (`noEntryForkBare`): 0.49 (0.47–0.54). Robinson et al. 2005: 71 %. `NO_ENTRY_PAINTED` 4 was not tuned. |
-| B8 `tweezers` | carriers moved 30–60 sideways (median 18.5 a seed): **81 %** (52–89 %) came within 6 of where home would be before finding home; **100 %** home within 300 s, median 20.5 s after the move |
+| B8 `tweezers` | carriers moved 30–60 sideways (median 18.5 a seed): **92 %** (70–100 %) came within 6 of where home would be before finding home; **100 %** home within 300 s, median **36.5 s** (18–50.5) after the move. Their stored route is dropped (`routeClear`, review of #229): kept, most walked back by it and were home in 20.5 s |
 
 **Checks.**
 - Golden masters are bit-exact.

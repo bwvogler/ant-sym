@@ -14,6 +14,7 @@
 
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import type { Game } from "./game.ts";
+import { routeClear } from "./homing.ts";
 import type { Channel, Pheromones } from "./pheromone.ts";
 import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
 import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
@@ -299,6 +300,9 @@ export class Builder {
     const dy = y - c.y[i]!;
     if (dx === 0 && dy === 0) return false;
     c.putAnt(i, PLANE, x, y);
+    // The places it stored on its way out are not where it now is: no retrace by them (docs/builder.md "Slice 2";
+    // review of #229, S1). An undo can't give them back: a put-back ant has none for the rest of this trip.
+    routeClear(c, i);
     c.carriedX[i] += dx;
     c.carriedY[i] += dy;
     const change: Change = { kind: "ant", colony: k, i, gen: c.gen[i]!, dx, dy };

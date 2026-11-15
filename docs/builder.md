@@ -230,8 +230,8 @@ The owner's next step (2026-11-15): tweezers, no-entry paint and "look what happ
 - **Near home,** landmarks and the nest's smell correct the vector (`nest-search.md`, `nest-and-home.md` §1).
 
 **In the game:** the tweezers lift one ant off the plane and set it down where a finger lets go, on open ground.
-- The ant's sense of home is not reset. Its belief of where home lies (`believePlane`: the hole plus its own drift) is shifted by exactly the distance it was carried, through its `driftSurf`. A carrier then walks to a "home" that is off by that distance, searches there in its loops, and finds home by the search, the mound's smell or the hole in sight, as `nest-search.md` built.
-- Any retrace by route memory is dropped: the places it stored are not where it now is.
+- The ant's sense of home is not reset. Its belief of where home lies (`believePlane`: the hole plus its own drift) is shifted by exactly the distance it was carried, through two per-ant arrays, `carriedX` and `carriedY`. A carrier then walks to a "home" that is off by that distance, searches there in its loops, and finds home by the search, the mound's smell or the hole in sight, as `nest-search.md` built.
+- Any retrace by route memory is dropped (`routeClear`): the places it stored are not where it now is. An undo puts the ant back but not its places: it has none for the rest of that trip.
 - Nothing about choice changes. The ant decides from what it senses, as before. Only its position and its belief move, the way a real experimenter's forceps move them.
 - **Design:** tweezers work on the plane only, never underground; an ant can't be dropped on rock or in the sky.
 
@@ -286,7 +286,7 @@ This is design: no paper. It reads the game, never steers it.
 ### What slice 2 built (PRD §73.3)
 
 - **B7:** with the sign on one branch of a crayon fork, a median 75 % of the ants on the fork took the other branch, against 49 % with no sign. Robinson et al. found 71 %.
-- **B8:** of carriers moved 30–60 sideways, 81 % walked to where home would be by their old vector before finding home. All were home within 300 s (median 20 s), as Wehner & Srinivasan's displaced ants were.
+- **B8:** of carriers moved 30–60 sideways, 92 % walked to where home would be by their old vector before finding home. All were home within 300 s (median 36.5 s), as Wehner & Srinivasan's displaced ants were. Before the review of #229 dropped their stored route, most walked back by it instead, and got home in 20 s.
 
 ## Sources
 
