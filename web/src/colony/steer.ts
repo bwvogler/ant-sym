@@ -466,7 +466,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const f = marksAt(col, i, h, STORE_MARKS);
       const r = marksAt(col, i, h + a, STORE_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if (col.band(i) === 0 && col.under[i] && (p.broodClimb > 0 || col.queen?.alive)) {
+    } else if ((col.band(i) === 0 || col.reverts(i)) && col.under[i] && (p.broodClimb > 0 || col.queen?.alive)) {
       if (p.broodClimb > 0) {
         // A young ant in a chamber keeps to the brood by its odour (ja-k4k.15, docs/brood-odour.md): it climbs it at its
         // antennae through open ground, and searches where it smells none. Not the queen's position, nor the royal and

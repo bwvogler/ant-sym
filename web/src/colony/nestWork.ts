@@ -416,7 +416,7 @@ export function middenSmell(col: Colony, dt: number): void {
  * a step it is asked (ja-xu6.1). Before, the old never did, and when births stalled nobody carried food to the brood.
  */
 export function worksInside(col: Colony, i: number): boolean {
-  if (col.band(i) !== 2) return true;
+  if (col.band(i) !== 2 || col.reverts(i)) return true; // a reverted old ant nurses as the young do (ja-7r7x)
   const s = col.need[i];
   return s > 0 && col.rng() < respond(s, THETA_OLD);
 }
@@ -503,7 +503,7 @@ export function nestLife(col: Colony, dt: number): void {
       col.layT -= LAY_INTERVAL;
       const royalC = ch.list[ch.at(qx, qy)];
       if (
-        col.larder + col.inJaws < due + EGG_FOOD + LARVA_FOOD ||
+        col.larder + col.inJaws + col.inCrops < due + EGG_FOOD + LARVA_FOOD ||
         col.population + col.brood.size >= p.maxAnts ||
         !royalC ||
         royalC.food < EGG_FOOD

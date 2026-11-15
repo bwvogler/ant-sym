@@ -59,6 +59,40 @@ export const INTAKE_PLENTY = 0.01;
 /** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
 export const MET_HALF = 20;
 
+/**
+ * Task reversion (ja-7r7x, docs/task-reversion.md): seconds over which an ant's sense of meeting young nestmates
+ * (`youngMet`, the share of recent time a young one was within a cell of it) settles. Design: no paper measures how
+ * long an old ant goes without meeting young before it reverts (in ants "within 24 h"; in fire ants within minutes).
+ */
+export const YOUNG_TAU = 60;
+/** An old ant at home reverts to nursing while its `youngMet` is below this (design). */
+export const REVERT_BELOW = 0.05;
+/**
+ * ...and only while its `broodMet` (the share of recent time, YOUNG_TAU, a brood item was within BROOD_SMELL cells of it) is at
+ * least this: foragers revert when "exposed to brood in absence of younger workers" (Symonowicz et al. 2015). A colony
+ * with no brood (one at its cap lays none) has no reverting ants (design threshold; review of #217, D1).
+ */
+export const BROOD_MET_MIN = 0.05;
+/**
+ * How far (cells) an old ant at home senses brood for broodMet: brood odour a little way, not only touch (owner,
+ * 2026-11-15, review of #217, D2: at one cell the old ants away from the brood never met it). Design: Temnothorax
+ * workers respond to larval cuticle extracts (Kohlmeier et al. 2018), but no paper read gives a range. It reads a disc of cells
+ * whatever lies between, so brood behind solid soil counts too (odour through soil; for ja-7r7x.4 to check).
+ */
+export const BROOD_SMELL = 4;
+
+/**
+ * Larval feeding by mouth (ja-638i, docs/larval-feeding.md): food an ant takes into its crop a second from a stocked
+ * store or reception within reach (design).
+ */
+export const CROP_FILL = 0.5;
+/** Food a second at most that passes mouth to mouth from a fuller crop to a needier nestmate (design). */
+export const CROP_PASS = 0.2;
+/** Food a second a nurse feeds a larva from its crop at full strength (a larva begging hard); less as it begs less (design). */
+export const CROP_FEED = 0.25;
+/** The strength a larva still owed its growth food draws feeding at, when it is not yet hungry enough to beg (design). */
+export const CROP_OWED = 0.3;
+
 /** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
 export const FOES_HALF = 20;
 

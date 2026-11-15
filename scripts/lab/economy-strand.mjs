@@ -1,4 +1,4 @@
-// Offline, no key: slow/economy.test's own hour on many seeds, as a guard for nest changes (PRD §71, §74; ja-k4k.15.1).
+// Offline, no key: slow/economy.test's own hour on many seeds, as a guard for nest changes (PRD §71, §76; ja-k4k.15.1).
 // The test's map (256 × 160, ground 40 rows down, one colony of 110, 0.3 of the map's food), the game seeded
 // world × 7919 + n. Each minute from 300 s on it counts larvae unfed over 120 s while the larder could feed them
 // ("stranded"), and reports per seed the worst stranding at once, where those larvae lay (royal chamber, a brood
