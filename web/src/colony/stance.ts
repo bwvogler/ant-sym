@@ -113,7 +113,7 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
   if (
     col.responses.carry !== localResponses.carry &&
     (col.carrying[i] || col.pellet[i] || col.broodHeld[i]) &&
-    col.responses.carry(touch(col, i, toEnemy !== null)) === "put down"
+    col.responses.carry(touch(col, i, toEnemy !== null), col.antDraw(i)) === "put down"
   )
     putDown(col, i);
 
