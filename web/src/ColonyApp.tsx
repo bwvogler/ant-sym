@@ -17,6 +17,7 @@ import {
 import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
 import { play, say, setSoundOn, soundOn } from "./ui/sounds.ts";
+import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -71,7 +72,7 @@ import { openLearn } from "./ui/learn.ts";
 import { openLab, toggleLab, useLab } from "./ui/labStore.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
-import { pushToast } from "./ui/toasts.ts";
+import { pushToast, toastPlace } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
@@ -106,6 +107,7 @@ export default function ColonyApp() {
   // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
   // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
   const lab = useLab() !== null;
+  const theme = useTheme();
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const toggle = useCallback((d: DrawerId) => setDrawer((cur) => (cur === d ? null : d)), []);
@@ -614,6 +616,14 @@ export default function ColonyApp() {
         run: toggleLens,
       },
       { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
+      ...THEMES.map((t) => ({
+        id: `theme-${t}`,
+        label: `Appearance: ${THEME_LABEL[t].toLowerCase()}${t === "system" ? " (follow the device)" : ""}`,
+        group: "Help",
+        words: "theme dark light mode night day colour",
+        off: theme === t ? "in use" : undefined,
+        run: () => setTheme(t),
+      })),
       ...guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => ({
         id: `learn-${e.id}`,
         label: `Codex: ${e.title}`,
@@ -846,7 +856,7 @@ export default function ColonyApp() {
           1024 px it waits while a drawer is open, so the two never overlap. */}
         {!building && (penCard || followed || specimens.length > 0) && (
           <div
-            className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
+            className={`panel-in pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
           >
             {penCard ? (
               <QueenPen
@@ -923,7 +933,7 @@ export default function ColonyApp() {
         />
         {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
         {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-        <Toasts place={building ? "top" : lab ? "lab" : "bottom"} />
+        <Toasts place={toastPlace({ building, drawer: drawer !== null, lab })} />
         {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
         {flight && gate?.open && !circle && (
           <QueenPen
@@ -1015,6 +1025,7 @@ function Settings({
         </div>
         <p className="mt-1.5 text-xs text-fg-3">Only where your hosts have smelled them lately.</p>
       </div>
+      <ThemeSetting />
       <SoundSetting />
       <div>
         <SectionHead>Keys</SectionHead>
@@ -1066,6 +1077,24 @@ function buildNotice(e: BuildEvent): string {
     case "aphidsGone":
       return "Your aphids are all gone: aphid families grow, then fade away.";
   }
+}
+
+/** Light or dark (PRD §69.9): the system's by default, or the player's choice, per browser. */
+function ThemeSetting() {
+  const theme = useTheme();
+  return (
+    <div>
+      <SectionHead>Appearance</SectionHead>
+      <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="appearance">
+        {THEMES.map((t) => (
+          <button key={t} type="button" className={`flex-1 ${seg(theme === t)}`} aria-pressed={theme === t} onClick={() => setTheme(t)}>
+            {THEME_LABEL[t]}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-xs text-fg-3">System follows the device&apos;s light or dark setting.</p>
+    </div>
+  );
 }
 
 /** The builder's sounds and spoken tool names (PRD §73): on unless turned off, per browser. */
