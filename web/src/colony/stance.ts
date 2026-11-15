@@ -42,7 +42,8 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
     const felt = toEnemy !== null || col.alarmSmelt !== "none";
     const th = col.threat[i] * threatLeak + (felt ? dt : 0);
     col.threat[i] = th;
-    col.defending[i] = th >= p.defendAt && homeDistPlane(col, i) <= p.homeGround ? 1 : 0;
+    // Tending (ja-nzkg.4, docs/aphids.md): an ant touching an aphid clump defends there as on home ground.
+    col.defending[i] = th >= p.defendAt && (homeDistPlane(col, i) <= p.homeGround || (p.tendDefend > 0 && col.atAphids(i))) ? 1 : 0;
   }
   // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
   // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
