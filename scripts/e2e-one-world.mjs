@@ -37,8 +37,9 @@
 //  14. notices (PRD §69.6), at 390 px by real touch: the bell at the top right; a small drag slides a toast back, a swipe
 //     takes it away, a hold outlives its time; the bell counts it, lists it, clears the count, hides the field's toasts;
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
-//  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair and
-//     table; the step control a tick and a second at a time while paused (off while playing); each tab; l closes it.
+//  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair (by
+//     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
+//     paused (off while playing); each tab; l closes it.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -693,8 +694,14 @@ try {
       const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
       if (!panel || bars.length !== 1) return null;
       const b = bars[0].getBoundingClientRect();
+      // Its max-height is relative to the stage (calc and %), so resolve it in px with a probe beside it.
+      const probe = document.createElement("div");
+      probe.style.cssText = `position:absolute;height:${getComputedStyle(panel).maxHeight}`;
+      panel.parentElement.appendChild(probe);
+      const longest = probe.getBoundingClientRect().height;
+      probe.remove();
       return {
-        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        panelBottom: Math.round(panel.getBoundingClientRect().top + longest) /* at its longest */,
         barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
       };
     });
@@ -1630,12 +1637,32 @@ try {
   const livingFig = bench.getByRole("figure", { name: "Living ants", exact: true });
   await livingFig.waitFor({ timeout: 3000 });
   check((await bench.getByRole("figure").count()) === 4, "four history charts");
-  check((await livingFig.locator("polyline").count()) === 2, "a line for each colony");
+  check((await livingFig.locator("svg path").count()) === 2, "a line for each colony");
   const livingBox = await livingFig.locator("svg").boundingBox();
   await lbp.mouse.move(livingBox.x + livingBox.width * 0.5, livingBox.y + livingBox.height * 0.5);
-  check(/Ink/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the crosshair reads out every line");
+  check(/Ink[\s\S]*Amber/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the crosshair reads out every line");
+  await lbp.mouse.move(livingBox.x + livingBox.width * 0.5, livingBox.y - 40);
+  // The keyboard reads the chart too: focused, the arrow keys move the crosshair back from now.
+  await livingFig.locator("svg").focus();
+  await lbp.keyboard.press("ArrowLeft");
+  check(/Ink[\s\S]*Amber/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the arrow keys read a chart out too");
+  await lbp.keyboard.press("Escape");
+  check((await livingFig.getByRole("status").count()) === 0, "and Escape puts the crosshair away");
   await bench.getByText("As a table").click();
-  check((await bench.locator("table tbody tr").count()) >= 2, "and the same numbers as a table");
+  const tableRows = bench.locator("table tbody tr");
+  check(
+    (await tableRows.count()) >= 2 && /^0:00/.test((await tableRows.first().locator("td").first().textContent()) ?? ""),
+    "and the same numbers as a table, from the start",
+  );
+  // A notice clears the workbench rather than covering it.
+  await lbp.evaluate(() => window.jevAnts.notify("A notice in Lab mode.", "good"));
+  const labNote = lbp.getByRole("button", { name: "A notice in Lab mode. (dismiss)" });
+  await until(() => labNote.isVisible(), "a notice shows in Lab mode", 3000, 50);
+  const [noteBox, benchBox] = [await labNote.boundingBox(), await bench.boundingBox()];
+  check(
+    noteBox.y + noteBox.height <= benchBox.y,
+    `a notice sits above the workbench (${Math.round(noteBox.y + noteBox.height)} ≤ ${Math.round(benchBox.y)})`,
+  );
   // The step control: off while playing; paused, a tick is 1/30 s and a second is 30 ticks.
   const stepTick = bench.getByRole("button", { name: "Step a tick" });
   check(await stepTick.isDisabled(), "the steps wait while the game plays");

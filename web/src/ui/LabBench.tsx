@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { clock } from "./clock.ts";
-import { History, niceMax } from "./history.ts";
+import { clock, clockTicks } from "./clock.ts";
+import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
 import { Icon } from "./kit.tsx";
 import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
@@ -35,14 +35,18 @@ export default function LabBench(
     onClose: () => void;
   },
 ) {
-  const { history, step, onClose, controls, update, journal } = props;
+  const { history, step, onClose, controls, update, journal, game } = props;
   const [tab, setTab] = useState<Tab>("history");
+  // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
+  const [, setSteps] = useState(0);
+  // A queen in flight waits for the page to found her (the pen), as play does.
+  const flying = game.flights.length > 0;
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
   return (
-    <section aria-label="lab" className="absolute inset-x-0 bottom-0 z-20 flex h-[42dvh] flex-col border-t border-line bg-ground">
+    <section aria-label="lab" className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground">
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5">
-        <h2 className="font-semibold text-fg">Lab</h2>
-        <div className="flex overflow-x-auto rounded-md border border-line text-[13px]" role="tablist" aria-label="lab tabs">
+        <h2 className="font-semibold text-fg max-sm:order-1">Lab</h2>
+        <div className="flex overflow-x-auto rounded-md border border-line text-[13px] max-sm:order-3" role="tablist" aria-label="lab tabs">
           {tabs.map(([t, name]) => (
             <button
               key={t}
@@ -56,7 +60,7 @@ export default function LabBench(
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-1.5 text-xs" role="group" aria-label="step">
+        <div className="ml-auto flex items-center gap-1.5 text-xs max-sm:order-4 max-sm:ml-0" role="group" aria-label="step">
           <button
             type="button"
             className="rounded-md border border-line px-2 py-1 text-fg-2 hover:bg-raised"
@@ -74,20 +78,27 @@ export default function LabBench(
               key={n}
               type="button"
               className="rounded-md border border-line px-2 py-1 text-fg-2 hover:bg-raised disabled:opacity-40"
-              disabled={controls.playing}
-              title={controls.playing ? "Pause first" : tip}
-              onClick={() => step(n)}
+              disabled={controls.playing || flying}
+              title={controls.playing ? "Pause first" : flying ? "Found her first" : tip}
+              onClick={() => {
+                step(n);
+                setSteps((k) => k + 1);
+              }}
             >
               {label}
             </button>
           ))}
-          <span className="font-mono text-fg-3 tabular-nums" aria-label="game time">
-            {clock(props.game.time)}.{String(Math.floor((props.game.time % 1) * 30)).padStart(2, "0")}
+          <span
+            className="font-mono text-fg-3 tabular-nums"
+            aria-label="game time"
+            title="Game time: minutes and seconds, then the tick within the second (of 30)"
+          >
+            {clockTicks(game.time)}
           </span>
         </div>
         <button
           type="button"
-          className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg"
+          className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg max-sm:order-2 max-sm:ml-auto"
           onClick={onClose}
           aria-label="Close the Lab"
           title="Close the Lab (l)"
@@ -127,7 +138,7 @@ function HistoryTab({ history }: { history: History }) {
   if (xs.length < 2) return <p className="text-xs text-fg-3">The charts start once the game has run a couple of seconds.</p>;
   const colonies = Math.max(...xs.map((s) => s.living.length));
   const per = (pick: (s: (typeof xs)[number]) => number[]) =>
-    Array.from({ length: colonies }, (_, k) => ({ name: colonyName(k), color: seriesColor(k), values: xs.map((s) => pick(s)[k] ?? 0) }));
+    Array.from({ length: colonies }, (_, k) => ({ name: colonyName(k), color: seriesColor(k), values: perColony(xs, pick, k) }));
   const living = per((s) => s.living);
   const infected = per((s) => s.infected);
   // The table: about a dozen rows, evenly spaced, and the last.
@@ -175,7 +186,7 @@ function HistoryTab({ history }: { history: History }) {
           series={[{ name: "mutations", color: seriesColor(0), values: xs.map((s) => s.mutations) }]}
           yMax={niceMax(
             xs.map((s) => s.mutations),
-            5,
+            10,
           )}
           format={whole}
         />
@@ -207,12 +218,12 @@ function HistoryTab({ history }: { history: History }) {
                   <td className="pr-3">{clock(s.t)}</td>
                   {Array.from({ length: colonies }, (_, k) => (
                     <td key={`i${k}`} className="pr-3 text-right">
-                      {pct(s.infected[k] ?? 0)}
+                      {k < s.infected.length ? pct(s.infected[k]!) : "—"}
                     </td>
                   ))}
                   {Array.from({ length: colonies }, (_, k) => (
                     <td key={`l${k}`} className="pr-3 text-right">
-                      {s.living[k] ?? 0}
+                      {s.living[k] ?? "—"}
                     </td>
                   ))}
                   <td className="pr-3 text-right">{s.gap.toFixed(2)}</td>

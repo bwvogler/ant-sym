@@ -42,8 +42,8 @@
   --sky: #e4edf1; /* the side view: above the ground line */
   --spoil: #c8b28c; /* the side view: loose soil heaped on the mound, darker than the undug ground */
   /* Lab mode's charts (PRD §69.7): one hue per colony, in a fixed order, validated (the dataviz skill's validator) on
-     --paper in both themes: adjacent CVD ΔE ≥ 8.4, normal-vision ≥ 19.3. Three light slots sit under 3:1, so every
-     chart names its lines (legend, end labels) and has a table. */
+     --ground, the workbench's surface, in both themes: every check passes. Four light slots (2-5) sit under 3:1 there,
+     so every chart names its lines (legend, end labels) and has a table. */
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;

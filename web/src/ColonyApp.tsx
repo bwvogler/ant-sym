@@ -131,7 +131,7 @@ export default function ColonyApp() {
     () =>
       onFrame(() =>
         history.offer(game.time, () =>
-          sampleOf(game.time, game.colonies, game.fungus, game.unity().gap, game.fungus.evolution?.mutations ?? 0),
+          sampleOf(game.time, game.colonies, game.fungus, game.unity().gap, Math.floor(game.fungus.evolution?.mutations ?? 0)),
         ),
       ),
     [onFrame, game, history],
@@ -870,7 +870,7 @@ export default function ColonyApp() {
           1024 px it waits while a drawer is open, so the two never overlap. */}
         {!building && (penCard || followed || specimens.length > 0) && (
           <div
-            className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
+            className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
           >
             {penCard ? (
               <QueenPen

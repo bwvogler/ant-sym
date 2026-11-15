@@ -396,7 +396,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     setLoads((n) => n + 1);
   }, []);
   /**
-   * Step the game `n` fixed ticks of MAX_STEP (1/30 s), as the loop does at 1×: Lab mode's step control, used while paused
+   * Step the game `n` fixed ticks of MAX_STEP (1/30 s: the assays' tick, and the longest the loop takes): Lab mode's step control, used while paused
    * (PRD §69.7). A flight stops it, as it stops play: the page founds her before the game goes on.
    */
   const step = useCallback(

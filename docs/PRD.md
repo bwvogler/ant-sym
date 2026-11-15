@@ -5934,7 +5934,7 @@ Stage 4 goes out in two PRs. This first half builds Lab mode and retires the Det
   - Journal: when `?log=` asks for one.
 
   These are the Details screen's cards, kept in `ui/LabCards.tsx`. The Colonies and Saved games cards keep their drawers.
-- **The step control.** Pause or play, "Step a tick" (1/30 s, as the loop's own step) and "Step a second" (30 ticks), from `useColony.step`. The game time shows to the tick. The steps wait while the game plays, and a flight stops them, as it stops play.
+- **The step control.** Pause or play, "Step a tick" (1/30 s: the assays' tick, and the longest the frame loop takes) and "Step a second" (30 ticks), from `useColony.step`. The game time shows to the tick. The steps wait while the game plays, and a flight stops them, as it stops play.
 - **History.** The game is sampled once a game-second from its start, whether or not the Lab is open (`ui/history.ts`, pure, tested). The buffer keeps the whole game in at most 600 samples: when it fills, every other sample goes and the interval doubles. Time going back (a restart, a load) starts it afresh. The charts are small multiples sharing game time:
   - each colony's infected share, its axis rounded up from the data (at least 10 %);
   - each colony's living ants;

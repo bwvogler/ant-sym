@@ -69,12 +69,44 @@ export function sampleOf(t: number, colonies: readonly Colony[], fungus: Fungus,
   return { t, infected, living, gap, mutations };
 }
 
+/**
+ * Colony k's values over the samples: null where the sample has no such colony (one founded later), so the chart leaves a
+ * gap and the table a dash rather than reading 0.
+ */
+export function perColony(samples: readonly Sample[], pick: (s: Sample) => readonly number[], k: number): (number | null)[] {
+  return samples.map((s) => pick(s)[k] ?? null);
+}
+
 /** A round top for a chart's y axis: 1, 2 or 5 times a power of ten, at least the largest value (and at least `floor`). */
-export function niceMax(values: readonly number[], floor = 1): number {
-  const m = Math.max(floor, ...values);
+export function niceMax(values: readonly (number | null)[], floor = 1): number {
+  const m = Math.max(floor, ...values.filter((v) => v !== null));
   const p = 10 ** Math.floor(Math.log10(m));
   for (const k of [1, 2, 5, 10]) if (k * p >= m) return k * p;
   return 10 * p;
+}
+
+/**
+ * A chart's end labels, top to bottom (`y` maps a value to its height on screen, down from the top). Lines ending on the
+ * same value as read share one label ("Ink · Amber 600"); any other label within `gap` px of the one above is left out (the
+ * legend names every line). Lines with no value at the end have none.
+ */
+export function endLabels(
+  ends: readonly { name: string; value: number | null }[],
+  y: (v: number) => number,
+  format: (v: number) => string,
+  gap = 12,
+): { names: string[]; value: number; y: number }[] {
+  const out: { names: string[]; value: number; y: number }[] = [];
+  const known = ends.filter((e): e is { name: string; value: number } => e.value !== null);
+  for (const e of known.sort((a, b) => y(a.value) - y(b.value))) {
+    const above = out[out.length - 1];
+    if (above && y(e.value) - above.y < gap) {
+      if (format(e.value) === format(above.value)) above.names.push(e.name);
+      continue;
+    }
+    out.push({ names: [e.name], value: e.value, y: y(e.value) });
+  }
+  return out;
 }
 
 /** The index of the sample nearest time t (the crosshair's snap), or −1 with none. */

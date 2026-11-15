@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { INFECTED } from "../../colony/index.ts";
-import { History, HISTORY_POINTS, nearestSample, niceMax, type Sample, sampleOf } from "../history.ts";
+import { endLabels, History, HISTORY_POINTS, nearestSample, niceMax, perColony, type Sample, sampleOf } from "../history.ts";
 import { buildGame } from "../useColony.ts";
+import { clockTicks } from "../clock.ts";
 
 // Lab mode's history (PRD §69.7): the game sampled once a sim-second, the whole game kept in a bounded buffer.
 
@@ -73,6 +74,19 @@ test("time gone back (a restart, a load) starts the history afresh", () => {
   assert.equal(h.every, 1);
 });
 
+test("a restart after the buffer has halved starts at one a second again (review of #226, N11)", () => {
+  const h = new History();
+  for (let t = 0; t <= HISTORY_POINTS; t++) h.offer(t, () => s(t));
+  assert.equal(h.every, 2);
+  h.offer(0, () => s(0));
+  assert.equal(h.every, 1);
+  assert.equal(
+    h.offer(1, () => s(1)),
+    true,
+    "the next a second later",
+  );
+});
+
 test("a sample of a real game: each colony's infected share and living ants", () => {
   const g = buildGame({ species: "generic", seed: 3, antCount: 30, rival: true, generation: 0 });
   const c = g.colonies[1]!;
@@ -88,6 +102,54 @@ test("a sample of a real game: each colony's infected share and living ants", ()
   const after = sampleOf(5, g.colonies, g.fungus, 0.8, 2);
   assert.equal(after.infected[1], 3 / living);
   assert.deepEqual([after.t, after.gap, after.mutations], [5, 0.8, 2]);
+});
+
+test("a colony with no living ants: 0 alive, 0 infected, not a division by zero (review of #226, N11)", () => {
+  const g = buildGame({ species: "generic", seed: 3, antCount: 30, rival: true, generation: 0 });
+  const c = g.colonies[1]!;
+  for (let i = 0; i < c.n; i++) c.alive[i] = 0;
+  const x = sampleOf(1, g.colonies, g.fungus, 1, 0);
+  assert.equal(x.living[1], 0);
+  assert.equal(x.infected[1], 0);
+  assert.ok(x.living[0]! > 0, "the other colony is untouched");
+});
+
+test("a colony not yet founded reads as a gap, not 0 (review of #226, N3)", () => {
+  const xs: Sample[] = [
+    { t: 0, infected: [0.1], living: [40], gap: 1, mutations: 0 },
+    { t: 1, infected: [0.2, 0], living: [38, 3], gap: 1, mutations: 0 },
+  ];
+  assert.deepEqual(
+    perColony(xs, (x) => x.living, 1),
+    [null, 3],
+  );
+  assert.deepEqual(
+    perColony(xs, (x) => x.infected, 0),
+    [0.1, 0.2],
+  );
+  assert.equal(niceMax([null, 3, null], 10), 10, "the axis ignores the gaps");
+});
+
+test("end labels: equal values share a label, a near one is left out, a gap has none (review of #226, N4)", () => {
+  const y = (v: number) => 100 - v; // higher values sit higher up
+  const whole = (v: number) => String(Math.round(v));
+  assert.deepEqual(
+    endLabels(
+      [
+        { name: "Ink", value: 60 },
+        { name: "Amber", value: 60.2 },
+        { name: "Jade", value: 55 },
+        { name: "Rust", value: 20 },
+        { name: "Slate", value: null },
+      ],
+      y,
+      whole,
+    ),
+    [
+      { names: ["Amber", "Ink"], value: 60.2, y: 39.8 },
+      { names: ["Rust"], value: 20, y: 80 },
+    ],
+  );
 });
 
 test("a round top for the y axis, and the crosshair's nearest sample", () => {
@@ -106,4 +168,14 @@ test("a round top for the y axis, and the crosshair's nearest sample", () => {
   assert.equal(nearestSample(xs, 6.1), 4);
   assert.equal(nearestSample(xs, 99), 4);
   assert.equal(nearestSample([], 3), -1);
+});
+
+test("the step control's time, to the tick: a float hair under a second is the next second (review of #226, N5)", () => {
+  assert.equal(clockTicks(0), "0:00 +00/30");
+  assert.equal(clockTicks(13 + 7 / 30), "0:13 +07/30");
+  let t = 0;
+  for (let k = 0; k < 15 * 30; k++) t += 1 / 30; // summed as the game sums its ticks
+  assert.ok(t !== 15, "the sum drifts off a whole second");
+  assert.equal(clockTicks(t), "0:15 +00/30");
+  assert.equal(clockTicks(3600 + 29 / 30), "1:00:00 +29/30");
 });
