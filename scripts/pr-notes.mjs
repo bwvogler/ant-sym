@@ -81,7 +81,9 @@ export function notes({ changed, body, colony, fungus, costRan = false }) {
     // Every figure in the table, compared as printed (review of #234, S2 and N5).
     const FMT = { usdPerHour: usd, tokPerQuestion: tok, responsesUsdPerHour: usd };
     const shown = (k, v) => (FMT[k] ?? String)(v);
-    const differs = (p) => p !== null && Object.keys(p.head).some((k) => shown(k, p.base[k]) !== shown(k, p.head[k]));
+    // Only figures read on both sides count; with none, the verdict is "unknown", not "no change" (review of #234, S3).
+    const both = (p) => (p === null ? [] : Object.keys(p.head).filter((k) => p.base[k] !== null && p.head[k] !== null));
+    const differs = (p) => both(p).some((k) => shown(k, p.base[k]) !== shown(k, p.head[k]));
     const unread = (p) => p !== null && Object.keys(p.head).every((k) => p.base[k] === null && p.head[k] === null);
     out.push("");
     for (const [name, p] of [
@@ -99,7 +101,9 @@ export function notes({ changed, body, colony, fungus, costRan = false }) {
     out.push(
       differs(colony) || differs(fungus)
         ? "The cost moved: CLAUDE.md asks the PR to note the new figure for that lane."
-        : "No lane's cost moved.",
+        : both(colony).length + both(fungus).length > 0
+          ? "No lane's cost moved."
+          : "No figure was read on both sides, so whether the cost moved is unknown.",
       "",
     );
   }

@@ -79,6 +79,14 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
   const failed = notes({ changed: [], body: "", colony: { base: same, head: same }, fungus: null, costRan: true });
   assert.match(failed, /⚠ fungus-cost didn't finish on the base or the head/);
   assert.doesNotMatch(failed, /Not run/);
+  // S3: no figure read on both sides gives "unknown", never "no lane moved".
+  const crashed = notes({ changed: [], body: "", colony: null, fungus: null, costRan: true });
+  assert.match(crashed, /⚠ colony-cost didn't finish/);
+  assert.match(crashed, /⚠ fungus-cost didn't finish/);
+  assert.match(crashed, /whether the cost moved is unknown/);
+  assert.doesNotMatch(crashed, /Not run|No lane's cost moved|\| lane \|/);
+  const oneSide = notes({ changed: [], body: "", colony: { base: same, head: blank }, fungus: null });
+  assert.match(oneSide, /whether the cost moved is unknown/, "a figure read on one side only is not a change");
 
   const golden = "web/src/colony/tests/golden/oneWorldGolden.json";
   assert.ok(isGolden(golden) && isGolden("web/src/colony/tests/slow/golden.json") && !isGolden("web/src/colony/params.ts"));
@@ -92,7 +100,7 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
 test("pr-notes.yml passes pr-notes.mjs the flags it reads, and runs the cost only for colony or shared changes", () => {
   const yml = readFileSync(join(ROOT, ".github/workflows/pr-notes.yml"), "utf8");
   const script = readFileSync(join(ROOT, "scripts/pr-notes.mjs"), "utf8");
-  for (const flag of ["--changed", "--body", "--colony-base", "--colony-head", "--fungus-base", "--fungus-head"])
+  for (const flag of ["--changed", "--body", "--colony-base", "--colony-head", "--fungus-base", "--fungus-head", "--cost-ran"])
     assert.ok(script.includes(`"${flag}"`), `pr-notes.mjs reads ${flag}`);
   assert.match(yml, /args=\(--changed "\$RUNNER_TEMP\/changed\.txt" --body "\$RUNNER_TEMP\/body\.txt"\)/);
   assert.match(yml, /args\+=\("--\$lane-base" "\$RUNNER_TEMP\/\$lane-base\.txt" "--\$lane-head" "\$RUNNER_TEMP\/\$lane-head\.txt"\)/);
@@ -101,8 +109,12 @@ test("pr-notes.yml passes pr-notes.mjs the flags it reads, and runs the cost onl
   // The description reaches bash as an environment variable, never spliced into the script.
   assert.match(yml, /BODY: \$\{\{ github\.event\.pull_request\.body \}\}/);
   // Anywhere in the file, not only on a run: line: every run here is a `run: |` block (review of #234, S1).
-  for (const line of yml.split("\n").filter((l) => /github\.event\.pull_request\.(body|title|head\.ref)/.test(l)))
-    assert.match(line, /^\s+[A-Z_]+: \$\{\{ github\.event\.pull_request\.[\w.]+ \}\}$/, `only as an env value: ${line.trim()}`);
+  for (const line of yml.split("\n").filter((l) => /github\.(event\.pull_request\.(body|title|head\.ref)|head_ref)/.test(l)))
+    assert.match(line, /^\s+[A-Z_]+: \$\{\{ github\.(event\.pull_request\.[\w.]+|head_ref) \}\}$/, `only as an env value: ${line.trim()}`);
+  assert.match(yml, /args\+=\(--cost-ran\)/, "the workflow tells the script the estimates ran");
+  // A failed estimate is reported in the comment, not as a red step that skips it (review of #234, N8).
+  assert.equal((yml.match(/^\s+continue-on-error: true$/gm) ?? []).length, 2, "both cost steps continue on error");
+  assert.match(yml, /^\s+set -euo pipefail$/m, "the comment step fails loudly rather than posting a duplicate");
   assert.match(yml, /persist-credentials: false/, "the write token stays out of .git/config");
   assert.match(yml, /select\(\.user\.login == \\"github-actions\[bot\]\\"/, "only the bot's own comment is edited");
 });
