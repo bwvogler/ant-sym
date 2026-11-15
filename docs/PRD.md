@@ -6764,3 +6764,38 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 
 - Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
+
+
+## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
+
+**Research basis:** [aphids.md](aphids.md):
+- *L. niger* scouts head toward aphid odour (Verheggen et al. 2012, full text: 67 % chose aphid alarm scent in a two-way test); recruitment to honeydew is the ordinary food trail (Mailleux et al. 2000, 2003, **unverified**).
+- Tenders bite intruders more readily than other ants (Gaber et al. 2024, full text: 90 % against 76 % of 332), locally, without calling the nest (Detrain et al. 2017, **unverified**). No study measured colonies fighting each other over aphids.
+- Ants eat some aphids, mostly the poorer producers (Oliver, Leather & Cook 2012, full text: 118 against 147 aphids after 7 days; Jossart et al. 2025 saw none in 10 days).
+
+**The problem.** The builder's food is a pile that is used up. The game has nothing that produces food over time, nothing ants defend away from home, and nothing ants farm. The owner asked for aphids (2026-11-15).
+
+**Decisions** (owner, 2026-11-15, each put with its sources for and against):
+- Ants find a clump by searching and by a short smell plume (the range is design).
+- Tenders at the clump defend it on a threat, as on home ground, rival ants included, with no recruitment (the rival part is design).
+- Ants eat a few aphids; larval demand as the cue waits for a sensed cue (`ja-nzkg.7`).
+- A clump grows, then crashes, over a few game minutes (design timing).
+
+**The mechanic.** In [aphids.md "The mechanic"](aphids.md#the-mechanic):
+- the clump is body: a per-cell aphid count on the plane, honeydew refilled as ordinary food up to a cap, a life that grows and crashes;
+- honeydew is food (taste, trail by quality, recruitment): nothing new;
+- the plume is `plume.ts` from aphid cells only (`aphidPlume`), steering only;
+- touching an aphid cell counts as home ground in `stance.ts`'s defend test (`tendDefend`);
+- a small share of takes at a clump is an aphid (`aphidPrey`).
+
+Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the clump's position, its count or the colony's larvae. The tool is hidden for a species that takes no honeydew (the desert ant).
+
+**Play.** A clump a child places is found, trailed to, worked for minutes, and fought over; it swells, thins and goes; now and then an ant carries an aphid home. The choice is the child's (where, near which colony). Risks: runaway food (a cap and the crash), a clump never found (B9, the plume), a battlefield between nests (B11).
+
+**Assays and targets** (`ja-nzkg.1`, first, no behaviour change): B9 `aphidsFound` (sooner with the plume), B10 `aphidsRenewable` (more than the same cells of sugar, and a trail), B11 `tendersDefend` (more fights at the clump than away from home), B12 `aphidsEaten` (fewer aphids with ants: report).
+
+**Cost (estimated).** None in Jev: no situation field, no lane. Tick: the plume rebuild (about 10 ms a build on one world's plane, at most every 4 s while food changes) and a refill pass over aphid cells; measured in the build.
+
+**Beads.** `ja-nzkg` (this); `.1` assays; `.2` the clump and the tool; `.3` the plume; `.4` tenders defend; `.5` aphids eaten; `.6` tray, notices and Learn; `.7` research: a forager's cue for larval hunger.
+
+**Still open.** Honeydew per aphid and the cap (no verified figure); tenders lingering; tending raising the flow; the larval-hunger cue.
