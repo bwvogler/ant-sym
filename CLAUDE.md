@@ -38,7 +38,7 @@ npm run format                 # Prettier (width 140, Tailwind class order) over
 npm run test:slow              # whole-game guards (web/src/colony/tests/slow): ~16 min locally, ~4 in slow.yml's 4 shards; run before merging colony changes
 npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs): switch views, linked clicks, follow through a hole, the pen by a click, the Mutations drawer's tooltips, the tutorial, palette, lens, builder, Codex; ~140 s; uses the machine's playwright, spends nothing
 node scripts/colony-cost.mjs   # offline estimate of a colony game's cost: tokens per question from request size, $/h (no key, no spend)
-npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline; --set sweeps, --policy cache:<file> replays Jev
+npm run exp -- all --seeds 1-10   # behaviour assays (web/src/colony/experiment.ts), offline (GitHub: assays.yml); --set sweeps, --policy cache:<f> replays Jev
 npm run exp -- game --seeds 1 --log summary   # watch a game, offline: the journal (skill `watching-a-game`; page: ?log=<spec>); every scripts/*.mjs answers --help
 node scripts/colony-live.mjs all --budget 0.10   # live: Jev against the local rule per lane; saves replayable caches (experiments/out/)
 node scripts/precache.mjs --import experiments/caches/<live-check>-*.json   # no spend: ship the answers a live check got (colony-live caches) as the preset doctrines' answers in web/public/precache; do this when precache.test fails (a legend, question or version moved)
