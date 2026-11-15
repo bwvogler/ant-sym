@@ -5808,6 +5808,33 @@ The second half of stage 2: ways to find any action and to learn what anything o
 - **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
 
+
+### 69.4 S3a: the Codex (ja-mvo9.3, first half)
+Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a notebook that fills as the player plays. Specimens (pin ants and compare them) follow in S3b.
+- **Entries open on first sight.** Each guide entry waits, named and numbered, until the game first shows the player what it is about through the fungus's hosts. Then it opens.
+  - **Cues:** the pure `ui/codex.ts` reads a cue from the game twice a second (`cues`); its `UNLOCK` table says which cue opens which entry and what the locked card tells the player to look for.
+    - The fungus, its senses, how the mycelium feeds its tips, the line and the curtain, and a species' own entry are open from the start.
+    - The builder's five tools' entries are open from the start for now; each opening on the tool's first use is ja-mvo9.7 (owner, review of #206, D2).
+    - A first host opens Jobs by age.
+    - A host carrying food opens the food trail, tasting food, forager trips, the way home and route memory.
+    - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.
+    - A host underground opens chambers, finding the way inside, the queen and brood.
+    - Alarm where a host stands, at the field's own threshold, opens alarm.
+    - A host meeting strangers (its own contact, `foes`: not the policy's fight mode, which a host may never take) opens strangers and battles; a tired host opens tiredness and rest.
+    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand: `codexNumbers`), one colony.
+  - A dead host shows nothing: a dead slot keeps its load.
+  - `codex.test` holds every guide entry in `UNLOCK`, so a new entry must say how it opens.
+- **What the player sees:**
+  - one notice naming what opened together;
+  - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
+  - a "new" mark on those entries;
+  - the count, "Seen 11 of 22".
+- **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
+- **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
+- **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
+- **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
