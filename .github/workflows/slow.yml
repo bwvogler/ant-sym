@@ -2,7 +2,8 @@
 # deleted in S2.3c, took 786 s in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) runs its ten seeds in worker
 # threads, one per core, so it has a job of its own: beside another file in a shard it ran out of the 20-minute limit
 # (run 43722461875, ja-w7ef.15). It takes 11-14 minutes alone.
-# - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
+# - Nightly on main, and on demand from the Actions tab for a branch with no PR (main, staging): a red run is a measurement to look at.
+#   Not for a PR's branch: that run attaches to no PR and wakes no session; the label below does (ja-w7ef.17).
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
 #   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` and `g1` checks, which wake a watching session like any other
