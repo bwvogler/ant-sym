@@ -24,7 +24,9 @@ import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField, { type FieldApi, type FieldBuild, type FieldPen } from "./ui/ColonyField.tsx";
-import DetailsScreen, { BareCards, Colonies, SavedGames, type DetailsProps } from "./ui/DetailsScreen.tsx";
+import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.tsx";
+import LabBench from "./ui/LabBench.tsx";
+import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
@@ -60,6 +62,7 @@ import Help from "./ui/Help.tsx";
 import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
 import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
+import { clock } from "./ui/clock.ts";
 import Specimens from "./ui/Specimens.tsx";
 import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./ui/specimens.ts";
 import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
@@ -79,28 +82,27 @@ import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 // settings; a tab bar on a phone); the followed ant or the queen's pen in an inspector at its right. The fungus is the
 // player: you shape its policy in words (its aim); Jev reads them and decides what the fungus does in each host it
 // lives in. Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md). The lab and the full
-// numbers are behind Settings → Lab and numbers.
+// numbers are Lab mode's (the key l, the palette, Settings): a workbench under the map (PRD §69.6).
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
 /** The drawers the rail opens. */
 type DrawerId = "fungus" | "evolve" | "colonies" | "saves" | "settings";
 
-/** The speeds the HUD offers (4× is the game's default; PRD §50); the Details screen's slider has the rest. */
+/** The speeds the HUD offers (4× is the game's default; PRD §50); the Lab's World tab has the slider for the rest. */
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 /** A dialog that has the page: the game's keys wait while one is open (the palette's key still works). */
-const BLOCKING = [
-  '[aria-modal="true"]',
-  ...["Details", "Codex", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`),
-].join(", ");
+const BLOCKING = ['[aria-modal="true"]', ...["Codex", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`)].join(
+  ", ",
+);
 
 export default function ColonyApp() {
-  const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal } = useColony();
+  const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
-  const [details, setDetails] = useState(false);
-  const closeDetails = useCallback(() => setDetails(false), []);
+  // Lab mode (PRD §69.6): the map shares the screen with a workbench of the game's numbers, levers, history and steps.
+  const [lab, setLab] = useState(false);
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const toggle = useCallback((d: DrawerId) => setDrawer((cur) => (cur === d ? null : d)), []);
@@ -121,6 +123,18 @@ export default function ColonyApp() {
     followedNow.current = followed;
   }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
+  // The Lab's history (PRD §69.6): the game sampled once a game second from its start, whether or not the Lab is open.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh history for each game: `game` is the key, not an input
+  const history = useMemo(() => new History(), [game]);
+  useEffect(
+    () =>
+      onFrame(() =>
+        history.offer(game.time, () =>
+          sampleOf(game.time, game.colonies, game.fungus, game.unity().gap, game.fungus.evolution?.mutations ?? 0),
+        ),
+      ),
+    [onFrame, game, history],
+  );
   // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Codex says how many are new.
   useCodexWatch(game, onFrame, stats);
   const codex = useCodex();
@@ -347,7 +361,7 @@ export default function ColonyApp() {
         SPEEDS,
       );
       if (!a) return;
-      // Over a dialog that has the page (the palette, the sheet, Details, the Codex, the start, the queen's pen) only the
+      // Over a dialog that has the page (the palette, the sheet, the Codex, the start, the queen's pen) only the
       // palette's key works: the game's keys wait.
       if (a.kind !== "palette" && document.querySelector(BLOCKING)) return;
       e.preventDefault();
@@ -356,6 +370,7 @@ export default function ColonyApp() {
         setPalette((o) => !o);
       } else if (a.kind === "shortcuts") setSheet(true);
       else if (a.kind === "lens") toggleLens();
+      else if (a.kind === "lab") setLab((on) => !on);
       else if (a.kind === "play") update({ playing: !controls.playing });
       else if (a.kind === "speed") update({ speed: a.speed });
       else if (a.kind === "view") {
@@ -533,9 +548,7 @@ export default function ColonyApp() {
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   // The page (PRD §69, ja-mvo9.1): the map fills the screen; a HUD over its top; a rail of drawers at its left (a tab bar
   // on a phone); the followed ant in an inspector at its right (a sheet on a phone).
-  const detailsProps: DetailsProps = {
-    open: details,
-    onClose: closeDetails,
+  const labProps: LabProps = {
     game,
     controls,
     update,
@@ -546,7 +559,7 @@ export default function ColonyApp() {
     jev,
     journal,
     saves: games,
-    onLoad: (r) => (continueFrom(r), closeDetails(), setDrawer(null)),
+    onLoad: (r) => (continueFrom(r), setDrawer(null)),
   };
   const ev = stats?.evolution;
   const affordable = ev
@@ -610,10 +623,11 @@ export default function ColonyApp() {
       { id: "learn", label: "Codex: the field guide", group: "Panels", words: "help guide learn", run: () => openLearn({ tab: "guide" }) },
       {
         id: "lab",
-        label: "Lab and numbers",
+        label: lab ? "Close the Lab" : "Lab mode: history, world, Jev, levers, steps",
         group: "Panels",
-        words: "details debug seed world jev spend",
-        run: () => (setDrawer(null), setDetails(true)),
+        key: "l",
+        words: "details debug seed world jev spend history charts step numbers journal",
+        run: () => setLab((on) => !on),
       },
       {
         id: "lens",
@@ -634,335 +648,338 @@ export default function ColonyApp() {
     ].map((c) => ({ ...c, run: () => (clearProbe(), c.run()) }));
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
-      <div className="absolute inset-0">
-        <ColonyField
-          colonies={game.colonies}
-          fungus={game.fungus}
-          sensed={sensed}
-          onFrame={onFrame}
-          showFoodTrail={controls.showFoodTrail}
-          showHomeTrail={controls.showHomeTrail}
-          followed={followed}
-          onFollow={setFollowed}
-          onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
-          world={oneWorld}
-          view={controls.view === "above" ? PLANE : CURTAIN}
-          onLink={onLink}
-          onCross={onCross}
-          api={field}
-          specimens={specimens}
-          pen={pen}
-          lens={lensOn}
-          onProbe={offerProbe}
-          toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
-          build={build}
-        />
-        {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
-      </div>
-
-      {/* The HUD: time and the goal, over the map's top edge. */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-stretch gap-2">
-        <div className={`pointer-events-auto flex items-center gap-1 px-1.5 py-1 ${FLOAT}`} aria-label="game bar">
-          <span className="hidden items-center gap-1.5 pr-2 pl-1.5 text-[15px] font-semibold tracking-tight md:flex">
-            <Icon name="fungus" className="size-5 text-spore" />
-            Jev Ants
-          </span>
-          <IconButton
-            icon={controls.playing ? "pause" : "play"}
-            label={controls.playing ? "Pause" : "Play"}
-            onClick={() => update({ playing: !controls.playing })}
+      {/* The stage: the map and all over it. In Lab mode it gives the workbench the bottom of the screen (PRD §69.6). */}
+      <div className={`absolute inset-x-0 top-0 ${lab ? "bottom-[42dvh]" : "bottom-0"}`}>
+        <div className="absolute inset-0">
+          <ColonyField
+            colonies={game.colonies}
+            fungus={game.fungus}
+            sensed={sensed}
+            onFrame={onFrame}
+            showFoodTrail={controls.showFoodTrail}
+            showHomeTrail={controls.showHomeTrail}
+            followed={followed}
+            onFollow={setFollowed}
+            onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
+            world={oneWorld}
+            view={controls.view === "above" ? PLANE : CURTAIN}
+            onLink={onLink}
+            onCross={onCross}
+            api={field}
+            specimens={specimens}
+            pen={pen}
+            lens={lensOn}
+            onProbe={offerProbe}
+            toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
+            build={build}
           />
-          <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="speed">
-            {SPEEDS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                className={`${seg(controls.speed === v)} max-sm:px-1.5 max-sm:text-[13px]`}
-                onClick={() => update({ speed: v })}
-                aria-pressed={controls.speed === v}
-              >
-                {v}×
-              </button>
-            ))}
-          </div>
-          {oneWorld && (
-            <div className="ml-1 flex overflow-hidden rounded-md border border-line" role="group" aria-label="view">
-              {(["above", "below"] as const).map((v) => (
+          {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
+        </div>
+
+        {/* The HUD: time and the goal, over the map's top edge. */}
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-stretch gap-2">
+          <div className={`pointer-events-auto flex items-center gap-1 px-1.5 py-1 ${FLOAT}`} aria-label="game bar">
+            <span className="hidden items-center gap-1.5 pr-2 pl-1.5 text-[15px] font-semibold tracking-tight md:flex">
+              <Icon name="fungus" className="size-5 text-spore" />
+              Jev Ants
+            </span>
+            <IconButton
+              icon={controls.playing ? "pause" : "play"}
+              label={controls.playing ? "Pause" : "Play"}
+              onClick={() => update({ playing: !controls.playing })}
+            />
+            <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="speed">
+              {SPEEDS.map((v) => (
                 <button
                   key={v}
                   type="button"
-                  className={`${seg(controls.view === v)} max-sm:px-1.5 max-sm:text-[13px]`}
-                  onClick={() => setView(v)}
-                  aria-pressed={controls.view === v}
-                  title={
-                    v === "above"
-                      ? "The surface from above: foraging, trails, the mound and the line through the holes (v)"
-                      : "Underground: the curtain under the line, unrolled, with every nest (v)"
-                  }
+                  className={`${seg(controls.speed === v)} max-sm:px-1.5 max-sm:text-[13px]`}
+                  onClick={() => update({ speed: v })}
+                  aria-pressed={controls.speed === v}
                 >
-                  {v}
+                  {v}×
                 </button>
               ))}
             </div>
-          )}
-          <IconButton icon="lens" label="Lens: say what is under the pointer (i)" active={lensOn} onClick={toggleLens} className="ml-1" />
-          <IconButton icon="search" label={`Commands (${MOD_K})`} onClick={() => setPalette(true)} className="max-sm:hidden" />
-          <span className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" title="sim time">
-            {clock(stats?.time ?? 0)}
-          </span>
-          {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
-          {game.player.params.heatDay > 0 && (
-            <>
+            {oneWorld && (
+              <div className="ml-1 flex overflow-hidden rounded-md border border-line" role="group" aria-label="view">
+                {(["above", "below"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`${seg(controls.view === v)} max-sm:px-1.5 max-sm:text-[13px]`}
+                    onClick={() => setView(v)}
+                    aria-pressed={controls.view === v}
+                    title={
+                      v === "above"
+                        ? "The surface from above: foraging, trails, the mound and the line through the holes (v)"
+                        : "Underground: the curtain under the line, unrolled, with every nest (v)"
+                    }
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
+            <IconButton icon="lens" label="Lens: say what is under the pointer (i)" active={lensOn} onClick={toggleLens} className="ml-1" />
+            <IconButton icon="search" label={`Commands (${MOD_K})`} onClick={() => setPalette(true)} className="max-sm:hidden" />
+            <span className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" title="sim time">
+              {clock(stats?.time ?? 0)}
+            </span>
+            {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
+            {game.player.params.heatDay > 0 && (
+              <>
+                <span
+                  className="flex items-center gap-1 px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden"
+                  aria-label="sun"
+                  title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
+                >
+                  {sunChip(game.player.params, stats?.time ?? 0)}
+                  {/* Only where the species has its own guide entry (review of #194, N2). */}
+                  {ownEntry && <Help to={{ tab: "guide", id: ownEntry }} label={game.params.species.name.toLowerCase()} />}
+                </span>
+                {/* On a phone, short (owner, review of #194 D1). */}
+                <span className="px-1.5 font-mono text-[12px] text-fg-2 tabular-nums sm:hidden" aria-label="sun, short">
+                  {sunChip(game.player.params, stats?.time ?? 0, true)}
+                </span>
+              </>
+            )}
+            {slow && stats && (
               <span
-                className="flex items-center gap-1 px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden"
-                aria-label="sun"
-                title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
+                className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
+                title="This machine can't step the sim that fast: it runs as fast as it can"
               >
-                {sunChip(game.player.params, stats?.time ?? 0)}
-                {/* Only where the species has its own guide entry (review of #194, N2). */}
-                {ownEntry && <Help to={{ tab: "guide", id: ownEntry }} label={game.params.species.name.toLowerCase()} />}
+                running at {stats.pace.toFixed(1)}×
               </span>
-              {/* On a phone, short (owner, review of #194 D1). */}
-              <span className="px-1.5 font-mono text-[12px] text-fg-2 tabular-nums sm:hidden" aria-label="sun, short">
-                {sunChip(game.player.params, stats?.time ?? 0, true)}
+            )}
+          </div>
+          <div
+            className={`pointer-events-auto flex min-w-0 basis-full items-center px-3 py-2 text-[13px] text-fg-2 sm:flex-1 sm:basis-0 ${FLOAT}`}
+            aria-label="goal"
+          >
+            <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
+              {clock(stats?.time ?? 0)}
+            </span>
+            {slow && (
+              <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
+                {stats!.pace.toFixed(1)}×
               </span>
-            </>
-          )}
-          {slow && stats && (
-            <span
-              className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
-              title="This machine can't step the sim that fast: it runs as fast as it can"
-            >
-              running at {stats.pace.toFixed(1)}×
-            </span>
-          )}
+            )}
+            <span className="truncate">{goalLine(stats)}</span>
+          </div>
         </div>
-        <div
-          className={`pointer-events-auto flex min-w-0 basis-full items-center px-3 py-2 text-[13px] text-fg-2 sm:flex-1 sm:basis-0 ${FLOAT}`}
-          aria-label="goal"
-        >
-          <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
-            {clock(stats?.time ?? 0)}
-          </span>
-          {slow && (
-            <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
-              {stats!.pace.toFixed(1)}×
-            </span>
-          )}
-          <span className="truncate">{goalLine(stats)}</span>
-        </div>
-      </div>
 
-      {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. The builder's tray takes its place. */}
-      {building && (
-        <BuilderTray
-          items={tray}
-          picked={picked.key}
-          little={little}
-          smell={smell}
-          canUndo={builder.canUndo}
-          odours={game.colonies.map((c) => c.nestOdour)}
-          onPick={pickTool}
-          onUndo={undoBuild}
-          onLittle={() => {
-            setLittle((l) => !l);
-            setToolKey("move");
-          }}
-          onSmell={() => setSmell((v) => !v)}
-          onExit={toggleBuilding}
-        />
-      )}
-      <nav
-        aria-label="panels"
-        hidden={building}
-        className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:flex-col sm:gap-1 ${FLOAT}`}
-      >
-        <IconButton icon="build" label="Builder" onClick={toggleBuilding} />
-        <IconButton icon="fungus" label="The fungus" active={drawer === "fungus"} onClick={() => toggle("fungus")} />
-        <IconButton
-          icon="evolve"
-          label="Mutations"
-          active={drawer === "evolve"}
-          badge={affordable ? "!" : undefined}
-          badgeLabel="mutations to keep"
-          onClick={() => toggle("evolve")}
-        />
-        <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
-        <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
-        <IconButton
-          icon="learn"
-          label="Codex"
-          badge={codex.fresh.length || undefined}
-          badgeLabel={`${codex.fresh.length} new in the field guide`}
-          onClick={() => openLearn({ tab: "guide" })}
-        />
-        <IconButton
-          icon="settings"
-          label="Settings"
-          active={drawer === "settings"}
-          badge={backend?.needsPass ? "!" : undefined}
-          badgeLabel="Jev needs the passphrase"
-          onClick={() => toggle("settings")}
-        />
-      </nav>
-
-      {drawer === "fungus" && (
-        <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
-          <FungusStatus stats={stats} />
-          <Aim jev={jev} />
-          {jev.lock && <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {jev.lock}</p>}
-        </Drawer>
-      )}
-      {drawer === "evolve" && (
-        <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer}>
-          {ev ? <Evolve e={ev} evolve={evolve} menu={controls.menu} /> : <p className="text-fg-3">The fungus has not landed yet.</p>}
-        </Drawer>
-      )}
-      {drawer === "colonies" && (
-        <Drawer label="colonies" title="Colonies" onClose={closeDrawer}>
-          <BareCards>
-            <Colonies {...detailsProps} />
-          </BareCards>
-        </Drawer>
-      )}
-      {drawer === "saves" && (
-        <Drawer label="saves" title="Saved games" onClose={closeDrawer}>
-          <BareCards>
-            <SavedGames {...detailsProps} />
-          </BareCards>
-        </Drawer>
-      )}
-      {drawer === "settings" && (
-        <Drawer label="settings" title="Settings" onClose={closeDrawer}>
-          <Settings
-            controls={controls}
-            update={update}
-            openLab={() => (clearProbe(), setDrawer(null), setDetails(true))}
-            openShortcuts={() => setSheet(true)}
-            pass={backend?.needsPass ? <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} /> : null}
+        {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. The builder's tray takes its place. */}
+        {building && (
+          <BuilderTray
+            items={tray}
+            picked={picked.key}
+            little={little}
+            smell={smell}
+            canUndo={builder.canUndo}
+            odours={game.colonies.map((c) => c.nestOdour)}
+            onPick={pickTool}
+            onUndo={undoBuild}
+            onLittle={() => {
+              setLittle((l) => !l);
+              setToolKey("move");
+            }}
+            onSmell={() => setSmell((v) => !v)}
+            onExit={toggleBuilding}
           />
-        </Drawer>
-      )}
-
-      {/* The inspector: the queen's pen while she flies, else the specimens and the followed ant. A sheet on a phone; below
-          1024 px it waits while a drawer is open, so the two never overlap. */}
-      {!building && (penCard || followed || specimens.length > 0) && (
-        <div
-          className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
+        )}
+        <nav
+          aria-label="panels"
+          hidden={building}
+          className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:flex-col sm:gap-1 ${FLOAT}`}
         >
-          {penCard ? (
-            <QueenPen
-              key={flight.at}
-              flight={flight}
-              mother={colonyName(flight.mother)}
-              daughter={colonyName(game.colonies.length)}
-              doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
-              onFound={foundHers}
-              place={{ radius: circle.r, onWords, onFly }}
+          <IconButton icon="build" label="Builder" onClick={toggleBuilding} />
+          <IconButton icon="fungus" label="The fungus" active={drawer === "fungus"} onClick={() => toggle("fungus")} />
+          <IconButton
+            icon="evolve"
+            label="Mutations"
+            active={drawer === "evolve"}
+            badge={affordable ? "!" : undefined}
+            badgeLabel="mutations to keep"
+            onClick={() => toggle("evolve")}
+          />
+          <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
+          <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
+          <IconButton
+            icon="learn"
+            label="Codex"
+            badge={codex.fresh.length || undefined}
+            badgeLabel={`${codex.fresh.length} new in the field guide`}
+            onClick={() => openLearn({ tab: "guide" })}
+          />
+          <IconButton
+            icon="settings"
+            label="Settings"
+            active={drawer === "settings"}
+            badge={backend?.needsPass ? "!" : undefined}
+            badgeLabel="Jev needs the passphrase"
+            onClick={() => toggle("settings")}
+          />
+        </nav>
+
+        {drawer === "fungus" && (
+          <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
+            <FungusStatus stats={stats} />
+            <Aim jev={jev} />
+            {jev.lock && <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {jev.lock}</p>}
+          </Drawer>
+        )}
+        {drawer === "evolve" && (
+          <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer}>
+            {ev ? <Evolve e={ev} evolve={evolve} menu={controls.menu} /> : <p className="text-fg-3">The fungus has not landed yet.</p>}
+          </Drawer>
+        )}
+        {drawer === "colonies" && (
+          <Drawer label="colonies" title="Colonies" onClose={closeDrawer}>
+            <BareCards>
+              <Colonies {...labProps} />
+            </BareCards>
+          </Drawer>
+        )}
+        {drawer === "saves" && (
+          <Drawer label="saves" title="Saved games" onClose={closeDrawer}>
+            <BareCards>
+              <SavedGames {...labProps} />
+            </BareCards>
+          </Drawer>
+        )}
+        {drawer === "settings" && (
+          <Drawer label="settings" title="Settings" onClose={closeDrawer}>
+            <Settings
+              controls={controls}
+              update={update}
+              openLab={() => (clearProbe(), setDrawer(null), setLab(true))}
+              openShortcuts={() => setSheet(true)}
+              pass={backend?.needsPass ? <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} /> : null}
             />
-          ) : followed || specimens.length ? (
-            <>
-              {specimens.length > 0 && (
-                <Specimens
-                  list={specimens}
-                  colonies={game.colonies}
-                  followed={followed}
-                  onFollow={goTo}
-                  onUnpin={(f) => setSpecimens(unpin(specimens, f))}
-                />
-              )}
-              {followed && (
-                <AntCard
-                  followed={followed}
-                  colonies={game.colonies}
-                  fungus={game.fungus}
-                  explain={jev.explain}
-                  explainFungus={jev.explainFungus}
-                  onClose={() => setFollowed(null)}
-                  fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
-                  pinned={specimens.some((s) => sameAnt(s, followed))}
-                  onPin={() => togglePin(followed)}
-                />
-              )}
-            </>
-          ) : null}
-        </div>
-      )}
+          </Drawer>
+        )}
 
-      {!building && (
-        <AimBar
+        {/* The inspector: the queen's pen while she flies, else the specimens and the followed ant. A sheet on a phone; below
+          1024 px it waits while a drawer is open, so the two never overlap. */}
+        {!building && (penCard || followed || specimens.length > 0) && (
+          <div
+            className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
+          >
+            {penCard ? (
+              <QueenPen
+                key={flight.at}
+                flight={flight}
+                mother={colonyName(flight.mother)}
+                daughter={colonyName(game.colonies.length)}
+                doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+                onFound={foundHers}
+                place={{ radius: circle.r, onWords, onFly }}
+              />
+            ) : followed || specimens.length ? (
+              <>
+                {specimens.length > 0 && (
+                  <Specimens
+                    list={specimens}
+                    colonies={game.colonies}
+                    followed={followed}
+                    onFollow={goTo}
+                    onUnpin={(f) => setSpecimens(unpin(specimens, f))}
+                  />
+                )}
+                {followed && (
+                  <AntCard
+                    followed={followed}
+                    colonies={game.colonies}
+                    fungus={game.fungus}
+                    explain={jev.explain}
+                    explainFungus={jev.explainFungus}
+                    onClose={() => setFollowed(null)}
+                    fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
+                    pinned={specimens.some((s) => sameAnt(s, followed))}
+                    onPin={() => togglePin(followed)}
+                  />
+                )}
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {!building && (
+          <AimBar
+            aim={jev.aim}
+            setAim={jev.setAim}
+            draftAim={jev.draftAim}
+            lock={jev.lock}
+            tokens={TOKENS_PER_FUNGAL_SITUATION}
+            leftOpen={drawer !== null}
+          />
+        )}
+
+        {!building && tut.tutorial && tut.card && (
+          <TutorialCard
+            step={tut.tutorial.step}
+            card={tut.card}
+            fast={tut.tutorial.fast}
+            onNext={tut.next}
+            onFaster={tut.faster}
+            onSkip={tut.skip}
+            high={drawer !== null}
+          />
+        )}
+
+        <LearnDrawer
+          colonies={game.colonies}
+          followed={followed}
+          doctrines={jev.doctrines}
           aim={jev.aim}
-          setAim={jev.setAim}
-          draftAim={jev.draftAim}
           lock={jev.lock}
-          tokens={TOKENS_PER_FUNGAL_SITUATION}
-          leftOpen={drawer !== null}
+          game={game}
+          fungusAnswers={jev.fungusAnswers}
+          menu={controls.menu}
+          setMenu={(menu) => update({ menu })}
+          hide={controls.hide}
+          cull={controls.cull}
+          setRule={(r) => update(r)}
+          retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
+          demo={isDemo(backend)}
         />
-      )}
-
-      {!building && tut.tutorial && tut.card && (
-        <TutorialCard
-          step={tut.tutorial.step}
-          card={tut.card}
-          fast={tut.tutorial.fast}
-          onNext={tut.next}
-          onFaster={tut.faster}
-          onSkip={tut.skip}
-          high={drawer !== null}
+        <LensLayer
+          on={lensOn}
+          colonies={game.colonies}
+          fungus={game.fungus}
+          world={oneWorld}
+          sensed={sensed}
+          layer={shownLayer}
+          trails={{ food: controls.showFoodTrail, home: controls.showHomeTrail }}
+          onFollow={setFollowed}
         />
-      )}
-
-      <LearnDrawer
-        colonies={game.colonies}
-        followed={followed}
-        doctrines={jev.doctrines}
-        aim={jev.aim}
-        lock={jev.lock}
-        game={game}
-        fungusAnswers={jev.fungusAnswers}
-        menu={controls.menu}
-        setMenu={(menu) => update({ menu })}
-        hide={controls.hide}
-        cull={controls.cull}
-        setRule={(r) => update(r)}
-        retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
-        demo={isDemo(backend)}
-      />
-      <DetailsScreen {...detailsProps} />
-      <LensLayer
-        on={lensOn}
-        colonies={game.colonies}
-        fungus={game.fungus}
-        world={oneWorld}
-        sensed={sensed}
-        layer={shownLayer}
-        trails={{ food: controls.showFoodTrail, home: controls.showHomeTrail }}
-        onFollow={setFollowed}
-      />
-      {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
-      {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-      <Toasts />
-      {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
-      {flight && gate?.open && !circle && (
-        <QueenPen
-          key={flight.at}
-          flight={flight}
-          mother={colonyName(flight.mother)}
-          daughter={colonyName(game.colonies.length)}
-          doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
-          onFound={foundHers}
-        />
-      )}
-      {!controls.started && (
-        <StartScreen
-          seed={controls.seed}
-          onStart={onStart}
-          firstGame={firstGame()}
-          colonies={game.colonies.length}
-          latest={newestReadable(games.list)}
-          onContinue={continueFrom}
-        />
-      )}
+        {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
+        {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
+        <Toasts raised={lab} />
+        {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
+        {flight && gate?.open && !circle && (
+          <QueenPen
+            key={flight.at}
+            flight={flight}
+            mother={colonyName(flight.mother)}
+            daughter={colonyName(game.colonies.length)}
+            doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+            onFound={foundHers}
+          />
+        )}
+        {!controls.started && (
+          <StartScreen
+            seed={controls.seed}
+            onStart={onStart}
+            firstGame={firstGame()}
+            colonies={game.colonies.length}
+            latest={newestReadable(games.list)}
+            onContinue={continueFrom}
+          />
+        )}
+      </div>
+      {lab && <LabBench {...labProps} history={history} step={step} onClose={() => setLab(false)} />}
     </main>
   );
 }
@@ -1025,10 +1042,11 @@ function Settings({
       <div>
         <SectionHead>Deeper</SectionHead>
         <Button className="mt-2 w-full" onClick={openLab}>
-          Lab and numbers
+          Lab mode
         </Button>
         <p className="mt-1.5 text-xs text-fg-3">
-          The colonies&apos; full numbers, Jev&apos;s spend, the world&apos;s seed and size, the lever menu and the lab&apos;s foundings.
+          A workbench under the map: the game&apos;s history in charts, a step control, the world&apos;s seed and size, Jev&apos;s spend,
+          the lever menu and the lab&apos;s foundings, the full numbers. Or press l.
         </p>
       </div>
       <a
@@ -1228,14 +1246,6 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
       </ul>
     </div>
   );
-}
-
-function clock(t: number): string {
-  const s = Math.floor(t);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const ss = String(s % 60).padStart(2, "0");
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
 /** The top bar's one line: where the game stands. Goals proper come with the game's chapters (ja-lo8.5). */

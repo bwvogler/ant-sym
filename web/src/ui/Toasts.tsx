@@ -7,12 +7,15 @@ const TONE = {
   good: "border-accent/40 bg-accent-soft text-accent",
 } as const;
 
-/** The notices raised with pushToast, bottom centre, each gone after TOAST_MS or on a click. */
-export default function Toasts() {
+/**
+ * The notices raised with pushToast, bottom centre, each gone after TOAST_MS or on a click. `raised`: Lab mode's workbench
+ * holds the bottom of the screen, so they sit above it, at the map's foot (PRD §69.6).
+ */
+export default function Toasts({ raised = false }: { raised?: boolean }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:bottom-32"
+      className={`pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${raised ? "bottom-[calc(42dvh+5rem)] lg:bottom-[calc(42dvh+8rem)]" : "bottom-20 lg:bottom-32"}`}
       role="status"
       aria-live="polite"
     >

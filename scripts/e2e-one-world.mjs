@@ -30,6 +30,8 @@
 //     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
 //  12. the Codex (ja-mvo9.3), paused at the landing: a first host opens Jobs by age with one notice and a badge; the new
 //     mark, Read it anyway, Show every entry, the palette, a reload, starting afresh.
+//  14. Lab mode (PRD §69.6): l opens it under the map, which shares the screen; the history's charts, their crosshair and
+//     table; the step control a tick and a second at a time while paused (off while playing); each tab; l closes it.
 //  13. specimens (PRD §69.5), paused: pin from the ant panel, follow from the list (the camera to its view), unpin (focus
 //     to the header), a fourth replaces the oldest and takes its number, a fifth's notice names the kept number it frees, a
 //     specimen that dies leaves with a notice and the rest keep theirs, the list stays with nothing followed and folds to one
@@ -943,16 +945,17 @@ try {
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
   );
-  // Details is Settings → Lab and numbers now (PRD §69).
+  // The world's settings are Lab mode's World tab now (Settings → Lab mode; PRD §69.6).
   await dp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Settings", exact: true }).click();
-  await dp.getByRole("button", { name: "Lab and numbers", exact: true }).click();
-  const det = dp.getByRole("dialog", { name: "Details" });
+  await dp.getByRole("button", { name: "Lab mode", exact: true }).click();
+  const det = dp.getByRole("region", { name: "lab" });
+  await det.getByRole("tab", { name: "World" }).click();
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(
     (await det.getByRole("button", { name: "Codex: trails" }).count()) === 0,
-    "Details: no link to the trail entries it lacks (review of #144, S1)",
+    "the Lab's World: no link to the trail entries it lacks (review of #144, S1)",
   );
-  await det.getByRole("button", { name: "Close Details" }).click();
+  await det.getByRole("button", { name: "Close the Lab" }).click();
   await dp.getByRole("button", { name: "Codex", exact: true }).click();
   const learn = dp.getByRole("dialog", { name: "Codex" });
   await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });
@@ -1169,11 +1172,11 @@ try {
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   await lp.keyboard.press("Control+k");
   await pal.waitFor({ timeout: 3000 });
-  await lp.keyboard.type("lab and");
+  await lp.keyboard.type("lab mode");
   await lp.keyboard.press("Enter");
-  await lp.getByRole("dialog", { name: "Details" }).waitFor({ timeout: 3000 });
-  check((await lensCard.count()) === 0, "a palette command (Lab and numbers) closes the pinned card");
-  await lp.getByRole("button", { name: "Close Details" }).click();
+  await lp.getByRole("region", { name: "lab" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "a palette command (Lab mode) closes the pinned card");
+  await lp.getByRole("button", { name: "Close the Lab" }).click();
   // The lens off and on again starts afresh: no old pinned card (N8).
   await lp.mouse.click(hole.x, hole.y);
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
@@ -1498,8 +1501,9 @@ try {
   check((await list.getByRole("listitem").count()) === 2, "and open again");
   // A new game starts with none (S2).
   await sp.keyboard.press("Control+k");
-  await sp.keyboard.type("Lab and numbers");
+  await sp.keyboard.type("Lab mode");
   await sp.keyboard.press("Enter");
+  await sp.getByRole("region", { name: "lab" }).getByRole("tab", { name: "World" }).click();
   await sp.getByRole("button", { name: "Restart", exact: true }).click();
   await until(async () => (await list.count()) === 0, "a new game starts with no specimens", 3000, 50);
   check(true, "a new game starts with no specimens");
@@ -1520,6 +1524,71 @@ try {
   await until(async () => (await plist.getByRole("listitem").count()) === 0, "on a phone, folded once nothing is followed", 2000, 50);
   check((await plist.count()) === 1, "on a phone, folded to one line once nothing is followed");
   await pctx.close();
+
+  // ——— 14. Lab mode (PRD §69.6): a workbench under the map; history charts, a step control, the game's numbers ———
+  console.log("14. Lab mode");
+  const bctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lbp = await bctx2.newPage();
+  lbp.on("pageerror", (e) => errors.push(String(e)));
+  await lbp.goto(url);
+  await lbp.getByLabel("world seed").fill(String(SEED));
+  await lbp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lbp.evaluate(() => (window.jevAnts?.game.time ?? 0) > 4), "a game a few seconds in, for the Lab", 20_000, 100);
+  const canvasH = () =>
+    lbp
+      .locator("canvas")
+      .first()
+      .evaluate((c) => c.getBoundingClientRect().height);
+  const fullH = await canvasH();
+  await lbp.locator("canvas").first().focus();
+  await lbp.keyboard.press("l");
+  const bench = lbp.getByRole("region", { name: "lab" });
+  await bench.waitFor({ timeout: 3000 });
+  await until(async () => (await canvasH()) < fullH * 0.7, "the map shares the screen with the Lab", 3000, 50);
+  check(true, `the map shares the screen with the Lab (${Math.round(fullH)} → ${Math.round(await canvasH())} px)`);
+  // The history: four charts, one line a colony where it is per colony, and a readout under the pointer.
+  const livingFig = bench.getByRole("figure", { name: "Living ants", exact: true });
+  await livingFig.waitFor({ timeout: 3000 });
+  check((await bench.getByRole("figure").count()) === 4, "four history charts");
+  check((await livingFig.locator("polyline").count()) === 2, "a line for each colony");
+  const livingBox = await livingFig.locator("svg").boundingBox();
+  await lbp.mouse.move(livingBox.x + livingBox.width * 0.5, livingBox.y + livingBox.height * 0.5);
+  check(/Ink/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the crosshair reads out every line");
+  await bench.getByText("As a table").click();
+  check((await bench.locator("table tbody tr").count()) >= 2, "and the same numbers as a table");
+  // The step control: off while playing; paused, a tick is 1/30 s and a second is 30 ticks.
+  const stepTick = bench.getByRole("button", { name: "Step a tick" });
+  check(await stepTick.isDisabled(), "the steps wait while the game plays");
+  await bench.getByRole("group", { name: "step" }).getByRole("button", { name: "Pause" }).click();
+  const time0 = await lbp.evaluate(() => window.jevAnts.game.time);
+  await stepTick.click();
+  const time1 = await lbp.evaluate(() => window.jevAnts.game.time);
+  await bench.getByRole("button", { name: "Step a second" }).click();
+  const time2 = await lbp.evaluate(() => window.jevAnts.game.time);
+  check(
+    Math.abs(time1 - time0 - 1 / 30) < 1e-6 && Math.abs(time2 - time1 - 1) < 1e-6,
+    `a tick and a second (${(time1 - time0).toFixed(4)}, ${(time2 - time1).toFixed(4)})`,
+  );
+  // Each tab shows its cards.
+  for (const [tab, card] of [
+    ["World", "world"],
+    ["Jev", "colony jev"],
+    ["Levers", "levers"],
+    ["Numbers", "debug"],
+  ]) {
+    await bench.getByRole("tab", { name: tab }).click();
+    check((await bench.getByRole("region", { name: card }).count()) === 1, `the ${tab} tab`);
+  }
+  await lbp.locator("canvas").first().focus();
+  await lbp.keyboard.press("l");
+  await until(
+    async () => (await bench.count()) === 0 && (await canvasH()) > fullH * 0.95,
+    "l closes the Lab and gives the map back",
+    3000,
+    50,
+  );
+  check(true, "l closes the Lab and gives the map back the screen");
+  await bctx2.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

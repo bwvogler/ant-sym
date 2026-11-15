@@ -121,7 +121,7 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Codex, Details). Closing it gives focus back to
+ * preventDefault) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -134,7 +134,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"], [role="dialog"][aria-label="Details"]')) return;
+      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"]')) return;
       onClose();
     };
     window.addEventListener("keydown", key);
