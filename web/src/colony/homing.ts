@@ -475,8 +475,17 @@ export function searchOn(c: Colony, i: number, stalled = false): void {
   } else if (c.line !== null && c.cur === PLANE) {
     const { w, h } = c.map.size;
     c.searchA[i] = s === 0 ? c.heading[i] : c.searchA[i] + Math.PI / 2;
-    // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
-    c.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+    if (p.searchScale > 0 && !(p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0)) {
+      // Sized by its own vector's error (ja-lp4.20): point n reaches σ × (searchScale + searchScaleStep × n/4) from where the
+      // vector ran out. A search round its first stored place (routeEnd) is not the vector's: it keeps the spiral below.
+      const n = s === 0 ? 0 : c.searchLeg[i] + 1;
+      c.searchLeg[i] = n;
+      const sigma = PI_DRIFT_2D * piSpan(c, i);
+      c.search[i] = Math.min(Math.max(w, h * R), Math.max(SEARCH_START, sigma * (p.searchScale + (p.searchScaleStep * n) / 4)));
+    } else {
+      // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
+      c.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+    }
   } else {
     const most = c.map.size.w;
     c.search[i] = s === 0 ? SEARCH_START * (c.rng() < 0.5 ? -1 : 1) : Math.max(-most, Math.min(most, -s * SEARCH_GROW));

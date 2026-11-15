@@ -139,6 +139,17 @@ export interface ColonyParams {
    */
   searchStall: number;
   /**
+   * One world's plane (ja-lp4.20, docs/nest-search.md "Sizing the search to the vector's error", PRD §79.2): U3b's spiral
+   * (searchLoops 0) sized by the vector's own error, σ = PI_DRIFT/√2 × piSpan (with piErrorLaw 1, PI_SPAN_GAIN ×
+   * √(piErrorAt × distance out)): its first point this many σ out (at least SEARCH_START), each next quarter turn
+   * searchScaleStep/4 σ further (an even spiral, not 1.6× a turn). The search is wider after a longer trip, by the distance
+   * out (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), broader with more uncertainty (Vickerstaff & Merkle 2012); the
+   * multiples are design. Not round a stored place (routeEnd): that search is the spiral's. 0 = U3b's spiral, bit for bit.
+   */
+  searchScale: number;
+  /** One world's plane, with searchScale: σ a full turn of the spiral adds to its reach (design) */
+  searchScaleStep: number;
+  /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a searching ant (its vector ran out at no hole) on its own mound
    * smells its colony's hydrocarbons there, strongest at the hole (Sturgis, Greene & Gordon 2011), and walks up them to
    * its hole, as it does in sight of it; only while searching (Buehlmann, Hansson & Knaden 2012). 1 = on; 0 = HOLE_SIGHT only.
@@ -433,6 +444,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   searchTurn: GOLDEN_ANGLE,
   searchPetal: Math.PI / 3,
   searchStall: 1,
+  searchScale: 0,
+  searchScaleStep: 0.5,
   moundSmell: 1,
   siteFidelity: 0,
   siteGive: 0,
