@@ -6306,7 +6306,7 @@ Merging is not delegated: PRs wait for the owner.
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
 
-## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
+## 74. Task reversion: old foragers nurse when the young are gone (built, on, ja-7r7x, 2026-11-14)
 
 **Research basis:** [task-reversion.md](task-reversion.md):
 - In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
@@ -6437,7 +6437,21 @@ Merging is not delegated: PRs wait for the owner.
 - Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
 - Adding crops ends worker starvation too, but one seed goes over the bound (14).
 - Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
-- Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+**Confirmed and turned on (ja-7r7x.4, 2026-11-15).** `assays.yml` on GitHub, branch at `4e411b5`, each run crossing `revert` 0/1 with `cropFeed` 0/0.5 ([larvae](https://github.com/bwvogler/ant-sym/actions/runs/43681296621), [game](https://github.com/bwvogler/ant-sym/actions/runs/43681298553), [nestFlow](https://github.com/bwvogler/ant-sym/actions/runs/43681300400)):
+
+| Assay, seeds | main | `cropFeed` 0.5 | **`revert` 1** | `revert` 1 + `cropFeed` 0.5 |
+|---|---|---|---|---|
+| `larvae` 17–32: pass (failing) | 12/16 (19, 21, 26, 30) | 12/16 (same) | **15/16 (22)** | 14/16 (19, 22) |
+| `larvae` 17–32: worst waiting | 83 | 53 | **10** | 49 |
+| `larvae` 17–32: most workers / larvae starved in a seed | 8 / 8 | 0 / 7 | **0 / 0** | 0 / 0 |
+| `larvae` 17–32: fewest workers | 62 | 58 | **143** | 110 |
+| `game` 1–20 (two colonies, 600 s): pass | 17/20 (3, 10, 11) | 17/20 | 17/20 | 17/20 |
+| `nestFlow` 1–10 (900 s): most larvae waiting | 3 | 3 | 3 | 3 |
+
+- Over seeds 1–32, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting), and no worker or larva starves on any seed. Crops add nothing on top and make seeds 17–32 worse, so `cropFeed` stays off.
+- The two-colony game and the nest flow are unchanged in every metric: their games are short and keep their young, so reversion rarely fires. Every golden master is unchanged with it on, for the same reason.
+- **`revert: 1` is the default now**; `cropFeed: 0`.
+- Still open: N12, brood smelt through solid soil (`BROOD_SMELL` reads a disc)., nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
 
 **Still open.**
 - Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).

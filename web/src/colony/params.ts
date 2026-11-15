@@ -436,7 +436,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   restFetch: 1,
   forageDig: 0,
   owedBeg: 0,
-  revert: 0,
+  revert: 1,
   cropFeed: 0,
   routeStep: 3,
   routeSee: 3,
