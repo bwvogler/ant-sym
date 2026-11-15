@@ -36,6 +36,7 @@ import {
   estimateTokens,
   packResponseRequest,
   readResponse,
+  responseOf,
   RESPONSE_BRAIN_VERSION,
   RESPONSE_HOOKS,
   responseKey,
@@ -160,10 +161,11 @@ const answered = (lane, s) => {
   const table = lane === "mode" ? base.modes : lane === "stance" ? base.stances : base.responses?.[lane];
   return table?.[LANES[lane].key(s)];
 };
-// A mode answer is weighted (Jev's probabilities, colony/weighted.ts): the replayed colony draws from it as the page's does.
+// Mode and response answers are weighted (Jev's probabilities, colony/weighted.ts): the replayed colony draws from them as the
+// page's does (a response with the ant's own draw, ja-m7rr).
 const brain = (lane) => (s, draw) => {
   const a = answered(lane, s);
-  if (a !== undefined) return lane === "mode" ? pick(a, draw) : a;
+  if (a !== undefined) return lane === "mode" ? pick(a, draw) : lane === "stance" ? a : responseOf(lane, LANES[lane].key(s), a, draw);
   note(lane, s);
   return LANES[lane].local(s);
 };
@@ -268,7 +270,14 @@ try {
           if (a === null) return;
           row.answered++;
           const local = L.local(s);
-          if ((lane === "mode" ? topOf(a) : a) === local) row.agree++;
+          if (
+            (lane === "mode"
+              ? topOf(a)
+              : lane === "stance"
+                ? a
+                : responseOf(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (lane), k, a)) === local
+          )
+            row.agree++;
           else row.disagreements.push({ situation: k, jev: a, local });
           const c = caches[d.id];
           if (lane === "mode") c.modes[k] = a;

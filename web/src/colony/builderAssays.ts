@@ -7,6 +7,8 @@
 //   B3 rain        rain along an established trail: how far does delivery dip, and how fast does it come back? (report)
 //   B4 lateSugar   sugar dropped beside a crumb pile the colony already works (report; Beckers et al. 1990)
 //   B5 crayonRing  a crayon circle round the hole: how long do ants stay on it? (report; Butterfield et al. 2025)
+//   B7 noEntryFork a no-entry sign on one branch of a crayon fork: do followers take the other? (Robinson et al. 2005)
+//   B8 tweezers    carriers moved sideways: do they run their old vector before finding home? (report; Wehner & Srinivasan 1981)
 //   B6 fillShaft   dirt poured over the colony's largest chamber: do the ants dig it out? (report; Rajendran et al. 2026)
 
 import { Builder, type Stroke } from "./builder.ts";
@@ -339,4 +341,160 @@ export const fillShaft: Assay = {
   score: () => ({}),
 };
 
-export const BUILDER_ASSAYS: Assay[] = [crayonLine, wall, rain, lateSugar, crayonRing, fillShaft];
+/**
+ * B7: a crayon fork from the hole, with the no-entry paint across the start of one branch (`paint` false: the same fork
+ * bare, the control). Which branch do the ants on the fork take? Robinson et al. 2005: 71 % took the unmarked one.
+ * Which branch is painted alternates with the seed.
+ */
+function noEntryForkAssay(paint: boolean): Assay {
+  return {
+    id: paint ? "noEntryFork" : "noEntryForkBare",
+    title: paint
+      ? "B7 a no-entry sign on one branch of a crayon fork: do followers take the other?"
+      : "B7 control: the same crayon fork, no sign (report)",
+    target: paint
+      ? "≥ 70 % of the ants on the fork's branches on the unpainted one, 10–70 s after drawing, in ≥ 8 of 10 seeds (Robinson et al. 2005: 71 %)"
+      : "report only: the share on the branch B7 would paint's other side (about half, with no sign)",
+    seconds: 80,
+    spec: (seed) => {
+      const fork = at(50, 60);
+      const stem = { a: at(50, 76), b: fork };
+      const left = { a: fork, b: at(30, 35) };
+      const right = { a: fork, b: at(70, 35) };
+      const painted = seed % 2 === 1 ? left : right;
+      const other = painted === left ? right : left;
+      // The sign: across the painted branch a few cells in, from where it leaves the fork.
+      const t0 = 0.12;
+      const t1 = 0.3;
+      const sign = along(
+        { x: painted.a.x + (painted.b.x - painted.a.x) * t0, y: painted.a.y + (painted.b.y - painted.a.y) * t0 },
+        { x: painted.a.x + (painted.b.x - painted.a.x) * t1, y: painted.a.y + (painted.b.y - painted.a.y) * t1 },
+      );
+      // Counted beyond the sign, on each branch alike.
+      const beyond = (br: { a: Pt; b: Pt }) => ({
+        a: { x: br.a.x + (br.b.x - br.a.x) * 0.35, y: br.a.y + (br.b.y - br.a.y) * 0.35 },
+        b: br.b,
+      });
+      const onPainted: number[] = [];
+      const onOther: number[] = [];
+      const t1p = everySecond((g) => nearSegment(g, beyond(painted).a, beyond(painted).b, 1.6), onPainted);
+      const t2p = everySecond((g) => nearSegment(g, beyond(other).a, beyond(other).b, 1.6), onOther);
+      const events: NonNullable<RunSpec["events"]> = [
+        {
+          at: 5,
+          kind: "call",
+          run: (g: Game) => {
+            const b = new Builder(g);
+            for (const br of [stem, left, right]) b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: along(br.a, br.b) });
+            if (paint) b.apply({ tool: "noEntry", layer: PLANE, points: sign });
+          },
+        },
+      ];
+      return onPlane({
+        seed,
+        seconds: 80,
+        // No food: the crayon is the only trail, as in B1.
+        map: () => new Arena(100, 100, true).build([NEST]),
+        game: { antCount: 300, rival: false },
+        events,
+        probes: [
+          {
+            tick: (g, dt) => (t1p(g, dt), t2p(g, dt)),
+            summary: () => {
+              const p = mean(onPainted.slice(10, 70));
+              const o = mean(onOther.slice(10, 70));
+              return { onPainted: p, onOther: o, otherShare: p + o > 0 ? o / (p + o) : NaN };
+            },
+          },
+        ],
+      });
+    },
+    score: (r): Record<string, number> => (paint ? { pass: (r.metrics.otherShare as number) >= 0.7 ? 1 : 0 } : {}),
+  };
+}
+export const noEntryFork = noEntryForkAssay(true);
+export const noEntryForkBare = noEntryForkAssay(false);
+
+/**
+ * B8: the tweezers on carriers. At 120 s every food carrier of colony 0 out on the plane, 15 or more from the hole, is
+ * moved 30–60 sideways. Do they run their old vector, coming near where home would be by it, before they find home?
+ * Wehner & Srinivasan 1981: displaced desert ants run the whole vector, then search (report only).
+ */
+export const tweezers: Assay = {
+  id: "tweezers",
+  title: "B8 tweezers: do carriers moved sideways run their old vector before finding home? (report)",
+  target:
+    "report only: the share that come within 6 of where home would be by their vector before they reach home, and the share home within 300 s",
+  seconds: 420,
+  spec: (seed) => {
+    const moved: { i: number; gen: number; wx: number; wy: number; near: boolean; home: number }[] = [];
+    let at = 0;
+    let next = 0;
+    return onPlane({
+      seed,
+      seconds: 420,
+      map: () => new Arena(100, 100, true).pile(50, 25, 3, 400).build([NEST]),
+      game: { antCount: 300, rival: false },
+      events: [
+        {
+          at: 120,
+          kind: "call",
+          run: (g: Game) => {
+            at = g.time;
+            const b = new Builder(g);
+            const c = g.colonies[0]!;
+            const hole = c.layers[PLANE]!.nest;
+            let r = (seed * 2654435761) >>> 0;
+            const rnd = () => (r = (r * 1664525 + 1013904223) >>> 0) / 4294967296;
+            for (let i = 0; i < c.n; i++) {
+              if (!c.alive[i] || c.layer[i] !== PLANE || !c.carrying[i]) continue;
+              if (Math.hypot(c.x[i]! - hole.x, c.y[i]! - hole.y) < 15) continue;
+              const d = (30 + 30 * rnd()) * (c.x[i]! < 50 ? 1 : -1);
+              if (!b.moveAnt(0, i, c.x[i]! + d, c.y[i]!)) continue;
+              // Where home would be by its vector now: the hole, its drift, and what it was carried.
+              const odo = c.odoSurf[i]!;
+              moved.push({
+                i,
+                gen: c.gen[i]!,
+                wx: hole.x + odo * c.driftSurf[i]! + c.carriedX[i]!,
+                wy: hole.y + odo * c.driftSurfY[i]! + c.carriedY[i]!,
+                near: false,
+                home: NaN,
+              });
+            }
+          },
+        },
+      ],
+      probes: [
+        {
+          tick: (g) => {
+            if (!moved.length || g.time + 1e-9 < next) return;
+            next = g.time + 0.5;
+            const c = g.colonies[0]!;
+            for (const m of moved) {
+              if (!Number.isNaN(m.home) || !c.alive[m.i] || c.gen[m.i] !== m.gen) continue;
+              if (c.layer[m.i] !== PLANE) {
+                m.home = g.time - at;
+                continue;
+              }
+              if (Math.hypot(c.x[m.i]! - m.wx, c.y[m.i]! - m.wy) <= 6) m.near = true;
+            }
+          },
+          summary: () => {
+            const n = moved.length;
+            const home = moved.filter((m) => m.home <= 300);
+            return {
+              moved: n,
+              ranVector: n ? moved.filter((m) => m.near).length / n : NaN,
+              home300: n ? home.length / n : NaN,
+              medianHome: home.length ? home.map((m) => m.home).sort((a, b) => a - b)[Math.floor(home.length / 2)]! : NaN,
+            };
+          },
+        },
+      ],
+    });
+  },
+  score: () => ({}),
+};
+
+export const BUILDER_ASSAYS: Assay[] = [crayonLine, wall, rain, lateSugar, crayonRing, fillShaft, noEntryFork, noEntryForkBare, tweezers];

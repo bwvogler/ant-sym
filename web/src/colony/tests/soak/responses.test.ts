@@ -187,11 +187,18 @@ test("response lanes: one question per situation, cached per hook and doctrine",
   assert.notEqual(responseContext("get", "x"), responseContext("drop", "x"), "each hook its own cache");
 });
 
-test("readResponse: nouls are yes strictly above ½; choices must be one of the hook's answers", () => {
-  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), true);
-  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), false);
+test("readResponse: kept with Jev's probabilities; nouls are the probability of yes (yes strictly above ½); choices must be one of the hook's", () => {
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), "true=0.9,false=0.1");
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), "false=0.5,true=0.5");
+  assert.equal(readResponse("drop", { s0_drop: { type: "noul", noul: 1 } }, "s0"), "true=1", "certain: never drawn");
+  assert.equal(readResponse("drop", { s0_drop: { type: "noul", noul: 1.5 } }, "s0"), null);
   assert.equal(readResponse("drop", { s0_drop: { type: "choice", choice: "yes" } }, "s0"), null);
-  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down", "no probabilities: bare");
+  assert.equal(
+    readResponse("contact", { s0_contact: { type: "choice", choice: "flee", probabilities: { fight: 0.3, flee: 0.6, home: 0.1 } } }, "s0"),
+    "flee=0.667,fight=0.333",
+    "options the hook doesn't have are left out",
+  );
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), null, "a mode is no carry answer any more");
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
   assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
@@ -203,7 +210,7 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
 test("responsesFromAnswers: cached answers win, the local responses cover the rest, and every lookup is heard", () => {
   const t = touch({ mode: "follow" });
   const heard: string[] = [];
-  const r = responsesFromAnswers({ get: { [touchKey(t)]: false }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) =>
+  const r = responsesFromAnswers({ get: { [touchKey(t)]: "false=1" }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) =>
     heard.push(`${h}:${hit}`),
   );
   assert.equal(r.get(t), false);

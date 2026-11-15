@@ -24,7 +24,7 @@ import {
   PLANE,
   CURTAIN,
 } from "./vocab.ts";
-import type { Draw } from "./weighted.ts";
+import { type AntDraw, type Draw, unitOf } from "./weighted.ts";
 import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
@@ -51,7 +51,7 @@ import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from ".
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { placeOn, raidSmelt, touch } from "./sense.ts";
+import { placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
@@ -295,7 +295,7 @@ export class Colony {
   alarmSmelt: Trail = "none";
   /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
   oddsNow: Odds = "none";
-  t: Touch = Object.defineProperties(
+  t: Touch = Object.defineProperty(
     {
       mode: "explore",
       carrying: "none",
@@ -311,11 +311,8 @@ export class Colony {
       returns: "none",
       crowd: "few",
     } as Touch,
-    {
-      place: { get: () => this.place(this.ti), enumerable: true },
-      // Its raid trail likewise (ja-lp4.6.7): only `leave` reads it, for a raider.
-      raid: { get: () => this.raidOf(this.ti), enumerable: true },
-    },
+    "place",
+    { get: () => this.place(this.ti), enumerable: true },
   );
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
@@ -525,6 +522,37 @@ export class Colony {
     "temperature",
     { get: () => this.params.sampleTemp },
   ) as Draw;
+  /**
+   * What makes the response draws this game's (antDraw): a uniform from the colony's rng, taken the first time a response is
+   * drawn; −1 until then, so a game that never meets a weighted response draws nothing more than it did (the golden masters).
+   */
+  drawSalt = -1;
+  /** the ant antDraw is handing out draws for */
+  #drawAnt = 0;
+  readonly #antDraw: AntDraw = Object.defineProperty(
+    (salt: string): number => {
+      if (this.drawSalt < 0) this.drawSalt = this.rng();
+      const i = this.#drawAnt;
+      // Its own clock: an ant draws afresh every `reroll` seconds, each ant at its own phase (not the whole colony at once).
+      const at = `${this.drawSalt}|${i}|${this.gen[i]}`;
+      const r = this.params.reroll;
+      const epoch = r > 0 ? Math.floor(this.time / r + unitOf(at)) : 0;
+      return unitOf(`${at}|${epoch}|${salt}`);
+    },
+    "temperature",
+    { get: () => this.params.sampleTemp },
+  ) as AntDraw;
+
+  /**
+   * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
+   * situation while the ant holds it, until its next `reroll`. One object for every ant, so handing it out allocates nothing; a
+   * draw itself hashes two strings (a game whose six hooks all draw ran 10–14 % slower, review of #223: cache the ant's part of
+   * the hash if a response lane is ever asked on the page).
+   */
+  antDraw(i: number): AntDraw {
+    this.#drawAnt = i;
+    return this.#antDraw;
+  }
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   s = new Float64Array(9);
 
@@ -734,19 +762,6 @@ export class Colony {
     this.bind(l);
     try {
       return placeOn(this, i);
-    } finally {
-      this.bind(was);
-    }
-  }
-
-  /** The raid trail ant i smells (raidSmelt), with its layer bound: Touch.raid, worked out when a response reads it. */
-  raidOf(i: number): "none" | "faint" | "strong" {
-    const l = this.layer[i];
-    if (l === this.cur) return raidSmelt(this, i);
-    const was = this.cur;
-    this.bind(l);
-    try {
-      return raidSmelt(this, i);
     } finally {
       this.bind(was);
     }
@@ -1232,7 +1247,7 @@ export class Colony {
     // (One world, ja-web: at the gate at the top of its shaft too, where the stance is the ant's own.)
     const own = this.entrance === null || this.line !== null;
     const asked = this.params.raidGate > 0 && own && this.stanceOf(i) === "raid" ? FIGHT : mode;
-    const answer = this.responses.leave(touch(this, i, enemy, asked, "none"));
+    const answer = this.responses.leave(touch(this, i, enemy, asked, "none"), this.antDraw(i));
     // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
     const rate = leaveRate(this.params, answer);
     if (!(this.rng() < 1 - Math.exp(-rate * dt))) return false;

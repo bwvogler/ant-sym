@@ -522,6 +522,12 @@
   ],
   "broodMet": [
    0
+  ],
+  "carriedX": [
+   0
+  ],
+  "carriedY": [
+   0
   ]
  },
  "asIs": {
@@ -1047,6 +1053,12 @@
   ],
   "broodMet": [
    39.75
+  ],
+  "carriedX": [
+   40
+  ],
+  "carriedY": [
+   40.25
   ]
  }
 }

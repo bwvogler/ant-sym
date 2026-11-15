@@ -315,8 +315,18 @@ export interface ColonyParams {
   stanceGate: number;
   /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
   defendAt: number;
-  /** how far from its nest an ant is on home ground, by its home vector (world units) */
+  /** how far from its nest an ant is on home ground: by sight of its hole where it sees it, else by its home vector (world units) */
   homeGround: number;
+  /**
+   * Brood odour each brood item lying in the nest gives off, a second (ja-k4k.15, docs/brood-odour.md): the young climb it
+   * in a chamber (broodClimb). 0: none laid, the channel stays empty (main bit for bit).
+   */
+  broodOdour: number;
+  /**
+   * A young ant in a chamber climbs brood odour (ja-k4k.15.3, docs/brood-odour.md), turning at turnRate × this; 0: it
+   * turns toward the queen's position instead (the scripted rule it replaces, main bit for bit).
+   */
+  broodClimb: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -452,6 +462,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   stanceGate: 1,
   defendAt: 1,
   homeGround: 10,
+  broodOdour: 0,
+  broodClimb: 0,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,
@@ -483,6 +495,12 @@ export const NO_ENTRY_DROP = 0.5;
 
 /** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
 export const NO_ENTRY_RATE = 4;
+
+/**
+ * How hard a follower shies from "no entry" a child painted (builder.ts), while its colony's own noEntryAvoid is 0: the
+ * value PRD §45 tested (docs/builder.md "Slice 2"; Robinson et al. 2005: 71 % took the unmarked branch).
+ */
+export const NO_ENTRY_PAINTED = 4;
 
 /** Every channel's params: the defaults, with `over` merged in per channel and per field. */
 export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {
