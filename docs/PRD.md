@@ -4924,6 +4924,20 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Tests:** `tests/int/desertHeat.test.ts` (the day and the game's start, the body, the sun seen only where the sky is and unseen deeper in, the hot rule, the sun's rule, heat deaths counted, more out at noon than in the low sun, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun; the shaft's top not seeing the sky; the hot rule removed.
 - **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); every ant out at night counted (`ja-rf5.14`); why homing ants stay lost at night (`ja-rf5.15`); the colony in step at noon.
 
+### 60.5a Lost at night: every desert ant out counted (ja-rf5.14, ja-rf5.15, 2026-11-15)
+
+- **The count.** D5's night count left out ants on their way home (`return`). It now also reports `outNightAll`, every ant out on the plane at night, and its pass needs both ≤ 0.1 × out at noon (owner, 2026-11-15).
+- **Measured** (D5, seeds 1–20, local rule, main after #214): out at night, every ant: median 1.86, most 13.9 (seed 19); over a tenth of noon on 5 seeds (2, 7, 10, 17, 19). Setting out at night: 0 on every seed. **D5 passes 14/20** (seed 3 also fails, on a 30 s high-sun window with no pickup, as on main before this: ja-rf5.24).
+- **Why they stay out** (seeds 2, 10, 17, 19, every homing trip on the plane): 125 of the 133 trips home over 100 s are empty-jawed ants that turned home by day, not hot and under a high sun, because they **tired**: they walked about 300 cells (median) with nothing found before patience (60 s, `planePatience` 1) ran out. Their home vector is then about 30 cells off (median; 5 for the trips under 100 s), and the four-point spiral search takes over 100 s to find the hole, so those that tire in the afternoon are still searching after sunset. Carriers are rarely lost (7 of 133). Not sunset: ants that turn home at sunset are near the hole.
+- **Fixes measured, not taken** (owner: report only for now; ja-rf5.23):
+
+| option | seeds over 10 % at night | worst | D5 pass (old mark) | food stored, median / worst seed | fewest births |
+|---|---|---|---|---|---|
+| as is | 5 | 0.30 | 19 | 883 / 605 | 140 |
+| search loops (`searchLoops` 1.5) | 2 | 0.16 | 19 | 900 / 404 | 100 |
+| tire sooner on the plane (`planePatience` 0.5) | 2 | 0.13 | 20 | 942 / 487 | 115 |
+| `planePatience` 0.35 | 0 | 0.09 | 20 | 894 / 402 | 99 |
+
 ### 60.6 The invitation: a finder's pace, passed on in the shaft (ja-rf5.6, 2026-11-14)
 
 - **Research** ([desert-ant.md §1](desert-ant.md), Razin, Eckmann & Feinerman 2013, full text, *C. niger*): no trail and no location; a finder runs home fast, an ant that meets a faster one speeds up and a slower one slows (crossing at about 2 cm/s), an ant's chance of leaving rises with its own speed past a soft threshold at about 8 cm/s and, given its speed, not with whom it met; a recruiter's entry raises the idle ants leaving in the next minute sevenfold (nests of 4–8); more ants in the nest lower exits.
