@@ -239,7 +239,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   };
   if (!stocked(here)) {
     here = -1;
-    const o = discOffsets(PORT_REACH)[cy & 1] as Int16Array;
+    const o = discOffsets(col.params.portReach || PORT_REACH)[cy & 1] as Int16Array;
     for (let k = 2; k < o.length && here < 0; k += 2) {
       const id = ch.at(cx + o[k], cy + o[k + 1]);
       if (stocked(id)) here = id;

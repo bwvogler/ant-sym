@@ -1259,7 +1259,7 @@ function starvedProbe(): Probe {
 
 /**
  * The porters' supply (ja-ukac.2, docs/relay-transport.md, PRD §80): how many carries start a minute and how many are
- * put down, from 300 s on, and the mean number of idle ants within `PORT_REACH` of a stocked store or reception (an ant
+ * put down, from 300 s on, and the mean number of idle ants within `portReach` (PORT_REACH by default) of a stocked store or reception (an ant
  * that could start a carry: underground, exploring, empty-jawed), sampled every 30 s. Reads the game, draws nothing.
  */
 function portSupplyProbe(): Probe {
@@ -1294,7 +1294,7 @@ function portSupplyProbe(): Probe {
         c.antCell(i);
         const cx = CELL[0];
         const cy = CELL[1];
-        const o = discOffsets(PORT_REACH)[cy & 1]!;
+        const o = discOffsets(c.params.portReach || PORT_REACH)[cy & 1]!;
         for (let k = 0; k < o.length; k += 2)
           if (stocked(ch.at(cx + o[k]!, cy + o[k + 1]!))) {
             near++;
