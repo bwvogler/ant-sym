@@ -34,6 +34,9 @@
 //     to the header), a fourth replaces the oldest and takes its number, a fifth's notice names the kept number it frees, a
 //     specimen that dies leaves with a notice and the rest keep theirs, the list stays with nothing followed and folds to one
 //     line; a new game has none; on a 390 px phone the list folds once nothing is followed.
+//  14. notices (PRD §69.6), at 390 px by real touch: the bell at the top right; a small drag slides a toast back, a swipe
+//     takes it away, a hold outlives its time; the bell counts it, lists it, clears the count, hides the field's toasts;
+//     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1520,6 +1523,84 @@ try {
   await until(async () => (await plist.getByRole("listitem").count()) === 0, "on a phone, folded once nothing is followed", 2000, 50);
   check((await plist.count()) === 1, "on a phone, folded to one line once nothing is followed");
   await pctx.close();
+
+  // ——— 14. Notices (PRD §69.6): swipe a toast away; the bell at the top right keeps it ———
+  // A real finger (CDP touch events, review of #219 S2): the mouse would not show a browser taking the drag as a pan.
+  console.log("14. notices");
+  const nctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const np2 = await nctx2.newPage();
+  np2.on("pageerror", (e) => errors.push(String(e)));
+  await np2.goto(url);
+  await np2.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => np2.evaluate(() => !!window.jevAnts?.game.world), "the notices page's game");
+  await np2.getByRole("button", { name: "Pause", exact: true }).tap();
+  const cdp = await nctx2.newCDPSession(np2);
+  /** One finger down at the first point, held `holdMs`, moved through the rest, lifted. */
+  const finger = async (pts, holdMs = 0) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: pts[0][0], y: pts[0][1] }] });
+    if (holdMs) await sleep(holdMs);
+    for (const [x, y] of pts.slice(1)) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+  const bell = np2.getByRole("button", { name: "Notices", exact: true });
+  const bellBox = await bell.boundingBox();
+  check(bellBox !== null && bellBox.x + bellBox.width > 390 - 24 && bellBox.y < 140, "the bell sits at the top right");
+  const raise = async (text) => {
+    await np2.evaluate((t) => window.jevAnts.notify(t, "good"), text);
+    const t = np2.getByRole("button", { name: `${text} (dismiss)` });
+    await until(() => t.isVisible(), `"${text}" shows`, 3000, 50);
+    const b = await t.boundingBox();
+    return { t, x: b.x + 20, y: b.y + b.height / 2 };
+  };
+  const a = await raise("A notice to swipe away.");
+  await finger([
+    [a.x, a.y],
+    [a.x + 5, a.y],
+    [a.x + 12, a.y],
+  ]);
+  await sleep(300);
+  check(await a.t.isVisible(), "a small drag slides it back");
+  const shown = await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length);
+  await finger([
+    [a.x, a.y],
+    [a.x + 40, a.y],
+    [a.x + 90, a.y],
+    [a.x + 160, a.y],
+  ]);
+  await until(async () => (await a.t.count()) === 0, "a finger's swipe sideways takes it away", 3000, 50);
+  check((await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length)) === shown - 1, "and only it");
+  // A notice held past its time stays, and lifting the hold leaves it (review of #219, N1).
+  const h = await raise("A notice to hold.");
+  await finger([[h.x, h.y]], 7000 + 1000);
+  await sleep(300);
+  check(await h.t.isVisible(), "a notice held outlives its 7 s, and lifting the hold leaves it");
+  check(/new/.test((await bell.getAttribute("title")) ?? ""), "the bell counts what is new");
+  // Escape closes the list and not the drawer under it; the field's toasts hide while the list is open.
+  await mutations(np2).tap();
+  await bell.tap();
+  const noticeList = np2.getByRole("region", { name: "notices" });
+  check((await bell.getAttribute("aria-expanded")) === "true", "the bell says the list is open");
+  check((await noticeList.getByText("A notice to swipe away.").count()) === 1, "the bell's list keeps the swiped notice");
+  check(!/new/.test((await bell.getAttribute("title")) ?? ""), "opening the list clears the count");
+  check((await np2.locator('[role="status"] button').count()) === 0, "the field's notices hide while the list is open");
+  await np2.keyboard.press("Escape");
+  check((await noticeList.count()) === 0, "Escape closes the list");
+  check((await np2.locator('[role="status"] button').count()) === 0, "and what it showed doesn't come back onto the field");
+  check(await np2.getByRole("region", { name: "mutations" }).isVisible(), "and leaves the drawer under it open");
+  await np2.keyboard.press("Escape");
+  // A tap outside the list closes it.
+  await bell.tap();
+  check((await noticeList.count()) === 1, "the list opens again");
+  await np2.touchscreen.tap(20, 600);
+  await until(async () => (await noticeList.count()) === 0, "a tap outside closes the list", 3000, 50);
+  // While building, the notices sit between the HUD and the tray.
+  await np2.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Builder", exact: true }).tap();
+  const tray = await np2.getByRole("navigation", { name: "builder tools" }).boundingBox();
+  const b2 = await raise("A notice while building.");
+  const tb2 = await b2.t.boundingBox();
+  check(tb2.y > 100 && tb2.y + tb2.height < tray.y, `while building, a notice sits under the HUD, above the tray (${Math.round(tb2.y)})`);
+  await nctx2.close();
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

@@ -5864,6 +5864,36 @@ The second half of stage 3: a few ants kept to watch and compare, the notebook's
 - **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring, drawn over them.
 - The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
 - **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
+
+### 69.6 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
+
+The owner, playing on a phone, found the green notices at the bottom in the way: "let me swipe them away and check them later in some notifications in the top right."
+
+- **Swipe away** (`ui/Toasts.tsx`):
+  - a tap, or a swipe of 60 px sideways or down, takes a notice off the field (`swipeOutcome`, pure and tested);
+  - a smaller drag slides it back;
+  - its timer waits while a finger holds it.
+  - Before, on a phone the notices took no touch at all (`max-sm:pointer-events-none`), so they couldn't even be tapped away.
+- **The bell** (`ui/Notices.tsx`): at the top right, beside the goal; on a phone it shares the goal's row.
+  - Every notice raised goes in a log (`toasts.ts` `noticeLog`), newest first, at most 50. The log lasts the visit and is not saved.
+  - A badge counts the ones not yet seen. Opening the list marks them seen.
+  - The list gives each notice's tone, its words and how long ago; Clear empties it.
+  - Escape or a press outside closes it.
+- **While building,** the notices show under the HUD instead of over the builder's tray.
+- **Review of #219:**
+  - one Escape closes the list and not a dialog opened over it;
+  - a press held past 0.5 s is a hold to read, so lifting it leaves the notice (`HOLD_MS`);
+  - the field's notices hide while the list is open (they are in it), and closing it clears them from the field;
+  - the bell is announced as opening a list (`aria-expanded`), not as a toggle.
+- **Checks:**
+  - `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, the swipe and hold rule, and `ago`'s boundaries.
+  - `npm run e2e` step 14 runs at 390 px by real touch (CDP touch events):
+    - a swipe and a slide back;
+    - a hold past 7 s;
+    - Escape over a drawer, and a tap outside;
+    - toasts above the builder's tray.
+  - Without `touch-none`, its swipe check fails.
+- **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
