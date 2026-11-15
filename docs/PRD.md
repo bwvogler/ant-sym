@@ -6799,3 +6799,16 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 **Beads.** `ja-nzkg` (this); `.1` assays; `.2` the clump and the tool; `.3` the plume; `.4` tenders defend; `.5` aphids eaten; `.6` tray, notices and Learn; `.7` research: a forager's cue for larval hunger.
 
 **Still open.** Honeydew per aphid and the cap (no verified figure); tenders lingering; tending raising the flow; the larval-hunger cue.
+
+### 78.1 The clump and its tool (ja-nzkg.2), assays B9 and B10 (ja-nzkg.1)
+
+**Built.** `colony/aphids.ts`: a clump is a list of plane cells with a start count (`APHID.perCell` 3 a cell), an age and its aphids eaten. Its life curve grows from 1 to `peak` 3× at 150 s and falls to nothing at 360 s. It makes `honey` 0.02 units an aphid a second as food of quality 1.5 (the builder's sugar) on its emptiest open cell, up to `cellCap` 4 a cell. It draws no random numbers. `Game.aphids` steps each tick and saves only when there are clumps, so a game without them saves and plays as before (goldens bit-exact). The builder's `aphids` tool puts a clump on open plane ground; a drag grows the clump it began; undo takes it off, and honeydew already made stays as food. The tray button comes with `ja-nzkg.6`.
+
+**Found on the way.** A map given a quality layer by the builder's food (sugar, crumbs, now honeydew) loaded the layer as a plain object, and the first taste after a reload threw. `qualityLike` (`world.ts`) now gives the map its layer before `Game.load` fills it (`ja-8c5e`).
+
+**Assays,** seeds 1–4, nothing yet steering ants to aphids:
+
+| Id | Result |
+|---|---|
+| B9 `aphidsFound` (60 ants, a clump 75 units off in a corner) | first find a median 9.1 s after it is put down (7.5–15.4). The plume (`ja-nzkg.3`) is measured against this. |
+| B10 `aphidsRenewable` against `aphidsRenewableSugar` (about 37 cells, 300 ants) | food home over 300 s: a median 1,130 (816–1,225) from the clump against 444 (all of it) from the same cells of sugar; ants on the hole–clump line 68 against 4 on a bare line. Passes. |

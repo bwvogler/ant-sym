@@ -25,6 +25,7 @@ export const LABEL: Record<TrayTool, string> = {
   rock: "Rock",
   sugar: "Sugar",
   crumb: "Crumbs",
+  aphids: "Aphids",
   crayon: "Trail crayon",
   rain: "Rain",
 };
@@ -38,6 +39,7 @@ export const PICTURE: Record<TrayTool, string> = {
   rock: "🪨",
   sugar: "🍬",
   crumb: "🍪",
+  aphids: "🌿",
   crayon: "🖍️",
   rain: "🌧️",
 };
@@ -52,6 +54,7 @@ export const GESTURE: Record<TrayTool, "tap" | "drag"> = {
   rock: "tap",
   sugar: "tap",
   crumb: "tap",
+  aphids: "tap",
   crayon: "drag",
   rain: "drag",
 };

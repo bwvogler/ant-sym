@@ -591,6 +591,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "What real ants do when someone changes their world: drawn trails followed for a while, circles left, walls rerouted (or not), sweet food found late, nests dug out again; and how young children use touch screens.",
   },
   {
+    note: "aphids",
+    title: "Ants and aphids",
+    covers:
+      "How ants find aphids (by smell, and by chance), milk them for honeydew, defend them more readily than other ants, eat a few, and leave them when the honeydew stops.",
+  },
+  {
     note: "queens-and-merging",
     title: "Queens and merging",
     covers: "Several queens, adoption, and orphaned colonies merging (not built).",

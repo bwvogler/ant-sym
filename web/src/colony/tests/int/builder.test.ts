@@ -157,6 +157,19 @@ test("crayon lines are saved with the game", () => {
   assert.deepEqual(h.crayons, g.crayons);
 });
 
+test("a map given a quality layer by sugar loads with it, and plays on (the load left it a plain object: ja-nzkg.2)", () => {
+  const g = game(1);
+  const map = g.layers[PLANE] as WorldMap;
+  const [x, y] = find(g, PLANE, OPEN);
+  assert.ok(!map.quality, "the map begins with none");
+  new Builder(g).apply({ tool: "sugar", layer: PLANE, points: [pt(x, y)] });
+  assert.ok(map.quality);
+  const h = game(1);
+  h.load(JSON.parse(JSON.stringify(g.save())));
+  assert.equal(qualityAt(h.layers[PLANE] as WorldMap, x, y), qualityAt(map, x, y));
+  for (let k = 0; k < 30 * 10; k++) h.tick(1 / 30);
+});
+
 test("rain clears every colony's trails and alarm under the cloud, and the crayon cells there; undo puts them back", () => {
   const g = game(1);
   const b = new Builder(g);

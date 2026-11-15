@@ -8,13 +8,14 @@ import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fu
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, foundNest, isSky, mulberry32, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, foundNest, isSky, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
+import { stepAphids, type AphidClump } from "./aphids.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -166,6 +167,8 @@ export interface GameSave {
   flights?: Flight[];
   /** the builder's crayon lines still fading (Game.crayons, builder.ts) */
   crayons?: CrayonLine[];
+  /** the builder's aphid clumps still living (Game.aphids, aphids.ts) */
+  aphids?: AphidClump[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -344,6 +347,8 @@ export class Game {
   regrown = 0;
   /** The builder's crayon lines (builder.ts, ja-kjj8): each kept topped up as it fades; none unless a child drew one. */
   crayons: CrayonLine[] = [];
+  /** The builder's aphid clumps (aphids.ts, ja-nzkg.2): each makes honeydew as it grows and crashes; none unless a child put one down. */
+  aphids: AphidClump[] = [];
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
    * §50: colony policy is hidden until the fungus infects a queen). Never closes again.
@@ -1008,6 +1013,7 @@ export class Game {
   tick(dt: number): void {
     this.time += dt;
     if (this.crayons.length) stepCrayons(this, dt);
+    if (this.aphids.length) stepAphids(this, dt);
     for (const c of this.colonies) c.tick(dt);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
@@ -1214,6 +1220,7 @@ export class Game {
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       flights: this.flights.map((f) => ({ ...f })),
       crayons: this.crayons.map((l) => ({ ...l, cells: [...l.cells] })),
+      ...(this.aphids.length ? { aphids: this.aphids.map((a) => ({ ...a, cells: [...a.cells] })) } : {}),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
       map: encode(map),
@@ -1285,9 +1292,14 @@ export class Game {
     this.revealed = [...(saved.revealed ?? [])];
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
     this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
+    this.aphids = (saved.aphids ?? []).map((a) => ({ ...a, cells: [...a.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
+    qualityLike(this.map, saved.map);
     fillLike(this.map, saved.map);
-    if (world && sw) fillLike(world.curtain, sw.curtain);
+    if (world && sw) {
+      qualityLike(world.curtain, sw.curtain);
+      fillLike(world.curtain, sw.curtain);
+    }
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
     this.colonies.forEach((c, k) => {
       const t = this.colonies[saved.raids[k] ?? -1];

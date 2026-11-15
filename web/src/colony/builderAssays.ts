@@ -10,6 +10,8 @@
 //   B7 noEntryFork a no-entry sign on one branch of a crayon fork: do followers take the other? (Robinson et al. 2005)
 //   B8 tweezers    carriers moved sideways: do they run their old vector before finding home? (report; Wehner & Srinivasan 1981)
 //   B6 fillShaft   dirt poured over the colony's largest chamber: do the ants dig it out? (report; Rajendran et al. 2026)
+//   B9 aphidsFound      a clump of aphids far from the hole: how soon is it first found? (docs/aphids.md, PRD §78)
+//   B10 aphidsRenewable a clump against sugar on the same cells: which brings more home over 5 minutes, and is a trail laid?
 
 import { Builder, type Stroke } from "./builder.ts";
 import type { Game } from "./game.ts";
@@ -497,4 +499,119 @@ export const tweezers: Assay = {
   score: () => ({}),
 };
 
-export const BUILDER_ASSAYS: Assay[] = [crayonLine, wall, rain, lateSugar, crayonRing, fillShaft, noEntryFork, noEntryForkBare, tweezers];
+// ———— Aphids (docs/aphids.md "The mechanic", PRD §78, ja-nzkg.1) ————
+
+/** Where the assays put a clump: up the arena from the hole, as far as B2's pile. */
+const CLUMP = at(50, 22);
+/** A tap and a ring round it: the clump (or the sugar) the aphid assays put down, about 19 cells. */
+const clumpPoints = (o: Pt) => [
+  o,
+  ...[0, 60, 120, 180, 240, 300].map((deg) => ({
+    x: o.x + 2 * Math.cos((deg * Math.PI) / 180),
+    y: o.y + 2 * Math.sin((deg * Math.PI) / 180),
+  })),
+];
+
+/**
+ * Food taken from the map since `base` (foodTotal and foodLeft then): what was added (honeydew, a stroke) less what still
+ * lies. On an arena with no other food, honeydew taken by ants.
+ */
+const taken = (g: Game, base: { total: number; left: number }) => g.map.foodTotal - base.total - (g.map.foodLeft - base.left);
+
+/** B9's clump: a far corner of the arena, about 75 units from the hole, so a few scouts take a while to come by. */
+const FAR = at(15, 15);
+
+/** B9: a clump far from the hole, on bare ground, with few ants out: when is it first found? */
+export const aphidsFound: Assay = {
+  id: "aphidsFound",
+  title: "B9 a clump of aphids far from the hole: how soon is it first found?",
+  target:
+    "with the aphid plume (ja-nzkg.3), sooner than without it, seed for seed, in most seeds (Verheggen et al. 2012: L. niger scouts head toward aphid odour; docs/aphids.md). Report until the plume is built",
+  seconds: 240,
+  spec: (seed) => {
+    let found = NaN;
+    let base: { total: number; left: number } | null = null;
+    return onPlane({
+      seed,
+      seconds: 240,
+      map: () => new Arena(100, 100, true).build([NEST]),
+      game: { antCount: 60, rival: false },
+      events: [
+        strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(FAR) }, (g) => {
+          base = { total: g.map.foodTotal, left: g.map.foodLeft };
+        }),
+      ],
+      probes: [
+        {
+          tick: (g) => {
+            if (Number.isNaN(found) && base && taken(g, base) > 0) found = g.time - 5;
+          },
+          summary: () => ({ firstFind: found }),
+        },
+      ],
+    });
+  },
+  score: () => ({}),
+};
+
+/** B10 and its control: a clump, or the builder's sugar on the same cells, up the arena from the hole. */
+function renewableAssay(tool: "aphids" | "sugar"): Assay {
+  return {
+    id: tool === "aphids" ? "aphidsRenewable" : "aphidsRenewableSugar",
+    title:
+      tool === "aphids"
+        ? "B10 a clump of aphids: more food home over 5 minutes than sugar on the same cells, and a trail to it"
+        : "B10 control: the builder's sugar on the clump's cells",
+    target:
+      tool === "aphids"
+        ? "stored from the clump over 300 s > the sugar control's, seed for seed, in ≥ 8 of 10 seeds; ants on the hole–clump line ≥ 3× those on a bare line off to the side (honeydew renews; recruitment as to food: Mailleux et al. 2000, 2003; docs/aphids.md)"
+        : "report: the control for aphidsRenewable",
+    seconds: 320,
+    spec: (seed) => {
+      const stored: number[] = [];
+      const onLine: number[] = [];
+      const onMirror: number[] = [];
+      // The line from the hole to the clump, and as long a line from the hole off to the side where nothing is: the control.
+      const hole = at(NEST.x, NEST.y);
+      const side = at(NEST.x + 50, NEST.y - 30);
+      const tick1 = everySecond((g) => g.colonies[0]!.stored, stored);
+      const tick2 = everySecond((g) => nearSegment(g, hole, CLUMP, 1.6), onLine);
+      const tick3 = everySecond((g) => nearSegment(g, hole, side, 1.6), onMirror);
+      return onPlane({
+        seed,
+        seconds: 320,
+        map: () => new Arena(100, 100, true).build([NEST]),
+        game: { antCount: 300, rival: false },
+        events: [strokeAt(5, { tool, layer: PLANE, points: clumpPoints(CLUMP) })],
+        probes: [
+          {
+            tick: (g, dt) => (tick1(g, dt), tick2(g, dt), tick3(g, dt)),
+            summary: () => ({
+              stored300: (stored[304] ?? stored[stored.length - 1] ?? 0) - (stored[4] ?? 0),
+              onLine: mean(onLine.slice(120, 300)),
+              onSide: mean(onMirror.slice(120, 300)),
+            }),
+          },
+        ],
+      });
+    },
+    score: () => ({}),
+  };
+}
+export const aphidsRenewable = renewableAssay("aphids");
+export const aphidsRenewableSugar = renewableAssay("sugar");
+
+export const BUILDER_ASSAYS: Assay[] = [
+  crayonLine,
+  wall,
+  rain,
+  lateSugar,
+  crayonRing,
+  fillShaft,
+  noEntryFork,
+  noEntryForkBare,
+  tweezers,
+  aphidsFound,
+  aphidsRenewable,
+  aphidsRenewableSugar,
+];
