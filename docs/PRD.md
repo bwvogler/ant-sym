@@ -5835,19 +5835,19 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
 - **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
-
 ### 69.5 S3b: specimens (ja-mvo9.3, second half)
 The second half of stage 3: a few ants kept to watch and compare, the notebook's specimens.
 - **Pinning.** The ant panel's "Pin as a specimen" keeps the followed ant; "Pinned" unpins it.
   - At most three (`MAX_SPECIMENS`): a fourth replaces the oldest, and a notice names the ant let go.
+  - Each keeps its number (owner, review of #218, D1): the lowest free one of 1 to 3 when pinned. A death or a replacement frees that number; nothing else is renumbered, on the list or the map.
   - An ant is (colony, slot, generation), as a follow is. A specimen that dies leaves the list with a notice ("No. 2, ant #9 of Amber, has died"), checked once a second.
   - Specimens belong to their game: a new game starts with none.
-- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Each row has two lines:
+- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Its header folds the list to one line ("Specimens: 3") and back; on a phone it starts folded while nothing is followed (owner, D2). Each row has two lines:
   - its label (No. 1), the ant and its colony, and how far the fungus is in it ("host", or the share);
   - its mode, whether it carries food, above or below, and its fatigue of the colony's patience.
 
   A row follows its ant, taking the camera to its view. Its × unpins it.
-- **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring.
+- **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring, drawn over them.
 - The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
 - **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.

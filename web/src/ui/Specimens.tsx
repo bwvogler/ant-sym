@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Colony } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
 import { Icon } from "./kit.tsx";
 import { colonyTone } from "./names.ts";
-import { sameAnt, specimenRow } from "./specimens.ts";
+import { sameAnt, type Specimen, specimenRow } from "./specimens.ts";
 
 // The specimens in the inspector (PRD §69.5): the pinned ants side by side, read four times a second, each a row to follow
-// it by. The notebook's look, as the Codex: specimen labels in a serif, the numbers in mono.
+// it by. The notebook's look, as the Codex: specimen labels in a serif, the numbers in mono. Its header folds it to one line
+// (owner, review of #218, D2): on a phone it starts folded while nothing is followed, so it doesn't sit over the map.
 
 export default function Specimens({
   list,
@@ -15,12 +16,20 @@ export default function Specimens({
   onFollow,
   onUnpin,
 }: {
-  list: readonly Followed[];
+  list: readonly Specimen[];
   colonies: readonly Colony[];
   followed: Followed | null;
   onFollow: (f: Followed) => void;
   onUnpin: (f: Followed) => void;
 }) {
+  const phone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
+  const [folded, setFolded] = useState(() => !followed && phone());
+  // On a phone the list folds when the follow ends, so it doesn't sit over the map with nothing followed (D2).
+  const following = followed !== null;
+  useEffect(() => {
+    if (!following && phone()) setFolded(true);
+  }, [following]);
+  const head = useRef<HTMLButtonElement>(null);
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 250);
@@ -28,10 +37,23 @@ export default function Specimens({
   }, []);
   return (
     <section className="mb-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm" aria-label="specimens">
-      <h2 className="font-serif text-[15px] text-fg">Specimens</h2>
-      <ul className="mt-1 flex flex-col gap-0.5">
-        {list.map((f, n) => {
-          const r = specimenRow(colonies, f, n);
+      <h2>
+        <button
+          ref={head}
+          type="button"
+          className="flex w-full items-baseline gap-2 text-left font-serif text-[15px] text-fg"
+          aria-expanded={!folded}
+          onClick={() => setFolded((v) => !v)}
+        >
+          Specimens{folded && <span className="font-mono text-xs text-fg-3">: {list.length}</span>}
+          <span aria-hidden className="ml-auto text-xs text-fg-3">
+            {folded ? "▸" : "▾"}
+          </span>
+        </button>
+      </h2>
+      <ul className="mt-1 flex flex-col gap-0.5" hidden={folded}>
+        {list.map((f) => {
+          const r = specimenRow(colonies, f);
           if (!r) return null;
           const on = followed !== null && sameAnt(followed, f);
           return (
@@ -61,7 +83,10 @@ export default function Specimens({
               <button
                 type="button"
                 className="grid size-6 shrink-0 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg"
-                onClick={() => onUnpin(f)}
+                onClick={() => {
+                  onUnpin(f);
+                  head.current?.focus(); // the row goes with its button: focus to the list's header, not lost (review of #218)
+                }}
                 aria-label={`Unpin ${r.label}`}
               >
                 <Icon name="close" className="size-3.5" />

@@ -9,21 +9,37 @@ import { colonyName } from "./names.ts";
 /** At most this many specimens: a fourth replaces the oldest. */
 export const MAX_SPECIMENS = 3;
 
-export const sameAnt = (a: Followed, b: Followed): boolean => a.k === b.k && a.i === b.i && a.gen === b.gen;
-
-/** The list with `f` pinned: last, and the oldest dropped (and said) when the list was full. Already pinned: unchanged. */
-export function pin(list: readonly Followed[], f: Followed): { list: Followed[]; dropped: Followed | null } {
-  if (list.some((s) => sameAnt(s, f))) return { list: [...list], dropped: null };
-  const full = list.length >= MAX_SPECIMENS;
-  return { list: [...(full ? list.slice(1) : list), f], dropped: full ? list[0]! : null };
+/** A pinned ant and the number it keeps (owner, review of #218, D1): the lowest free one when pinned; nothing renumbers it. */
+export interface Specimen extends Followed {
+  no: number;
 }
 
-export const unpin = (list: readonly Followed[], f: Followed): Followed[] => list.filter((s) => !sameAnt(s, f));
+export const sameAnt = (a: Followed, b: Followed): boolean => a.k === b.k && a.i === b.i && a.gen === b.gen;
+
+/** The lowest number from 1 that no specimen of `list` holds. */
+export function freeNumber(list: readonly Specimen[]): number {
+  let n = 1;
+  while (list.some((s) => s.no === n)) n++;
+  return n;
+}
+
+/**
+ * The list with `f` pinned: last, with the lowest free number, and the oldest dropped (and said) when the list was full,
+ * which frees its number. Already pinned: unchanged.
+ */
+export function pin(list: readonly Specimen[], f: Followed): { list: Specimen[]; dropped: Specimen | null } {
+  if (list.some((s) => sameAnt(s, f))) return { list: [...list], dropped: null };
+  const full = list.length >= MAX_SPECIMENS;
+  const kept = full ? list.slice(1) : [...list];
+  return { list: [...kept, { k: f.k, i: f.i, gen: f.gen, no: freeNumber(kept) }], dropped: full ? list[0]! : null };
+}
+
+export const unpin = (list: readonly Specimen[], f: Followed): Specimen[] => list.filter((s) => !sameAnt(s, f));
 
 /** The specimens still alive, and those gone (dead, or their slot taken by a newborn). */
-export function living(list: readonly Followed[], colonies: readonly Colony[]): { kept: Followed[]; gone: Followed[] } {
-  const kept: Followed[] = [];
-  const gone: Followed[] = [];
+export function living(list: readonly Specimen[], colonies: readonly Colony[]): { kept: Specimen[]; gone: Specimen[] } {
+  const kept: Specimen[] = [];
+  const gone: Specimen[] = [];
   for (const s of list) (followedColony(colonies, s) ? kept : gone).push(s);
   return { kept, gone };
 }
@@ -45,22 +61,22 @@ export interface SpecimenRow {
   patience: number;
 }
 
-export const specimenLabel = (n: number): string => `No. ${n + 1}`;
+export const specimenLabel = (no: number): string => `No. ${no}`;
 
-/** Specimen n's row, or null when the ant is gone. */
-export function specimenRow(colonies: readonly Colony[], f: Followed, n: number): SpecimenRow | null {
-  const c = followedColony(colonies, f);
+/** Specimen s's row, or null when the ant is gone. */
+export function specimenRow(colonies: readonly Colony[], s: Specimen): SpecimenRow | null {
+  const c = followedColony(colonies, s);
   if (!c) return null;
-  const load = c.load[f.i]!;
+  const load = c.load[s.i]!;
   return {
-    label: specimenLabel(n),
-    who: `#${f.i} · ${colonyName(f.k)}`,
-    mode: MODES[c.mode[f.i]!] ?? "?",
-    carrying: c.carrying[f.i] === 1,
+    label: specimenLabel(s.no),
+    who: `#${s.i} · ${colonyName(s.k)}`,
+    mode: MODES[c.mode[s.i]!] ?? "?",
+    carrying: c.carrying[s.i] === 1,
     load: Math.min(1, load),
     host: load >= INFECTED,
-    below: c.layer[f.i] === CURTAIN,
-    fatigue: c.fatigue[f.i]!,
+    below: c.layer[s.i] === CURTAIN,
+    fatigue: c.fatigue[s.i]!,
     patience: c.params.patience,
   };
 }

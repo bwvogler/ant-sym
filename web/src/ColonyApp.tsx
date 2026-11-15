@@ -61,7 +61,7 @@ import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
 import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
 import Specimens from "./ui/Specimens.tsx";
-import { living, pin, sameAnt, specimenLabel, unpin } from "./ui/specimens.ts";
+import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./ui/specimens.ts";
 import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
@@ -112,9 +112,9 @@ export default function ColonyApp() {
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
   // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game.
-  const [pinned, setPinned] = useState<{ token: object; list: Followed[] }>({ token: gameToken, list: [] });
+  const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
   const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
-  const setSpecimens = useCallback((list: Followed[]) => setPinned({ token: gameToken, list }), [gameToken]);
+  const setSpecimens = useCallback((list: Specimen[]) => setPinned({ token: gameToken, list }), [gameToken]);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -304,11 +304,16 @@ export default function ColonyApp() {
   const togglePin = useCallback(
     (f: Followed) => {
       if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
-      const r = pin(specimens, f);
+      // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
+      const r = pin(living(specimens, game.colonies).kept, f);
       setSpecimens(r.list);
-      if (r.dropped) pushToast(`Three specimens at most: ant #${r.dropped.i} of ${colonyName(r.dropped.k)} is unpinned.`, "info");
+      if (r.dropped)
+        pushToast(
+          `Three specimens at most: ${specimenLabel(r.dropped.no)}, ant #${r.dropped.i} of ${colonyName(r.dropped.k)}, is unpinned.`,
+          "info",
+        );
     },
-    [specimens, setSpecimens],
+    [specimens, setSpecimens, game],
   );
   // A specimen that dies leaves the list, with a notice (checked once a second: the rows show nothing once it is gone).
   useEffect(() => {
@@ -318,7 +323,7 @@ export default function ColonyApp() {
       if (!gone.length) return;
       setSpecimens(kept);
       for (const f of gone)
-        pushToast(`${specimenLabel(specimens.indexOf(f))}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info");
+        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info");
     }, 1000);
     return () => clearInterval(t);
   }, [specimens, game, setSpecimens]);

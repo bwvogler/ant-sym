@@ -67,6 +67,7 @@ import { sightOf, type SensedMap } from "./fungusSight.ts";
 import { antTag, badgeParts, nestBadge } from "./badges.ts";
 import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
+import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import type { FieldProbe } from "./lensStore.ts";
 
 export type { FieldProbe };
@@ -123,7 +124,7 @@ interface Props {
   /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
   toolsAt?: string;
   /** the specimens (PRD §69.5): each marked on the map with its label */
-  specimens?: readonly Followed[];
+  specimens?: readonly Specimen[];
   /** the lens is on (PRD §69.3): a mouse over the map reports what is under it, and a click reports it pinned instead of following */
   lens?: boolean;
   /** what is under the pointer, with the lens on (null: the pointer left the map) */
@@ -185,7 +186,7 @@ interface ViewCam {
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
 /** No specimens: one empty list, so the default prop is the same each render. */
-const NO_SPECIMENS: readonly Followed[] = [];
+const NO_SPECIMENS: readonly Specimen[] = [];
 
 /** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
 const ONE_MAP = -1;
@@ -1519,6 +1520,23 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
+      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring, drawn
+      // after these so its tag stays on top (review of #218).
+      for (const s of pinnedRef.current) {
+        const sc = followedColony(colonies, s);
+        if (!sc || (lv >= 0 && sc.layer[s.i] !== lv) || (f && sameAnt(f, s))) continue;
+        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
+        const r = Math.max(7 * d, c.zoom * 1.3);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.setLineDash([3 * d, 3 * d]);
+        ctx.strokeStyle = theme.ink;
+        ctx.lineWidth = 1.5 * d;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const tpx = Math.round(10 * d);
+        pill([{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
+      }
       // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
       // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
       // (ja-rkse, PRD §61).
@@ -1532,22 +1550,6 @@ export default function ColonyField({
         ctx.stroke();
         const tpx = Math.round(11 * d);
         pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
-      }
-      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring.
-      for (const [n, s] of pinnedRef.current.entries()) {
-        const sc = followedColony(colonies, s);
-        if (!sc || (lv >= 0 && sc.layer[s.i] !== lv) || (f && f.k === s.k && f.i === s.i && f.gen === s.gen)) continue;
-        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
-        const r = Math.max(7 * d, c.zoom * 1.3);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.setLineDash([3 * d, 3 * d]);
-        ctx.strokeStyle = theme.ink;
-        ctx.lineWidth = 1.5 * d;
-        ctx.stroke();
-        ctx.setLineDash([]);
-        const tpx = Math.round(10 * d);
-        pill([{ text: `No. ${n + 1}`, fill: theme.ink }], x, y - r - tpx, tpx);
       }
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
       if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);

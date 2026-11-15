@@ -1432,28 +1432,83 @@ try {
   check((await list.getByText("No. 2").count()) === 1, "a second: No. 2");
   await list.getByRole("button", { name: new RegExp(`^No\\. 1 #${ants[0]} `) }).click();
   check((await sp.evaluate(() => window.jevAnts.followed()?.i)) === ants[0], "a row follows its specimen");
+  check(
+    (await sp.evaluate(() => window.jevAnts.view())) === "below",
+    "and takes the camera to its view (it is below) (review of #218, S2)",
+  );
   await list.getByRole("button", { name: "Unpin No. 2" }).click();
   check((await list.getByText("No. 2").count()) === 0, "unpinned");
+  check(await list.evaluate((el) => document.activeElement === el.querySelector("h2 button")), "focus goes to the list's header, not lost");
+  // Numbers are kept (owner, review of #218, D1): ants[1] takes No. 2 again (the lowest free), ants[2] No. 3; the fourth,
+  // ants[3], replaces the oldest (ants[0]) and takes its No. 1; nothing else is renumbered.
   for (const i of ants.slice(1)) {
     await followAnt(i);
     await pinBtn.click();
   }
-  await until(async () => (await sp.getByText(/^Three specimens at most: ant #/).count()) === 1, "the notice of a fourth", 2000, 50);
-  check(
-    (await list.getByRole("listitem").count()) === 3 && (await list.getByText(`#${ants[0]} · Ink`).count()) === 0,
-    "a fourth replaces the oldest",
-  );
-  // A specimen that dies leaves, with a notice; with nothing followed the list stays in the inspector.
-  await sp.getByRole("button", { name: "Stop following" }).click();
-  await sp.evaluate((i) => (window.jevAnts.game.colonies[0].alive[i] = 0), ants[1]);
   await until(
-    async () => (await sp.getByText(/has died: it leaves your specimens/).count()) === 1,
+    async () => (await sp.getByText(new RegExp(`^Three specimens at most: No\\. 1, ant #${ants[0]} of Ink, is unpinned`)).count()) === 1,
+    "the notice of a fourth",
+    2000,
+    50,
+  );
+  const labelOf = (i) => list.getByRole("button", { name: new RegExp(`^No\\. \\d #${i} `) }).evaluate((b) => b.textContent.slice(0, 5));
+  check(
+    (await list.getByRole("listitem").count()) === 3 &&
+      (await labelOf(ants[1])) === "No. 2" &&
+      (await labelOf(ants[2])) === "No. 3" &&
+      (await labelOf(ants[3])) === "No. 1",
+    "a fourth replaces the oldest and takes its number; the others keep theirs",
+  );
+  // A specimen that dies leaves, with a notice naming it; the rest keep their numbers; with nothing followed the list stays.
+  await sp.getByRole("button", { name: "Stop following" }).click();
+  await sp.evaluate((i) => (window.jevAnts.game.colonies[0].alive[i] = 0), ants[2]);
+  await until(
+    async () => (await sp.getByText(new RegExp(`^No\\. 3, ant #${ants[2]} of Ink, has died`)).count()) === 1,
     "the notice of a specimen's death",
     3000,
     50,
   );
-  check((await list.getByRole("listitem").count()) === 2, "it leaves the list, and the list stays with nothing followed");
+  check(
+    (await list.getByRole("listitem").count()) === 2 &&
+      (await list.getByText("No. 3").count()) === 0 &&
+      (await labelOf(ants[1])) === "No. 2",
+    "it leaves the list, the rest keep their numbers, and the list stays with nothing followed",
+  );
+  // The header folds the list to one line and back (owner, D2).
+  const header = list.getByRole("button", { name: /^Specimens/ });
+  await header.click();
+  check(
+    (await header.getAttribute("aria-expanded")) === "false" &&
+      (await list.getByRole("listitem").count()) === 0 &&
+      /: 2/.test(await header.innerText()),
+    "folded: one line, its count",
+  );
+  await header.click();
+  check((await list.getByRole("listitem").count()) === 2, "and open again");
+  // A new game starts with none (S2).
+  await sp.keyboard.press("Control+k");
+  await sp.keyboard.type("Lab and numbers");
+  await sp.keyboard.press("Enter");
+  await sp.getByRole("button", { name: "Restart", exact: true }).click();
+  await until(async () => (await list.count()) === 0, "a new game starts with no specimens", 3000, 50);
+  check(true, "a new game starts with no specimens");
   await sctx.close();
+  // On a phone the list folds when the follow ends (D2).
+  const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const pp = await pctx.newPage();
+  pp.on("pageerror", (e) => errors.push(String(e)));
+  await pp.goto(url);
+  await pp.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  await until(() => pp.evaluate(() => window.jevAnts?.game.landed !== null), "a phone game for the specimens");
+  await pp.getByRole("button", { name: "Pause", exact: true }).tap();
+  await pp.evaluate(() => window.jevAnts.follow(0, window.jevAnts.game.colonies[0].alive.indexOf(1)));
+  await pp.getByRole("button", { name: "Pin as a specimen" }).tap();
+  const plist = pp.getByRole("region", { name: "specimens" });
+  check((await plist.getByRole("listitem").count()) === 1, "on a phone, open while an ant is followed");
+  await pp.getByRole("button", { name: "Stop following" }).tap();
+  await until(async () => (await plist.getByRole("listitem").count()) === 0, "on a phone, folded once nothing is followed", 2000, 50);
+  check((await plist.count()) === 1, "on a phone, folded to one line once nothing is followed");
+  await pctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
