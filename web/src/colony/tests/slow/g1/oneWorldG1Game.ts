@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { game1, runAssay } from "../../experiment.ts";
+import { game1, runAssay } from "../../../experiment.ts";
 
 // One G1 game in a worker thread, for oneWorldG1.test.ts: posts back the held-food figures of one seed.
 const { seed } = workerData as { seed: number };

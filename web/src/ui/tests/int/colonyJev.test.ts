@@ -2,6 +2,7 @@ import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   Colony,
+  CURTAIN,
   localPolicy,
   localStance,
   type Mode,
@@ -13,9 +14,8 @@ import {
   stanceKey,
   fungalKey,
   fungusContext,
-  generateWorld,
+  generateOneWorld,
   mulberry32,
-  OPEN_WORLD,
   Game,
   LEVERS,
   STRAINS,
@@ -27,6 +27,12 @@ import {
 } from "../../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../../shared/jev.ts";
+
+/** A bare colony of n on the curtain of seed 1's one world (S2.3c: on the open top-down map until then). */
+function oneWorldColony(n: number, seed: number): Colony {
+  const w = generateOneWorld(1);
+  return new Colony(w.curtain, { antCount: n }, mulberry32(seed), undefined, undefined, { plane: w.plane, line: w.line });
+}
 
 // The colony's Jev client against a scripted fetch: no server, no key.
 
@@ -108,7 +114,7 @@ afterEach(() => {
 });
 
 function colony(n = 60) {
-  return new Colony(generateWorld(1, OPEN_WORLD), { antCount: n }, mulberry32(9));
+  return oneWorldColony(n, 9);
 }
 
 /** Run the colony for k ticks (the policy is asked inside tick). */
@@ -616,9 +622,9 @@ function scriptAll(fungal: string) {
   return reqs;
 }
 
-/** A small game with Garden painted on the player's nest. */
+/** A small one-world game with Garden painted round the player's royal chamber. */
 function infectedGame() {
-  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
   g.paintSpores(
     g.player.nest.x,
     g.player.nest.y,
@@ -626,6 +632,7 @@ function infectedGame() {
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
+    CURTAIN,
   );
   return g;
 }
@@ -732,8 +739,12 @@ function scriptByDoctrine(answer: (doctrine: string) => string) {
 }
 
 function twoColonies(n = 40) {
-  const map = generateWorld(1);
-  return [new Colony(map, { antCount: n, nest: 0 }, mulberry32(9)), new Colony(map, { antCount: n, nest: 1 }, mulberry32(10))];
+  const w = generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } });
+  const at = { plane: w.plane, line: w.line };
+  return [
+    new Colony(w.curtain, { antCount: n, nest: 0 }, mulberry32(9), undefined, undefined, at),
+    new Colony(w.curtain, { antCount: n, nest: 1 }, mulberry32(10), undefined, undefined, at),
+  ];
 }
 
 const modeRequests = (reqs: (JevRequest & { state: Record<string, unknown> })[]) => reqs.filter((r) => r.state.ants);
@@ -787,22 +798,17 @@ test("each colony its own doctrine: its questions carry its own words, its own c
   assert.deepEqual([...doctrines].sort(), ["Amber's way.", "Ink's way."]);
   assert.equal(j.state.doctrineCached.length, 2);
   assert.ok(j.state.doctrineCached[0]! > 0 && j.state.doctrineCached[1]! > 0);
-  const s: Situation = {
-    mode: "explore",
-    tired: false,
-    foodTrail: "none",
-    homeTrail: "none",
-    alarm: "none",
-    enemy: "none",
-    stance: "forage",
-  };
+  // A situation each colony was asked about (on one world the ants start in the nest: S2.3c picks them from the requests).
+  const askedOf = (doctrine: string) =>
+    Object.values(modeRequests(reqs).find((r) => r.state.doctrine === doctrine)!.state.ants as Record<string, Situation>)[0]!;
   run(a!, 1);
   run(b!, 1);
-  const ea = j.explain(s, 0);
-  const eb = j.explain(s, 1);
-  if (ea.by === "jev") assert.equal(ea.mode, "explore");
-  if (eb.by === "jev") assert.equal(eb.mode, "return", "the second colony is on Jev too, under its own doctrine");
-  assert.ok(ea.by === "jev" || eb.by === "jev", "at least this common situation was met and answered");
+  const ea = j.explain(askedOf("Ink's way."), 0);
+  const eb = j.explain(askedOf("Amber's way."), 1);
+  assert.equal(ea.by, "jev");
+  assert.equal(ea.mode, "explore");
+  assert.equal(eb.by, "jev", "the second colony is on Jev too, under its own doctrine");
+  assert.equal(eb.mode, "return");
 });
 
 test("explain says 'waiting' while the question is in flight", async () => {
@@ -885,7 +891,7 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   j.attach(g.player);
   const asked = g.fungus.asked;
   const other = { ...GARDEN, groomed: true };
-  store.data.set(fungusContext("Stored aim.", g.map.sky ? "side" : "top"), [
+  store.data.set(fungusContext("Stored aim.", "side"), [
     [fungalKey(GARDEN, asked), encodeLevels({}, asked)],
     [fungalKey(other, asked), "9"],
   ]);
@@ -901,7 +907,7 @@ test("a new aim plays the fungus's local rule until Jev answers; the earlier aim
   const g = infectedGame();
   j.attach(g.player);
   const asked = g.fungus.asked;
-  store.data.set(fungusContext("Old aim.", g.map.sky ? "side" : "top"), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
+  store.data.set(fungusContext("Old aim.", "side"), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
   j.attachFungus(g.fungus);
   j.setAim("Old aim.");
   assert.equal(j.explainFungus(GARDEN).by, "jev");

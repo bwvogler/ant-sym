@@ -243,13 +243,16 @@ export interface ColonyParams {
    * ja-7r7x (docs/task-reversion.md, PRD §74): the share of old ants that revert to nursing when they meet no young
    * nestmates at home (each by its own draw: individual thresholds). A reverted ant stays in, keeps to the queen and
    * brood as the young do, works inside at the young's threshold and takes no foraging dig; it goes back to foraging
-   * once it meets young again. 0 = off.
+   * once it meets young again. 0 = off; on (1) by default since ja-7r7x.4.
    */
   revert: number;
   /**
    * ja-638i (docs/larval-feeding.md, PRD §75): an ant's crop, in food units. An ant underground that feels some need fills
    * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
-   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off.
+   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off, the default: at 0.1
+   * (with `revert` 1) no worker starved on assay larvae, but one-world A5 brought home less food (12 of 20 seeds worse) and
+   * larvae seed 19 left 47 larvae waiting (PRD §75, review of #236; ja-638i.4). Without reversion 0.1 is worse than off:
+   * larvae seeds 26 and 30 fell to 71 and 65 workers.
    */
   cropFeed: number;
   /**
@@ -457,7 +460,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   restFetch: 1,
   forageDig: 0,
   owedBeg: 0,
-  revert: 0,
+  revert: 1,
   cropFeed: 0,
   routeStep: 3,
   routeSee: 3,

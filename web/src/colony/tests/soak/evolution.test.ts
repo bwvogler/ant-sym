@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keyX, keyY } from "../../hex.ts";
+import { centreX, centreY, keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../../evolution.ts";
@@ -8,11 +8,11 @@ import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../..
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
 import { hold, LEVERS } from "../../levers.ts";
-import { generateSideWorld, mulberry32, type WorldMap } from "../../world.ts";
+import { mulberry32, type WorldMap } from "../../world.ts";
 import { put } from "../hexmaps.ts";
 import { readFileSync } from "node:fs";
 import type { FungalSituation } from "../../fungalPolicy.ts";
-import { arena } from "../builders.ts";
+import { arena, oneColony, smallOne } from "../builders.ts";
 
 // The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
 // come with growth, the mycelium pays for its spores, a founded colony can get what the first colony got, and the
@@ -80,8 +80,7 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   for (const v of LEVERS) assert.ok(reach[v.id] !== undefined, `${v.id}: some upgrade names it`);
   assert.equal(reach.weapon, 0, "the odour weapon starts held off");
   assert.equal(reach.crown, 0, "and so does crown");
-  const map = generateSideWorld(1); // crown acts only where there is a nest: the top-down menu drops it
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(1));
+  const { map, c } = oneColony(1, { maxAnts: 1 }, undefined, 1); // crown acts only where there is a nest
   c.strain[0] = GARDEN;
   const f = new Fungus(map);
   f.configure({ hide: false, cull: false }, ["weapon", "crown"]); // the player has put both on the menu
@@ -202,7 +201,7 @@ test("the minimum dose is a rate: a clean ant exposed above it is infected at an
 });
 
 test("the game's landing: an evolving fungus roots by the hole, keeps sporulating there, and mutates as it grows", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   assert.ok(f.evolution && f.base.length > 0);
@@ -213,18 +212,20 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
   assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
   // A lab or test landing keeps the strain as listed, with no body.
-  const lab = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
+  const lab = new Game(smallOne(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
   lab.land(0, GARDEN);
   assert.equal(lab.fungus.evolution, null);
   assert.equal(lab.fungus.base.length, 0);
 });
 
 test("a colony the world starts with has nothing a founded one can't get", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
-  const e = g.colonies[1]!.nest.entrance!;
-  const clean = g.colonies[g.addColony({ x: e.x + 40, y: e.y, antCount: 200, odour: 0.5 })]!;
+  // Foundings beyond the line's two ends (one world grows its line from its ends).
+  const holes = g.world!.line.holes;
+  const beyond = (v: { x: number; y: number }, by: number) => ({ x: centreX(v.x, v.y) + by, y: centreY(v.y) });
+  const clean = g.colonies[g.addColony({ ...beyond(holes[0]!, -20), antCount: 200, odour: 0.5 })]!;
   const first = g.colonies[0]!;
   // The same colony: params but identity, a queen, chambers, policies, responses and the game's wiring.
   const own = (c: typeof first) =>
@@ -241,20 +242,25 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   // The fungus: a clean founding gets no patch; one whose queen carries the evolving fungus gets what the landing gave.
   const patches = g.fungus.base.length;
   assert.equal(g.fungus.evolution!.patches, 1);
-  const carried = g.colonies[g.addColony({ x: e.x + 80, y: e.y, antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
+  const carried =
+    g.colonies[g.addColony({ ...beyond(holes[holes.length - 1]!, 20), antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
   assert.equal(carried.queen!.load, 0.4);
   assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
   assert.ok(g.fungus.base.length > patches);
-  const hole = carried.nest.entrance!;
-  assert.ok(
-    g.fungus.base.slice(patches).every((key) => Math.abs(keyX(key) + 0.5 - hole.x) < 8),
-    "by her hole, as the landing is by the first colony's",
-  );
+  // On the plane by her hole, as the landing is by the first colony's: every cell of her patch nearer her hole than any other.
+  const dist = (key: number, c: typeof first) => {
+    const h = c.holeCells[c.params.nest]!;
+    return Math.hypot(keyX(key) - h.px, keyY(key) - h.py);
+  };
+  for (const key of g.fungus.base.slice(patches))
+    for (const other of g.colonies)
+      if (other !== carried) assert.ok(dist(key, carried) < dist(key, other), `cell ${keyX(key)},${keyY(key)}: nearer her hole`);
+  for (const key of g.fungus.base.slice(0, patches)) assert.ok(dist(key, first) < dist(key, carried), "and the landing's by the first");
 });
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {
   const share = (evolve: boolean) => {
-    const g = new Game(generateSideWorld(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
+    const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
     g.land(0, GARDEN, { evolve });
     let most = 0;
     for (let k = 0; k < 30 * 60; k++) {
@@ -273,7 +279,7 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
 });
 
 test("the queen's levels are held too: Stealth decides how far she can hide (PR #43 review, T1)", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   const q = g.colonies[0]!.queen!;
@@ -320,7 +326,7 @@ test("mutations from hosts: load passed on by contact counts, spores picked up f
 
 test("spores a full patch can't hold stay mycelium (PR #43 review, N3)", () => {
   // A ground that holds no spores at all: every spore the mycelium puts out is one it can't lay.
-  const g = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const e = g.fungus.evolution!;
   e.mass = 50; // above what one patch holds: it does not grow, so its mass moves only by spores

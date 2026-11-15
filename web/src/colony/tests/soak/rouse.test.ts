@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony, PLANE } from "../../colony.ts";
+import { PLANE } from "../../colony.ts";
 import { crossDown } from "../../crossing.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 import { DEFAULT_MENU, Fungus, STRAINS, menuFor } from "../../fungus.ts";
@@ -8,7 +8,7 @@ import { Game, gameRng } from "../../game.ts";
 import { encodeLevels, inertLevers } from "../../levers.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import type { Species } from "../../species.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { oneColony } from "../builders.ts";
 
 // ja-rf5.18 (docs/rouse.md, PRD §60.8; design): the fungus's rouse lever. An infected host coming down its shaft counts as a share of a finder to
 // the nestmates waiting at the top (their pace, invite.ts). Inert on a species whose finders don't invite; off the default menu.
@@ -16,8 +16,7 @@ import { generateSideWorld, mulberry32 } from "../../world.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 test("rouse: none, some, strong set the host's share of a finder; off the default menu; inert where finders don't invite", () => {
-  const map = generateSideWorld(1);
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(1));
+  const { map, c } = oneColony(1, { maxAnts: 1 }, undefined, 1);
   c.strain[0] = GARDEN;
   const f = new Fungus(map);
   f.configure({ hide: false, cull: false }, [...DEFAULT_MENU, "rouse"]);
