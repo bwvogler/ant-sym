@@ -86,6 +86,12 @@ test("slow.yml's step runs test:slow's files at its per-file limit, sharded by t
   assert.match(block(slowYml, "G1, seeds 1-10", "slow.yml"), /^\s+working-directory: web$/m);
   // The shards run every slow folder but G1's, which has a job of its own (ja-w7ef.15): together, test:slow's globs.
   assert.deepEqual(globs(g1), ["src/colony/tests/slow/g1/*.test.ts"]);
+  // The file itself, not only the glob: back in slow/, the shards would run it again (review of #240, N2).
+  assert.deepEqual(
+    readdirSync(join(ROOT, "web/src/colony/tests/slow/g1")).filter((f) => f.endsWith(".test.ts")),
+    ["oneWorldG1.test.ts"],
+  );
+  assert.ok(!readdirSync(join(ROOT, "web/src/colony/tests/slow")).includes("oneWorldG1.test.ts"), "G1 is not in the shards' folder");
   assert.deepEqual([...globs(run), ...globs(g1)], globs(script("test:slow")));
   assert.equal(timeout(run), timeout(script("test:slow")));
   assert.equal(timeout(g1), timeout(script("test:slow")));
