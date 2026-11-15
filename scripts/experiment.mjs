@@ -37,7 +37,8 @@
 //
 // merge <file.json ...> joins the --json files of runs over different seeds into one report, as if one run had covered
 // them all (a seed in two files is an error). .github/workflows/assays.yml runs one runner per seed and merges them so;
-// a session reads the table in that workflow's report job log (ja-w7ef.12).
+// a session reads the table in that workflow's report job log (ja-w7ef.12; how to start and read it: the running-assays
+// skill, .claude/skills/running-assays).
 import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";

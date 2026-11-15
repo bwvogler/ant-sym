@@ -1,6 +1,6 @@
 ---
 name: watching-a-game
-description: "Shows what happens in a jev-ants game as events: births, deaths and their cause, mode and stance changes with the situation the policy was asked, the queen, infections, Jev batches. Use whenever you or the user need to know why an ant, colony or the fungus did something, what a game or an assay run actually did, to debug or inspect behaviour, to add logging, or when someone says logs, trace, journal, 'what happened' or 'why did it'. Offline and free. Not for tuning a number (npm run exp's metrics) or live Jev checks (colony-live)."
+description: "Shows what happens in a jev-ants game as events: births, deaths and their cause, mode and stance changes with the situation the policy was asked, the queen, infections, Jev batches. Use whenever you or the user need to know why an ant, colony or the fungus did something, what a game or an assay run actually did, to debug or inspect behaviour, to add logging, or when someone says logs, trace, journal, 'what happened' or 'why did it'. Offline and free. Not for tuning a number over seeds (running-assays) or live Jev checks (colony-live)."
 ---
 
 # Watching a game
