@@ -6239,7 +6239,7 @@ Merging is not delegated: PRs wait for the owner.
 **The mechanic (built, off, setting `revert`).**
 - *Cue:* two senses by contact, each the share of the last minute or so (`YOUNG_TAU`) that one was within a cell:
   - young nestmates met (`youngMet`) below `REVERT_BELOW`;
-  - brood met (`broodMet`) at least `BROOD_MET_MIN`.
+  - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
   A colony with no brood (one at its cap lays none) has no reverting ants. The brood cue was added on the review of #217 (D1, owner, 2026-11-15); the brood floor mark could not serve, as it is laid by ants leaving any brood chamber, brood or not.
 - *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
 - *Ending:* it reverts back when it meets young again.
@@ -6326,7 +6326,7 @@ Merging is not delegated: PRs wait for the owner.
 - The store's floor mark is laid only by ants that have just left a store, and fades with the time since; beyond a few cells from the store there is nothing to follow, and fetchers wander.
 - Crops fill only at the store, so they share that blind spot. The limit is finding the store, not the dose or the queue.
 
-**Measured with task reversion, on main after §71's brood rule (2026-11-15, assay `larvae`, seeds 1–16).** On this main the baseline collapses on two seeds (ja-097s).
+**Measured with task reversion before its brood cue (ddef6b9), on main after §71's brood rule (2026-11-15, assay `larvae`, seeds 1–16).** On this main the baseline collapses on two seeds (ja-097s).
 
 | `revert` | `cropFeed` | Seeds over 8 waiting | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
 |---|---|---|---|---|---|---|---|
@@ -6336,8 +6336,9 @@ Merging is not delegated: PRs wait for the owner.
 | 1 | 0.5 | 2 | 20 | 0 | 0 | 149 | 12,218 |
 
 - **Crops** stop workers starving: hungry ants eat from their own crops and pass food to needier ones.
-- **Reversion** stops larvae starving: old ants come to the brood when the young are gone.
+- **Reversion**, before the brood cue, stopped larvae starving: old ants came to the brood when the young were gone.
 - **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
+
 **With the brood cue (review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 now matches main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never meet any, so they never revert. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. The owner's next call: how an old ant away from the brood should sense it.
 - Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
 

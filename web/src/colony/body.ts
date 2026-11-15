@@ -22,7 +22,7 @@ import {
   feel,
 } from "./hunger.ts";
 import { SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY } from "./royal.ts";
-import { CROP_FEED, CROP_FILL, CROP_OWED, CROP_PASS, EGG_FOOD, QUEEN_STOCK, YOUNG_TAU } from "./tuning.ts";
+import { BROOD_SMELL, CROP_FEED, CROP_FILL, CROP_OWED, CROP_PASS, EGG_FOOD, QUEEN_STOCK, YOUNG_TAU } from "./tuning.ts";
 import { EXPLORE } from "./vocab.ts";
 import { dropFood } from "./world.ts";
 import { clearPellet } from "./pellets.ts";
@@ -181,6 +181,7 @@ export function body(col: Colony, dt: number): void {
   if (revert) {
     youngs.reset();
     broods.reset();
+    // Brood lying in the nest only: an item in a nurse's jaws is on its way somewhere and rarely so for long.
     for (const b of col.brood.items) if (b.held < 0) broods.put(b.x, b.y, 1);
   }
   // Larval feeding by mouth (ja-638i): crops filled at the stores, passed to the needy, fed to larvae.
@@ -322,10 +323,11 @@ export function body(col: Colony, dt: number): void {
           crop[i] += give;
         }
       }
-      // Meeting young nestmates, and brood (ja-7r7x): the share of recent time one was within a cell, read by the old only.
+      // Meeting young nestmates (within a cell) and brood (smelt within BROOD_SMELL cells; ja-7r7x): the share of recent
+      // time one was there, read by the old only.
       if (revert && col.band(i) === 2) {
         col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
-        col.broodMet[i] = col.broodMet[i] + (broods.near(cx, cy) - col.broodMet[i]) * youngStep;
+        col.broodMet[i] = col.broodMet[i] + (broods.near(cx, cy, BROOD_SMELL) - col.broodMet[i]) * youngStep;
       }
     }
     scent[i] = sc;

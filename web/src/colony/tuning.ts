@@ -73,6 +73,12 @@ export const REVERT_BELOW = 0.05;
  * with no brood (one at its cap lays none) has no reverting ants (design threshold; review of #217, D1).
  */
 export const BROOD_MET_MIN = 0.05;
+/**
+ * How far (cells) an old ant at home senses brood for broodMet: brood odour a little way, not only touch (owner,
+ * 2026-11-15, review of #217, D2: at one cell the old ants away from the brood never met it). Design: Temnothorax
+ * workers respond to larval cuticle extracts (Kohlmeier et al. 2018), but no paper read gives a range.
+ */
+export const BROOD_SMELL = 4;
 
 /**
  * Larval feeding by mouth (ja-638i, docs/larval-feeding.md): food an ant takes into its crop a second from a stocked

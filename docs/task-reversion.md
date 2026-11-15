@@ -40,7 +40,7 @@ One setting whose 0 is main bit for bit. All of it is steering and body rules wi
 
 - **Cue (sensed; as built):** two per-ant senses by contact, each the share of the last minute or so (`YOUNG_TAU`) that one was within a cell:
   - `youngMet`: young nestmates (age band 0) met;
-  - `broodMet`: brood met (eggs, larvae, pupae lying in the nest).
+  - `broodMet`: brood met (eggs, larvae, pupae lying in the nest), smelt within `BROOD_SMELL` cells (4, **design**: at one cell the old ants away from the brood never met it, review of #217).
   The brood floor mark can't serve as the brood cue: it is laid by ants leaving any brood chamber, whether or not brood lies there (review of #217).
 - **Reverting:** an old ant (band 2) inside its own nest whose `youngMet` is below `REVERT_BELOW` and whose `broodMet` is at least `BROOD_MET_MIN`: brood, and no younger workers, as in the ant evidence. A colony with no brood (one at its cap lays none) has no reverting ants (owner, 2026-11-15).
 - **Individual thresholds (design):** only a share of the old revert, each by a draw fixed to its slot in the colony (a newborn takes a dead ant's). A colony of all-old ants then keeps foragers. The setting `revert` is that share; 0 is off.

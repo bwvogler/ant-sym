@@ -6,7 +6,7 @@ import { CELL, cellOf } from "../../hex.ts";
 import { NEED_FETCH } from "../../hunger.ts";
 import { worksInside } from "../../nestWork.ts";
 import { fetches } from "../../tunnel.ts";
-import { REVERT_BELOW } from "../../tuning.ts";
+import { BROOD_SMELL, REVERT_BELOW } from "../../tuning.ts";
 import { EXPLORE } from "../../vocab.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { SMALL_SIDE, ageOf } from "../builders.ts";
@@ -145,4 +145,36 @@ test("a reverted ant goes back once it meets young again", () => {
   });
   assert.ok(c.youngMet[0] >= REVERT_BELOW, `met young again: ${c.youngMet[0]}`);
   assert.equal(c.reverts(0), false, "back to foraging");
+});
+
+test("the young gone, an old ant by brood reverts; the brood gone too, it stops (both grids rebuilt each tick)", () => {
+  const c = colony(1, 2);
+  const b = larvaAtHome(c);
+  const away = () => {
+    home(c, 0, 2);
+    home(c, 1, 0);
+    c.x[1] += 200; // the young one kept well out of reach
+  };
+  hold(c, 120, () => {
+    home(c, 0, 2);
+    home(c, 1, 0);
+  });
+  assert.equal(c.reverts(0), false, "a young one beside it");
+  hold(c, 240, away);
+  assert.equal(c.reverts(0), true, "the young gone, the brood still there");
+  b.x += 10; // the larva carried off, out of smell
+  hold(c, 240, away);
+  assert.equal(c.reverts(0), false, "the brood gone too");
+});
+
+test("brood is smelt a few cells off: an old ant BROOD_SMELL cells from a larva, meeting no young, reverts; further off, not", () => {
+  const at = (dx: number) => {
+    const c = colony(1, 1);
+    const b = larvaAtHome(c);
+    b.x += dx;
+    hold(c, 240, () => home(c, 0, 2));
+    return c.reverts(0);
+  };
+  assert.equal(at(BROOD_SMELL), true, "within smell");
+  assert.equal(at(BROOD_SMELL + 6), false, "out of smell");
 });
