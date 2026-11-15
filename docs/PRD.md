@@ -6449,3 +6449,60 @@ Merging is not delegated: PRs wait for the owner.
 - Whether to retire the porters' table once crops carry the brood's food.
 - Reading Cassill & Tschinkel and the 2021 trophallaxis review in full (on blocked hosts).
 
+## 76. One world only, step 2: the assays' baselines on one world (ja-fnd.3.2, 2026-11-14)
+
+Stage 2 of the foundation refactor ([refactor.md](refactor.md#stage-2-one-world-only-owner-2026-11-11)) retires the top-down and side maps; step 2 records each assay's baseline on one world before the arena versions go. The inventory is [one-world-only.md](one-world-only.md) §2. Split into `ja-fnd.3.2.1` (these baselines), `.2` (the lifecycle assays), `.3` (A6 and A13 with the attackers walked by the harness), `.4` (A11 and A12, raids by trail) and `.5` (the gate tests on the one-world twins).
+
+### 76.1 The one-world twins (`ja-fnd.3.2.1`)
+
+`npm run exp -- <assay> --one --seeds 1-20`, one assay at a time, on main at `fbf6415` (after #198 route ends, #201 brood chambers and #214 the tick). This replaces a first run on `9620499`, which #198 and #201 had already moved (review of #211, S1). "§51" is #210's U6b run on seeds 1–10 ("U6b built", §51), the latest before this; the key metric is each assay's own, with its median and worst seed over 1–20.
+
+| assay | mark | seeds 1–10 | seeds 11–20 | §51 (1–10) | key metric: median, worst (seed) | failing seeds |
+|---|---|---|---|---|---|---|
+| A1 bridge | short branch ≥ 80 % | 10/10 | 10/10 | 10/10 | shortShare 0.90, 0.865 (11) | none |
+| A2a twin | busier source ≥ 70 % | 10/10 | 10/10 | 10/10 | majorityShare 0.89, 0.778 (4) | none |
+| A2b richPoor | rich source ≥ 70 % | 9/10 | 8/10 | 9/10 | richShare 0.92, 0.072 (18) | 9, 18, 20 |
+| A3 deplete | crowd < 20 % of peak within 60 s | 10/10 | 10/10 | 10/10 | clearAfter 17 s, 35 s (13) | none |
+| A4 alarm | scatter ≤ 50 %, recover within 60 s | 10/10 | 10/10 | 10/10 | recoverAfter 22 s, 33 s (4) | none |
+| A5 regulate | outside before ≤ ½ × after | **0/10** | 0/10 | 0/10 | outside before ÷ after 1.67, 2.65 (5): more ants out *before* food | all |
+| A5b regulateStop | departures fall by half once food is gone | 9/10 | 9/10 | 9/10 | departsGone 121, 158 (14) | 7, 20 |
+| A6 pass | exchange in the pass ≥ 1.5 × open ground | 5/10 | 7/10 | 5/10 | gain 2.10, 0.80 (18) | 5–9, 16–18 |
+| A9 contact | ≤ 4 lost per 100 food home | 5/10 | 5/10 | 5/10 | lostPer100Food 4.17, 8.04 (7) | 2, 3, 6–8, 12, 13, 16, 18, 19 |
+| A10 faintAlarm | ≥ 2 more ants near a faint alarm | 0/10 | 2/10 | 0/10 | draw 0.65, −0.5 (6) | all but 14, 19 |
+| A11 raidFind | ≥ 1.5 × as many reach the rival with the trail; ≤ 10 % stuck | 10/10 | 10/10 | 10/10 | gain 3.38, 2.33 (12) | none |
+| A12 raidStop | stored on a raid stance ≥ 50 % of forage's | 9/10 | 8/10 | 8/10 | share 0.83, 0.25 (12) | 8, 12, 19 |
+| A8 nestFlow | report only | — | — | — | beyond 0.77, 0.155 (17) | — |
+
+- **Since the first run on `9620499`:** A4 19 → 20/20, A9 8 → 10/20, A5b 19 → 18/20, A8's worst 0.17 → 0.155. A5 seed 1 moved from 1.77 to 2.64 (#198 to 3.11, #201 back to 2.64; review of #211).
+- **Against §51 (1–10):** the same, but A12 9/10 (seed 7 now passes; 8 still fails).
+- **Each failing assay has its bead.** A5: `ja-lp4.6.8` (middle-aged ants forage on the plane unheld by the gate). A6: `ja-lp4.6.5`, and `ja-fnd.3.2.3` (its walked-attacker setup). A9: `ja-lp4.6.4` (one world's foraging yield). A10: `ja-je8`. A12's seeds: `ja-lp4.6.10`.
+
+**The marks (owner, 2026-11-14).** The assays keep their research and design marks as the target and keep reporting pass counts. The gate tests (`soak/assays`, `slow/assays` on seeds 1–2, `ja-fnd.3.2.5`) check the assays that pass against their marks. For the four that fail (A5, A6, A9, A10) they check only that one world gets no worse than today's worst seed here, and move to the real mark when the bead is fixed. Today's worst seeds over 1–20, and seeds 1 and 2:
+
+| assay | guard metric | worst (seed) | seed 1 | seed 2 |
+|---|---|---|---|---|
+| A5 | outside before ÷ after | 2.65 (5) | 2.64 | 1.42 |
+| A6 | gain | 0.80 (18) | 3.30 | 2.82 |
+| A9 | lost per 100 food | 8.04 (7) | 1.87 | 5.90 |
+| A10 | draw | −0.5 (6) | 1.1 | 0.5 |
+
+A5's seed 1 sits at its worst seed's line (2.64 against 2.65): a guard on seed 1 alone has no slack, which `ja-fnd.3.2.5` should weigh.
+
+### 76.2 The lifecycle assays on one world (`ja-fnd.3.2.2`)
+
+`lifecycle`, `lifecycle-signal` and `lifecycle-scent` now also run on a solo one world (`lifecycleOne` in `ONE_ASSAYS`, the same ids; `npm run exp -- --one lifecycle-signal`): `generateOneWorld(seed)`, 600 ants, no rival, Garden landed by the hole at the start, 30 minutes, a queen lever forced in every host as in §50.21. "The daughter's first forager" is now her first ant up on the plane. The side-view versions stay in `ASSAYS` until step 4.
+
+Measured on main at `fbf6415`, as §76.1. Median (min–max) over seeds 1–10; first gyne over the seeds that rear one. Side view: §50.21.
+
+| arm | seeds with a gyne | first gyne | gynes | daughters | first daughter's ants at 30 min | side view: first gyne, gynes, daughters |
+|---|---|---|---|---|---|---|
+| None (dilution only) | 1/10 | 1,715 s (seed 1 only) | 0 (0–1) | 0 | – | never, 0, 0 |
+| Signal damped | 6/10 | 278 s (200–1,711) | 1 (0–5) | 0.5 (0–5) | 23 (4–95) | 169 s, 4 (1–9), 4 (1–5) |
+| Scent damped | 10/10 | 181 s (38–1,711) | 1.5 (1–5) | 1.5 (0–4) | 26 (12–132) | 37 s, 7 (4–11), 5 (3–5) |
+
+- **Confirmed on seeds 11–20** (signal damped): 3/10 seeds rear a gyne, first at 204 s (171–222), gynes 0 (0–2), daughters 0 (0–2), the first daughter's ants at 30 min 40 (25–42). Side view (§50.21, measured then with the free reserve, before #47's fattened alate): first gyne 206 s, gynes 3 (1–7), daughters 3 (1–5).
+- **The fungus reaches the queen** at 43 s (33–101) on every arm and seed.
+- **A daughter's first ant is up on the plane** after her first worker ecloses: medians 513 s against 473 s with the signal damped, 388 s against 373 s with the scent damped.
+- **One world rears far fewer gynes** than the side view did: four seeds in ten rear none with the signal damped (seven in ten on 11–20). The levers still bite, so this is the colony's, not the port's (`ja-lp4.6.12`).
+- **The tick** is 6.0–8.5 ms median (one solo colony of ~880 ants). Each run is 30 minutes of game, about 5 minutes of CPU: `npm run exp -- all --one` now runs these three too, which roughly doubles a full one-world sweep.
+- **First measured on `9620499`** (before #198 and #201): signal 0.5 (0–4) gynes on 5/10 seeds, scent 1.5 (0–5) on 8/10.

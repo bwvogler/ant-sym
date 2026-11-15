@@ -14,6 +14,7 @@ import {
   forage1,
   game1,
   heldProbe,
+  lifecycleOne,
   nestFlowProbe,
   occupancyProbe,
   ONE_ASSAYS,
@@ -377,6 +378,35 @@ test("nestFlowProbe reads the curtain's chambers in one world (A8)", () => {
   g.time = 300;
   probe.tick(g, 1);
   assert.equal(probe.summary(g).beyond, 1, "the food lies past reception, in the royal chamber");
+});
+
+test("L on one world: the three lifecycle arms run a solo one world with the fungus landed by the hole, under the legacy ids", () => {
+  assert.deepEqual(
+    lifecycleOne.map((a) => a.id),
+    ["lifecycle", "lifecycle-signal", "lifecycle-scent"],
+  );
+  for (const a of lifecycleOne) assert.ok(ONE_ASSAYS.includes(a), `${a.id} is in ONE_ASSAYS`);
+  const { game, result } = runGame({ ...lifecycleOne[1]!.spec(1), seconds: 2 });
+  assert.ok(game.world && game.colonies.length === 1, "a solo one world");
+  assert.equal(game.landed?.colony, 0, "the fungus has landed by the first colony's hole");
+  assert.equal(game.player.queen?.signal, 0.4, "the signal arm damps the queen's signal");
+  assert.ok(Number.isNaN(result.metrics["t.daughterOut"]), "no daughter yet, 2 s in");
+});
+
+test("L on one world: a daughter is out only once one of her ants is up on the plane (review of #211, S2)", () => {
+  const spec = lifecycleOne[1]!.spec(1);
+  const { game } = runGame({ ...spec, seconds: 1 });
+  const m = game.colonies[0]!;
+  const nest = m.layers[PLANE]!.nest;
+  const k = game.addColony({ x: nest.x, y: nest.y, antCount: 5, odour: m.nestOdour, mother: 0, reserve: 24 });
+  const d = game.colonies[k]!;
+  d.founding = false;
+  const probe = spec.probes![0]!;
+  probe.tick(game, 1);
+  assert.ok(Number.isNaN(probe.summary(game)["t.daughterOut"]), "every ant of hers in the curtain: not out yet");
+  d.layer[d.alive.indexOf(1)] = PLANE;
+  probe.tick(game, 1);
+  assert.equal(probe.summary(game)["t.daughterOut"], game.time, "one up on the plane: out");
 });
 
 test("raidProbe in one world (A11): reach and stuck on the plane only, a recruit in the curtain is home, the trail read at the hole", () => {
