@@ -2,7 +2,7 @@
 
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
-import { cellKey, inReach } from "./grid.ts";
+import { cellKey, inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
@@ -57,7 +57,13 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
   // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
   if (c.params.invitePace > 0) t.returns = paceReturns(c.params, c.pace[i]);
-  t.raid = raidSmelt(c, i);
+  // t.raid is worked out when a response reads it (Colony.raidOf). Reading it here left the shared CELL on its last sensor
+  // tip, where the callers after touch() go on reading CELL (arrive takes food at CELL): kept as it was, bit for bit.
+  if (c.params.raidGate > 0 && c.entrance === null && c.ph.live("raid")) {
+    const h = c.heading[i] + c.params.sensorAngle;
+    const d = c.params.sensorDistance;
+    cellOf(c.x[i] + Math.cos(h) * d, c.y[i] + Math.sin(h) * d);
+  }
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;
 }
@@ -85,7 +91,8 @@ export function placeOn(c: Colony, i: number): Where {
 
 /**
  * What the sensor in direction (dx, dy) (a unit vector) reads on every channel, into s[slot] (food), s[slot + 3] (home) and
- * s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN.
+ * s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN. Its reach checks share one
+ * search per ant (inReachShared): a caller outside perceive, which resets it, calls freshReach() first.
  */
 export function sense(c: Colony, i: number, dx: number, dy: number, slot: number): void {
   const d = c.params.sensorDistance;
@@ -106,7 +113,7 @@ export function sense(c: Colony, i: number, dx: number, dy: number, slot: number
   // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
   // With scentReach, so is scent: a tip out of reach (another tunnel, behind a wall) reads none (ja-uvhw).
   const hasFood = map.food.get(cx, cy) > 0;
-  const reach = hasFood || c.params.scentReach > 0 ? inReach(map, c.x[i], c.y[i], sx, sy) : true;
+  const reach = hasFood || c.params.scentReach > 0 ? inReachShared(map, c.x[i], c.y[i], sx, sy) : true;
   if (!reach && c.params.scentReach > 0) {
     s[slot] = s[slot + 3] = s[slot + 6] = 0;
     return;
