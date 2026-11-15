@@ -6925,3 +6925,34 @@ Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found wi
 **Cost, the PR's.** No lane, situation field, legend or question changed: no Jev cost. Tick: the plume's rebuild and the honeydew pass show no cost past the noise in B9–B12 (3.0–3.9 ms a tick, as the runs without clumps).
 
 **Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.
+
+## 79. Relay in stages: food reaches the brood by short carries (design, ja-ukac, 2026-11-15)
+
+**Research basis:** [relay-transport.md](relay-transport.md):
+- Harvester seeds are dropped in the top chambers and carried down in stages by a separate group of workers; sand goes up by "transport, deposition, and re-transport" (Tschinkel, Rink & Kwapich 2015, read in full).
+- Leaf-cutter soil pellets were carried over 2 m by up to 12 workers in three groups, the short-distance ones dropping a pellet after a few centimetres (Pielström & Roces 2013, abstract only, **unverified**).
+- Piles of loads may tell a carrier where to put one down: the authors' hypothesis, untested (Tschinkel et al. 2015). No source read covers the store-to-larvae leg.
+
+**The problem (measured, 2026-11-15, `ja-rvli`).** Economy world 3, nudge 1, reversion on, 2,000–2,700 s: 201 carries started and 198 were delivered (median 30 s), so delivery works. Only about 17 a minute start, against the 25–58 a minute the larvae are owed, because a carry starts only when an idle ant is within two cells of a stocked chamber and the store is a tunnel's dead end. Larvae seeds 22 and 16 and this game are `ja-rvli`'s remaining failures (PRD §75).
+
+**Decisions.**
+- Relay in stages (owner, 2026-11-15), chosen over chamber smell as a cue and over fixing crops first.
+- Proposed, needs the owner: D1 the M1 ablation first; D2 floor loads (M2) over hand-over by contact (M3); D3 brood odour (`ja-k4k.15`, built off) as the direction cue, and turning it on.
+
+**The mechanic.** M0 the supply probe (no behaviour change), M1 the pick-up reach as a setting (`portReach`, an ablation), M2 floor loads carried in short legs (`loadLeg`, design). Off is main bit for bit. See the note.
+
+**Play.** Loads moved ant to ant down the tunnels, larvae on time. Risks: loads lost to the economy, a jam, invisibility.
+
+**Assays and targets.** `larvae` seeds 1–32, economy's 16 games, one-world A5 seeds 1–20. Target (`ja-rvli`): no seed above 8 larvae waiting over 120 s, nobody starved, food stored and food brought home not worse by the worst seed.
+
+**Cost (estimated).** None in Jev: body and steering rules, no situation field.
+
+**Beads.**
+- ja-ukac: the epic.
+- ja-ukac.1: research (store-to-larvae leg).
+- ja-ukac.2: the supply probe.
+- ja-ukac.3: the pick-up reach ablation.
+- ja-ukac.4: floor loads.
+- ja-rvli closes when the gate in ja-ukac.4 passes, or when the ablation shows reach alone is enough.
+
+**Still open.** Whether reach alone ends `ja-rvli`; `LEG` and `PICK_LOAD`; how harvesters feed larvae from the seed chambers.
