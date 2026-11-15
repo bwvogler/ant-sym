@@ -494,7 +494,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   // field (exact as-is: × 1, nothing leaked).
   // Which trail, and how much, are the trail and trailRate responses.
   const tt = touch(col, i, toEnemy !== null, mode, item);
-  const trail = resp.trail(tt);
+  const trail = resp.trail(tt, col.antDraw(i));
   if (trail !== "none") {
     const laid =
       p.deposit *

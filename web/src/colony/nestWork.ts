@@ -203,7 +203,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       }
     }
-    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"))) return false;
+    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) return false;
     col.carrying[i] = 0;
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
@@ -329,7 +329,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
       if (to < 0) to = royal;
       if (to < 0) return;
-      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"))) return;
+      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"), col.antDraw(i))) return;
       b.held = i;
       if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
       b.chamber = -1;
@@ -361,7 +361,7 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
   if (outside ? Math.abs(cx - col.entranceCol) > MIDDEN_NEAR : col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
   for (const k of col.corpses)
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
-      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"))) return;
+      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"), col.antDraw(i))) return;
       k.held = i;
       clearPellet(col, i);
       col.corpse[i] = 1;

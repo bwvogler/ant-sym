@@ -1,7 +1,7 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { legendOf } from "./schema.ts";
-import { weigh } from "./weighted.ts";
+import { type AntDraw, pickFor, weigh, weightedValid } from "./weighted.ts";
 import {
   type LaneWords,
   MODES,
@@ -234,8 +234,11 @@ export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANC
   return `stance-v${words.version}-${hash(words.legend + JSON.stringify(stanceQuestion("c0", words.criteria)) + doctrine.trim())}`;
 }
 
-/** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 11;
+/**
+ * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
+ * responses no longer apply. 12: kept with Jev's probabilities (readResponse, ja-m7rr), where 11 kept a boolean or a bare choice.
+ */
+export const RESPONSE_BRAIN_VERSION = 12;
 
 export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. ",
@@ -404,21 +407,46 @@ export function cacheContexts(doctrine: string): Record<"mode" | "stance" | Resp
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
 export type ResponseAnswer = boolean | Carry | TrailKind | Contact | Leave;
-const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
+
+/** The answers each response hook's question allows; `get` and `drop` are nouls, kept as "true" and "false". */
+export const RESPONSE_OPTIONS: Record<ResponseHook, readonly string[]> = {
+  get: ["true", "false"],
+  drop: ["true", "false"],
+  carry: CARRY,
+  contact: CONTACT,
+  leave: LEAVE,
+  trail: ["food", "home", "none"],
+};
 
 /**
- * A response from a reply, or null when it is missing or not one of the hook's answers (the local response covers
- * it). `get` and `drop` are nouls: yes strictly above ½, so exactly 0.5 is no.
+ * A response from a reply as the caches keep it, or null when it is missing or not one of the hook's answers (the local
+ * response covers it). Kept with Jev's probabilities (weighted.ts, ja-m7rr), as the mode is: a choice as `weigh` keeps it
+ * (`fight=0.62,flee=0.38`); a noul (`get`, `drop`) is itself the probability of yes, kept as `true=0.9,false=0.1` with the
+ * likelier first (exactly ½ is no, as before), or `true=1` when certain.
  */
-export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): ResponseAnswer | null {
+export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): string | null {
   const a = answers[`${id}_${hook}`];
   if (!a) return null;
-  if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
+  if (hook === "get" || hook === "drop") {
+    if (a.type !== "noul" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1) return null;
+    return weigh(String(a.noul > 0.5), { true: a.noul, false: 1 - a.noul }, RESPONSE_OPTIONS[hook]);
+  }
   if (a.type !== "choice") return null;
-  if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
-  if (hook === "contact") return (CONTACT as readonly string[]).includes(a.choice) ? (a.choice as Contact) : null;
-  if (hook === "leave") return (LEAVE as readonly string[]).includes(a.choice) ? (a.choice as Leave) : null;
-  return TRAILS_LAID.includes(a.choice) ? (a.choice as TrailKind) : null;
+  return RESPONSE_OPTIONS[hook].includes(a.choice) ? weigh(a.choice, a.probabilities, RESPONSE_OPTIONS[hook]) : null;
+}
+
+/** Whether a kept answer is one a hook's question could have given (every option one it allows). */
+export function validResponse(hook: ResponseHook, answer: string): boolean {
+  return weightedValid(answer, (c) => RESPONSE_OPTIONS[hook].includes(c));
+}
+
+/**
+ * The response a kept answer gives an ant: drawn with its `draw` under this hook and situation `key` (weighted.ts pickFor), or
+ * with no draw Jev's own answer; `get` and `drop` as booleans.
+ */
+export function responseOf(hook: ResponseHook, key: string, answer: string, draw?: AntDraw): ResponseAnswer {
+  const a = pickFor(answer, draw, `${hook}|${key}`);
+  return hook === "get" || hook === "drop" ? a === "true" : (a as ResponseAnswer);
 }
 
 /**
@@ -432,12 +460,13 @@ const CONTACT_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "alarm", "odds"]);
 const RAIDER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "raid"]);
 const FORAGER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "returns", "crowd"]);
 
-/** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
-export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
+/** Cached response answers per hook, keyed by responseKey (readResponse's form): what scripts/colony-live.mjs saves and the experiments replay. */
+export type ResponseCache = Partial<Record<ResponseHook, Record<string, string>>>;
 
 /**
- * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. `onLookup`, if
- * given, hears every lookup (hook, and whether the cache had it): the replay's hit rate.
+ * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. An answer with Jev's
+ * probabilities is drawn from with the ant's draw (responseOf). `onLookup`, if given, hears every lookup (hook, and whether
+ * the cache had it): the replay's hit rate.
  */
 export function responsesFromAnswers(
   cache: ResponseCache,
@@ -448,11 +477,12 @@ export function responsesFromAnswers(
   for (const hook of RESPONSE_HOOKS) {
     const table = cache[hook];
     if (!table) continue;
-    const local = base[hook] as (t: Touch) => ResponseAnswer;
-    (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
-      const a = table[responseKey(hook, t)];
+    const local = base[hook] as (t: Touch, draw?: AntDraw) => ResponseAnswer;
+    (over as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
+      const key = responseKey(hook, t);
+      const a = table[key];
       onLookup?.(hook, a !== undefined);
-      return a ?? local(t);
+      return a === undefined ? local(t, draw) : responseOf(hook, key, a, draw);
     };
   }
   return responses({ ...base, ...over });

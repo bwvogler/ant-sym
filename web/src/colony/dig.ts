@@ -477,7 +477,7 @@ export function pickPlane(self: Colony, i: number, cx: number, cy: number, enemy
     }
     if (!steep) return false;
   }
-  if (!self.responses.get(touch(self, i, enemy, self.mode[i], "none", "soil"))) return false;
+  if (!self.responses.get(touch(self, i, enemy, self.mode[i], "none", "soil"), self.antDraw(i))) return false;
   if (!takePlane(map, cx, cy)) return false;
   self.pellet[i] = 1;
   self.soil[i] = fill ? SOIL_FILL : SOIL_LOOSE;

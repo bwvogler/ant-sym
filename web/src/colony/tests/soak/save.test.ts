@@ -153,6 +153,7 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "diedHot",
     "diedHungry",
     "diedOld",
+    "drawSalt",
     "eaten",
     "finds",
     "flights",

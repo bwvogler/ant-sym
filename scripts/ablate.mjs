@@ -38,7 +38,7 @@ const top = Number(opt("top", "0"));
 const match = opt("match", undefined);
 
 const { localPolicy, localStance, topOf } = await import("../web/src/colony/index.ts");
-const { localResponses } = await import("../web/src/colony/index.ts");
+const { localResponses, responseOf } = await import("../web/src/colony/index.ts");
 
 const cache = JSON.parse(readFileSync(file, "utf8"));
 const outDir = join(root, "experiments", "out", "ablate", `${basename(file, ".json")}-${opt("assay", "game")}-${opt("seconds", "300")}`);
@@ -96,10 +96,12 @@ for (const [k, v] of Object.entries(cache.stances ?? {})) {
 }
 for (const [hook, table] of Object.entries(cache.responses ?? {}))
   for (const [k, v] of Object.entries(table)) {
+    // Kept with Jev's probabilities too (ja-m7rr): its own answer, undrawn, is what differs from the local rule, or not.
     const l = local.response(hook, k);
-    if (l !== v) {
+    const top = responseOf(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (hook), k, v);
+    if (l !== top) {
       const f = k.split("|");
-      add(`${hook}: ${hook === "get" ? `offered ${f[5]}` : `carrying ${f[1]}`} ${l} → ${v}`, `responses.${hook}`, k);
+      add(`${hook}: ${hook === "get" ? `offered ${f[5]}` : `carrying ${f[1]}`} ${l} → ${top}`, `responses.${hook}`, k);
     }
   }
 

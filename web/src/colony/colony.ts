@@ -24,7 +24,7 @@ import {
   PLANE,
   CURTAIN,
 } from "./vocab.ts";
-import type { Draw } from "./weighted.ts";
+import { type AntDraw, type Draw, unitOf } from "./weighted.ts";
 import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
@@ -515,6 +515,35 @@ export class Colony {
     "temperature",
     { get: () => this.params.sampleTemp },
   ) as Draw;
+  /**
+   * What makes the response draws this game's (antDraw): a uniform from the colony's rng, taken the first time a response is
+   * drawn; −1 until then, so a game that never meets a weighted response draws nothing more than it did (the golden masters).
+   */
+  drawSalt = -1;
+  /** the ant antDraw is handing out draws for */
+  #drawAnt = 0;
+  readonly #antDraw: AntDraw = Object.defineProperty(
+    (salt: string): number => {
+      if (this.drawSalt < 0) this.drawSalt = this.rng();
+      const i = this.#drawAnt;
+      // Its own clock: an ant draws afresh every `reroll` seconds, each ant at its own phase (not the whole colony at once).
+      const at = `${this.drawSalt}|${i}|${this.gen[i]}`;
+      const r = this.params.reroll;
+      const epoch = r > 0 ? Math.floor(this.time / r + unitOf(at)) : 0;
+      return unitOf(`${at}|${epoch}|${salt}`);
+    },
+    "temperature",
+    { get: () => this.params.sampleTemp },
+  ) as AntDraw;
+
+  /**
+   * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
+   * situation while the ant holds it, until its next `reroll`. One object for every ant, so asking costs nothing per step.
+   */
+  antDraw(i: number): AntDraw {
+    this.#drawAnt = i;
+    return this.#antDraw;
+  }
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
   s = new Float64Array(9);
 
@@ -1207,7 +1236,7 @@ export class Colony {
     // (One world, ja-web: at the gate at the top of its shaft too, where the stance is the ant's own.)
     const own = this.entrance === null || this.line !== null;
     const asked = this.params.raidGate > 0 && own && this.stanceOf(i) === "raid" ? FIGHT : mode;
-    const answer = this.responses.leave(touch(this, i, enemy, asked, "none"));
+    const answer = this.responses.leave(touch(this, i, enemy, asked, "none"), this.antDraw(i));
     // "raid" goes at raidScout: scouts are few (behaviour MR 5.2), and their trail brings the rest.
     const rate = leaveRate(this.params, answer);
     if (!(this.rng() < 1 - Math.exp(-rate * dt))) return false;
