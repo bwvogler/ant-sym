@@ -6282,3 +6282,144 @@ Merging is not delegated: PRs wait for the owner.
 - the gestures on a real phone and tablet with the children (the owner's);
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
+
+## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
+
+**Research basis:** [task-reversion.md](task-reversion.md):
+- In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
+- With every young worker removed, old *Temnothorax longispinosus* moved inside the nest and cared for brood about as often as the young had (Kohlmeier et al. 2018).
+- In *Solenopsis invicta* micro-colonies, tasks were reassigned within 5 minutes of removing the nurses, depending on the kind of brood (Starkey & Tamborindeguy 2023).
+- Honey bees revert in all-old colonies even without brood (Huang & Robinson 1996, abstract, **unverified**).
+- Workers recognise nestmates' tasks by cuticular hydrocarbons in *Pogonomyrmex* (Greene & Gordon 2003, abstract, **unverified**); recognising a young nurse by contact is **design**.
+
+**The problem (measured, §70).** Larvae still owed their growth food send nothing until they are hungry, and old ants answer the brood's need only by touch at `THETA_OLD`, and nothing brings them to the brood. When a colony's founders age as one cohort, there is a stretch with no young ants at all, and larvae wait beside food. Over `economy.test`'s 16 hour-long games (worlds 1–4 × nudges 0–3), 3 games had more than 8 larvae waiting at once (worst 19); with the foraging dig on (`forageDig: 120`), 15 games (worst 54). The begging fix (`owedBeg`) only moved luck around: the beg is felt only by touch and nobody was beside the larvae (ja-rvli).
+
+**Decisions.**
+- Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
+- The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
+
+**The mechanic (built, off, setting `revert`).**
+- *Cue:* two senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells):
+  - young nestmates met (`youngMet`) below `REVERT_BELOW`;
+  - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
+  A colony with no brood (one at its cap lays none) has no reverting ants. The brood cue was added on the review of #217 (D1, owner, 2026-11-15); the brood floor mark could not serve, as it is laid by ants leaving any brood chamber, brood or not.
+- *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
+- *Ending:* it goes back to foraging when it meets young again, or when the brood is gone (`broodMet` below `BROOD_MET_MIN`).
+- *Only a share of the old* revert, each by a draw fixed to its slot in the colony (a newborn takes a dead ant's), the setting `revert`; 0 = off, main bit for bit.
+
+**Assays and targets.**
+- Assay `larvae` lands first: `economy.test`'s `hour()` as an assay. It records the peak of larvae waiting over 120 s beside enough food in each of 16 games, with workers alive and born, starved workers, food stored and food home as guards.
+- **Target:** no game above 8 (`ja-rvli`'s acceptance), food home not worse by the worst game. Then the same with `forageDig: 120` (`ja-16rp.5`).
+
+**Cost (estimated).** None in Jev: body and steering, no situation field. CPU: one per-cell count of the young, and one leaky count per ant.
+
+**Beads.**
+- ja-7r7x: the epic.
+- ja-7r7x.1: assay `larvae`.
+- ja-7r7x.2: the young-met sense.
+- ja-7r7x.3: reversion, off.
+- ja-7r7x.4: tune and turn it on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Measured (assay `larvae`, seeds 1–16, 2026-11-14).** The most larvae waiting over 120 s beside enough food, per seed. Bound 8.
+
+| `revert` | `owedBeg` | Seeds over 8 | Worst | Workers starved (all seeds) | Food stored (sum) |
+|---|---|---|---|---|---|
+| 0 (main) | 0 | 3 | 38 | 14 | 12,284 |
+| 0.25 | 0 | 4 | 49 | 19 | 12,328 |
+| 0.5 | 0 | 6 | 30 | 1 | 12,337 |
+| 1 | 0 | 6 | 24 | 2 | 12,246 |
+| 0 | 0.15 | 3 | 27 | 0 | 12,319 |
+| 0 | 0.3 | 7 | 30 | 17 | 12,276 |
+| 1 | 0.15 | 9 | 29 | 0 | 12,334 |
+| 1 | 0.3 | 4 | 41 | 10 | 12,276 |
+
+- No setting beats main: every one has 3–9 seeds over the bound, with no trend. Reversion and begging both happen, and the larvae still wait.
+- In a failing seed (10, `revert` 1), 10–15 young ants are alive throughout, so nobody reverts. Larvae wait in three brood chambers with no food in them, while 300+ food lies in the store. Only 1–3 ants are carrying food at a time. The bottleneck is carrying food from the store to the brood chambers, not who is beside the brood.
+
+**Traced (seed 10, `owedBeg` 0.15, minute samples from 2,600 to 3,100 s).**
+- Every waiting larva lies in one brood chamber, and porters do deliver there, at 7–30 food a minute. The larvae there are owed 25–58 food, so they fall behind; few starve (3 larvae over the 16 seeds on main), they wait.
+- Porters start only within two cells of a stocked store. Here all 300+ food lies in a single store of 3 cells at a tunnel's end.
+- Up to 54 ants feel enough need to fetch, and most can read the store's mark, but at any sample none are at the store: they queue on the way.
+- More fetchers (reversion, begging) join the same queue, so neither moves the assay. The limit is getting food out of a small store, not who is by the brood.
+
+**Still open.**
+- How food should get from the stores to the brood faster: bigger or more stores, porters carrying more, or nurses feeding larvae by mouth from their own crops (trophallaxis) rather than only from food lying in the chamber. The last is a new mechanic, with research first.
+- The share of old ants that can revert (owner's call; no measured share).
+- What ends a reversion (not measured in any paper read).
+- Reading the *Pheidole dentata* papers.
+
+## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, off, ja-638i, 2026-11-15)
+
+**Research basis:** [larval-feeding.md](larval-feeding.md):
+- Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
+- In *Camponotus sanctus*, food brought in by foragers spreads mouth to mouth through the colony within an hour (Greenwald, Segre & Feinerman 2015, read in full):
+  - foragers unload about half their crop per nest visit;
+  - some inner workers keep what they receive, others relay it on.
+
+**The problem (traced, §74).** Larvae are fed only from food lying in their chamber, and porters bring it a unit at a time, starting only beside a stocked store. In the traced seed all 300+ food lay in one 3-cell store at a tunnel's end. Fetchers queued on the way, and porters delivered 7–30 food a minute against the 25–58 the larvae were owed.
+
+**Decisions.**
+- Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
+
+**The mechanic (built, off, setting `cropFeed`, 0 = main bit for bit).**
+- *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
+- *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
+- *Unchanged:* porters and their table stay for now.
+- *Design numbers:* the cap (the setting `cropFeed`), `CROP_FILL`, `CROP_PASS`, `CROP_FEED` and `CROP_OWED`.
+
+**Assays and targets.**
+- Assay `larvae` (§74), seeds 1–16, confirmed on 17–32.
+- **Target:** no seed above 8 larvae waiting, no worker starved, food stored not worse by the worst seed. Then with `forageDig: 120` (ja-16rp.5) and the two-colony game.
+
+**Cost (estimated).** None in Jev: body rules, no situation field. CPU: a pass over touching pairs underground each tick, like sharing by mouth today.
+
+**Beads.**
+- ja-638i: the epic.
+- ja-638i.1: crops (fill and pass).
+- ja-638i.2: nurses feed larvae.
+- ja-638i.3: tune and turn on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Built, off (`cropFeed`), and a first look (2026-11-15).**
+- With crops of 0.5 on three seeds that fail on main, crops barely fill: at most about 4 food is ever in crops, and no crop is ever full.
+- Seed 14 is no better (40 waiting against 38 on main). Seed 5 collapsed: 57 workers left and 32 larvae starved, against 38 waiting on main.
+- Tracing seed 14 corrects §74's reading. The ants feeling enough need to fetch are mostly 11–20+ cells from the store, and they stay there: they are not queueing.
+- The store's floor mark is laid only by ants that have just left a store, and fades with the time since; beyond a few cells from the store there is nothing to follow, and fetchers wander.
+- Crops fill only at the store, so they share that blind spot. The limit is finding the store, not the dose or the queue.
+
+**Measured with task reversion before its brood cue (ddef6b9), on main after §71's brood rule (2026-11-15, assay `larvae`, seeds 1–16).** On this main the baseline collapses on two seeds (ja-097s).
+
+| `revert` | `cropFeed` | Seeds over 8 waiting | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 (main) | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 0 | 0.5 | 3 | 61 | 0 | 27 | 49 | 12,267 |
+| 1 | 0 | 1 | 23 | 38 | 0 | 87 | 12,218 |
+| 1 | 0.5 | 2 | 20 | 0 | 0 | 149 | 12,218 |
+
+- **Crops** stop workers starving: hungry ants eat from their own crops and pass food to needier ones.
+- **Reversion**, before the brood cue, stopped larvae starving: old ants came to the brood when the young were gone.
+- **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
+
+**With the brood cue by touch, one cell (b6e33c7, review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 matched main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never met any, so they never reverted. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. How an old ant away from the brood should sense it was the owner's D2 call, below.
+
+**With brood smelt within `BROOD_SMELL` (4) cells (owner, D2, 2026-11-15), same seeds.**
+
+| `revert` | `cropFeed` | Seeds over 8 | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 (main) | 0 | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 1 | 0 | 0 | 6 | 17 | 0 | 125 | 12,292 |
+| 1 | 0.5 | 1 | 14 | 0 | 0 | 122 | 12,291 |
+
+- Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
+- Adding crops ends worker starvation too, but one seed goes over the bound (14).
+- Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
+- Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+
+**Still open.**
+- Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).
+- How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
+- The design numbers (owner's call after the sweep).
+- Whether to retire the porters' table once crops carry the brood's food.
+- Reading Cassill & Tschinkel and the 2021 trophallaxis review in full (on blocked hosts).
+

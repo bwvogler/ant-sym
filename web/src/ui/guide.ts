@@ -509,6 +509,16 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "Whether ants dig to reach food, and a digging bout for foragers who come home empty (built, off for now).",
   },
   {
+    note: "task-reversion",
+    title: "Task reversion",
+    covers: "Whether old foragers go back to nursing when the young are gone, and what tells them (built, off for now).",
+  },
+  {
+    note: "larval-feeding",
+    title: "Larval feeding",
+    covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (built, off for now).",
+  },
+  {
     note: "activation",
     title: "Activation",
     covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake.",

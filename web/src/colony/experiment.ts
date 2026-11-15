@@ -11,7 +11,7 @@ import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
+import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
@@ -1086,6 +1086,65 @@ export const pockets: Assay = {
 };
 
 /**
+ * slow/economy.test's map: the tests' small side map (256 × 160) with one nest and 0.3 of its food, about the full
+ * game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
+ */
+export function economyMap(seed: number): WorldMap {
+  const map = generateSideWorld(((seed - 1) % 4) + 1, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
+  let total = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      const v = map.food.get(x, y) * 0.3;
+      map.food.set(x, y, v);
+      total += v;
+    }
+  map.foodTotal = map.foodLeft = total;
+  return map;
+}
+
+/** Workers and larvae starved by the end, and births, of the first colony. */
+function starvedProbe(): Probe {
+  return {
+    tick() {},
+    summary(game) {
+      const c = game.player;
+      return { diedHungry: c.diedHungry, broodStarved: c.broodStarved, diedOld: c.diedOld };
+    },
+  };
+}
+
+/**
+ * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §74): slow/economy.test's hour as an assay.
+ * A colony of 110 on that test's map; its founders age as one cohort, so for a stretch it has no young ants and its
+ * larvae are fed only if old ants come to them. `starved` is the most larvae at once waiting over 120 s, unfed, with
+ * food enough for them in the nest (nestFlowProbe's measure, sampled every 30 s). Target: no seed above 8, the
+ * economy test's bound and ja-rvli's acceptance; workers starved, workers alive and food stored are the guards.
+ */
+export const larvae: Assay = {
+  id: "larvae",
+  title: "Larvae fed when the young are gone: the most larvae left waiting beside food in an hour",
+  target:
+    "no seed above 8 larvae waiting over 120 s beside enough food (slow/economy.test, ja-rvli); no worker starved; workers alive and food stored not worse",
+  seconds: 3600,
+  spec: (seed) => ({
+    seed,
+    map: economyMap,
+    seconds: 3600,
+    game: { antCount: 110, rival: false },
+    probes: [nestFlowProbe(), starvedProbe()],
+  }),
+  score: (r) => ({
+    waiting: r.metrics.starved as number,
+    ants: r.metrics["you.ants"] as number,
+    births: r.metrics["you.births"] as number,
+    stored: r.metrics["you.stored"] as number,
+    diedHungry: r.metrics.diedHungry as number,
+    broodStarved: r.metrics.broodStarved as number,
+    pass: (r.metrics.starved as number) <= 8 && r.metrics.diedHungry === 0 ? 1 : 0,
+  }),
+};
+
+/**
  * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
  * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
  * worker ecloses and first goes out. `arm` forces one of the fungus's queen levers in every host from the start, so
@@ -1187,6 +1246,7 @@ export const ASSAYS: Assay[] = [
   gameTop,
   nestFlow,
   pockets,
+  larvae,
   lifecycle,
   lifecycleSignal,
   lifecycleScent,

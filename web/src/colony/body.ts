@@ -3,7 +3,7 @@
 import type { Colony } from "./colony.ts";
 import { antResets } from "./ants.ts";
 import type { ColonyParams } from "./params.ts";
-import { isFed, LARVA } from "./brood.ts";
+import { foodOf, isFed, LARVA } from "./brood.ts";
 import { SOIL_DUG } from "./grid.ts";
 import { CELL, cellOf, discOffsets, hexDistance } from "./hex.ts";
 import {
@@ -11,6 +11,8 @@ import {
   ADULT_DRAIN_OUT,
   EAT_BELOW,
   ENERGY_PER_FOOD,
+  LARVA_ENERGY_PER_FOOD,
+  NEED_FETCH,
   PASS,
   QUEEN_BEG,
   QUEEN_WAIT,
@@ -20,7 +22,7 @@ import {
   feel,
 } from "./hunger.ts";
 import { SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY } from "./royal.ts";
-import { EGG_FOOD, QUEEN_STOCK } from "./tuning.ts";
+import { BROOD_SMELL, CROP_FEED, CROP_FILL, CROP_OWED, CROP_PASS, EGG_FOOD, QUEEN_STOCK, YOUNG_TAU } from "./tuning.ts";
 import { EXPLORE } from "./vocab.ts";
 import { dropFood } from "./world.ts";
 import { clearPellet } from "./pellets.ts";
@@ -80,6 +82,12 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
     col.carrying[i] = 0;
     col.porter[i] = 0;
     col.portTo[i] = -1;
+  }
+  if (col.crop[i] > 0) {
+    // The food in its crop dies with it (ja-638i).
+    col.eaten += col.crop[i];
+    col.inCrops -= col.crop[i];
+    col.crop[i] = 0;
   }
   if (col.carrying[i]) dropFood(col.map, col.x[i], col.y[i], 1, col.quality[i]);
   col.antCell(i);
@@ -166,7 +174,22 @@ export function dropBrood(col: Colony, i: number, atX = NaN, atY = NaN): void {
  */
 export function body(col: Colony, dt: number): void {
   const ch = col.map.chambers;
-  const { felt, donors, energy, scent, scentSum, perceived } = col;
+  const { felt, donors, energy, scent, scentSum, perceived, youngs } = col;
+  // Task reversion (ja-7r7x): where the young are, so each old ant at home senses whether it meets any.
+  const revert = col.params.revert > 0 && col.queen !== null;
+  const broods = col.broods;
+  if (revert) {
+    youngs.reset();
+    broods.reset();
+    // Brood lying in the nest only: an item in a nurse's jaws is on its way somewhere and rarely so for long.
+    for (const b of col.brood.items) if (b.held < 0) broods.put(b.x, b.y, 1);
+  }
+  // Larval feeding by mouth (ja-638i): crops filled at the stores, passed to the needy, fed to larvae.
+  const cap = col.params.cropFeed;
+  const crops = cap > 0 && col.queen !== null && !!ch;
+  const crop = col.crop;
+  const cropDonors = col.cropDonors;
+  if (crops) cropDonors.reset();
   felt.reset();
   donors.reset();
   scentSum.reset();
@@ -200,6 +223,14 @@ export function body(col: Colony, dt: number): void {
     const cy = CELL[1];
     const under = col.under[i] === 1;
     let e = energy[i] - (under ? ADULT_DRAIN : ADULT_DRAIN_OUT) * dt;
+    if (e < EAT_BELOW && crop[i] > 0) {
+      // Hungry, it eats from its own crop first (ja-638i).
+      const bite = Math.min(crop[i], (1 - e) / ENERGY_PER_FOOD);
+      crop[i] -= bite;
+      col.inCrops -= bite;
+      col.eaten += bite;
+      e += bite * ENERGY_PER_FOOD;
+    }
     if (e < EAT_BELOW && under && ch) {
       const o = discOffsets(2)[cy & 1] as Int16Array;
       for (let k = 0; k < o.length; k += 2) {
@@ -223,14 +254,32 @@ export function body(col: Colony, dt: number): void {
     }
     energy[i] = e;
     if (!under) continue;
+    if (revert && col.band(i) === 0) youngs.put(cx, cy, 1);
     scentSum.add(cx, cy, scent[i]);
     if (queenHere && hexDistance(cx, cy, qx, qy) <= 1) touching++;
     felt.put(cx, cy, Math.max(PASS * col.feltLast[i], adultBegOf(e)));
     if (e > SHARE_ABOVE) donors.put(cx, cy, i, energy);
+    if (crops) {
+      // Feeling some need, it fills its crop from a stocked store or reception within reach.
+      if (col.need[i] >= NEED_FETCH && crop[i] < cap) {
+        const o = discOffsets(2)[cy & 1] as Int16Array;
+        for (let k = 0; k < o.length; k += 2) {
+          const c = ch!.list[ch!.at(cx + o[k], cy + o[k + 1])];
+          if (!c || c.colony !== col.params.nest || (c.role !== "store" && c.role !== "reception") || c.food <= 0) continue;
+          const take = Math.min(CROP_FILL * dt, cap - crop[i], c.food);
+          col.stock(c, -take);
+          crop[i] += take;
+          col.inCrops += take;
+          break;
+        }
+      }
+      if (crop[i] > 0) cropDonors.put(cx, cy, i, crop);
+    }
   }
   // The queen's scent (ja-lo8.9, royal.ts): it fades; underground it moves toward the mean the ants within one cell
   // carry, and the ants touching her share her supply, × her signal.
   const fade = Math.exp(-dt / SCENT_FADE);
+  const youngStep = 1 - Math.exp(-dt / YOUNG_TAU);
   const share = 1 - Math.exp(-dt / SCENT_SHARE);
   let supply = 0;
   if (q && q.alive && queenHere) {
@@ -265,11 +314,45 @@ export function body(col: Colony, dt: number): void {
         }
       }
       now = felt.near(cx, cy);
+      // Mouth to mouth (ja-638i): feeling need, it takes from the fullest crop it touches, if that nestmate feels less.
+      if (crops && col.need[i] >= NEED_FETCH && crop[i] < cap) {
+        const d = cropDonors.near(cx, cy, crop);
+        if (d >= 0 && d !== i && crop[d] > crop[i] && col.need[d] < col.need[i]) {
+          const give = Math.min(CROP_PASS * dt, (crop[d] - crop[i]) / 2, cap - crop[i]);
+          crop[d] -= give;
+          crop[i] += give;
+        }
+      }
+      // Meeting young nestmates (within a cell) and brood (smelt within BROOD_SMELL cells; ja-7r7x): the share of recent
+      // time one was there, read by the old only.
+      if (revert && col.band(i) === 2) {
+        col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
+        col.broodMet[i] = col.broodMet[i] + (broods.near(cx, cy, BROOD_SMELL) - col.broodMet[i]) * youngStep;
+      }
     }
     scent[i] = sc;
     col.feltLast[i] = now;
     col.need[i] = feel(col.need[i], now, dt);
   }
+  // Nurses feed larvae by mouth (ja-638i, Cassill & Tschinkel 1995: small doses, more often for a hungrier larva): a larva
+  // that begs, or is still owed the food it grows on, is fed from the fullest crop within a cell, to its energy first.
+  if (crops)
+    for (const b of col.brood.items) {
+      if (b.stage !== LARVA || b.held >= 0) continue;
+      const strength = Math.max(begOf(b.energy), isFed(b) ? 0 : CROP_OWED);
+      if (strength <= 0) continue;
+      const d = cropDonors.near(b.x, b.y, crop);
+      if (d < 0 || crop[d] <= 0) continue;
+      const lack = Math.max(0, (1 - b.energy) / LARVA_ENERGY_PER_FOOD);
+      const take = Math.min(crop[d], CROP_FEED * strength * dt, foodOf(b) - b.fed + lack);
+      if (take <= 0) continue;
+      const toEnergy = Math.min(take, lack);
+      b.energy += toEnergy * LARVA_ENERGY_PER_FOOD;
+      col.eaten += toEnergy;
+      b.fed += take - toEnergy;
+      crop[d] -= take;
+      col.inCrops -= take;
+    }
 }
 
 /** Workers age and die of it (the colony's life cycle; a colony with no queen runs it only if its species is `mortalWithoutQueen`). */
