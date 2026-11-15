@@ -329,7 +329,7 @@ export class Builder {
     return true;
   }
 
-  /** The ants the tweezers moved that are not home, dead or undone yet (the page draws their way home). Read only. */
+  /** The moved ants not home, dead or undone at the last watch() (it prunes them once a second: check). Read only. */
   moved(): readonly Readonly<MovedAnt>[] {
     return this.#moved;
   }

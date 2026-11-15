@@ -138,6 +138,16 @@ test("dead, it ends as lost", () => {
   assert.equal(traces.traces[0]!.end, "lost");
 });
 
+test("its slot reborn, it ends as lost, not home (review of #238, N1)", () => {
+  const { c, i, b, to, traces } = setUp();
+  assert.ok(b.moveAnt(0, i, to.x, to.y));
+  traces.update(0);
+  c.gen[i] = (c.gen[i]! + 1) >>> 0; // died and born again in its slot, underground
+  c.layer[i] = CURTAIN;
+  traces.update(500);
+  assert.equal(traces.traces[0]!.end, "lost");
+});
+
 test("a long walk is thinned, keeping where it began and where it is", () => {
   const { c, i, b, to, traces } = setUp();
   assert.ok(b.moveAnt(0, i, to.x, to.y));
