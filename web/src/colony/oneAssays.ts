@@ -2,6 +2,7 @@
 // ONE_ASSAYS, which also reruns the arena assays on the plane, is in experiment.ts.
 
 import { type Colony, HOLE_SIGHT, type HoleCell, LIFESPAN, PI_DRIFT, PLANE, planeMoundReach } from "./colony.ts";
+import { piSpanOf } from "./homing.ts";
 import { MODES } from "./vocab.ts";
 import { Game } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
@@ -82,7 +83,7 @@ export const S1_MOUND = 1000;
  * (generateOneWorld(seed)), S1_PER_TRIP old carriers of the player per trip length T in S1_TRIPS are set down at t = 0
  * with food, homing, their vector as a trip of T out of their own hole leaves it: odoSurf = T, each drift part drawn as
  * the game draws it at the hole (Gaussian, σ = PI_DRIFT/√2, so the miss is σ = 0.1/√2 × T per axis). Each stands at its
- * vector's end (the hole + T × drift: the search's origin), so its search begins there; a draw whose end is off the plane
+ * vector's end (the hole + T × drift, or with piErrorLaw 1 + piSpanOf(T out) × drift: the search's origin), so its search begins there; a draw whose end is off the plane
  * (within 2 of an edge), in rock or in a pocket of open ground walled off from the hole is drawn again. Every other ant is young (stays in), with no scouts, and a carrier home is made young
  * too, so the carriers search alone. The player's mound starts as the game would have heaped S1_MOUND pellets.
  * Per trip (`t400.home120` …): the share home (down its own hole) within 120 s and within 600 s, the
@@ -133,6 +134,8 @@ export const search1: Assay = {
       c.loadState({ fields: {}, private: { heaped: encode(S1_MOUND) } });
       for (let i = 0; i < n; i++) {
         const T = S1_TRIPS[Math.floor(i / S1_PER_TRIP)];
+        // A trip of T straight out: T walked, T out (piErrorLaw 1 scales the drift by the distance out).
+        const span = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, T, T);
         let dx = 0;
         let dy = 0;
         let bx = 0;
@@ -140,8 +143,8 @@ export const search1: Assay = {
         for (;;) {
           dx = (gauss() * PI_DRIFT) / Math.SQRT2;
           dy = (gauss() * PI_DRIFT) / Math.SQRT2;
-          bx = hx + T * dx;
-          by = hy + T * dy;
+          bx = hx + span * dx;
+          by = hy + span * dy;
           if (bx < 2 || by < 2 || bx > xMax || by > yMax) continue;
           cellOf(bx, by);
           if (joined[CELL[0] + CELL[1] * w]) break;
@@ -155,6 +158,7 @@ export const search1: Assay = {
         c.mode[i] = MODES.indexOf("return");
         c.heading[i] = rng() * 2 * Math.PI;
         c.odoSurf[i] = T;
+        c.reachSurf[i] = T;
         c.driftSurf[i] = dx;
         c.driftSurfY[i] = dy;
       }
@@ -340,6 +344,7 @@ export const forage1: Assay = {
         c.mode[i] = MODES.indexOf("explore");
         c.heading[i] = rng() * 2 * Math.PI;
         c.odoSurf[i] = 3;
+        c.reachSurf[i] = 3;
         c.driftSurf[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
         c.driftSurfY[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
         // The find: a straight walk out to the spot, with a drift of its own, as the game draws one at the hole.
@@ -347,7 +352,8 @@ export const forage1: Assay = {
         const dy = (gauss() * PI_DRIFT) / Math.SQRT2;
         // Where its hole was believed to be on that trip, the plane's nest plus its drift: the find's offset from it.
         const nest = plane.nests[c.params.nest] as Nest;
-        const odo = Math.hypot(sx - hx, sy - hy);
+        const out = Math.hypot(sx - hx, sy - hy);
+        const odo = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, out, out);
         rememberAt(c, i, sx - (nest.x + odo * dx), sy - (nest.y + odo * dy));
       }
     };
@@ -571,6 +577,7 @@ export const route1: Assay = {
         c.mode[i] = MODES.indexOf("explore");
         c.heading[i] = Math.atan2(oy - hy, ox - hx);
         c.odoSurf[i] = 3;
+        c.reachSurf[i] = 3;
         c.driftSurf[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
         c.driftSurfY[i] = (gauss() * PI_DRIFT) / Math.SQRT2;
         lastX[i] = ox;

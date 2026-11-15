@@ -6715,3 +6715,88 @@ Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defen
 
 - Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
+
+## 78. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
+
+**Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
+- *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
+- Between-ant SD about 16 % after 10 m (Pfeffer, Wahl & Wolf 2020, full text).
+- Uncertainty grows like √distance (Heinze, Narendra & Cheung 2018, full text).
+- Search width follows distance out, not the path's tortuosity (Merkle & Wehner 2010, **unverified**).
+
+**The problem (measured, `ja-lp4.14`).** The plane's error was the odometer × one drift a trip (`PI_DRIFT` 0.1): linear in the path, and fighting, defending and winding all added. Defence is gated by the vector (`homeDistPlane` ≤ `homeGround`, Knaden & Wehner 2004; Bollig et al. 2026), so ants far out after long winding paths believed themselves home and defended there. G1 seeds 1–10 on main: 41 defenders died, a median 55 cells from their hole (88 % more than 20 out).
+
+**The law** (`piErrorLaw` 1). The same two drift draws a trip; they are multiplied by `PI_SPAN_GAIN` × √(`piErrorAt` × reach) instead of the odometer, reach (`reachSurf`) being the farthest the ant has walked, straight, from its own hole this trip. The median miss is `PI_MISS_AT` (0.25) × √(`piErrorAt` × reach).
+- **Sourced:** the √ (Heinze 2018; Merkle 2006's 5 → 20 m), the 25 % (Merkle 2006), distance out rather than path (Merkle & Wehner 2010).
+- **Design:** `piErrorAt` 50 cells for 5 m (the map keeps ratios: 2.5–20 m for the game's 25–200-cell trips); the farthest point as "distance out" for a winding path; reach counted in every mode but the walk home, as the odometer is.
+- **Fighting and defending** add only by taking the ant further out than it has been.
+- **Draws:** unchanged in number and order. Off (0) is main bit for bit: the goldens, and G1 seed 3's per-tick hash over 120 s against `5a646196`.
+- **Not built:** the distance shortfall (Sommer & Wehner 2004), the path-shape bias (Müller & Wehner 1988), the food vector's error, the side view.
+- **Cost:** no situation field, legend or question changes: $0 an hour. One `hypot` a step on the plane while law 1 is on, one `sqrt` a belief.
+
+**The vector's miss in G1** (`scripts/lab/pi-error.mjs`; each ant's turn for home, by its reach out that trip; median miss / reach, 90th percentile in brackets; seeds 1–10, 600 s):
+
+| reach out (cells) | 20–30 | 40–60 | 80–120 | 160–240 |
+|---|---|---|---|---|
+| law 0 (main) | 13 % (37 %) | 16 % (57 %) | 17 % (46 %) | 16 % (31 %) |
+| law 1 | 33 % (61 %) | 26 % (46 %) | 18 % (33 %) | 14 % (25 %) |
+| the law's median | 35 % | 25 % | 18 % | 12.5 % |
+| sources (×10 cm) | — | 25 % | 25 %, ~19 % | 12 % |
+
+Law 1 matches the sources' shape; law 0 is flat in the median with a long tail (90th percentile 57 % at 50 out, from long winding paths). Seeds 11–20 give the same within 2 points.
+
+**G1** (seeds 1–10, then 11–20; both colonies at the law; `scripts/lab/pi-error.mjs`, a read-only probe, one game a call):
+
+| | law 0, 1–10 | law 1, 1–10 | law 0, 11–20 | law 1, 11–20 |
+|---|---|---|---|---|
+| most held over 120 s, worst seed | 6 | 3 | 4 | 4 |
+| #183's guard: seeds within 2 (none ≥ 10 in any) | 6/10 | 8/10 | 4/10 | 8/10 |
+| food carried down, median seed (both colonies) | 4,641 | 4,824 | 5,049 | 4,922 |
+| food, the weakest colony | 1,754 (s2) | **1,532 (s7)** | 1,333 (s19) | **1,220 (s19)** |
+| births, median seed | 740 | 736 | 765 | 716 |
+| ants lost, all seeds | 1,653 | 1,558 | 1,933 | 1,449 |
+| ants lost, worst seed | 399 | 361 | 349 | 243 |
+| defenders killed | 41 | 16 | 65 | 4 |
+| their distance from the hole, median (90th pct) | 55 (88) | 25 (38) | 59 (89) | 20 (30) |
+
+**Other assays** (one world, seeds 1–10, both colonies at the law):
+- **S1** (lost carriers set down at the vector's end of a straight trip of T, so law 1 gives larger misses at short trips: 17.7 against 8.3 cells at T = 100). Home within 600 s, median [worst]:
+
+  | T | law 0, 1–10 | law 1, 1–10 | law 0, 11–20 | law 1, 11–20 |
+  |---|---|---|---|---|
+  | 100 | 100 % [100] | 100 % [92.5] | 100 % [100] | 100 % [92.5] |
+  | 200 | 100 % [95] | 98.8 % [87.5] | 100 % [90] | 97.5 % [82.5] |
+  | 400 | 96.2 % [72.5] | 92.5 % [67.5] | 95 % [85] | 93.8 % [80] |
+  | 600 | 87.5 % [77.5] | 93.8 % [70] | 87.5 % [70] | 88.7 % [67.5] |
+
+  Median time home at T = 200: 3.7 → 28 s. The search, tuned to misses of 8 % of a straight trip, finds 25 % misses more slowly.
+- **A13 `defendHome`:** pass 3/10 → 4/10; stored, worst seed 151 → 159; `vsNone` worst 0.57 → 0.73.
+- **A6 `pass`:** pass 3/10 both, the same failing seeds; exchange median 0.86 → 0.90.
+- **R1:** pass 6/10 both, the same seeds.
+- **`--one all`:** see 78.1.
+
+**Decision: built, off.** By the worst seed law 1 is no worse on G1's guard (better: 8/10 within 2 on both seed sets), A13, A6 and R1, and it matches the sources. It is worse on two things: the weakest colony's food (−13 % on 1–10, −8 % on 11–20) and S1's short trips (92.5 % home at T = 100 and 82.5–87.5 % at 200, against 100 % and 90–95 %). So `piErrorLaw` stays 0 and the owner decides. If it goes on, S1's short-trip searches are the place to look (the search starts at `SEARCH_START` and widens by `SEARCH_GROW_2D` whatever the vector's own σ; `searchLoops` scales by σ but is off).
+
+**Beads.** `ja-lp4.19` (this). The owner's choices: the default; `piErrorAt` (50, design; 500 if 1 cell is read literally as a body length, which puts the miss at 79 % at 50 cells out); whether fights should blur the vector more than walking (no source found).
+
+### 78.1 Every one-world assay, law 0 against law 1 (seeds 1–10)
+
+Both colonies at the law, offline, run one assay and seed a process (`runAssay` with `{ colony, rival }` overrides; `--set colony.` alone would set only the first colony). `lifecycle-signal` and `lifecycle-scent` ran on seeds 1–5 only (each a 1,800 s game; the session's time ran out). G1 is above. Pass counts, failing seeds in brackets:
+
+| moved | law 0 | law 1 | the worst seed |
+|---|---|---|---|
+| A9 `contact` | 5/10 | 2/10 | lost per 100 food 8.04 → 7.23 (better); median 3.86 → 4.45 |
+| D2 `d2` (desert invitation) | 8/10 | 6/10 | rate after 0.038 → 0.0075 |
+| B2 `wall` | 3/10 | 1/10 | stored 722 → 543; share after the wall, median 0.24 → 0.11 |
+| A2b `richPoor` | 9/10 | 8/10 | rich share 0.098 → 0.089 (seed 9 fails both) |
+| D5 `d5` (desert heat, two days) | 6/10 | 9/10 | stored 638 → 440 |
+| A12 `raidStop` | 8/10 | 10/10 | stored 906 → 1,693 |
+| `noEntryFork` | 9/10 | 10/10 | |
+| A13 `defendHome` | 3/10 | 4/10 | stored 151 → 159 |
+| `lifecycle` | 0/10 | 0/10 | stored 2,904 → 3,100; most held 12 → 4 |
+| `lifecycle-signal` (1–5) | 0/5 | 0/5 | stored 3,752 → 3,622; most held 12 → 4 |
+| `lifecycle-scent` (1–5) | 0/5 | 0/5 | stored 3,769 → 3,717; most held 12 → 6 |
+
+The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` (10/10); `regulateStop` 9/10; `r1` 6/10; `pass` 3/10; `s1`, `regulate`, `faintAlarm`, `f1`, `d1` 0/10. No `pass` metric (reported only): `open`, `rain`, `lateSugar`, `tweezers`, `crayonRing`, `fillShaft`, `noEntryForkBare`, `nestFlow`, `d3`, `d4`. `d2c` and `f1` are bit-identical (no ant homes on the plane by its vector there; F1's planted find reads the law, but 30 s is too short to differ).
+
+**Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.

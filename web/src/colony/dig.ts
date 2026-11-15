@@ -20,7 +20,7 @@ import {
 } from "./tuning.ts";
 import { FAINT, PLANE } from "./vocab.ts";
 import { OPEN, dropFood, fillCell, groundTop, heapMound, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
-import { fromHomePlane } from "./homing.ts";
+import { fromHomePlane, piSpan } from "./homing.ts";
 import { touch } from "./sense.ts";
 import { dropBrood } from "./body.ts";
 import { clearPellet, markMidden, markMiddenPlane } from "./pellets.ts";
@@ -488,7 +488,7 @@ export function pickPlane(self: Colony, i: number, cx: number, cy: number, enemy
   if (fill) self.looseDown++;
   else {
     // Away from where its vector says home is, farther out by LOOSE_SPREAD on average.
-    const odo = self.odoSurf[i];
+    const odo = piSpan(self, i);
     const bx = self.nest.x + odo * self.driftSurf[i] + self.carriedX[i];
     const by = self.nest.y + odo * self.driftSurfY[i] + self.carriedY[i];
     self.spoilA[i] = Math.atan2(self.y[i] - by, self.x[i] - bx);
