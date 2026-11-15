@@ -5,8 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/ant-sym/pr-preview/pr-251/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Jev Ants</title>
-    <script type="module" crossorigin src="/ant-sym/pr-preview/pr-251/assets/index-BS9TpzX0.js"></script>
-    <link rel="stylesheet" crossorigin href="/ant-sym/pr-preview/pr-251/assets/index-yaVn_wmq.css">
+    <script>
+      // The player's theme, before the first paint (ui/theme.ts keeps the same key; ui/tests/theme.test.ts holds them equal).
+      try {
+        var t = localStorage.getItem("jevants.theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="/ant-sym/pr-preview/pr-251/assets/index-CLDu4vf2.js"></script>
+    <link rel="stylesheet" crossorigin href="/ant-sym/pr-preview/pr-251/assets/index-CCAf6ECk.css">
   </head>
   <body>
     <div id="root"></div>
