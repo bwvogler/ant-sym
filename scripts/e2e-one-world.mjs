@@ -38,6 +38,9 @@
 //  14. notices (PRD §69.6), at 390 px by real touch: the bell at the top right; a small drag slides a toast back, a swipe
 //     takes it away, a hold outlives its time; the bell counts it, lists it, clears the count, hides the field's toasts;
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
+//  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair (by
+//     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
+//     paused (off while playing); each tab; l closes it.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -736,8 +739,14 @@ try {
       const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
       if (!panel || bars.length !== 1) return null;
       const b = bars[0].getBoundingClientRect();
+      // Its max-height is relative to the stage (calc and %), so resolve it in px with a probe beside it.
+      const probe = document.createElement("div");
+      probe.style.cssText = `position:absolute;height:${getComputedStyle(panel).maxHeight}`;
+      panel.parentElement.appendChild(probe);
+      const longest = probe.getBoundingClientRect().height;
+      probe.remove();
       return {
-        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        panelBottom: Math.round(panel.getBoundingClientRect().top + longest) /* at its longest */,
         barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
       };
     });
@@ -991,16 +1000,17 @@ try {
     await dp.evaluate(() => window.jevAnts.game.colonies.every((c) => !c.layers[0].ph.live("food") && !c.layers[0].ph.live("home"))),
     "no food or home trail on the plane",
   );
-  // Details is Settings → Lab and numbers now (PRD §69).
+  // The world's settings are Lab mode's World tab now (Settings → Lab mode; PRD §69.6).
   await dp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Settings", exact: true }).click();
-  await dp.getByRole("button", { name: "Lab and numbers", exact: true }).click();
-  const det = dp.getByRole("dialog", { name: "Details" });
+  await dp.getByRole("button", { name: "Lab mode", exact: true }).click();
+  const det = dp.getByRole("region", { name: "lab" });
+  await det.getByRole("tab", { name: "World" }).click();
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(
     (await det.getByRole("button", { name: "Codex: trails" }).count()) === 0,
-    "Details: no link to the trail entries it lacks (review of #144, S1)",
+    "the Lab's World: no link to the trail entries it lacks (review of #144, S1)",
   );
-  await det.getByRole("button", { name: "Close Details" }).click();
+  await det.getByRole("button", { name: "Close the Lab" }).click();
   await dp.getByRole("button", { name: "Codex", exact: true }).click();
   const learn = dp.getByRole("dialog", { name: "Codex" });
   await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });
@@ -1217,11 +1227,11 @@ try {
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   await lp.keyboard.press("Control+k");
   await pal.waitFor({ timeout: 3000 });
-  await lp.keyboard.type("lab and");
+  await lp.keyboard.type("lab mode");
   await lp.keyboard.press("Enter");
-  await lp.getByRole("dialog", { name: "Details" }).waitFor({ timeout: 3000 });
-  check((await lensCard.count()) === 0, "a palette command (Lab and numbers) closes the pinned card");
-  await lp.getByRole("button", { name: "Close Details" }).click();
+  await lp.getByRole("region", { name: "lab" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "a palette command (Lab mode) closes the pinned card");
+  await lp.getByRole("button", { name: "Close the Lab" }).click();
   // The lens off and on again starts afresh: no old pinned card (N8).
   await lp.mouse.click(hole.x, hole.y);
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
@@ -1601,8 +1611,9 @@ try {
   check((await list.getByRole("listitem").count()) === 2, "and open again");
   // A new game starts with none (S2).
   await sp.keyboard.press("Control+k");
-  await sp.keyboard.type("Lab and numbers");
+  await sp.keyboard.type("Lab mode");
   await sp.keyboard.press("Enter");
+  await sp.getByRole("region", { name: "lab" }).getByRole("tab", { name: "World" }).click();
   await sp.getByRole("button", { name: "Restart", exact: true }).click();
   await until(async () => (await list.count()) === 0, "a new game starts with no specimens", 3000, 50);
   check(true, "a new game starts with no specimens");
@@ -1701,6 +1712,90 @@ try {
   check(tb2.y > 100 && tb2.y + tb2.height < tray.y, `while building, a notice sits under the HUD, above the tray (${Math.round(tb2.y)})`);
   await nctx2.close();
 
+  // ——— 15. Lab mode (PRD §69.7): a workbench under the map; history charts, a step control, the game's numbers ———
+  console.log("15. Lab mode");
+  const bctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lbp = await bctx2.newPage();
+  lbp.on("pageerror", (e) => errors.push(String(e)));
+  await lbp.goto(url);
+  await lbp.getByLabel("world seed").fill(String(SEED));
+  await lbp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lbp.evaluate(() => (window.jevAnts?.game.time ?? 0) > 4), "a game a few seconds in, for the Lab", 20_000, 100);
+  const canvasH = () =>
+    lbp
+      .locator("canvas")
+      .first()
+      .evaluate((c) => c.getBoundingClientRect().height);
+  const fullH = await canvasH();
+  await lbp.locator("canvas").first().focus();
+  await lbp.keyboard.press("l");
+  const bench = lbp.getByRole("region", { name: "lab" });
+  await bench.waitFor({ timeout: 3000 });
+  await until(async () => (await canvasH()) < fullH * 0.7, "the map shares the screen with the Lab", 3000, 50);
+  check(true, `the map shares the screen with the Lab (${Math.round(fullH)} → ${Math.round(await canvasH())} px)`);
+  // The history: four charts, one line a colony where it is per colony, and a readout under the pointer.
+  const livingFig = bench.getByRole("figure", { name: "Living ants", exact: true });
+  await livingFig.waitFor({ timeout: 3000 });
+  check((await bench.getByRole("figure").count()) === 4, "four history charts");
+  check((await livingFig.locator("svg path").count()) === 2, "a line for each colony");
+  const livingBox = await livingFig.locator("svg").boundingBox();
+  await lbp.mouse.move(livingBox.x + livingBox.width * 0.5, livingBox.y + livingBox.height * 0.5);
+  check(/Ink[\s\S]*Amber/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the crosshair reads out every line");
+  await lbp.mouse.move(livingBox.x + livingBox.width * 0.5, livingBox.y - 40);
+  // The keyboard reads the chart too: focused, the arrow keys move the crosshair back from now.
+  await livingFig.locator("svg").focus();
+  await lbp.keyboard.press("ArrowLeft");
+  check(/Ink[\s\S]*Amber/.test((await livingFig.getByRole("status").textContent()) ?? ""), "the arrow keys read a chart out too");
+  await lbp.keyboard.press("Escape");
+  check((await livingFig.getByRole("status").count()) === 0, "and Escape puts the crosshair away");
+  await bench.getByText("As a table").click();
+  const tableRows = bench.locator("table tbody tr");
+  check(
+    (await tableRows.count()) >= 2 && /^0:00/.test((await tableRows.first().locator("td").first().textContent()) ?? ""),
+    "and the same numbers as a table, from the start",
+  );
+  // A notice clears the workbench rather than covering it.
+  await lbp.evaluate(() => window.jevAnts.notify("A notice in Lab mode.", "good"));
+  const labNote = lbp.getByRole("button", { name: "A notice in Lab mode. (dismiss)" });
+  await until(() => labNote.isVisible(), "a notice shows in Lab mode", 3000, 50);
+  const [noteBox, benchBox] = [await labNote.boundingBox(), await bench.boundingBox()];
+  check(
+    noteBox.y + noteBox.height <= benchBox.y,
+    `a notice sits above the workbench (${Math.round(noteBox.y + noteBox.height)} ≤ ${Math.round(benchBox.y)})`,
+  );
+  // The step control: off while playing; paused, a tick is 1/30 s and a second is 30 ticks.
+  const stepTick = bench.getByRole("button", { name: "Step a tick" });
+  check(await stepTick.isDisabled(), "the steps wait while the game plays");
+  await bench.getByRole("group", { name: "step" }).getByRole("button", { name: "Pause" }).click();
+  const time0 = await lbp.evaluate(() => window.jevAnts.game.time);
+  await stepTick.click();
+  const time1 = await lbp.evaluate(() => window.jevAnts.game.time);
+  await bench.getByRole("button", { name: "Step a second" }).click();
+  const time2 = await lbp.evaluate(() => window.jevAnts.game.time);
+  check(
+    Math.abs(time1 - time0 - 1 / 30) < 1e-6 && Math.abs(time2 - time1 - 1) < 1e-6,
+    `a tick and a second (${(time1 - time0).toFixed(4)}, ${(time2 - time1).toFixed(4)})`,
+  );
+  // Each tab shows its cards.
+  for (const [tab, card] of [
+    ["World", "world"],
+    ["Jev", "colony jev"],
+    ["Levers", "levers"],
+    ["Numbers", "debug"],
+  ]) {
+    await bench.getByRole("tab", { name: tab }).click();
+    check((await bench.getByRole("region", { name: card }).count()) === 1, `the ${tab} tab`);
+  }
+  await lbp.locator("canvas").first().focus();
+  await lbp.keyboard.press("l");
+  await until(
+    async () => (await bench.count()) === 0 && (await canvasH()) > fullH * 0.95,
+    "l closes the Lab and gives the map back",
+    3000,
+    50,
+  );
+  check(true, "l closes the Lab and gives the map back the screen");
+  await bctx2.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
