@@ -48,9 +48,49 @@ test("every variable the dark theme sets, the light theme sets first", () => {
   for (const name of Object.keys(declarations(':root[data-theme="dark"]'))) assert.ok(name in light, `${name} has a light value`);
 });
 
-test("the page's boot script reads the key the store writes", () => {
+/** What index.html's boot script does with a stored value: the data-theme it leaves on <html>, and whether it threw. */
+function boot(read: () => string | null): { theme: string | undefined; threw: boolean } {
   const html = readFileSync(here("../../../index.html"), "utf8");
-  assert.ok(html.includes(`localStorage.getItem("${THEME_KEY}")`), "index.html applies the stored theme before the first paint");
+  const body = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(body, "index.html has the boot script");
+  const document = { documentElement: { dataset: {} as DOMStringMap } };
+  const localStorage = {
+    getItem: (key: string) => {
+      assert.equal(key, THEME_KEY, "it reads the key the store writes");
+      return read();
+    },
+  };
+  let threw = false;
+  try {
+    new Function("localStorage", "document", body)(localStorage, document);
+  } catch {
+    threw = true;
+  }
+  return { theme: document.documentElement.dataset.theme, threw };
+}
+
+test("the page's boot script applies a stored light or dark before the first paint, and nothing else (review of #252, S2)", () => {
+  assert.deepEqual(
+    boot(() => "dark"),
+    { theme: "dark", threw: false },
+  );
+  assert.deepEqual(
+    boot(() => "light"),
+    { theme: "light", threw: false },
+  );
+  for (const odd of [null, "system", "", "auto", "Dark"])
+    assert.deepEqual(
+      boot(() => odd),
+      { theme: undefined, threw: false },
+      `“${odd}”`,
+    );
+  assert.deepEqual(
+    boot(() => {
+      throw new Error("no storage");
+    }),
+    { theme: undefined, threw: false },
+    "a browser without storage: the system's, no error",
+  );
 });
 
 // WCAG 2.x contrast, from the tokens in index.css: what axe found under S5 (--fg-3 at 4.38:1, white on the dark spore badge).

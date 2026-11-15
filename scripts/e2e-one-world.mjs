@@ -1978,9 +1978,12 @@ try {
     .catch(() => {});
   await hp.evaluate(() => window.jevAnts.notify("A notice behind a sheet.", "good"));
   await hp.waitForTimeout(300);
+  // Unseen but still announced: the live region is cut to a pixel (sr-only), not removed from the page.
+  const hiddenRegion = hp.locator('[role="status"][aria-live="polite"]').filter({ hasText: "A notice behind a sheet." });
+  const hiddenBox = await hiddenRegion.boundingBox();
   check(
-    !(await hp.getByRole("button", { name: "A notice behind a sheet. (dismiss)" }).isVisible()),
-    "on a phone an open sheet is not covered: the notice waits in the bell",
+    hiddenBox !== null && hiddenBox.width <= 2 && hiddenBox.height <= 2,
+    "on a phone an open sheet is not covered: the notice is cut to a pixel, still in the page for a screen reader, and waits in the bell",
   );
   await hp
     .getByRole("button", { name: /^Close/ })

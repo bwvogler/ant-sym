@@ -24,7 +24,7 @@ export type ToastPlace = "bottom" | "top" | "lab" | "sheet" | "sheet-lab";
 /**
  * Where notices go for what is on screen (PRD §69.9). The builder's tray fills the bottom, so they go under the HUD. Lab
  * mode's workbench is the map's foot, so they sit above it. An open drawer is a bottom sheet on a phone, which they would
- * cover (review of #182, N10): there they wait in the bell instead, and everywhere else they keep the place they would have had.
+ * cover (review of #182, N10): there they are not shown (still announced; they wait in the bell) instead, and everywhere else they keep the place they would have had.
  */
 export function toastPlace(on: { building: boolean; drawer: boolean; lab: boolean }): ToastPlace {
   if (on.building) return "top";

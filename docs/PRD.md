@@ -6029,7 +6029,7 @@ The last stage of the page reorganisation: what makes it feel finished. The simu
 
 - **Appearance.** Settings has System / Light / Dark.
   - The choice is kept per browser (`ui/theme.ts`, the key `jevants.theme`) and shown as `data-theme` on `<html>`.
-  - `index.html` applies it before the first paint, so a chosen theme never flashes the other one.
+  - `index.html` applies it before the first paint, so a chosen theme never flashes the other one (a test runs the script over a stubbed storage: light, dark, anything else, no storage).
   - `index.css` holds the dark variables twice, under the system's preference (unless light is chosen) and under `data-theme="dark"`. `ui/tests/theme.test.ts` holds the copies equal.
   - The canvas watches the attribute and recolours, as it does for the system's setting.
   - The palette lists "Appearance: …" for each.
@@ -6041,7 +6041,7 @@ The last stage of the page reorganisation: what makes it feel finished. The simu
   - A struck-through (inert) lever lost its extra `opacity-50`.
   - The three sideways-scrolling tables (colonies, history, a nest's chambers) are keyboard-focusable named regions.
   - `ui/tests/theme.test.ts` computes the text tokens' contrast on every surface, in both themes, so a palette edit that drops under 4.5:1 fails a test.
-- **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card drops its text for its title and buttons, so a tall sheet is not reached. From sm up, nothing changes.
+- **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices are cut to a pixel (`sr-only`, so a screen reader still announces them) and wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card shows its title and buttons, its text left for a screen reader, so a tall sheet is not reached. From sm up, nothing changes.
 - **Not in this stage:** one colony palette for the map and the charts (`ja-mvo9.9`), and the builder's Codex entries opening on first use of each tool (`ja-mvo9.7`).
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)

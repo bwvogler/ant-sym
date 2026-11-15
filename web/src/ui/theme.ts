@@ -49,6 +49,15 @@ export function setTheme(t: Theme): void {
   for (const fn of listeners) fn();
 }
 
+// A theme chosen in another tab of the page shows here at once.
+if (typeof window !== "undefined")
+  window.addEventListener("storage", (e) => {
+    if (e.key !== THEME_KEY && e.key !== null) return;
+    current = parseTheme(e.key === null ? null : e.newValue);
+    applyTheme(current);
+    for (const fn of listeners) fn();
+  });
+
 function subscribe(fn: () => void): () => void {
   listeners.add(fn);
   return () => void listeners.delete(fn);

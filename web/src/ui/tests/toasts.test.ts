@@ -117,7 +117,7 @@ test("where notices sit: the builder's tray and the Lab's workbench keep their p
   const at = (building: boolean, drawer: boolean, lab: boolean) => toastPlace({ building, drawer, lab });
   assert.equal(at(false, false, false), "bottom");
   assert.equal(at(false, false, true), "lab");
-  assert.equal(at(false, true, false), "sheet", "an open drawer: none on a phone (they wait in the bell), the bottom's place from sm up");
+  assert.equal(at(false, true, false), "sheet", "an open drawer: unseen on a phone (they wait in the bell), the bottom's place from sm up");
   assert.equal(at(false, true, true), "sheet-lab");
   for (const drawer of [false, true])
     for (const lab of [false, true]) assert.equal(at(true, drawer, lab), "top", "building: always under the HUD");
