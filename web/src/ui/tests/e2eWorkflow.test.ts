@@ -82,7 +82,8 @@ test("the tweezers check picks an ant no other ant sits near, as the page's pick
   assert.ok(pick > 0, "ColonyField's PICK_PX");
   const radius = Number(/Math\.hypot\(ox - sx, oy - sy\) < (\d+)\) return true/.exec(script)?.[1]);
   assert.ok(radius >= 2 * pick, `the e2e keeps other ants ${radius} px away, at least twice the pick radius (${pick} px)`);
-  assert.match(script, /if \(crowded\) continue;/);
+  assert.match(script, /^\s*if \(crowded\) continue;$/m);
+  assert.match(script, /const crowded = window\.jevAnts\.game\.colonies\.some\(/, "every colony's ants, as pick() looks at every colony");
 });
 
 test("e2e.yml installs one exact Playwright version", () => {
