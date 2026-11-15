@@ -52,9 +52,9 @@ for (const seed of [1, 2]) {
 }
 
 // One world (PRD §76.1): A9 10/20 at its mark of 4 lost per 100 food (ja-lp4.6.4), A10 2/20 at its draw of 2 (ja-je8), so
-// both are guarded: A9 at most A9_GUARD lost per 100 food (worst 8.04, seed 7, + 10 %); A10's draw at least A10_GUARD
+// both are guarded: A9 at most A9_GUARD lost per 100 food (worst 8.04, seed 7, + 10 %, rounded up); A10's draw at least A10_GUARD
 // (worst −0.5, seed 6, − 10 %).
-const A9_GUARD = 8.84;
+const A9_GUARD = 8.85;
 const A10_GUARD = -0.55;
 test("A9 strangers meet at food, guarded (ja-lp4.6.4): no more lost per food than today's worst seed", () => {
   for (const seed of [1, 2]) {
