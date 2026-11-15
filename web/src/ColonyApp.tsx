@@ -66,6 +66,7 @@ import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
+import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
@@ -449,6 +450,7 @@ export default function ColonyApp() {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
       game,
+      notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
       follow: (k: number, i: number) => {
         const c = game.colonies[k];
         if (!c || !c.alive[i]) return false;
@@ -692,19 +694,23 @@ export default function ColonyApp() {
             </span>
           )}
         </div>
-        <div
-          className={`pointer-events-auto flex min-w-0 basis-full items-center px-3 py-2 text-[13px] text-fg-2 sm:flex-1 sm:basis-0 ${FLOAT}`}
-          aria-label="goal"
-        >
-          <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
-            {clock(stats?.time ?? 0)}
-          </span>
-          {slow && (
-            <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
-              {stats!.pace.toFixed(1)}×
+        {/* The goal, and the bell at the top right: on a phone they share the second row. */}
+        <div className="flex min-w-0 basis-full items-stretch gap-2 sm:flex-1 sm:basis-0">
+          <div
+            className={`pointer-events-auto flex min-w-0 flex-1 items-center px-3 py-2 text-[13px] text-fg-2 ${FLOAT}`}
+            aria-label="goal"
+          >
+            <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
+              {clock(stats?.time ?? 0)}
             </span>
-          )}
-          <span className="truncate">{goalLine(stats)}</span>
+            {slow && (
+              <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
+                {stats!.pace.toFixed(1)}×
+              </span>
+            )}
+            <span className="truncate">{goalLine(stats)}</span>
+          </div>
+          <Notices />
         </div>
       </div>
 
@@ -881,7 +887,7 @@ export default function ColonyApp() {
       />
       {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
       {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-      <Toasts />
+      <Toasts place={building ? "top" : "bottom"} />
       {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
       {flight && gate?.open && !circle && (
         <QueenPen

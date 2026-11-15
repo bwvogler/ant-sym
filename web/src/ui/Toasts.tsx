@@ -1,5 +1,5 @@
-import { useEffect, useSyncExternalStore } from "react";
-import { currentToasts, dismissToast, subscribeToasts, TOAST_MS, type Toast } from "./toasts.ts";
+import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent } from "react";
+import { currentToasts, dismissToast, subscribeToasts, swipeOutcome, TOAST_MS, type Toast } from "./toasts.ts";
 
 const TONE = {
   info: "border-line bg-panel text-fg",
@@ -7,12 +7,18 @@ const TONE = {
   good: "border-accent/40 bg-accent-soft text-accent",
 } as const;
 
-/** The notices raised with pushToast, bottom centre, each gone after TOAST_MS or on a click. */
-export default function Toasts() {
+/**
+ * The notices raised with pushToast, each gone after TOAST_MS, on a tap, or swiped away (owner, 2026-11-15): sideways
+ * or down. A swiped notice is still in the log behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar,
+ * "top" under the HUD (while the builder's tray fills the bottom).
+ */
+export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 lg:bottom-32"
+      className={`pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
+        place === "top" ? "top-[7.5rem] sm:top-[4.5rem]" : "bottom-20 lg:bottom-32"
+      }`}
       role="status"
       aria-live="polite"
     >
@@ -24,16 +30,56 @@ export default function Toasts() {
 }
 
 function Item({ t }: { t: Toast }) {
+  // Where the finger went (CSS px) while it is down; null when no finger is on it.
+  const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
+  const [leaving, setLeaving] = useState(0);
+  const start = useRef<{ x: number; y: number; id: number } | null>(null);
+  // The timer waits while a finger holds the notice.
   useEffect(() => {
+    if (drag) return;
     const timer = setTimeout(() => dismissToast(t.id), TOAST_MS);
     return () => clearTimeout(timer);
-  }, [t.id]);
+  }, [t.id, drag]);
+  // A swiped notice slides off, then goes.
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = setTimeout(() => dismissToast(t.id), 150);
+    return () => clearTimeout(timer);
+  }, [leaving, t.id]);
+  const down = (e: PointerEvent<HTMLButtonElement>) => {
+    start.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDrag({ dx: 0, dy: 0 });
+  };
+  const move = (e: PointerEvent<HTMLButtonElement>) => {
+    const s = start.current;
+    if (!s || s.id !== e.pointerId) return;
+    setDrag({ dx: e.clientX - s.x, dy: Math.max(0, e.clientY - s.y) });
+  };
+  const up = (e: PointerEvent<HTMLButtonElement>) => {
+    const s = start.current;
+    if (!s || s.id !== e.pointerId) return;
+    start.current = null;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    setDrag(null);
+    if (e.type === "pointerup" && swipeOutcome(dx, dy) === "dismiss") setLeaving(dx < 0 ? -1 : 1);
+  };
+  const dx = leaving ? leaving * 480 : (drag?.dx ?? 0);
+  const dy = leaving ? 0 : Math.abs(drag?.dx ?? 0) > (drag?.dy ?? 0) ? 0 : (drag?.dy ?? 0);
+  const fade = leaving ? 0 : 1 - Math.min(0.7, Math.max(Math.abs(dx), dy) / 200);
   return (
     <button
       type="button"
-      className={`pointer-events-auto max-w-xl rounded-md border px-3 py-2 text-left text-sm shadow-lg max-sm:pointer-events-none ${TONE[t.tone]}`}
-      onClick={() => dismissToast(t.id)}
-      title="Dismiss"
+      className={`pointer-events-auto max-w-xl touch-none rounded-md border px-3 py-2 text-left text-sm shadow-lg select-none ${drag ? "" : "transition-[transform,opacity] duration-150"} ${TONE[t.tone]}`}
+      style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: fade }}
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={up}
+      onPointerCancel={up}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && dismissToast(t.id)}
+      title="Tap or swipe away; the bell at the top right keeps it"
+      aria-label={`${t.text} (dismiss)`}
     >
       {t.text}
     </button>

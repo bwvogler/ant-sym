@@ -5835,6 +5835,25 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
 - **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
+### 69.5 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
+
+The owner, playing on a phone, found the green notices at the bottom in the way: "let me swipe them away and check them later in some notifications in the top right."
+
+- **Swipe away** (`ui/Toasts.tsx`):
+  - a tap, or a swipe of 60 px sideways or down, takes a notice off the field (`swipeOutcome`, pure and tested);
+  - a smaller drag slides it back;
+  - its timer waits while a finger holds it.
+  - Before, on a phone the notices took no touch at all (`max-sm:pointer-events-none`), so they couldn't even be tapped away.
+- **The bell** (`ui/Notices.tsx`): at the top right, beside the goal; on a phone it shares the goal's row.
+  - Every notice raised goes in a log (`toasts.ts` `noticeLog`), newest first, at most 50. The log lasts the visit and is not saved.
+  - A badge counts the ones not yet seen. Opening the list marks them seen.
+  - The list gives each notice's tone, its words and how long ago; Clear empties it.
+  - Escape or a press outside closes it.
+- **While building,** the notices show under the HUD instead of over the builder's tray.
+- **Checks:** `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, and the swipe rule. `npm run e2e` step 13 runs it at 390 px.
+- **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):

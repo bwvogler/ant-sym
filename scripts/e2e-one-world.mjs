@@ -24,6 +24,8 @@
 //     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
 //  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
 //     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
+//  13. notices (PRD §69.5), at 390 px: the bell at the top right; a small drag slides a toast back, a swipe takes it away,
+//     and the bell counts it, lists it, and clears the count when opened; Escape closes the list.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1393,6 +1395,44 @@ try {
   check((await locked("Jobs by age").count()) === 1, "and stays locked through this game, though a host is there");
   check((await cp.evaluate(() => localStorage.getItem("jev-ants:codex-seen"))) === "[]", "and the notebook kept is empty too (S5)");
   await cctx.close();
+  // ——— 13. Notices (PRD §69.5): swipe a toast away; the bell at the top right keeps it ———
+  console.log("13. notices");
+  const nctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const np2 = await nctx2.newPage();
+  np2.on("pageerror", (e) => errors.push(String(e)));
+  await np2.goto(url);
+  await np2.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => np2.evaluate(() => !!window.jevAnts?.game.world), "the notices page's game");
+  await np2.getByRole("button", { name: "Pause", exact: true }).tap();
+  const bell = np2.getByRole("button", { name: "Notices", exact: true });
+  const bellBox = await bell.boundingBox();
+  check(bellBox !== null && bellBox.x + bellBox.width > 390 - 24 && bellBox.y < 140, "the bell sits at the top right");
+  const shown = await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length);
+  await np2.evaluate(() => window.jevAnts.notify("A notice to swipe away.", "good"));
+  const toast = np2.getByRole("button", { name: "A notice to swipe away. (dismiss)" });
+  await until(() => toast.isVisible(), "the notice shows", 3000, 50);
+  const tb = await toast.boundingBox();
+  await np2.mouse.move(tb.x + 20, tb.y + tb.height / 2);
+  await np2.mouse.down();
+  await np2.mouse.move(tb.x + 30, tb.y + tb.height / 2, { steps: 2 });
+  await np2.mouse.up();
+  await sleep(300);
+  check(await toast.isVisible(), "a small drag slides it back");
+  await np2.mouse.move(tb.x + 20, tb.y + tb.height / 2);
+  await np2.mouse.down();
+  await np2.mouse.move(tb.x + 180, tb.y + tb.height / 2, { steps: 8 });
+  await np2.mouse.up();
+  await until(async () => (await toast.count()) === 0, "a swipe sideways takes it away", 3000, 50);
+  check((await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length)) <= shown, "and only it");
+  check(/new/.test((await bell.getAttribute("title")) ?? ""), "the bell counts what is new");
+  await bell.tap();
+  const list = np2.getByRole("region", { name: "notices" });
+  check((await list.getByText("A notice to swipe away.").count()) === 1, "the bell's list keeps the swiped notice");
+  check(!/new/.test((await bell.getAttribute("title")) ?? ""), "opening the list clears the count");
+  await np2.keyboard.press("Escape");
+  check((await list.count()) === 0, "Escape closes the list");
+  await nctx2.close();
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
