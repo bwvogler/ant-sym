@@ -75,6 +75,16 @@ test("every e2e step heading goes through section(), so a failure names its step
   assert.match(script, /section\("15\. Lab mode"\)/);
 });
 
+test("the tweezers check picks an ant no other ant sits near, as the page's pick would choose it (review of #233, S3)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  const field = readFileSync(join(ROOT, "web/src/ui/ColonyField.tsx"), "utf8");
+  const pick = Number(/^const PICK_PX = (\d+);$/m.exec(field)?.[1]);
+  assert.ok(pick > 0, "ColonyField's PICK_PX");
+  const radius = Number(/Math\.hypot\(ox - sx, oy - sy\) < (\d+)\) return true/.exec(script)?.[1]);
+  assert.ok(radius >= 2 * pick, `the e2e keeps other ants ${radius} px away, at least twice the pick radius (${pick} px)`);
+  assert.match(script, /if \(crowded\) continue;/);
+});
+
 test("e2e.yml installs one exact Playwright version", () => {
   assert.match(yml, /^\s+PLAYWRIGHT_VERSION: \d+\.\d+\.\d+$/m, "pin an exact x.y.z: a range would change the browser under the guard");
   assert.match(yml, /playwright@\$PLAYWRIGHT_VERSION/);

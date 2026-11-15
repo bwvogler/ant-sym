@@ -1353,6 +1353,19 @@ try {
           const sy = ((c.y[i] - cam.y) * cam.zoom + cv.height / 2) * k;
           const d = Math.hypot(sx - cv.clientWidth / 2, sy - cv.clientHeight * 0.4);
           if (!(sx > 40 && sx < cv.clientWidth - 40 && sy > 160 && sy < cv.clientHeight * 0.6) || (best && d >= best.d)) continue;
+          // The tweezers lift the nearest live ant of any colony within PICK_PX (14 CSS px, ColonyField's pick): with another
+          // ant within twice that, the drag can lift that one and leave this one where it was (run 43721564508; review of
+          // #233, S3). Only an ant alone there.
+          const crowded = window.jevAnts.game.colonies.some((o, ok) => {
+            for (let j = 0; j < o.n; j++) {
+              if ((ok === kk && j === i) || !o.alive[j] || o.layer[j] !== 0) continue;
+              const ox = ((o.x[j] - cam.x) * cam.zoom + cv.width / 2) * k;
+              const oy = ((o.y[j] - cam.y) * cam.zoom + cv.height / 2) * k;
+              if (Math.hypot(ox - sx, oy - sy) < 28) return true;
+            }
+            return false;
+          });
+          if (crowded) continue;
           // Dropped 80 px to one side, on open ground (the tweezers refuse rock): that side, if either.
           const map = window.jevAnts.game.layers[0];
           const open = (wx, wy) => {
@@ -1380,7 +1393,7 @@ try {
     );
     check(
       Math.abs(after[0] - ant.x) > 2 && Math.abs(after[1]) > 2,
-      `the tweezers carry the ant, and its belief of home with it (${after.map((v) => v.toFixed(1))})`,
+      `the tweezers carry the ant, and its belief of home with it (colony ${ant.k} ant ${ant.i}: x ${ant.x.toFixed(1)} → ${after[0].toFixed(1)}, belief carried ${after[1].toFixed(1)})`,
     );
     const cam0 = await g(() => window.jevAnts.camera("above"));
     await tool("Move");
