@@ -3,6 +3,7 @@
 import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
 export { cellKey, keyX, keyY } from "./hex.ts";
 import { NO_KEY } from "./ants.ts";
+import { CHUNK, CHUNK_BITS } from "./chunks.ts";
 import { BACKFILL } from "./params.ts";
 import {
   DIG_ALONE,
@@ -132,6 +133,98 @@ export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: n
     }
   }
   return false;
+}
+
+/** The shared search's window: offsets −SENSE_STEPS … SENSE_STEPS each way (no path of SENSE_STEPS moves leaves it). */
+const SHARED_W = 2 * SENSE_STEPS + 1;
+const SHARED_FULL = (1 << SHARED_W) - 1;
+const CHUNK_MASK = CHUNK - 1;
+/** Row k of the window (cell row ay + k − SENSE_STEPS): bit j is cell ax + j − SENSE_STEPS, open and below the surface rows. */
+const sharedOpen = new Int32Array(SHARED_W);
+/** The same rows: the cells reached from (ax, ay) in at most SENSE_STEPS moves through open cells. */
+const sharedSeen = new Int32Array(SHARED_W);
+const sharedNext = new Int32Array(SHARED_W);
+/** Whose search sharedSeen holds: the map and start cell, or null since freshReach. */
+let sharedMap: WorldMap | null = null;
+let sharedAx = 0;
+let sharedAy = 0;
+
+/** Forget the shared search: call before an ant's sensors ask inReachShared (perceive), so no answer outlives a change of soil. */
+export function freshReach(): void {
+  sharedMap = null;
+}
+
+/**
+ * inReach for an ant's sensors, all from the ant's own position, between freshReach calls (perceive): the same answer,
+ * but where the straight line fails, one search over the window round the ant answers every sensor, instead of a
+ * search of its own for each. The search is breadth-first by whole rows of bits: after k rounds a row holds every cell
+ * within k moves through open cells, as inReach's queue finds them (the start cell itself need not be open).
+ */
+export function inReachShared(map: WorldMap, x0: number, y0: number, x1: number, y1: number): boolean {
+  cellOf(x1, y1);
+  const bx = CELL[0];
+  const by = CELL[1];
+  cellOf(x0, y0);
+  const ax = CELL[0];
+  const ay = CELL[1];
+  if (ax === bx && ay === by) return true;
+  if (hexDistance(ax, ay, bx, by) > SENSE_STEPS) return false;
+  const top = map.surfaceRows ?? 0;
+  if (straightReach(map, ax, ay, bx, by, top)) return true;
+  if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) searchWindow(map, ax, ay, top);
+  // Within SENSE_STEPS of (ax, ay) (checked above), so inside the window.
+  return ((sharedSeen[by - ay + SENSE_STEPS]! >> (bx - ax + SENSE_STEPS)) & 1) === 1;
+}
+
+/** Fill sharedSeen: every cell within SENSE_STEPS moves of (ax, ay) through open cells below `top` (inReachShared). */
+function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void {
+  const S = SENSE_STEPS;
+  // Read straight from the rock layer's chunk arrays, a row at a time (as rockAt reads: off the map is rock, a missing chunk `empty`).
+  const rock = map.rock;
+  const xLo = Math.max(ax - S, map.x0);
+  const xHi = Math.min(ax + S, map.x0 + map.size.w - 1);
+  for (let k = 0; k < SHARED_W; k++) {
+    const y = ay + k - S;
+    let bits = 0;
+    if (y >= top && y >= 0 && y < map.size.h) {
+      const cy = y >> CHUNK_BITS;
+      const row = (y & CHUNK_MASK) << CHUNK_BITS;
+      for (let x = xLo; x <= xHi;) {
+        const cx = x >> CHUNK_BITS;
+        const end = Math.min(xHi, ((cx + 1) << CHUNK_BITS) - 1);
+        const a = rock.chunk(cx, cy);
+        if (a === undefined) {
+          // Defensive: every chunk of today's maps inside their columns exists; a missing one reads as `empty`, as rockAt.
+          if (rock.empty === OPEN) for (; x <= end; x++) bits |= 1 << (x - ax + S);
+          else x = end + 1;
+        } else for (; x <= end; x++) if (a[row | (x & CHUNK_MASK)] === OPEN) bits |= 1 << (x - ax + S);
+      }
+    }
+    sharedOpen[k] = bits;
+    sharedSeen[k] = 0;
+  }
+  sharedSeen[S] = 1 << S;
+  for (let step = 0; step < S; step++) {
+    for (let k = 0; k < SHARED_W; k++) {
+      const m = sharedSeen[k]!;
+      // The same row: east and west.
+      let nb = (m << 1) | (m >> 1);
+      // The rows above and below: from a cell on an even row, the cells x − 1 and x; on an odd row, x and x + 1 (hex.ts NX).
+      if (k > 0) {
+        const u = sharedSeen[k - 1]!;
+        nb |= ((ay + k - 1 - S) & 1) === 0 ? u | (u >> 1) : u | (u << 1);
+      }
+      if (k < SHARED_W - 1) {
+        const d = sharedSeen[k + 1]!;
+        nb |= ((ay + k + 1 - S) & 1) === 0 ? d | (d >> 1) : d | (d << 1);
+      }
+      sharedNext[k] = m | (nb & sharedOpen[k]! & SHARED_FULL);
+    }
+    sharedSeen.set(sharedNext);
+  }
+  sharedMap = map;
+  sharedAx = ax;
+  sharedAy = ay;
 }
 
 /**
