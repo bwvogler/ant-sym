@@ -1,7 +1,7 @@
 import type { JevRequest } from "../../shared/jev.ts";
 import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneName, type LaneWords } from "../colony/index.ts";
 
-// What Jev is sent, pure: the Learn drawer shows the exact request for one
+// What Jev is sent, pure: Lab mode's Policy tab shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
 // one shared legend and doctrine (colonyBrain.ts), so the cost of a question
 // is a full request's size over the situations it carries, as useColonyJev's

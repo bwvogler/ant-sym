@@ -673,18 +673,13 @@ function endNest(game: Game, end: "start" | "end"): string {
 }
 
 /**
- * One world's lab founding (Game.foundBeyond): no room beyond that end within the radius leaves the game as it was.
+ * One world's lab founding (Game.tryFoundBeyond): no room beyond that end within the radius leaves the game as it was.
  * Returns what the lab says: null when a colony was founded, else why not (the engine's reason, NO_ROOM).
  */
 function foundBeyondEnd(game: Game, end: "start" | "end"): string | null {
   const name = endNest(game, end);
-  try {
-    game.foundBeyond(end);
-    return null;
-  } catch (e) {
-    if (!(e instanceof Error && e.message.includes("no room"))) throw e;
-    return `Nothing founded beyond ${name}: ${e.message.replace(/^addColony: /, "")}.`;
-  }
+  const r = game.tryFoundBeyond(end);
+  return r.ok ? null : `Nothing founded beyond ${name}: ${r.reason}.`;
 }
 
 /** The lab's founding (Game.addColony): 30 ants at the first colony's odour, a third of the way from the first nest to the second. */

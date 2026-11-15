@@ -405,3 +405,23 @@ test("a founding joins the plane's main open ground: on seed 19 the lab's foundi
   for (const c of own) cells += c;
   assert.ok(cells > 100_000, `the new colony can walk ${cells} cells of the surface`);
 });
+
+test("the lab's typed founding (ja-fnd.6.2): tryFoundBeyond gives the colony's index, or why not with the game unchanged", () => {
+  const g = game(1);
+  const r = g.tryFoundBeyond("end", 8);
+  assert.ok(r.ok, "room beyond the end on the default plane");
+  assert.equal(r.k, 2);
+  assert.equal(g.colonies.length, 3);
+  // Found beyond the start until there is no room: the last answer says so, and changes nothing.
+  let last = g.tryFoundBeyond("start", 2);
+  for (let n = 0; last.ok && n < 40; n++) last = g.tryFoundBeyond("start", 2);
+  assert.equal(last.ok, false, "the line runs out of room beyond its start");
+  if (last.ok) return;
+  assert.equal(last.reason, NO_ROOM);
+  const line = g.world!.line;
+  const n = g.colonies.length;
+  assert.deepEqual(g.tryFoundBeyond("start", 2), { ok: false, reason: NO_ROOM });
+  assert.equal(g.world!.line, line, "nothing grown");
+  assert.equal(g.colonies.length, n, "nothing founded");
+  assert.throws(() => g.foundBeyond("start", 2), /addColony: no room/, "foundBeyond still throws for scripts and tests");
+});

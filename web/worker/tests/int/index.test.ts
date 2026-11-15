@@ -1,7 +1,7 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
-import worker, { JevLedger } from "../index.ts";
+import { USD_PER_INPUT_TOKEN } from "../../../shared/jev.ts";
+import worker, { JevLedger } from "../../index.ts";
 
 // The Worker's wiring (PR #66 review S2): the locks in its fetch, and the Durable Object's storage. Driven in Node with a
 // fake environment and a stubbed upstream, so nothing is spent.

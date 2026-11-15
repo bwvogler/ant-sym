@@ -1,12 +1,13 @@
-# The whole-game guards (web/src/colony/tests/slow): on runners about 11 minutes in 4 shards, against 17 in one job before
-# G1's ten seeds (2026-11-14). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9);
-# G1 (oneWorldG1.test.ts) runs its ten seeds in worker threads and holds its shard for about 11 minutes (ja-ysco).
+# The whole-game guards (web/src/colony/tests/slow): on runners up to about 13 minutes in 4 shards (side.test.ts took 786 s
+# in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) runs its ten seeds in worker
+# threads, one per core, so it has a job of its own: beside another file in a shard it ran out of the 20-minute limit
+# (run 43722461875, ja-w7ef.15). It takes 11-14 minutes alone.
 # - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves (the steward skill), and the run then repeats on every push while
-#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` checks, which wake a watching session like any other
+#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` and `g1` checks, which wake a watching session like any other
 #   check; a manual dispatch did not (2026-11-14). CLAUDE.md: run them before merging colony changes.
-# The globs and limit are copies of web/package.json's test:slow; ui/tests/ciShards.test.ts holds them equal.
+# The globs and limit are copies of web/package.json's test:slow (the shards' folder and g1's); ui/tests/ciShards.test.ts holds them equal.
 name: Slow guards
 
 on:
@@ -62,6 +63,38 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: slow-durations-${{ matrix.shard }}
+          path: ${{ runner.temp }}/durations/
+          retention-days: 30
+          if-no-files-found: ignore
+          overwrite: true
+
+  # G1 alone on a runner: its ten games take every core (see the header). Runs when the shards do.
+  g1:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'slow-guards') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'slow-guards'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: G1, seeds 1-10
+        env:
+          TEST_REPORT_TITLE: G1, seeds 1-10
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/g1.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=1200000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout src/colony/tests/slow/g1/*.test.ts
+        working-directory: web
+      - name: durations artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: slow-durations-g1
           path: ${{ runner.temp }}/durations/
           retention-days: 30
           if-no-files-found: ignore

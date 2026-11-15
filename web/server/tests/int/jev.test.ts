@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, headersFor, inputTokensOf, isStaleSocketReset, retryDelayMs } from "../jev.ts";
+import { DEFAULT_IN_FLIGHT, JevAbortError, JevClient, headersFor, inputTokensOf, isStaleSocketReset, retryDelayMs } from "../../jev.ts";
 
 // A stand-in for api.typesafe.ai: answers after `delayMs`, counts how many
 // requests are open at once, and can be told to 429 the first N calls.
