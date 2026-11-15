@@ -65,7 +65,7 @@ test("every response hook called in colony/ is handed antDraw", () => {
       // the call's arguments, to its closing parenthesis (a call Prettier wrapped spans lines)
       let depth = 1;
       let end = m.index + m[0].length;
-      while (depth > 0 && end < text.length) ((depth += text[end] === "(" ? 1 : text[end] === ")" ? -1 : 0), end++);
+      for (; depth > 0 && end < text.length; end++) depth += text[end] === "(" ? 1 : text[end] === ")" ? -1 : 0;
       const call = text.slice(m.index, end);
       const line = text.slice(0, m.index).split("\n").length;
       calls.push(`${f}:${line}`);
