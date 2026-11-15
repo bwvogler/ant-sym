@@ -165,6 +165,27 @@ export interface ColonyParams {
    */
   foodPlume: number;
   /**
+   * Aphid odour in the air (ja-nzkg.3, docs/aphids.md finding 1): an outside ant with empty jaws climbs the smell of a living
+   * aphid clump (the builder's) within this many cells of it (aphids.ts, plume.ts). L. niger scouts head toward aphid odour in
+   * olfactometers (Verheggen et al. 2012); no field range was measured, so the range is design. 0 = deaf to it (a species
+   * that takes no honeydew). With no clump on the map it reads nothing: main bit for bit.
+   */
+  aphidPlume: number;
+  /**
+   * Tenders defend (ja-nzkg.4, docs/aphids.md finding 5): an ant touching a living aphid clump (on an aphid cell or beside one) counts
+   * as on home ground for the defend stance, so a threat it senses there makes it stand and fight rather than flee, and it calls no one
+   * from the nest. L. niger caretakers bit an intruder more often than other ants (90 % against 76 %; Gaber et al. 2024); against
+   * rival ants it is design (no study measured colonies fighting over aphids). 0 = no tending defence: main bit for bit.
+   */
+  tendDefend: number;
+  /**
+   * Aphids eaten (ja-nzkg.5, docs/aphids.md finding 6): an ant taking honeydew from a living aphid cell takes one of the aphids
+   * instead with this chance, home as food (quality 1). Ants eat some aphids: with larvae, colonies left 118 against 147 after 7
+   * days (Oliver, Leather & Cook 2012); another study saw none in 10 days (Jossart et al. 2025). The rate is design, and is not
+   * tied to the colony's hunger yet (ja-nzkg.7: no sensed cue for it). 0 = never eaten: main bit for bit.
+   */
+  aphidPrey: number;
+  /**
    * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
    * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
    * field) and dies past heatDeath. 0 = no heat (the generic ant: main bit for bit).
@@ -426,6 +447,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
+  aphidPlume: 8,
+  tendDefend: 1,
+  aphidPrey: 0.05,
   heatDay: 0,
   heatDawn: 25,
   heatNoon: 52,

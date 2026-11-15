@@ -1323,6 +1323,11 @@ try {
     for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my);
     check((await g(() => window.jevAnts.view())) === "above", "taps that build follow no ant and switch no view");
     check((await g(() => window.jevAnts.game.layers[0].foodLeft)) > food0, "a tap with sugar puts food down");
+    // Aphids (PRD §78): a tap puts a clump down on open ground, and its honeydew comes as the game steps on.
+    await tool("Aphids");
+    for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my + 20);
+    const clumps = await g(() => window.jevAnts.game.aphids.length);
+    check(clumps >= 1, `a tap with aphids puts a clump down (${clumps})`);
     const walls0 = await g(() => window.jevAnts.game.layers[0].filled);
     await tool("Rock");
     await drag(mx - 90, my - 50, mx + 90, my - 50);

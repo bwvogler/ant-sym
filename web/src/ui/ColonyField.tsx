@@ -40,6 +40,8 @@ import {
   type WorldMap,
   worldExtent,
   type BuildTool,
+  aphidCount,
+  type AphidClump,
 } from "../colony/index.ts";
 import {
   aimed,
@@ -134,6 +136,8 @@ interface Props {
   build?: FieldBuild | null;
   /** the ants the tweezers moved: each one's way home, drawn on the top view (ja-cwjp), builder on or off */
   traces?: AntTraces | null;
+  /** the builder's aphid clumps (docs/aphids.md, ja-nzkg.6), read each frame: the game replaces its list as clumps go */
+  aphids?: (() => readonly AphidClump[]) | null;
 }
 
 /** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
@@ -189,6 +193,14 @@ interface ViewCam {
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
+
+/** Where an aphid cell's dots sit, in world units from its centre: up to four. */
+const APHID_SPOTS: readonly (readonly [number, number])[] = [
+  [-0.22, -0.18],
+  [0.24, -0.12],
+  [-0.12, 0.24],
+  [0.2, 0.22],
+];
 
 /** No specimens: one empty list, so the default prop is the same each render. */
 const NO_SPECIMENS: readonly Specimen[] = [];
@@ -274,6 +286,7 @@ export default function ColonyField({
   onProbe,
   build = null,
   traces = null,
+  aphids = null,
   specimens = NO_SPECIMENS,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
@@ -353,6 +366,10 @@ export default function ColonyField({
   useEffect(() => {
     follow.current = followed;
   }, [followed]);
+  const aphidsRef = useRef(aphids);
+  useEffect(() => {
+    aphidsRef.current = aphids;
+  }, [aphids]);
   const tracesRef = useRef(traces);
   useEffect(() => {
     tracesRef.current = traces;
@@ -479,6 +496,7 @@ export default function ColonyField({
       inkRgb: rgb("#1c1b19"),
       warnRgb: rgb("#8a5300"),
       spore: "#7a4fa0",
+      aphid: "#5a9a2c",
       sporeRgb: rgb("#7a4fa0"),
       chamber: rgb("#a39a8a"),
     };
@@ -502,6 +520,7 @@ export default function ColonyField({
         inkRgb: rgb(cssVar("--ink")),
         warnRgb: rgb(cssVar("--warn")),
         spore: cssVar("--spore"),
+        aphid: cssVar("--aphid"),
         sporeRgb: rgb(cssVar("--spore")),
         chamber: rgb(cssVar("--mound")),
       };
@@ -1538,6 +1557,33 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
+      // The builder's aphids (docs/aphids.md, ja-nzkg.6): one to four green dots a cell, as many as the clump has aphids a
+      // cell, fading as it crashes. On the top view (or the one map).
+      const clumps = aphidsRef.current?.();
+      if (clumps?.length && (world ? lv === PLANE : true)) {
+        ctx.fillStyle = theme.aphid;
+        const r = Math.max(1.2 * d, 0.13 * c.zoom);
+        for (const cl of clumps) {
+          const n = aphidCount(cl);
+          const cells = cl.cells.length / 2;
+          if (n <= 0 || !cells) continue;
+          const per = Math.max(1, Math.min(4, Math.round(n / cells / 2)));
+          ctx.globalAlpha = Math.min(1, 0.35 + n / cells / 4);
+          for (let k = 0; k < cl.cells.length; k += 2) {
+            const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
+            const wy = centreY(cl.cells[k + 1]!);
+            if (!inView(wx, wy)) continue;
+            for (let j = 0; j < per; j++) {
+              const [ox, oy] = APHID_SPOTS[j]!;
+              const [x, y] = toScreen(c, v, wx + ox, wy + oy);
+              ctx.beginPath();
+              ctx.arc(x, y, r, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
       // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
       // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
       const tr = tracesRef.current;

@@ -12,6 +12,7 @@ import { describe, type SaveRecord } from "./saves.ts";
 const SPECIES_BLURB: Record<string, string> = {
   generic: "trails, recruitment and raids",
   desert: "Cataglyphis: lone foragers with no trails, hostile to strangers (docs/desert-ant.md)",
+  neglectus: "Lasius neglectus: one supercolony, its nests never fight one another (docs/lasius-neglectus.md)",
 };
 
 export default function StartScreen({

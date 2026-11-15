@@ -283,6 +283,10 @@ This is design: no paper. It reads the game, never steers it.
 
 - How strong the painted sign is (`NO_ENTRY_PAINTED` 4) was to be tuned on B7, but it needed no tuning. B7 passes 9/10 on seeds 1–10 and 10/10 on 11–20 (PRD §73.3).
 
+### Aphids (PRD §78, [aphids.md](aphids.md))
+
+A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note.
+
 ### What slice 2 built (PRD §73.3)
 
 - **The way home, drawn** (ja-cwjp): a moved ant's walk is traced on the top view from where it was set down, the run of its old vector solid and its search loops dotted, so a child sees the experiment happen. It fades once the ant is home or dead.

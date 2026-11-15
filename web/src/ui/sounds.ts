@@ -108,6 +108,11 @@ export function play(cue: Cue): void {
     case "rain":
       noise(a, 0.5, 4000, "highpass", 0.15);
       break;
+    case "aphids":
+      tone(a, 1000, 1400, 0.05, "sine", 0.1);
+      tone(a, 1100, 1500, 0.05, "sine", 0.08, 0.07);
+      tone(a, 1200, 1600, 0.05, "sine", 0.06, 0.14);
+      break;
     case "tweezers":
       tone(a, 1500, 2400, 0.06, "triangle", 0.12);
       break;
