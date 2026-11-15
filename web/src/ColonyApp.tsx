@@ -60,6 +60,7 @@ import Help from "./ui/Help.tsx";
 import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
 import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
+import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
@@ -72,7 +73,7 @@ import type { DoctrineChoice } from "./ui/useColonyJev.ts";
 import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
-// clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, Learn,
+// clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, the Codex,
 // settings; a tab bar on a phone); the followed ant or the queen's pen in an inspector at its right. The fungus is the
 // player: you shape its policy in words (its aim); Jev reads them and decides what the fungus does in each host it
 // lives in. Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md). The lab and the full
@@ -89,7 +90,7 @@ const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 /** A dialog that has the page: the game's keys wait while one is open (the palette's key still works). */
 const BLOCKING = [
   '[aria-modal="true"]',
-  ...["Details", "Learn", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`),
+  ...["Details", "Codex", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`),
 ].join(", ");
 
 export default function ColonyApp() {
@@ -114,6 +115,9 @@ export default function ColonyApp() {
     followedNow.current = followed;
   }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
+  // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Codex says how many are new.
+  useCodexWatch(game, onFrame, stats);
+  const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
   const setView = useCallback((view: View) => update({ view }), [update]);
@@ -299,7 +303,7 @@ export default function ColonyApp() {
         SPEEDS,
       );
       if (!a) return;
-      // Over a dialog that has the page (the palette, the sheet, Details, Learn, the start, the queen's pen) only the
+      // Over a dialog that has the page (the palette, the sheet, Details, the Codex, the start, the queen's pen) only the
       // palette's key works: the game's keys wait.
       if (a.kind !== "palette" && document.querySelector(BLOCKING)) return;
       e.preventDefault();
@@ -559,7 +563,7 @@ export default function ColonyApp() {
           ["settings", "Settings", "trails passphrase"],
         ] as const
       ).map(([d, label, words]) => ({ id: `drawer-${d}`, label, group: "Panels", words, run: () => setDrawer(d) })),
-      { id: "learn", label: "Learn: the field guide", group: "Panels", words: "help guide", run: () => openLearn({ tab: "guide" }) },
+      { id: "learn", label: "Codex: the field guide", group: "Panels", words: "help guide learn", run: () => openLearn({ tab: "guide" }) },
       {
         id: "lab",
         label: "Lab and numbers",
@@ -578,8 +582,9 @@ export default function ColonyApp() {
       { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
       ...guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => ({
         id: `learn-${e.id}`,
-        label: `Learn: ${e.title}`,
-        group: "Learn",
+        label: `Codex: ${e.title}`,
+        group: "Codex",
+        words: "learn guide",
         run: () => openLearn({ tab: "guide", id: e.id }),
       })),
     ].map((c) => ({ ...c, run: () => (clearProbe(), c.run()) }));
@@ -703,7 +708,7 @@ export default function ColonyApp() {
         </div>
       </div>
 
-      {/* The rail: each drawer, Learn, Settings. A tab bar along the bottom on a phone. The builder's tray takes its place. */}
+      {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. The builder's tray takes its place. */}
       {building && (
         <BuilderTray
           items={tray}
@@ -739,7 +744,13 @@ export default function ColonyApp() {
         />
         <IconButton icon="colonies" label="Colonies" active={drawer === "colonies"} onClick={() => toggle("colonies")} />
         <IconButton icon="saves" label="Saved games" active={drawer === "saves"} onClick={() => toggle("saves")} />
-        <IconButton icon="learn" label="Learn" onClick={() => openLearn({ tab: "guide" })} />
+        <IconButton
+          icon="learn"
+          label="Codex"
+          badge={codex.fresh.length || undefined}
+          badgeLabel={`${codex.fresh.length} new in the field guide`}
+          onClick={() => openLearn({ tab: "guide" })}
+        />
         <IconButton
           icon="settings"
           label="Settings"

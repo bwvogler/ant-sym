@@ -4197,7 +4197,7 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **A6 is a fight at the nest:** every defender dies on 6 of 10 seeds and 413 of 821 defender deaths are in the curtain. Raiders keep going down a rival's shaft (owner, 2026-11-14); what A6 measures on one world stays open (`ja-lp4.6.5`).
 - **G1:** 6 of seeds 1–10 within 2, worst 6 (seed 7). #205's guard asks for 5. Raids: 166 scouts, 42 finds, 13 recruits, recruits on 4 seeds (`ja-lp4.6.9`).
 - **Unity:** peaks 0.02–0.23 % at 300 + 300 and 0.42–0.56 % at 600 + 600 in 600 s; nobody unifies (`ja-lp4.6.6`).
-- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`).
+- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`). **Gate moved (owner, 2026-11-15):** to **13 ms** at 1,200 + 1,200 on the reference machine (second-half mean), from 10 ms. The bit-exact speed-ups of `ja-lp4.6.7` (#214: the sensors share one reach search, Touch.raid worked out lazily; −7.9 %) bring `main` to about 11.9 ms there, so the gate holds with about 1 ms of slack. The ideas that would go further are filed, not scheduled: scentReach only underground (`ja-lp4.6.14`), SENSE_STEPS 5 → 3 (`ja-lp4.6.15`), scent read every other tick (`ja-lp4.6.16`), a cheaper route memory (`ja-lp4.6.17`), reach answers kept across ticks (`ja-lp4.6.18`), the pheromone step (`ja-lp4.6.19`).
 - **Cost:** none: no situation, legend or question changed.
 
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
@@ -5808,6 +5808,33 @@ The second half of stage 2: ways to find any action and to learn what anything o
 - **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
 
+
+### 69.4 S3a: the Codex (ja-mvo9.3, first half)
+Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a notebook that fills as the player plays. Specimens (pin ants and compare them) follow in S3b.
+- **Entries open on first sight.** Each guide entry waits, named and numbered, until the game first shows the player what it is about through the fungus's hosts. Then it opens.
+  - **Cues:** the pure `ui/codex.ts` reads a cue from the game twice a second (`cues`); its `UNLOCK` table says which cue opens which entry and what the locked card tells the player to look for.
+    - The fungus, its senses, how the mycelium feeds its tips, the line and the curtain, and a species' own entry are open from the start.
+    - The builder's five tools' entries are open from the start for now; each opening on the tool's first use is ja-mvo9.7 (owner, review of #206, D2).
+    - A first host opens Jobs by age.
+    - A host carrying food opens the food trail, tasting food, forager trips, the way home and route memory.
+    - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.
+    - A host underground opens chambers, finding the way inside, the queen and brood.
+    - Alarm where a host stands, at the field's own threshold, opens alarm.
+    - A host meeting strangers (its own contact, `foes`: not the policy's fight mode, which a host may never take) opens strangers and battles; a tired host opens tiredness and rest.
+    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand: `codexNumbers`), one colony.
+  - A dead host shows nothing: a dead slot keeps its load.
+  - `codex.test` holds every guide entry in `UNLOCK`, so a new entry must say how it opens.
+- **What the player sees:**
+  - one notice naming what opened together;
+  - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
+  - a "new" mark on those entries;
+  - the count, "Seen 11 of 22".
+- **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
+- **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
+- **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
+- **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
@@ -6103,6 +6130,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - chapter goals keep counting, and the tutorial doesn't start in builder mode;
 - the little-hands tray is a switch inside the builder;
 - sounds come from WebAudio plus speechSynthesis.
+- Dig opens any rock, the map's own as well as the builder's, on both layers (owner, 2026-11-15; D1 of #204's review): a child can take down a wall without Undo. The note's tool table said "not rock"; the code always did this, and the table now says so.
 
 Merging is not delegated: PRs wait for the owner.
 

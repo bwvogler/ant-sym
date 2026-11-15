@@ -49,7 +49,7 @@ import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from ".
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { placeOn, touch } from "./sense.ts";
+import { placeOn, raidSmelt, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
@@ -293,7 +293,7 @@ export class Colony {
   alarmSmelt: Trail = "none";
   /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
   oddsNow: Odds = "none";
-  t: Touch = Object.defineProperty(
+  t: Touch = Object.defineProperties(
     {
       mode: "explore",
       carrying: "none",
@@ -309,8 +309,11 @@ export class Colony {
       returns: "none",
       crowd: "few",
     } as Touch,
-    "place",
-    { get: () => this.place(this.ti), enumerable: true },
+    {
+      place: { get: () => this.place(this.ti), enumerable: true },
+      // Its raid trail likewise (ja-lp4.6.7): only `leave` reads it, for a raider.
+      raid: { get: () => this.raidOf(this.ti), enumerable: true },
+    },
   );
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
@@ -721,6 +724,19 @@ export class Colony {
     this.bind(l);
     try {
       return placeOn(this, i);
+    } finally {
+      this.bind(was);
+    }
+  }
+
+  /** The raid trail ant i smells (raidSmelt), with its layer bound: Touch.raid, worked out when a response reads it. */
+  raidOf(i: number): "none" | "faint" | "strong" {
+    const l = this.layer[i];
+    if (l === this.cur) return raidSmelt(this, i);
+    const was = this.cur;
+    this.bind(l);
+    try {
+      return raidSmelt(this, i);
     } finally {
       this.bind(was);
     }

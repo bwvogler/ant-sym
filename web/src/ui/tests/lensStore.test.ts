@@ -20,7 +20,8 @@ test("a hover moves the hover; a click pins, replacing any pinned card; leaving 
 
 test("each view shows its pinned card, else the pointer's there (review of #196, S6)", () => {
   const s: LensState = { pinned: at(1, true, 0), hover: at(2, false, 1) };
-  assert.deepEqual(shownOn(s, 0), at(1, true, 0), "the pinned card's view: the card, over the hover");
+  assert.deepEqual(shownOn(s, 0), at(1, true, 0), "the pinned card's view: the card");
+  assert.deepEqual(shownOn({ pinned: at(1, true, 0), hover: at(2, false, 0) }, 0), at(1, true, 0), "over a hover on the same view");
   assert.deepEqual(shownOn(s, 1), at(2, false, 1), "the other view: the pointer's, though a card waits pinned");
   assert.equal(shownOn({ pinned: at(1, true, 0), hover: null }, 1), null);
   assert.deepEqual(shownOn({ pinned: null, hover: at(2, false, 0) }, 0), at(2, false, 0));
