@@ -30,7 +30,7 @@
 import { LEVERS, type Reach } from "./levers.ts";
 
 /** A spread trait an upgrade sets. */
-export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots";
+export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks";
 
 export interface Upgrade {
   id: string;
@@ -104,6 +104,17 @@ export const UPGRADES: readonly Upgrade[] = [
     values: [0, 1, 2],
   },
   {
+    // Stalks (ja-2bw.10, PRD §63.12): its value is the level fungus.ts STALK reads (0 none, 1 a stalk, 2 a tall stalk).
+    id: "stalks",
+    kind: "spread",
+    name: "Stalks",
+    blurb: "whether a corpse it has colonised outside grows a stalk that spreads its spores over a ring round it",
+    steps: ["none", "a stalk", "a tall stalk"],
+    costs: [600, 2000],
+    trait: "stalks",
+    values: [0, 1, 2],
+  },
+  {
     id: "fruiting",
     kind: "spread",
     name: "Fruiting body",
@@ -158,10 +169,10 @@ export const UPGRADES: readonly Upgrade[] = [
     id: "trails",
     kind: "reach",
     name: "Trails",
-    blurb: "how far it bends what a host lays: trail, trail leaked to rivals, alarm in a fight",
+    blurb: "how far it bends what a host lays and how it recruits: trail, trail leaked to rivals, alarm in a fight, rouse (desert ants)",
     steps: ["none", "one step", "the full range"],
     costs: [10, 1500],
-    levers: ["trail", "leak", "alarmLaid"],
+    levers: ["trail", "leak", "alarmLaid", "rouse"],
     reach: [0, 1, 2],
   },
   {
@@ -226,6 +237,8 @@ export interface Traits {
   capacity: number;
   /** the Knots level (hyphae.ts KNOT): 0 none, 1 a few, 2 many */
   knots: number;
+  /** the Stalks level (fungus.ts STALK): 0 none, 1 a stalk, 2 a tall stalk */
+  stalks: number;
 }
 
 export interface EvolutionSave {
@@ -345,7 +358,7 @@ export class Evolution {
 
   /** The spread traits at the levels chosen. */
   traits(): Traits {
-    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0 };
+    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0 };
     for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }

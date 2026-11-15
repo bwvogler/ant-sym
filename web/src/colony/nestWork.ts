@@ -47,6 +47,7 @@ import {
   QUEEN_MARK,
   QUEEN_STOCK,
   RECEPTION_MIN,
+  BROOD_MIN,
   STORE_AFTER,
   T_EGG,
   T_LARVA,
@@ -58,6 +59,7 @@ import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
 import { around, touch } from "./sense.ts";
 import { ageWorkers, dropBrood } from "./body.ts";
+import { clearPellet, markMidden, markMiddenPlane } from "./pellets.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -317,7 +319,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
   let royal = -1;
   for (const c of ch.list) {
     if (c.colony !== col.params.nest || c.cells === 0) continue;
-    if (c.role === "brood" && c.brood < least) ((least = c.brood), (to = c.id));
+    if (c.role === "brood" && c.cells >= BROOD_MIN && c.brood < least) ((least = c.brood), (to = c.id));
     if (c.role === "royal") royal = c.id;
   }
   // Eggs by the queen go to a brood chamber (with none yet, brood stays with her); brood lying outside any chamber
@@ -361,7 +363,7 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
       if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"))) return;
       k.held = i;
-      col.clearPellet(i);
+      clearPellet(col, i);
       col.corpse[i] = 1;
       col.pellet[i] = 1;
       if (outside) {
@@ -403,8 +405,8 @@ export function middenSmell(col: Colony, dt: number): void {
     if (left <= 0) break;
     const n = Math.min(left, count);
     left -= n;
-    if (col.line !== null) col.markMiddenPlane(keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
-    else col.markMidden(keyX(key), MIDDEN_MARK * dt * 0.1 * n);
+    if (col.line !== null) markMiddenPlane(col, keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
+    else markMidden(col, keyX(key), MIDDEN_MARK * dt * 0.1 * n);
   }
 }
 

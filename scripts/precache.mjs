@@ -28,6 +28,14 @@
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
+//        node scripts/precache.mjs --species desert --lanes fungus [--budget …] [--dry]
+//        node scripts/precache.mjs --lanes fungus --fungus-also <fungus-bundle.json> [...] [--budget …] [--dry]
+//
+// --species <id> --lanes fungus (ja-rf5.22): the fungus's answers under that species' menu (the desert ant's has rouse on, so its keys differ
+// from the generic answers'), in the situations a page game of it meets; written into the same fungus bundles (the context is the same).
+//
+// --fungus-also: the fungus lane also asks every situation the given (older) fungus bundles hold, beside the ones the recorded game meets,
+// so a re-ship after a legend change keeps all an earlier ship had (save the old bundles first, e.g. with git show).
 //
 // --reweigh (ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
@@ -47,12 +55,18 @@ import {
   FUNGUS_BRAIN_VERSION,
   encodeFungal,
   decodeFungal,
+  FUNGAL_SCHEMA,
+  FUNGAL_SITUATIONS,
   DEFAULT_MENU,
   STRAINS,
   Game,
   centreX,
   centreY,
   generateSideWorld,
+  generateOneWorld,
+  gameRng,
+  menuFor,
+  GAME_REGROW,
   mulberry32,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
@@ -62,8 +76,6 @@ import {
   DESERT_ANT,
   isWeighted,
   weightsOf,
-  generateOneWorld,
-  gameRng,
   steerKey,
   NEUTRAL_STEERING,
 } from "../web/src/colony/index.ts";
@@ -83,6 +95,7 @@ const opts = {
   import: [],
   species: null,
   reweigh: false,
+  fungusAlso: [],
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -94,6 +107,7 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else if (a === "--species") opts.species = args[++k];
   else if (a === "--reweigh") opts.reweigh = true;
+  else if (a === "--fungus-also") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.fungusAlso.push(args[++k]);
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
@@ -119,6 +133,8 @@ function fungalSituations() {
       g.paintSpores(c.nest.entrance.x, c.nest.entrance.y, 3, 2, 0.3, strain("lockpick"));
     }
   }
+  const also = fungusAlso();
+  for (let n = 0; n < FUNGAL_SITUATIONS; n++) if (also.has(FUNGAL_SCHEMA.key(decodeFungal(n)))) met.add(n);
   return [...met].sort((a, b) => a - b).map(decodeFungal);
 }
 
@@ -137,6 +153,18 @@ function steerSituationsMet() {
     for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
   }
   return [...met.values()];
+}
+
+/**
+ * --fungus-also: the situation part of every key in the given fungus bundles (a key is `<situation>|<levers asked>`; the situation has bars of its own), so a re-ship after a
+ * legend change also asks what an earlier ship held but this recording didn't meet (ja-rf5.18: main's bundles held 130 an aim, a fresh
+ * recording 96).
+ */
+function fungusAlso() {
+  const keys = new Set();
+  for (const path of opts.fungusAlso)
+    for (const [key] of JSON.parse(readFileSync(path, "utf8"))) keys.add(key.slice(0, key.lastIndexOf("|")));
+  return keys;
 }
 
 // One row a lane, from the lane registry (colony/lanes.ts): the situations it is asked in (the fungus's are the ones a recorded game meets),
@@ -159,6 +187,29 @@ const LANES = Object.fromEntries(
   ]),
 );
 
+/**
+ * The fungal situations a page game of `species` meets (ja-rf5.22): one world as the page builds it (600 + 600 ants, hyphae), the game's
+ * strain landed by each colony's hole in turn, 300 s, on seeds 1–3.
+ */
+function speciesFungalSituations(sp) {
+  const met = new Set();
+  const strain = STRAINS.findIndex((x) => x.id === "garden");
+  for (const seed of [1, 2, 3])
+    for (const k of [0, 1]) {
+      const g = new Game(
+        generateOneWorld(seed),
+        { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+        gameRng(seed, 0),
+      );
+      g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
+      for (let t = 0; t < 300; t += 1 / 30) {
+        if (!g.landed && g.time >= 2) g.land(k, strain, { evolve: true });
+        g.tick(1 / 30);
+      }
+    }
+  return [...met].sort((a, b) => a - b).map(decodeFungal);
+}
+
 // A species' own mode lane (ja-rf5.9): its words bound into the row's key, packing, reading and context, its situations its schema's.
 const SPECIES_KNOWN = { desert: DESERT_ANT };
 const species = opts.species ? SPECIES_KNOWN[opts.species] : null;
@@ -166,7 +217,19 @@ if (opts.species && !species) throw new Error(`--species: no "${opts.species}" (
 // --import ships colony-live caches, which are the generic ant's: a species' answers come from this script's own run (review of #140).
 if (species && opts.import.length)
   throw new Error("--species and --import do not go together: run --species on its own (it is the live check)");
-if (species) {
+// --species with --lanes fungus (ja-rf5.22): the fungus asked under that species' menu (the desert ant's has rouse on), in the situations
+// its page game meets. Same context as the generic answers, so they go into the same bundles under their own keys.
+const speciesFungus = species && opts.lanes === "fungus";
+if (speciesFungus) {
+  const l = LANE_LIST.find((x) => x.name === "fungus");
+  const menu = new Set(menuFor(DEFAULT_MENU, (species.params.invitePace ?? 0) > 0));
+  LANES.fungus = {
+    ...LANES.fungus,
+    situations: () => speciesFungalSituations(species),
+    key: (s) => l.key(s, menu),
+    read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, menu)),
+  };
+} else if (species) {
   const l = LANE_LIST.find((x) => x.name === "mode");
   const lw = species.lanes.mode;
   LANES.mode = {
@@ -183,7 +246,7 @@ if (opts.reweigh) {
   if (opts.import.length) throw new Error("--reweigh and --import do not go together");
   opts.lanes = "mode";
 }
-const prefix = species ? `-${species.id}` : "";
+const prefix = species && !speciesFungus ? `-${species.id}` : "";
 
 const lanes = opts.lanes.split(",").map((l) => {
   if (!LANES[l]) throw new Error(`unknown lane ${l}`);
@@ -224,7 +287,7 @@ for (const lane of lanes) {
     bundles.set(file, {
       lane,
       [L.field]: d.id,
-      ...(species ? { species: species.id } : {}),
+      ...(species && !speciesFungus ? { species: species.id } : {}),
       context,
       file,
       answers: have,

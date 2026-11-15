@@ -102,7 +102,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
               type="button"
               className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline"
               onClick={() => openLearn(to)}
-              title={`Learn: ${k}`}
+              title={`Codex: ${k}`}
             >
               {k} {v}
             </button>

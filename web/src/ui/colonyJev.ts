@@ -15,8 +15,10 @@ import { apiHeaders, apiUrl } from "./backend.ts";
 export type { LaneName } from "../colony/index.ts";
 import {
   LANE_KINDS,
+  LANE_LIST,
   LANES,
   laneOfContext,
+  type ErasedLane,
   type LaneSpec,
   type LaneName,
   localPolicy,
@@ -36,14 +38,7 @@ import {
   type FungusPolicy,
   decodeFungal,
   askedIn,
-  FUNGUS_BATCH,
   FUNGUS_GATHER_MS,
-  fungalKey,
-  fungusContext,
-  packFungusRequest,
-  readLevels,
-  validLevels,
-  worthAsking,
   askedLevers,
   DEFAULT_MENU,
   type Fungus,
@@ -100,31 +95,34 @@ export interface CacheStore {
 export interface ColonyJevState {
   phase: "off" | "running" | "stopped";
   run: RunSummary | null;
-  /** this run: situations sent to Jev (ant modes and stances, every colony), requests sent */
-  asked: number;
-  stancesAsked: number;
+  /**
+   * Per lane (the registry's names, colony/lanes.ts): this run's situations sent to Jev, and the answers cached under the lane's words now.
+   * An ant lane's are every driven colony's, a doctrine two colonies share counted once; the fungus's are its aim's, under every menu asked.
+   * A lane the colonies' species lacks (Species.lanes) counts 0: see stanceLane.
+   */
+  lanes: Record<LaneName, LaneCounts>;
+  /** this run: requests sent */
   requests: number;
   /** this run: mode choices answered from the cache, and by the local rule while a situation was unanswered */
   hits: number;
   misses: number;
-  /** answers cached under every colony's doctrine (modes, stances): a doctrine two colonies share counts once */
-  cached: number;
-  stancesCached: number;
   /** whether the colonies driven have a stance lane at all (a species may not: Species.lanes, ja-fnd.5.12): the panel says so rather than "0 stances" */
   stanceLane: boolean;
   /** mode answers cached for each colony's doctrine */
   doctrineCached: number[];
-  /** this run: fungal situations sent to Jev; answers cached for the current aim (under every menu asked) */
-  fungusAsked: number;
-  fungusCached: number;
-  /** this run: hyphal tips' situations sent to Jev; answers cached for the current aim (the growth lane, ja-2bw.5) */
-  growthAsked: number;
-  growthCached: number;
-  /** this run: steering situations sent to Jev; answers cached under every colony's doctrine (the steer lane, staging ja-ykmu.3) */
-  steerAsked: number;
-  steerCached: number;
   failures: number;
   lastError: string | null;
+}
+
+/** A lane's counts in the panel: situations sent this run, answers cached under its words now. */
+export interface LaneCounts {
+  asked: number;
+  cached: number;
+}
+
+/** A record over every lane of the registry, in its order. */
+function perLane<T>(f: (name: LaneName) => T): Record<LaneName, T> {
+  return Object.fromEntries(LANE_LIST.map((l) => [l.name, f(l.name)])) as Record<LaneName, T>;
 }
 
 type Listener = (s: ColonyJevState) => void;
@@ -261,24 +259,21 @@ export class ColonyJev {
   #menu: Set<string> = new Set(DEFAULT_MENU);
   /** the fungus's menuSeq when #menu was copied from it */
   #menuSeq = -1;
-  // The levers asked (the menu's, in table order) are in each key, so a question is packed and its answer read and
-  // kept against the levers it asked, whatever the menu is by the time it lands.
+  // The fungus's row of the lane registry (colony/lanes.ts), with what only the client knows bound in: the menu it asks under (the levers
+  // asked are in each key, so a question is packed and its answer read and kept against the levers it asked, whatever the menu is by the
+  // time it lands), the view of its context (side, with a nest underground), and the local rule (a method of the attached fungus).
   #fungal = lane<FungalSituation, string>({
     name: "fungus",
-    key: (s) => fungalKey(s, this.#asked(s)),
-    pack: (items, aim) =>
-      packFungusRequest(
-        items.map((it) => ({ ...it, asked: askedIn(it.key) })),
-        aim,
-      ),
-    read: (a, id, _s, key) => readLevels(a, id, askedIn(key)),
-    valid: validLevels,
+    key: (s) => LANES.fungus.key(s, this.#menuNow()),
+    pack: (items, aim) => LANES.fungus.pack(items, aim),
+    read: (a, id, s, key) => LANES.fungus.read(a, id, s, key),
+    valid: LANES.fungus.valid,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
-    asks: (s) => worthAsking(this.#asked(s)),
-    contextOf: (aim) => fungusContext(aim, this.#fungus?.hasNest ? "side" : "top"),
+    asks: (s) => LANES.fungus.asks(s, this.#menuNow()),
+    contextOf: (aim) => LANES.fungus.contextOf(aim, this.#fungus?.hasNest ? "side" : "top"),
     words: "",
-    batch: FUNGUS_BATCH,
-    gather: true,
+    batch: LANES.fungus.batch ?? undefined,
+    gather: LANES.fungus.gather,
   });
   // The growth lane (ja-2bw.5), under the fungus's aim. While a situation has no answer its `local` is NO_ANSWER: the tip then plays its
   // own local rule (hyphae.ts localGrowth), which reads its body as well as its situation.
@@ -292,12 +287,16 @@ export class ColonyJev {
     contextOf: (aim) => LANES.growth.contextOf(aim),
     words: "",
     batch: LANES.growth.batch ?? undefined,
-    gather: true,
+    gather: LANES.growth.gather,
   });
   /** The levers the fungus lane asks for a host in situation s: the menu's, a queen's or a worker's, in table order. */
   #asked(s?: FungalSituation): string[] {
+    return askedLevers(this.#menuNow(), s?.task === "queen");
+  }
+  /** The menu the fungus lane asks under now (after following the fungus's, if it changed). */
+  #menuNow(): ReadonlySet<string> {
     this.#followMenu();
-    return askedLevers(this.#menu, s?.task === "queen");
+    return this.#menu;
   }
   /**
    * Copy the fungus's menu if it changed since (whoever set it: setMenu, Fungus.configure, a load). Queued questions were
@@ -336,21 +335,12 @@ export class ColonyJev {
   #state: ColonyJevState = {
     phase: "off",
     run: null,
-    asked: 0,
-    stancesAsked: 0,
+    lanes: perLane(() => ({ asked: 0, cached: 0 })),
     requests: 0,
     hits: 0,
     misses: 0,
-    cached: 0,
-    stancesCached: 0,
     stanceLane: true,
     doctrineCached: [],
-    fungusAsked: 0,
-    fungusCached: 0,
-    growthAsked: 0,
-    growthCached: 0,
-    steerAsked: 0,
-    steerCached: 0,
     failures: 0,
     lastError: null,
   };
@@ -405,23 +395,25 @@ export class ColonyJev {
   }
 
   #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
+    return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+  }
+
+  /** The cache of a context, loaded from the store on first use, keeping only stored answers `valid` (its lane's question) accepts. */
+  #cacheAt(context: string, valid: (key: string, answer: string) => boolean): PolicyCache<string> {
     let c = this.#caches.get(context);
     if (!c) {
       // Stored answers are kept only if this lane's question could have given them.
       c = new PolicyCache<string>(
         context,
-        (this.#store?.load(context) ?? []).filter(([key, a]) => l.valid(key, a)),
+        (this.#store?.load(context) ?? []).filter(([key, a]) => valid(key, a)),
       );
       this.#caches.set(context, c);
     }
-    return c as unknown as PolicyCache<A>;
+    return c;
   }
 
-  /** The cache sizes the panel shows. */
-  #counts(): Pick<
-    ColonyJevState,
-    "cached" | "stancesCached" | "stanceLane" | "doctrineCached" | "fungusCached" | "growthCached" | "steerCached"
-  > {
+  /** The cache sizes the panel shows (each lane's `asked` is kept as it is). */
+  #counts(): Pick<ColonyJevState, "lanes" | "stanceLane" | "doctrineCached"> {
     // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
@@ -432,14 +424,17 @@ export class ColonyJev {
       if (d.steers) steers.set(d.steers.context, this.#cache(d.steers).size);
     }
     const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+    const cached: Record<LaneName, number> = {
+      mode: sum(modes),
+      stance: sum(stances),
+      fungus: this.#cache(this.#fungal).size,
+      growth: this.#cache(this.#growth).size,
+      steer: sum(steers),
+    };
     return {
-      cached: sum(modes),
-      stancesCached: sum(stances),
+      lanes: perLane((name) => ({ asked: this.#state.lanes[name].asked, cached: cached[name] })),
       stanceLane: this.#species.lanes.stance !== undefined,
       doctrineCached: this.#driven.map((d) => (d.modes ? this.#cache(d.modes).size : 0)),
-      fungusCached: this.#cache(this.#fungal).size,
-      growthCached: this.#cache(this.#growth).size,
-      steerCached: sum(steers),
     };
   }
 
@@ -662,12 +657,12 @@ export class ColonyJev {
   seed(context: string, entries: readonly [string, string][], species: Species = GENERIC_ANT): number {
     // Checked against the bundle's own species' words, not the game's (ja-fnd.5.15): a page that seeds while playing one species keeps
     // every other species' answers for a later game.
-    const l = this.#laneFor(context, species);
-    if (!l) return 0;
-    const cache = this.#cache(l, context);
+    const valid = this.#validFor(context, species);
+    if (!valid) return 0;
+    const cache = this.#cacheAt(context, valid);
     let added = 0;
     for (const [key, a] of entries)
-      if (!cache.get(key) && l.valid(key, a)) {
+      if (!cache.get(key) && valid(key, a)) {
         cache.put(key, a);
         added++;
       }
@@ -678,18 +673,17 @@ export class ColonyJev {
     return added;
   }
 
-  /** A lane whose kind of context this is (by its prefix: colony-, stance-, fungus-), to check answers against. */
-  #laneFor(context: string, species: Species): Lane<unknown, string> | null {
-    const kind = laneOfContext(context);
-    if (kind === "fungus") return this.#fungal as Lane<unknown, string>;
-    if (kind === "growth") return this.#growth as Lane<unknown, string>;
-    const d = colonyLanes("", species);
-    if (kind === "steer") return d.steers as Lane<unknown, string> | null;
-    return kind === "mode"
-      ? (d.modes as Lane<unknown, string> | null)
-      : kind === "stance"
-        ? (d.stances as Lane<unknown, string> | null)
-        : null;
+  /**
+   * What answers a context's lane accepts (its row of the lane registry, by the context's prefix: colony-, stance-, fungus-, growth-), in
+   * `species`' lane words for an ant's lane; null for a context of no lane, or of a lane the species lacks (Species.lanes).
+   */
+  #validFor(context: string, species: Species): ((key: string, answer: string) => boolean) | null {
+    const name = laneOfContext(context);
+    if (!name) return null;
+    const words = name === "mode" || name === "stance" ? species.lanes[name] : undefined;
+    if ((name === "mode" || name === "stance") && !words) return null;
+    const row: ErasedLane = LANES[name];
+    return (key, answer) => row.valid(key, answer, words);
   }
 
   /** Drive this one colony (kept for a single colony; see attachColonies). */
@@ -776,19 +770,17 @@ export class ColonyJev {
     this.#aborter = new AbortController();
     this.#clearQueues();
     this.#cooldown = 0;
+    const counts = this.#counts();
     this.#set({
       phase: "running",
       run,
-      asked: 0,
-      stancesAsked: 0,
-      fungusAsked: 0,
-      growthAsked: 0,
       requests: 0,
       hits: 0,
       misses: 0,
       failures: 0,
       lastError: null,
-      ...this.#counts(),
+      ...counts,
+      lanes: perLane((name) => ({ asked: 0, cached: counts.lanes[name].cached })),
     });
     if (this.#askOnStart) {
       this.#askOnStart = false;
@@ -923,9 +915,12 @@ export class ColonyJev {
       key,
       situation,
     }));
-    const counted = LANE_KINDS[l.name].counter;
+    const counts = this.#state.lanes[l.name];
     this.#inFlight++;
-    this.#set({ [counted]: this.#state[counted] + items.length, requests: this.#state.requests + 1 });
+    this.#set({
+      lanes: { ...this.#state.lanes, [l.name]: { ...counts, asked: counts.asked + items.length } },
+      requests: this.#state.requests + 1,
+    });
     this.journal?.note("jev", -1, `asked ${items.length} ${l.name} situation${items.length === 1 ? "" : "s"}`, {
       lane: l.name,
       keys: items.map((it) => it.key),
@@ -956,7 +951,11 @@ export class ColonyJev {
             if (m.name === l.name && m.context === context)
               for (const it of items)
                 if (m.key(it.situation) === it.key && !this.#cache(m, context).get(it.key)) m.queue.set(it.key, it.situation); // a fungus key built under an older menu is not asked again
-        this.#set({ [counted]: this.#state[counted] - items.length, run: runOf(body) ?? this.#state.run });
+        const back = this.#state.lanes[l.name];
+        this.#set({
+          lanes: { ...this.#state.lanes, [l.name]: { ...back, asked: back.asked - items.length } },
+          run: runOf(body) ?? this.#state.run,
+        });
         return;
       }
       if (!res.ok) error = errorOf(body) ?? `HTTP ${res.status}`;

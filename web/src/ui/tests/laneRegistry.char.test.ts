@@ -98,7 +98,7 @@ test("each lane's cache context, under two doctrines or aims, and the fungus's t
   );
   assert.deepEqual(
     AIM_TEXTS.flatMap((a) => (["top", "side"] as const).map((v) => fungusContext(a, v))),
-    ["fungus-v8-ec1a7461", "fungus-v8-side-ec1a7461", "fungus-v8-0859ac1c", "fungus-v8-side-0859ac1c"],
+    ["fungus-v8-bb724482", "fungus-v8-side-bb724482", "fungus-v8-abe11431", "fungus-v8-side-abe11431"],
   );
 });
 
@@ -144,10 +144,10 @@ test("each lane's packed request (a hash of its JSON, and its length), under two
       }),
     ),
     [
-      ["c9226995458e5dab", 4941],
-      ["7e3b23f9b6d9b6cf", 2869],
-      ["66d251acb1dbcedf", 4860],
-      ["4bc4b45e5fa72a24", 2788],
+      ["50559d14fdbc416e", 5041],
+      ["af70a960ed5e28ff", 2969],
+      ["372c25c4e37bc978", 4960],
+      ["ab7c12fe6b851770", 2888],
     ],
   );
   // A fungus request asks one question per lever asked, by host id.
@@ -227,7 +227,7 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
   assert.deepEqual(samples.map(idOf), [
     ["d08b5e29ecdab99a", 3741],
     ["5412af7a49137dcb", 2150],
-    ["6325a426a255b960", 6366],
+    ["0901c198dcb08ba0", 6466],
   ]);
   // The sample asks what a host in that situation is asked: a worker's levers, not a queen's.
   const workerLevers = askedLevers(new Set(DEFAULT_MENU), false);
@@ -241,27 +241,27 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
   assert.deepEqual(Object.keys(queenRequest.questions), ["h0_show", "h0_queenSignal"]);
   // The fungus sample takes a menu (the Learn panel shows the levers the player has on): the request asks only those.
   assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL, menu: new Set(MENUS[1]) }, AIM_TEXTS[0]!, 2)), [
-    "0a8d8be9e2350816",
-    2869,
+    "b59d6066325e496e",
+    2969,
   ]);
-  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["5fd1111c0ab03d17", 4941]);
+  assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["2db96f666465cfc3", 5041]);
   assert.deepEqual(
     [
       tokensPerQuestion("mode", DOCTRINE_TEXTS[0]!),
       tokensPerQuestion("stance", DOCTRINE_TEXTS[0]!),
       tokensPerQuestion("fungus", AIM_TEXTS[0]!),
     ],
-    [240, 197, 706],
+    [240, 197, 707],
   );
 });
 
-test("each lane's flags: id prefix, counter, context prefix, hits, reconsidering, situations a request carries", () => {
+test("each lane's flags: id prefix, context prefix, hits, reconsidering, situations a request carries", () => {
   assert.deepEqual(LANE_KINDS, {
-    mode: { idPrefix: "s", counter: "asked", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
-    stance: { idPrefix: "c", counter: "stancesAsked", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
-    fungus: { idPrefix: "h", counter: "fungusAsked", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
-    growth: { idPrefix: "g", counter: "growthAsked", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
-    steer: { idPrefix: "w", counter: "steerAsked", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
+    mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
+    stance: { idPrefix: "c", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
+    fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
+    growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    steer: { idPrefix: "w", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
   });
 });
 
@@ -269,24 +269,22 @@ test("the client's state carries these fields, in this order (the page shows and
   assert.deepEqual(Object.keys(new ColonyJev().state), [
     "phase",
     "run",
-    "asked",
-    "stancesAsked",
+    "lanes", // per lane of the registry: { asked, cached } (ja-fnd.5.7)
     "requests",
     "hits",
     "misses",
-    "cached",
-    "stancesCached",
     "stanceLane", // whether there is a stance lane at all (ja-fnd.5.12)
     "doctrineCached",
-    "fungusAsked",
-    "fungusCached",
-    "growthAsked",
-    "growthCached",
-    "steerAsked",
-    "steerCached",
     "failures",
     "lastError",
   ]);
+  assert.deepEqual(new ColonyJev().state.lanes, {
+    mode: { asked: 0, cached: 0 },
+    stance: { asked: 0, cached: 0 },
+    fungus: { asked: 0, cached: 0 },
+    growth: { asked: 0, cached: 0 },
+    steer: { asked: 0, cached: 0 },
+  });
 });
 
 test("every context the shipped precache holds belongs to the lane its bundle says", () => {

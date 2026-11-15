@@ -174,7 +174,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 
 **`ChunkLayer`** (`chunks.ts`) gains three things:
 - **A generator on miss** for layers that have one (rock, food, quality). It fills a chunk on its first read, so `rockAt`'s explicit bounds go.
-- **Eviction:** `drop` with a delta kept by the layer's owner.
+- **Eviction:** `drop` with a delta kept by the layer's owner. A region left with no chunk is freed with its last one (`ja-qpv.1.5`).
 - **A table that doesn't grow with the square of the spread.** Built in E1.2: a dense box of regions of 16 × 16 chunks, each a dense array of chunk slots, with no map and no cache, so a read is still two array indexes. Chosen by `scripts/lab/chunk-table-bench.mjs` and `colony-bench` (PRD §66): on today's plane it reads about as fast as the dense bounding box it replaced, where a `Map<chunkKey, A>` was 20–30 % slower and a map of regions with a last-region cache lost 4–8 % of the game's tick; two places 100 × 60 chunks apart cost 1,584 slots a layer in the bench against the box's 7,659.
 
 **Pheromones:** a chunk that falls asleep is dropped back to the pool, not kept zeroed. The rule pheromone.ts uses for a missing rock chunk ("no ground, holds nothing", and a missing neighbour reads as rock) changes to ask the generator.
@@ -182,7 +182,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 **Flat keys go:**
 - the fungus's `sporeCells` and `base` are keyed by `cellKey` (no `regrid`) (E1.3);
 - regrowth's piles are noted per chunk when the chunk is generated, not by one scan at the start;
-- `#outField` becomes a window round the colony's own holes on its own line, a few hundred columns wide, not the whole curtain;
+- `#outField` becomes a window round the colony's own hole on its own line, 193 columns wide and widened only when a tunnel reaches its edge, not the whole curtain (E1.4, `OutField` in `homing.ts`);
 - `cellKey` widens to the chunk key's range (E1.3: one key in `hex.ts`, where `grid.ts`, `hyphae.ts`, `transect.ts` and the forks each had their own).
 
 **`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit for the fog (§8).

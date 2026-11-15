@@ -75,7 +75,7 @@ The species is an **agent kind the one-policy shape must carry**. Cheapest slice
 | Food odour gradient in the air | **new row** (§3) | steering of an empty-jawed forager | climb the gradient within range, else the existing search | no species, no gradient | adds one world field; no gap |
 | Own body heat | own body | mode: return, rest | return at a heat threshold; rest in shade or nest to cool | no heat field | adds a body rule; no gap |
 | Vector and route memory (no trails) | path integration, route memory | carrier steers by them | the existing vector, once route memory (`ja-lp4.16`) is built | trails on | route-memory moves from optional to a dependency |
-| A finder's invitation | encounter rate | `leave` | a returning finder raises a nestmate's `returns` | no invitation | none |
+| A finder's invitation | own body (its pace), raised by contact | `leave` | a finder coming down raises a waiting nestmate's pace; it leaves by its pace (built, `ja-rf5.6`, PRD §60.6) | `invitePace` 0: the generic ant's encounter count | none |
 
 **Situation and lanes.** The species' mode lane has *fewer* values than the generic ant's (`foodTrail` and `alarm` are constant "none"; a new `heat` field has two or three values). Because every situation field multiplies the question space, the lane is its own: its own legend, its own doctrine and its own precache. This is the case the descriptor must serve, and exactly the one that today's hard-coded `Situation` cannot: **one species' sense list is not another's.**
 
@@ -122,11 +122,28 @@ The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situ
 
 Food odour in the air (`colony/plume.ts`, `foodPlume`): every food cell on the plane is a source, and the odour falls step by step through open ground (rock stops it) to nothing at the range, a radial gradient with no wind (Open questions 3). An outside forager with empty jaws and no food in sight climbs it with its three sensors, ahead of its search and of its vector to a remembered spot. The range is **21 cells**: the turn-in distance of about 6 m (Buehlmann et al. 2014, draft) at one world's scale, whose nests are 140 cells apart against *C. fortis*'s about 40 m. The plume is rebuilt at most every 4 s of game time, when the food has changed: odour lags its source, and a rebuild costs about 10 ms. D3: the first find comes sooner than the same seed's blind search on all of seeds 1–20, and about 4.5× as much food is home after 120 s.
 
+## Reading for ja-rf5.1, 2026-11-14 (what could be read in full)
+
+The session's network reached only PubMed Central's article pages, so these stay **unread**: Wehner, Marsh & Wehner 1992, Schmid-Hempel & Schmid-Hempel 1984, the published Buehlmann et al. 2014, Gehring & Wehner 1995 (beyond its abstract), Amor et al. 2011 and Wehner & Wehner 2011 (publishers and repositories refused; free PDFs were found for Buehlmann 2014 at sussex.ac.uk and pure.mpg.de, and Amor's 2011 thesis at dictionnaire-amoureux-des-fourmis.fr, if those hosts are opened). Read in full on PMC, from papers that measured or cite:
+- *C. fortis* running speed: 4.5–619 mm/s over 388 runs (field runs at Maharès and lab recordings pooled), none over 0.62 m/s, the fastest around noon (Wahl et al. 2015, *J Comp Physiol A*, [PMC4439428](https://pmc.ncbi.nlm.nih.gov/articles/PMC4439428/)).
+- Lethal temperature over 3 hours (not CTmax, and lower): *C. bombycina* LT50 44.8 °C, *C. holgerseni* 46.0 °C (de Souza Araujo et al. 2023, [PMC10500329](https://pmc.ncbi.nlm.nih.gov/articles/PMC10500329/)). Gehring & Wehner 1995's abstract gives CTmax 53.6 ± 0.8 °C (*C. bombycina*) and 55.1 ± 1.1 °C (*C. bicolor*), none for *C. fortis* (**unverified** beyond the abstract).
+- *C. bombycina*'s foraging window is "48–51 °C", with the lizard *Acanthodactylus dumerili* its main predator; air and ground reach 50 °C and 70 °C (Willot et al. 2016, [PMC4830450](https://pmc.ncbi.nlm.nih.gov/articles/PMC4830450/), and 2018, [PMC6003908](https://pmc.ncbi.nlm.nih.gov/articles/PMC6003908/), both citing the 1992 letter: secondary, **unverified** against it).
+- Worker life: *C. bicolor* life expectancy 6.1 days, cited from Schmid-Hempel 1984 (Gilad et al. 2021, *Curr Zool*, [PMC9450180](https://pmc.ncbi.nlm.nih.gov/articles/PMC9450180/): secondary); *C. niger* in the lab lived 13.0 ± 14.0 days uninjured, 6.8 with a leg removed, 5.3 with two, and 8.8 % of field workers were injured (Gilad 2021, full text).
+- No record of fungal infection or social immunity in *Cataglyphis* was found on PMC (searched: fungus, entomopathogen, *Beauveria*, *Metarhizium*, social immunity, corpse, necrophoresis).
+
+## What ja-rf5.6 built
+
+The invitation (PRD §60.6, `invite.ts`): an ant waiting at the top of its shaft keeps a pace; each finder coming down past it raises it, a crowd damps it back, and it leaves by its own pace. Staged as Razin's chamber (D2c), at least sevenfold after a finder in groups of 4–8 and fewer exits in a crowd; no trail, no location.
+
 ## What ja-rf5.5 and ja-rf5.12 built
 
 Heat, the sun's height and a night: [desert-heat.md](desert-heat.md), PRD §60.5.
 
 ## Sources
+- Wahl et al. (2015). *J Comp Physiol A* (*C. fortis* running speeds). [PMC4439428](https://pmc.ncbi.nlm.nih.gov/articles/PMC4439428/)
+- Willot et al. (2016). *PLoS ONE*. [PMC4830450](https://pmc.ncbi.nlm.nih.gov/articles/PMC4830450/) (citing Wehner, Marsh & Wehner 1992)
+- Willot et al. (2018). *Sci Rep*. [PMC6003908](https://pmc.ncbi.nlm.nih.gov/articles/PMC6003908/) (citing Wehner, Marsh & Wehner 1992; not opened beyond the citation)
+- Gilad et al. (2021). *Curr Zool*. [PMC9450180](https://pmc.ncbi.nlm.nih.gov/articles/PMC9450180/) (worker survival with injuries; citing Schmid-Hempel & Schmid-Hempel 1984)
 
 - Razin N, Eckmann J-P, Feinerman O (2013). Desert ants achieve reliable recruitment across noisy interactions. *J R Soc Interface* 10:20130079. [doi:10.1098/rsif.2013.0079](https://doi.org/10.1098/rsif.2013.0079), [PMC3627090](https://pmc.ncbi.nlm.nih.gov/articles/PMC3627090/) (full text read 2026-11-11)
 - Wehner R, Marsh AC, Wehner S (1992). Desert ants on a thermal tightrope. *Nature* 357:586–587. [doi:10.1038/357586a0](https://doi.org/10.1038/357586a0)

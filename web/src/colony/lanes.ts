@@ -61,7 +61,7 @@ import {
   type SteerSituation,
 } from "./vocab.ts";
 
-// What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the counter it feeds, the id its items carry, the
+// What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
 // many situations a request carries. One row a lane: ui/colonyJev.ts, ui/prompt.ts and the Learn panel read it instead of switching on a name
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
@@ -69,14 +69,9 @@ import {
 
 export type LaneName = "mode" | "stance" | "fungus" | "growth" | "steer";
 
-/** The counters of ColonyJevState that count situations sent, by lane. */
-export type SentCounter = "asked" | "stancesAsked" | "fungusAsked" | "growthAsked" | "steerAsked";
-
 export interface LaneKind {
   /** the first character of the ids its situations carry in a request (s0, s1, …) */
   readonly idPrefix: string;
-  /** the ColonyJevState counter of situations sent */
-  readonly counter: SentCounter;
   /** the start of every cache context of this lane (policyContext, stanceContext, fungusContext) */
   readonly contextPrefix: string;
   /** whether a lookup counts as a hit or a miss in the run's tally (the ants' mode choices only) */
@@ -91,10 +86,9 @@ export interface LaneKind {
 export const PER_REQUEST = 100;
 
 export const LANE_KINDS: Record<LaneName, LaneKind> = {
-  mode: { idPrefix: "s", counter: "asked", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: PER_REQUEST },
+  mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: PER_REQUEST },
   stance: {
     idPrefix: "c",
-    counter: "stancesAsked",
     contextPrefix: "stance-",
     countsHits: false,
     reconsiders: true,
@@ -102,7 +96,6 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
   },
   fungus: {
     idPrefix: "h",
-    counter: "fungusAsked",
     contextPrefix: "fungus-",
     countsHits: false,
     reconsiders: false,
@@ -111,7 +104,6 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
   // The fungus's hyphal tips (ja-2bw.5): a tip asks its policy at every step, so answers take hold by themselves.
   growth: {
     idPrefix: "g",
-    counter: "growthAsked",
     contextPrefix: "growth-",
     countsHits: false,
     reconsiders: false,
@@ -120,7 +112,6 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
   // An ant's steering weights (staging, ja-ykmu.3): asked at its mode decisions, so a reply makes the ants reconsider.
   steer: {
     idPrefix: "w",
-    counter: "steerAsked",
     contextPrefix: "steer-",
     countsHits: false,
     reconsiders: true,
@@ -142,9 +133,6 @@ export function laneOfContext(context: string): LaneName | null {
 // fungus's asked levers when its menu does). Nothing here is new behaviour: each function is the brain's own, as colonyJev.ts wires it today
 // (laneRegistry.char.test.ts and laneWiring.char.test.ts pin that, laneBinding.test.ts that the rows agree).
 
-/** The counters of ColonyJevState that count answers kept, by lane. */
-export type CachedCounter = "cached" | "stancesCached" | "fungusCached" | "growthCached" | "steerCached";
-
 /** A lane spec that is known to have the optional members `K` (the ants' lanes have a local rule and enumerate their situations; the fungus has `asks`). */
 type Has<L, K extends keyof L> = L & { [P in K]-?: NonNullable<L[P]> };
 
@@ -152,8 +140,6 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   readonly name: LaneName;
   /** the flags and sizes of the lane (LANE_KINDS) */
   readonly kind: LaneKind;
-  /** the ColonyJevState counters it feeds: situations sent, answers kept */
-  readonly counters: { readonly asked: SentCounter; readonly cached: CachedCounter };
   /** the forms its cache context takes besides the words: [""] for one, the fungus's "top" and "side" views */
   readonly variants: readonly Variant[];
   /** a situation the Learn panel shows and costs a question by */
@@ -214,7 +200,6 @@ export const SAMPLE_FUNGAL: FungalSituation = {
 const modeLane: Has<LaneSpec<Situation, string, undefined>, "local" | "all"> = {
   name: "mode",
   kind: LANE_KINDS.mode,
-  counters: { asked: "asked", cached: "cached" },
   variants: [""],
   sample: SAMPLE_SITUATION,
   wordsField: "doctrine",
@@ -237,7 +222,6 @@ const modeLane: Has<LaneSpec<Situation, string, undefined>, "local" | "all"> = {
 const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "all"> = {
   name: "stance",
   kind: LANE_KINDS.stance,
-  counters: { asked: "stancesAsked", cached: "stancesCached" },
   variants: [""],
   sample: SAMPLE_STANCE,
   wordsField: "doctrine",
@@ -261,7 +245,6 @@ export type FungusView = "top" | "side";
 const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>, FungusView>, "asks"> = {
   name: "fungus",
   kind: LANE_KINDS.fungus,
-  counters: { asked: "fungusAsked", cached: "fungusCached" },
   variants: ["top", "side"],
   sample: SAMPLE_FUNGAL,
   wordsField: "aim",
@@ -287,7 +270,6 @@ export const SAMPLE_GROWTH: GrowthSituation = { ahead: "soil", exposed: "wall", 
 const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local" | "all"> = {
   name: "growth",
   kind: LANE_KINDS.growth,
-  counters: { asked: "growthAsked", cached: "growthCached" },
   variants: [""],
   sample: SAMPLE_GROWTH,
   wordsField: "aim",
@@ -310,7 +292,6 @@ export const SAMPLE_STEER: SteerSituation = { ...SAMPLE_SITUATION, mode: "explor
 const steerLane: Has<LaneSpec<SteerSituation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
   name: "steer",
   kind: LANE_KINDS.steer,
-  counters: { asked: "steerAsked", cached: "steerCached" },
   variants: [""],
   sample: SAMPLE_STEER,
   wordsField: "doctrine",
@@ -339,7 +320,6 @@ export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, g
 export interface ErasedLane {
   readonly name: LaneName;
   readonly kind: LaneKind;
-  readonly counters: { readonly asked: SentCounter; readonly cached: CachedCounter };
   readonly variants: readonly string[];
   readonly sample: unknown;
   readonly wordsField: "doctrine" | "aim";

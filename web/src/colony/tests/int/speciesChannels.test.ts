@@ -29,8 +29,9 @@ test("a channel the species lacks takes no scent and reads 0; the others work as
 });
 
 test("the fungus's levers on channels a species lacks are inert", () => {
-  assert.deepEqual(inertLevers(null), [], "the generic ant: none");
-  assert.deepEqual(inertLevers(NO_ALARM).sort(), ["alarm", "alarmLaid"]);
+  assert.deepEqual(inertLevers(null), ["rouse"], "the generic ant: only rouse, which needs a species whose finders invite (ja-rf5.18)");
+  assert.deepEqual(inertLevers(null, true), [], "with an invitation: none");
+  assert.deepEqual(inertLevers(NO_ALARM, true).sort(), ["alarm", "alarmLaid"]);
   // home trail only: the food-scent levers have nothing to bend, the trail lever still lays home trail (review of #127, S1)
   const homeOnly = inertLevers(["home"]);
   for (const id of ["food", "rival", "leak", "alarm", "alarmLaid", "marks"]) assert.ok(homeOnly.includes(id), id);

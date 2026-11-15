@@ -9,8 +9,8 @@
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
-// whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A11, A12) are listed
-// with why. Without --one, `game1` still names G1.
+// whole one-world game. The ids are the legacy ones (U6b added A11 and A12); an assay listed in
+// ONE_PENDING, none now, is reported with why it is not rerun. Without --one, `game1` still names G1.
 //
 // --species <id> plays every run's colonies as that species (colony/species.ts SPECIES, e.g. desert); --set's colony values
 // still apply over its own. Not with --policy (a replayed cache holds the generic ant's answers).
@@ -35,7 +35,7 @@
 // --set both.<param>=… sets a colony parameter on both colonies at once.
 //
 // --log <spec> keeps a game journal of each run (colony/journal.ts, ja-8tb): what happened, as events. The spec is
-// a level (summary; detail adds births, deaths, infections; verbose adds every mode change), categories (colony, queen, stance, birth, death, mode, infection) and filters
+// a level (summary; detail adds births, deaths, infections; verbose adds every mode change and foraging digs), categories (colony, queen, stance, jev, birth, death, mode, infection, dig) and filters
 // (colony=<k>, ant=<i>), comma-separated: --log summary, --log death,mode,colony=0, --log verbose,ant=42. Each run
 // writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
 // --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second

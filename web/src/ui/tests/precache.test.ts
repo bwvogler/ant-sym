@@ -164,6 +164,15 @@ test("every preset aim ships fungus answers for the side view, each a level for 
     const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
     assert.ok(pairs.length > 50, `${b.file}: only ${pairs.length} situations`);
     for (const [key, answer] of pairs) assert.ok(validLevels(key, answer), `${b.file}: ${key} → ${answer}`);
+    // A desert game asks with rouse on its menu, so its workers' keys differ: they ship too (ja-rf5.22), or a desert game without Jev plays
+    // the local rule for every worker.
+    const desert = pairs.filter(([key]) =>
+      key
+        .slice(key.lastIndexOf("|") + 1)
+        .split(",")
+        .includes("rouse"),
+    );
+    assert.ok(desert.length > 40, `${b.file}: only ${desert.length} answers under the desert menu`);
   }
 });
 

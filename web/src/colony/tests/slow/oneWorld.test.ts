@@ -1,35 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, type Layer } from "../../colony.ts";
-import { game1, runAssay } from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { GAME_REGROW, Game, gameRng, MET } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 
 // Whole-game guards of one world (docs/one-world.md U6a), beside slow/side.test.ts: `npm run test:slow`.
 
-// G1 (experiment.ts game1): generateOneWorld(seed), 600 + 600 ants, 600 s, gameRng, the side view's held-food bound (A7):
-// no colony with more than 2 foragers holding food over 120 s at any 10-s sample, counted on both layers.
-// Route memory (ja-lp4.16, PRD §59) turned on at its shipped defaults (routeMemory 1, routeStep 4, routeSee 3) brings the guard's seeds under the bound:
-// the most per colony (you / rival) on seed 4: 2 / 1, 5: 2 / 1, 9: 2 / 1 (seeds 1-10, the worst seed 5, sum 27; without it, on main: 33 / 6, 7 / 3,
-// 11 / 3, worst 33, sum 193; PRD §59 has the table). Before it, one world failed the bound on every seed (U6a's measure: 12-44 at worst; the mound's smell,
-// ja-lp4.11, PRD §56: seeds 5 and 9 at 10 and 7). The bound is not loosened (owner, 2026-11-11). Each seed runs about 3-5 minutes.
-test(
-  "G1, one world: hardly a forager holds its food over 120 s (seeds 4, 5 and 9, 600 + 600 ants, 600 s; bound 2)",
-  { timeout: 1_800_000 },
-  () => {
-    const held: string[] = [];
-    let worst = 0;
-    for (const seed of [4, 5, 9]) {
-      const m = runAssay(game1, seed).metrics;
-      held.push(
-        `seed ${seed}: ${m["you.maxHeld"]} / ${m["rival.maxHeld"]} (on the plane ${m["you.maxHeldPlane"]} / ${m["rival.maxHeldPlane"]})`,
-      );
-      worst = Math.max(worst, m.maxHeld as number);
-    }
-    assert.ok(worst <= 2, `foragers holding food over 120 s, most at any 10-s sample per colony: ${held.join("; ")}`);
-  },
-);
+// G1, one world, is its own file (oneWorldG1.test.ts): seeds 1-10 in worker threads, judged on a share of seeds (ja-ysco).
 
 // Unity reachable on one world (PRD §53, ja-i0f; docs/one-world.md U6a): Garden painted in both colonies at the start, in
 // the curtain by each royal chamber, and the game as the page plays it (gameRng, regrowth on, autoFound off). The side view never got

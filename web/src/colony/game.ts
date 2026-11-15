@@ -4,7 +4,7 @@ import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE
 import { type Policy, SITUATION_SCHEMA, type StancePolicy } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
-import { Fungus, INFECTED, type FungusParams } from "./fungus.ts";
+import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
@@ -13,6 +13,8 @@ import { type Cell, type End, nearestValid, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
+import { seeHoles } from "./layers.ts";
+import { stepCrayons, type CrayonLine } from "./builder.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -78,9 +80,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -162,6 +164,8 @@ export interface GameSave {
   founded?: Founding[];
   /** alates flown and not yet founded or lost (Game.flights) */
   flights?: Flight[];
+  /** the builder's crayon lines still fading (Game.crayons, builder.ts) */
+  crayons?: CrayonLine[];
   params: unknown;
   map: unknown;
   colonies: Record<string, unknown>[];
@@ -338,6 +342,8 @@ export class Game {
   #regrowClock = 0;
   /** food units that have grown back (map.foodTotal grows by it too) */
   regrown = 0;
+  /** The builder's crayon lines (builder.ts, ja-kjj8): each kept topped up as it fades; none unless a child drew one. */
+  crayons: CrayonLine[] = [];
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
    * §50: colony policy is hidden until the fungus infects a queen). Never closes again.
@@ -393,6 +399,8 @@ export class Game {
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // One world: spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(one ? this.layers : map, this.params.fungus);
+    // A species whose finders invite starts with rouse on its menu (owner, review of #202 D2).
+    if (this.#speciesParams().invitePace ?? 0) this.fungus.menu = menuFor(DEFAULT_MENU, true);
     // The midden's corpses, for a hypha that reaches one (ja-2bw.7): every colony's, on the layer they are buried on.
     const middenLayer = one ? PLANE : 0;
     // One world: a plane tip that comes to a hole crosses down it (ja-2bw.14).
@@ -434,7 +442,7 @@ export class Game {
     this.colonies.forEach((c, k) => {
       // One world: the line as it stands (it grows with every founding), before the holes are read off it.
       if (this.world) c.line = this.world.line;
-      c.seeHoles();
+      seeHoles(c);
       this.layers.forEach((m, l) => {
         if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
       });
@@ -999,6 +1007,7 @@ export class Game {
 
   tick(dt: number): void {
     this.time += dt;
+    if (this.crayons.length) stepCrayons(this, dt);
     for (const c of this.colonies) c.tick(dt);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
@@ -1204,6 +1213,7 @@ export class Game {
       revealed: [...this.revealed],
       founded: this.founded.map((f) => JSON.parse(JSON.stringify(f)) as Founding),
       flights: this.flights.map((f) => ({ ...f })),
+      crayons: this.crayons.map((l) => ({ ...l, cells: [...l.cells] })),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
       map: encode(map),
@@ -1274,6 +1284,7 @@ export class Game {
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
     this.flights = (saved.flights ?? []).map((f) => ({ ...f }));
+    this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
     fillLike(this.map, saved.map);
     if (world && sw) fillLike(world.curtain, sw.curtain);

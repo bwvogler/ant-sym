@@ -278,8 +278,8 @@ export const ANT_FIELDS = {
   /**
    * What the pellet carried is (with `pellet`; one place for it, review of MR 15: five per-ant arrays each cleared by
    * hand): DUG, soil it dug, to the hole and out, or into unused space on the way; LOOSE, loose soil off the mound (moved,
-   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. #clearPellet
-   * puts the pellet and all its state down at once.
+   * not dug: not in soilDug), out along the ground; FILL, loose soil taken down into the nest to backfill. `clearPellet`
+   * (pellets.ts) puts the pellet and all its state down at once.
    */
   soil: { type: Uint8Array, reset: "spawn" },
   /** the cell it looked from before that (cellKey; NO_KEY none): the way it came, which is never a stale branch */
@@ -310,6 +310,15 @@ export const ANT_FIELDS = {
    * ja-nan3); −1 = its last answer was not drawn, so it is asked again only when its situation changes
    */
   redraw: { type: Float32Array, fill: -1, reset: "spawn" },
+  // ——— the desert ant's invitation (ja-rf5.6), last for the same reason as the heat's ———
+  /** its pace (cm/s), waiting at the top of its shaft: what a finder passing raises, and what its leave response reads; 0 at birth */
+  pace: { type: Float32Array, reset: "spawn" },
+  // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
+  /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
+  digBout: { type: Float32Array, reset: "spawn" },
+  // ——— the fungus's rouse (ja-rf5.18), last for the same reason ———
+  /** rouse (ja-rf5.18, the fungus's): coming down its shaft, it counts as this share of a finder to the ants waiting at the top */
+  rouse: { type: Float32Array, reset: "asIs" },
   /** the steering weights an ant out exploring or following steers by, packed (vocab.ts encodeSteering; staging, ja-ykmu): STEER_NEUTRAL = none */
   steerCode: { type: Uint16Array, fill: 364, reset: "spawn" },
   /** the weights it steers by near its last find (find `near`), packed as steerCode; STEER_NEUTRAL = none */

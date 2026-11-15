@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   DOCTRINES,
   LETHAL,
@@ -44,6 +44,7 @@ interface Props {
   saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
   onLoad: (r: SaveRecord) => void;
 }
+export type DetailsProps = Props;
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 const h2 = "flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3";
@@ -57,7 +58,7 @@ export default function DetailsScreen(props: Props) {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       // The Learn drawer opens over this screen: its Escape is its own.
-      if (document.querySelector('[role="dialog"][aria-label="Learn"]')) return;
+      if (document.querySelector('[role="dialog"][aria-label="Codex"]')) return;
       const a = document.activeElement;
       if (a instanceof HTMLElement && panel.current?.contains(a)) a.blur(); // commits a doctrine being typed (onBlur)
       onClose();
@@ -96,7 +97,20 @@ export default function DetailsScreen(props: Props) {
   );
 }
 
+/** Inside a drawer (PRD §69) a card drops its own frame and heading: the drawer has them. */
+const Bare = createContext(false);
+export function BareCards({ children }: { children: ReactNode }) {
+  return <Bare.Provider value>{children}</Bare.Provider>;
+}
+
 function Card({ label, title, children, wide = false }: { label: string; title: ReactNode; children: ReactNode; wide?: boolean }) {
+  const bare = useContext(Bare);
+  if (bare)
+    return (
+      <section className="min-w-0 text-sm text-fg-2" aria-label={label}>
+        {children}
+      </section>
+    );
   return (
     <section
       className={`min-w-0 rounded-lg border border-line bg-panel px-4 py-3 text-sm text-fg-2 ${wide ? "lg:col-span-2" : ""}`}
@@ -108,7 +122,7 @@ function Card({ label, title, children, wide = false }: { label: string; title: 
   );
 }
 
-function Colonies({ stats }: Props) {
+export function Colonies({ stats }: Props) {
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
   return (
     <Card label="colony stats" title="Colonies" wide>
@@ -201,10 +215,10 @@ function JevCard({ jev }: Props) {
         <Stat label="this run" value={run ? usd(run.usd) : "—"} />
         <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
         <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
-        <Stat label="situations asked" value={String(jev.state.asked)} />
+        <Stat label="situations asked" value={String(jev.state.lanes.mode.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.cached} · ${jev.state.stanceLane ? `${jev.state.stancesCached} stances` : "no stance lane"} · ${jev.state.fungusCached} fungus · ${jev.state.growthCached} growth`}
+          value={`${jev.state.lanes.mode.cached} · ${jev.state.stanceLane ? `${jev.state.lanes.stance.cached} stances` : "no stance lane"} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
         />
         <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>
@@ -514,7 +528,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
 }
 
 /** Saved games: the autosave and the player's slots, each with Load; Save to a slot. */
-function SavedGames({ saves, onLoad, controls }: Props) {
+export function SavedGames({ saves, onLoad, controls }: Props) {
   const slots = Array.from({ length: SLOTS }, (_, k) => k);
   return (
     <Card label="saved games" title="Saved games">
@@ -657,8 +671,9 @@ export function LeverChips({
   lock: string | null;
   onChange: (menu: string[]) => void;
 }) {
-  // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12).
-  const inert = new Set(inertLevers(game.player.params.channelSet));
+  // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12); an
+  // invite lever (rouse) is inert where the species' finders invite no one (ja-rf5.18).
+  const inert = new Set(inertLevers(game.player.params.channelSet, game.player.params.invitePace > 0));
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
       {(["perceive", "emit", "lethal"] as const).map((kind) => (
@@ -682,9 +697,11 @@ export function LeverChips({
                   locked
                     ? (lock ?? undefined)
                     : nothing
-                      ? `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
+                      ? v.invite
+                        ? `${v.blurb}. Nothing to bend: this species' finders invite no one out.`
+                        : `${v.blurb}. Nothing to bend: this species lays and reads none of its scent.`
                       : heldOff
-                        ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Fungus panel).`
+                        ? `${v.blurb}. Held off until your fungus keeps the ${upgradeFor(v.id)?.name ?? ""} upgrade (Mutations).`
                         : v.blurb
                 }
                 onClick={() => onChange(on ? menu.filter((id) => id !== v.id) : [...menu, v.id])}

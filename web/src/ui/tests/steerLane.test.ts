@@ -129,7 +129,7 @@ test("shipped answers reach the colony's steer policy; a situation with none pla
   assert.deepEqual(c.steerPolicy(out), NEUTRAL_STEERING, "nothing cached: neutral");
   assert.equal(j.seed(steerContext(doctrine), [[steerKey(out), "0/0/1,0/0/1"]]), 1);
   assert.deepEqual(c.steerPolicy(out), { ...NEUTRAL_STEERING, search: 1, memory: 1 });
-  assert.equal(j.state.steerCached, 1);
+  assert.equal(j.state.lanes.steer.cached, 1);
   assert.deepEqual(c.steerPolicy({ ...out, mode: "return" }), NEUTRAL_STEERING, "a homing ant is not asked: neutral");
 });
 
@@ -145,7 +145,7 @@ test("in a run, an explorer's situation is asked under the doctrine, and the ans
   await tick(80);
   assert.ok(seen.questions.includes("w0_search") && seen.questions.includes("w0_memory"), `asked ${seen.questions.join(", ")}`);
   assert.deepEqual(c.steerPolicy(out), { ...NEUTRAL_STEERING, search: 1, memory: 1 });
-  assert.ok(j.state.steerAsked >= 1);
+  assert.ok(j.state.lanes.steer.asked >= 1);
   // Another doctrine is another cache.
   j.setDoctrine(DOCTRINES[1]!.text);
   assert.deepEqual(c.steerPolicy(out), NEUTRAL_STEERING);

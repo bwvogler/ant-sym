@@ -24,6 +24,7 @@ import {
 import { fetches, walkTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN, STEER_NEUTRAL, steerLevel } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
+import { mill, nearFind, onMLine, siteAim } from "./plane.ts";
 
 /**
  * The steering weights' effects (staging, ja-ykmu; docs/steering.md "The mechanic"), by level −1, 0, +1: `search` scales random
@@ -81,7 +82,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const noise = (rng() - 0.5) * 2 * dt;
   // Steering weights (staging, ja-ykmu): an empty-jawed ant out exploring or following on one world's plane steers by the weights its
   // steer policy gave it. None (STEER_NEUTRAL, always so with steerLane 0) leaves every term below as it was, bit for bit.
-  const sc = col.steerNear[i] !== col.steerCode[i] && col.nearFind(i) ? col.steerNear[i] : col.steerCode[i];
+  const sc = col.steerNear[i] !== col.steerCode[i] && nearFind(col, i) ? col.steerNear[i] : col.steerCode[i];
   const steered =
     sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
   const sl = steered ? steerLevel(sc, 0) : 0;
@@ -105,7 +106,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   if (held && col.leaveOk[i] === 0) {
     // One world (ja-web): held at the gate, it mills among the top cells of its shaft (mill), where the carriers come
     // down past it.
-    if (col.mill(i, p.speed * dt)) h = col.towardTarget(i);
+    if (mill(col, i, p.speed * dt)) h = col.towardTarget(i);
     else h += noise * p.wander;
   } else if (outward) {
     // Out on its heading; a bump turned it (in moveDig, where the step is blocked), and while it wanders after one, it wanders.
@@ -252,7 +253,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
         // Round rock in open ground: steer by touch.
         if (t0 < FOLLOW_FLIP && t >= FOLLOW_FLIP) h += Math.PI;
         const dist = Math.hypot(nest.x - x, nest.y - y);
-        if (dist < col.hitDist[i] - 1 && col.onMLine(i, x, y) && !touchProbe(col, x, y, toNest, 1.5)) {
+        if (dist < col.hitDist[i] - 1 && onMLine(col, i, x, y) && !touchProbe(col, x, y, toNest, 1.5)) {
           col.wall[i] = 0; // back on its line home, nearer than where it met this wall, and the way is open
           h = turnToward(h, toNest, p.turnRate * dt * 0.8);
         } else if (t >= FOLLOW_GIVE_UP) col.giveUp(i);
@@ -300,7 +301,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
           const hit = col.hitDist[i];
           const open2 = open && !touchProbe(col, ox, oy, Math.atan2(nest.y - oy, nest.x - ox), 2);
           // Back on its line home, nearer than the nearest it has been on this trip, with the way open.
-          const onLine = dist < hit - 1 && col.onMLine(i, ox, oy, SIDE) && open;
+          const onLine = dist < hit - 1 && onMLine(col, i, ox, oy, SIDE) && open;
           // Round an island and back where it met it, with the way home open (it met it turning, not heading home).
           const island = t > 2 && cx === CELL[0] && cy === CELL[1] && open;
           // In dug ground, the way home open two cells on and some way nearer than its best this trip.
@@ -350,7 +351,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     }
   } else if (memoryLead) {
     // Memory over the trail (Grüter, Czaczkes & Ratnieks 2011): back to where it found food, as site fidelity steers.
-    h = turnToward(h, col.siteAim(i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
+    h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
   } else if (mode === FOLLOW && col.staysIn(i)) {
     // An inside worker (zoned by age) doesn't follow a food trail: it leads out, where it may not go. It explores.
     if (walkTunnel(col, i, EXPLORE, p.speed * dt)) h = col.towardTarget(i);
@@ -499,7 +500,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       !Number.isNaN(col.foodX[i]) &&
       !(steered && steerLevel(sc, 1) === -1)
     )
-      h = turnToward(h, col.siteAim(i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
+      h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
     else h += noise * p.wander * sm;
   }
   if (steered) {

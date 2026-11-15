@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { CORPSE, STRAINS } from "../../fungus.ts";
+import { CORPSE, STALK, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
@@ -16,10 +16,10 @@ import { OPEN, rockAt, SOIL } from "../../world.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100), hyphae on, the fungus landed by colony 0's hole and evolving. */
-function game(hyphae: boolean): Game {
+function game(hyphae: boolean, flow = false): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae } },
+    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae, flow } },
     gameRng(7),
     // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
     { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
@@ -110,6 +110,21 @@ test("a game with hyphae saves and loads as it was", () => {
   back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
   assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
   assert.deepEqual(back.fungus.hyphaeOn(CURTAIN)!.save(), g.fungus.hyphaeOn(CURTAIN)!.save());
+});
+
+test("with mass flow on (the default), a game saves, loads and plays on as it would have (ja-tgw9)", () => {
+  const g = game(true, true);
+  crossDown(g);
+  runFor(g, 20);
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true, true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
+  assert.ok(g.fungus.hyphaeOn(PLANE)!.loaded > 0, "nothing in transit to save");
+  // Played on, the loaded game's hyphae match the unbroken game's: loads, links and idle rounds all came back.
+  runFor(g, 60);
+  runFor(back, 60);
+  for (const l of [PLANE, CURTAIN]) assert.deepEqual(back.fungus.hyphaeOn(l)!.save(), g.fungus.hyphaeOn(l)!.save(), `layer ${l}`);
 });
 
 test("with hyphae off, the fungus grows none", () => {
@@ -276,7 +291,7 @@ test("a crossing tip leaves the plane: no plane tip stays in a hole's mouth, so 
   const was = g.fungus.rootShaft.bind(g.fungus);
   g.fungus.rootShaft = (l, x, y) => {
     rooted++;
-    was(l, x, y);
+    return was(l, x, y);
   };
   const plane = g.fungus.hyphaeOn(PLANE)!;
   const end = g.time + 120;
@@ -413,4 +428,135 @@ test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps 
   e.mass += 200;
   for (let t = 0; t < KNOT.sprout[1] + 10 && !knot.sprouted; t++) runFor(g, 1);
   assert.ok(knot.sprouted, `no sprout ${KNOT.sprout[1] + 10} s after forming`);
+});
+
+/** A game with *Stalks* bought to `level` and one corpse buried on the plane at (60, 40). */
+function buried(level: number): Game {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  for (let k = 0; k < level; k++) assert.ok(g.fungus.upgrade("stalks"));
+  g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  return g;
+}
+
+/** The spores on the plane within hex distance `from`..`to` of cell (cx, cy). */
+function sporesNearAt(g: Game, cx: number, cy: number, from: number, to: number): number {
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  let sum = 0;
+  for (let y = cy - to - 1; y <= cy + to + 1; y++)
+    for (let x = cx - to - 1; x <= cx + to + 1; x++) {
+      const d = hexDistance(x, y, cx, cy);
+      if (d >= from && d <= to) sum += spores.get(x, y);
+    }
+  return sum;
+}
+
+/** The spores on the plane within hex distance `from`..`to` of the corpse at (60, 40). */
+const sporesNear = (g: Game, from: number, to: number) => sporesNearAt(g, 60, 40, from, to);
+
+test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.delay and its spores then fill a ring; the ground holds what the cadaver paid (ja-2bw.10)", () => {
+  // The design's numbers (PRD §63.12; the delays the owner's, 2026-11-14): the checks below read them from STALK.
+  assert.deepEqual(STALK, { delay: [0, 20, 10], radius: [0, 2, 4] });
+  const k = hyphaKey(60, 40);
+  for (const level of [1, 2]) {
+    const g = buried(level);
+    const none = buried(0);
+    const delay: number = STALK.delay[level] ?? 0;
+    const radius: number = STALK.radius[level] ?? 0;
+    runFor(g, delay - 1);
+    assert.ok(!g.fungus.stalksOn(PLANE).includes(k), `a stalk before its delay at level ${level}`);
+    assert.equal(sporesNear(g, 1, radius), 0, `spores round the corpse before the stalk at level ${level}`);
+    runFor(g, 2);
+    assert.ok(g.fungus.stalksOn(PLANE).includes(k), `no stalk after its delay at level ${level}`);
+    runFor(g, 20);
+    // Most of what it paid since the stalk lies round it, out to the edge of its radius and no further.
+    assert.ok(sporesNear(g, 1, radius) > 0.5 * CORPSE.rate * 20, `the ring holds little at level ${level}`);
+    assert.ok(sporesNear(g, radius, radius) > 0, `nothing at the ring's edge at level ${level}`);
+    assert.equal(sporesNear(g, radius + 1, radius + 1), 0, `spores past the radius at level ${level}`);
+    // The ground holds about what the cadaver paid, as without a stalk: spread, not lost to the fade, nor made from
+    // nothing. A little less, since more of the ring lies where foragers pass and take some (level 2: 4.0 against 4.6).
+    runFor(none, g.time - none.time);
+    assert.ok(!none.fungus.stalksOn(PLANE).includes(k), "a stalk without the upgrade");
+    const [ours, theirs] = [sporesNear(g, 0, radius), sporesNear(none, 0, radius)];
+    assert.ok(ours > 0.75 * theirs && ours < 1.05 * theirs, `level ${level}: ${ours} on the ground against ${theirs} without a stalk`);
+    assert.ok(Math.abs(none.fungus.corpsesOn(PLANE).get(k)! - g.fungus.corpsesOn(PLANE).get(k)!) < 1e-9, "the cadaver paid differently");
+    if (level !== 1) continue;
+    // A second corpse on the same cell adds its spores and keeps the stalk; its age is saved.
+    g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: g.fungus.evolution!.strain }, PLANE);
+    assert.ok(g.fungus.stalksOn(PLANE).includes(k), "a second corpse reset the stalk");
+    const back = game(true);
+    back.load(JSON.parse(JSON.stringify(g.save())) as GameSave);
+    assert.ok(back.fungus.stalksOn(PLANE).includes(k), "the stalk was not saved");
+  }
+  // A spent corpse's stalk is gone.
+  const spent = buried(1);
+  runFor(spent, CORPSE.spores / CORPSE.rate + 2);
+  assert.ok(!spent.fungus.stalksOn(PLANE).includes(k), "a spent corpse still has a stalk");
+});
+
+test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
+  const [x, y, radius] = [55, 30, STALK.radius[2]];
+  const map = g.world!.plane;
+  const rocks: [number, number][] = [];
+  for (let cy = y - radius - 1; cy <= y + radius + 1; cy++)
+    for (let cx = x - radius - 1; cx <= x + radius + 1; cx++)
+      if (hexDistance(cx, cy, x, y) <= radius && rockAt(map, cx, cy) !== OPEN) rocks.push([cx, cy]);
+  assert.ok(rocks.length > 0, "no rock round the corpse");
+  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  const spores = g.fungus.sporesOn(PLANE)!.spores;
+  for (let t = 0; t < STALK.delay[2] + 30; t++) {
+    runFor(g, 1);
+    for (const [cx, cy] of rocks) assert.equal(spores.get(cx, cy), 0, `spores on rock at (${cx}, ${cy}) after ${g.time.toFixed(0)} s`);
+  }
+  assert.ok(sporesNearAt(g, x, y, 1, radius) > 0, "no spores round the corpse");
+});
+
+test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
+  const g = game(true);
+  const e = g.fungus.evolution!;
+  e.growth = 1e7;
+  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(g.fungus.upgrade("stalks"));
+  crossDown(g);
+  const map = g.world!.curtain;
+  let at: [number, number] | null = null;
+  for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];
+  assert.ok(at);
+  g.fungus.colonise(CURTAIN, ...at);
+  runFor(g, STALK.delay[2] + 5);
+  assert.deepEqual(g.fungus.stalksOn(CURTAIN), []);
+});
+
+test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mass; mass reaches the curtain down the hole, and its tips grow on it", () => {
+  const g = game(true, true);
+  const e = g.fungus.evolution!;
+  let worst = 0;
+  let curtainFed = false;
+  for (let t = 0; t < 150; t++) {
+    runFor(g, 1);
+    let held = 0;
+    for (const l of [PLANE, CURTAIN]) {
+      const h = g.fungus.hyphaeOn(l);
+      if (h) held += h.length * HYPHA_MASS + h.loaded;
+    }
+    // From the first round of tip steps on (the body's mass is placed at each round, TIP_STEP apart).
+    if (t >= 5) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
+    const down = g.fungus.hyphaeOn(CURTAIN);
+    if (down && down.loaded > 0) curtainFed = true;
+  }
+  assert.ok(worst < 0.06, `the hyphae held ${(worst * 100).toFixed(1)} % off the body's mass`);
+  assert.ok(curtainFed, "no mass reached the curtain");
+  const down = g.fungus.hyphaeOn(CURTAIN)!;
+  assert.ok(down.length > 6, `the curtain's hyphae grew to ${down.length} cells`);
+  // Mass flows out to the tips rather than sitting where it entered: most of the body is hypha, not load in transit
+  // (with the patch's mass spread over cells no hypha grows from, two thirds of it sat stuck).
+  const loaded = g.fungus.hyphaeOn(PLANE)!.loaded + down.loaded;
+  assert.ok(loaded < 0.4 * e.mass, `${loaded.toFixed(1)} of ${e.mass.toFixed(1)} in transit`);
 });

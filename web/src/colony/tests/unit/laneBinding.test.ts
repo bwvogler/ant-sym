@@ -51,25 +51,12 @@ const FUNGAL_SEEN: FungalSituation[] = [
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the five lanes, each with its flags, counters, variants, words and batching", () => {
+test("the registry lists the five lanes, each with its flags, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
     ["mode", "stance", "fungus", "growth", "steer"],
   );
-  for (const l of LANE_LIST) {
-    assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
-    assert.equal(l.counters.asked, l.kind.counter, "the counter a lane feeds is the one its flags row names");
-  }
-  assert.deepEqual(
-    LANE_LIST.map((l) => [l.counters.asked, l.counters.cached]),
-    [
-      ["asked", "cached"],
-      ["stancesAsked", "stancesCached"],
-      ["fungusAsked", "fungusCached"],
-      ["growthAsked", "growthCached"],
-      ["steerAsked", "steerCached"],
-    ],
-  );
+  for (const l of LANE_LIST) assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
     [[""], [""], ["top", "side"], [""], [""]],

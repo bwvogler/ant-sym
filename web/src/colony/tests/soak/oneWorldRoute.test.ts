@@ -147,8 +147,8 @@ test("route memory records a place every routeStep cells on the way out, from th
 test("route memory off (routeMemory 0) records nothing, and a place set by hand changes nothing", () => {
   assert.deepEqual(
     [DEFAULT_COLONY.routeMemory, DEFAULT_COLONY.routeStep, DEFAULT_COLONY.routeSee],
-    [1, 4, 3],
-    "the shipped defaults: on a stall, every 4 cells, a place seen within 3",
+    [1, 3, 3],
+    "the shipped defaults: on a stall, every 3 cells, a place seen within 3",
   );
   const run = (mem: boolean): number[] => {
     const w = plane({ routeMemory: 0 });
@@ -349,7 +349,8 @@ test("route memory 2 retraces the way out to where it began: its first place, ne
 
 test("route memory: a carrier without food, without places, or already retraced this trip does not retrace", () => {
   const run = (mem: number, how: "food" | "places" | "done"): { state: number; search: number } => {
-    const w = plane({ routeMemory: mem });
+    // routeEnd 0: a retrace done searches round its vector's end, where this carrier stands (with routeEnd 1 it would make for its first place).
+    const w = plane({ routeMemory: mem, routeEnd: 0 });
     const { g, c, hx, hy } = w;
     if (how !== "places")
       store(
@@ -525,7 +526,7 @@ test("route memory: not on a top-down map, which has no vector to fail", () => {
 });
 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
-  assert.equal(SAVE_VERSION, 11);
+  assert.equal(SAVE_VERSION, 12);
   const make = (): Game =>
     new Game(
       generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),

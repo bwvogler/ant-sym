@@ -1,4 +1,5 @@
 // Arrive (docs/refactor.md S3.4): the last stage of an ant's step in tick. Where the step landed it: food picked up, spoil or a corpse carried out and dropped, a pellet onto the mound or back as fill, a loose pellet or the plane's spoil taken up, home at the nest (food stored, a hand chosen, rest), tiredness, home and leaving again, and the bookkeeping of its home vector, floor marks, nest work and route on the plane. Moved out of Colony.tick verbatim but for `this` becoming `colony` (the moved code has its own `col` and `c`); a pellet carrier crossing up at its hole, or an ant on the plane going down a hole (its own, or a raided foe's), ends its step here (returns true).
+import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
 import { crossDown, crossUp } from "./crossing.ts";
@@ -13,6 +14,8 @@ import { fetches } from "./tunnel.ts";
 import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
+import { pointDown, rememberSite } from "./plane.ts";
+import { pickLoose } from "./pellets.ts";
 
 export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -53,7 +56,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   // for a tick: the count stayed under the threshold, and only scouts went out.
   // One world (ja-web): held at the gate, it meets every carrier that came down the hole last tick (holeSeen): each
   // walks down the shaft past all of them. Its count leaks on both layers, so a wait's count fades on its trip out.
-  if (leak) {
+  // The invitation (ja-rf5.6, Razin et al. 2013): for a species whose finders invite by pace, a waiting ant's own pace instead: each finder
+  // that came down the shaft past it last tick pulls it toward the finder's pace; a crowded shaft top damps it back faster (invite.ts).
+  if (leak && colony.params.invitePace > 0) {
+    colony.pace[i] = paceAfter(colony.params, colony.pace[i], held ? colony.holeSeen : 0, colony.crowd[i], dt);
+  } else if (leak) {
     let m = colony.met[i] * metLeak;
     if (gate ? atNest && !carrying : held) m += gate ? returnsAround(colony, CELL[0], CELL[1]) : colony.holeSeen;
     colony.met[i] = m;
@@ -80,7 +87,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.carrying[i] = 1;
     colony.quality[i] = qualityAt(map, CELL[0], CELL[1]);
     // Remembered too while ants ask for steering weights (staging, ja-ykmu): the `memory` weight steers by it.
-    if ((p.siteFidelity > 0 || p.steerLane > 0) && colony.line !== null && colony.cur === PLANE) colony.rememberSite(i);
+    if ((p.siteFidelity > 0 || p.steerLane > 0) && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
     colony.homeAfresh(i);
     colony.since[i] = 0;
     colony.fatigue[i] = 0; // found food: the search succeeded
@@ -145,7 +152,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     mode === EXPLORE &&
     isSky(map, CELL[0], CELL[1]) &&
     colony.enteredCell(i) &&
-    colony.pickLoose(i, CELL[0], CELL[1], toEnemy !== null)
+    pickLoose(colony, i, CELL[0], CELL[1], toEnemy !== null)
   ) {
     // Picked up a loose pellet off the mound (see pickLoose).
   } else if (
@@ -165,6 +172,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.bestD[i] = Infinity;
     colony.stallT[i] = 0;
     if (colony.since[i] > 0) colony.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
+    // Home from a trip with nothing (ja-16rp): an old forager digs out from the nest for a while before it goes out again.
+    // Only just in (since > 0): an ant resting at home keeps what is left of its bout. No pellet: a spoil carrier isn't
+    // home from a search (not met in practice; a guard).
+    if (p.forageDig > 0 && colony.since[i] > 0 && mode === RETURN && !carrying && !pellet && colony.queen && colony.band(i) === 2)
+      colony.digBout[i] = p.forageDig;
     if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item))) {
       colony.carrying[i] = 0;
       colony.stored++;
@@ -199,6 +211,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     }
   } else colony.since[i] = colony.since[i] + dt;
   if (!atNest) colony.restT[i] = 0;
+  // A foraging dig (ja-16rp) runs down while the ant explores underground, and ends when it has food in its jaws.
+  if (colony.digBout[i] > 0) {
+    if (colony.carrying[i]) colony.digBout[i] = 0;
+    else if (colony.mode[i] === EXPLORE && colony.under[i] === 1) colony.digBout[i] = Math.max(0, colony.digBout[i] - dt);
+  }
   // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
   // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
   // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
@@ -261,7 +278,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // back down (carriers aside: soil goes out to the mound; food is on its way in).
     if (colony.queen && colony.under[i] && !carrying && !pellet && !colony.mayGoOut(i)) {
       colony.antCell(i);
-      if (isSky(map, CELL[0], CELL[1])) h = colony.pointDown(i, x0, y0, h);
+      if (isSky(map, CELL[0], CELL[1])) h = pointDown(colony, i, x0, y0, h);
     }
     integrate(colony, i, x0, y0, atNest);
     // Road signs: underground, a strong nest trail where it stands tells it where it is, and its memory's error fades
@@ -287,7 +304,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // heads home the vector is fixed.
     // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
     if (colony.mode[i] !== RETURN || outward) colony.odoSurf[i] = colony.odoSurf[i] + Math.hypot(colony.x[i] - x0, colony.y[i] - y0);
-    if (p.routeMemory > 0 && (colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW) && !colony.carrying[i]) routeRecord(colony, i);
+    const out = colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW || (p.routeFight > 0 && colony.mode[i] === FIGHT);
+    if (p.routeMemory > 0 && out && !colony.carrying[i]) routeRecord(colony, i);
     colony.antCell(i);
     const k = colony.holeAt(CELL[0], CELL[1]);
     if (k >= 0 && (k === p.nest ? colony.wantsIn(i, colony.mode[i]) : colony.mode[i] === FIGHT && colony.stanceOf(i) === "raid")) {

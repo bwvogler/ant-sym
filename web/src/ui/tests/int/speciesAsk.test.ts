@@ -99,10 +99,10 @@ test("a species' requests carry its own legend and choices, and no stance questi
 
 test("a reply in the species' choices is cached; one its words drop is not", async () => {
   const ok = await play("explore");
-  assert.ok(ok.j.state.cached > 0, "explore is one of the species' answers");
+  assert.ok(ok.j.state.lanes.mode.cached > 0, "explore is one of the species' answers");
   ok.j.dispose();
   live.delete(ok.j);
   const dropped = await play("follow");
   assert.ok(dropped.reqs.length > 0, "it asked");
-  assert.equal(dropped.j.state.cached, 0, "follow is not the lone forager's to give");
+  assert.equal(dropped.j.state.lanes.mode.cached, 0, "follow is not the lone forager's to give");
 });

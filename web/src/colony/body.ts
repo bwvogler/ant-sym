@@ -3,7 +3,7 @@
 import type { Colony } from "./colony.ts";
 import { antResets } from "./ants.ts";
 import type { ColonyParams } from "./params.ts";
-import { LARVA } from "./brood.ts";
+import { isFed, LARVA } from "./brood.ts";
 import { SOIL_DUG } from "./grid.ts";
 import { CELL, cellOf, discOffsets, hexDistance } from "./hex.ts";
 import {
@@ -23,6 +23,7 @@ import { SCENT_FADE, SCENT_HELD, SCENT_SHARE, SCENT_SUPPLY } from "./royal.ts";
 import { EGG_FOOD, QUEEN_STOCK } from "./tuning.ts";
 import { EXPLORE } from "./vocab.ts";
 import { dropFood } from "./world.ts";
+import { clearPellet } from "./pellets.ts";
 
 /** The newborn's resets for one colony's parameters (ants.ts antResets), worked out once: a parameter a reset reads (tolerance, routeStep) is read at the first birth, so a colony does not change it afterwards (asIs reads tolerance live). */
 const SPAWN_RESETS = new WeakMap<object, [string, number][]>();
@@ -110,7 +111,7 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
       strain: col.strain[i],
       layer: col.home,
     });
-  col.clearPellet(i);
+  clearPellet(col, i);
   col.alive[i] = 0;
   col.carrying[i] = 0;
   col.digT[i] = 0;
@@ -170,7 +171,10 @@ export function body(col: Colony, dt: number): void {
   donors.reset();
   scentSum.reset();
   perceived.reset();
-  for (const b of col.brood.items) if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, begOf(b.energy));
+  // A larva begs when it is hungry, and (owedBeg, ja-rvli) a little while it is still owed the food it grows on.
+  const owedBeg = col.params.owedBeg;
+  for (const b of col.brood.items)
+    if (b.stage === LARVA && b.held < 0) felt.put(b.x, b.y, Math.max(begOf(b.energy), isFed(b) ? 0 : owedBeg));
   const q = col.queen;
   // Her cell, when she lives in a nest: a column can be negative (one world's curtain), so whether there is one is its own flag.
   let queenHere = false;

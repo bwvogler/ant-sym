@@ -41,38 +41,90 @@ export function atHome(c: Colony, i: number): boolean {
  */
 export function climbOut(c: Colony, cx: number, cy: number): number {
   const f = outField(c);
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  const here = cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? f[cy * w + cx - x0] : -1;
+  const here = stepsAt(f, cx, cy);
   if (here === 0) return -1;
   if (here > 0)
     for (const d of UP_FIRST) {
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
-      if (tx >= x0 && ty >= 0 && tx < x0 + w && ty < h && f[ty * w + tx - x0] === here - 1 && rockAt(c.map, tx, ty) === OPEN) return d;
+      if (stepsAt(f, tx, ty) === here - 1 && rockAt(c.map, tx, ty) === OPEN) return d;
     }
   c.holeX = (c.entrance as Nest).x;
   return towardHole(c, cx, cy, false);
 }
 
 /**
- * The side view: steps from each open cell underground to this colony's hole through the tunnels (−1: not joined to it).
+ * A colony's way out of its nest (outField): the steps from each open cell underground to its hole through its tunnels,
+ * over a window of columns round the hole rather than the whole curtain (endless world §7, E1.4: memory per colony no
+ * longer grows with the curtain's width). Cell (x, y) is at y·w + x − x0; −1: not joined to the hole, or outside.
+ */
+export interface OutField {
+  /** the window's first column (the map's own column numbers, like WorldMap.x0) and its width; its rows are the map's */
+  x0: number;
+  w: number;
+  /** the map's first column and width it was built over: a curtain that has grown since builds it afresh */
+  mapX0: number;
+  mapW: number;
+  dist: Int32Array;
+}
+
+/** Half the width of a fresh out-field's window, in columns: a nest's tunnels rarely spread wider; if they do, the window grows. */
+const OUT_HALF = 96;
+
+/** Steps from cell (x, y) to the hole in field `f`, or −1: outside its window or rows, or not joined to the hole. */
+function stepsAt(f: OutField, x: number, y: number): number {
+  const col = x - f.x0;
+  return col >= 0 && col < f.w && y >= 0 && y * f.w < f.dist.length ? f.dist[y * f.w + col] : -1;
+}
+
+/**
+ * The side view: steps from each open cell underground to this colony's hole through the tunnels (see OutField).
  * Cached for the colony, and rebuilt when the ground has changed (cells dug or filled), at most every OUT_FIELD_EVERY
  * seconds, or at once when the map has grown (one world's curtain, Game.addColony): a breadth-first walk over the nest's
- * own tunnels, a few thousand cells. Cell (x, y) is at y·w + x − x0.
+ * own tunnels, a few thousand cells. The walk stays inside the window; one that would step out of it widens the window
+ * (twice as wide, within the map) and walks again, so the field holds every cell the hole reaches, as one over the
+ * whole map would.
  */
-export function outField(c: Colony): Int32Array {
+export function outField(c: Colony): OutField {
   const map = c.map;
   const version = map.dug + map.filled;
-  const { w, h } = map.size;
-  const { x0 } = map;
+  const { w: mw, h } = map.size;
+  const mx0 = map.x0;
   const kept = c.outDist;
-  const have = kept && kept.length === w * h ? kept : null;
+  const have = kept && kept.mapX0 === mx0 && kept.mapW === mw && kept.dist.length === kept.w * h ? kept : null;
   if (have && (c.outVersion === version || c.time - c.outAt < OUT_FIELD_EVERY)) return have;
-  const dist = have ?? new Int32Array(w * h).fill(-1);
-  c.outDist = dist;
+  // A fresh window over columns [lo, hi), within the map: every cell −1, nothing reached yet.
+  const fresh = (lo: number, hi: number): OutField => {
+    const x0 = Math.max(mx0, lo);
+    const w = Math.min(mx0 + mw, hi) - x0;
+    c.outCells.length = 0;
+    return { x0, w, mapX0: mx0, mapW: mw, dist: new Int32Array(w * h).fill(-1) };
+  };
+  let f = have ?? fresh(c.entranceCol - OUT_HALF, c.entranceCol + OUT_HALF + 1);
+  c.outDist = f;
+  while (!walkOut(c, f, h)) {
+    const wider = fresh(f.x0 - f.w, f.x0 + 2 * f.w);
+    // A window that is the whole map never walks out of it, so it always widens; if not, walking again would never end.
+    if (wider.w <= f.w) throw new Error(`outField: the window at ${f.x0} (${f.w} columns) did not widen`);
+    f = wider;
+    c.outDist = f;
+  }
+  c.outVersion = version;
+  c.outAt = c.time;
+  return f;
+}
+
+/**
+ * One breadth-first walk from the hole over field `f`'s window: false (and the field left half-built) if it would step
+ * onto an open cell underground outside the window but on the map, so the window must widen.
+ */
+function walkOut(c: Colony, f: OutField, h: number): boolean {
+  const map = c.map;
+  const { dist, x0, w } = f;
+  const mx0 = map.x0;
+  const mx1 = mx0 + map.size.w;
   const cells = c.outCells;
-  if (have) for (const k of cells) dist[k] = -1;
+  for (const k of cells) dist[k] = -1;
   cells.length = 0;
   const start = c.entranceRow * w + c.entranceCol - x0;
   dist[start] = 0;
@@ -86,16 +138,18 @@ export function outField(c: Colony): Int32Array {
     for (let dir = 0; dir < 6; dir++) {
       const tx = stepX(x, y, dir);
       const ty = stepY(y, dir);
-      if (tx < x0 || ty < 0 || tx >= x0 + w || ty >= h) continue;
+      if (tx < mx0 || ty < 0 || tx >= mx1 || ty >= h) continue;
+      if (tx < x0 || tx >= x0 + w) {
+        if (rockAt(map, tx, ty) === OPEN && !isSky(map, tx, ty)) return false;
+        continue;
+      }
       const t = ty * w + tx - x0;
       if (dist[t] >= 0 || rockAt(map, tx, ty) !== OPEN || isSky(map, tx, ty)) continue;
       dist[t] = d;
       cells.push(t);
     }
   }
-  c.outVersion = version;
-  c.outAt = c.time;
-  return dist;
+  return true;
 }
 
 /**
@@ -133,9 +187,7 @@ export function integrate(c: Colony, i: number, x0: number, y0: number, atNest: 
 
 /** The side view: whether cell (cx, cy) is in this colony's nest: open ground underground joined to its hole (see outField). */
 export function ownTunnels(c: Colony, cx: number, cy: number): boolean {
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h && outField(c)[cy * w + cx - x0] >= 0;
+  return stepsAt(outField(c), cx, cy) >= 0;
 }
 
 /** The side view: whether world point (x, y) is at this colony's hole (its cell, or one beside it). */
@@ -203,6 +255,11 @@ export function believe(c: Colony, i: number, goal: Nest): Nest {
   return b;
 }
 
+/** Whether an ant at (x, y), `d` from its hole `goal`, knows it by sight: within HOLE_SIGHT (seen, and the entrance's smell), or within NEST_SIGHT with a clear line to it. */
+function seesHole(c: Colony, x: number, y: number, goal: Nest, d: number): boolean {
+  return d < HOLE_SIGHT || (d < NEST_SIGHT && c.clearTo(x, y, goal.x, goal.y));
+}
+
 /**
  * One world's plane (U3b, docs/one-world.md §4): where ant i believes its hole (`goal`, the plane nest) is. Its vector,
  * started afresh up out of that hole (crossUp), puts it odoSurf × (driftSurf, driftSurfY) off, plus the search's point
@@ -213,7 +270,7 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   const x = c.x[i];
   const y = c.y[i];
   const d = Math.hypot(x - goal.x, y - goal.y);
-  if (d < HOLE_SIGHT || (d < NEST_SIGHT && c.clearTo(x, y, goal.x, goal.y))) return goal;
+  if (seesHole(c, x, y, goal, d)) return goal;
   if (c.params.moundSmell > 0 && c.search[i] !== 0 && c.onOwnMound(x, y, d)) return goal;
   if (c.routeState[i] === 1) {
     const place = routeBelief(c, i, goal);
@@ -223,6 +280,11 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   let s = c.search[i];
   let a = c.searchA[i];
   const p = c.params;
+  // routeEnd (ja-lp4.6.3.1): its retrace over, it searches round its first stored place, not its vector's end.
+  const atFirst = p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0;
+  const at0 = atFirst ? (i * c.routePlaces.length) / c.n : 0;
+  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i];
+  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i];
   if (p.searchLoops > 0 && s !== 0) {
     // Loops (ja-lp4.11): loop k heads searchTurn × k on from the first; out to its reach at the heading − half its
     // width, across to + half, then back to where the vector ran out.
@@ -237,8 +299,8 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   const lx = c.map.x0 + EDGE;
   const hx = c.map.x0 + c.map.size.w - EDGE;
   const hy = c.map.size.h * R - EDGE;
-  b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, goal.x + odo * c.driftSurf[i])) + s * Math.cos(a)));
-  b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, goal.y + odo * c.driftSurfY[i])) + s * Math.sin(a)));
+  b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, cx)) + s * Math.cos(a)));
+  b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, cy)) + s * Math.sin(a)));
   b.r = goal.r;
   return b;
 }
@@ -291,7 +353,35 @@ export function routeFail(c: Colony, i: number, stalled: boolean): boolean {
   if (c.routeState[i] !== 0 || c.routeN[i] === 0 || c.carrying[i] !== 1 || c.pellet[i] === 1 || (!stalled && p.routeMemory < 2))
     return false;
   c.routeState[i] = 1;
-  return routeTo(c, i, c.routeN[i] - 1);
+  // routeJoin 1: only once its vector has run out (it reached its belief, found no hole, and is searching: its own search
+  // state, reset when it picks up); a stall before that, at or near the pickup, starts from its newest place. 2: always.
+  const join = p.routeJoin >= 2 || (p.routeJoin > 0 && c.search[i] !== 0);
+  return routeTo(c, i, join ? routeNearest(c, i) : c.routeN[i] - 1);
+}
+
+/**
+ * routeJoin (ja-lp4.6.3.1): the index of ant i's stored place nearest where it stands that it can see (a clear straight
+ * line to it: a familiar view is one in view), the newest of equals; none in view, its newest. Its own places only. By
+ * straight distance alone a place across a band of rock was "nearest", and a pocket carrier went back to its wall (G1
+ * seed 4: 44 held, against 4 joining at its newest).
+ */
+export function routeNearest(c: Colony, i: number): number {
+  const at = (i * c.routePlaces.length) / c.n;
+  const x = c.x[i];
+  const y = c.y[i];
+  const newest = c.routeN[i] - 1;
+  let best = newest;
+  let bestD = Infinity;
+  for (let k = newest; k >= 0; k--) {
+    const px = c.routePlaces[at + 2 * k];
+    const py = c.routePlaces[at + 2 * k + 1];
+    const d = Math.hypot(px - x, py - y);
+    if (d < bestD && c.clearTo(x, y, px, py)) {
+      bestD = d;
+      best = k;
+    }
+  }
+  return best;
 }
 
 /** Ant i's goal is its place k, progress judged afresh toward it; none left (k < 0): it has retraced this trip and searches as it did. Always true. */
@@ -303,6 +393,7 @@ export function routeTo(c: Colony, i: number, k: number): boolean {
   if (k < 0) {
     c.routeState[i] = 2;
     c.routeGoal[i] = -1;
+    if (c.params.routeEnd > 0) c.search[i] = 0; // the search starts afresh, round its first place (believePlane)
     searchOn(c, i);
   } else c.routeGoal[i] = k;
   return true;
@@ -454,6 +545,17 @@ export function fromHomePlane(c: Colony, i: number): number {
   return Math.hypot(c.x[i] - bx, c.y[i] - by);
 }
 
+/**
+ * How far ant i is from home as it knows it, on the plane bound: by sight where it sees its hole (as believePlane), else
+ * by its own vector (fromHomePlane). What `homeGround` is measured by (stance.ts, ja-k4k.6.2).
+ */
+export function homeDistPlane(c: Colony, i: number): number {
+  const x = c.x[i];
+  const y = c.y[i];
+  const d = Math.hypot(x - c.nest.x, y - c.nest.y);
+  return seesHole(c, x, y, c.nest, d) ? d : fromHomePlane(c, i);
+}
+
 /** Whether any open neighbour of cell (x, y) holds home scent an ant would notice (FAINT or more). */
 export function homeScentNear(c: Colony, x: number, y: number): boolean {
   const home = c.ph.fields.home;
@@ -467,7 +569,5 @@ export function homeScentNear(c: Colony, x: number, y: number): boolean {
 
 /** Steps from cell (cx, cy) to this colony's hole along its tunnels (outField), or −1: off the map, or not joined to it. */
 export function outDistAt(c: Colony, cx: number, cy: number): number {
-  const { w, h } = c.map.size;
-  const { x0 } = c.map;
-  return cx >= x0 && cy >= 0 && cx < x0 + w && cy < h ? outField(c)[cy * w + cx - x0] : -1;
+  return stepsAt(outField(c), cx, cy);
 }
