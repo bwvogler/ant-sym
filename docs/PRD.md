@@ -5945,3 +5945,40 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
 
+## 72. Larval feeding by mouth: nurses feed larvae from their crops (design, ja-638i, 2026-11-15)
+
+**Research basis:** [larval-feeding.md](larval-feeding.md):
+- Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
+- In *Camponotus sanctus*, food brought in by foragers spreads mouth to mouth through the colony within an hour (Greenwald, Segre & Feinerman 2015, read in full):
+  - foragers unload about half their crop per nest visit;
+  - some inner workers keep what they receive, others relay it on.
+
+**The problem (traced, §71).** Larvae are fed only from food lying in their chamber, and porters bring it a unit at a time, starting only beside a stocked store. In the traced seed all 300+ food lay in one 3-cell store at a tunnel's end. Fetchers queued on the way, and porters delivered 7–30 food a minute against the 25–58 the larvae were owed.
+
+**Decisions.**
+- Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
+
+**The mechanic (planned, setting `cropFeed`, 0 = main bit for bit).**
+- *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
+- *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it a fixed bolus, more often the more the larva begs.
+- *Unchanged:* porters and their table stay for now.
+- *Design numbers:* `CROP_MAX`, the share passed and the bolus.
+
+**Assays and targets.**
+- Assay `larvae` (§71), seeds 1–16, confirmed on 17–32.
+- **Target:** no seed above 8 larvae waiting, no worker starved, food stored not worse by the worst seed. Then with `forageDig: 120` (ja-16rp.5) and the two-colony game.
+
+**Cost (estimated).** None in Jev: body rules, no situation field. CPU: a pass over touching pairs underground each tick, like sharing by mouth today.
+
+**Beads.**
+- ja-638i: the epic.
+- ja-638i.1: crops (fill and pass).
+- ja-638i.2: nurses feed larvae.
+- ja-638i.3: tune and turn on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Still open.**
+- The design numbers (owner's call after the sweep).
+- Whether to retire the porters' table once crops carry the brood's food.
+- Reading Cassill & Tschinkel and the 2021 trophallaxis review in full (on blocked hosts).
+
