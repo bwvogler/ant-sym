@@ -19,6 +19,7 @@ import { aphidCount } from "./aphids.ts";
 import { Builder, type Stroke } from "./builder.ts";
 import type { Game } from "./game.ts";
 import { centreX, centreY } from "./hex.ts";
+import { piSpan } from "./homing.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { CURTAIN, MODES, PLANE } from "./vocab.ts";
 import { OPEN, rockAt } from "./world.ts";
@@ -457,7 +458,7 @@ export const tweezers: Assay = {
               const d = (30 + 30 * rnd()) * (c.x[i]! < 50 ? 1 : -1);
               if (!b.moveAnt(0, i, c.x[i]! + d, c.y[i]!)) continue;
               // Where home would be by its vector now: the hole, its drift, and what it was carried.
-              const odo = c.odoSurf[i]!;
+              const odo = piSpan(c, i);
               moved.push({
                 i,
                 gen: c.gen[i]!,

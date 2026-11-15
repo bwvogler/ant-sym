@@ -33,6 +33,19 @@ export const PI_DRIFT = 0.1;
 /** One world's plane: each part (x, y) of the 2D drift, so its length's RMS is PI_DRIFT (U3b). */
 export const PI_DRIFT_2D = PI_DRIFT / Math.SQRT2;
 
+/**
+ * One world's plane, with piErrorLaw 1 (ja-lp4.19, docs/nest-search.md "How far the vector is off"): the median miss, as a
+ * share of the distance out, at piErrorAt cells out. *C. fortis* missed by a median 1.27 m after 5 m and 2.47 m after 20 m
+ * (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017): 25 % there, about half that at four times as far.
+ */
+export const PI_MISS_AT = 0.25;
+
+/**
+ * piErrorLaw 1: the drift (PI_DRIFT_2D a part, so its length's median is PI_DRIFT × √ln 2) is multiplied by this × √(piErrorAt ×
+ * the distance out), in place of the odometer, so the miss's median is PI_MISS_AT × √(piErrorAt × distance out).
+ */
+export const PI_SPAN_GAIN = PI_MISS_AT / (PI_DRIFT * Math.sqrt(Math.LN2));
+
 /** Within this (world units) across the ground of the hole (and twice it up or down: the crater) an ant sees it and smells the entrance: its vector no longer matters. */
 export const HOLE_SIGHT = 6;
 

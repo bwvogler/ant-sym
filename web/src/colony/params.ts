@@ -122,8 +122,8 @@ export interface ColonyParams {
   /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
    * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
-   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
+   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × piSpan: the odometer, or by the
+   * distance out with piErrorLaw 1; Merkle & Wehner 2010: the search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
    * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
    */
   searchLoops: number;
@@ -315,6 +315,17 @@ export interface ColonyParams {
    */
   routeFight: number;
   /**
+   * One world's plane (ja-lp4.19, docs/nest-search.md "How far the vector is off", PRD §79): how the home vector's error grows.
+   * 0 = with the path walked (the odometer × the trip's drift: linear, and every step but the walk home adds, fighting
+   * too). 1 = with the square root of the distance out (the farthest the ant has been from its hole this trip, straight):
+   * a median miss of PI_MISS_AT × √(piErrorAt × that distance) (Merkle, Knaden & Wehner 2006: 25 % at 5 m, 12 % at 20 m;
+   * Heinze, Narendra & Cheung 2018: uncertainty grows like √distance; Merkle & Wehner 2010: by distance out, not how winding
+   * the path was). The same drift draws: the law scales them. Steering, the search's σ and every belief of home read it.
+   */
+  piErrorLaw: number;
+  /** piErrorLaw 1: the distance out (cells) at which the median miss is PI_MISS_AT of it: 50 cells stand for 5 m (design: the map keeps ratios, docs/ant-communication.md) */
+  piErrorAt: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -481,6 +492,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeJoin: 0,
   routeEnd: 1,
   routeFight: 0,
+  piErrorLaw: 0,
+  piErrorAt: 50,
   raidGate: 1,
   raidLay: 1,
   findAt: 0.3,
