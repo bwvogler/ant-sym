@@ -1,5 +1,5 @@
-# The whole-game guards (web/src/colony/tests/slow): on runners up to about 13 minutes in 4 shards (side.test.ts took 786 s
-# in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) runs its ten seeds in worker
+# The whole-game guards (web/src/colony/tests/slow): on runners up to about 13 minutes in 4 shards (the side view's side.test.ts,
+# deleted in S2.3c, took 786 s in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) runs its ten seeds in worker
 # threads, one per core, so it has a job of its own: beside another file in a shard it ran out of the 20-minute limit
 # (run 43722461875, ja-w7ef.15). It takes 11-14 minutes alone.
 # - Nightly on main, and on demand from the Actions tab: a red run is a measurement to look at.

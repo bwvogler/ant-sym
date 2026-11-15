@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { CHAMBER_MIN_DEPTH, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { nx, ny } from "../../hex.ts";
-import { generateSideWorld, groundTop, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
-import { SMALL_SIDE } from "../builders.ts";
+import { groundTop, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): whole-colony chamber tests, too slow for `npm test`'s 60 s per file
-// (`npm run test:slow`). The rest are in ../int/chambers.test.ts.
+// (`npm run test:slow`). The rest are in ../int/chambers.test.ts. On the curtain of a small one world (S2.3c), whose columns
+// run from x0 (negative) to x0 + w; the ground there is the crust under the strip's sky.
 
 /** The ground's top in column x as dug: under the mound's loose soil (what a chamber's depth is measured from). */
 function soilTop(map: WorldMap, x: number): number {
@@ -20,7 +21,7 @@ function soilTop(map: WorldMap, x: number): number {
 function touching(map: WorldMap): string {
   const ch = map.chambers!;
   for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
+    for (let x = map.x0; x < map.x0 + map.size.w; x++) {
       const a = ch.at(x, y);
       if (a < 0) continue;
       for (let d = 0; d < 6; d++) {
@@ -36,7 +37,7 @@ function touching(map: WorldMap): string {
 function shallow(map: WorldMap): string {
   const ch = map.chambers!;
   for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
+    for (let x = map.x0; x < map.x0 + map.size.w; x++) {
       const id = ch.at(x, y);
       if (id < 0 || ch.list[id]!.role === "royal") continue;
       if (y - soilTop(map, x) < CHAMBER_MIN_DEPTH) return `chamber ${id}'s cell (${x}, ${y}) is ${y - soilTop(map, x)} rows down`;
@@ -57,8 +58,9 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
   const growth: number[] = [];
   const stacked: number[] = [];
   for (const seed of [4, 5, 6]) {
-    const map = generateSideWorld(2, SMALL_SIDE);
-    const g = new Game(map, { antCount: 400, rival: false }, mulberry32(seed));
+    const w = smallOne(2);
+    const map = w.curtain;
+    const g = new Game(w, { antCount: 400, rival: false }, mulberry32(seed));
     const ch = map.chambers!;
     const floor0 = ch.floorOf[0]!;
     // Every ant middle-aged, a digger: this is about how chambers are dug, not who digs (slice 6 zones digging by age).
@@ -72,7 +74,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
     growth.push(ch.floorOf[0]! / floor0);
     // No chamber was dug into another: widening and new chambers don't break into other passages (review of slice 2).
     for (let y = 0; y < map.size.h; y++)
-      for (let x = 0; x < map.size.w; x++) {
+      for (let x = map.x0; x < map.x0 + map.size.w; x++) {
         const a = ch.at(x, y);
         if (a < 0) continue;
         for (let d = 0; d < 6; d++) {
@@ -82,7 +84,7 @@ test("a crowded nest digs chambers: the founding one widens, new ones start off 
       }
     // Every chamber cell is open: backfill never fills one.
     for (let y = 0; y < map.size.h; y++)
-      for (let x = 0; x < map.size.w; x++)
+      for (let x = map.x0; x < map.x0 + map.size.w; x++)
         if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
     // The gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth: the imposed rule.
     const gaps = mine
@@ -134,8 +136,9 @@ test("two crowded colonies on several maps: no chamber touches another, of eithe
   // beside it; a stale aim forcing a dig), and widening dug a chamber 4 rows under the ground beside the shaft, its depth
   // read from the mound's top and only where a chamber starts.
   for (const world of [1, 2]) {
-    const map = generateSideWorld(world, { ...SMALL_SIDE, nestCount: 2 });
-    const g = new Game(map, { antCount: 200, rivalAnts: 200 }, mulberry32(world + 10));
+    const w = smallOne(world);
+    const map = w.curtain;
+    const g = new Game(w, { antCount: 200, rivalAnts: 200 }, mulberry32(world + 10));
     for (const c of g.colonies)
       for (let i = 0; i < c.n; i++) {
         c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;

@@ -994,12 +994,12 @@ export const faintAlarm: Assay = {
 /**
  * G — the real game as the page opens it (the side view), 600 + 600 ants, 10 minutes. Also the
  * homing guard (A7): no colony with more than 2 foragers holding food over 120 s at any 10-s sample
- * (slow/side.test's bound).
+ * (the side view's slow/side.test bound, now G1's).
  */
 export const game: Assay = {
   id: "game",
   title: "G the side-view game (with A7: foragers holding food)",
-  target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample (slow/side.test's bound); food home and outcome reported",
+  target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample (the side view's slow/side.test bound, now G1's); food home and outcome reported",
   seconds: 600,
   spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rivalAnts: 600 } }),
   score: (r) => {
