@@ -115,7 +115,7 @@ Decided here (2026-11-12; the owner can overturn):
 
 For the owner:
 3. ~~Whether this species comes second~~ **Owner (2026-11-12): second, after the desert ant** (PRD §64).
-4. Whether the grooming and immunisation rules are built for every species (closing more of `ja-k4k.12`) or for this one first.
+4. ~~Whether the grooming and immunisation rules are built for every species or for this one first~~ **Owner (2026-11-15): this one first**, behind a species setting; the generic ant keeps fixed-rate grooming, and every species is decided after N1. Epic raised to P2. Stroeymeyt et al. 2018's host not allowed for now.
 5. The fungus's levers on this host (the owner is asked when the species is built).
 
 Still to read (2026-11-15: unreachable from the session): Ugelvig & Cremer 2007's and Tragust et al. 2013's papers (*Curr Biol*, no open copy reached; Tragust's data read); Stroeymeyt et al. 2018's numbers (an open copy on `iris.unil.ch`, a host the owner could allow). No account of *L. neglectus* workers handling adult corpses exists that the search found.
