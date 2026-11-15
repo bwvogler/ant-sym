@@ -44,11 +44,13 @@ import {
   type Fungus,
   type GrowthAnswer,
   type GrowthSituation,
+  type SteerSituation,
   type Journal,
   PolicyCache,
   pick,
   topOf,
   weightsOf,
+  steeringOf,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -188,6 +190,8 @@ interface Driven {
   /** answers are weighted (Jev's mode with its probabilities, colony/weighted.ts): the colony's policy draws from them */
   modes: Lane<Situation, string> | null;
   stances: Lane<StanceSituation, Stance> | null;
+  /** its ants' steering weights (ja-ykmu.3): the generic ant's situations only (a species with its own schema has none) */
+  steers: Lane<SteerSituation, string> | null;
 }
 
 /**
@@ -213,6 +217,22 @@ function antLane<Sit, Ans extends string>(
   });
 }
 
+/** A colony's steer lane (ja-ykmu.3), asking under `words`: the weights STEER_ASKED, only for explorers and followers. */
+function steerLane(words: string): Lane<SteerSituation, string> {
+  const row = LANES.steer;
+  return lane<SteerSituation, string>({
+    name: row.name,
+    key: (s) => row.key(s, undefined),
+    pack: (items, w) => row.pack(items, w),
+    read: (a, id, s, key) => row.read(a, id, s, key),
+    local: row.local,
+    valid: row.valid,
+    contextOf: (w) => row.contextOf(w),
+    asks: (s) => row.asks(s, undefined),
+    words,
+  });
+}
+
 /** A colony's lanes, asking under `words` (its doctrine) in its species' lane words; a lane the species lacks is null. */
 function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
   const { mode, stance } = species.lanes;
@@ -220,6 +240,7 @@ function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
     // the stand-in while a situation is unanswered is the species' own local rule (ja-fnd.5.9)
     modes: mode ? antLane<Situation, string>(LANES.mode, words, mode, species.policy ?? LANES.mode.local) : null,
     stances: stance ? antLane(LANES.stance, words, stance) : null,
+    steers: mode && !mode.schema ? steerLane(words) : null,
   };
 }
 
@@ -396,9 +417,11 @@ export class ColonyJev {
     // Every colony's, not the first's (PRD §65): one cache per context, so colonies of one doctrine count once.
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
+    const steers = new Map<string, number>();
     for (const d of this.#driven) {
       if (d.modes) modes.set(d.modes.context, this.#cache(d.modes).size);
       if (d.stances) stances.set(d.stances.context, this.#cache(d.stances).size);
+      if (d.steers) steers.set(d.steers.context, this.#cache(d.steers).size);
     }
     const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
     const cached: Record<LaneName, number> = {
@@ -406,6 +429,7 @@ export class ColonyJev {
       stance: sum(stances),
       fungus: this.#cache(this.#fungal).size,
       growth: this.#cache(this.#growth).size,
+      steer: sum(steers),
     };
     return {
       lanes: perLane((name) => ({ asked: this.#state.lanes[name].asked, cached: cached[name] })),
@@ -677,9 +701,10 @@ export class ColonyJev {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
       const d: Driven = { colony, ...colonyLanes(words, species) };
       // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
-      const { modes, stances } = d;
+      const { modes, stances, steers } = d;
       if (modes) colony.bindPolicy("mode", this.#modePolicy(modes));
       if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
+      if (steers) colony.bindPolicy("steer", (s, draw) => steeringOf(steers.key(s), this.#lookup(steers, s), draw));
       colony.reconsider();
       return d;
     });
@@ -703,7 +728,8 @@ export class ColonyJev {
       if (j !== k && !(k === 0 && this.#doctrines[j] === undefined)) return;
       const a = d.modes ? this.#recontext(d.modes, text) : false;
       const b = d.stances ? this.#recontext(d.stances, text) : false;
-      if (a || b) d.colony.reconsider();
+      const c = d.steers ? this.#recontext(d.steers, text) : false;
+      if (a || b || c) d.colony.reconsider();
     });
   }
 
@@ -820,6 +846,7 @@ export class ColonyJev {
     for (const d of this.#driven) {
       if (d.stances) out.push(d.stances as Lane<unknown, string>);
       if (d.modes) out.push(d.modes as Lane<unknown, string>);
+      if (d.steers) out.push(d.steers as Lane<unknown, string>);
     }
     out.push(this.#fungal as Lane<unknown, string>, this.#growth as Lane<unknown, string>);
     return out;
