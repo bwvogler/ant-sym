@@ -10,7 +10,8 @@ import { own, smallOne } from "../builders.ts";
 // The curtain in play (S2.3c, from the side view's soak/side.test.ts "the ground line's crust stays…" and mound.soak.test.ts's
 // last checks): after two minutes of digging, nobody stood buried, each nest still reaches its hole, the crust is open only at
 // the holes and nothing was filled into the strip's sky. int/oneWorld's "the crust is solid except at the holes" checks a
-// fresh curtain; soak/oneWorldMound the mound's books on the plane.
+// fresh curtain; soak/oneWorldMound the mound's books on the plane. An outcome guard: in this game no digger meets a face
+// under the crust and nobody needs unburying (review of #247, N2), so it holds what the world ends as, not the mechanisms.
 
 test("one world, the curtain over 120 s: nobody is buried, the way in stays open, the crust holds, the sky stays empty", () => {
   const g = new Game(smallOne(2), { antCount: 200, rivalAnts: 200 }, mulberry32(7));

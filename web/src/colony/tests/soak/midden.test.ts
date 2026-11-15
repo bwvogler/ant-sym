@@ -103,12 +103,13 @@ test(
 );
 
 test(
-  "a raid in force gets past the rival's midden and in at its hole",
+  "a raid in force goes in at the rival's hole",
   { todo: "ja-utdq: on one world no raider goes in at the rival's hole (0 on seeds 1, 2 and 7)" },
   () => {
     // Review of #26: the midden's saturated mark turned back 98 % of raiders at every step onto it: a wall, and no raider
     // ever got into a nest that had one. Now the turn-back falls with the raiders around (a scout shies, a raid presses on).
-    // On one world the midden is a ring off the mound (soak/oneWorldMound), laid by the colony's own dead.
+    // On one world the midden is a ring off the mound (soak/oneWorldMound), laid by the colony's own dead; in this run the rival
+    // has none (no dead in 90 s), so this reads only the way in. The midden half waits for ja-utdq (review of #247, S3).
     const g = new Game(smallOne(1), { antCount: 150, rivalAnts: 150 }, mulberry32(1));
     const [a, b] = g.colonies as [Colony, Colony];
     middleAged(b);

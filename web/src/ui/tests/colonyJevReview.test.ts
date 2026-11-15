@@ -4,9 +4,9 @@ import { Colony, DEFAULT_RULE, Fungus, type Situation, type FungalSituation, gen
 import { ColonyJev, type CacheStore } from "../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 
-/** A bare colony of n on the curtain of seed 1's one world (S2.3c: on the open top-down map until then). */
+/** A bare colony of n on the curtain of seed 1's small one world (S2.3c: on the open top-down map until then). */
 function oneWorldColony(n: number, seed: number): Colony {
-  const w = generateOneWorld(1);
+  const w = generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } });
   return new Colony(w.curtain, { antCount: n }, mulberry32(seed), undefined, undefined, { plane: w.plane, line: w.line });
 }
 
@@ -194,7 +194,7 @@ test("a 409 ends the run and cancels what is still in flight: Start again asks i
 test("one menu: Fungus.configure alone changes the levers Jev asks (ja-d87)", async () => {
   const { reqs } = proxy({ answer: () => "1" });
   const j = make();
-  const f = new Fungus(generateOneWorld(1).plane);
+  const f = new Fungus(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }).plane);
   f.configure(DEFAULT_RULE, ["calm", "alarm"]);
   j.attachFungus(f);
   j.setAim("x");
@@ -219,8 +219,8 @@ test("one menu: Fungus.configure alone changes the levers Jev asks (ja-d87)", as
 test("a new fungus whose menu counter matches the old one's: Jev still takes the new fungus's menu (review of #156 S1)", async () => {
   const { reqs } = proxy({ answer: () => "1" });
   const j = make();
-  const a = new Fungus(generateOneWorld(1).plane);
-  const b = new Fungus(generateOneWorld(1).plane);
+  const a = new Fungus(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }).plane);
+  const b = new Fungus(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }).plane);
   a.configure(DEFAULT_RULE, ["calm", "alarm"]);
   b.configure(DEFAULT_RULE, ["calm"]);
   assert.equal(a.menuSeq, b.menuSeq, "the case: equal counters on two fungi");
@@ -236,7 +236,7 @@ test("a new fungus whose menu counter matches the old one's: Jev still takes the
 test("a menu change drops the questions queued under the old one, by configure or by setMenu with no fungus (review of #156 S2)", async () => {
   const { reqs } = proxy({ answer: () => "1" });
   const j = make();
-  const f = new Fungus(generateOneWorld(1).plane);
+  const f = new Fungus(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }).plane);
   f.configure(DEFAULT_RULE, ["calm", "alarm"]);
   j.attachFungus(f);
   j.setAim("x");
@@ -264,7 +264,7 @@ test("a menu change drops the questions queued under the old one, by configure o
 });
 
 test("changing only hide or cull keeps the menu counter and Jev's queue (review of #156 N1)", () => {
-  const f = new Fungus(generateOneWorld(1).plane);
+  const f = new Fungus(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }).plane);
   f.configure(DEFAULT_RULE, ["calm"]);
   const seq = f.menuSeq;
   f.configure({ hide: true, cull: true }, ["calm"]);

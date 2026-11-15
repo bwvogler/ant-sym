@@ -87,15 +87,16 @@ test("inside the nest an ant is asked where it is, not the home trail: just home
 
 test("ja-qnx: a policy that always says 'return' to a homing ant no longer parks the colony at home", () => {
   // The cached-answer trap: an ant just home with food, still in "return", asked and told "return" again, stayed home
-  // for good (its time out resets at the nest): all 300 of 300. It rests REST seconds and is asked afresh as an explorer,
-  // so about a third are resting at home at any moment.
+  // for good (its time out resets at the nest): all 300 of 300. Its trip now ends when its load is down (decide), and one
+  // still home in "return" rests REST seconds and is asked afresh as an explorer.
   const stubborn = (s: Situation) => (s.mode === "return" ? "return" : localPolicy(s));
-  // On one world (S2.3c): 734 food home in 150 s, 4 of 300 resting at home in return.
+  // On one world (S2.3c): 734 food home in 150 s, 4 of 300 resting at home in return; with decide's reset off, 455 and 24
+  // (review of #247), so the bounds are set close to one world's numbers.
   const { c } = oneColony(300, { maxAnts: 300 }, stubborn, 9);
   for (let k = 0; k < 30 * 150; k++) c.tick(1 / 30);
   let parked = 0;
   for (let i = 0; i < c.n; i++) if (c.alive[i] && c.mode[i] === 2 && !c.carrying[i] && !c.pellet[i] && c.since[i] === 0) parked++;
-  assert.ok(c.stored > 30, `food home ${c.stored}`);
-  assert.ok(parked < 150, `${parked} of 300 resting at home in return`);
+  assert.ok(c.stored > 600, `food home ${c.stored}`);
+  assert.ok(parked < 30, `${parked} of 300 resting at home in return`);
   assert.ok(REST > 0);
 });
