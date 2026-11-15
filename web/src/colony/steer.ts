@@ -29,7 +29,7 @@ import type { Channel } from "./pheromone.ts";
 
 /**
  * The steering weights' effects (staging, ja-ykmu; docs/steering.md "The mechanic"), by level −1, 0, +1: `search` scales random
- * turning by params.searchSpan (÷ at −1, × at +1); `trail` scales a follower's turn up the food trail; `home`, `vector` and `nestmates` add a turn of their own (away at −1,
+ * turning by params.searchSpan (× at −1, tight: loops close round where it is; ÷ at +1, wide: straight and ranging); `trail` scales a follower's turn up the food trail; `home`, `vector` and `nestmates` add a turn of their own (away at −1,
  * toward at +1) at these shares of the turn rate. `memory` +1 lets the last find lead over the food trail; −1 leaves it unused.
  */
 export const TRAIL_MUL = [0, 1, 2] as const;
@@ -103,7 +103,8 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const steered =
     sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
   const sl = steered ? steerLevel(sc, 0) : 0;
-  const sm = sl === 0 ? 1 : sl > 0 ? p.searchSpan : 1 / p.searchSpan;
+  // tight (−1) turns more, wide (+1) less: the questions say "low: tight loops", "high: straight and ranging" (it was the other way round until PRD S3 round 6)
+  const sm = sl === 0 ? 1 : sl < 0 ? p.searchSpan : 1 / p.searchSpan;
   const detouring = col.detour[i] > 0;
   if (mode !== EXPLORE) col.digT[i] = 0;
   if (mode !== EXPLORE || pellet) col.hugT[i] = 0;

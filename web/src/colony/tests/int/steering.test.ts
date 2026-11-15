@@ -135,3 +135,28 @@ test("near its last find an ant steers by its near weights, elsewhere by its far
   assert.equal(run(false), plain, "far from its find: its far (neutral) weights, the plain game");
   assert.notEqual(run(true), plain, "at its find: its near weights (wide search) change its steering");
 });
+
+test("search −1 is tight (explorers turn more per step), +1 is wide (they turn less): the direction the questions say (PRD S3 round 6)", () => {
+  const turned = (level: -1 | 0 | 1): number => {
+    const g = world(1);
+    const c = g.player;
+    c.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    c.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, search: level }));
+    let total = 0;
+    const prev = Array.from({ length: 30 }, (_, i) => c.heading[i]!);
+    for (let k = 0; k < 4 * 30; k++) {
+      g.tick(1 / 30);
+      for (let i = 0; i < 30; i++) {
+        let d = Math.abs(c.heading[i]! - prev[i]!) % (2 * Math.PI);
+        if (d > Math.PI) d = 2 * Math.PI - d;
+        total += d;
+        prev[i] = c.heading[i]!;
+      }
+    }
+    return total;
+  };
+  const tight = turned(-1);
+  const usual = turned(0);
+  const wide = turned(1);
+  assert.ok(tight > usual && usual > wide, `turning: tight ${tight.toFixed(1)}, usual ${usual.toFixed(1)}, wide ${wide.toFixed(1)}`);
+});
