@@ -161,7 +161,7 @@ export const N3_BASE = binCentre(binOf(0.2));
 export const N3_TRIALS = 5;
 /** N3: seconds each trial plays. */
 export const N3_SECONDS = 240;
-/** N3: a trial counts only if the colonies met for this many ant-seconds: on some worlds they barely do, and a trial with no meeting can't fight. */
+/** N3: a peaceful trial counts only if the colonies met for this many ant-seconds: on some worlds they barely do, and a trial with no meeting can't fight. */
 export const N3_MIN_MEET = 5;
 /** N3: within this (world units) an ant of one colony meets one of the other. */
 const MEET = 2.5;
@@ -187,7 +187,8 @@ export function classN3(runs: readonly { distance: number; meetings: number; fou
 } {
   const tally = new Map<number, { fought: number; trials: number }>();
   for (const r of runs) {
-    if (r.meetings < N3_MIN_MEET) continue;
+    // A trial that fought counts however short the meeting (review of #228, S3): only an unmet, peaceful trial says nothing.
+    if (r.meetings < N3_MIN_MEET && !r.fought) continue;
     const t = tally.get(r.distance) ?? { fought: 0, trials: 0 };
     t.trials++;
     if (r.fought) t.fought++;

@@ -22,7 +22,9 @@ test("N2 infected pupae are destroyed before they sporulate", { todo: "ja-e668.5
 
 test(
   "N3 colonies fight in proportion to how unalike they smell: most distances mixed over their trials, rising with distance",
-  { todo: "ja-e668.10: recognition is a step at the tolerance (see PRD §64.2 for seeds 1-40)" },
+  {
+    skip: "ja-e668.10: recognition is a step at the tolerance (PRD §64.2, seeds 1-40); 40 games, 7-12 min: turned on with the graded rule",
+  },
   () => {
     const runs = [];
     for (let seed = 1; seed <= N3_DISTANCES.length * N3_TRIALS; seed++) runs.push(runAssay(neglectusTolerance, seed).metrics);

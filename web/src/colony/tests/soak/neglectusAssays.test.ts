@@ -77,15 +77,19 @@ test("N3 classes a distance over the trials where the colonies met: never, alway
     { distance: 0.5, meetings: 1, fought: 0 },
     // A distance with no trial that met is left out.
     { distance: 0.7, meetings: 0, fought: 0 },
+    // A trial that fought counts however short the meeting: 0.2 fought once in a brief meeting and once not, so mixed.
+    { distance: 0.2, meetings: 2, fought: 1 },
+    { distance: 0.2, meetings: 10, fought: 0 },
   ];
   const c = classN3(runs);
   assert.deepEqual(
     [...c.byDistance],
     [
       [0, 0],
+      [0.2, 1],
       [0.3, 1],
       [0.5, 2],
     ],
   );
-  assert.ok(Math.abs(c.mixed - 1 / 3) < 1e-12 && Math.abs(c.never - 1 / 3) < 1e-12 && Math.abs(c.always - 1 / 3) < 1e-12);
+  assert.ok(Math.abs(c.mixed - 2 / 4) < 1e-12 && Math.abs(c.never - 1 / 4) < 1e-12 && Math.abs(c.always - 1 / 4) < 1e-12);
 });
