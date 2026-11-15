@@ -7,7 +7,8 @@
 # The result is the same table `npm run exp` prints, merged over the seeds (experiment.mjs merge): in the `report` job's
 # log and the run's summary, so an agent reads it with get_job_logs; the merged --json is the `assays` artifact.
 # The assays play the local rule, or with `policy` replay Jev's answers from a cache committed under experiments/caches
-# (--policy cache:<file>): never Jev itself, so no spend.
+# (--policy cache:<file>), or the answers the page ships for a preset doctrine (--policy precache:<doctrine>, staging, ja-ykmu): never
+# Jev itself, so no spend.
 name: Assays
 
 on:
@@ -33,7 +34,7 @@ on:
         description: "Play every colony as this species (--species), e.g. desert"
         default: ""
       policy:
-        description: "Replay a committed cache of Jev's answers for the first colony (--policy cache:), e.g. experiments/caches/draw-top-forage.json"
+        description: "Replay Jev's answers for the colonies: a committed cache (experiments/caches/draw-top-forage.json) or the shipped answers of a doctrine (precache:forage)"
         default: ""
 
 permissions:
@@ -66,7 +67,7 @@ jobs:
           [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
           [[ "$SECONDS_IN" =~ ^[0-9]*$ ]] || bad "seconds: a whole number"
           [[ "$SPECIES" =~ ^[a-z0-9]*$ ]] || bad "species: an id"
-          [[ -z "$POLICY" || "$POLICY" =~ ^experiments/caches/[A-Za-z0-9._-]+\.json$ ]] || bad "policy: a file under experiments/caches"
+          [[ -z "$POLICY" || "$POLICY" =~ ^experiments/caches/[A-Za-z0-9._-]+\.json$ || "$POLICY" =~ ^precache:[a-z]+$ ]] || bad "policy: a file under experiments/caches, or precache:<doctrine>"
           [[ "$POLICY" == *..* ]] && bad "policy: no .."
           args="$ASSAYS"
           [ "$ONE" = "true" ] && args="$args --one"
@@ -76,7 +77,7 @@ jobs:
           done
           [ -n "$SECONDS_IN" ] && args="$args --seconds $SECONDS_IN"
           [ -n "$SPECIES" ] && args="$args --species $SPECIES"
-          [ -n "$POLICY" ] && args="$args --policy cache:$POLICY"
+          if [[ "$POLICY" == precache:* ]]; then args="$args --policy $POLICY"; elif [ -n "$POLICY" ]; then args="$args --policy cache:$POLICY"; fi
           seeds=$(node -e '
             const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
             const u = [...new Set(s)];

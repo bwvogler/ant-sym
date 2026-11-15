@@ -19,7 +19,7 @@ import {
 // switches them on (ja-ykmu.4), and the weights asked are part of the key, as the fungus's levers are.
 
 /** Bump when the legend, the questions or what an answer means changes: old cached answers no longer apply. */
-export const STEER_BRAIN_VERSION = 5;
+export const STEER_BRAIN_VERSION = 7;
 
 /** The weights asked unless the Lab adds design ones: the two the biology lets a situation set (docs/steering.md §3, §7). */
 export const STEER_ASKED: readonly SteerWeight[] = ["search", "memory"];
@@ -27,9 +27,9 @@ export const STEER_ASKED: readonly SteerWeight[] = ["search", "memory"];
 /** What each weight is, and its low and high levels (medium is how the ant steers without a weight). */
 export const STEER_MEANINGS: Record<SteerWeight, string> = {
   search:
-    "search is how it searches: low, tight (turning often, close round where it is, as round a spot where food was found); high, wide (ranging far, turning little)",
+    "search is how tightly it turns: low, tight loops close round where it is (what a forager does at a spot where it just found food); high, wide and straight (what a forager does when searching new ground, far from any find)",
   memory:
-    "memory is the way to where it last found food (it keeps it for a trip): low, ignore it; high, set out for that spot and keep to it, even over a food scent that leads elsewhere",
+    "memory is whether it goes back to where it last found food: low, ignore that spot and go by the scent and what it senses; high, a forager that remembers a find sets out for that spot and keeps to it, even over a food scent that leads elsewhere (what a forager does after one visit)",
   trail: "trail is how strongly it follows a food scent: low, ignore it; high, hold to it hard",
   home: "home is the colony's home scent on the ground: low, keep away from it (out to new ground); high, keep near it",
   vector: "vector is its own sense of where home is: low, head away from home; high, keep close to home (a leash)",
@@ -42,13 +42,32 @@ export const STEER_LEGEND =
   STEER_WEIGHTS.map((w) => STEER_MEANINGS[w]).join(". ") +
   ".";
 
-/** A weight's three levels as a score question lists them, lowest first. */
+/** A weight's three levels as a score question lists them, lowest first, where a weight has no levels of its own. */
 export const STEER_SCALE = ["low", "medium", "high"] as const;
+
+/**
+ * The levels of the two weights the biology lets a situation set, in the question itself (brain v7, PRD S3 round 6). Under the
+ * legend alone, the answers for the real situations did not tell an ant at its last find from one far from it (P(tight) 0.28 near,
+ * 0.25 far); with each level saying what it is, 0.91 near and 0.05 far, and an ant that remembers a find leads by it.
+ */
+export const STEER_LEVELS: Partial<Record<SteerWeight, readonly string[]>> = {
+  search: [
+    "tight: loops close round where it is, as a forager does at a spot where it just found food",
+    "medium: its usual wander",
+    "wide: straight and ranging, as a forager does on new ground far from any find",
+  ],
+  memory: [
+    "ignore: go by the scent and what it senses, not by the spot where it last found food",
+    "medium: go partly by that spot",
+    "lead: set out for that spot and keep to it, even over a food scent that leads elsewhere",
+  ],
+};
 
 /** The questions for ant `id`: a score per weight asked. */
 export function steerQuestion(id: string, asked: readonly SteerWeight[] = STEER_ASKED): JevRequest["questions"] {
   const out: JevRequest["questions"] = {};
-  for (const w of asked) out[`${id}_${w}`] = { type: "score", instructions: `${w} for ant \`${id}\``, criteria: [...STEER_SCALE] };
+  for (const w of asked)
+    out[`${id}_${w}`] = { type: "score", instructions: `${w} for ant \`${id}\``, criteria: [...(STEER_LEVELS[w] ?? STEER_SCALE)] };
   return out;
 }
 

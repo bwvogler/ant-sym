@@ -84,6 +84,9 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     good.out,
     /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert --policy cache:experiments\/caches\/draw-top-forage\.json$/m,
   );
+  const pre = await plan({ ASSAYS: "t1", POLICY: "precache:forage" });
+  assert.equal(pre.code, 0, pre.out);
+  assert.match(pre.out, /^args=t1 --policy precache:forage$/m);
   const bads: Record<string, string>[] = [
     { ASSAYS: "a; rm -rf /" },
     { ASSAYS: "all merge" },
@@ -98,6 +101,9 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     { POLICY: "experiments/caches/../../x.json" },
     { POLICY: "experiments/caches/a b.json" },
     { POLICY: "experiments/caches/x.json; id" },
+    { POLICY: "precache:forage; id" },
+    { POLICY: "precache:../x" },
+    { POLICY: "precache:" },
   ];
   for (const bad of bads) {
     const r = await plan(bad);
