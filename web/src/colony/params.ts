@@ -308,6 +308,11 @@ export interface ColonyParams {
    * in a chamber (broodClimb). 0: none laid, the channel stays empty (main bit for bit).
    */
   broodOdour: number;
+  /**
+   * A young ant in a chamber climbs brood odour (ja-k4k.15.3, docs/brood-odour.md), turning at turnRate × this; 0: it
+   * turns toward the queen's position instead (the scripted rule it replaces, main bit for bit).
+   */
+  broodClimb: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -442,6 +447,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   defendAt: 1,
   homeGround: 10,
   broodOdour: 0,
+  broodClimb: 0,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,

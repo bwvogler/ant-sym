@@ -5,8 +5,9 @@
 // chamber of two cells or fewer, a bigger one, none), the bands at that moment, and the workers alive at 3,600 s
 // (a collapse: under 110). Fed to `xargs -P` it runs seeds side by side.
 //
-// Usage: node scripts/lab/economy-strand.mjs <world> <n> [root=this repo]
+// Usage: node scripts/lab/economy-strand.mjs <world> <n> [root=this repo] [colony=JSON]
 //   root: another checkout to measure (its web/src/colony is imported), so the same probe measures before and after.
+//   colony: the colony's params as JSON (Game's sides.colony), e.g. '{"broodOdour":1,"broodClimb":1}'.
 // Example, the 20 seeds of PRD §71 (world 1 n = 1-7, 9-12; world 2 n = 0, 2-9), four at a time:
 //   for c in "1 1" "1 2" "1 3" "1 4" "1 5" "1 6" "1 7" "1 9" "1 10" "1 11" "1 12" "2 0" "2 2" "2 3" "2 4" "2 5" "2 6" \
 //     "2 7" "2 8" "2 9"; do echo "$c"; done | xargs -P 4 -L 1 node scripts/lab/economy-strand.mjs
@@ -14,7 +15,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const [w, nudge] = [Number(process.argv[2] ?? 2), Number(process.argv[3] ?? 0)];
-const root = resolve(process.argv[4] ?? resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
+const root = resolve(process.argv[4] || resolve(dirname(fileURLToPath(import.meta.url)), "../.."));
+const colony = process.argv[5] ? JSON.parse(process.argv[5]) : undefined;
 const M = (p) => import(`${root}/web/src/colony/${p}`);
 const { isFed, LARVA, LARVA_FOOD } = await M("brood.ts");
 const { Game } = await M("game.ts");
@@ -34,7 +36,7 @@ for (let y = 0; y < map.size.h; y++)
     total += v;
   }
 map.foodTotal = map.foodLeft = total;
-const g = new Game(map, { antCount: 110, rival: false }, mulberry32(w * 7919 + nudge));
+const g = new Game(map, { antCount: 110, rival: false }, mulberry32(w * 7919 + nudge), colony ? { colony } : undefined);
 const c = g.player;
 const ch = map.chambers;
 let stranded = 0;
