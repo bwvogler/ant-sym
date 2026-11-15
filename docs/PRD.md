@@ -6954,3 +6954,31 @@ By the worst seed (CLAUDE.md), steering as shipped costs food: half on the worst
 **Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
 
 **Beads.** `ja-ykmu` (this); `ja-ykmu.1` assays, `ja-ykmu.2` steer response and plumbing, `ja-ykmu.3` the policy lane for search and memory, `ja-ykmu.4` design weights in the Lab, `ja-ykmu.5` play, results and the owner's decision. Found on the way: `ja-w8ys` (a species name in two notes).
+
+**Round 6 (ja-ykmu.6, 2026-11-15): the questions say what each level is, and a sign fixed.** The preset doctrines' answers did not tell an ant at its last find from one far from it (P(tight) 0.28 near, 0.25 far, over the shipped situations). Probes (about $0.002 each, Forage and the other two doctrines alike, search and memory only):
+
+| Wording | Near a find: P(tight) | Far: P(tight) | Notes |
+|---|---|---|---|
+| Legend as it was (v5) | 0.33–0.35 | 0.24–0.28 | matched triples |
+| The biology in the weight's meaning (v6) | 0.45–0.49 | 0.23–0.24 | matched triples only: on the real mix the contrast vanished (0.28 / 0.25) |
+| Each question says where the ant is | 0.06 | 0.17 | backwards: "at the spot" read as "searching a lot" |
+| **The meaning in the question's own levels (v7)** | **0.86–0.91** | **0.04–0.05** | the real shipped situations, full-size requests |
+
+v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "medium: its usual wander", "wide: straight and ranging…"; `memory` is "ignore…", "medium…", "lead: set out for that spot and keep to it, even over a food scent that leads elsewhere". Re-asked for the three doctrines, $0.0066 (~258 tokens a question, was ~172: the lane costs about half as much again per situation). Mean over the shipped situations, the doctrines alike: `none` search P(wide) 0.43–0.45, memory P(ignore) 0.83; `far` P(wide) 0.86–0.89, memory P(lead) 0.34–0.37; `near` P(tight) 0.86, memory P(lead) 0.42–0.44.
+
+**A sign bug (found by the first v7 measurement).** `steer.ts` scaled the heading noise by `searchSpan` at +1 (wide) and divided at −1 (tight): the opposite of the questions. It was invisible while the answers were flat; under v7's answers T1 fell to 0.90 with steering on. Tight now turns more and wide less; `steering.test.ts` holds the order (tight > usual > wide) and fails on the old sign. Steering off is untouched: goldens bit-exact.
+
+**Measured** (`assays.yml` on staging, `lockstep t1 m1 --one`, seeds 1–20, `both.steerLane=0,1`, `--policy precache:<doctrine>`; the first colony, median over seeds; [Forage](https://github.com/bwvogler/ant-sym/actions/runs/43758303707), [Warlike](https://github.com/bwvogler/ant-sym/actions/runs/43758306277)):
+
+| | T1 near ÷ far turning (design target 1.5) | M1 memory / trail (target memory 0.8) | Food on ÷ off, per seed | Losses off → on | Held > 120 s |
+|---|---|---|---|---|---|
+| Forage, off | 1.00 | 0.05 / 0.22 | | 9 | 0 |
+| Forage, on | 1.24 | 0.38 / 0.00 | 0.94 (0.51–1.24), 6/20 higher | 8 | 0 |
+| Warlike, off | 1.00 | 0.00 / 0.20 | | 7.5 | 0 |
+| Warlike, on | 1.17 | 0.20 / 0.09 | 0.93 (0.57–1.61), 8/20 higher | 7 | 0 |
+
+- Search now follows the find (T1 1.00 → 1.24 and 1.17; 0.90 under the inverted sign); it falls short of the 1.5 design mark, which is a design number: the weight multiplies the turning by `searchSpan` 1.33 (up to 1.77 between a tight and a wide ant), and a draw from the answers' odds blurs it. Raising `searchSpan` would widen it at some cost in food (round 5 chose 1.33 against the placebo).
+- Memory leads where the ant remembers a find (M1 memory 0.05 → 0.38, the trail share 0.22 → 0.00 on Forage), short of 0.8 as P(lead) ≈ 0.4 says.
+- Food stays inside the placebo's noise (0.76–1.77×, round 5); fewer ants die; no held carriers.
+- Spent on the lane so far: about $0.027 (rounds 1–5 $0.0156, round 6's probes $0.0045 and re-ask $0.0066).
+- `assays.yml`'s `policy` input takes `precache:<doctrine>` on staging, so these ran on the runners in about 4 minutes.
