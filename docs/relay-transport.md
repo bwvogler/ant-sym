@@ -1,6 +1,6 @@
 # Relay in stages: food reaches the brood by short carries, not one ant's whole trip
 
-*Research note for `ja-ukac` (fixes `ja-rvli`; PRD §79). Written 2026-11-15, against code at `08571f0`. Read in full: Tschinkel, Rink & Kwapich 2015 (Europe PMC full text; figures not seen), Greenwald, Segre & Feinerman 2015 (read for `larval-feeding.md`). Read as an abstract only, so its numbers are **unverified**: Pielström & Roces 2013. Known only as cited by Tschinkel et al.: Howard & Tschinkel 1976 (necrophoric piles).*
+*Research note for `ja-ukac` (fixes `ja-rvli`; PRD §80). Written 2026-11-15, against code at `08571f0`. Read in full: Tschinkel, Rink & Kwapich 2015 (Europe PMC full text; figures not seen), Greenwald, Segre & Feinerman 2015 (read for `larval-feeding.md`). Read as an abstract only, so its numbers are **unverified**: Pielström & Roces 2013. Known only as cited by Tschinkel et al.: Howard & Tschinkel 1976 (necrophoric piles).*
 
 The question: how does a colony get stored food to its brood when the store is far away, and who does the carrying?
 

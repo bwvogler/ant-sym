@@ -115,6 +115,7 @@ export function crossUp(c: Colony, i: number, cx: number, cy: number): void {
     // Up out of its own hole the vector starts afresh, pointing at it, with this trip's drift in 2D (U3b). Up out of a
     // rival's it runs on, its error standing (the side view's rule, integrate; review of #20).
     c.odoSurf[i] = 0;
+    c.reachSurf[i] = 0;
     c.driftSurf[i] = gauss(c.rng) * PI_DRIFT_2D;
     c.driftSurfY[i] = gauss(c.rng) * PI_DRIFT_2D;
     c.carriedX[i] = 0; // a fresh trip: nothing carried yet (builder.ts moveAnt)

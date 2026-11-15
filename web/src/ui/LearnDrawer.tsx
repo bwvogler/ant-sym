@@ -65,7 +65,7 @@ export default function LearnDrawer(props: Props) {
       tabIndex={-1}
       role="dialog"
       aria-label="Codex"
-      className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
+      className="panel-in fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
     >
       <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
         <h2 className="font-semibold text-fg">Codex</h2>
@@ -311,7 +311,12 @@ function NestCard({ k, v, focus }: { k: number; v: NestView; focus?: string }) {
         queen {v.queen === "alive" ? "alive" : v.queen === "dead" ? "dead (orphaned)" : "—"} · brood {v.brood.join(" / ")} (eggs / larvae /
         pupae) · {v.inside} inside, {v.outside} out · {v.midden} on the midden
       </p>
-      <div className="mt-2 overflow-x-auto">
+      <div
+        className="mt-2 overflow-x-auto focus-visible:outline-2 focus-visible:outline-accent"
+        tabIndex={0}
+        role="region"
+        aria-label={`${colonyName(k)} chambers table`}
+      >
         <table className="w-full min-w-[22rem] text-left text-xs">
           <thead className="text-[11px] tracking-wide text-fg-3 uppercase">
             <tr>
