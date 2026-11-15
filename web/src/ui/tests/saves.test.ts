@@ -59,6 +59,11 @@ test("a save from a single map (the side view or the open surface) is listed but
   const flat = { ...record(AUTOSAVE, settings, player, single as unknown as ReturnType<Game["save"]>, "1. land"), savedAt: 2000 };
   const one = { ...record(1, settings, player, small(4).save(), "1. land"), savedAt: 1000 };
   assert.equal(readable(flat), false);
+  assert.throws(
+    () => small(4).load(single as unknown as ReturnType<Game["save"]>),
+    /one map/,
+    "and Game.load refuses it rather than misreading it",
+  );
   assert.equal(newestReadable([flat, one]), one, "Continue skips it for the newest one-world save");
 });
 

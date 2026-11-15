@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { Colony, type Layer, localPolicy, localStance, PLANE } from "../../colony.ts";
 import type { Situation, StanceSituation } from "../../vocab.ts";
+import { responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
 import { foodIn, mulberry32, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -209,6 +210,44 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
   const y0 = at(20, 6).y;
   assert.ok(run(0.3) > y0 + 0.2, "faint: drawn south, toward it");
   assert.ok(run(12) < y0 - 0.2, "strong: turned north, away");
+});
+
+test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
+  // 40 ants at home on a strong raid trail, 40 out on one 16 cells away, on the plane; recruited at raidRecruit (0.5/s here) for 1 s.
+  const g = new Game(oneArena(arena(), 21), { antCount: 80, rivalAnts: 5 }, mulberry32(21), {
+    policy: () => "return",
+    responses: responses({ leave: () => "wait" }),
+    colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 },
+  });
+  const c = g.player;
+  const ph = (c.layers[PLANE] as Layer).ph;
+  const home = (i: number) => i < 40;
+  const place = () => {
+    for (let i = 0; i < 80; i++) putOn(c, i, home(i) ? 4 : 20, 6);
+    for (const x of [4, 20])
+      for (let dx = -3; dx <= 3; dx++)
+        for (let y = 3; y <= 9; y++) {
+          const p = at(x + dx, y);
+          ph.deposit("raid", p.x, p.y, 2 - Math.max(0, ph.read("raid", p.x, p.y))); // held at strong
+        }
+  };
+  for (let i = 0; i < 10; i++) c.carrying[i] = 1; // carriers at home: never recruited
+  for (let k = 0; k < 30; k++) {
+    place();
+    g.tick(1 / 30);
+  }
+  let atHome = 0;
+  let out = 0;
+  let carriers = 0;
+  for (let i = 0; i < 80; i++) {
+    if (i < 10) carriers += c.recruited[i]!;
+    else if (home(i)) atHome += c.recruited[i]!;
+    else out += c.recruited[i]!;
+  }
+  assert.equal(out, 0, "not out at its work");
+  assert.equal(carriers, 0, "not while carrying");
+  // 30 at home over 1 s at 0.5/s: 1 − e^−0.5 ≈ 39 % expected (12); all at once would be 30.
+  assert.ok(atHome >= 4 && atHome <= 21, `by degrees: ${atHome} of 30 at home recruited in 1 s`);
 });
 
 test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside goes home laying the raid trail", () => {

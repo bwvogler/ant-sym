@@ -62,7 +62,7 @@ export class AntStep {
 export interface Gates {
   /** one world's curtain (ja-web): outgoing foragers are held at the top of their own shaft (the gate) and asked `leave` there */
   hold: boolean;
-  /** whether `met` leaks on this layer: where the colony gates leaving (one world: on both layers, so it fades on a trip out too) */
+  /** whether `met` leaks on this layer: where the colony holds ants at the gate (on both layers, so a wait's count fades on a trip out too) */
   leak: boolean;
   metLeak: number;
   rgate: boolean;
@@ -73,8 +73,8 @@ export interface Gates {
 }
 
 /**
- * A layer's gates for a tick of dt, open ground's only (`open`: no hole into the layer). Activation (behaviour MR 5):
- * `met` leaks over MET_HALF. Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
+ * A layer's gates for a tick of dt (`open`: no hole into the layer, the plane). Activation (behaviour MR 5): `met` leaks over MET_HALF;
+ * only the curtain's gate holds ants (`hold`). Raids by trail (behaviour MR 5.2): a finder's count of strangers met leaks like `met`. Each
  * ant's own stance (docs/stance.md): its threat leaks like `foes`; a waiting ant feels its home's crowd over CROWD_HALF.
  * One world (`one`, ja-web): nobody waits on the plane, where every returner goes down its hole; activation is the
  * curtain's, at the top of each shaft (`hold`), where the waiting ant feels its crowd too. Raids by trail and each ant's

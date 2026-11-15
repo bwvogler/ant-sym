@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { deplete, nurseZoneProbe, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
-import { oneColony, smallOne } from "../builders.ts";
+import { arena, oneColony, smallOne } from "../builders.ts";
 
 // The behaviour assays (experiment.ts), the gate: the ones today's ants pass, short, two seeds each.
 // The ones they don't pass yet are `todo` in tests/slow/assays.test.ts, with the behaviour MR meant to
@@ -16,6 +16,11 @@ test("runGame: the same seed gives the same numbers", () => {
   const a = runAssay(oneAssay("deplete"), 3, {}, 90).metrics;
   const b = runAssay(oneAssay("deplete"), 3, {}, 90).metrics;
   assert.deepEqual(a, b);
+});
+
+test("runGame: a game is one world, so a spec on a bare arena is refused (onPlane or oneArena make one)", () => {
+  assert.throws(() => runGame({ seed: 1, seconds: 1, map: arena(), game: { antCount: 5, rival: false } }), /one world/);
+  runGame(onPlane({ seed: 1, seconds: 1, map: arena(), game: { antCount: 5, rival: false } }));
 });
 
 test("runGame builds the game the page builds (one world, gameRng): same numbers after 10 s", () => {

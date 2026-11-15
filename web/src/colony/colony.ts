@@ -1415,8 +1415,8 @@ export class Colony {
     const got = this.stored - this.storedSeen;
     this.storedSeen = this.stored;
     this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
-    // The gates (activation, raids by trail, each ant's own stance) are open ground's, where there is no hole into the
-    // layer (gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
+    // The gates (raids by trail and each ant's own stance on open ground, where there is no hole into the layer; the curtain's
+    // hold at the top of the shaft: gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
     const one = this.line !== null;
     const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, one, dt)) : null;
     let { hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } =
