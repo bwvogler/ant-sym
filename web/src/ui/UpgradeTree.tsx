@@ -33,21 +33,26 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
     const measure = () => {
       const o = el.getBoundingClientRect();
       const at = (id: string, level: number) => el.querySelector<HTMLElement>(`[data-level="${id}:${level}"]`)?.getBoundingClientRect();
-      const out: { d: string; met: boolean }[] = [];
+      // Each line leaves the needed level's right side, runs down its own lane right of every chip, and enters the level
+      // that needs it from the right: lanes in order of length, so short ones sit nearest the chips.
+      const pairs: { a: DOMRect; b: DOMRect; met: boolean }[] = [];
+      let right = 0;
+      for (const c of el.querySelectorAll<HTMLElement>("[data-level]")) right = Math.max(right, c.getBoundingClientRect().right - o.left);
       for (const u of UPGRADES)
         u.needs.forEach((ns, k) => {
           for (const n of ns) {
             const a = at(n.id, n.level);
             const b = at(u.id, k + 1);
-            if (!a || !b) continue;
-            const x1 = a.left + a.width / 2 - o.left;
-            const y1 = (a.top < b.top ? a.bottom : a.top) - o.top;
-            const x2 = b.left + b.width / 2 - o.left;
-            const y2 = (a.top < b.top ? b.top : b.bottom) - o.top;
-            const my = (y1 + y2) / 2;
-            out.push({ d: `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, met: (levels[n.id] ?? 0) >= n.level });
+            if (a && b) pairs.push({ a, b, met: (levels[n.id] ?? 0) >= n.level });
           }
         });
+      pairs.sort((p, q) => Math.abs(p.a.top - p.b.top) - Math.abs(q.a.top - q.b.top));
+      const out = pairs.map(({ a, b, met }, i) => {
+        const lane = right + 10 + 6 * i;
+        const y1 = a.top + a.height / 2 - o.top;
+        const y2 = b.top + b.height / 2 - o.top;
+        return { d: `M${a.right - o.left},${y1} H${lane} V${y2} H${b.right - o.left}`, met };
+      });
       setEdges(out);
     };
     measure();
@@ -65,7 +70,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
         <button
           type="button"
           data-level={wide ? `${u.id}:${level + 1}` : undefined}
-          className={`rounded-md border px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40 ${missing.length ? "border-dashed border-line" : "border-accent"}`}
+          className={`rounded-md border bg-panel px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40 ${missing.length ? "border-dashed border-line" : "border-accent"}`}
           disabled={!canKeep(levels, mutations, u.id)}
           onClick={() => evolve(u.id)}
         >
@@ -96,9 +101,9 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
         </li>
       );
     return (
-      <li key={u.id} className="grid grid-cols-[8rem_1fr] items-center gap-2 text-xs">
+      <li key={u.id} className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-[11px]">
         {name}
-        <span className="flex items-center gap-1.5">
+        <span className="relative flex flex-wrap items-center gap-1">
           {u.steps.map((s, k) =>
             k === level + 1 ? (
               <span key={s}>{next}</span>
@@ -106,7 +111,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
               <span
                 key={s}
                 data-level={`${u.id}:${k}`}
-                className={`rounded-md border px-2 py-0.5 ${k <= level ? "border-spore/40 bg-spore/10 text-fg" : "border-dashed border-line text-fg-3"}`}
+                className={`rounded-md border px-1.5 py-0.5 ${k <= level ? "border-spore/40 bg-panel text-fg shadow-[inset_0_0_0_99px_color-mix(in_oklab,var(--spore)_10%,transparent)]" : "border-dashed border-line bg-panel text-fg-3"}`}
               >
                 {s}
               </span>
@@ -127,7 +132,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
               d={e.d}
               fill="none"
               className={e.met ? "stroke-spore/60" : "stroke-fg-3/50"}
-              strokeWidth={1.25}
+              strokeWidth={1}
               strokeDasharray={e.met ? undefined : "3 3"}
             />
           ))}

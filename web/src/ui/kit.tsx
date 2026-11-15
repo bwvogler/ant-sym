@@ -157,7 +157,7 @@ export function Drawer({
   return (
     <section
       aria-label={label}
-      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none ${wide ? "sm:w-[22rem] lg:w-[46rem]" : "sm:w-[22rem]"} ${FLOAT}`}
+      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none ${wide ? "sm:w-[22rem] lg:w-[32rem]" : "sm:w-[22rem]"} ${FLOAT}`}
     >
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <h2 className="text-[15px] font-semibold text-fg">{title}</h2>
