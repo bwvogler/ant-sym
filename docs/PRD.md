@@ -5977,7 +5977,15 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - ja-638i.3: tune and turn on.
 - Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
 
+**Built, off (`cropFeed`), and a first look (2026-11-15).**
+- With crops of 0.5 on three seeds that fail on main, crops barely fill: at most about 4 food is ever in crops, and no crop is ever full.
+- Seed 14 is no better (40 waiting against 38 on main). Seed 5 collapsed: 57 workers left and 32 larvae starved, against 38 waiting on main.
+- Tracing seed 14 corrects §71's reading. The ants feeling enough need to fetch are mostly 11–20+ cells from the store, and they stay there: they are not queueing.
+- The store's floor mark is laid only by ants that have just left a store, and fades with the time since; beyond a few cells from the store there is nothing to follow, and fetchers wander.
+- Crops fill only at the store, so they share that blind spot. The limit is finding the store, not the dose or the queue.
+
 **Still open.**
+- How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
 - The design numbers (owner's call after the sweep).
 - Whether to retire the porters' table once crops carry the brood's food.
 - Reading Cassill & Tschinkel and the 2021 trophallaxis review in full (on blocked hosts).

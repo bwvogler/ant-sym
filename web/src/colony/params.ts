@@ -247,6 +247,12 @@ export interface ColonyParams {
    */
   revert: number;
   /**
+   * ja-638i (docs/larval-feeding.md, PRD §72): an ant's crop, in food units. An ant underground that feels some need fills
+   * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
+   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off.
+   */
+  cropFeed: number;
+  /**
    * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds of digging (counted while it explores in the nest) an old forager
    * home from a trip with nothing takes before it climbs back out. At tunnels' dead ends and forks (walkTunnel) it digs
    * without the ROOMY_DIG damping and without nestmates by; starting a face or meeting a tunnel's end head-on (move.ts)
@@ -431,6 +437,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   forageDig: 0,
   owedBeg: 0,
   revert: 0,
+  cropFeed: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,

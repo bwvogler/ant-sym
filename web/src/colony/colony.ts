@@ -366,6 +366,8 @@ export class Colony {
   handedOn = 0;
   /** food porters are carrying between chambers: still the colony's (the queen's reserve and the strategist count it) */
   inJaws = 0;
+  /** food in the crops of the colony's ants (cropFeed, ja-638i): still the colony's, like inJaws */
+  inCrops = 0;
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead not yet on the midden: where each lies (a cell), who carries it (−1 none), when it died, its fungus */
   readonly corpses: Corpse[] = [];
@@ -455,6 +457,8 @@ export class Colony {
   felt = new FeltGrid();
   /** where the young (age band 0) are underground this tick, for youngMet (task reversion, ja-7r7x); filled only with revert on */
   youngs = new FeltGrid();
+  /** the fullest crop on each cell this tick (cropFeed, ja-638i) */
+  cropDonors = new DonorGrid();
   /** the best-fed ant on each cell this tick, for food shared by mouth (hunger.ts); rebuilt every tick, not saved */
   donors = new DonorGrid();
   /** what the ants on each cell carry of the queen's scent, for the mean they share by contact (royal.ts); rebuilt every tick, not saved */
@@ -776,7 +780,7 @@ export class Colony {
   spare(): number {
     if (!this.queen) return this.larder;
     if (!this.orphaned && this.population + this.brood.size < this.params.maxAnts) return 0; // orphaned, it will never grow: its food is spare
-    return this.larder + this.inJaws - this.brood.owed();
+    return this.larder + this.inJaws + this.inCrops - this.brood.owed();
   }
 
   /** The queen dies (a raider at her side; later, the fungus): the colony is orphaned, it lays no more eggs. */

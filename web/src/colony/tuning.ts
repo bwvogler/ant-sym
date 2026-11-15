@@ -68,6 +68,18 @@ export const YOUNG_TAU = 60;
 /** An old ant at home reverts to nursing while its `youngMet` is below this (design). */
 export const REVERT_BELOW = 0.05;
 
+/**
+ * Larval feeding by mouth (ja-638i, docs/larval-feeding.md): food an ant takes into its crop a second from a stocked
+ * store or reception within reach (design).
+ */
+export const CROP_FILL = 0.5;
+/** Food a second at most that passes mouth to mouth from a fuller crop to a needier nestmate (design). */
+export const CROP_PASS = 0.2;
+/** Food a second a nurse feeds a larva from its crop at full strength (a larva begging hard); less as it begs less (design). */
+export const CROP_FEED = 0.25;
+/** The strength a larva still owed its growth food draws feeding at, when it is not yet hungry enough to beg (design). */
+export const CROP_OWED = 0.3;
+
 /** half-life (s) of a scout's count of seconds in contact with strangers (behaviour MR 5.2) */
 export const FOES_HALF = 20;
 

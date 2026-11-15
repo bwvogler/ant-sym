@@ -500,7 +500,7 @@ export function nestLife(col: Colony, dt: number): void {
       col.layT -= LAY_INTERVAL;
       const royalC = ch.list[ch.at(qx, qy)];
       if (
-        col.larder + col.inJaws < due + EGG_FOOD + LARVA_FOOD ||
+        col.larder + col.inJaws + col.inCrops < due + EGG_FOOD + LARVA_FOOD ||
         col.population + col.brood.size >= p.maxAnts ||
         !royalC ||
         royalC.food < EGG_FOOD

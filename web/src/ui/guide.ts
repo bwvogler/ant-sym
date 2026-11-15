@@ -415,6 +415,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "Whether old foragers go back to nursing when the young are gone, and what tells them (not built yet).",
   },
   {
+    note: "larval-feeding",
+    title: "Larval feeding",
+    covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (not built yet).",
+  },
+  {
     note: "activation",
     title: "Activation",
     covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake.",

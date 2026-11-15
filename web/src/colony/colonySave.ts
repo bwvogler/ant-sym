@@ -28,6 +28,7 @@ export const COLONY_STATE = [
   "outAt",
   "layT",
   "inJaws",
+  "inCrops",
   "belief",
   "entrance",
   "entranceCol",
