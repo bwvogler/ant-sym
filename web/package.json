@@ -17,7 +17,7 @@
     "test:soak": "node --test --test-timeout=120000 src/colony/tests/soak/*.test.ts",
     "test:golden": "node --test --test-timeout=60000 src/colony/tests/golden/*.test.ts",
     "preview": "vite preview",
-    "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts",
+    "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts src/colony/tests/slow/g1/*.test.ts",
     "e2e": "node ../scripts/e2e-one-world.mjs"
   },
   "dependencies": {
