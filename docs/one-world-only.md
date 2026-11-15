@@ -180,9 +180,9 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | `game` G | yes: §42.2, §46.4 | `game1` (G1) | covered | G1 slow guard on seeds 4, 5, 9 passes (route memory, §59) |
 | `gameTop` G′ | yes: §42.2, §46.4 (G′ table) | none | **delete** | report-only bench bed on `OPEN_WORLD`, no queen. G1 replaces it as the whole-game measure |
 | `nestFlow` A8 | yes: §43.4, §46.4 (report only) | `nestFlowOne` | covered | one world: beyond 0.77 (worst 0.37) against 1.00 (one-world.md §5) |
-| `lifecycle` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §74.2) | was a solo side game with the fungus landed; now a solo `generateOneWorld` (the side-view versions stay in `ASSAYS` until step 4) |
-| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | `lifecycleOne` | **ported** (PRD §74.2) | as above |
-| `lifecycle-scent` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §74.2) | as above |
+| `lifecycle` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §76.2) | was a solo side game with the fungus landed; now a solo `generateOneWorld` (the side-view versions stay in `ASSAYS` until step 4) |
+| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | `lifecycleOne` | **ported** (PRD §76.2) | as above |
+| `lifecycle-scent` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §76.2) | as above |
 
 ## 3. Slow guards (`tests/slow/*.test.ts`)
 
@@ -254,7 +254,7 @@ For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `s
 
    1b. **A6 `pass`** (§42.2, §46.4, §49.3, §54.3): "covered" by `passAssay(onPlane)`, but both sides are broadcast raiders (`stanceGate: 0`), and the attackers march at the defenders' hole by the same branch. Once the broadcast goes it needs a new setup and baseline.
 2. **A11 `raidFind`, A12 `raidStop`** (§49.3, §49.7, §54.3): pending since U6b. These are the slow guards `raidFind.test`/`raidStop.test`. (`ja-d6c`, the raid trail on one world's surface, is closed: raids from a scout's trail run on the plane since `ja-web`.)
-3. **L lifecycle ×3** (§50.19, §50.21): gynes, flights and daughters. The only measure of them, plus `soak/royal.test.ts`'s ~12 tests, all in the side nest. The three now run on one world (PRD §74.2, where one world rears far fewer gynes: `ja-lp4.6.12`), but still no test rears a gyne; that stays with the `soak/royal` port.
+3. **L lifecycle ×3** (§50.19, §50.21): gynes, flights and daughters. The only measure of them, plus `soak/royal.test.ts`'s ~12 tests, all in the side nest. The three now run on one world (PRD §76.2, where one world rears far fewer gynes: `ja-lp4.6.12`), but still no test rears a gyne; that stays with the `soak/royal` port.
 4. **A5 and A9 as slow guards**: the legacy arena passes 10/10, the plane 0/10 and 3/10. Porting the slow guard as-is fails, so S2 step 2 must re-mark them with the owner (the worst-seed rule).
 5. **Side economy hour** (`slow/economy.test.ts`, PRD §41/§50.18; ja-xu6): the only long-run nest-economy guard.
 6. **Unity in a real game** (`soak/recognition*.test.ts`, PRD §53): its one-world twin is skipped (ja-lp4.6.6).

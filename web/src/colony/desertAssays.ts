@@ -376,14 +376,14 @@ export const D5_SECONDS = 1200;
  * (owner, review of #155 D1): the hot-adapted Cataglyphis forage at the hottest hours, close to their limit (desert-heat.md §1), and the sun's
  * height sets the nest's day (Amor 2011, unverified). Pass, all four: more ants out on the plane at noon (the daylight's middle quarter) than in
  * the low sun (its first and last eighth); at night (the sun down) no more setting out (not on their way home) than a tenth of those out at
- * noon; heat deaths a day no more than 16 % of the colony (C. bicolor loses about 16 % of its foragers a day to every cause: Schmid-Hempel &
- * Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in every 30 s while the sun is high, after the first minute.
+ * noon, and no more out at all (lost homers too: ja-rf5.14, owner 2026-11-15) than a tenth of noon; heat deaths a day no more than 16 % of
+ * the colony (C. bicolor loses about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in every 30 s while the sun is high, after the first minute.
  */
 export const desertHeat: Assay = {
   id: "d5",
   title: "D5 heat: the desert ant forages under the high sun, stays in at night, and few die of heat (one world, two days)",
   target:
-    "out at noon > in the low sun; at night ≤ 0.1 × noon; heat deaths ≤ 16 % of the colony a day; food every 30 s under the high sun (Amor 2011, borrowings: unverified)",
+    "out at noon > in the low sun; at night ≤ 0.1 × noon, setting out and out at all; heat deaths ≤ 16 % of the colony a day; food every 30 s under the high sun (Amor 2011, borrowings: unverified)",
   seconds: D5_SECONDS,
   spec: (seed) => {
     let noon = 0;
@@ -391,6 +391,7 @@ export const desertHeat: Assay = {
     let dawn = 0;
     let dawnN = 0;
     let night = 0;
+    let nightAll = 0;
     let nightN = 0;
     let aliveSum = 0;
     let aliveN = 0;
@@ -428,7 +429,12 @@ export const desertHeat: Assay = {
         const light = 1 - c.params.heatNight;
         if (phase >= light) {
           // At night: those out and not on their way home (a lost carrier still searching for the hole is coming home, not setting out).
-          for (let i = 0; i < c.n; i++) if (c.alive[i] && c.layer[i] === PLANE && c.mode[i] !== RETURN) night++;
+          // Every ant out counts too (ja-rf5.14): lost homers included, reported beside it.
+          for (let i = 0; i < c.n; i++)
+            if (c.alive[i] && c.layer[i] === PLANE) {
+              nightAll++;
+              if (c.mode[i] !== RETURN) night++;
+            }
           nightN++;
         } else if (Math.abs(phase - light / 2) < light / 8) {
           noon += out;
@@ -445,6 +451,7 @@ export const desertHeat: Assay = {
         const outDawn = dawn / Math.max(1, dawnN);
         const ratio = outNoon / outDawn;
         const outNight = night / Math.max(1, nightN);
+        const outNightAll = nightAll / Math.max(1, nightN);
         const deathsADay = c.diedHot / days / (aliveSum / Math.max(1, aliveN));
         // The 30-s windows after the first minute, but those in the high sun (any moment of them), where a lull is the biology (desert-heat.md §1).
         const after = bins
@@ -456,10 +463,11 @@ export const desertHeat: Assay = {
           outDawn,
           ratio,
           outNight,
+          outNightAll,
           heatDeaths: c.diedHot,
           deathsADay,
           minPickups,
-          pass: ratio > 1 && outNight <= 0.1 * outNoon && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
+          pass: ratio > 1 && outNight <= 0.1 * outNoon && outNightAll <= 0.1 * outNoon && deathsADay <= 0.16 && minPickups > 0 ? 1 : 0,
         };
       },
     });

@@ -63,7 +63,7 @@ export interface Touch {
   /** how good the food is, tasted: the food it carries, or the food `get` offers; "fair" otherwise */
   quality: Quality;
   /** the alarm it smells, strongest of its three sensors: none, faint or strong (behaviour MR 4: graded alarm) */
-  alarm: "none" | "faint" | "strong";
+  alarm: (typeof SCENT_LEVELS)[number];
   /**
    * with strangers in contact, nestmates against strangers in its cell and the six round it, by touch (behaviour MR 4):
    * outnumbered (under two thirds as many), even, outnumbering (over half as many again); "none" with no stranger near
@@ -78,12 +78,12 @@ export interface Touch {
    * the raid trail it smells where it is (behaviour MR 5.2, docs/raid-recruitment.md): none, faint or strong. A colony that
    * doesn't recruit raiders by trail (raidGate 0, or the side view) reads "strong", so its raiders leave as they did.
    */
-  raid: "none" | "faint" | "strong";
+  raid: (typeof SCENT_LEVELS)[number];
   /**
    * how crowded home is, felt by a waiting ant (docs/stance.md: nestmates in its cell and the six round it, over a few seconds):
    * few or many; "few" where each ant's stance is not its own (the side view)
    */
-  crowd: "few" | "many";
+  crowd: (typeof CROWD)[number];
 }
 
 export type Returns = (typeof RETURNS)[number];

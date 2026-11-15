@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { RESPONSE_HOOKS, RESPONSE_LEGEND, responseKey } from "../../colonyBrain.ts";
-import { ITEMS, QUALITY, WHERE, touchKey, type Touch } from "../../responses.ts";
+import { ITEMS, QUALITY, WHERE, touchKey, touchSchemaOf, type Touch } from "../../responses.ts";
 import { MODES, STANCES } from "../../vocab.ts";
 
 // The response lanes' cache keys and legend (ja-fnd.5.6): Touch on a schema must leave every key and the legend byte for
@@ -88,4 +88,8 @@ test("the response legend is byte for byte the one written whole", () => {
     createHash("sha256").update(RESPONSE_LEGEND).digest("hex"),
     "be493b05e04ffc784421b91d1d47b1aeaa4d2defe8b86c518242168ef3bb0430",
   );
+});
+
+test("a lane's key over a field Touch doesn't have does not build (review of #199, N4)", () => {
+  assert.throws(() => touchSchemaOf(["mode", "smell" as keyof Touch]), /no field "smell"/);
 });
