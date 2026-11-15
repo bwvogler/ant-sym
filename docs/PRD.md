@@ -5773,7 +5773,31 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 
 **What it changes in play.** Nothing on the page yet: the page doesn't ask the response lanes, so they play the local rule (ja-m7rr's note). The change shows in live checks and their replays, and on the page once a response lane is asked there.
 
-**Cost.** None per hour: no legend, question or schema changed. To measure it, a live check of the six lanes on the top-down map (`colony-live.mjs get,carry,drop,trail,contact,leave --top`, 62 situations per doctrine) is estimated at 86k input tokens, about $0.0036 for the three doctrines.
+**Cost.** None per hour: no legend, question or schema changed.
+
+**Measured** (2026-11-15). The six lanes were asked live under version 12 for each doctrine: top-down map, seed 1, 600 + 600 ants, 300 s, then a second round (`--from`) for the situations the replay met that the first round lacked. That cost $0.0036 in all, and the caches are `experiments/caches/draw-top-<doctrine>.json`. Jev mostly answers with odds, not a certain choice. Situations whose top answer is under 0.9:
+
+| Lane (situations) | Forage | Cautious | Warlike |
+|---|---|---|---|
+| trail (18) | 13 | 16 | 17 |
+| contact (21) | 16 | 11 | 17 |
+| leave (10) | 9 | 7 | 7 |
+| carry (7) | 1 | 4 | 4 |
+
+The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an ant meeting a stranger with even or better odds fights at 0.75–0.94, where the local rule flees. Several trail answers are near even, for example "none" 0.52 against "home" 0.48.
+
+**Replayed** (free; `assays.yml` with `policy`, [runs 43721252762](https://github.com/bwvogler/ant-sym/actions/runs/43721252762), [43721255686](https://github.com/bwvogler/ant-sym/actions/runs/43721255686), [43721258448](https://github.com/bwvogler/ant-sym/actions/runs/43721258448)). `gameTop`, seeds 1–10, 600 s. The first colony plays the cache's response answers, either drawn (`sampleTemp` 1) or Jev's top answer (`sampleTemp` 0). Its mode is the local rule, since the caches hold no mode answers. Drawn ÷ top per seed: the median, the worst and best seeds, and how many seeds came out higher:
+
+| Doctrine | Food stored | Losses (own) | Losses (rival) |
+|---|---|---|---|
+| Forage | 0.99 (0.82–1.23), 5/10 | 1.03 (0.90–1.63), 6/10 | 1.00 (0.82–1.71), 5/10 |
+| Cautious | 1.03 (0.97–1.08), 8/10 | **0.81 (0.54–0.99), 0/10** | **0.82 (0.51–0.95), 0/10** |
+| Warlike | 1.00 (0.83–1.11), 5/10 | 0.89 (0.48–1.44), 3/10 | 0.88 (0.57–1.50), 1/10 |
+
+- Food doesn't move under any doctrine: medians 0.99–1.03, with the spread of any change to play.
+- Under Cautious, drawing costs fewer ants on both sides in every seed (−19 % and −18 % at the median). With odds kept, some ants act on the less likely contact answer instead of every ant doing the same, and fewer fights follow.
+- Under Warlike the losses lean the same way (0.89 and 0.88) but swing by seed. Under Forage nothing moves.
+- Unlike the mode draws (§68), drawing the responses costs no food.
 
 ## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
 
