@@ -191,7 +191,7 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | slow/assays.test.ts | O (A1, A2a, A2b, A5, A5b, A9, A10: `oneAssay`); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | **ported** (PRD §76.4) | A1, A2a, A2b, A5b held to their marks; A5, A9, A10 guarded at their worst seed + 10 % (owner) |
 | slow/chambers.test.ts | S | a crowded nest digs chambers; chambers never touch, none too shallow | port (curtain) | `int/transect` "the hole gap keeps founded royal chambers apart…" covers founding chambers only |
 | slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
-| slow/golden.test.ts | S | "side view war, seed 6" golden | re-record on one world | S2 step 3 |
+| slow/golden.test.ts | O (full size) | "one world war, seed 6" golden (was "side view war, seed 6") | **re-recorded on one world** (S2.3a) | |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
 | slow/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
@@ -203,12 +203,12 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 
 | scenario | file | view | verdict |
 |---|---|---|---|
-| "side view, seed 4" (300 ants, 90 s, alarm at 30) | golden/golden.test.ts (`golden.json`) | side | re-record on one world |
-| "top-down war, seed 3" (150 ants, 150 s, alarm 20/60/61) | golden/golden.test.ts | top | re-record on one world |
-| "side view war, seed 6" (600 ants, 600 s) | slow/golden.test.ts (`slow/golden.json`) | side | re-record on one world |
+| "side view, seed 4" (300 ants, 90 s, alarm at 30) | golden/golden.test.ts (`golden.json`) | side | **re-recorded** as "one world, seed 4" (S2.3a) |
+| "top-down war, seed 3" (150 ants, 150 s, alarm 20/60/61) | golden/golden.test.ts | top | **re-recorded** as "one world war, seed 3" (S2.3a) |
+| "side view war, seed 6" (600 ants, 600 s) | slow/golden.test.ts (`slow/golden.json`) | side | **re-recorded** as "one world war, seed 6", full-size world (S2.3a) |
 | "one world, seed 7" | golden/oneWorldGolden.test.ts | one | keep. It re-records only if S2 changes behaviour (merging the twins should be bit-exact) |
 
-`tests/goldens.ts` `Scenario.view: "side" | "top" | "one"` and `record`'s side and top branches go once the three old scenarios move.
+`tests/goldens.ts` lost `Scenario.view` and `record`'s side and top branches in S2.3a (`ja-fnd.3.3.1`): every golden is one world, the small plane or (`full`) the full-size world.
 Other pinned hashes that S2 touches: `int/world.test.ts` "golden: the generator is deterministic" (port to the plane), `soak/side.test.ts`'s
 golden (delete), and `ui/tests/laneRegistry.char.test.ts` (re-record when `fungusContext` loses its view).
 
