@@ -7,6 +7,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { heatStep } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
+import type { AphidOdour } from "./aphids.ts";
 import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
@@ -897,6 +898,33 @@ export class Colony {
     // Never past 40 % of the way to the nearest neighbour on that side: each midden on its own colony's ground (nests close together).
     const t = this.neighbour();
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
+  }
+
+  /** The aphids' odour in the air (aphids.ts, ja-nzkg.3): the game's, shared by its colonies; null until a clump is put down. */
+  aphidOdour: AphidOdour | null = null;
+  /**
+   * Whether ant i, heading h, smells aphids in the air (docs/aphids.md, ja-nzkg.3) on any of its three sensors, within its
+   * species' aphidPlume; if so, the turn of at most `max` toward the strongest is left in plumeTurn. Leaves CELL as it found it.
+   */
+  smellsAphids(i: number, h: number, a: number, max: number): boolean {
+    const dist = this.aphidOdour?.dist;
+    if (!dist) return false;
+    const keepX = CELL[0];
+    const keepY = CELL[1];
+    const range = this.params.aphidPlume;
+    const d = this.params.sensorDistance;
+    const read = (b: number) => {
+      cellOf(this.x[i] + Math.cos(b) * d, this.y[i] + Math.sin(b) * d);
+      return plumeAt(dist, this.map, range, CELL[0], CELL[1]);
+    };
+    const l = read(h - a);
+    const f = read(h);
+    const r = read(h + a);
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    if (Math.max(l, f, r) <= 0) return false;
+    this.plumeTurn = climb(l, f, r, max);
+    return true;
   }
 
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */

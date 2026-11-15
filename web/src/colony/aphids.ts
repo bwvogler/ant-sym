@@ -7,6 +7,7 @@
 // Deterministic: a clump draws no random numbers, so a game with none is the same game as before, tick for tick.
 
 import { centreX, centreY } from "./hex.ts";
+import { PLUME_EVERY, spread } from "./plume.ts";
 import { dropFood, OPEN, rockAt, type WorldMap } from "./world.ts";
 
 /** The clumps' numbers (design marks; docs/aphids.md). Times in game seconds. */
@@ -110,4 +111,64 @@ export function aphidCells(clumps: readonly AphidClump[], layer: number): Set<nu
     for (let k = 0; k < c.cells.length; k += 2) out.add((c.cells[k + 1]! + 0x8000) * 0x10000 + (c.cells[k]! + 0x8000));
   }
   return out;
+}
+
+/**
+ * The aphids' odour in the air (docs/aphids.md, finding 1; ja-nzkg.3): a plume out from every living clump's cells, which
+ * an empty-jawed ant of a species with `aphidPlume` climbs, as the desert ant climbs its food's (plume.ts). One for the
+ * game, shared by its colonies, built out to the farthest any of them smells. Not saved: rebuilt from the clumps, in each
+ * PLUME_EVERY period and whenever their cells change, so a loaded game builds it as the unbroken one did from the same clumps.
+ */
+export interface AphidOdour {
+  /** per plane cell, steps from the nearest living aphid cell through open ground; −1 beyond; null with no clumps */
+  dist: Int16Array | null;
+  /** the PLUME_EVERY period it was built in */
+  epoch: number;
+  /** the clumps' living cells when built, as a count and a sum of keys: a change rebuilds it at once */
+  cells: number;
+  sum: number;
+  /** how far it was built out */
+  range: number;
+}
+
+export const aphidOdour = (): AphidOdour => ({ dist: null, epoch: -1, cells: 0, sum: 0, range: 0 });
+
+/** Bring the game's aphid odour up to date over `map` (the plane) out to `range` cells, at game time `t`. */
+export function updateAphidOdour(
+  o: AphidOdour,
+  clumps: readonly AphidClump[],
+  layer: number,
+  map: WorldMap,
+  range: number,
+  t: number,
+): void {
+  const { w, h } = map.size;
+  const live = range > 0 ? aphidCells(clumps, layer) : new Set<number>();
+  if (!live.size) {
+    o.dist = null;
+    o.cells = 0;
+    o.sum = 0;
+    return;
+  }
+  let sum = 0;
+  for (const k of live) sum = (sum + k) % 2147483647;
+  const epoch = Math.floor(t / PLUME_EVERY);
+  if (o.dist && o.dist.length === w * h && epoch === o.epoch && o.cells === live.size && o.sum === sum && o.range === range) return;
+  const dist = o.dist && o.dist.length === w * h ? o.dist : new Int16Array(w * h);
+  dist.fill(-1);
+  const src: number[] = [];
+  for (const k of live) {
+    const x = (k % 0x10000) - 0x8000;
+    const y = Math.floor(k / 0x10000) - 0x8000;
+    const col = x - map.x0;
+    if (col < 0 || y < 0 || col >= w || y >= h) continue;
+    dist[y * w + col] = 0;
+    src.push(y * w + col);
+  }
+  spread(dist, map, range, src);
+  o.dist = dist;
+  o.epoch = epoch;
+  o.cells = live.size;
+  o.sum = sum;
+  o.range = range;
 }

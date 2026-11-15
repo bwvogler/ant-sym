@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { desertFirstFind, desertInvitation, desertNoTrail, oneAssay, runAssay, crayonLine, wall } from "../../experiment.ts";
+import { aphidsFound, desertFirstFind, desertInvitation, desertNoTrail, oneAssay, runAssay, crayonLine, wall } from "../../experiment.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42), on one world (their
@@ -89,6 +89,17 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
     const smelt = first(false);
     const blind = first(true);
     assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the plume, ${blind} s blind`);
+  }
+});
+
+// ja-nzkg.3 (PRD §78.2): the generic ant climbs aphid odour. Sooner than with aphidPlume 0 on 10 of seeds 1–10 (median 9.9 → 7.9 s)
+// and 7 of 11–20 (8.5 → 7.8 s); seeds 1, 6 and 7 by a few seconds each.
+test("B9 aphid odour brings the first find of a clump sooner than a blind search", () => {
+  for (const seed of [1, 6, 7]) {
+    const first = (blind: boolean) => runAssay(aphidsFound, seed, blind ? { colony: { aphidPlume: 0 } } : {}).metrics.firstFind;
+    const smelt = first(false);
+    const blind = first(true);
+    assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the aphid plume, ${blind} s blind`);
   }
 });
 

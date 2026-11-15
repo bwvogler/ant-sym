@@ -127,3 +127,37 @@ test("a game's clumps save and load; a game with none saves as before", () => {
   }
   assert.deepEqual(h.aphids, g.aphids, "and step alike after");
 });
+
+test("the aphid odour: built from the living clumps, gone with them; an ant within range smells it and turns toward it", () => {
+  const g = game();
+  const c = g.colonies[0]!;
+  const o = openSpot(g);
+  g.tick(1 / 30);
+  assert.equal(g.aphidOdour.dist, null, "no clump, no odour");
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [o] });
+  g.tick(1 / 30);
+  assert.ok(g.aphidOdour.dist, "built");
+  assert.equal(c.aphidOdour, g.aphidOdour, "the colonies share it");
+  // An ant 4 units east of the clump's centre, heading north: the strongest smell is west, so it turns toward the clump.
+  const i = [...Array(c.n).keys()].find((j) => c.alive[j])!;
+  c.bind(PLANE);
+  c.x[i] = o.x + 4;
+  c.y[i] = o.y;
+  const north = -Math.PI / 2;
+  assert.ok(c.smellsAphids(i, north, Math.PI / 4, 1), "smelt within range");
+  assert.ok(c.plumeTurn < 0, `turned toward the clump (west of north): ${c.plumeTurn}`);
+  // Out of its range it smells nothing.
+  c.x[i] = o.x + c.params.aphidPlume + 6;
+  assert.ok(!c.smellsAphids(i, north, Math.PI / 4, 1));
+  // A species deaf to it (aphidPlume 0, the desert ant's) smells nothing even beside the clump.
+  c.x[i] = o.x + 2;
+  const keep = c.params.aphidPlume;
+  c.params.aphidPlume = 0;
+  assert.ok(!c.smellsAphids(i, north, Math.PI / 4, 1));
+  c.params.aphidPlume = keep;
+  c.bind(c.home);
+  // Undone, the clump's odour goes at the next tick.
+  g.aphids.length = 0;
+  g.tick(1 / 30);
+  assert.equal(g.aphidOdour.dist, null);
+});

@@ -494,6 +494,15 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       col.smellsFood(i, h, a, p.turnRate * dt)
     )
       h += col.plumeTurn + noise * p.wander * 0.25;
+    else if (
+      // Aphid odour (ja-nzkg.3, docs/aphids.md): an empty-jawed ant outside climbs a clump's plume, as the desert ant climbs food's.
+      p.aphidPlume > 0 &&
+      !carrying &&
+      col.aphidOdour?.dist &&
+      (col.entrance === null || (col.line !== null && col.cur === PLANE)) &&
+      col.smellsAphids(i, h, a, p.turnRate * dt)
+    )
+      h += col.plumeTurn + noise * p.wander * 0.25;
     else if (p.siteFidelity > 0 && col.line !== null && col.cur === PLANE && !Number.isNaN(col.foodX[i]))
       h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25;
     else h += noise * p.wander;

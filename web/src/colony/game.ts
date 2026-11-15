@@ -15,7 +15,7 @@ import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
-import { stepAphids, type AphidClump } from "./aphids.ts";
+import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -349,6 +349,8 @@ export class Game {
   crayons: CrayonLine[] = [];
   /** The builder's aphid clumps (aphids.ts, ja-nzkg.2): each makes honeydew as it grows and crashes; none unless a child put one down. */
   aphids: AphidClump[] = [];
+  /** The clumps' odour in the air (aphids.ts, ja-nzkg.3), shared by the colonies; rebuilt from the clumps, not saved. */
+  readonly aphidOdour = aphidOdour();
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
    * §50: colony policy is hidden until the fungus infects a queen). Never closes again.
@@ -1013,7 +1015,13 @@ export class Game {
   tick(dt: number): void {
     this.time += dt;
     if (this.crayons.length) stepCrayons(this, dt);
-    if (this.aphids.length) stepAphids(this, dt);
+    if (this.aphids.length || this.aphidOdour.dist) {
+      stepAphids(this, dt);
+      const layer = this.layers.length > 1 ? PLANE : 0;
+      const range = Math.max(0, ...this.colonies.map((c) => c.params.aphidPlume));
+      updateAphidOdour(this.aphidOdour, this.aphids, layer, this.layers[layer]!, range, this.time);
+      for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
+    }
     for (const c of this.colonies) c.tick(dt);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {

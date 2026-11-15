@@ -443,7 +443,9 @@ export class Builder {
         out.push({ kind: "food", map, x, y, added: add, quality: q });
       }
     } else if (tool === "aphids") {
-      // A clump on open ground (docs/aphids.md): a drag grows the clump it began, cell by cell.
+      // A clump on open ground (docs/aphids.md): a drag grows the clump it began, cell by cell. Aphids live on the surface:
+      // in one world, the plane only.
+      if (game.layers.length > 1 && layer !== PLANE) return out;
       const have = new Set<number>();
       if (clump)
         for (let k = 0; k < clump.cells.length; k += 2) have.add((clump.cells[k + 1]! + 0x8000) * 0x10000 + (clump.cells[k]! + 0x8000));

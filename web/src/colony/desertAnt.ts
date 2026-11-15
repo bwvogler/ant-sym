@@ -103,6 +103,8 @@ export const DESERT_ANT: Species = {
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
     // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
     foodPlume: 21,
+    // Aphids (docs/aphids.md "Not every ant in the game tends aphids"): Cataglyphis takes no honeydew, so it is deaf to aphid odour.
+    aphidPlume: 0,
     // Heat and the sun (ja-rf5.5, ja-rf5.12; docs/desert-heat.md, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring &
     // Wehner 1995, read through later papers: a borrowing, unverified; the params.ts default). A 10-minute day, a third of it night (owner,
     // 2026-11-13). The papers' direction (owner, review of #155 D1): out under the high sun, at the hottest hours, close to their limit; so the

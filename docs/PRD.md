@@ -6812,3 +6812,9 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 |---|---|
 | B9 `aphidsFound` (60 ants, a clump 75 units off in a corner) | first find a median 9.1 s after it is put down (7.5–15.4). The plume (`ja-nzkg.3`) is measured against this. |
 | B10 `aphidsRenewable` against `aphidsRenewableSugar` (about 37 cells, 300 ants) | food home over 300 s: a median 1,130 (816–1,225) from the clump against 444 (all of it) from the same cells of sugar; ants on the hole–clump line 68 against 4 on a bare line. Passes. |
+
+### 78.2 The aphid plume (ja-nzkg.3)
+
+**Built.** `aphidPlume` (params.ts, 8 cells; the desert ant's 0: it takes no honeydew). The game keeps one plume (`AphidOdour`, aphids.ts), spread with `plume.ts`'s `spread` from every living aphid cell out to the farthest any colony smells, rebuilt each `PLUME_EVERY` period and whenever the clumps' living cells change; it is shared by the colonies and not saved (rebuilt from the saved clumps). An outside ant with empty jaws climbs it (`Colony.smellsAphids`, the branch after the food plume in `steer.ts`), as the desert ant climbs its food's. Steering only: no situation field, no Jev cost. With no clump, the plume is null and the branch is never taken (goldens bit-exact). `plumeAt` now reads 0 past the reader's range (the desert ant's is built to its own range, so its values are unchanged).
+
+**B9, the plume against a blind search** (`--set colony.aphidPlume=0,8`): first find sooner with it on **10 of seeds 1–10** (median 9.9 → 7.9 s; worst seed 15.4 → 11.9 s) and **7 of 11–20** (8.5 → 7.8 s). Passes. B10 holds with it (median 1,190 food home, 68 ants on the line, seeds 1–4); no tick cost measured beyond the noise (3.0 ms against 3.2). `tests/slow/assays.test.ts` holds seeds 1, 6 and 7.

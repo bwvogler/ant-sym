@@ -165,6 +165,13 @@ export interface ColonyParams {
    */
   foodPlume: number;
   /**
+   * Aphid odour in the air (ja-nzkg.3, docs/aphids.md finding 1): an outside ant with empty jaws climbs the smell of a living
+   * aphid clump (the builder's) within this many cells of it (aphids.ts, plume.ts). L. niger scouts head toward aphid odour in
+   * olfactometers (Verheggen et al. 2012); no field range was measured, so the range is design. 0 = deaf to it (a species
+   * that takes no honeydew). With no clump on the map it reads nothing: main bit for bit.
+   */
+  aphidPlume: number;
+  /**
    * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
    * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
    * field) and dies past heatDeath. 0 = no heat (the generic ant: main bit for bit).
@@ -423,6 +430,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
+  aphidPlume: 8,
   heatDay: 0,
   heatDawn: 25,
   heatNoon: 52,
