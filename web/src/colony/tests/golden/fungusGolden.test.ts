@@ -14,7 +14,6 @@ import { check, fixture, record, type Scenario } from "../goldens.ts";
 const SCENARIOS: Scenario[] = [
   {
     name: "one world, fungus landed, seed 5",
-    view: "one",
     seed: 5,
     ants: 600,
     seconds: 40,
