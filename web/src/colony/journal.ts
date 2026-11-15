@@ -2,7 +2,7 @@
 // observer: `observe(game)` after a tick diffs what the game shows (each ant's alive, gen, mode and load; each colony's
 // stance and queen; the colonies; the outcome) against what it saw last time, and writes an event for each change.
 // It reads only: it draws no random numbers and writes no game state, so a game played with a journal is the game
-// played without one (tests/unit/journal.test.ts holds that). Code outside the game (the page's Jev lanes) adds its
+// played without one (tests/int/journal.test.ts holds that). Code outside the game (the page's Jev lanes) adds its
 // own events with `note`.
 //
 // Levels pick categories: "summary" is what happens to colonies (founded, fallen, stance, queen, Jev batches),

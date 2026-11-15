@@ -6,7 +6,8 @@ import { localResponses } from "../../responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "../../species.ts";
 import type { LaneWords, Mode, Policy } from "../../vocab.ts";
 import { smallOne } from "../builders.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { centreX, centreY } from "../../hex.ts";
+import { mulberry32 } from "../../world.ts";
 
 // ja-fnd.5.9: a species' mode set and local rule are its own. Words that drop `follow` mean its ants never enter FOLLOW (ColonyParams.follows,
 // derived by the Game), and the Game hands its colonies the species' local rule. Before this, a no-follow species spent thousands of ant-ticks
@@ -67,10 +68,10 @@ test("a no-follow species is never asked about a situation in which it is follow
 });
 
 test("a colony founded mid-game takes the species' rule and mode set too (review of #121, S1)", () => {
-  const g = new Game(generateSideWorld(2), { antCount: 60, rivalAnts: 60, species: LONE }, mulberry32(11));
-  const a = g.colonies[0]!.nest.entrance!;
-  const b = g.colonies[1]!.nest.entrance!;
-  const k = g.addColony({ x: a.x + 0.25 * (b.x - a.x), y: a.y, antCount: 20, odour: 0 });
+  const g = new Game(smallOne(), { antCount: 60, rivalAnts: 60, species: LONE }, mulberry32(11));
+  const v = g.world!.line.holes[0]!;
+  const k = g.addColony({ x: centreX(v.x, v.y) - 20, y: centreY(v.y), antCount: 20, odour: 0 });
+  assert.equal(g.founded.length, 1, "a colony was founded beyond V₀");
   const c = g.colonies[k]!;
   assert.equal(c.policy, lonePolicy);
   assert.equal(c.params.follows, false);

@@ -1,18 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
 import { loadColony, saveColony } from "../../colonySave.ts";
 import { FAINT } from "../../vocab.ts";
-import { generateSideWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
-import { SMALL_SIDE } from "../builders.ts";
+import { OPEN, rockAt } from "../../world.ts";
+import { oneColony } from "../builders.ts";
 
 // Brood odour (ja-k4k.15.2, docs/brood-odour.md): the brood gives off its own scent where it lies, reaching two or three
 // cells, strongest on the pile. Off (broodOdour 0) the channel stays empty.
 
 /** A colony of one ant with `items` brood items on one cell of the royal chamber, run `seconds`; the cell and the row's open cells east. */
 function pile(items: number, broodOdour: number, seconds = 30, held = false) {
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, broodOdour }, mulberry32(1), () => "explore");
+  const { map, c } = oneColony(1, { maxAnts: 1, broodOdour }, () => "explore", 1);
   const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   const y = royal.floorRow - 3;
   const x = royal.x0 + 1;
@@ -54,8 +52,7 @@ test("brood odour off (broodOdour 0): nothing is laid, the channel stays empty",
 test("brood odour is saved with the colony's fields and loads back as it was", () => {
   const { c, at } = pile(5, 1, 5);
   const saved = JSON.parse(JSON.stringify(saveColony(c))) as Record<string, unknown>;
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const back = new Colony(map, { antCount: 1, maxAnts: 1, broodOdour: 1 }, mulberry32(1), () => "explore");
+  const { map, c: back } = oneColony(1, { maxAnts: 1, broodOdour: 1 }, () => "explore", 1);
   loadColony(back, saved);
   const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   for (let d = 0; d <= 3; d++) assert.equal(back.ph.fields.broodOdour.get(royal.x0 + 1 + d, royal.floorRow - 3), at(d), `${d} cells east`);

@@ -81,9 +81,25 @@ test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
 // slow.yml runs test:slow sharded, on a schedule and on labelled colony PRs (ja-w7ef.4), with the same kind of copied globs.
 test("slow.yml's step runs test:slow's files at its per-file limit, sharded by the matrix", () => {
   const run = runOf(slowYml, "slow guards", "slow.yml");
+  const g1 = runOf(slowYml, "G1, seeds 1-10", "slow.yml");
   assert.match(block(slowYml, "slow guards", "slow.yml"), /^\s+working-directory: web$/m);
-  assert.deepEqual(globs(run), globs(script("test:slow")));
+  assert.match(block(slowYml, "G1, seeds 1-10", "slow.yml"), /^\s+working-directory: web$/m);
+  // The shards run every slow folder but G1's, which has a job of its own (ja-w7ef.15): together, test:slow's globs.
+  assert.deepEqual(globs(g1), ["src/colony/tests/slow/g1/*.test.ts"]);
+  // The file itself, not only the glob: back in slow/, the shards would run it again (review of #240, N2).
+  assert.deepEqual(
+    readdirSync(join(ROOT, "web/src/colony/tests/slow/g1")).filter((f) => f.endsWith(".test.ts")),
+    ["oneWorldG1.test.ts"],
+  );
+  assert.ok(!readdirSync(join(ROOT, "web/src/colony/tests/slow")).includes("oneWorldG1.test.ts"), "G1 is not in the shards' folder");
+  assert.deepEqual([...globs(run), ...globs(g1)], globs(script("test:slow")));
   assert.equal(timeout(run), timeout(script("test:slow")));
+  assert.equal(timeout(g1), timeout(script("test:slow")));
+  assert.doesNotMatch(g1, /--test-shard/, "G1 is not sharded: it runs alone");
+  // It runs exactly when the shards do: the same condition.
+  const cond = (job: string): string =>
+    new RegExp(`^  ${job}:\\n(?:    #.*\\n)*    if: >-\\n((?:      .+\\n)+)`, "m").exec(slowYml)?.[1] ?? "";
+  assert.ok(cond("slow").length > 0 && cond("g1") === cond("slow"), "the g1 job's if: is the slow job's");
   assert.match(run, /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /);
 });
 
@@ -92,12 +108,14 @@ test("every sharded test step runs both reporters, so a failure prints its ::err
     [ci, "int and golden", "ci.yml"],
     [ci, "soak", "ci.yml"],
     [slowYml, "slow guards", "slow.yml"],
+    [slowYml, "G1, seeds 1-10", "slow.yml"],
   ] as const) {
     const b = block(yml, name, file);
     assert.ok(runOf(yml, name, file).includes(REPORTERS), `${file} "${name}" runs spec and ci-report`);
     assert.match(b, /TEST_DURATIONS_FILE: /, `${file} "${name}" writes its durations`);
   }
   assert.match(slowYml, /^\s+name: slow-durations-\$\{\{ matrix\.shard \}\}$/m, "slow.yml uploads each shard's durations");
+  assert.match(slowYml, /^\s+name: slow-durations-g1$/m, "and G1's");
 });
 
 // The nightly tiers job (ja-w7ef.10) times each unit and int file alone against its tier's line (docs/agent-guide.md,

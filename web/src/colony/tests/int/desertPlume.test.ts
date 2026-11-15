@@ -7,7 +7,7 @@ import { Game, gameRng, type GameSave } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { PLUME_EVERY, plumeAt, updatePlume, type PlumeState } from "../../plume.ts";
-import { OPEN, ROCK, generateWorld, setRock } from "../../world.ts";
+import { OPEN, ROCK, setRock, worldFromArrays } from "../../world.ts";
 import { hashGame } from "../saveHash.ts";
 import { run } from "../builders.ts";
 
@@ -15,16 +15,7 @@ import { run } from "../builders.ts";
 // species' range, rebuilt only at multiples of PLUME_EVERY in game time; the desert ant climbs it with empty jaws.
 
 /** A bare 40 × 30 map: open everywhere, no food. */
-function bare() {
-  const map = generateWorld(1, { size: { w: 40, h: 30 } });
-  for (let y = 0; y < 30; y++)
-    for (let x = 0; x < 40; x++) {
-      setRock(map, x, y, OPEN);
-      map.food.set(x, y, 0);
-    }
-  map.foodLeft = 0;
-  return map;
-}
+const bare = () => worldFromArrays({ w: 40, h: 30 }, []);
 
 /** The desert ant's plume range (cells). */
 const PLUME = DESERT_ANT.params.foodPlume ?? 0;
