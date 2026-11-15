@@ -28,7 +28,7 @@ import {
   upgradeFor,
   type LaneWords,
 } from "../colony/index.ts";
-import { LeverChips } from "./DetailsScreen.tsx";
+import { LeverChips } from "./LabCards.tsx";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { UNLOCK } from "./codex.ts";
