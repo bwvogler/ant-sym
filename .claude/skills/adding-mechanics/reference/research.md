@@ -26,7 +26,7 @@ Tested from a cloud session on 2026-11-15, after the owner allowed these hosts i
 
 | Need | Call |
 |---|---|
-| Search papers | Europe PMC: `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=<terms>&format=json&resultType=lite` (each hit gives pmid, pmcid, doi, title) |
+| Search papers | Europe PMC: `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=<terms>&format=json&resultType=lite` (each hit gives pmid, pmcid, doi, title). If Europe PMC answers 503 (it has been down for minutes at a time), use E-utilities and the PMC page meanwhile |
 | Search PubMed or PMC | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<terms>&retmode=json` (`db=pmc` for full-text papers; it returns bare numbers, so prefix `PMC` for the full-text calls) |
 | Abstract by PMID | `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=<pmid>&rettype=abstract&retmode=text` |
 | Full text (open access) | `https://www.ebi.ac.uk/europepmc/webservices/rest/<PMCID>/fullTextXML` (about 80 KB: grep it in a subagent or a file, don't print it); the page `https://pmc.ncbi.nlm.nih.gov/articles/<PMCID>/` also works |
@@ -35,7 +35,7 @@ Tested from a cloud session on 2026-11-15, after the owner allowed these hosts i
 | Check a citation | Crossref: `https://api.crossref.org/works/<doi>` gives the title, authors and year. Check every DOI under **Sources** this way before committing a note: titles written from memory have been wrong |
 
 What doesn't work, and what to do instead:
-- **Publisher bot walls** (any allowlist): Wiley, ScienceDirect, Oxford Academic, Royal Society, PNAS, Science, Cell, MDPI, ASM, Cambridge, Annual Reviews, Taylor & Francis, Chicago, AntWiki and AntWeb answer 403 themselves. Look the DOI up in Europe PMC (MDPI and many society journals deposit full text there) or in Semantic Scholar's `openAccessPdf`; failing that, abstract plus **unverified**. Springer, Frontiers and PLOS pages load. Nature pages redirect to `idp.nature.com`, which the proxy refuses (so do their PDF links): read Nature papers through Europe PMC. bioRxiv pages answer 429: read preprints through the bioRxiv API or Europe PMC.
+- **Publisher bot walls** (any allowlist): Wiley, ScienceDirect, Oxford Academic, Royal Society, PNAS, Science, Cell, MDPI, ASM, Cambridge, Annual Reviews, Taylor & Francis, Chicago, AntWiki and AntWeb answer 403 themselves. Look the DOI up in Europe PMC (MDPI and many society journals deposit full text there) or in Semantic Scholar's `openAccessPdf`; failing that, abstract plus **unverified**. Frontiers and PLOS pages load. Springer and Nature pages and PDFs load with `curl -L`: without it they stop at a 303 to the Springer Nature login host (`idp.springer.com`, `idp.nature.com`). bioRxiv pages answer 429: read preprints through the bioRxiv API or Europe PMC.
 - **Shared rate limits:** Semantic Scholar sometimes answers 429 (wait a few seconds, retry once). OpenAlex without a key and scholar.archive.org are usually spent (scholar.archive.org reports it inside a 200 page, so read the body, not just the status). Unpaywall wants a contact email: don't send the owner's.
 - **Not allowed:** Google Scholar, `api.elifesciences.org` (eLife papers are in Europe PMC).
 - **A refusal tagged `[bio]`** from WebSearch or WebFetch is a content filter on the topic (fungal pathogens trip it), not the network. Don't retry or rephrase around it: use the APIs above.
