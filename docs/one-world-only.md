@@ -193,7 +193,7 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
 | slow/golden.test.ts | S | "side view war, seed 6" golden | re-record on one world | S2 step 3 |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
-| slow/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
+| slow/g1/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
 | slow/raidFind.test.ts | O (`oneAssay("raidFind")`) | A11, seeds 1–10 | **ported** (PRD §76.4) | |
 | slow/raidStop.test.ts | O (`oneAssay("raidStop")`) | A12, seeds 1–2 | **ported** (PRD §76.4) | |
