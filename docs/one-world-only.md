@@ -200,15 +200,15 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | file | builds | what it guards | verdict | note |
 |---|---|---|---|---|
 | slow/assays.test.ts | O (A1, A2a, A2b, A5, A5b, A9, A10: `oneAssay`); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | **ported** (PRD §76.4) | A1, A2a, A2b, A5b held to their marks; A5, A9, A10 guarded at their worst seed + 10 % (owner) |
-| slow/chambers.test.ts | S | a crowded nest digs chambers; chambers never touch, none too shallow | port (curtain) | `int/transect` "the hole gap keeps founded royal chambers apart…" covers founding chambers only |
-| slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
+| slow/chambers.test.ts | S | a crowded nest digs chambers; chambers never touch, none too shallow | **ported** (S2.3c: curtain; the floor-growth bounds a todo, `ja-rw75`: ×2.31, ×1.38, ×1.38 on one world) | `int/transect` "the hole gap keeps founded royal chambers apart…" covers founding chambers only |
+| slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | **ported** (S2.3c: `smallOne`, both layers at 0.3 of their food; worlds 2 and 1 + 1 hold 162 and 163 workers at 3,600 s, none stranded or starved) | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
 | slow/golden.test.ts | O (full size) | "one world war, seed 6" golden (was "side view war, seed 6") | **re-recorded on one world** (S2.3a) | |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
 | slow/g1/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
 | slow/raidFind.test.ts | O (`oneAssay("raidFind")`) | A11, seeds 1–10 | **ported** (PRD §76.4) | |
 | slow/raidStop.test.ts | O (`oneAssay("raidStop")`) | A12, seeds 1–2 | **ported** (PRD §76.4) | |
-| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | covered | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
+| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | **deleted** (S2.3c: G1 green on every PR since; its references now name G1) | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
 
 ### Golden masters
 

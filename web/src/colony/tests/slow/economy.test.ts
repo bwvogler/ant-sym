@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { isFed, LARVA, LARVA_FOOD } from "../../brood.ts";
 import { LIFESPAN } from "../../colony.ts";
 import { Game } from "../../game.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 
-// The side view's long-run economy (PRD §41, the F2 fix-up; review of nest slice 4). With a queen, workers die of age and
+// The long-run economy (PRD §41, the F2 fix-up; review of nest slice 4), on one world since S2.3c. With a queen, workers die of age and
 // only brood replaces them, so a colony lasts only if the food it brings home reaches the larvae. On nest 9 every colony
 // died of old age within about an hour: food piled up in a one- or two-cell reception chamber while the larvae starved,
 // and a worker lived half an hour.
@@ -21,19 +22,25 @@ import { generateSideWorld, mulberry32 } from "../../world.ts";
 // larder is down to 33: 2). `scripts/lab/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
 // §50.18) adults eat too (38 food in the hour here): 148 workers (159 born, 121 dead of age), 6 larvae once stranded, none starved.
 
-/** An hour of the tests' small map, one colony of 110 on 0.3 of the map's food (world `w`, the game seeded w × 7919 + nudge). */
+/**
+ * An hour of a small one world, one colony of 110 on 0.3 of the world's food, both layers (world `w`, the game seeded
+ * w × 7919 + nudge). Measured on one world (S2.3c): world 2, 162 workers at 3,600 s (175 born, 123 dead of age), none
+ * stranded or starved; world 1 + 1, 163 (172 born, 119 dead of age), the same. About 105 s each.
+ */
 function hour(w: number, nudge: number) {
   const ants = 110;
-  const map = generateSideWorld(w, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
-  let total = 0;
-  for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
-      const v = map.food.get(x, y) * 0.3;
-      map.food.set(x, y, v);
-      total += v;
-    }
-  map.foodTotal = map.foodLeft = total;
-  const g = new Game(map, { antCount: ants, rival: false }, mulberry32(w * 7919 + nudge));
+  const world = smallOne(w);
+  for (const map of [world.plane, world.curtain]) {
+    let total = 0;
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+        const v = map.food.get(x, y) * 0.3;
+        map.food.set(x, y, v);
+        total += v;
+      }
+    map.foodTotal = map.foodLeft = total;
+  }
+  const g = new Game(world, { antCount: ants, rival: false }, mulberry32(w * 7919 + nudge));
   const c = g.player;
   // Food idle in the nest while larvae starve: larvae unfed for over two minutes (a larva is fed in about 6 s once food
   // lies by it), while the chambers hold enough to feed them.
