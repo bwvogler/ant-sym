@@ -122,7 +122,7 @@ Still to read (2026-11-15: unreachable from the session): Ugelvig & Cremer 2007'
 
 ## What ja-e668.3 built (PRD §64.2)
 
-The species on the descriptor (`neglectus.ts`): one supercolony (tolerance 1, owner 2026-11-15), so its two colonies never fight (0 fight deaths on seeds 1–3 against the generic ant's 72–171 in 600 s); its own mode words, with Jev's answers shipped for the 81 situations a game meets ($0.0022). Its grooming, brood disinfection, queens and budding are still the generic ant's (`ja-e668.4`–`.6`).
+The species on the descriptor (`neglectus.ts`): one supercolony (tolerance 1, owner 2026-11-15), so its two colonies never fight (0 fight deaths on seeds 1–3 against the generic ant's 72–171 in 600 s); its own mode words without fight (one population has no one to fight; back in mixed worlds, `ja-e668.11`), with Jev's answers shipped for the 81 situations a game meets ($0.0040 for two rounds). Its grooming, brood disinfection, queens and budding are still the generic ant's (`ja-e668.4`–`.6`).
 
 ## Sources
 

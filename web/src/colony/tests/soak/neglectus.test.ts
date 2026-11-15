@@ -15,6 +15,8 @@ test("the invasive garden ant is a species the page can name, with its own mode 
   assert.equal(speciesById("neglectus"), NEGLECTUS_ANT);
   const forage = DOCTRINES[0]!.text;
   assert.notEqual(policyContext(forage, NEGLECTUS_MODE_WORDS), policyContext(forage, MODE_WORDS), "its words ask under their own context");
+  // One population has no one to fight (owner, review of #244 D1): its words offer no fight (ja-e668.11 brings it back in mixed worlds).
+  assert.deepEqual(Object.keys(NEGLECTUS_MODE_WORDS.criteria).sort(), ["explore", "follow", "return"]);
 });
 
 test("its tolerance reaches recognition, where fights are judged; the generic ant's and a game's own stay as they were", () => {

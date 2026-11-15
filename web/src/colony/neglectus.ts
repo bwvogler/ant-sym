@@ -14,15 +14,15 @@ import type { LaneWords, Mode } from "./vocab.ts";
  */
 export const NEGLECTUS_TOLERANCE = 1;
 
-/** Its mode lane's words: the generic ant's legend and modes, with fighting reserved for ants that smell unlike its own population. */
+/**
+ * Its mode lane's words: the generic ant's legend, with no `fight` (owner, 2026-11-15: realistic). Within one population nests show no
+ * aggression at all (Cremer et al. 2008; Ugelvig et al. 2008, full text), and a game of one species is one population here, so an ant has no
+ * one to fight. Fighting comes back with rival populations (ja-e668.10) or other species in a mixed world (bead under ja-e668).
+ */
 export const NEGLECTUS_MODE_WORDS: LaneWords<Mode> = {
   legend: COLONY_LEGEND,
-  criteria: {
-    ...MODE_CRITERIA,
-    fight:
-      "fight: go for ants that smell unlike us, follow alarm scent to a fight, or raid; other nests that smell like us are our own population, never enemies",
-  },
-  version: 1,
+  criteria: { explore: MODE_CRITERIA.explore, follow: MODE_CRITERIA.follow, return: MODE_CRITERIA.return },
+  version: 2,
 };
 
 export const NEGLECTUS_ANT: Species = {
