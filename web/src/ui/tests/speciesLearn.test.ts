@@ -5,7 +5,7 @@ import {
   defineSchema,
   Game,
   GENERIC_ANT,
-  generateWorld,
+  generateOneWorld,
   localResponses,
   MODES,
   mulberry32,
@@ -23,9 +23,9 @@ import { ruleTextAgrees } from "../policyText.ts";
 import { requestFor, tokensPerQuestion } from "../prompt.ts";
 import { situationsOf } from "../useColony.ts";
 
-// ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Details shows
+// ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Lab mode's Jev tab shows
 // "no stance lane", not "0 stances"); a species' rule text is checked against its own rule over every situation of its schema; the request
-// the Learn drawer shows is the species' own.
+// Lab mode's Policy tab shows is the species' own.
 
 const SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },
@@ -69,7 +69,7 @@ test("the client says whether the colonies have a stance lane at all", () => {
     [GENERIC_ANT, true],
     [LONE, false],
   ] as const) {
-    const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
     const jev = new ColonyJev({});
     live.add(jev);
     jev.attachColonies(g.colonies, species);
@@ -109,7 +109,7 @@ test("the request the drawer shows for a species is its own: its legend, its fie
 
 test("situations are counted out of the species' own, and its questions cost its own tokens (review of #132)", () => {
   const game = (species: Species) =>
-    new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
   assert.equal(situationsOf(game(GENERIC_ANT).colonies), 3888);
   assert.equal(situationsOf(game(LONE).colonies), SCHEMA.size);
   const own = tokensPerQuestion("mode", "forage", WORDS);
@@ -124,7 +124,7 @@ test("the desert ant's rule text says what its rule does, in every situation it 
 
 test("the field guide leaves out the entries on trails a species doesn't lay: the desert ant's has no trail entries (owner, ja-rf5.11)", () => {
   const ids = (species: Species) => {
-    const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
     return guideFor((c) => g.player.ph.has(c), species.id).map((e) => e.id);
   };
   const common = GUIDE.filter((e) => e.species === undefined).map((e) => e.id);
@@ -134,10 +134,19 @@ test("the field guide leaves out the entries on trails a species doesn't lay: th
     ids(DESERT_ANT).includes("desert-ant") && !ids(GENERIC_ANT).includes("desert-ant"),
     "the desert ant's own entry, only in its games (ja-rf5.8)",
   );
-  assert.deepEqual(gone, ["food-trail", "home-trail", "food-quality", "double-bridge", "no-entry", "alarm", "builder-crayon"]);
+  assert.deepEqual(gone, [
+    "food-trail",
+    "home-trail",
+    "food-quality",
+    "double-bridge",
+    "no-entry",
+    "alarm",
+    "builder-crayon",
+    "builder-noentry",
+  ]);
   assert.ok(ids(DESERT_ANT).includes("way-home"), "the way home, without a trail, is every species' (owner, review of #144 D1)");
   const note = (species: Species) => {
-    const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
     return guideNote((c) => g.player.ph.has(c), species.name);
   };
   assert.equal(note(GENERIC_ANT), null, "no note for the generic ant (review of #144, S2)");

@@ -1,11 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { BUILD, Builder, crayonLevel, guarded, RAIN_CHANNELS, strokeCells, type BuildTool } from "../../builder.ts";
+import { BUILD, Builder, crayonLevel, FOLLOWED_AT, guarded, RAIN_CHANNELS, strokeCells, type BuildTool } from "../../builder.ts";
+import { believePlane, fromHomePlane } from "../../homing.ts";
+import { crossUp } from "../../crossing.ts";
+import { NO_ENTRY_PAINTED } from "../../params.ts";
 import { Game } from "../../game.ts";
-import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY, R } from "../../hex.ts";
 import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
-import { generateSideWorld, mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "../../world.ts";
-import { SMALL_SIDE, smallOne } from "../builders.ts";
+import { mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, takeFoodCell, type WorldMap } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 
 // The builder (docs/builder.md, PRD §73, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
@@ -325,27 +328,6 @@ test("a rock ring round a hole leaves every open cell within BUILD.holeGuard of 
   }
 });
 
-test("on one map (the scripts' and assays' side view) the nest and its entrance are guarded too (review of #204, N3, N4)", () => {
-  const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 5, rival: false }, mulberry32(1));
-  const b = new Builder(g);
-  const map = g.layers[0] as WorldMap;
-  const e = g.colonies[0]!.nest.entrance!;
-  cellOf(e.x, e.y);
-  const [ex, ey] = [CELL[0], CELL[1]];
-  const was = rockAt(map, ex, ey);
-  b.apply({ tool: "dirt", layer: 0, points: [e] });
-  assert.equal(rockAt(map, ex, ey), was, "the entrance is left as it was");
-  assert.ok(guarded(g, 0).has(key(ex, ey)));
-  // And the nest itself, every cell within holeGuard of its centre (review of #204, N4).
-  const n = g.colonies[0]!.nest;
-  const guard = guarded(g, 0);
-  cellOf(n.x, n.y);
-  const [nx, ny] = [CELL[0], CELL[1]];
-  for (let y = ny - 3; y <= ny + 3; y++)
-    for (let x = nx - 3; x <= nx + 3; x++)
-      if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) <= BUILD.holeGuard) assert.ok(guard.has(key(x, y)), `nest cell ${x},${y}`);
-});
-
 test("builder food counts in the map's total, so a share of it stays a share; undo takes it back off (review of #204, S4)", () => {
   const g = game(1);
   const b = new Builder(g);
@@ -375,4 +357,212 @@ test("undo gives refilled chamber cells back to their chamber (review of #204, N
   assert.ok(b.undo());
   assert.equal(room.cells, before, "undo gives every cell back");
   assert.deepEqual({ room: room.floor, colony: ch.floorOf[room.colony] }, floor, "and its floor, counted again (review of #204, S5)");
+});
+
+/** A row of open ground on the plane, clear of the guards and of food, 13 cells long and 5 high: its left end. */
+function openRow(g: Game): [number, number] {
+  const map = g.layers[PLANE] as WorldMap;
+  const guard = guarded(g, PLANE);
+  for (let y = 10; y < map.size.h - 10; y++)
+    for (let x = 10; x < map.size.w - 20; x++) {
+      let ok = true;
+      for (let dy = -2; dy <= 2 && ok; dy++)
+        for (let dx = -2; dx <= 12 && ok; dx++)
+          ok = rockAt(map, x + dx, y + dy) === OPEN && !guard.has(key(x + dx, y + dy)) && map.food.get(x + dx, y + dy) === 0;
+      if (ok) return [x, y];
+    }
+  throw new Error("no open row");
+}
+
+// Slice 2 (docs/builder.md "Slice 2", PRD §73.3, ja-b3us.2): tweezers, the no-entry paint, and what happened.
+
+/** An ant of colony 0 out on the plane, after `seconds` of play. */
+function planeAnt(g: Game, seconds = 20): number {
+  for (let k = 0; k < 30 * seconds; k++) g.tick(1 / 30);
+  const c = g.colonies[0]!;
+  const i = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === PLANE);
+  assert.ok(i !== undefined, "an ant on the plane");
+  return i!;
+}
+
+test("tweezers: the ant is set down there, and its belief of home moves by as much; undo puts both back", () => {
+  const g = game(30);
+  const b = new Builder(g);
+  const c = g.colonies[0]!;
+  const i = planeAnt(g);
+  const [x, y] = find(g, PLANE, OPEN, [0, 0], 6);
+  const to = pt(x, y);
+  const from = { x: c.x[i]!, y: c.y[i]! };
+  c.bind(PLANE);
+  const home0 = fromHomePlane(c, i);
+  assert.ok(b.moveAnt(0, i, to.x, to.y));
+  assert.equal(c.x[i], Math.fround(to.x));
+  assert.equal(c.y[i], Math.fround(to.y));
+  // The believed home moved with the ant: its distance from it is as it was before the move.
+  assert.ok(Math.abs(fromHomePlane(c, i) - home0) < 1e-3, `distance to believed home ${fromHomePlane(c, i)} vs ${home0}`);
+  assert.ok(Math.abs(c.carriedX[i]! - (to.x - from.x)) < 1e-3 && Math.abs(c.carriedY[i]! - (to.y - from.y)) < 1e-3);
+  assert.ok(b.undo());
+  assert.ok(Math.abs(c.x[i]! - from.x) < 1e-3 && Math.abs(c.y[i]! - from.y) < 1e-3, "back where it was picked up");
+  assert.ok(Math.abs(c.carriedX[i]!) < 1e-3 && Math.abs(c.carriedY[i]!) < 1e-3, "and its belief with it");
+  c.bind(c.home);
+});
+
+test("tweezers: the belief the ant steers by is the hole, its drift and the carry; up out of its own hole the carry is gone (review of #229, S2)", () => {
+  const g = game(30);
+  const b = new Builder(g);
+  const c = g.colonies[0]!;
+  const i = planeAnt(g);
+  const h = c.holeCells[c.params.nest]!;
+  const hole = pt(h.px, h.py);
+  // Set down far from its hole (out of sight of it), on open ground, where the home it then believes in is on the map
+  // (believePlane keeps a belief inside the plane's edges).
+  const map = g.layers[PLANE] as WorldMap;
+  c.bind(PLANE);
+  const [ox, oy] = [c.nest.x + c.odoSurf[i]! * c.driftSurf[i]!, c.nest.y + c.odoSurf[i]! * c.driftSurfY[i]!];
+  const [lx, hx, hy] = [c.map.x0 + 20, c.map.x0 + c.map.size.w - 20, c.map.size.h * R - 20];
+  c.bind(c.home);
+  const [fx, fy] = [c.x[i]!, c.y[i]!];
+  let to: { x: number; y: number } | null = null;
+  for (let y = 5; y < map.size.h - 5 && !to; y++)
+    for (let x = 5; x < map.size.w - 5 && !to; x++) {
+      const p = pt(x, y);
+      const [bx, by] = [ox + p.x - fx, oy + p.y - fy];
+      if (Math.hypot(p.x - hole.x, p.y - hole.y) > 40 && rockAt(map, x, y) === OPEN && bx > lx && bx < hx && by > 20 && by < hy) to = p;
+    }
+  c.routeN[i] = 3; // it stored places on its way out, and is retracing them
+  c.routeState[i] = 1;
+  assert.ok(to && b.moveAnt(0, i, to.x, to.y));
+  assert.equal(c.routeN[i], 0, "no retrace by places stored where it no longer is (S1)");
+  assert.equal(c.routeState[i], 0);
+  assert.equal(c.search[i], 0);
+  c.bind(PLANE);
+  const goal = c.nest;
+  const odo = c.odoSurf[i]!;
+  const bx = goal.x + odo * c.driftSurf[i]! + c.carriedX[i]!;
+  const by = goal.y + odo * c.driftSurfY[i]! + c.carriedY[i]!;
+  const belief = believePlane(c, i, goal);
+  assert.ok(Math.abs(belief.x - bx) < 1e-3 && Math.abs(belief.y - by) < 1e-3, `belief ${belief.x},${belief.y} vs ${bx},${by}`);
+  assert.ok(Math.hypot(c.carriedX[i]!, c.carriedY[i]!) > 1, "the carry is in it");
+  c.bind(c.home);
+  // Down its hole and up again: a fresh trip, nothing carried.
+  c.putAnt(i, CURTAIN, centreX(h.col, h.row), centreY(h.row));
+  crossUp(c, i, h.col, h.row);
+  assert.equal(c.carriedX[i], 0);
+  assert.equal(c.carriedY[i], 0);
+});
+
+test("tweezers refuse rock and an ant underground", () => {
+  const g = game(30);
+  const b = new Builder(g);
+  const c = g.colonies[0]!;
+  const i = planeAnt(g);
+  const [rx, ry] = find(g, PLANE, ROCK);
+  assert.equal(b.moveAnt(0, i, pt(rx, ry).x, pt(rx, ry).y), false, "not onto rock");
+  const u = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === CURTAIN)!;
+  const [x, y] = find(g, PLANE, OPEN);
+  assert.equal(b.moveAnt(0, u, pt(x, y).x, pt(x, y).y), false, "not an ant underground");
+});
+
+test("the no-entry paint lays every colony's 'no entry', topped up as it fades, and undo takes it off", () => {
+  const g = game(1);
+  const b = new Builder(g);
+  const [x, y] = openRow(g);
+  b.begin();
+  b.apply({ tool: "noEntry", layer: PLANE, points: [pt(x, y), pt(x + 3, y)] }, true);
+  b.apply({ tool: "noEntry", layer: PLANE, points: [pt(x + 3, y), pt(x + 6, y)] }, true);
+  assert.equal(g.crayons.length, 1, "one line for the drag");
+  assert.equal(g.crayons[0]!.channel, "noEntry");
+  assert.equal(g.crayons[0]!.colony, -1);
+  for (const c of g.colonies) {
+    const ph = c.layers[PLANE]!.ph;
+    assert.ok(ph.fields.noEntry.get(x + 3, y) >= BUILD.crayonLevel - 1e-6, `colony ${c.params.nest}'s no entry`);
+    assert.equal(ph.fields.food.get(x + 3, y), 0, "no food trail");
+    assert.ok(ph.live("noEntry"));
+  }
+  for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
+  const level = crayonLevel(g.crayons[0]!.age);
+  assert.ok(g.colonies[1]!.layers[PLANE]!.ph.fields.noEntry.get(x + 3, y) >= level - 0.2, "topped up");
+  assert.ok(b.undo());
+  assert.equal(g.crayons.length, 0);
+  // What diffusion carried past the line's level during play fades by itself; below FAINT, no ant senses it.
+  for (const c of g.colonies) assert.ok(c.layers[PLANE]!.ph.fields.noEntry.get(x + 3, y) < FAINT);
+});
+
+test("painted 'no entry' is read at NO_ENTRY_PAINTED while noEntryAvoid is 0; with no paint the field never wakes (the turn: builderSign.test.ts)", () => {
+  assert.equal(NO_ENTRY_PAINTED, 4);
+  // The colonies lay none of their own: a game with no paint never wakes the field.
+  const g = game(20);
+  for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
+  for (const c of g.colonies) {
+    assert.equal(c.params.noEntryAvoid, 0);
+    assert.equal(c.layers[PLANE]!.ph.live("noEntry"), false, "no paint, no field");
+  }
+});
+
+test("watch: sugar found, then gone; a followed crayon line; a moved ant home, and one lost; each said once", () => {
+  const g = game(30);
+  const b = new Builder(g);
+  const c = g.colonies[0]!;
+  const i = planeAnt(g, 10);
+  const map = g.layers[PLANE] as WorldMap;
+  const [x, y] = find(g, PLANE, OPEN, [0, 0], 6);
+  b.apply({ tool: "sugar", layer: PLANE, points: [pt(x, y)] });
+  assert.deepEqual(b.watch(), []);
+  takeFoodCell(map, x, y);
+  assert.deepEqual(b.watch(), [{ kind: "foodFound", tool: "sugar" }]);
+  assert.deepEqual(b.watch(), [], "said once");
+  for (let yy = y - 3; yy <= y + 3; yy++) for (let xx = x - 3; xx <= x + 3; xx++) while (takeFoodCell(map, xx, yy));
+  assert.deepEqual(b.watch(), [{ kind: "foodGone", tool: "sugar" }]);
+  // A crayon line with three of its colony's ants on it.
+  const [lx, ly] = find(g, PLANE, OPEN, [0, y + 10], 6);
+  b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(lx, ly), pt(lx + 4, ly)] });
+  const on = [...Array(c.n).keys()].filter((j) => c.alive[j] && c.layer[j] === PLANE && j !== i).slice(0, FOLLOWED_AT);
+  on.forEach((j, k) => c.putAnt(j, PLANE, pt(lx + k, ly).x, pt(lx + k, ly).y));
+  const ev = b.watch();
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0]!.kind, "lineFollowed");
+  assert.deepEqual(b.watch(), [], "said once");
+  // A moved ant that goes down a hole is home; one that dies is lost.
+  const [mx, my] = find(g, PLANE, OPEN, [0, ly + 10], 6);
+  assert.ok(b.moveAnt(0, i, pt(mx, my).x, pt(mx, my).y));
+  for (let k = 0; k < 30 * 2; k++) g.tick(1 / 30);
+  if (c.layer[i] === PLANE && c.alive[i]) c.layer[i] = CURTAIN; // as if it went down its hole
+  const home = b.watch().find((e) => e.kind === "antHome");
+  assert.ok(home && home.kind === "antHome" && home.seconds >= 2 - 1e-6, JSON.stringify(home));
+  const j = [...Array(c.n).keys()].find((k) => c.alive[k] && c.layer[k] === PLANE)!;
+  assert.ok(b.moveAnt(0, j, pt(mx, my).x, pt(mx, my).y));
+  c.alive[j] = 0;
+  assert.deepEqual(
+    b.watch().filter((e) => e.kind === "antLost"),
+    [{ kind: "antLost", colony: 0 }],
+  );
+});
+
+test("watch says nothing of a move undone, and nothing of a line fewer than FOLLOWED_AT follow (review of #229, S3)", () => {
+  const g = game(30);
+  const b = new Builder(g);
+  const c = g.colonies[0]!;
+  const i = planeAnt(g, 10);
+  const [x, y] = openRow(g);
+  assert.ok(b.moveAnt(0, i, pt(x, y).x, pt(x, y).y));
+  assert.ok(b.undo());
+  c.layer[i] = CURTAIN; // as if it went down a hole: not "home", the move was undone
+  assert.deepEqual(b.watch(), []);
+  b.apply({ tool: "crayon", layer: PLANE, colony: 0, points: [pt(x, y), pt(x + 6, y)] });
+  const two = [...Array(c.n).keys()].filter((j) => c.alive[j] && c.layer[j] === PLANE).slice(0, FOLLOWED_AT - 1);
+  two.forEach((j, k) => c.putAnt(j, PLANE, pt(x + k, y).x, pt(x + k, y).y));
+  assert.deepEqual(
+    b.watch().filter((e) => e.kind === "lineFollowed"),
+    [],
+    `${FOLLOWED_AT - 1} ants are not a following`,
+  );
+});
+
+test("watch says nothing of a build undone", () => {
+  const g = game(1);
+  const b = new Builder(g);
+  const [x, y] = find(g, PLANE, OPEN, [0, 0], 6);
+  b.apply({ tool: "sugar", layer: PLANE, points: [pt(x, y)] });
+  assert.ok(b.undo());
+  assert.deepEqual(b.watch(), []);
 });

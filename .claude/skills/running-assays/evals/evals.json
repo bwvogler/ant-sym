@@ -1,0 +1,45 @@
+{
+  "skill": "running-assays",
+  "how_to_run": "In a fresh session per case, give the prompt and grade the transcript against `expect`. Run each scenario once with the skill and once with .claude/skills/running-assays moved aside (the baseline). Tell it not to start workflows (grade what it would start). Trigger cases: does Claude load the skill unprompted? Run each trigger case 3 times; the near-misses (should_not_trigger) matter most.",
+  "trigger": {
+    "should_trigger": [
+      "Sweep routeStep 2-6 on G1 seeds 1-10 and tell me which is best",
+      "Compare my branch's A1 and A9 with main over seeds 1-20",
+      "Does the new rule hurt food on G1? Check seeds 11-20",
+      "Run all the one-world assays on this PR",
+      "Which commit since yesterday moved G1 seed 4? Bisect it",
+      "npm run exp game1 --one --seeds 1-20 is taking forever here",
+      "Tune colony.deposit against the assays",
+      "Measure births and food for both settings over 10 seeds"
+    ],
+    "should_not_trigger": [
+      "Why did ant 523 die in seed 1?",
+      "Show me the journal of game seed 3",
+      "Run the slow guards on #183",
+      "Is the nightly slow run green?",
+      "Check what Jev answers for the mode lane live",
+      "Review PR #224",
+      "Can CI be improved?",
+      "Fix the failing golden test on main"
+    ]
+  },
+  "scenarios": [
+    {
+      "prompt": "Sweep colony.routeStep=2,3,4,5 on game1 --one over seeds 1-20 and pick one.",
+      "expect": [
+        "Starts assays.yml on GitHub (run_workflow with assays game1, one true, seeds, set) rather than running 80 games locally",
+        "Includes the current value in the set list as the baseline",
+        "Sets a send_later check-in instead of polling, then reads the report job's log whole",
+        "Picks by the worst seed and confirms on seeds 11-20"
+      ]
+    },
+    {
+      "prompt": "Run A1 on seed 1 with --log detail and tell me what the foragers did.",
+      "expect": ["Runs it locally (one seed, a journal); does not start assays.yml"]
+    },
+    {
+      "prompt": "Measure G1 seeds 1-10 on my branch, cut last week from main.",
+      "expect": ["Notices the branch lacks assays.yml and merges main first (or measures locally), before starting the workflow"]
+    }
+  ]
+}

@@ -67,6 +67,8 @@ import { sightOf, type SensedMap } from "./fungusSight.ts";
 import { antTag, badgeParts, nestBadge } from "./badges.ts";
 import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
+import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
+import { type AntTraces, traceAlpha } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
 
 export type { FieldProbe };
@@ -122,22 +124,28 @@ interface Props {
   pen?: FieldPen | null;
   /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
   toolsAt?: string;
+  /** the specimens (PRD §69.5): each marked on the map with its label */
+  specimens?: readonly Specimen[];
   /** the lens is on (PRD §69.3): a mouse over the map reports what is under it, and a click reports it pinned instead of following */
   lens?: boolean;
   /** what is under the pointer, with the lens on (null: the pointer left the map) */
   onProbe?: (p: FieldProbe | null) => void;
   /** the builder (docs/builder.md, PRD §73): the tool in hand, smell vision, and where a stroke goes; null when it is off */
   build?: FieldBuild | null;
+  /** the ants the tweezers moved: each one's way home, drawn on the top view (ja-cwjp), builder on or off */
+  traces?: AntTraces | null;
 }
 
 /** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
 export interface FieldBuild {
-  /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever) */
-  tool: BuildTool | null;
+  /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever); "tweezers": a touch on an ant lifts it */
+  tool: BuildTool | "tweezers" | null;
   /** smell vision (owner, PRD §73): every colony's trails and alarm, everywhere, each trail in its colony's tone */
   smell: boolean;
   /** a piece of a stroke at world points on `layer` (PLANE, CURTAIN, or 0 on one map); `first`: a new drag begins */
   onStroke: (layer: number, points: { x: number; y: number }[], first: boolean) => void;
+  /** the tweezers carry colony k's ant i to world (x, y) on the plane; `first`: a new lift begins */
+  onTweeze?: (k: number, i: number, x: number, y: number, first: boolean) => void;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -181,6 +189,9 @@ interface ViewCam {
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
+
+/** No specimens: one empty list, so the default prop is the same each render. */
+const NO_SPECIMENS: readonly Specimen[] = [];
 
 /** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
 const ONE_MAP = -1;
@@ -231,7 +242,15 @@ interface ChunkCanvas {
 }
 
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
-type Gesture = { kind: "pan" | "pinch" | "mini" | "paint" | "none"; moved: number; button: number; sx: number; sy: number };
+type Gesture = {
+  kind: "pan" | "pinch" | "mini" | "paint" | "tweeze" | "none";
+  moved: number;
+  button: number;
+  sx: number;
+  sy: number;
+  /** the ant the tweezers hold */
+  ant?: Followed;
+};
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
 export default function ColonyField({
@@ -254,6 +273,8 @@ export default function ColonyField({
   lens = false,
   onProbe,
   build = null,
+  traces = null,
+  specimens = NO_SPECIMENS,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -332,6 +353,14 @@ export default function ColonyField({
   useEffect(() => {
     follow.current = followed;
   }, [followed]);
+  const tracesRef = useRef(traces);
+  useEffect(() => {
+    tracesRef.current = traces;
+  }, [traces]);
+  const pinnedRef = useRef(specimens);
+  useEffect(() => {
+    pinnedRef.current = specimens;
+  }, [specimens]);
   useEffect(() => {
     followCb.current = onFollow;
   }, [onFollow]);
@@ -1509,6 +1538,68 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
+      // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
+      // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
+      const tr = tracesRef.current;
+      if (tr) {
+        const now = performance.now();
+        tr.update(now);
+        if (world && lv === PLANE)
+          for (const t of tr.traces) {
+            const n = t.xs.length;
+            const a = traceAlpha(t, now);
+            if (!n || a <= 0) continue;
+            ctx.globalAlpha = 0.85 * a;
+            ctx.strokeStyle = theme.accent;
+            ctx.fillStyle = theme.accent;
+            ctx.lineWidth = Math.max(1.5 * d, 0.25 * c.zoom);
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            for (let k = 1; k < n;) {
+              // One run of points in the same phase, as one path.
+              const ph = t.search[k]!;
+              ctx.setLineDash(ph ? [2 * d, 4 * d] : []);
+              ctx.beginPath();
+              const [x0, y0] = toScreen(c, v, t.xs[k - 1]!, t.ys[k - 1]!);
+              ctx.moveTo(x0, y0);
+              for (; k < n && t.search[k] === ph; k++) {
+                const [x, y] = toScreen(c, v, t.xs[k]!, t.ys[k]!);
+                ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            const [sx, sy] = toScreen(c, v, t.xs[0]!, t.ys[0]!);
+            ctx.beginPath();
+            ctx.arc(sx, sy, Math.max(5 * d, 0.8 * c.zoom), 0, Math.PI * 2);
+            ctx.lineWidth = 2 * d;
+            ctx.stroke();
+            if (t.end === "home") {
+              const [ex, ey] = toScreen(c, v, t.xs[n - 1]!, t.ys[n - 1]!);
+              ctx.beginPath();
+              ctx.arc(ex, ey, Math.max(4 * d, 0.6 * c.zoom), 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+      }
+      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring, drawn
+      // after these so its tag stays on top (review of #218).
+      for (const s of pinnedRef.current) {
+        const sc = followedColony(colonies, s);
+        if (!sc || (lv >= 0 && sc.layer[s.i] !== lv) || (f && sameAnt(f, s))) continue;
+        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
+        const r = Math.max(7 * d, c.zoom * 1.3);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.setLineDash([3 * d, 3 * d]);
+        ctx.strokeStyle = theme.ink;
+        ctx.lineWidth = 1.5 * d;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const tpx = Math.round(10 * d);
+        pill([{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
+      }
       // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
       // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
       // (ja-rkse, PRD §61).
@@ -1742,6 +1833,14 @@ export default function ColonyField({
     if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
+    } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
+      // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
+      const ant = world && shown.current === PLANE ? pick(x, y) : null;
+      if (ant) {
+        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant };
+        const [wx, wy] = toWorld(camera(), viewport(), x, y);
+        buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+      } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
     } else if (e.button === 0 && buildRef.current?.tool) {
       // A tool in hand: the touch builds where it lands (a tap places), and a drag carries on painting.
       gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
@@ -1791,6 +1890,10 @@ export default function ColonyField({
         ],
         false,
       );
+    else if (g.kind === "tweeze" && g.ant) {
+      const [wx, wy] = toWorld(camera(), viewport(), x, y);
+      buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+    }
     pointers.current.set(e.pointerId, { x, y });
   };
 

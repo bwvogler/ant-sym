@@ -1,5 +1,6 @@
 import { defineSchema, type FieldOf } from "./schema.ts";
 import { MODES, STANCES, type Mode, type Stance } from "./vocab.ts";
+import type { AntDraw } from "./weighted.ts";
 
 // An ant's responses to what it touches and carries, pure. Choosing a mode is
 // the ant's one big decision (colony.ts, a `Policy`); these are the small
@@ -63,7 +64,7 @@ export interface Touch {
   /** how good the food is, tasted: the food it carries, or the food `get` offers; "fair" otherwise */
   quality: Quality;
   /** the alarm it smells, strongest of its three sensors: none, faint or strong (behaviour MR 4: graded alarm) */
-  alarm: "none" | "faint" | "strong";
+  alarm: (typeof SCENT_LEVELS)[number];
   /**
    * with strangers in contact, nestmates against strangers in its cell and the six round it, by touch (behaviour MR 4):
    * outnumbered (under two thirds as many), even, outnumbering (over half as many again); "none" with no stranger near
@@ -78,12 +79,12 @@ export interface Touch {
    * the raid trail it smells where it is (behaviour MR 5.2, docs/raid-recruitment.md): none, faint or strong. A colony that
    * doesn't recruit raiders by trail (raidGate 0, or the side view) reads "strong", so its raiders leave as they did.
    */
-  raid: "none" | "faint" | "strong";
+  raid: (typeof SCENT_LEVELS)[number];
   /**
    * how crowded home is, felt by a waiting ant (docs/stance.md: nestmates in its cell and the six round it, over a few seconds):
    * few or many; "few" where each ant's stance is not its own (the side view)
    */
-  crowd: "few" | "many";
+  crowd: (typeof CROWD)[number];
 }
 
 export type Returns = (typeof RETURNS)[number];
@@ -107,20 +108,25 @@ export type TrailKind = "food" | "home" | "none";
 export const CARRY = ["take", "put down"] as const;
 export type Carry = (typeof CARRY)[number];
 
+/**
+ * The ant's small responses. The six a policy can answer (RESPONSE_HOOKS: get, carry, drop, trail, contact, leave) take the
+ * ant's `draw` (weighted.ts AntDraw, ja-m7rr): an answer kept with Jev's probabilities is drawn from with it, so ants in one
+ * situation answer differently, each keeping its draw while the situation lasts. The local rules never draw.
+ */
 export interface Responses {
   /** Empty jaws, touching something it could take (`offered`: food, loose soil, a corpse, brood): take it? */
-  get(t: Touch): boolean;
+  get(t: Touch, draw?: AntDraw): boolean;
   /**
    * Carrying anything (asked every step while carrying; the mode policy is not asked then): take it where it belongs
    * (food home to the nest's chambers, a porter's to the chamber that wants it, soil out to the mound, a corpse to the
    * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh. (Carrying no
    * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
    */
-  carry(t: Touch): Carry;
+  carry(t: Touch, draw?: AntDraw): Carry;
   /** Carrying food, at a place it can put it down (the nest on a top-down map; its chamber in the side view): put it down? */
-  drop(t: Touch): boolean;
+  drop(t: Touch, draw?: AntDraw): boolean;
   /** Which trail to lay this step. */
-  trail(t: Touch): TrailKind;
+  trail(t: Touch, draw?: AntDraw): TrailKind;
   /** How much of it, as a share of the colony's `deposit`. */
   trailRate(t: Touch): number;
   /**
@@ -134,7 +140,7 @@ export interface Responses {
    * Strangers within reach (asked every step while they are, `odds` filled in): fight them; flee (home, away from
    * them); or drop what it carries and flee (behaviour MR 4).
    */
-  contact(t: Touch): Contact;
+  contact(t: Touch, draw?: AntDraw): Contact;
   /**
    * Following a food trail to where it ends, and no food there (behaviour MR 3, docs/trails.md: Robinson et al. 2005):
    * "no entry" laid, as a share of the colony's `deposit` (0 = none).
@@ -144,7 +150,7 @@ export interface Responses {
    * Rested, empty-jawed and home, where the colony gates leaving: go out now, soon, or wait (only a scout goes out, now
    * and then). `returns` says how many nestmates bringing food it has met lately (behaviour MR 5).
    */
-  leave(t: Touch): Leave;
+  leave(t: Touch, draw?: AntDraw): Leave;
 }
 
 /**

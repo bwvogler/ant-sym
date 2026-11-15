@@ -366,7 +366,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
-      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
+      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Spores left out on the open plane, off its patch, die in the sun twice as fast as in the soil (the game's number: full sun kills Metarhizium spores within an hour). Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
     sources: [
       { note: "fungus-body", anchor: "1-growth-without-a-host", label: "Growth without a host" },
       { note: "fungus-body", anchor: "3-adapting-to-hosts", label: "Adapting to hosts" },
@@ -470,6 +470,35 @@ export const GUIDE: GuideEntry[] = [
     sources: [{ note: "builder", anchor: "damaged-nests-are-repaired", label: "Damaged nests are repaired" }],
   },
   {
+    id: "builder-tweezers",
+    title: "Tweezers",
+    onScreen:
+      "Pick an ant up with the tweezers (🤏) and drop it somewhere else on the surface. A line follows it home: solid while it walks to where it thinks home is, dotted while it searches in loops. The bell tells you how long it took.",
+    realAnts:
+      "Scientists move desert ants with tweezers to see how they find home. A moved ant walks the same distance and direction it would have walked home from where it was picked up, as if it hadn't been moved, then searches in loops until it finds the nest.",
+    inGame:
+      "The ant keeps its sense of where home is, moved by as far as you carried it. So it walks to where home would be, searches there, and finds home by its search, the smell of its own mound, or seeing its hole.",
+    sources: [
+      {
+        note: "builder",
+        anchor: "a-displaced-ant-runs-off-its-old-vector-then-searches",
+        label: "A displaced ant runs off its old vector, then searches",
+      },
+    ],
+  },
+  {
+    id: "builder-noentry",
+    trail: "noEntry",
+    title: "No-entry sign",
+    onScreen:
+      "Paint a no-entry sign (🚫) across a trail. Ants following the trail turn away from it and take another way. Ants just wandering about walk straight over it.",
+    realAnts:
+      "Pharaoh's ants mark a dead-end branch of a trail with a 'no entry' smell. When an ant following the trail reaches a fork, 71 out of 100 take the branch without the mark.",
+    inGame:
+      "The sign is 'no entry' smell for every colony. An ant following a trail counts the trail as weaker where the sign is, so at a fork it takes the other branch: about three in four do. It fades over a few minutes.",
+    sources: [{ note: "builder", anchor: "no-entry-turns-trail-followers-away", label: "“No entry” turns trail followers away" }],
+  },
+  {
     id: "builder-rain",
     title: "Rain",
     onScreen: "The rain cloud (🌧️) washes every trail and alarm off the ground under it.",
@@ -512,6 +541,21 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "foraging-tunnels",
     title: "Foraging tunnels",
     covers: "Whether ants dig to reach food, and a digging bout for foragers who come home empty (built, off for now).",
+  },
+  {
+    note: "task-reversion",
+    title: "Task reversion",
+    covers: "Whether old foragers go back to nursing when the young are gone, and what tells them (built, off for now).",
+  },
+  {
+    note: "larval-feeding",
+    title: "Larval feeding",
+    covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (built, off for now).",
+  },
+  {
+    note: "brood-odour",
+    title: "Brood odour",
+    covers: "The young keep to the brood by its smell, not to the queen: queen pheromones are mostly contact signals.",
   },
   {
     note: "activation",

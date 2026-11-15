@@ -1,0 +1,28 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { oneAssay, runAssay } from "../../experiment.ts";
+
+// A6 and A13 on one world, with the attackers walked to the defenders' hole by the harness (marchProbe; S2.2c, PRD §76.3).
+// Both fail their marks today, so under the owner's marks rule (2026-11-14, 2026-11-15) they are held only to no worse than
+// their worst seed over 1–20, widened by 10 %, until their beads are fixed.
+
+// A6 passes 4/20 (gain median 0.96; ja-lp4.6.5, its defenders ja-lp4.6.5.1): the gain at least A6_GUARD (worst 0.603, seed 14, − 10 %).
+const A6_GUARD = 0.54;
+test("A6 a pass on one world, guarded (ja-lp4.6.5): the defenders' exchange no worse than today's worst seed", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(oneAssay("pass"), seed).metrics;
+    assert.ok(m.gain >= A6_GUARD, `seed ${seed}: gain ${m.gain}, guard ${A6_GUARD}`);
+  }
+});
+
+// A13 passes 8/20 (ja-lp4.6.20: defending pays nothing over not defending): food against the no-defence colony's at least
+// A13_FOOD (worst 0.568, seed 1, − 10 %), and at least A13_KILLED raiders killed (worst 27, seed 4, − 10 %).
+const A13_FOOD = 0.51;
+const A13_KILLED = 24;
+test("A13 defence on one world, guarded (ja-lp4.6.20): food and kills no worse than today's worst seed", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(oneAssay("defendHome"), seed).metrics;
+    assert.ok(m.vsNone >= A13_FOOD, `seed ${seed}: food ${m.vsNone} of the no-defence colony's, guard ${A13_FOOD}`);
+    assert.ok(m.killed >= A13_KILLED, `seed ${seed}: ${m.killed} raiders killed, guard ${A13_KILLED}`);
+  }
+});

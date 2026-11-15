@@ -7,8 +7,11 @@ import { Colony, localPolicy, localStance } from "../../colony.ts";
 import { MODES, type Situation, type StanceSituation } from "../../vocab.ts";
 import { localResponses, responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
-import { foodIn, generateWorld, mulberry32, OPEN_WORLD, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
+import { foodIn, mulberry32, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
+import { generateOneWorld } from "../../oneWorld.ts";
+import { PUPA } from "../../brood.ts";
 import { touch } from "../../sense.ts";
+import { smallOne } from "../builders.ts";
 
 /** A bare 40×12 field with two nests, no food. */
 function arena(): WorldMap {
@@ -45,9 +48,9 @@ const view = (s: Partial<StanceSituation>): StanceSituation => ({
   ...s,
 });
 
-test("generateWorld: two nests, a walk apart, joined on foot, with food away from both", () => {
+test("the plane: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
-    const m = generateWorld(seed, OPEN_WORLD);
+    const m = generateOneWorld(seed).plane;
     assert.equal(m.nests.length, 2);
     assert.equal(m.nest, m.nests[0]);
     const [a, b] = m.nests as [WorldMap["nest"], WorldMap["nest"]];
@@ -153,29 +156,26 @@ test("a fighting ant goes for the enemy it can see", () => {
   assert.ok(c.y[0] > at(20, 6).y + 0.3, `it turned south toward the enemy: y ${c.y[0]}`);
 });
 
-test("the game: both colonies forage and grow, they meet and fight, no strategist on open ground, and food is never made or lost", () => {
-  const map = generateWorld(1, OPEN_WORLD);
-  const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(11));
+test("the game: both colonies forage and grow, and they meet and fight", () => {
+  // On a small one world (S2.3c); that food and ants are conserved is int/oneWorldGame's.
+  const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(11));
   for (let k = 0; k < 30 * 150; k++) g.tick(1 / 30);
   const [you, rival] = g.colonies as [Colony, Colony];
   assert.ok(you.stored > 100 && rival.stored > 50, `stored ${you.stored} / ${rival.stored}`);
   assert.ok(you.births > 0 && rival.births > 0, "both grew");
   assert.ok(you.losses + rival.losses > 0, "they fought");
-  assert.equal(g.strategyChoices, 0, "on open ground each ant's stance is its own (docs/stance.md): no colony stance is chosen");
-  let carried = 0;
-  for (const c of g.colonies) for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.carrying[i]! ? 1 : 0;
-  assert.equal(Math.round(you.foodLeft + you.stored + rival.stored + carried), map.foodTotal, "food is conserved");
   assert.ok(["playing", "unified", "fallen"].includes(g.outcome()));
 });
 
-test("the outcome: a colony with no ants and too little food for one more is beaten", () => {
-  const g = new Game(generateWorld(2, OPEN_WORLD), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
+test("the outcome: a colony with no workers and no pupae is beaten", () => {
+  const g = new Game(smallOne(2), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
   // The player is the fungus (docs/fungus-policy.md §9): a colony beaten is a loss for it, whichever colony.
   for (let i = 0; i < g.rival!.n; i++) g.rival!.kill(i);
+  g.rival!.brood.items.length = 0;
   assert.equal(g.outcome(), "fallen");
   assert.equal(g.fallen(), 1);
-  g.rival!.larder = 4;
-  assert.equal(g.outcome(), "playing", "it can still raise an ant");
+  g.rival!.brood.add(1, 1, -1).stage = PUPA;
+  assert.equal(g.outcome(), "playing", "a pupa will still hatch");
   for (let i = 0; i < g.player.n; i++) g.player.kill(i);
   assert.equal(g.outcome(), "fallen");
   assert.equal(g.fallen(), 0);
@@ -340,7 +340,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
 
 test("each ant's own stance (docs/stance.md): alarm near home makes it defend, the same far out doesn't; 'raid' makes a scout; a crowded home is felt", () => {
   // Alarm round one ant, kept up for 2 s: on home ground (within homeGround of its nest) it defends; 30 cells out it forages.
-  // Home ground is by its own vector (ja-k4k.6.2): `off` cells of believed error put the hole it would defend that far east.
+  // Home ground by sight of its hole, else by its vector (ja-k4k.6.2): `off` cells of error put the hole it would defend that far east.
   const threatened = (cx: number, off = 0) => {
     const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, wander: 0 }, mulberry32(13), () => "return");
     c.odoSurf[0] = off;
@@ -357,6 +357,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(threatened(34), "forage", "far out");
   // By sight where it sees its hole, else by its vector (ja-k4k.6.2, review of #180 S1).
   assert.equal(threatened(8, 30), "defend", "it sees its hole: its vector doesn't matter");
+  assert.equal(threatened(11, 30), "defend", "7 cells off, it sees its hole down a clear line (NEST_SIGHT)");
   assert.equal(threatened(13, 0), "defend", "out of sight, inside home ground by its vector");
   assert.equal(threatened(13, 30), "forage", "out of sight, its vector says home is 30 cells off");
   // The colony's own stance is not read: a defend broadcast makes no one defend (review of #53, N2).

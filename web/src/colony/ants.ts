@@ -319,6 +319,22 @@ export const ANT_FIELDS = {
   // ——— the fungus's rouse (ja-rf5.18), last for the same reason ———
   /** rouse (ja-rf5.18, the fungus's): coming down its shaft, it counts as this share of a finder to the ants waiting at the top */
   rouse: { type: Float32Array, reset: "asIs" },
+  // ——— task reversion (ja-7r7x, PRD §74), last for the same reason ———
+  /** the share of recent time (YOUNG_TAU) a young nestmate was within a cell of it at home; 1 at birth, as if among them */
+  youngMet: { type: Float32Array, fill: 1, reset: "spawn" },
+  // ——— larval feeding by mouth (ja-638i, PRD §75), last for the same reason ———
+  /** food in its crop (food units, up to params.cropFeed): filled at the stores, passed mouth to mouth, fed to larvae */
+  crop: { type: Float64Array, reset: "spawn" },
+  // ——— task reversion's brood cue (ja-7r7x, review of #217), last for the same reason ———
+  /** the share of recent time (YOUNG_TAU) a brood item lay within a cell of it at home; 0 at birth */
+  broodMet: { type: Float32Array, reset: "spawn" },
+  /**
+   * How far the builder's tweezers carried ant i on the plane this trip (docs/builder.md "Slice 2"): its belief of home
+   * moves by as much, so it runs its old vector, as a displaced desert ant does (Wehner & Srinivasan 1981). 0 unless
+   * a child moved it; cleared with the vector up out of its own hole.
+   */
+  carriedX: { type: Float32Array, reset: "spawn" },
+  carriedY: { type: Float32Array, reset: "spawn" },
   /** the steering weights an ant out exploring or following steers by, packed (vocab.ts encodeSteering; staging, ja-ykmu): STEER_NEUTRAL = none */
   steerCode: { type: Uint16Array, fill: 364, reset: "spawn" },
   /** the weights it steers by near its last find (find `near`), packed as steerCode; STEER_NEUTRAL = none */

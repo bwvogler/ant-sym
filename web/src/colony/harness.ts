@@ -5,12 +5,12 @@ import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
 import { type Policy, type StancePolicy, type SteerPolicy } from "./vocab.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
-import { centreX, centreY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
 import { oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, generateSideWorld, OPEN, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, generateSideWorld, OPEN, ROCK, rockAt, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -555,3 +555,97 @@ export function gateProbe(): Probe {
 
 /** The mean of a list, NaN for none. */
 export const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+
+/** How near the hole (in steps of the way round) a walked ant counts as arrived and is let go: MARCH_REACH. */
+export const MARCH_REACH = 3;
+
+/**
+ * An experimental device, not a behaviour (owner, review of #184 D2): the harness walks colony `k`'s ants on one world's
+ * plane to colony `to`'s hole, by the open ground's way round, so no colony code marches at coordinates. Every tick each
+ * of them on the plane that has no stranger of colony `to` within its enemy range (+1 cell) is turned toward the cell two
+ * steps on along the way (as R1's walk out); one that has is let go, so the fight is the ants' own. So is one within
+ * MARCH_REACH steps of the hole. Ants in the curtain come up by their own rules. Reported: `marched`, the share of
+ * colony `k`'s ants that reached the hole (within MARCH_REACH steps) at least once. `walks` is [k, to], for tests.
+ */
+export function marchProbe(k: number, to: number): Probe & { walks: readonly [number, number] } {
+  let field: Int32Array | null = null;
+  let w = 0;
+  let h = 0;
+  const arrived = new Set<number>();
+  const build = (game: Game): Int32Array => {
+    const plane = (game.world as OneWorld).plane;
+    w = plane.size.w;
+    h = plane.size.h;
+    const f = new Int32Array(w * h).fill(-1);
+    const nest = game.colonies[to]!.layers[PLANE]!.nest;
+    cellOf(nest.x, nest.y);
+    const queue = [CELL[0] + CELL[1] * w];
+    f[queue[0]!] = 0;
+    for (let q = 0; q < queue.length; q++) {
+      const at = queue[q]!;
+      const x = at % w;
+      const y = (at - x) / w;
+      for (let d = 0; d < 6; d++) {
+        const tx = nx(x, y, d);
+        const ty = ny(y, d);
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+        const t = tx + ty * w;
+        if (f[t] >= 0 || rockAt(plane, tx, ty) !== OPEN) continue;
+        f[t] = f[at]! + 1;
+        queue.push(t);
+      }
+    }
+    return f;
+  };
+  return {
+    walks: [k, to] as const,
+    tick(game) {
+      if (!game.world) throw new Error("marchProbe: one world only");
+      const f = (field ??= build(game));
+      const c = game.colonies[k];
+      const foe = game.colonies[to];
+      if (!c || !foe) return;
+      const reach = c.params.enemyRange + 1;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.layer[i] !== PLANE) continue;
+        const x = c.x[i];
+        const y = c.y[i];
+        cellOf(x, y);
+        let cx = CELL[0];
+        let cy = CELL[1];
+        const here = cx >= 0 && cy >= 0 && cx < w && cy < h ? f[cx + cy * w]! : -1;
+        if (here < 0) continue;
+        if (here <= MARCH_REACH) {
+          arrived.add(i);
+          continue;
+        }
+        let near = false;
+        for (let j = 0; j < foe.n && !near; j++)
+          if (foe.alive[j] && foe.layer[j] === PLANE && Math.hypot(foe.x[j] - x, foe.y[j] - y) <= reach) near = true;
+        if (near) continue;
+        for (let s = 0; s < 2; s++) {
+          let best = f[cx + cy * w]!;
+          let bx = cx;
+          let by = cy;
+          for (let d = 0; d < 6; d++) {
+            const tx = nx(cx, cy, d);
+            const ty = ny(cy, d);
+            if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+            const g = f[tx + ty * w]!;
+            if (g >= 0 && g < best) {
+              best = g;
+              bx = tx;
+              by = ty;
+            }
+          }
+          cx = bx;
+          cy = by;
+        }
+        c.heading[i] = Math.atan2(centreY(cy) - y, centreX(cx, cy) - x);
+      }
+    },
+    summary(game) {
+      return { marched: arrived.size / Math.max(1, game.colonies[k]?.params.antCount ?? 1) };
+    },
+  };
+}

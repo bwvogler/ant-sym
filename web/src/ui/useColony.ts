@@ -399,6 +399,19 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     }));
     setLoads((n) => n + 1);
   }, []);
+  /**
+   * Step the game `n` fixed ticks of MAX_STEP (1/30 s: the assays' tick, and the longest the loop takes): Lab mode's step control, used while paused
+   * (PRD §69.7). A flight stops it, as it stops play: the page founds her before the game goes on.
+   */
+  const step = useCallback(
+    (n: number) => {
+      for (let k = 0; k < n && !game.flights.length; k++) {
+        game.tick(MAX_STEP);
+        journal?.observe(game);
+      }
+    },
+    [game, journal],
+  );
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = {
     species: controls.species,
@@ -434,7 +447,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal };
+  return { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step };
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */

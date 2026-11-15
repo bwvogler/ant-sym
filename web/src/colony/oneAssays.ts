@@ -517,7 +517,11 @@ export const memory1: Assay = {
           const k = counted.reduce((a, b) => a + b, 0);
           let mem = 0;
           let trail = 0;
-          for (let i = 0; i < n; i++) if (counted[i]) first[i] === 1 ? mem++ : first[i] === 2 ? trail++ : 0;
+          for (let i = 0; i < n; i++) {
+            if (!counted[i]) continue;
+            if (first[i] === 1) mem++;
+            else if (first[i] === 2) trail++;
+          }
           return { counted: k, memory: k ? mem / k : NaN, trail: k ? trail / k : NaN };
         },
       },

@@ -31,8 +31,8 @@ export function onMLine(c: Colony, i: number, x: number, y: number, width = M_LI
  */
 export function rememberSite(c: Colony, i: number): void {
   const odo = c.odoSurf[i];
-  c.foodX[i] = c.x[i] - (c.nest.x + odo * c.driftSurf[i]);
-  c.foodY[i] = c.y[i] - (c.nest.y + odo * c.driftSurfY[i]);
+  c.foodX[i] = c.x[i] - (c.nest.x + odo * c.driftSurf[i] + c.carriedX[i]);
+  c.foodY[i] = c.y[i] - (c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i]);
 }
 
 /**
@@ -49,8 +49,8 @@ export function siteAim(c: Colony, i: number): number {
   const lx = c.map.x0 + EDGE;
   const hx = c.map.x0 + c.map.size.w - EDGE;
   const hy = c.map.size.h * R - EDGE;
-  const tx = Math.max(lx, Math.min(hx, c.nest.x + odo * c.driftSurf[i] + c.foodX[i]));
-  const ty = Math.max(EDGE, Math.min(hy, c.nest.y + odo * c.driftSurfY[i] + c.foodY[i]));
+  const tx = Math.max(lx, Math.min(hx, c.nest.x + odo * c.driftSurf[i] + c.carriedX[i] + c.foodX[i]));
+  const ty = Math.max(EDGE, Math.min(hy, c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i] + c.foodY[i]));
   let s = c.search[i];
   if (s === 0) {
     if (Math.hypot(tx - x, ty - y) >= LOOP_AT) return Math.atan2(ty - y, tx - x);

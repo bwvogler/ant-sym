@@ -1,0 +1,155 @@
+# Behaviour assays (npm run exp, scripts/experiment.mjs) on GitHub's runners instead of a session's 4 cores: one runner
+# per seed, so 10-20 seeds take about as long as the slowest one, and a container restart loses nothing (ja-w7ef.12).
+# Started by hand only (the Actions tab, or mcp__github__actions_run_trigger with method run_workflow, workflow_id
+# assays.yml, ref the branch to measure and the inputs below). It runs the branch it is started on, so the branch needs
+# this file: one cut before it merges main first.
+#
+# The result is the same table `npm run exp` prints, merged over the seeds (experiment.mjs merge): in the `report` job's
+# log and the run's summary, so an agent reads it with get_job_logs; the merged --json is the `assays` artifact.
+# The assays play the local rule, or with `policy` replay Jev's answers from a cache committed under experiments/caches
+# (--policy cache:<file>): never Jev itself, so no spend.
+name: Assays
+
+on:
+  workflow_dispatch:
+    inputs:
+      assays:
+        description: "Assay ids, space-separated, or all (experiment.mjs ASSAYS / ONE_ASSAYS)"
+        default: all
+      one:
+        description: "On one world (--one)"
+        type: boolean
+        default: false
+      seeds:
+        description: "Seeds: a range or list, e.g. 1-10 or 1-5,11 (at most 40: one runner each)"
+        default: "1-10"
+      set:
+        description: "Overrides, space-separated, each path=v1,v2 (one --set each; their cross product runs), e.g. colony.routeStep=3,4"
+        default: ""
+      seconds:
+        description: "Game length in seconds, if not each assay's own"
+        default: ""
+      species:
+        description: "Play every colony as this species (--species), e.g. desert"
+        default: ""
+      policy:
+        description: "Replay a committed cache of Jev's answers for the first colony (--policy cache:), e.g. experiments/caches/draw-top-forage.json"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      seeds: ${{ steps.plan.outputs.seeds }}
+      args: ${{ steps.plan.outputs.args }}
+    steps:
+      # The inputs reach the shell as environment variables, never spliced into the script, and each is checked
+      # against a narrow pattern before it becomes an argument.
+      - id: plan
+        env:
+          ASSAYS: ${{ inputs.assays }}
+          ONE: ${{ inputs.one }}
+          SEEDS: ${{ inputs.seeds }}
+          SET: ${{ inputs.set }}
+          SECONDS_IN: ${{ inputs.seconds }}
+          SPECIES: ${{ inputs.species }}
+          POLICY: ${{ inputs.policy }}
+        run: |
+          set -f # no glob expansion of the inputs
+          bad() { echo "::error title=assays input::$1"; exit 1; }
+          [[ "$ASSAYS" =~ ^[A-Za-z0-9\ ]+$ ]] || bad "assays: ids and spaces only"
+          [[ " $ASSAYS " == *" merge "* ]] && bad "assays: merge is the report job's, not an assay"
+          [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
+          [[ "$SECONDS_IN" =~ ^[0-9]*$ ]] || bad "seconds: a whole number"
+          [[ "$SPECIES" =~ ^[a-z0-9]*$ ]] || bad "species: an id"
+          [[ -z "$POLICY" || "$POLICY" =~ ^experiments/caches/[A-Za-z0-9._-]+\.json$ ]] || bad "policy: a file under experiments/caches"
+          [[ "$POLICY" == *..* ]] && bad "policy: no .."
+          args="$ASSAYS"
+          [ "$ONE" = "true" ] && args="$args --one"
+          for s in $SET; do
+            [[ "$s" =~ ^[A-Za-z0-9_.]+=[A-Za-z0-9_.,-]+$ ]] || bad "set: path=v1,v2, got $s"
+            args="$args --set $s"
+          done
+          [ -n "$SECONDS_IN" ] && args="$args --seconds $SECONDS_IN"
+          [ -n "$SPECIES" ] && args="$args --species $SPECIES"
+          [ -n "$POLICY" ] && args="$args --policy cache:$POLICY"
+          seeds=$(node -e '
+            const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
+            const u = [...new Set(s)];
+            if (u.length === 0 || u.length > 40) { console.error(`${u.length} seeds: 1 to 40`); process.exit(1); }
+            console.log(JSON.stringify(u));' "$SEEDS") || bad "seeds: 1 to 40 of them"
+          echo "seeds=$seeds" >> "$GITHUB_OUTPUT"
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+          echo "experiment.mjs $args, seeds $seeds" >> "$GITHUB_STEP_SUMMARY"
+
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: ${{ fromJSON(needs.plan.outputs.seeds) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      # Checked in plan; word splitting turns them back into arguments.
+      - name: seed ${{ matrix.seed }}
+        env:
+          ARGS: ${{ needs.plan.outputs.args }}
+          SEED: ${{ matrix.seed }}
+        run: |
+          mkdir -p out
+          # shellcheck disable=SC2086
+          node scripts/experiment.mjs $ARGS --seeds "$SEED" --json "out/seed-$SEED.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: assay-seed-${{ matrix.seed }}
+          path: out/seed-${{ matrix.seed }}.json
+          retention-days: 7
+          overwrite: true
+
+  report:
+    needs: [plan, run]
+    # Not after a refused input: plan's ::error is the one to read.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: assay-seed-*
+          path: out
+          merge-multiple: true
+      # The merged table: in this step's log (get_job_logs) and on the run's summary page. A seed whose runner failed is
+      # missing from it, and the step says which.
+      - name: merged report
+        env:
+          SEEDS: ${{ needs.plan.outputs.seeds }}
+        run: |
+          node scripts/experiment.mjs merge out/seed-*.json --json assays.json | tee -a "$GITHUB_STEP_SUMMARY"
+          missing=$(node -e 'const fs = require("fs"); console.log(JSON.parse(process.argv[1]).filter((s) => !fs.existsSync(`out/seed-${s}.json`)).join(" "))' "$SEEDS")
+          if [ -n "$missing" ]; then echo "::error title=assays::no result for seeds $missing (their runners failed)"; exit 1; fi
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: assays
+          path: assays.json
+          retention-days: 30
+          overwrite: true

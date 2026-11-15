@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Game, gameRng, NO_ROOM } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld, mainGround } from "../../oneWorld.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
 
 // Game.settleAt (U5.2, docs/one-world.md §5): where a founding at a plane point would put its hole, read without founding
 // it. The queen's pen previews it under the pointer and addColony founds where it says, so the preview and the founding
@@ -57,10 +57,3 @@ for (const seed of [1, 2]) {
     assert.ok(refused >= 3, `only ${refused} refusals`);
   });
 }
-
-test("settleAt on a game of one map is refused, and founds nothing", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 4, rivalAnts: 4 }, gameRng(1));
-  const s = g.settleAt({ x: 100, y: 30 });
-  assert.equal(s.ok, false);
-  assert.equal(g.colonies.length, 2);
-});

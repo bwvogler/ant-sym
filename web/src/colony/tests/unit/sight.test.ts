@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, inReach } from "../../colony.ts";
 import { sense } from "../../sense.ts";
+import { freshReach } from "../../grid.ts";
 import { CELL, cellOf, nx, ny, R } from "../../hex.ts";
 import { mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
@@ -53,6 +54,7 @@ test("sense: a food trail in the next tunnel, one cell of soil away, reads nothi
     const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0, scentReach, sensorDistance: d }, mulberry32(1));
     for (let x = 1; x <= 8; x++) c.ph.depositCell("food", x, 3, 5);
     put(c, 0, 5, 1);
+    freshReach(); // outside perceive, which resets the shared reach search
     sense(c, 0, (to.x - from.x) / d, (to.y - from.y) / d, 0);
     return c.s[0];
   };

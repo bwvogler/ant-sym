@@ -14,9 +14,16 @@ import {
   forage1,
   game1,
   heldProbe,
+  lifecycleOne,
+  marchProbe,
+  MARCH_REACH,
   nestFlowProbe,
   occupancyProbe,
+  ASSAYS,
+  defendWalked,
   ONE_ASSAYS,
+  oneAssay,
+  passWalked,
   oneArena,
   onPlane,
   outingProbe,
@@ -379,6 +386,35 @@ test("nestFlowProbe reads the curtain's chambers in one world (A8)", () => {
   assert.equal(probe.summary(g).beyond, 1, "the food lies past reception, in the royal chamber");
 });
 
+test("L on one world: the three lifecycle arms run a solo one world with the fungus landed by the hole, under the legacy ids", () => {
+  assert.deepEqual(
+    lifecycleOne.map((a) => a.id),
+    ["lifecycle", "lifecycle-signal", "lifecycle-scent"],
+  );
+  for (const a of lifecycleOne) assert.ok(ONE_ASSAYS.includes(a), `${a.id} is in ONE_ASSAYS`);
+  const { game, result } = runGame({ ...lifecycleOne[1]!.spec(1), seconds: 2 });
+  assert.ok(game.world && game.colonies.length === 1, "a solo one world");
+  assert.equal(game.landed?.colony, 0, "the fungus has landed by the first colony's hole");
+  assert.equal(game.player.queen?.signal, 0.4, "the signal arm damps the queen's signal");
+  assert.ok(Number.isNaN(result.metrics["t.daughterOut"]), "no daughter yet, 2 s in");
+});
+
+test("L on one world: a daughter is out only once one of her ants is up on the plane (review of #211, S2)", () => {
+  const spec = lifecycleOne[1]!.spec(1);
+  const { game } = runGame({ ...spec, seconds: 1 });
+  const m = game.colonies[0]!;
+  const nest = m.layers[PLANE]!.nest;
+  const k = game.addColony({ x: nest.x, y: nest.y, antCount: 5, odour: m.nestOdour, mother: 0, reserve: 24 });
+  const d = game.colonies[k]!;
+  d.founding = false;
+  const probe = spec.probes![0]!;
+  probe.tick(game, 1);
+  assert.ok(Number.isNaN(probe.summary(game)["t.daughterOut"]), "every ant of hers in the curtain: not out yet");
+  d.layer[d.alive.indexOf(1)] = PLANE;
+  probe.tick(game, 1);
+  assert.equal(probe.summary(game)["t.daughterOut"], game.time, "one up on the plane: out");
+});
+
 test("raidProbe in one world (A11): reach and stuck on the plane only, a recruit in the curtain is home, the trail read at the hole", () => {
   const g = oneGame();
   const c = g.player;
@@ -438,4 +474,78 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
     assay.score(result, game);
     assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
   }
+});
+
+test("marchProbe (S2.2c): turns a walked ant on the plane toward the other colony's hole, lets go of one that senses a stranger", () => {
+  const g = oneGame();
+  const c = g.player;
+  const foe = g.colonies[1]!;
+  const probe = marchProbe(0, 1);
+  const hole = at(48, 20);
+  for (let i = 3; i < c.n; i++) c.alive[i] = 0;
+  for (let i = 0; i < foe.n; i++) foe.alive[i] = 0;
+  // Ant 0 at the arena's west end, facing away; ant 1 the same, with a stranger 2.5 cells off (inside enemyRange + 1, outside enemyRange); ant 2 in the curtain.
+  put(c, 0, PLANE, 14, 30);
+  put(c, 1, PLANE, 14, 10);
+  put(c, 2, CURTAIN, 14, 30);
+  for (const i of [0, 1, 2]) c.heading[i] = Math.PI;
+  foe.alive[0] = 1;
+  put(foe, 0, PLANE, 16.5, 10);
+  probe.tick(g, 1);
+  const toward = Math.atan2(hole.y - c.y[0]!, hole.x - c.x[0]!);
+  assert.ok(
+    Math.cos(c.heading[0]! - toward) > 0.7,
+    `walked toward the hole: heading ${c.heading[0]!.toFixed(2)}, the hole at ${toward.toFixed(2)}`,
+  );
+  assert.equal(c.heading[1], Math.fround(Math.PI), "a stranger within reach: let go, its own fight");
+  assert.equal(c.heading[2], Math.fround(Math.PI), "in the curtain: its own rules");
+  put(c, 0, PLANE, hole.x - 2, hole.y);
+  c.heading[0] = Math.PI;
+  probe.tick(g, 1);
+  assert.equal(c.heading[0], Math.fround(Math.PI), `within ${MARCH_REACH} steps of the hole: let go`);
+  assert.equal(probe.summary(g).marched, 1 / c.params.antCount, `one ant within ${MARCH_REACH} steps of the hole`);
+});
+
+test("A6 and A13 on one world (S2.2c): no colony-wide stance (no stance policy, no stanceGate 0), the attackers walked", () => {
+  for (const id of ["pass", "open", "defendHome"]) {
+    const a = ONE_ASSAYS.find((x) => x.id === id);
+    assert.ok(a, `${id} is in ONE_ASSAYS`);
+    const spec = a.spec(1);
+    assert.ok(isOneWorld(specMap(spec)), id);
+    const sides = spec.sides ?? {};
+    assert.equal(sides.stance, undefined, `${id}: no stance policy`);
+    assert.equal(sides.rivalStance, undefined, `${id}: no rival stance policy`);
+    assert.notEqual(sides.colony?.stanceGate, 0, `${id}: the colony's stance is each ant's own`);
+    assert.notEqual(sides.rival?.stanceGate, 0, `${id}: the rival's stance is each ant's own`);
+    const march = (spec.probes ?? []).filter((p) => "walks" in p) as unknown as { walks: readonly [number, number] }[];
+    assert.deepEqual(
+      march.map((p) => p.walks),
+      [id === "defendHome" ? [1, 0] : [0, 1]],
+      `${id}: the attackers walked at the defenders' hole`,
+    );
+  }
+});
+
+test("oneAssay: each gate id gives its one-world twin, A6 and A13 walked (review of #235, S1)", () => {
+  for (const id of [
+    "bridge",
+    "twin",
+    "richPoor",
+    "deplete",
+    "alarm",
+    "regulate",
+    "regulateStop",
+    "contact",
+    "faintAlarm",
+    "raidFind",
+    "raidStop",
+  ]) {
+    const a = oneAssay(id);
+    assert.ok(ONE_ASSAYS.includes(a) && !ASSAYS.includes(a), id);
+  }
+  assert.equal(oneAssay("pass"), passWalked);
+  assert.equal(oneAssay("defendHome"), defendWalked);
+  const ids = ONE_ASSAYS.map((a) => a.id);
+  assert.equal(new Set(ids).size, ids.length, "ONE_ASSAYS ids are unique, so oneAssay's find is unambiguous");
+  assert.throws(() => oneAssay("nope"), /no one-world assay nope/);
 });

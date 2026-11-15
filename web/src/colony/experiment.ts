@@ -6,12 +6,12 @@ import { type ColonyParams, type Layer, PLANE } from "./colony.ts";
 import { FAINT, MODES, type Mode, type Stance } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
-import { R } from "./hex.ts";
+import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
+import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
@@ -26,6 +26,7 @@ import {
   gateProbe,
   occupancyProbe,
   onLayer,
+  marchProbe,
   onPlane,
   runGame,
   type Probe,
@@ -36,9 +37,11 @@ import {
 export * from "./harness.ts";
 export * from "./oneAssays.ts";
 export * from "./desertAssays.ts";
+export * from "./neglectusAssays.ts";
 export * from "./builderAssays.ts";
 import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
+import { neglectusImmunisation, neglectusTolerance } from "./neglectusAssays.ts";
 import { forage1, game1, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
 
 const always =
@@ -523,6 +526,31 @@ function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   };
 }
 export const pass = passAssay((spec) => spec);
+
+/**
+ * A6 on one world with no colony-wide stance (S2.2c, owner's D2 on #184): the arena made the plane, the attackers (colony 0)
+ * in fight mode with their own stance, walked to the defenders' hole by the harness (marchProbe) instead of marching at its
+ * coordinates; the defenders with their own stance. The same for the open control, so the gain compares like with like.
+ */
+export const passWalked: Assay = {
+  ...passAssay((spec) => walked(onPlane(spec), 0, 1)),
+  title: `${pass.title} (one world, attackers walked)`,
+};
+
+/** A battle spec with its colony-wide stances taken off (no stance policy, no stanceGate 0) and side `k` walked at side `to`'s hole. */
+function walked(spec: RunSpec, k: number, to: number): RunSpec {
+  const { stance: _s, rivalStance: _r, colony, rival, ...sides } = spec.sides ?? {};
+  const own = (p?: Partial<ColonyParams>) => {
+    if (!p) return undefined;
+    const { stanceGate: _g, ...rest } = p;
+    return rest;
+  };
+  return {
+    ...spec,
+    sides: { ...sides, ...(own(colony) ? { colony: own(colony) } : {}), ...(own(rival) ? { rival: own(rival) } : {}) },
+    probes: [...(spec.probes ?? []), marchProbe(k, to)],
+  };
+}
 export const open: Assay = {
   id: "open",
   title: "A6 control: the same battle on open ground",
@@ -839,6 +867,51 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     ],
   };
 }
+/**
+ * A13 on one world with no colony-wide stance (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with
+ * its own stance, walked to the colony's hole by the harness (marchProbe). The broadcast arm has no one-world twin (the
+ * colony-wide stance is what S2 deletes); in its place `noDefence` is the same battle with nobody defending (defendAt ∞).
+ * Design mark (owner, 2026-11-15, S2.2c): food at least DEFEND_FOOD of the no-defence colony's, and at least half the war
+ * party killed: defending by its senses should cost the colony no more than not defending, and stop the raiders.
+ */
+/** One arm of A13 on one world: the war party (colony 1) walked at the colony's hole. The spec and both controls use it. */
+const defendArm = (seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec =>
+  walked(onPlane(defendSpec(seed, sealed, colony)), 1, 0);
+
+export const defendWalked: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses (one world, the war party walked)",
+  target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => defendArm(seed, false),
+  score: (r, game) => {
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => runGame(defendArm(r.seed, sealed, colony)).result.metrics;
+    const stored = r.metrics["you.stored"];
+    const control = run(true)["you.stored"];
+    const none = run(false, { defendAt: Infinity });
+    const killed = r.metrics["rival.losses"];
+    const vsNone = control > 0 && none["you.stored"] > 0 ? stored / none["you.stored"] : NaN;
+    const half = game.params.rivalAnts / 2;
+    const lost = r.metrics["you.losses"];
+    return {
+      stored,
+      control,
+      foodShare: control > 0 ? stored / control : NaN,
+      noDefence: none["you.stored"] / Math.max(1, control),
+      vsNone,
+      noDefenceKilled: none["rival.losses"],
+      noDefenceLost: none["you.losses"],
+      killed,
+      lost,
+      exchange: killed / Math.max(1, lost),
+      fightNear: r.metrics.fightNear as number,
+      atPile: r.metrics.atPile as number,
+      marched: r.metrics.marched as number,
+      pass: vsNone >= DEFEND_FOOD && killed >= half ? 1 : 0,
+    };
+  },
+};
+
 export const defendHome: Assay = {
   id: "defendHome",
   title: "A13 defence from senses: the nest is defended, the far pile still worked",
@@ -1022,6 +1095,75 @@ export const nestFlow: Assay = {
   }),
 };
 
+/**
+ * Where the young sit (ja-k4k.15; docs/brood-odour.md): every 30 s from 120 s on, for the first colony's ants underground,
+ * the mean hex distance to the nearest brood item lying in the nest (not held), by band (young, middle-aged), and to the
+ * queen (world units, about a cell each). `margin` is the middle-aged's distance to the brood less the young's: positive when the young keep nearer it.
+ */
+export function nurseZoneProbe(): Probe {
+  let nextAt = 120;
+  const toBrood = [0, 0];
+  const toQueen = [0, 0];
+  const counts = [0, 0];
+  return {
+    tick(game) {
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 30;
+      const c = game.player;
+      // One world: the nest is in the curtain (game.map is the plane).
+      const map = game.world?.curtain ?? game.map;
+      const lying = c.brood.items.filter((b) => b.held < 0);
+      const q = c.queen;
+      if (lying.length === 0 || !q?.alive) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || !c.under[i]) continue;
+        const band = c.band(i);
+        if (band > 1) continue;
+        c.antCell(i);
+        const ax = CELL[0];
+        const ay = CELL[1];
+        if (isSky(map, ax, ay)) continue;
+        let near = Infinity;
+        for (const b of lying) near = Math.min(near, hexDistance(ax, ay, b.x, b.y));
+        toBrood[band]! += near;
+        toQueen[band]! += Math.hypot(c.x[i]! - q.x, c.y[i]! - q.y);
+        counts[band]!++;
+      }
+    },
+    summary() {
+      const young = counts[0] ? toBrood[0]! / counts[0] : NaN;
+      const middle = counts[1] ? toBrood[1]! / counts[1] : NaN;
+      return {
+        youngToBrood: young,
+        middleToBrood: middle,
+        margin: middle - young,
+        youngToQueen: counts[0] ? toQueen[0]! / counts[0] : NaN,
+        middleToQueen: counts[1] ? toQueen[1]! / counts[1] : NaN,
+      };
+    },
+  };
+}
+
+/**
+ * Nurse zone (ja-k4k.15.1): the young keep to the brood. Workers are drawn to brood odour and the brood pile holds nurses
+ * (Glancey & Dickens 1988; Sendova-Franks & Franks 1995); in *P. badius* over 90 % of workers below 70 cm are young,
+ * where the brood lies (Tschinkel & Hanley 2017). The side view, one colony of 600, 600 s.
+ */
+export const nurseZone: Assay = {
+  id: "nurseZone",
+  title: "Nurse zone: the young keep nearer the brood than the middle-aged",
+  target: "margin (middle-aged's mean distance to the nearest brood less the young's, cells) > 0; report the distances to the queen",
+  seconds: 600,
+  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rival: false }, probes: [nurseZoneProbe()] }),
+  score: (r) => ({
+    youngToBrood: r.metrics.youngToBrood as number,
+    middleToBrood: r.metrics.middleToBrood as number,
+    margin: r.metrics.margin as number,
+    youngToQueen: r.metrics.youngToQueen as number,
+    pass: (r.metrics.margin as number) > 0 ? 1 : 0,
+  }),
+};
+
 /** Food lying below the ground (not sky) on `map`, and the open cells there (the nest's and its tunnels' ground, net of fills). */
 function underground(map: WorldMap): { food: number; open: number } {
   let food = 0;
@@ -1086,6 +1228,65 @@ export const pockets: Assay = {
 };
 
 /**
+ * slow/economy.test's map: the tests' small side map (256 × 160) with one nest and 0.3 of its food, about the full
+ * game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
+ */
+export function economyMap(seed: number): WorldMap {
+  const map = generateSideWorld(((seed - 1) % 4) + 1, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
+  let total = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      const v = map.food.get(x, y) * 0.3;
+      map.food.set(x, y, v);
+      total += v;
+    }
+  map.foodTotal = map.foodLeft = total;
+  return map;
+}
+
+/** Workers and larvae starved by the end, and births, of the first colony. */
+function starvedProbe(): Probe {
+  return {
+    tick() {},
+    summary(game) {
+      const c = game.player;
+      return { diedHungry: c.diedHungry, broodStarved: c.broodStarved, diedOld: c.diedOld };
+    },
+  };
+}
+
+/**
+ * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §74): slow/economy.test's hour as an assay.
+ * A colony of 110 on that test's map; its founders age as one cohort, so for a stretch it has no young ants and its
+ * larvae are fed only if old ants come to them. `starved` is the most larvae at once waiting over 120 s, unfed, with
+ * food enough for them in the nest (nestFlowProbe's measure, sampled every 30 s). Target: no seed above 8, the
+ * economy test's bound and ja-rvli's acceptance; workers starved, workers alive and food stored are the guards.
+ */
+export const larvae: Assay = {
+  id: "larvae",
+  title: "Larvae fed when the young are gone: the most larvae left waiting beside food in an hour",
+  target:
+    "no seed above 8 larvae waiting over 120 s beside enough food (slow/economy.test, ja-rvli); no worker starved; workers alive and food stored not worse",
+  seconds: 3600,
+  spec: (seed) => ({
+    seed,
+    map: economyMap,
+    seconds: 3600,
+    game: { antCount: 110, rival: false },
+    probes: [nestFlowProbe(), starvedProbe()],
+  }),
+  score: (r) => ({
+    waiting: r.metrics.starved as number,
+    ants: r.metrics["you.ants"] as number,
+    births: r.metrics["you.births"] as number,
+    stored: r.metrics["you.stored"] as number,
+    diedHungry: r.metrics.diedHungry as number,
+    broodStarved: r.metrics.broodStarved as number,
+    pass: (r.metrics.starved as number) <= 8 && r.metrics.diedHungry === 0 ? 1 : 0,
+  }),
+};
+
+/**
  * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
  * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
  * worker ecloses and first goes out. `arm` forces one of the fungus's queen levers in every host from the start, so
@@ -1093,7 +1294,7 @@ export const pockets: Assay = {
  * every worker's perception of her scent at "damp" (0.3); "none" forces nothing (the fungus lands and plays the local
  * rule, which pulls neither: dilution alone).
  */
-export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
+export function lifecycleProbe(arm: "none" | "signal" | "scent", one = false): Probe {
   const at: Record<string, number> = { queen: NaN, gyne: NaN, flight: NaN, daughter: NaN, daughterWorker: NaN, daughterOut: NaN };
   const first = (k: string, t: number) => {
     if (Number.isNaN(at[k])) at[k] = t;
@@ -1114,7 +1315,8 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
       if (!d.founding) first("daughterWorker", t);
       if (Number.isNaN(at.daughterOut as number))
         for (let i = 0; i < d.n; i++)
-          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R))) {
+          // Out: on the ground above its nest (the side view), or up on the plane (one world).
+          if (d.alive[i] && (one ? d.layer[i] === PLANE : isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R)))) {
             first("daughterOut", t);
             break;
           }
@@ -1132,17 +1334,19 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
   };
 }
 
-function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
+/** The lifecycle assay for one arm: on a solo side-view game, or (`one`) on a solo one world (S2.2b, ja-fnd.3.2.2). */
+function lifecycleAssay(arm: "none" | "signal" | "scent", one = false): Assay {
   const id = arm === "none" ? "lifecycle" : `lifecycle-${arm}`;
   return {
     id,
-    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
+    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}${one ? " (one world)" : ""}`,
     target:
       "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
     seconds: 1800,
     spec: (seed) => ({
       seed,
       seconds: 1800,
+      ...(one ? { map: (s: number) => generateOneWorld(s) } : {}),
       game: { antCount: 600, rival: false },
       events: [
         {
@@ -1155,7 +1359,7 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
             ),
         },
       ],
-      probes: [lifecycleProbe(arm)],
+      probes: [lifecycleProbe(arm, one)],
     }),
     score: (r) =>
       Object.fromEntries(
@@ -1167,6 +1371,8 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
 export const lifecycle = lifecycleAssay("none");
 export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
+/** The three on one world (ONE_ASSAYS, same ids): the alates fly from the plane and their daughters dig in the curtain. */
+export const lifecycleOne = (["none", "signal", "scent"] as const).map((arm) => lifecycleAssay(arm, true));
 
 export const ASSAYS: Assay[] = [
   bridge,
@@ -1186,7 +1392,9 @@ export const ASSAYS: Assay[] = [
   game,
   gameTop,
   nestFlow,
+  nurseZone,
   pockets,
+  larvae,
   lifecycle,
   lifecycleSignal,
   lifecycleScent,
@@ -1223,12 +1431,14 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * plane. A5, A5b (ja-web), A11 and A12 (U6b) count outside on the plane, past the disc round the hole, and report the ants
  * held at the gate at the top of the shaft (gateProbe). A11 and A12 run their controls (no trail, straight at the hole,
  * a forage stance) on the plane too; their raiders are recruited at the gate (ja-web), so a recruit in the curtain is home.
+ * Also the one-world assays of their own (S1, F1, R1), the desert ant's, the builder's, and the lifecycle assays (L ×3,
+ * lifecycleOne) on a solo one world, 30 minutes each.
  */
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
-  { ...passAssay(onPlane), title: `${pass.title} (one world)` },
-  onPlaneAssay(open),
+  passWalked,
+  { ...open, title: `${open.title} (one world, attackers walked)`, spec: (s) => walked(onPlane(open.spec(s)), 0, 1) },
   { ...raidFindAssay(onPlaneGated), title: `${raidFind.title} (one world)` },
   { ...raidStopAssay(onPlaneGated), title: `${raidStop.title} (one world)` },
   onPlaneAssay(contact),
@@ -1247,8 +1457,19 @@ export const ONE_ASSAYS: Assay[] = [
   desertFirstFind,
   desertTrips,
   desertHeat,
+  neglectusImmunisation,
+  neglectusTolerance,
   ...BUILDER_ASSAYS,
+  ...lifecycleOne,
+  defendWalked,
 ];
+
+/** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */
+export function oneAssay(id: string): Assay {
+  const a = ONE_ASSAYS.find((x) => x.id === id);
+  if (!a) throw new Error(`no one-world assay ${id}`);
+  return a;
+}
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
 export const ONE_PENDING: Record<string, string> = {};

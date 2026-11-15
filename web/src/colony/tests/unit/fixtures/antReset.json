@@ -514,6 +514,21 @@
   "rouse": [
    0
   ],
+  "youngMet": [
+   1
+  ],
+  "crop": [
+   0
+  ],
+  "broodMet": [
+   0
+  ],
+  "carriedX": [
+   0
+  ],
+  "carriedY": [
+   0
+  ],
   "steerCode": [
    364
   ],
@@ -1036,11 +1051,26 @@
   "rouse": [
    0
   ],
+  "youngMet": [
+   39.25
+  ],
+  "crop": [
+   39.5
+  ],
+  "broodMet": [
+   39.75
+  ],
+  "carriedX": [
+   40
+  ],
+  "carriedY": [
+   40.25
+  ],
   "steerCode": [
-   39
+   40
   ],
   "steerNear": [
-   39
+   40
   ]
  }
 }

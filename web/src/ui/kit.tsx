@@ -93,6 +93,7 @@ const PATHS = {
   settings:
     "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.6 15H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.7 4V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z",
   close: "M6 6l12 12M18 6L6 18",
+  bell: "M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10.2 20.5a2 2 0 0 0 3.6 0",
   build: "M14 3l7 7M17.5 6.5L9 15M9 15l-4.5 4.5a2.1 2.1 0 0 1-3-3L6 12zM6 12l3 3",
   external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
@@ -121,7 +122,7 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Codex, Details). Closing it gives focus back to
+ * preventDefault) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -134,7 +135,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"], [role="dialog"][aria-label="Details"]')) return;
+      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"]')) return;
       onClose();
     };
     window.addEventListener("keydown", key);
@@ -143,7 +144,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   return (
     <section
       aria-label={label}
-      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[62dvh] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none sm:w-[22rem] ${FLOAT}`}
+      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none sm:w-[22rem] ${FLOAT}`}
     >
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <h2 className="text-[15px] font-semibold text-fg">{title}</h2>

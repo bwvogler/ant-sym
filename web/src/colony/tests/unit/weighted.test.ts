@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { localPolicy } from "../../colony.ts";
 import { readMode } from "../../colonyBrain.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
 import { isWeighted, pick, topOf, weigh, weightedValid, weightsOf } from "../../weighted.ts";
 import { MODES, type Mode, type Policy } from "../../vocab.ts";
-import { ticks } from "../builders.ts";
+import { smallOne, ticks } from "../builders.ts";
 
 // Jev's mode with its probabilities (ja-nan3; weighted.ts): kept with the answer, drawn from by each ant with its
 // colony's rng, and drawn afresh after `reroll` seconds; a policy that never draws leaves the game as it was.
@@ -98,7 +98,7 @@ test("pick draws once by probability, and not at all without a draw, from a bare
 });
 
 const game = (params: { reroll?: number; sampleTemp?: number } = {}) =>
-  new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 40, rivalAnts: 10 }, mulberry32(3), { colony: params });
+  new Game(smallOne(1), { antCount: 40, rivalAnts: 10 }, mulberry32(3), { colony: params });
 
 /** A policy that answers every situation with the same distribution, drawn from as the page's does. */
 const drawing =

@@ -1,6 +1,6 @@
 // The page's game journal (ja-8tb, colony/journal.ts): off unless the URL asks, `?log=summary`, `?log=detail`,
 // `?log=verbose,ant=42`, `?log=death,mode,colony=0`. Every event it keeps goes to the browser console at the debug
-// level (DevTools shows it under "Verbose") and to the Journal card in Details.
+// level (DevTools shows it under "Verbose") and to the Journal tab in Lab mode.
 import { formatJournalEvent, Journal, type JournalEvent } from "../colony/index.ts";
 import { colonyName } from "./names.ts";
 

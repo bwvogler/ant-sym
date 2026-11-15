@@ -6,10 +6,11 @@
 import type { BuildTool } from "../colony/index.ts";
 
 /** A tray tool: Move pans the map with one finger; the rest are the builder's. */
-export type TrayTool = "move" | BuildTool;
+/** A tray tool: Move pans the map with one finger; the tweezers lift an ant; the rest are strokes. */
+export type TrayTool = "move" | "tweezers" | BuildTool;
 
 /** The full tray (the 7-year-old's), in order. The crayon appears once per colony (up to CRAYONS). */
-export const FULL: readonly TrayTool[] = ["move", "dig", "dirt", "rock", "sugar", "crumb", "crayon", "rain"];
+export const FULL: readonly TrayTool[] = ["move", "tweezers", "dig", "dirt", "rock", "sugar", "crumb", "crayon", "noEntry", "rain"];
 /** The little-hands tray: four tools only, bigger still (owner, PRD §73). */
 export const LITTLE: readonly TrayTool[] = ["move", "sugar", "dig", "rain"];
 /** Crayons shown at most: one per colony, the first few. */
@@ -17,6 +18,8 @@ export const CRAYONS = 4;
 
 export const LABEL: Record<TrayTool, string> = {
   move: "Move",
+  tweezers: "Tweezers: pick up an ant",
+  noEntry: "No entry sign",
   dig: "Dig",
   dirt: "Dirt",
   rock: "Rock",
@@ -28,6 +31,8 @@ export const LABEL: Record<TrayTool, string> = {
 
 export const PICTURE: Record<TrayTool, string> = {
   move: "✋",
+  tweezers: "🤏",
+  noEntry: "🚫",
   dig: "⛏️",
   dirt: "🟫",
   rock: "🪨",
@@ -40,6 +45,8 @@ export const PICTURE: Record<TrayTool, string> = {
 /** The first-use demonstration's gesture: a tap, or a drag. */
 export const GESTURE: Record<TrayTool, "tap" | "drag"> = {
   move: "drag",
+  tweezers: "drag",
+  noEntry: "drag",
   dig: "drag",
   dirt: "drag",
   rock: "tap",
@@ -79,7 +86,9 @@ export function trayItems(little: boolean, names: readonly string[], trails = tr
         .forEach((name, colony) =>
           out.push({ tool, colony, key: `crayon-${colony}`, label: `${LABEL.crayon}, ${name}`, picture: PICTURE.crayon }),
         );
-    } else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
+    } else if (tool === "noEntry" && !trails)
+      continue; // the sign turns trail followers: no trails, nothing to turn
+    else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
   }
   return out;
 }
