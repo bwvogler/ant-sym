@@ -163,8 +163,8 @@ export interface FungusParams {
   /**
    * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
    * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
-   * paired test gives a ratio, so this is a design number. Off (1): ×2–×4 missed P1 on the progression, and ×4 with
-   * Stalks given at landing missed it further (PRD §63.13, ja-19oz; seed 9 took twice as long)
+   * paired test gives a ratio, so this is a design number. ×2 since 2026-11-15: with mass flow and the growth lane's answers,
+   * ×2 and ×4 hold P1 on seeds 1–20 and ×1 does not (seed 9 +25 %); ×2 is the faster of the two (PRD §63.13, ja-19oz)
    */
   sun: number;
   /** spores a cell holds at most */
@@ -210,7 +210,7 @@ export interface FungusParams {
 export const DEFAULT_FUNGUS: FungusParams = {
   pickup: 0.3,
   sporeDecay: 0.03,
-  sun: 1,
+  sun: 2,
   maxSpores: 6,
   grooming: 0.12,
   groomers: 4,

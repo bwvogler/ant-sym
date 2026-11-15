@@ -5333,7 +5333,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off), ×2 since 2026-11-15**: see the decisions below; at ×2 the half-life is about 12 s. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5377,6 +5377,31 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
 
 With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
+
+**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on `main` at `3c79e0fb` (after #203), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a fresh no-hyphae run on the same commit (the no-hyphae times moved since §63.14: seeds 6, 8 and 20 now never reach a quarter, seed 11 does). Seconds to a quarter of the hosts:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 217 | 358 | 227 | 156 | 178 | never | 341 | never | 334 | 261 |
+| sun ×1 | 210 | 296 | 225 | 147 | 153 | 338 | 319 | 473 | **418** | 242 |
+| sun ×2 | 210 | 337 | 225 | 147 | 144 | 375 | 319 | 474 | 213 | 242 |
+| sun ×4 | 210 | 370 | 225 | 147 | 161 | 379 | 319 | 473 | 215 | 242 |
+| sun ×1, *Stalks* at landing | 210 | 280 | 225 | 147 | 147 | 380 | 319 | 359 | 363 | 242 |
+| sun ×4, *Stalks* at landing | 210 | 370 | 225 | 147 | 161 | 378 | 319 | 473 | 212 | 242 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 435 | 253 | 207 | 18 | 382 | 485 | 234 | 315 | 299 | never |
+| sun ×1 | 458 | 238 | 182 | 18 | 290 | 530 | 230 | 266 | 242 | 402 |
+| sun ×2 | 475 | 238 | 182 | 18 | 318 | 530 | 230 | 265 | 249 | 390 |
+| sun ×4 | 473 | 238 | 182 | 18 | 335 | 530 | 230 | 269 | 233 | 419 |
+| sun ×1, *Stalks* at landing | 459 | 238 | 183 | 18 | 377 | 530 | 230 | 295 | 232 | 388 |
+| sun ×4, *Stalks* at landing | 466 | 238 | 180 | 18 | 335 | 530 | 230 | 269 | 230 | 385 |
+
+- **×1 misses P1 on this main:** seed 9 is 25 % slower than without hyphae (334 → 418 s). Every other configuration holds it on seeds 1–20. Seed 16 is the closest call in all of them (485 → 530 s, +9.3 %); it, seed 7 and seeds 1, 3, 4, 10, 12–14, 17 do not move with the sun at all.
+- **×2 over ×4:** both pass and have the same median on seeds 1–10 (233.5 s; 297.5 s without hyphae) and the same worst seed (530 s; never without hyphae). ×2 is faster on seeds 2 (337 against 370 s), 15 (318 against 335) and 20 (390 against 419), ×4 only on seeds 6 and 19 by a few seconds.
+- **With *Stalks*** the sun no longer costs more: ×4 with *Stalks* is within 4 s of plain ×4 on every seed but 20, and both pass. No run separates why; the §63.13 runs above had neither flow nor the growth answers.
+- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; at ×1 it fails. Raw runs, 2 × 20 seeds each, took about 25 min a pair. No sense, action, legend or question changed: no Jev cost change.
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
