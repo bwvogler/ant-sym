@@ -6323,7 +6323,22 @@ Merging is not delegated: PRs wait for the owner.
 - The store's floor mark is laid only by ants that have just left a store, and fades with the time since; beyond a few cells from the store there is nothing to follow, and fetchers wander.
 - Crops fill only at the store, so they share that blind spot. The limit is finding the store, not the dose or the queue.
 
+**Measured with task reversion, on main after §71's brood rule (2026-11-15, assay `larvae`, seeds 1–16).** On this main the baseline collapses on two seeds (ja-097s).
+
+| `revert` | `cropFeed` | Seeds over 8 waiting | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 (main) | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 0 | 0.5 | 3 | 61 | 0 | 27 | 49 | 12,267 |
+| 1 | 0 | 1 | 23 | 38 | 0 | 87 | 12,218 |
+| 1 | 0.5 | 2 | 20 | 0 | 0 | 149 | 12,218 |
+
+- **Crops** stop workers starving: hungry ants eat from their own crops and pass food to needier ones.
+- **Reversion** stops larvae starving: old ants come to the brood when the young are gone.
+- **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
+- Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+
 **Still open.**
+- Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).
 - How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
 - The design numbers (owner's call after the sweep).
 - Whether to retire the porters' table once crops carry the brood's food.
