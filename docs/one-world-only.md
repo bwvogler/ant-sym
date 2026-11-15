@@ -188,15 +188,15 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 
 | file | builds | what it guards | verdict | note |
 |---|---|---|---|---|
-| slow/assays.test.ts | arena (A1, A2a, A2b, A5, A5b, A9, A10 todo); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | port (the A-tests) | Point A1/A2a/A2b/A5/A5b/A9 at their `ONE_ASSAYS` twins, re-marked from one-world baselines. **A5 (0/10) and A9 (3/10) would fail today on the plane**; A1 fails seeds 5 and 9. D1–D3 are already one world, and are re-run once the desert ant has its own stance (owner, 2026-11-14) |
+| slow/assays.test.ts | O (A1, A2a, A2b, A5, A5b, A9, A10: `oneAssay`); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | **ported** (PRD §76.4) | A1, A2a, A2b, A5b held to their marks; A5, A9, A10 guarded at their worst seed + 10 % (owner) |
 | slow/chambers.test.ts | S | a crowded nest digs chambers; chambers never touch, none too shallow | port (curtain) | `int/transect` "the hole gap keeps founded royal chambers apart…" covers founding chambers only |
 | slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
 | slow/golden.test.ts | S | "side view war, seed 6" golden | re-record on one world | S2 step 3 |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
 | slow/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
-| slow/raidFind.test.ts | arena | A11, seeds 1–10 | port | `ONE_PENDING` |
-| slow/raidStop.test.ts | arena | A12, seeds 1–2 | port | `ONE_PENDING` |
+| slow/raidFind.test.ts | O (`oneAssay("raidFind")`) | A11, seeds 1–10 | **ported** (PRD §76.4) | |
+| slow/raidStop.test.ts | O (`oneAssay("raidStop")`) | A12, seeds 1–2 | **ported** (PRD §76.4) | |
 | slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | covered | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
 
 ### Golden masters
@@ -247,7 +247,7 @@ About 60 of the ports are in-nest mechanics (curtain): chambers, brood, queen, g
 For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `smallOne()` and re-deriving cells in the curtain, since the curtain runs the side view's nest code.
 
 **Assays** (20 in `ASSAYS`): covered 11 (A1, A2a, A2b, A3, A4, A5, A5b, A9, A10, G → G1, A8 → nestFlowOne); ported 8 (A11 and A12 by #210, L ×3 by #211, A6 and A6-open walked, A13 walked); delete 1 (G′).
-**Slow guards** (12 files, G1's three as one guard): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
+**Slow guards** (12 files, G1's three as one guard, and `slow/defence.test.ts` new in S2.2e): ported 3 (assays' A-tests, raidFind, raidStop; PRD §76.4); port 2 (chambers, economy); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
 
 **Riskiest: a PRD baseline and no one-world coverage**
 1. **A13 `defendHome`** (§54.3): in neither `ONE_ASSAYS` nor `ONE_PENDING`, so it is easy to drop by accident. Its `broadcast` control uses `stanceGate: 0`, which S2 deletes, so the score needs redefining, not only porting. Its war party is a broadcast raider in every arm: it marches at the colony's hole only through the colony `stance` field (`steer.ts:425`), so it needs a new way to attack: the harness walks it there (owner, 2026-11-14, review of #184 D2).
