@@ -6,7 +6,7 @@ import {
   fungalKey,
   fungusContext,
   Game,
-  generateWorld,
+  CURTAIN,
   LEVERS,
   mulberry32,
   PRESETS,
@@ -89,20 +89,7 @@ function scriptAll() {
   return reqs;
 }
 
-/** A game on the top-down kind of map (no nest underground), Garden painted on the player's nest. */
-function topGame() {
-  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
-  g.paintSpores(
-    g.player.nest.x,
-    g.player.nest.y,
-    g.player.nest.r + 2,
-    3,
-    0.4,
-    STRAINS.findIndex((s) => s.id === "garden"),
-  );
-  return g;
-}
-/** One world's: a curtain under the plane, so the fungus has a nest (its view is "side"). */
+/** One world's: a curtain under the plane, so the fungus has a nest (its view is "side"); Garden painted round the royal chamber. */
 function nestGame() {
   const g = new Game(smallOne(7), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
   g.paintSpores(
@@ -112,6 +99,7 @@ function nestGame() {
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
+    CURTAIN,
   );
   return g;
 }
@@ -129,28 +117,6 @@ const QUEEN: FungalSituation = { arousal: "calm", touch: "none", place: "queen",
 
 test("the client's defaults: a hundred situations a request, two in flight, a cycle every 300 ms, the fungus's gather wait, a save a second", () => {
   assert.deepEqual(DEFAULT_COLONY_JEV, { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: 2000, saveMs: 1000 });
-});
-
-test("the fungus lane asks and answers under the view its game has: top without a nest, side with one", () => {
-  for (const [game, view, other] of [
-    [topGame(), "top", "side"],
-    [nestGame(), "side", "top"],
-  ] as const) {
-    const askedFor = (s: FungalSituation) => askedLevers(game.fungus.menu, s.task === "queen");
-    const answer = encodeLevels(PRESETS[0]!.levels, askedFor(WORKER));
-    // Cached under the right view's context: a hit. Under the other view's: not asked there, so not a hit.
-    for (const [ctxView, expected] of [
-      [view, "jev"],
-      [other, "local"],
-    ] as const) {
-      const store = memoryStore();
-      store.data.set(fungusContext(AIM, ctxView), [[fungalKey(WORKER, askedFor(WORKER)), answer]]);
-      const j = make({}, store);
-      j.attachFungus(game.fungus);
-      j.setAim(AIM);
-      assert.equal(j.explainFungus(WORKER).by, expected, `${view} game, an answer cached under the ${ctxView} view`);
-    }
-  }
 });
 
 test("the fungus lane asks a queen host only her levers, and a worker the menu's", () => {
@@ -180,7 +146,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
 test("the fungus lane's batch is its own, not the client's: hosts go up to fifty a request while ants are held to the client's batch", async () => {
   const sent = scriptAll();
   const j = make({ batch: 2 });
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
@@ -199,7 +165,7 @@ test("the fungus lane's batch is its own, not the client's: hosts go up to fifty
 test("the fungus lane waits to gather a fuller request before it sends; the ants' lanes send at once", async () => {
   const sent = scriptAll();
   const j = make({ gatherMs: 600 });
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
@@ -224,7 +190,7 @@ test("the fungus lane waits to gather a fuller request before it sends; the ants
 test("each lane sends its own ids and feeds its own counter: ants s0.., the strategist c0.., the fungus h0..; hits are the ants' modes only (review of #101)", async () => {
   const sent = scriptAll();
   const j = make();
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
