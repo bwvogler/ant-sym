@@ -5,7 +5,6 @@ import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { CRUST, generateOneWorld } from "../../oneWorld.ts";
-import { generateSideWorld } from "../../world.ts";
 import { gridsFromLiving, hashGame } from "../saveHash.ts";
 import { DT, run } from "../builders.ts";
 
@@ -119,11 +118,7 @@ for (const [what, mutate, why] of refused)
     assert.match(outcome(s).error ?? "loaded", why);
   });
 
-test("one world: a save into the wrong kind of game, or another world, is refused", () => {
-  const side = new Game(generateSideWorld(7), { antCount: 20, rivalAnts: 20 }, gameRng(7));
-  assert.throws(() => side.load(copy(saved)), /a one-world save, and this game is on one map/);
-  const sideSave = copy(side.save());
-  assert.throws(() => small().load(sideSave), /a save of a game on one map, and this game is one world/);
+test("one world: a save of another world is refused", () => {
   assert.throws(() => small(8).load(copy(saved)), /another world \(seed 7/, "another seed");
   assert.throws(() => small(7, 176).load(copy(saved)), /another world/, "another plane size");
 });

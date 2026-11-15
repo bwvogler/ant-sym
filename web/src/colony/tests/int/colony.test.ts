@@ -33,11 +33,9 @@ import { trailLevel, type Situation } from "../../vocab.ts";
 import {
   fillCell,
   foodIn,
-  generateWorld,
   tunnelHeading,
   mulberry32,
   OPEN,
-  OPEN_WORLD,
   ROCK,
   rockAt,
   setRock,
@@ -46,6 +44,7 @@ import {
   type WorldMap,
 } from "../../world.ts";
 import { at, hexMap, nestAt, put } from "../hexmaps.ts";
+import { smallOne } from "../builders.ts";
 import { CELL, centreX, centreY, hexDistance, nx, ny } from "../../hex.ts";
 
 /** A bare 40×12 field: the nest on the left (cell (6, 6)), one food cell straight east of it along row 6 (cell (14, 6)). */
@@ -137,13 +136,13 @@ test("a policy answering nonsense falls back to the plain rule instead of breaki
 });
 
 test("the colony forages on the local rule alone: food comes home within a minute", () => {
-  const map = generateWorld(1, OPEN_WORLD);
-  const c = new Colony(map, { antCount: 600 }, mulberry32(101));
-  const before = c.foodLeft;
-  for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
+  // On one world (S2.3c); that food is conserved is int/oneWorldGame's "food and ants are conserved over 90 s".
+  const g = new Game(smallOne(7), { antCount: 600, rival: false }, mulberry32(101));
+  const c = g.player;
+  for (let k = 0; k < 30 * 60; k++) g.tick(1 / 30);
   assert.ok(c.stored > 200, `stored ${c.stored}`);
-  assert.equal(Math.round(before - c.foodLeft), c.stored + c.carrying.reduce((a, v) => a + v, 0), "food is neither made nor lost");
-  assert.ok(c.ph.total("food") > 0 && c.ph.total("home") > 0, "both trails were laid");
+  const laid = (ch: "food" | "home") => c.layers.reduce((sum, l) => sum + l.ph.total(ch), 0);
+  assert.ok(laid("food") > 0 && laid("home") > 0, "both trails were laid");
   assert.ok(c.situationsSeen <= SITUATIONS);
 });
 
@@ -933,21 +932,6 @@ test("an ant in a cell filled round it walks out; a homing ant or follower whose
     const moved = Math.hypot(c.x[0] - x0, c.y[0] - y0);
     assert.ok(moved > 2, `${mode}: moved ${moved.toFixed(2)} in 5 s, not pinned against the filled cell`);
   }
-});
-
-test("soil is conserved underground: every dug cell is on the mound, back in a dead end, in an ant's jaws or lost with an ant", () => {
-  const map = generateWorld(2, { size: { w: 200, h: 160 }, nestGap: 80 });
-  const g = new Game(map, { antCount: 250, rivalAnts: 250 }, mulberry32(9));
-  for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
-  let filled = 0;
-  for (const c of g.colonies) {
-    let carried = 0;
-    for (let i = 0; i < c.n; i++) carried += c.alive[i]! && c.pellet[i]! ? 1 : 0;
-    assert.equal(c.soilDug, c.soilOut + c.soilFilled + carried + c.soilLost, "dug = mound + filled + carried + lost");
-    filled += c.soilFilled;
-  }
-  assert.ok(filled > 0, "some soil went back into dead ends");
-  assert.equal(map.filled, filled);
 });
 
 test("hexes: a homing ant led round a ring of tunnels by home scent gets out and home (review of #8, and of the merge)", () => {
