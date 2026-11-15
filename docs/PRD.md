@@ -7066,4 +7066,22 @@ The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete
 - ja-ukac.4: floor loads.
 - ja-rvli closes when the gate in ja-ukac.4 passes, or when the ablation shows reach alone is enough.
 
-**Still open.** Whether reach alone ends `ja-rvli`; `LEG` and `PICK_LOAD`; how harvesters feed larvae from the seed chambers.
+**The pick-up reach ablation (ja-ukac.2, ja-ukac.3; 2026-11-15; `assays.yml` at `913fe30`, `colony.portReach` 0 / 4 / 8, `revert` 1, `cropFeed` 0).** [`larvae` seeds 1–32](https://github.com/bwvogler/ant-sym/actions/runs/43763124965), then [one-world `regulate`, `game1` and `nestFlow`, seeds 1–20](https://github.com/bwvogler/ant-sym/actions/runs/43763128118):
+
+| `portReach` (cells) | `larvae`: seeds over 8 waiting | worst | workers starved (most in a seed) | fewest workers | carries started a minute (median) | ants an idle carrier's reach covers |
+|---|---|---|---|---|---|---|
+| 0 (2, today) | 1 (22) | 10 | 17 | 125 | 31 | 1.05 |
+| 4 | 2 (4, 31) | 15 | 0 | 128 | 50 | 3.06 |
+| 8 | **0** | **8** | **0** | **151** | **62** | 8.5 |
+
+| `portReach` | A5 worst ratio (guard 2.91) | A5 food stored (median) | G1 passing | `nestFlow`: most larvae waiting beside food | `nestFlow` reception's largest pile (median) |
+|---|---|---|---|---|---|
+| 0 | 2.65 | 1,382 | 10/20 | 2 | 435 |
+| 4 | 2.55 | 1,090 | 14/20 | 9 (seed 6) | 210 |
+| 8 | 2.57 | 1,342 | 17/20 | **61 (seed 2)**, 8 (seeds 3, 12) | 10 |
+
+- **Pick-up supply is the limit, confirmed.** Doubling the carries started a minute (31 → 62) clears `larvae` on all 32 seeds, with no worker or larva starved: reach 8 meets `ja-rvli`'s bound there.
+- **Reach alone is not a clean fix.** On the 600-ant `nestFlow` game (900 s) the larvae waiting beside food rise from 2 to 61 on seed 2 at reach 8, and from 2 to 9 on seed 6 at reach 4. Reception drains almost completely (435 → 10) and foragers stop handing food on (`handedOn` median 163 → 0): food leaves reception for the stores faster than the brood chambers get it. A5 is not worse by the worst seed, and the one-world game improves (10/20 → 17/20).
+- **What it says for M2.** A longer reach starts more carries, but they carry to wherever `wanted` names, and the destinations still go through the chamber table. Relay's job is to put the food where the brood is, which the reach cannot do. The ablation is not the mechanic; it is its ceiling.
+
+**Still open.** `LEG` and `PICK_LOAD`; how harvesters feed larvae from the seed chambers; why reach 8 fails `nestFlow` seed 2 (not traced); whether a reach between 4 and 8, or reach with a cap on food drawn to stores, ends `ja-rvli` without it.
