@@ -6,6 +6,7 @@ import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf } from "../../hex.ts";
 import { OPEN, rockAt } from "../../world.ts";
 import { DT, curtainHole, planeHole, smallOne } from "../builders.ts";
+import { fromHomePlane, piSpanOf } from "../../homing.ts";
 
 // One world U3b (ja-lp4.3.2; docs/one-world.md §4, docs/nest-and-home.md §3.1): on the plane a homing ant steers by its own
 // drifting home vector, started afresh up out of its own hole, and searches in widening loops where it ran out. A small
@@ -18,8 +19,8 @@ const OLD = 0.5 * LIFESPAN;
 const NEST_SIGHT = 8;
 
 /** A game of few ants, every founder young (they stay in) but the one each test moves. */
-const game = (seed = 7): Game => {
-  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+const game = (seed = 7, colony: Partial<Colony["params"]> = {}): Game => {
+  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed), { colony });
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
   return g;
 };
@@ -91,6 +92,46 @@ test("plane: the vector starts afresh up out of its own hole, with both drifts d
   for (let k = 0; k < Math.round(1 / DT) && c.layer[0] === PLANE; k++) g.tick(DT);
   assert.equal(c.mode[0], RETURN);
   assert.equal(c.odoSurf[0], out, "not counted on the way home");
+});
+
+test("plane, piErrorLaw 1 (ja-lp4.19): the reach out starts afresh at its own hole, is the farthest it has walked out, and sets the error", () => {
+  const g = game(7, { piErrorLaw: 1 });
+  const c = g.player;
+  const h = c.holeCells[c.params.nest] as HoleCell;
+  const hole = c.layers[PLANE]!.nest; // the plane's nest point, where the reach is measured from
+  c.reachSurf[0] = 80;
+  climbOut(g, c, 0, h);
+  assert.equal(c.reachSurf[0], 0, "afresh");
+  let far = 0;
+  for (let k = 0; k < Math.round(4 / DT); k++) {
+    g.tick(DT);
+    if (c.mode[0] !== RETURN) far = Math.max(far, Math.hypot(c.x[0] - hole.x, c.y[0] - hole.y));
+  }
+  assert.ok(far > 5, `it walked out (${far.toFixed(1)})`);
+  assert.ok(Math.abs(c.reachSurf[0] - far) < 1e-3 * far, `reach ${c.reachSurf[0]} = farthest out ${far.toFixed(2)}`);
+  assert.ok(c.odoSurf[0] > c.reachSurf[0], "the odometer counts the path, more than the reach");
+  // Walking about nearer home than it has been adds nothing: the reach stands while the odometer runs on.
+  c.reachSurf[0] = 60;
+  const odo = c.odoSurf[0];
+  c.mode[0] = EXPLORE;
+  for (let k = 0; k < Math.round(1 / DT); k++) g.tick(DT);
+  assert.ok(Math.hypot(c.x[0] - hole.x, c.y[0] - hole.y) < 60, "still within 60 of its hole");
+  assert.equal(c.reachSurf[0], 60, "the reach stands");
+  assert.ok(c.odoSurf[0] > odo, "the odometer ran on");
+  // Its belief of home is the hole plus the span × its drift: law 1's span is by the reach, not the odometer.
+  const span = piSpanOf(1, c.params.piErrorAt, c.odoSurf[0], c.reachSurf[0]);
+  const bx = c.nest.x + span * c.driftSurf[0];
+  const by = c.nest.y + span * c.driftSurfY[0];
+  assert.ok(Math.abs(fromHomePlane(c, 0) - Math.hypot(c.x[0] - bx, c.y[0] - by)) < 1e-6, "its believed distance home is by the span");
+});
+
+test("plane, piErrorLaw 0: the reach is never counted (today's vector, bit for bit)", () => {
+  const g = game();
+  const c = g.player;
+  climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
+  for (let k = 0; k < Math.round(3 / DT); k++) g.tick(DT);
+  assert.ok(c.odoSurf[0] > 5);
+  assert.equal(c.reachSurf[0], 0);
 });
 
 test("plane: coming up a rival's hole leaves the vector as it was", () => {
