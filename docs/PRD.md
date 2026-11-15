@@ -5511,6 +5511,11 @@ Tier 1 for the species (wide tolerance, its words, the generic schema) and tier 
 - **Second reading** (`ja-e668.1`, 2026-11-15): Pull & Cremer 2017 read in full (*L. niger* queens bite, bury or remove a dead co-foundress; biting or burying cut the odds of dying about sevenfold); Tragust et al. 2013 through the authors' deposited data (poison: 1.3 % of conidia germinate against 97 %; on exposed pupae 10.8 % with workers against 48.2 % without). Ugelvig & Cremer 2007 and Stroeymeyt et al. 2018 stay abstract-only: no copy the session reaches (an open Stroeymeyt copy sits on `iris.unil.ch`, not on the allowlist). No account of *L. neglectus* workers handling adult corpses was found.
 - **N1's target, revised:** the game's fungus never kills a worker by itself, so Konrad's deaths have no counterpart; N1 measures the spread instead (about two-thirds of nestmates with a low load by days 3–5, loads 8–12 times lower than the exposed ant's) and the resistance groomers gain.
 
+- **Assays, landed before the species** (`ja-e668.2`, 2026-11-15; `neglectusAssays.ts`, one world, the generic ant, local rule; `npm run exp -- n1 n3 --one --seeds 1-10`):
+  - **N1 immunisation** (one worker inside the nest dosed 0.8 with Bloom at 20 s, read 120 s later; pass: nestmates carrying ≥ `INFECTED` 40–85 % and the exposed ant's load *at the reading* ≥ 8× their median, as Konrad compared them on the same days; review of #228 S2): **0/10**. Carriers median 100 % (least 95 %), median load 0.46 (0.36–0.57); the exposed ant's load then is only 0.84× it (0.60–1.24): grooming has brought it down to its nestmates' level. Against the dose, 1.75× (1.41–2.21), reported as `doseRatio`. Mean resistance 0.20. Contact passes the fungus freely and fixed-rate grooming doesn't thin it: the gap `ja-e668.4` closes.
+  - **N3 graded tolerance** (owner, review of #228 D1: classed over **repeated trials**, as Ugelvig's pairs were). Two colonies of 60; the first at odour 0.25 (a recognition band's centre: odour is read in 10 bands), the second 0, 0.1, … 0.7 from it; each distance plays 5 trials, one per world (seeds 1–40: seeds 1–8 the distances on world 1, 9–16 on world 2, …), 240 s each. A trial counts only if the colonies met for 5 ant-seconds or more (on world 3 they barely meet); a distance is **never** aggressive if no such trial had a fight death, **always** if every one did, **mixed** otherwise. Today: 0–0.3 never, 0.4, 0.5 and 0.7 always, 0.6 mixed (one 8-ant-second meeting without a fight): **4 never, 3 always, 1 mixed** (50 / 38 / 12 %) against 14 / 19 / 67 %. The one mixed distance is the floor's doing, not graded behaviour: at a 3 ant-second floor two read mixed, at 8 none (review of #228); a trial that fought counts however short its meeting (S3). Recognition is a step at the tolerance: `ja-e668.10` makes it graded, and should be read at more than one floor (3, 5, 8). The slow N3 test is skipped until then (40 games, 7–12 minutes).
+  - **N2** (destructive disinfection) and **N4** (budding) have no assay yet: the game's brood carries no fungus and no colony buds. Each lands with its mechanic (`ja-e668.5`, `ja-e668.6`); `tests/slow/neglectus.test.ts` holds all four as todos, and `tests/soak/neglectusAssays.test.ts` guards that N1 and N3 measure what they say.
+
 ### 64.3 Leafcutter (`ja-vq14`; [leafcutter.md](leafcutter.md))
 
 A caste field (minim, media, major) in its own schema and a size array (`.3`, on `ja-fnd.5.10`), the garden as a chamber role (`.4`, on `ja-fnd.5.5`), one-way waste workers and waste-odour rejection (`.5`), exposed brood to the dump (`.6`), plant learning with food kinds (`.7`, late). Stridulation (`.8`) waits on the owner: its function is contested. Assays L1 division of labour by size, L2 one-way waste work (Brown et al. 2006), L3 brood removal by 36 h (Armitage et al. 2016), L4 the garden fed (`.2`).
@@ -5773,7 +5778,33 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 
 **What it changes in play.** Nothing on the page yet: the page doesn't ask the response lanes, so they play the local rule (ja-m7rr's note). The change shows in live checks and their replays, and on the page once a response lane is asked there.
 
-**Cost.** None per hour: no legend, question or schema changed. To measure it, a live check of the six lanes on the top-down map (`colony-live.mjs get,carry,drop,trail,contact,leave --top`, 62 situations per doctrine) is estimated at 86k input tokens, about $0.0036 for the three doctrines.
+**Cost.** None per hour: no legend, question or schema changed.
+
+**Measured** (2026-11-15). The six lanes were asked live under version 12 for each doctrine: top-down map, seed 1, 600 + 600 ants, 300 s, then a second round (`--from`) for the situations the replay met that the first round lacked. That cost $0.0036 in all, and the caches are `experiments/caches/draw-top-<doctrine>.json`. Jev mostly answers with odds, not a certain choice. Situations whose top answer is under 0.9:
+
+| Lane (situations) | Forage | Cautious | Warlike |
+|---|---|---|---|
+| trail (21) | 15 | 17 | 20 |
+| contact (35 / 26 / 34) | 21 | 12 | 25 |
+| leave (10) | 9 | 7 | 7 |
+| carry (9) | 1 | 4 | 5 |
+| get (5) | 3 | 3 | 5 |
+| drop (2) | 2 | 2 | 2 |
+
+The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an exploring ant meeting a stranger with even or better odds mostly fights (0.50–0.94 by alarm), where the local rule flees. Several trail answers are near even, for example "none" 0.52 against "home" 0.48.
+
+**Replayed** (free; `assays.yml` with `policy`, [runs 43721252762](https://github.com/bwvogler/ant-sym/actions/runs/43721252762), [43721255686](https://github.com/bwvogler/ant-sym/actions/runs/43721255686), [43721258448](https://github.com/bwvogler/ant-sym/actions/runs/43721258448)). `gameTop`, seeds 1–10, 600 s. The first colony plays the cache's response answers, either drawn (`sampleTemp` 1) or Jev's top answer (`sampleTemp` 0). Its mode is the local rule, since the caches hold no mode answers. Drawn ÷ top per seed: the median, the worst and best seeds, and how many seeds came out higher:
+
+| Doctrine | Food stored | Losses (own) | Losses (rival) |
+|---|---|---|---|
+| Forage | 0.99 (0.82–1.23), 5/10 | 1.03 (0.90–1.63), 6/10 | 1.00 (0.82–1.71), 5/10 |
+| Cautious | 1.03 (0.97–1.08), 8/10 | **0.81 (0.54–0.99), 0/10** | **0.82 (0.51–0.95), 0/10** |
+| Warlike | 1.00 (0.83–1.11), 5/10 | 0.89 (0.48–1.44), 3/10 | 0.88 (0.57–1.50), 1/10 |
+
+- Food doesn't move under any doctrine: medians 0.99–1.03, with the spread of any change to play.
+- Under Cautious, drawing costs fewer ants on both sides in every seed (−19 % and −18 % at the median). With odds kept, some ants act on the less likely contact answer instead of every ant doing the same, and fewer fights follow.
+- Under Warlike the losses lean the same way (0.89 and 0.88) but swing by seed. The Warlike cache also lacks some situations the 600 s games reach: the local rule played 21 % of contact lookups in the top arm and 43 % of get lookups in the drawn arm (review of #239). So this row is the weakest of the three. Forage and Cautious stay under 5 % in every lane. Under Forage nothing moves.
+- Unlike the mode draws (§68), drawing the responses costs no food.
 
 ## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
 

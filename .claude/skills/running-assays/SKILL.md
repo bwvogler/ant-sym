@@ -11,7 +11,8 @@ description: "Runs jev-ants behaviour assays (npm run exp, scripts/experiment.mj
 
 | The run | Where |
 |---|---|
-| One seed, a quick look, `--log` journals, `--policy cache:` replays | here: `npm run exp -- <assay> --seeds 1` (seconds to minutes) |
+| One seed, a quick look, `--log` journals | here: `npm run exp -- <assay> --seeds 1` (seconds to minutes) |
+| A `--policy cache:` replay over many seeds | GitHub, with `policy` (the cache must be committed under `experiments/caches/`) |
 | 10+ seeds of a whole game (`game`, `game1`, `--one`), a `--set` sweep, a bisect over commits | GitHub: `assays.yml` |
 | Something in between | here if under ~5 minutes; else GitHub |
 
@@ -26,6 +27,7 @@ Several GitHub runs can go at once (one per setting or commit): each is its own 
    - `seeds`: `"1-10"`, `"11-20"` or `"1-5,11"` (1-40 seeds)
    - `set`: space-separated `path=v1,v2` overrides, e.g. `"colony.routeStep=3,4 colony.routeSee=3"` (their cross product runs on each runner)
    - `seconds`, `species`: optional
+   - `policy`: a cache committed under `experiments/caches/`, e.g. `"experiments/caches/draw-top-forage.json"` (`--policy cache:`; Jev's saved answers for the first colony, no spend)
 3. **Find the run**: `mcp__github__actions_list` (`list_workflow_runs`, `resource_id: assays.yml`, `workflow_runs_filter.branch`); the newest with `event: workflow_dispatch` is yours. It doesn't wake the session: set a `send_later` check-in for about the slowest seed's time plus 5 minutes (G1: ~15), and don't poll.
 4. **Read it**: `list_workflow_jobs` on the run, then `get_job_logs` on the `report` job (whole, not `tail_lines`: the table sits before the upload and clean-up lines). The table is markdown: `## <assay>`, then per setting `pass n/N (failing seeds: …)` and median, min and max per metric. A seed whose runner failed is named in an `::error` there, and its own `seed <n>` job has the cause.
 5. **Per-seed figures**: the `assays` artifact (`assays.json`, every run's metrics), via `list_workflow_run_artifacts` and `download_workflow_run_artifact`, then `curl` the URL it gives (the session's network allows `*.blob.core.windows.net`) and `unzip`.
