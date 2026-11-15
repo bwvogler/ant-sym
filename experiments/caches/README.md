@@ -19,3 +19,6 @@ The MR 3.1 caches no longer replay after MR 3 (asked under response version 4), 
 | `stance-top-forage.json`, `stance-top-cautious.json`, `stance-top-warlike.json` | 2026-11-08, stance from senses (ja-k4k.6, ja-d8e), each doctrine, top-down (`--top`), seed 1, 600 + 600, 300 s: every lane; the leave lane with `crowd` and the "raid" answer, each ant's own stance; re-asked after the review of #53 under the caution sentence; $0.0066 | 7 / 4 / 10 | until the next colony or response version | PRD §54: `npm run exp -- gameTop --seeds 1-6 --policy cache:experiments/caches/stance-top-forage.json` |
 
 The mr52 caches no longer replay after the stance MR (colony version 7, response version 10).
+| `draw-top-forage.json`, `draw-top-cautious.json`, `draw-top-warlike.json` | 2026-11-15, the response lanes drawn (ja-m7rr, #223), each doctrine, top-down (`--top`), seed 1, 600 + 600, 300 s: the six response lanes only (no mode or stance answers: those play the local rule), kept with Jev's probabilities, with a second round (`--from`); $0.0036 | 7 / 4 / 12 | until the next colony, stance or response version | PRD §68.1: `npm run exp -- gameTop --seeds 1-10 --set colony.sampleTemp=0,1 --policy cache:experiments/caches/draw-top-forage.json` |
+
+The stance-top caches no longer replay after #223 (response version 12: answers kept with Jev's probabilities).
