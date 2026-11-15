@@ -8,7 +8,7 @@ import { check, fixture, record, type Scenario } from "../goldens.ts";
 // golden.json. Re-record (only for an intended behaviour change, said in the PR):
 // GOLDEN_WRITE=1 node --test web/src/colony/tests/golden/oneWorldGolden.test.ts (it fails after writing; run again without it)
 
-const SCENARIOS: Scenario[] = [{ name: "one world, seed 7", view: "one", seed: 7, ants: 150, seconds: 90, alarmAt: [30] }];
+const SCENARIOS: Scenario[] = [{ name: "one world, seed 7", seed: 7, ants: 150, seconds: 90, alarmAt: [30] }];
 
 const golden = fixture(new URL("./oneWorldGolden.json", import.meta.url), SCENARIOS);
 

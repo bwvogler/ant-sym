@@ -7,8 +7,8 @@ import { NO_ENTRY_PAINTED } from "../../params.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, R } from "../../hex.ts";
 import { CURTAIN, FAINT, PLANE } from "../../vocab.ts";
-import { generateSideWorld, mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, takeFoodCell, type WorldMap } from "../../world.ts";
-import { SMALL_SIDE, smallOne } from "../builders.ts";
+import { mulberry32, OPEN, qualityAt, ROCK, rockAt, SOIL, takeFoodCell, type WorldMap } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 
 // The builder (docs/builder.md, PRD §73, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
@@ -341,27 +341,6 @@ test("a rock ring round a hole leaves every open cell within BUILD.holeGuard of 
   }
 });
 
-test("on one map (the scripts' and assays' side view) the nest and its entrance are guarded too (review of #204, N3, N4)", () => {
-  const g = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 5, rival: false }, mulberry32(1));
-  const b = new Builder(g);
-  const map = g.layers[0] as WorldMap;
-  const e = g.colonies[0]!.nest.entrance!;
-  cellOf(e.x, e.y);
-  const [ex, ey] = [CELL[0], CELL[1]];
-  const was = rockAt(map, ex, ey);
-  b.apply({ tool: "dirt", layer: 0, points: [e] });
-  assert.equal(rockAt(map, ex, ey), was, "the entrance is left as it was");
-  assert.ok(guarded(g, 0).has(key(ex, ey)));
-  // And the nest itself, every cell within holeGuard of its centre (review of #204, N4).
-  const n = g.colonies[0]!.nest;
-  const guard = guarded(g, 0);
-  cellOf(n.x, n.y);
-  const [nx, ny] = [CELL[0], CELL[1]];
-  for (let y = ny - 3; y <= ny + 3; y++)
-    for (let x = nx - 3; x <= nx + 3; x++)
-      if (Math.hypot(centreX(x, y) - n.x, centreY(y) - n.y) <= BUILD.holeGuard) assert.ok(guard.has(key(x, y)), `nest cell ${x},${y}`);
-});
-
 test("builder food counts in the map's total, so a share of it stays a share; undo takes it back off (review of #204, S4)", () => {
   const g = game(1);
   const b = new Builder(g);
@@ -485,7 +464,7 @@ test("tweezers: the belief the ant steers by is the hole, its drift and the carr
   assert.equal(c.carriedY[i], 0);
 });
 
-test("tweezers refuse rock, an ant underground, and a game on one map", () => {
+test("tweezers refuse rock and an ant underground", () => {
   const g = game(30);
   const b = new Builder(g);
   const c = g.colonies[0]!;
@@ -495,8 +474,6 @@ test("tweezers refuse rock, an ant underground, and a game on one map", () => {
   const u = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === CURTAIN)!;
   const [x, y] = find(g, PLANE, OPEN);
   assert.equal(b.moveAnt(0, u, pt(x, y).x, pt(x, y).y), false, "not an ant underground");
-  const side = new Game(generateSideWorld(2, SMALL_SIDE), { antCount: 5, rival: false }, mulberry32(1));
-  assert.equal(new Builder(side).moveAnt(0, 0, 10, 10), false, "one world only");
 });
 
 test("the no-entry paint lays every colony's 'no entry', topped up as it fades, and undo takes it off", () => {

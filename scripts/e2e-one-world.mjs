@@ -3,7 +3,7 @@
 // like the bench: `npm run e2e` (not part of `npm test`, which has no browser). It uses the `playwright` already on the
 // machine (no install, no dependency) and starts the dev server on a free port with no Jev key, so it spends nothing.
 //
-// Usage: npm run e2e   (E2E_SHOTS=<dir> saves screenshots; no other options)
+// Usage: npm run e2e   (E2E_SHOTS=<dir> saves screenshots, E2E_TRACE=<dir> Playwright traces; no other options)
 //
 //  1. a one-world game, seed fixed (Start: the page plays one world only): it opens above;
 //  2. above, below, above mid-game: each view keeps its own camera;
@@ -40,13 +40,18 @@
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
 //  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair (by
 //     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
-//     paused (off while playing); each tab; l closes it.
+//     paused (off while playing); each tab; the aim's "?" opens the Policy tab at its section (§69.8), and the Codex
+//     keeps only the guide and the nest; l closes it.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
+// On a failure every open page is shot (to E2E_SHOTS, or a temp folder the failure names), and with E2E_TRACE set each open
+// context's Playwright trace is saved there (`npx playwright show-trace <file>`). In GitHub Actions the failure is also one
+// ::error line naming the step and the last check that passed (.github/workflows/e2e.yml, ja-w7ef.8).
 
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
@@ -69,6 +74,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WEB = join(ROOT, "web");
 const SEED = 3;
 const SHOTS = process.env.E2E_SHOTS ?? null;
+const TRACE = process.env.E2E_TRACE ?? null;
 const t0 = Date.now();
 
 const freePort = () =>
@@ -94,8 +100,17 @@ async function until(fn, what, ms = 10_000, every = 100) {
   }
 }
 
+/** The step running and the last check that passed: named with a failure. */
+let step = "starting";
+let lastOk = null;
+function section(name) {
+  step = name;
+  console.log(name);
+}
+
 function check(ok, what) {
   if (!ok) throw new Error(what);
+  lastOk = what;
   console.log(`  ok  ${what}`);
 }
 
@@ -152,6 +167,30 @@ const stop = async () => {
 };
 process.on("SIGINT", () => void stop().then(() => process.exit(130)));
 
+/** A screenshot of every page still open, and with E2E_TRACE each open context's trace: where a failure left the game. */
+async function saveFailure() {
+  if (!browser) return;
+  const dir = SHOTS ?? join(tmpdir(), `e2e-one-world-${process.pid}`);
+  mkdirSync(dir, { recursive: true });
+  for (const [i, c] of browser.contexts().entries()) {
+    for (const [j, p] of c.pages().entries()) {
+      const path = join(dir, `failed-${i + 1}-${j + 1}.png`);
+      await p.screenshot({ path, timeout: 5000 }).then(
+        () => console.error(`  saved ${path} (${p.url()})`),
+        (err) => console.error(`  no screenshot of ${p.url()}: ${err}`),
+      );
+    }
+    if (TRACE) {
+      mkdirSync(TRACE, { recursive: true });
+      const path = join(TRACE, `failed-${i + 1}.zip`);
+      await c.tracing.stop({ path }).then(
+        () => console.error(`  saved ${path}`),
+        (err) => console.error(`  no trace of context ${i + 1}: ${err}`),
+      );
+    }
+  }
+}
+
 try {
   await until(
     async () => {
@@ -167,6 +206,15 @@ try {
   console.log(`dev server on ${url} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 
   browser = await chromium.launch();
+  if (TRACE) {
+    // Every context records a trace from its start; a failure saves those still open (the catch below).
+    const newContext = browser.newContext.bind(browser);
+    browser.newContext = async (options) => {
+      const c = await newContext(options);
+      await c.tracing.start({ screenshots: true, snapshots: true });
+      return c;
+    };
+  }
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 1,
@@ -183,7 +231,7 @@ try {
   };
 
   // ——— 1. A one-world game, seed fixed: it opens above ———
-  console.log("1. a one-world game");
+  section("1. a one-world game");
   await page.getByLabel("world seed").fill(String(SEED));
   // The seed chooses the colony the fungus lands by (PRD §65): seed 3 of two colonies lands by the second, Amber.
   check(
@@ -201,7 +249,7 @@ try {
   await sleep(1500); // mid-game
 
   // ——— 2. Above, below, above: each view keeps its camera ———
-  console.log("2. each view keeps its camera");
+  section("2. each view keeps its camera");
   const cam = (v) => page.evaluate((v) => window.jevAnts.camera(v), v);
   const view = () => page.evaluate(() => window.jevAnts.view());
   const keys = async (...ks) => {
@@ -271,7 +319,7 @@ try {
   await until(async () => (await view()) === "above", "above");
 
   // ——— 3. Linked clicks ———
-  console.log("3. linked clicks");
+  section("3. linked clicks");
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await keys("Digit0"); // the whole plane: the line in view
   const whole = await steadyCam("above");
@@ -377,7 +425,7 @@ try {
   );
 
   // ——— 4. An ant followed through a hole carries the camera across ———
-  console.log("4. follow an ant through a hole");
+  section("4. follow an ant through a hole");
   // No waiting on chance: with the page paused, the dev hook rehearses on a copy of the game which curtain ant comes up
   // next (no sooner than LEAD steps on) and on which fixed step (rehearse.ts: a save reloads bit-exact), steps the game
   // itself to LEAD steps before that, and the guard follows that ant from below while the page steps the game one fixed
@@ -491,7 +539,7 @@ try {
   );
 
   // ——— 5. The queen's pen: a click on the top view ———
-  console.log("5. the queen's pen");
+  section("5. the queen's pen");
   await page.getByRole("button", { name: "below", exact: true }).click(); // the pen must bring the top view back
   await until(async () => (await view()) === "below", "below");
   await page.getByRole("button", { name: "Play", exact: true }).click();
@@ -663,7 +711,7 @@ try {
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
   // ——— 5b. The aim bar (PRD §69.2): on a wide screen the aim is a bar under the map, and only there ———
-  console.log("5b. the aim bar");
+  section("5b. the aim bar");
   {
     const aims = page.getByRole("textbox", { name: "aim", exact: true });
     const shown = () => aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
@@ -712,7 +760,7 @@ try {
   }
 
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
-  console.log("6. the Mutations drawer's tooltips");
+  section("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
   const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
   const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
@@ -820,7 +868,7 @@ try {
   await touch.close();
 
   // ——— 7. The first game's tutorial ———
-  console.log("7. the tutorial");
+  section("7. the tutorial");
   const tctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 1,
@@ -933,7 +981,7 @@ try {
   await tctx.close();
 
   // ——— 8. The desert ant (ja-rf5) ———
-  console.log("8. the desert ant");
+  section("8. the desert ant");
   const dctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 1,
@@ -1006,7 +1054,7 @@ try {
   // The dev server here has no key, so elsewhere the aim is locked and can't take focus. This page is told a key is
   // set, and every other API call is left unanswered: nothing reaches Jev and nothing is spent, and the page's own start
   // stays on the wire, which keeps the aim open (a failed start would lock it, policyLock.ts).
-  console.log("9. the aim bar's keys");
+  section("9. the aim bar's keys");
   const kctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   await kctx.route("**/api/health", (r) => r.fulfill({ json: { ok: true, hasKey: true } }));
   await kctx.route(/\/api\/(?!health)/, () => {}); // never answered
@@ -1033,7 +1081,7 @@ try {
   await kctx.close();
 
   // ——— 10. The palette, the page's keys, the shortcuts sheet and the lens (PRD §69.3) ———
-  console.log("10. the palette, the keys and the lens");
+  section("10. the palette, the keys and the lens");
   const lctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const lp = await lctx.newPage();
   lp.on("pageerror", (e) => errors.push(String(e)));
@@ -1222,7 +1270,7 @@ try {
     [390, 844],
     [768, 1024],
   ]) {
-    console.log(`11. the builder at ${w} px`);
+    section(`11. the builder at ${w} px`);
     const bctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
     const bp = await bctx.newPage();
     bp.on("pageerror", (e) => errors.push(String(e)));
@@ -1311,6 +1359,19 @@ try {
           const sy = ((c.y[i] - cam.y) * cam.zoom + cv.height / 2) * k;
           const d = Math.hypot(sx - cv.clientWidth / 2, sy - cv.clientHeight * 0.4);
           if (!(sx > 40 && sx < cv.clientWidth - 40 && sy > 160 && sy < cv.clientHeight * 0.6) || (best && d >= best.d)) continue;
+          // The tweezers lift the nearest live ant of any colony within PICK_PX (14 CSS px, ColonyField's pick): with another
+          // ant within twice that, the drag can lift that one and leave this one where it was (run 43721564508; review of
+          // #233, S3). Only an ant alone there.
+          const crowded = window.jevAnts.game.colonies.some((o, ok) => {
+            for (let j = 0; j < o.n; j++) {
+              if ((ok === kk && j === i) || !o.alive[j] || o.layer[j] !== 0) continue;
+              const ox = ((o.x[j] - cam.x) * cam.zoom + cv.width / 2) * k;
+              const oy = ((o.y[j] - cam.y) * cam.zoom + cv.height / 2) * k;
+              if (Math.hypot(ox - sx, oy - sy) < 28) return true;
+            }
+            return false;
+          });
+          if (crowded) continue;
           // Dropped 80 px to one side, on open ground (the tweezers refuse rock): that side, if either.
           const map = window.jevAnts.game.layers[0];
           const open = (wx, wy) => {
@@ -1338,7 +1399,7 @@ try {
     );
     check(
       Math.abs(after[0] - ant.x) > 2 && Math.abs(after[1]) > 2,
-      `the tweezers carry the ant, and its belief of home with it (${after.map((v) => v.toFixed(1))})`,
+      `the tweezers carry the ant, and its belief of home with it (colony ${ant.k} ant ${ant.i}: x ${ant.x.toFixed(1)} → ${after[0].toFixed(1)}, belief carried ${after[1].toFixed(1)})`,
     );
     // Its way home is drawn from where it was set down (ja-cwjp): step the game a frame at a time until the trace has a
     // few points (the field records one a frame, once the ant has walked on).
@@ -1382,7 +1443,7 @@ try {
   }
 
   // ——— 12. The Codex (PRD §69.4): guide entries open as the game first shows what each is about ———
-  console.log("12. the Codex");
+  section("12. the Codex");
   const cctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const cp = await cctx.newPage();
   cp.on("pageerror", (e) => errors.push(String(e)));
@@ -1488,7 +1549,7 @@ try {
   await cctx.close();
 
   // ——— 13. Specimens (PRD §69.5): pin ants from the ant panel, compare and follow them from the inspector ———
-  console.log("13. specimens");
+  section("13. specimens");
   const sctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const sp = await sctx.newPage();
   sp.on("pageerror", (e) => errors.push(String(e)));
@@ -1607,7 +1668,7 @@ try {
 
   // ——— 14. Notices (PRD §69.6): swipe a toast away; the bell at the top right keeps it ———
   // A real finger (CDP touch events, review of #219 S2): the mouse would not show a browser taking the drag as a pan.
-  console.log("14. notices");
+  section("14. notices");
   const nctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const np2 = await nctx2.newPage();
   np2.on("pageerror", (e) => errors.push(String(e)));
@@ -1683,7 +1744,7 @@ try {
   await nctx2.close();
 
   // ——— 15. Lab mode (PRD §69.7): a workbench under the map; history charts, a step control, the game's numbers ———
-  console.log("15. Lab mode");
+  section("15. Lab mode");
   const bctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const lbp = await bctx2.newPage();
   lbp.on("pageerror", (e) => errors.push(String(e)));
@@ -1756,6 +1817,80 @@ try {
     await bench.getByRole("tab", { name: tab }).click();
     check((await bench.getByRole("region", { name: card }).count()) === 1, `the ${tab} tab`);
   }
+  // The policy is the Lab's Policy tab (PRD §69.8): a "?" on the policy opens it at its section, and the Codex has none.
+  await lbp.getByRole("button", { name: "Lab: how the fungus decides" }).first().click();
+  check(
+    (await bench.getByRole("tab", { name: "Policy" }).getAttribute("aria-selected")) === "true" &&
+      (await bench.locator("details#lab-fungus").evaluate((d) => d.open)),
+    "the aim's “?” opens the Lab's Policy tab at the fungus's section",
+  );
+  check(
+    await lbp.evaluate(() => document.activeElement?.closest("details")?.id === "lab-fungus"),
+    "and the keyboard's focus lands in that section",
+  );
+  // Escape, with focus in the Lab, closes it and gives the map the focus (owner, D1 on #237); then l opens it again.
+  await lbp.keyboard.press("Escape");
+  await until(() => bench.count().then((n) => n === 0), "Escape in the Lab closes it", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "Escape in the Lab closes it, and the map has the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  const codexTabs = lbp.getByRole("dialog", { name: "Codex" }).getByRole("tab");
+  check(
+    JSON.stringify(await codexTabs.allTextContents()) === JSON.stringify(["Field guide", "Nest"]),
+    "the Codex keeps the field guide and the nest",
+  );
+  // Policy's pointer to the moved controls opens the Levers tab and leaves the keyboard on it (review of #237, N2).
+  await lbp.getByRole("button", { name: "Close the Codex" }).click();
+  await bench.getByRole("tab", { name: "Policy" }).click();
+  await bench.getByRole("button", { name: "The menu and the two settings: the Levers tab" }).focus();
+  await lbp.keyboard.press("Enter");
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") === "tab" && document.activeElement.textContent === "Levers"),
+    "Policy's “the Levers tab” opens it and leaves the focus on its tab",
+  );
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  await lbp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
+  // One Escape, one thing: with the Codex open over it, Escape in the Lab closes the Codex and leaves the Lab.
+  await bench.getByRole("tab", { name: "World" }).focus();
+  await lbp.keyboard.press("Escape");
+  await until(
+    () =>
+      lbp
+        .getByRole("dialog", { name: "Codex" })
+        .count()
+        .then((n) => n === 0),
+    "Escape closes the Codex first",
+    3000,
+    50,
+  );
+  check((await bench.count()) === 1, "with the Codex over the Lab, Escape closes the Codex and leaves the Lab");
+  // The Lab's ×, by key, gives the map the focus as Escape does.
+  await bench.getByRole("button", { name: "Close the Lab" }).focus();
+  await lbp.keyboard.press("Enter");
+  await until(() => bench.count().then((n) => n === 0), "the × closes the Lab", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "the Lab's × gives the map the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  // Opening the Lab takes no focus: from nowhere (as after Start), l then Space still pauses (review of #237, S1).
+  await lbp.keyboard.press("l");
+  await until(() => bench.count().then((n) => n === 0), "l closes the Lab", 3000, 50);
+  await lbp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") !== "tab"),
+    "opening the Lab from nowhere leaves its tabs unfocused",
+  );
+  const runs = async () => {
+    const a = await lbp.evaluate(() => window.jevAnts.game.time);
+    await lbp.waitForTimeout(300);
+    return (await lbp.evaluate(() => window.jevAnts.game.time)) !== a;
+  };
+  const ranBefore = await runs();
+  await lbp.keyboard.press(" ");
+  await lbp.waitForTimeout(100);
+  check((await runs()) !== ranBefore, "and Space plays or pauses the game");
   await lbp.locator("canvas").first().focus();
   await lbp.keyboard.press("l");
   await until(
@@ -1771,9 +1906,13 @@ try {
   await stop();
   process.exit(0);
 } catch (e) {
-  console.error(
-    `e2e-one-world: FAILED after ${((Date.now() - t0) / 1000).toFixed(1)} s: ${e instanceof Error ? e.message : e}${errors.length ? `\npage errors: ${errors.join("\n")}` : ""}`,
-  );
+  const why = `${e instanceof Error ? e.message : e}${errors.length ? `\npage errors: ${errors.join("\n")}` : ""}`;
+  console.error(`e2e-one-world: FAILED after ${((Date.now() - t0) / 1000).toFixed(1)} s in "${step}": ${why}`);
+  if (process.env.GITHUB_ACTIONS === "true") {
+    const line = `in "${step}", after "${lastOk ?? "no check"}": ${why}`.replace(/%/g, "%25").replace(/\r/g, "").replace(/\n/g, "%0A");
+    console.log(`::error title=e2e-one-world failed::${line}`);
+  }
+  await saveFailure().catch((err) => console.error(`e2e-one-world: could not save the failure's pages: ${err}`));
   await stop();
   process.exit(1);
 }

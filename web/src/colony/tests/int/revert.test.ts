@@ -8,14 +8,12 @@ import { worksInside } from "../../nestWork.ts";
 import { fetches } from "../../tunnel.ts";
 import { BROOD_SMELL, REVERT_BELOW } from "../../tuning.ts";
 import { EXPLORE } from "../../vocab.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
-import { SMALL_SIDE, ageOf } from "../builders.ts";
+import { oneColony, ageOf } from "../builders.ts";
 
 // Task reversion (ja-7r7x, docs/task-reversion.md, PRD §74): an old ant at home that meets no young nestmates nurses as
-// the young do, if it is among the share `revert` of the old that can. World 2 of SMALL_SIDE, a fixed "explore" policy.
+// the young do, if it is among the share `revert` of the old that can. Seed 2's small one world, in colony 0's nest in the curtain (S2.3c: until then world 2 of the small side map), a fixed "explore" policy.
 
-const colony = (revert: number, n: number) =>
-  new Colony(generateSideWorld(2, SMALL_SIDE), { antCount: n, maxAnts: n, revert }, mulberry32(7), (() => "explore") as never);
+const colony = (revert: number, n: number) => oneColony(n, { maxAnts: n, revert }, () => "explore", 7).c;
 
 /** Ant i of age band `band` at the nest's centre, exploring, empty-jawed. */
 function home(c: Colony, i: number, band: 0 | 1 | 2) {

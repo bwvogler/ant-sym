@@ -6,7 +6,6 @@ import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { dropFood } from "../../world.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
 import { DT } from "../builders.ts";
 
 // Site fidelity on one world's plane (ja-lp4.15.3, docs/forager-trips.md §3, PRD §58): a forager that picks up food keeps
@@ -266,16 +265,4 @@ test("site fidelity: a newborn in a dead ant's slot remembers nothing", () => {
   c.kill(0);
   assert.ok(c.spawn(), "a slot was free");
   assert.ok(Number.isNaN(c.foodX[0]) && Number.isNaN(c.foodY[0]), "the dead ant's spot is not inherited");
-});
-
-test("site fidelity: not on a top-down map, where a find is not remembered", () => {
-  const world = generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 });
-  const flat = new Colony(world, { antCount: 1, maxAnts: 1, siteFidelity: 1, deposit: 0 }, mulberry32(5), () => "explore");
-  flat.age[0] = 0.5 * LIFESPAN;
-  flat.mode[0] = EXPLORE;
-  flat.carrying[0] = 0;
-  dropFood(world, flat.x[0], flat.y[0], 3);
-  for (let t = 0; t < 90 && flat.carrying[0] !== 1; t++) flat.tick(DT);
-  assert.equal(flat.carrying[0], 1, "it picked the food up");
-  assert.ok(Number.isNaN(flat.foodX[0]), "nothing remembered off the plane");
 });

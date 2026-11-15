@@ -1,16 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
+import { Colony, CURTAIN } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, nx as stepX, ny as stepY } from "../../hex.ts";
 import { EXPLORE, RETURN } from "../../vocab.ts";
-import { digCell, generateSideWorld, inBounds, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
-import { SMALL_SIDE, ageOf } from "../builders.ts";
+import { digCell, inBounds, isSky, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { ageOf, smallOne } from "../builders.ts";
 
 // restFetch (ja-4rfr): hungry ants who would otherwise sit still or leave go to the stores. On economy.test's map a
 // colony starved beside ~500 stored food: the old retire inside in "return", tired, and only explorers fetched, by felt
 // need alone, and only in tunnels. Hunger bites only late in an hour-long game, so the slow tier was all that reached it;
-// these put the hunger in at once. World 2 of SMALL_SIDE: the hole at cell (109, 39), a shaft down to the royal chamber
-// (rows 48 on), the nest's centre at (106, 53).
+// these put the hunger in at once. In seed 2's small one world, in colony 0's nest in the curtain (S2.3c: until then world 2
+// of the small side map): its hole in the crust, a shaft down to the royal chamber.
 
 /**
  * A four-cell store holding 20 food, its floor mark laid as ants coming from it would: strongest there, fading a little a
@@ -53,13 +53,16 @@ function stocked(map: WorldMap, where: "shaft" | "far" | "side") {
   return { store, cell: [sx + dir * 3, sy] as const, mouth: [sx - dir * 6, sy] as const };
 }
 
-/** A colony of `n` ants on world 2 with a store (see stocked), its mark laid, and a fixed policy if one is given. */
+/** A colony of `n` ants in seed 2's small one world, bound to its curtain, with a store (see stocked), its mark laid, and a fixed policy if one is given. */
 function colony(restFetch: number, n: number, where: "shaft" | "far" | "side", policy?: () => string) {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const { store, cell, mouth } = stocked(map, where);
+  const layered = { plane: w.plane, line: w.line };
   const c = policy
-    ? new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), policy as never)
-    : new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7));
+    ? new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), policy as never, undefined, layered)
+    : new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), undefined, undefined, layered);
+  c.bind(CURTAIN);
   c.larder += store.food; // the larder is the food in the chambers
   const seen = new Map<number, number>([[cell[0] * 4096 + cell[1], 0]]);
   const queue: [number, number][] = [[cell[0], cell[1]]];
@@ -96,7 +99,7 @@ const step = (c: Colony) => {
   c.tick(1 / 30);
 };
 
-test("restFetch: a starving old explorer in the royal chamber turns toward the store across it by its mark; without it, it heads out at the hole", () => {
+test("restFetch: a starving old explorer in the royal chamber turns toward the store across it by its mark; without it, it heads up to the gate at its hole", () => {
   // Its own hunger makes it fetch (fetches), and in the chamber it steers by the store's mark (steer.ts).
   const run = (rf: number) => {
     const { c, map, cell } = colony(rf, 1, "far", () => "explore");
@@ -109,7 +112,8 @@ test("restFetch: a starving old explorer in the royal chamber turns toward the s
       step(c);
       cellOf(c.x[0], c.y[0]);
       nearest = Math.min(nearest, hexDistance(CELL[0], CELL[1], cell[0], cell[1]));
-      if (!c.under[0]) out = 1;
+      // Out: up its shaft to the gate at the top (one world holds an explorer there and asks it to leave), or out on the plane.
+      if (!c.under[0] || c.layer[0] !== CURTAIN || c.atGate(0)) out = 1;
     }
     return { nearest, out };
   };
@@ -118,7 +122,7 @@ test("restFetch: a starving old explorer in the royal chamber turns toward the s
   // The store's middle cell is 3 from the chamber's edge at its mouth: there or nearer, it came to the store.
   assert.ok(on.nearest <= 3, `with restFetch it came to the store (nearest ${on.nearest} cells from its middle)`);
   assert.ok(off.nearest >= 6, `without it, it never came by the store (nearest ${off.nearest})`);
-  assert.equal(off.out, 1, "it went out");
+  assert.equal(off.out, 1, "it went up to its hole");
 });
 
 test('restFetch: a starving ant in "return" by a store takes food on from it; without it, it carries nothing', () => {

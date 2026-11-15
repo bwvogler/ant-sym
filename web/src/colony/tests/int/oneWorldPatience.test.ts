@@ -5,7 +5,6 @@ import { MODES } from "../../vocab.ts";
 import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
-import { generateSideWorld, generateWorld, mulberry32 } from "../../world.ts";
 import { DT } from "../builders.ts";
 
 // A shorter search on one world's plane (ja-lp4.15.2, docs/forager-trips.md §1, PRD §58): a forager on the plane tires at
@@ -99,7 +98,7 @@ test("planePatience: the ant's clock still scales it (a slow clock, a longer sea
   assert.ok(b > 44 && b < 47, `clock 1.5: tired at ${b.toFixed(1)} s`);
 });
 
-test("planePatience: not in the nest, not in the side view, not on a top-down map", () => {
+test("planePatience: not in the nest", () => {
   // The nest: ant 0 down in the curtain at 31 s of fatigue is not tired at planePatience 0.5.
   const { g, c } = plane({ planePatience: 0.5 });
   const hc = c.holeCells[c.params.nest] as HoleCell;
@@ -113,39 +112,6 @@ test("planePatience: not in the nest, not in the side view, not on a top-down ma
     tiredAt(c, (dt) => g.tick(dt), 61),
     true,
     "past patience, in the curtain",
-  );
-  // A top-down map and the side view: no plane, so `line` is null.
-  const flat = new Colony(
-    generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 }),
-    { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 },
-    mulberry32(5),
-    () => "explore",
-  );
-  assert.equal(
-    tiredAt(flat, (dt) => flat.tick(dt), 31),
-    false,
-    "top-down at 31 s",
-  );
-  assert.equal(
-    tiredAt(flat, (dt) => flat.tick(dt), 61),
-    true,
-    "top-down at 61 s",
-  );
-  const side = new Colony(
-    generateSideWorld(2, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 }),
-    { antCount: 1, maxAnts: 1, planePatience: 0.5, deposit: 0 },
-    mulberry32(5),
-    () => "explore",
-  );
-  assert.equal(
-    tiredAt(side, (dt) => side.tick(dt), 31),
-    false,
-    "side view at 31 s",
-  );
-  assert.equal(
-    tiredAt(side, (dt) => side.tick(dt), 61),
-    true,
-    "side view at 61 s",
   );
 });
 

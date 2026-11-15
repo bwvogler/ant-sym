@@ -3,15 +3,15 @@ import assert from "node:assert/strict";
 import { LARVA } from "../../brood.ts";
 import { Colony } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
-import { SMALL_SIDE, broodChamber } from "../builders.ts";
+import { digCell, OPEN, rockAt } from "../../world.ts";
+import { oneColony, broodChamber } from "../builders.ts";
 
 // Larval feeding by mouth (cropFeed, ja-638i, docs/larval-feeding.md, PRD §75): crops filled at the stores, passed mouth
-// to mouth to a needier nestmate, fed to larvae; the food in crops stays the colony's (inCrops). World 2 of SMALL_SIDE.
+// to mouth to a needier nestmate, fed to larvae; the food in crops stays the colony's (inCrops). Seed 2's small one world, in colony 0's nest in the curtain (S2.3c: until then world 2 of the small side map).
 
 /** A colony of `n` ants with crops of `cap`, and a four-cell store holding 20 food off the nest chamber's far wall. */
 function colony(cap: number, n: number) {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const { map, c } = oneColony(n, { maxAnts: n + 4, cropFeed: cap });
   const ch = map.chambers!;
   cellOf(map.nest.x, map.nest.y);
   const sy = CELL[1];
@@ -22,7 +22,6 @@ function colony(cap: number, n: number) {
     digCell(map, sx - k, sy);
     ch.claim(store.id, sx - k, sy, (a, b) => rockAt(map, a, b) === OPEN);
   }
-  const c = new Colony(map, { antCount: n, maxAnts: n + 4, cropFeed: cap }, mulberry32(2), () => "explore");
   c.stock(store, 20);
   return { map, c, store, at: [sx - 2, sy] as const };
 }

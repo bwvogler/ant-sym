@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { responseKey, responseOf, responsesFromAnswers, validResponse } from "../../colonyBrain.ts";
 import { localResponses, type Touch } from "../../responses.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
 import { pickFor, unitOf, type AntDraw } from "../../weighted.ts";
-import { ticks } from "../builders.ts";
+import { smallOne, ticks } from "../builders.ts";
 
 // The response lanes drawn from Jev's probabilities (ja-m7rr; weighted.ts AntDraw): each ant draws its own answer for a
 // hook and situation, keeps it while the situation lasts (the hooks are asked every step), and draws afresh after `reroll`.
 
-const colony = () => new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 40, rival: false }, mulberry32(3)).player;
+const colony = () => new Game(smallOne(1), { antCount: 40, rival: false }, mulberry32(3)).player;
 
 const near: Touch = {
   mode: "explore",
@@ -147,7 +147,7 @@ test("an ant draws afresh after `reroll` seconds, each at its own phase; with re
 });
 
 test("the local responses never draw: a game on them takes no salt from the rng", () => {
-  const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 40 }, mulberry32(3));
+  const g = new Game(smallOne(1), { antCount: 40 }, mulberry32(3));
   ticks(g, 300);
   for (const c of g.colonies) assert.equal(c.drawSalt, -1);
   assert.equal(localResponses.contact(near), "flee");

@@ -33,7 +33,7 @@ In the game today, larvae are fed only from food lying in their own chamber, by 
 
 ## The mechanic
 
-Behind one setting whose 0 is main bit for bit (`cropFeed`). These are body and steering rules with no situation field, so there is **no Jev cost**.
+Behind one setting, `cropFeed`, whose 0 (the default) is the old game bit for bit. At 0.1 no worker starved, but one-world foraging fell and one seed's larvae waited (PRD §75), so it stays off until ja-638i.4. These are body and steering rules with no situation field, so there is **no Jev cost**.
 
 - **Crop:** `crop`, per ant, in food units, up to `CROP_MAX` (**design**, about a third of a unit).
 - **Filling:** an ant underground within two cells of a stocked store or reception tops its crop up from that chamber's food. Today's limit is the store's 3 cells; ants in that queue now leave with crops full.

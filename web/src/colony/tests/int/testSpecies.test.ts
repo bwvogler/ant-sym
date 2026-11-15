@@ -5,11 +5,12 @@ import { Game } from "../../game.ts";
 import { LANES, laneOfContext } from "../../lanes.ts";
 import { localResponses } from "../../responses.ts";
 import { GENERIC_ANT, type Species } from "../../species.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 import type { LaneWords, Mode } from "../../vocab.ts";
 
 // The descriptor's acceptance (docs/species.md step 6, ja-fnd.5.3.5): a species made only of the pieces S4.3 built, in a test file, with nothing in the
-// colony edited: a lone forager that lays no trail, has a short life that ends on the plane, buries no dead, goes out without waiting for company, has
+// colony edited: a lone forager that lays no trail, has a short life, buries no dead, goes out without waiting for company, has
 // no stance lane, and asks Jev in its own words with one mode fewer. It is what the desert ant (ja-rf5) is made of, minus its senses.
 
 const LONE_MODE: LaneWords<Mode> = {
@@ -45,48 +46,41 @@ const LONE: Species = {
   lanes: { mode: LONE_MODE },
 };
 
-/**
- * `feed`: food reaching the larder each tick. On this 120x80 world no ant, the generic ant's or the lone forager's, reaches food in 150 s (the nearest is
- * 19-29 cells from the nest), so without it the colony of a 90 s life falls at about 117 s whatever the species; the feed is the only food in the game.
- * Whether the desert ant needs a food sense of its own is for ja-rf5.3 to measure.
- */
-const play = (species: Species, seconds: number, feed = 0) => {
-  const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 30, rival: false, species }, mulberry32(3));
-  for (let k = 0; k < 30 * seconds; k++) {
-    g.tick(1 / 30);
-    if (feed) g.player.feed(feed);
-  }
+/** A game of the species on a small one world: its colony alone, with its queen. */
+const play = (species: Species, seconds: number) => {
+  const g = new Game(smallOne(3), { antCount: 30, rival: false, species }, mulberry32(3));
+  for (let k = 0; k < 30 * seconds; k++) g.tick(1 / 30);
   return g;
 };
 
+/** What the colony laid of a channel, on both its layers. */
+const laid = (g: Game, channel: "home" | "food") => g.player.layers.reduce((sum, l) => sum + l.ph.total(channel), 0);
+
 test("a species of the descriptor's pieces alone plays a game: no trails laid, a short life that ends, its own Jev words", () => {
-  const g = play(LONE, 150, 0.05);
+  const born = new Game(smallOne(3), { antCount: 30, rival: false, species: LONE }, mulberry32(3)).player;
+  for (let i = 0; i < born.n; i++)
+    if (born.alive[i]) assert.ok(Number.isFinite(born.lifespan[i]!) && born.lifespan[i]! <= 117, `lifespan ${born.lifespan[i]}`);
+  // 90 s: with youngShare 0 nothing nurses, so none is born, and the colony falls at about 120 s (S2.3c).
+  const g = play(LONE, 90);
+  assert.equal(g.outcome(), "playing", "still playing at 90 s");
   const c = g.player;
   assert.equal(g.params.species, LONE);
-  // The Game hands each parameter down (the ones this plane game does not exercise by behaviour: undertakes, the bands and the raid gates are pinned in undertakes.test.ts, ageStructure.test.ts and a side-view game).
+  // The Game hands each parameter down (the ones this game does not exercise by behaviour: undertakes, the bands and the raid gates are pinned in undertakes.test.ts and ageStructure.test.ts).
   for (const [k, v] of Object.entries(LONE.params))
     assert.equal((g.player.params as unknown as Record<string, unknown>)[k], v, `${k} reaches the colony`);
   assert.equal(g.player.responses, LONE.responses);
-  assert.equal(g.outcome(), "playing");
-  // The responses lay nothing and the colony follows no home trail: no pheromone of its own on the ground.
-  assert.equal(c.ph.total("food"), 0, "no food trail");
-  assert.equal(c.ph.total("home"), 0, "no home trail");
-  // A short life that ends on the plane, replaced from the larder as food comes in.
+  // The responses lay nothing and the colony follows no home trail: no pheromone of its own on either layer.
+  assert.equal(laid(g, "food"), 0, "no food trail");
+  assert.equal(laid(g, "home"), 0, "no home trail");
+  // A short life that ends.
   assert.ok(c.diedOld > 0, `${c.diedOld} died of age`);
-  assert.ok(
-    c.alive.some((a) => a),
-    "and the colony lives on",
-  );
-  for (let i = 0; i < c.n; i++)
-    if (c.alive[i]) assert.ok(Number.isFinite(c.lifespan[i]!) && c.lifespan[i]! <= 117, `lifespan ${c.lifespan[i]}`);
   assert.ok(c.n <= 40, "its own size");
 });
 
-test("the generic ant on the same world lays trails and does not age out: the species is what differs", () => {
+test("the generic ant on the same world lays trails: the species is what differs", () => {
   const g = play(GENERIC_ANT, 150);
-  const c = g.player;
-  assert.ok(c.ph.total("home") > 0, "the generic ant lays a home trail");
-  assert.equal(c.diedOld, 0, "and does not age out on the plane");
+  assert.ok(laid(g, "home") > 0, "the generic ant lays a home trail");
+  assert.ok(laid(g, "food") > 0, "and a food trail");
 });
 
 test("its Jev words: its own context under the same lane prefix, one mode fewer, no stance lane", () => {

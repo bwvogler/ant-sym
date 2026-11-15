@@ -51,7 +51,7 @@ import {
   type SaveRecord,
 } from "./ui/saves.ts";
 import { colonyName, colonyTone } from "./ui/names.ts";
-import { isDemo, passphrase } from "./ui/backend.ts";
+import { passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
 import Tip from "./ui/Tip.tsx";
 import { NextBody, UpgradeBody } from "./ui/UpgradeTips.tsx";
@@ -71,12 +71,14 @@ import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
 import { openLearn } from "./ui/learn.ts";
+import { openLab, toggleLab, useLab } from "./ui/labStore.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
+import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
 import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 
@@ -104,8 +106,9 @@ export default function ColonyApp() {
   const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
-  // Lab mode (PRD §69.7): the map shares the screen with a workbench of the game's numbers, levers, history and steps.
-  const [lab, setLab] = useState(false);
+  // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
+  // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
+  const lab = useLab() !== null;
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const toggle = useCallback((d: DrawerId) => setDrawer((cur) => (cur === d ? null : d)), []);
@@ -398,7 +401,7 @@ export default function ColonyApp() {
         setPalette((o) => !o);
       } else if (a.kind === "shortcuts") setSheet(true);
       else if (a.kind === "lens") toggleLens();
-      else if (a.kind === "lab") setLab((on) => !on);
+      else if (a.kind === "lab") toggleLab();
       else if (a.kind === "play") update({ playing: !controls.playing });
       else if (a.kind === "speed") update({ speed: a.speed });
       else if (a.kind === "view") {
@@ -434,46 +437,25 @@ export default function ColonyApp() {
   // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
   const [devPen, setDevPen] = useState(false);
   const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
-  const settle = useCallback(
-    (f: Flight, k: number) => {
-      // Lost: the game says why (Game.lastLoss; one world's founding rule, docs/one-world.md §3).
-      const why = k < 0 && game.lastLoss?.flight === f ? game.lastLoss.reason : null;
-      if (k < 0)
-        pushToast(
-          game.colonies.length >= MAX_COLONIES
-            ? `A new queen from ${colonyName(f.mother)} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`
-            : why
-              ? `A new queen from ${colonyName(f.mother)} was lost: ${why}.`
-              : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
-          "warn",
-        );
-      if (!game.flights.length) {
+  // The founding rules are ui/flight.ts's (ja-fnd.6.2); the page shows what they return and resumes once no queen is in the air.
+  const apply = useCallback(
+    (r: Founded) => {
+      if (r.notice) pushToast(r.notice.text, r.notice.tone);
+      if (r.resume) {
         update({ playing: true });
         setDevPen(false); // the dev hook's pen was for that flight only
       }
     },
-    [game, update],
+    [update],
   );
   useEffect(() => {
     if (!flight || !gate || gate.open) return;
-    const k = game.found(flight);
-    if (k >= 0) {
-      jev.foundWith(k, jev.doctrines[flight.mother] ?? jev.doctrines[0]!);
-      pushToast(`${gate.reason} Her colony is ${colonyName(k)}.`, "info");
-    }
-    settle(flight, k);
-  }, [flight, gate, game, jev, settle]);
+    apply(foundOnMothers(game, jev, jev.doctrines, flight, gate.reason));
+  }, [flight, gate, game, jev, apply]);
   /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
   const foundOn = useCallback(
-    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => {
-      const k = game.found(f, at);
-      if (k >= 0) {
-        jev.foundWith(k, d);
-        pushToast(`${colonyName(k)} is founded, on your words.`, "good");
-      }
-      settle(f, k);
-    },
-    [game, jev, settle],
+    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => apply(foundOnWords(game, jev, f, d, at)),
+    [game, jev, apply],
   );
   const foundHers = useCallback(
     (d: DoctrineChoice, at: Landing) => {
@@ -654,11 +636,11 @@ export default function ColonyApp() {
       { id: "learn", label: "Codex: the field guide", group: "Panels", words: "help guide learn", run: () => openLearn({ tab: "guide" }) },
       {
         id: "lab",
-        label: lab ? "Close the Lab" : "Lab mode: history, world, Jev, levers, steps",
+        label: lab ? "Close the Lab" : "Lab mode: history, policy, world, Jev, levers, steps",
         group: "Panels",
         key: "l",
-        words: "details debug seed world jev spend history charts step numbers journal",
-        run: () => setLab((on) => !on),
+        words: "details debug seed world jev spend history charts step numbers journal policy doctrine",
+        run: toggleLab,
       },
       {
         id: "lens",
@@ -890,7 +872,7 @@ export default function ColonyApp() {
             <Settings
               controls={controls}
               update={update}
-              openLab={() => (clearProbe(), setDrawer(null), setLab(true))}
+              openLab={() => (clearProbe(), setDrawer(null), openLab())}
               openShortcuts={() => setSheet(true)}
               pass={backend?.needsPass ? <PassNote onSaved={recheckBackend} wrong={passphrase() !== null} /> : null}
             />
@@ -965,22 +947,7 @@ export default function ColonyApp() {
           />
         )}
 
-        <LearnDrawer
-          colonies={game.colonies}
-          followed={followed}
-          doctrines={jev.doctrines}
-          aim={jev.aim}
-          lock={jev.lock}
-          game={game}
-          fungusAnswers={jev.fungusAnswers}
-          menu={controls.menu}
-          setMenu={(menu) => update({ menu })}
-          hide={controls.hide}
-          cull={controls.cull}
-          setRule={(r) => update(r)}
-          retune={`A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`}
-          demo={isDemo(backend)}
-        />
+        <LearnDrawer colonies={game.colonies} game={game} />
         <LensLayer
           on={lensOn}
           colonies={game.colonies}
@@ -1016,7 +983,24 @@ export default function ColonyApp() {
           />
         )}
       </div>
-      {lab && <LabBench {...labProps} history={history} step={step} onClose={() => setLab(false)} />}
+      {lab && (
+        <LabBench
+          {...labProps}
+          history={history}
+          step={step}
+          policy={{
+            colonies: game.colonies,
+            followed,
+            doctrines: jev.doctrines,
+            aim: jev.aim,
+            lock: jev.lock,
+            game,
+            fungusAnswers: jev.fungusAnswers,
+            menu: controls.menu,
+            retune: `A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`,
+          }}
+        />
+      )}
     </main>
   );
 }

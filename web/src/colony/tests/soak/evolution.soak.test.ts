@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { STRAINS } from "../../fungus.ts";
 import { Game } from "../../game.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
+import { smallOne } from "../builders.ts";
 
 // The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
 // come with growth, the mycelium pays for its spores, a founded colony can get what the first colony got, and the
@@ -13,7 +14,7 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 test("the queen's larger grooming cap is the evolving game's: a lab or test game's queen is groomed as before (PR #43 review, S1)", () => {
   const queenAt = (queenGroomers: number, evolve: boolean) => {
-    const g = new Game(generateSideWorld(1), { antCount: 300, rivalAnts: 300, fungus: { queenGroomers } }, mulberry32(7919));
+    const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300, fungus: { queenGroomers } }, mulberry32(7919));
     g.land(0, GARDEN, { evolve });
     if (evolve) {
       // Garden as listed, so the fungus reaches her in a short run.
