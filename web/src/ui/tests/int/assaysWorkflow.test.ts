@@ -84,6 +84,7 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     { ASSAYS: "all merge" },
     { SEEDS: "1-50" },
     { SEEDS: "1\n2" },
+    { SEEDS: "1,x" },
     { SET: "x=$(id)" },
     { SET: "*" },
     { SPECIES: "../x" },
@@ -113,4 +114,7 @@ test("experiment.mjs merge of per-seed files prints the table of one run over al
     else assert.match(merged, /\*\*colony\.deposit=4\*\* — pass 0\/2 \(failing seeds: 1, 2\)/, "the failing seeds are named");
   }
   await assert.rejects(run("merge", join(dir, "legacy1.json"), join(dir, "legacy1.json")), /seed 1 in more than one file/);
+  // The same assay and setting run for another length is another measurement (review of #224, N10).
+  await run("bridge", "--seconds", "4", "--set", "colony.deposit=2,4", "--jobs", "2", "--seeds", "2", "--json", join(dir, "short2.json"));
+  await assert.rejects(run("merge", join(dir, "legacy1.json"), join(dir, "short2.json")), /ran 5 s in one file and 4 s in another/);
 });

@@ -13,6 +13,10 @@
 //                         test with that timeout)
 //   TEST_REPORT_TITLE     the summary's heading (default: the tests)
 //   TEST_DURATIONS_FILE   writes { "<file>": ms } as JSON, for an artifact that tracks durations from run to run
+//   TEST_TIER             "<tier>:<ms>:<next>", e.g. int:12000:soak: a ::warning per file over the tier's line, which
+//                         docs/agent-guide.md (Tests) draws by a file's time alone, so only for a run with
+//                         --test-concurrency=1 (slow.yml's nightly tiers job, ja-w7ef.10). Files run side by side take
+//                         longer: CI's shards measured fungus.test.ts at 16.4 s, 8.6 s alone.
 //
 // A file stopped at its limit is reported as "cancelled at the limit", not as a test failure: the cure is to split it or
 // move it to a slower tier (docs/agent-guide.md, Tests), never to raise the limit.
@@ -80,12 +84,13 @@ export function summarise(events) {
 /**
  * The step summary's Markdown and the annotation lines, from a summarise() result.
  * @param {ReturnType<typeof summarise>} s
- * @param {{ limitMs: number, title: string, root: string }} o
+ * @param {{ limitMs: number, title: string, root: string, tier?: { name: string, ms: number, next: string } | null }} o
  */
-export function render(s, { limitMs, title, root }) {
+export function render(s, { limitMs, title, root, tier = null }) {
   const rel = (f) => (f ? relative(root, f) : "?");
   const slow = [...s.durations].sort((a, b) => b[1] - a[1]);
   const near = limitMs > 0 ? slow.filter(([, ms]) => ms >= WARN_SHARE * limitMs) : [];
+  const over = tier ? slow.filter(([, ms]) => ms > tier.ms) : [];
   const md = [`### ${title}`, ""];
   const t = s.totals;
   if (t) md.push(`${t.passed} passed, ${t.failed} failed, ${t.cancelled} cancelled, ${t.skipped} skipped, ${t.todo} todo.`, "");
@@ -103,6 +108,13 @@ export function render(s, { limitMs, title, root }) {
       "",
     );
   }
+  if (tier)
+    md.push(
+      over.length
+        ? `Over ${tier.name}'s ${secs(tier.ms)} line, alone (move to ${tier.next}/):\n${over.map(([f, ms]) => `- ${rel(f)}: ${secs(ms)}`).join("\n")}`
+        : `Every file within ${tier.name}'s ${secs(tier.ms)} line, alone.`,
+      "",
+    );
   const notes = [
     ...s.failures.map(
       (f) =>
@@ -111,6 +123,10 @@ export function render(s, { limitMs, title, root }) {
     ...near.map(
       ([f, ms]) =>
         `::warning file=${escProp(rel(f))},title=${escProp("near its time limit")}::${escData(`${rel(f)} took ${secs(ms)} of its ${secs(limitMs)} limit: split it or move it to a slower tier (docs/agent-guide.md, Tests)`)}`,
+    ),
+    ...over.map(
+      ([f, ms]) =>
+        `::warning file=${escProp(rel(f))},title=${escProp(`over the ${tier.name} tier's line`)}::${escData(`${rel(f)} took ${secs(ms)} alone, over ${tier.name}'s ${secs(tier.ms)} line: move it to ${tier.next}/ (docs/agent-guide.md, Tests)`)}`,
     ),
   ];
   return { markdown: md.join("\n") + "\n", annotations: notes };
@@ -126,6 +142,14 @@ function limitMs() {
   return i < 0 ? 0 : Number(a[i].startsWith("--test-timeout=") ? a[i].slice("--test-timeout=".length) : a[i + 1]) || 0;
 }
 
+/** TEST_TIER, "<tier>:<ms>:<next>" (e.g. int:12000:soak), or null when unset; a malformed one is an error, not ignored. */
+export function parseTier(v) {
+  if (!v) return null;
+  const m = /^([a-z]+):(\d+):([a-z]+)$/.exec(v);
+  if (!m) throw new Error(`TEST_TIER=${v}: want <tier>:<ms>:<next>, e.g. int:12000:soak`);
+  return { name: m[1], ms: Number(m[2]), next: m[3] };
+}
+
 /** The reporter: collects every event, then writes the summary, the durations and the annotations once at the end. */
 export default async function* ciReport(source) {
   const events = [];
@@ -137,6 +161,7 @@ export default async function* ciReport(source) {
     limitMs: limitMs(),
     title: env.TEST_REPORT_TITLE || "Tests",
     root,
+    tier: parseTier(env.TEST_TIER),
   });
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, out.markdown);
   if (env.TEST_DURATIONS_FILE)
