@@ -82,6 +82,30 @@
     },
     {
       "lane": "mode",
+      "doctrine": "cautious",
+      "species": "neglectus",
+      "context": "colony-v1-58724ff4",
+      "file": "mode-neglectus-cautious.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "species": "neglectus",
+      "context": "colony-v1-b92c4521",
+      "file": "mode-neglectus-forage.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "species": "neglectus",
+      "context": "colony-v1-5ba58f21",
+      "file": "mode-neglectus-warlike.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
       "doctrine": "warlike",
       "context": "colony-v7-5b5501f8",
       "file": "mode-warlike.json",

@@ -29,7 +29,11 @@
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --species desert --lanes fungus [--budget …] [--dry]
+//        node scripts/precache.mjs --species neglectus --met [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --lanes fungus --fungus-also <fungus-bundle.json> [...] [--budget …] [--dry]
+//
+// --met (ja-e668.3), with --species: ask only the mode situations a page game of that species meets (one world, seeds 1–3, 300 s), not
+// every one of its schema: for a species on the generic schema (the invasive garden ant: 3,888 situations). Known: desert, neglectus.
 //
 // --species <id> --lanes fungus (ja-rf5.22): the fungus's answers under that species' menu (the desert ant's has rouse on, so its keys differ
 // from the generic answers'), in the situations a page game of it meets; written into the same fungus bundles (the context is the same).
@@ -71,6 +75,7 @@ import {
   STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
   DESERT_ANT,
+  NEGLECTUS_ANT,
   isWeighted,
   weightsOf,
 } from "../web/src/colony/index.ts";
@@ -91,6 +96,7 @@ const opts = {
   species: null,
   reweigh: false,
   fungusAlso: [],
+  met: false,
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -102,6 +108,7 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else if (a === "--species") opts.species = args[++k];
   else if (a === "--reweigh") opts.reweigh = true;
+  else if (a === "--met") opts.met = true;
   else if (a === "--fungus-also") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.fungusAlso.push(args[++k]);
   else throw new Error(`unknown argument ${a}`);
 }
@@ -188,10 +195,35 @@ function speciesFungalSituations(sp) {
   return [...met].sort((a, b) => a - b).map(decodeFungal);
 }
 
+/**
+ * --met (ja-e668.3): the mode situations a page game of `sp` meets, keyed under its words: one world as the page builds it (600 + 600 ants),
+ * 300 s on seeds 1–3, on its local rule. For a species on the generic schema (3,888 situations), whose every situation would cost far more.
+ */
+function speciesModeSituations(sp, l, lw) {
+  const met = new Map();
+  const local = sp.policy ?? l.local;
+  for (const seed of [1, 2, 3]) {
+    const g = new Game(
+      generateOneWorld(seed),
+      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, species: sp },
+      gameRng(seed, 0),
+    );
+    for (const c of g.colonies)
+      c.bindPolicy("mode", (s) => {
+        const k = l.key(s, undefined, lw);
+        if (!met.has(k)) met.set(k, { ...s });
+        return local(s);
+      });
+    for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
+  }
+  return [...met.values()];
+}
+
 // A species' own mode lane (ja-rf5.9): its words bound into the row's key, packing, reading and context, its situations its schema's.
-const SPECIES_KNOWN = { desert: DESERT_ANT };
+const SPECIES_KNOWN = { desert: DESERT_ANT, neglectus: NEGLECTUS_ANT };
 const species = opts.species ? SPECIES_KNOWN[opts.species] : null;
 if (opts.species && !species) throw new Error(`--species: no "${opts.species}" (known: ${Object.keys(SPECIES_KNOWN).join(", ")})`);
+if (opts.met && !species) throw new Error("--met needs --species: it records that species' page game");
 // --import ships colony-live caches, which are the generic ant's: a species' answers come from this script's own run (review of #140).
 if (species && opts.import.length)
   throw new Error("--species and --import do not go together: run --species on its own (it is the live check)");
@@ -212,7 +244,7 @@ if (speciesFungus) {
   const lw = species.lanes.mode;
   LANES.mode = {
     ...LANES.mode,
-    situations: () => l.all(lw),
+    situations: () => (opts.met ? speciesModeSituations(species, l, lw) : l.all(lw)),
     key: (s) => l.key(s, undefined, lw),
     pack: (items, words) => l.pack(items, words, lw),
     read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, undefined, lw), lw),

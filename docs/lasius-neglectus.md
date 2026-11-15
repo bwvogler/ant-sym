@@ -120,6 +120,10 @@ For the owner:
 
 Still to read (2026-11-15: unreachable from the session): Ugelvig & Cremer 2007's and Tragust et al. 2013's papers (*Curr Biol*, no open copy reached; Tragust's data read); Stroeymeyt et al. 2018's numbers (an open copy on `iris.unil.ch`, a host the owner could allow). No account of *L. neglectus* workers handling adult corpses exists that the search found.
 
+## What ja-e668.3 built (PRD §64.2)
+
+The species on the descriptor (`neglectus.ts`): one supercolony (tolerance 1, owner 2026-11-15), so its two colonies never fight (0 fight deaths on seeds 1–3 against the generic ant's 72–171 in 600 s); its own mode words, with Jev's answers shipped for the 81 situations a game meets ($0.0022). Its grooming, brood disinfection, queens and budding are still the generic ant's (`ja-e668.4`–`.6`).
+
 ## Sources
 
 - Ugelvig LV, Drijfhout FP, Kronauer DJC, Boomsma JJ, Pedersen JS, Cremer S (2008). The introduction history of invasive garden ants in Europe: integrating genetic, chemical and behavioural approaches. *BMC Biol* 6:11. [PMC2292682](https://pmc.ncbi.nlm.nih.gov/articles/PMC2292682/) (full text, first 100k characters)
