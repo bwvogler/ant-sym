@@ -63,3 +63,7 @@ test(
     assert.equal(jam.length, 0, `seeds at ${CEILING} or more: ${table}`);
   },
 );
+
+test.todo(
+  "whole games: hardly a porter holds its food over 120 s either, by its own hold clock (ja-3po: G seeds 1-10 reach 6, Cautious's replay 49; moved here from the side view's slow/side.test in S2.3c)",
+);

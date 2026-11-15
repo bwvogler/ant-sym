@@ -74,7 +74,7 @@ export interface RunResult {
   metrics: Record<string, number>;
 }
 
-/** Seconds a forager may hold its food before it counts as lost (slow/side.test's guard). */
+/** Seconds a forager may hold its food before it counts as lost (the side view's slow/side.test guard, now G1's). */
 export const STUCK_AFTER = 120;
 
 /** The map (or one world) a spec asks for. */
@@ -149,7 +149,7 @@ export function foodIn(map: WorldMap, wx: number, wy: number, r: number): number
 
 /**
  * Foragers holding food longer than STUCK_AFTER, the most at any 10-s sample from STUCK_AFTER on, per colony
- * (slow/side.test's measure; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
+ * (the side view's slow/side.test measure, now G1's; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
  * nest resets every tick, so it misses a carrier that won't put its food down at home; `maxCarrying` counts by the
  * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm). `maxPorting`: porters (food
  * moved between chambers, which both other measures leave out) holding theirs over STUCK_AFTER (review of #36, ja-3po).

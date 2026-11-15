@@ -5,7 +5,7 @@ import { STRAINS } from "../../fungus.ts";
 import { GAME_REGROW, Game, gameRng, MET } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 
-// Whole-game guards of one world (docs/one-world.md U6a), beside slow/side.test.ts: `npm run test:slow`.
+// Whole-game guards of one world (docs/one-world.md U6a): `npm run test:slow`.
 
 // G1, one world, is its own file (g1/oneWorldG1.test.ts, its own job in slow.yml): seeds 1-10 in worker threads, judged on a share of seeds (ja-ysco).
 
