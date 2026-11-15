@@ -80,6 +80,8 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "others",
   "felt",
   "donors",
+  "youngs",
+  "cropDonors",
   "scentSum",
   "perceived",
 ]);
