@@ -511,7 +511,7 @@ test("the no-entry paint lays every colony's 'no entry', topped up as it fades, 
   for (const c of g.colonies) assert.ok(c.layers[PLANE]!.ph.fields.noEntry.get(x + 3, y) < FAINT);
 });
 
-test("a follower's food scent counts for less under painted 'no entry', with the colony's own noEntryAvoid 0", () => {
+test("painted 'no entry' is read at NO_ENTRY_PAINTED while noEntryAvoid is 0; with no paint the field never wakes (the turn: builderSign.test.ts)", () => {
   assert.equal(NO_ENTRY_PAINTED, 4);
   // The colonies lay none of their own: a game with no paint never wakes the field.
   const g = game(20);
