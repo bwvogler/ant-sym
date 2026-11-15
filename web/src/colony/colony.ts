@@ -7,6 +7,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { heatStep } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
+import { clumpAt, type AphidOdour } from "./aphids.ts";
 import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
@@ -897,6 +898,70 @@ export class Colony {
     // Never past 40 % of the way to the nearest neighbour on that side: each midden on its own colony's ground (nests close together).
     const t = this.neighbour();
     return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
+  }
+
+  /** The aphids' odour in the air (aphids.ts, ja-nzkg.3): the game's, shared by its colonies; null until a clump is put down. */
+  aphidOdour: AphidOdour | null = null;
+  /**
+   * Whether ant i, heading h, smells aphids in the air (docs/aphids.md, ja-nzkg.3) on any of its three sensors, within its
+   * species' aphidPlume; if so, the turn of at most `max` toward the strongest is left in plumeTurn. Leaves CELL as it found it.
+   */
+  smellsAphids(i: number, h: number, a: number, max: number): boolean {
+    const dist = this.aphidOdour?.dist;
+    if (!dist) return false;
+    const keepX = CELL[0];
+    const keepY = CELL[1];
+    const range = this.params.aphidPlume;
+    const d = this.params.sensorDistance;
+    const read = (b: number) => {
+      cellOf(this.x[i] + Math.cos(b) * d, this.y[i] + Math.sin(b) * d);
+      return plumeAt(dist, this.map, range, CELL[0], CELL[1]);
+    };
+    const l = read(h - a);
+    const f = read(h);
+    const r = read(h + a);
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    if (Math.max(l, f, r) <= 0) return false;
+    this.plumeTurn = climb(l, f, r, max);
+    return true;
+  }
+
+  /**
+   * Whether ant i touches a living aphid clump (docs/aphids.md finding 5, ja-nzkg.4): on the plane, on an aphid cell or one of
+   * the six beside it, by contact (the plume's first step). The clump in contact is a cuticular cue the sense table has.
+   */
+  atAphids(i: number): boolean {
+    const dist = this.aphidOdour?.dist;
+    if (!dist || (this.entrance !== null && (this.line === null || this.cur !== PLANE))) return false;
+    const keepX = CELL[0];
+    const keepY = CELL[1];
+    cellOf(this.x[i], this.y[i]);
+    const { w, h } = this.map.size;
+    const col = CELL[0] - this.map.x0;
+    const row = CELL[1];
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    if (col < 0 || row < 0 || col >= w || row >= h) return false;
+    const d = dist[row * w + col]!;
+    return d >= 0 && d <= 1;
+  }
+
+  /**
+   * Whether an ant taking food at cell (cx, cy) takes an aphid instead (docs/aphids.md finding 6, ja-nzkg.5): on a living aphid
+   * cell, with the chance aphidPrey; the clump loses the aphid and the honeydew stays. Draws a number only on an aphid cell.
+   */
+  preyAphid(cx: number, cy: number): boolean {
+    const o = this.aphidOdour;
+    if (this.params.aphidPrey <= 0 || !o?.dist) return false;
+    const { w, h } = this.map.size;
+    const col = cx - this.map.x0;
+    if (col < 0 || cy < 0 || col >= w || cy >= h || o.dist[cy * w + col] !== 0) return false;
+    const clump = clumpAt(o.clumps, cx, cy);
+    if (!clump || this.rng() >= this.params.aphidPrey) return false;
+    clump.eaten += 1;
+    this.map.foodTotal += 1; // food the map never held, counted as honeydew is, so the stats' share stays a share (review of #243, N4)
+    return true;
   }
 
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */

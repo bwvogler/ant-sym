@@ -76,16 +76,19 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   // A load just put down here isn't taken straight back up: not until the ant has stepped off the cell.
   const here = cellKey(CELL[0], CELL[1]);
   if (colony.putAt[i] !== here) colony.putAt[i] = NO_KEY;
+  // Taken at an aphid clump, it may be one of the aphids rather than honeydew (ja-nzkg.5): the honeydew stays.
+  let prey = false;
   if (
     !carrying &&
     !pellet &&
     colony.putAt[i] === NO_KEY &&
     map.food.get(CELL[0], CELL[1]) > 0 &&
     resp.get(touch(colony, i, toEnemy !== null, mode, item, "food"), colony.antDraw(i)) &&
-    takeFoodCell(map, CELL[0], CELL[1])
+    ((prey = colony.cur === PLANE || colony.entrance === null ? colony.preyAphid(CELL[0], CELL[1]) : false) ||
+      takeFoodCell(map, CELL[0], CELL[1]))
   ) {
     colony.carrying[i] = 1;
-    colony.quality[i] = qualityAt(map, CELL[0], CELL[1]);
+    colony.quality[i] = prey ? 1 : qualityAt(map, CELL[0], CELL[1]);
     if (p.siteFidelity > 0 && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
     colony.homeAfresh(i);
     colony.since[i] = 0;

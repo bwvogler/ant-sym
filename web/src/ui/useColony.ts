@@ -375,7 +375,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => cancelAnimationFrame(raf);
   }, [game, controls.playing, controls.speed, journal]);
 
-  // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
+  // The dev hook (window.jevAnts, the game and the page's views) is dev/hook.ts, installed by ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the hole of the colony its seed chose.
   useEffect(() => {
     if (controls.started && !game.landed) game.land(landingOf(game), GAME_STRAIN, { evolve: true });

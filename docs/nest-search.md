@@ -93,7 +93,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 
 ## How far the vector is off: the error grows like the square root of the distance out (ja-lp4.19)
 
-*Added 2026-11-15 for `ja-lp4.19` (PRD §78), against code at `5a646196`. Labels: **FT** read in full text, **cit** read in a citing paper's full text, **abs** abstract only (**unverified**). The research is in `ja-lp4.14`'s notes.*
+*Added 2026-11-15 for `ja-lp4.19` (PRD §79), against code at `5a646196`. Labels: **FT** read in full text, **cit** read in a citing paper's full text, **abs** abstract only (**unverified**). The research is in `ja-lp4.14`'s notes.*
 
 **Today** (`piErrorLaw` 0): the error is the odometer (`odoSurf`, the path walked since the ant came up its own hole) times one drift drawn per trip (`PI_DRIFT_2D` = 0.1/√2 a part: a median miss of 8.3 % of the path). It grows linearly with the path, and every step but the walk home adds, so fighting, defending and winding all enlarge it. In G1 (seeds 1–4, `ja-lp4.14`) ants 5–25 cells from their hole after winding paths missed by a median 97 % of that distance, and 15 defenders died 30–105 cells out believing they were within 10 of home (median 440 cells walked).
 
@@ -121,7 +121,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 | sources (that distance ×10 cm) | none below 5 m | 25 % (Merkle) | 25 % (Merkle), ~19 % (Pfeffer's 16 % SD as a 2D median: the conversion, assuming the same spread across the path as along it, is design) | 12 % (Merkle) |
 | law 0, a straight trip | 8.3 % | 8.3 % | 8.3 % | 8.3 % |
 
-In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50, 100 and 200 cells (law 0: 13–17 %, with a long tail from winding paths). Every figure is in PRD §78.
+In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50, 100 and 200 cells (law 0: 13–17 %, with a long tail from winding paths). Every figure is in PRD §79.
 
 **Fighting and defending.** Under law 1 they add only as far as they take the ant further out than it has been: a fight or a stretch of guarding near where it already went costs nothing. That is what the sources measure (the vector over an outbound path, the width set by distance out), not a rule for fighters; whether fights blur the vector more than walking was not looked at by any source found (**not found**).
 
@@ -135,7 +135,7 @@ In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50,
 - **The cue:** the ant's own home vector (sense table: path integration). Nothing new is sensed; the vector it already steers by is off by a different amount.
 - **Who reads it:** every belief of home on the plane (`believePlane`, `fromHomePlane` and so `homeDistPlane`, which gates defence by `homeGround`), the remembered food spot (`rememberSite`, `siteAim`), where spoil goes (`dig.ts`), and the loops' σ (`searchOn`, with `searchLoops`), so the search widens with distance out as Merkle & Wehner 2010 report.
 - **Off:** `piErrorLaw` 0, today's odometer, bit for bit.
-- **Built off** (2026-11-15, PRD §78): law 1 holds G1's guard better and its defenders die nearer home (median 20–25 cells out against 55–59), but the weakest colony carries 8–13 % less food and S1's short-trip searches, now facing 25 % misses, bring fewer home in 600 s. The default is the owner's call.
+- **Built off** (2026-11-15, PRD §79): law 1 holds G1's guard better and its defenders die nearer home (median 20–25 cells out against 55–59), but the weakest colony carries 8–13 % less food and S1's short-trip searches, now facing 25 % misses, bring fewer home in 600 s. The default is the owner's call.
 
 ## What was not found
 
