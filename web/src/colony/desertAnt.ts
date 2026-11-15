@@ -70,7 +70,7 @@ export const desertPolicy: Policy = (s) => {
   return "explore";
 };
 
-/** desertPolicy in words, for the Learn drawer (ruleTextAgrees holds them equal over every situation of DESERT_SCHEMA). */
+/** desertPolicy in words, for Lab mode's Policy tab (ruleTextAgrees holds them equal over every situation of DESERT_SCHEMA). */
 export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },

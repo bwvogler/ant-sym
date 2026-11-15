@@ -40,7 +40,8 @@
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
 //  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair (by
 //     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
-//     paused (off while playing); each tab; l closes it.
+//     paused (off while playing); each tab; the aim's "?" opens the Policy tab at its section (§69.8), and the Codex
+//     keeps only the guide and the nest; l closes it.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1811,6 +1812,80 @@ try {
     await bench.getByRole("tab", { name: tab }).click();
     check((await bench.getByRole("region", { name: card }).count()) === 1, `the ${tab} tab`);
   }
+  // The policy is the Lab's Policy tab (PRD §69.8): a "?" on the policy opens it at its section, and the Codex has none.
+  await lbp.getByRole("button", { name: "Lab: how the fungus decides" }).first().click();
+  check(
+    (await bench.getByRole("tab", { name: "Policy" }).getAttribute("aria-selected")) === "true" &&
+      (await bench.locator("details#lab-fungus").evaluate((d) => d.open)),
+    "the aim's “?” opens the Lab's Policy tab at the fungus's section",
+  );
+  check(
+    await lbp.evaluate(() => document.activeElement?.closest("details")?.id === "lab-fungus"),
+    "and the keyboard's focus lands in that section",
+  );
+  // Escape, with focus in the Lab, closes it and gives the map the focus (owner, D1 on #237); then l opens it again.
+  await lbp.keyboard.press("Escape");
+  await until(() => bench.count().then((n) => n === 0), "Escape in the Lab closes it", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "Escape in the Lab closes it, and the map has the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  const codexTabs = lbp.getByRole("dialog", { name: "Codex" }).getByRole("tab");
+  check(
+    JSON.stringify(await codexTabs.allTextContents()) === JSON.stringify(["Field guide", "Nest"]),
+    "the Codex keeps the field guide and the nest",
+  );
+  // Policy's pointer to the moved controls opens the Levers tab and leaves the keyboard on it (review of #237, N2).
+  await lbp.getByRole("button", { name: "Close the Codex" }).click();
+  await bench.getByRole("tab", { name: "Policy" }).click();
+  await bench.getByRole("button", { name: "The menu and the two settings: the Levers tab" }).focus();
+  await lbp.keyboard.press("Enter");
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") === "tab" && document.activeElement.textContent === "Levers"),
+    "Policy's “the Levers tab” opens it and leaves the focus on its tab",
+  );
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  await lbp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
+  // One Escape, one thing: with the Codex open over it, Escape in the Lab closes the Codex and leaves the Lab.
+  await bench.getByRole("tab", { name: "World" }).focus();
+  await lbp.keyboard.press("Escape");
+  await until(
+    () =>
+      lbp
+        .getByRole("dialog", { name: "Codex" })
+        .count()
+        .then((n) => n === 0),
+    "Escape closes the Codex first",
+    3000,
+    50,
+  );
+  check((await bench.count()) === 1, "with the Codex over the Lab, Escape closes the Codex and leaves the Lab");
+  // The Lab's ×, by key, gives the map the focus as Escape does.
+  await bench.getByRole("button", { name: "Close the Lab" }).focus();
+  await lbp.keyboard.press("Enter");
+  await until(() => bench.count().then((n) => n === 0), "the × closes the Lab", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "the Lab's × gives the map the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  // Opening the Lab takes no focus: from nowhere (as after Start), l then Space still pauses (review of #237, S1).
+  await lbp.keyboard.press("l");
+  await until(() => bench.count().then((n) => n === 0), "l closes the Lab", 3000, 50);
+  await lbp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
+  check(
+    await lbp.evaluate(() => document.activeElement?.getAttribute("role") !== "tab"),
+    "opening the Lab from nowhere leaves its tabs unfocused",
+  );
+  const runs = async () => {
+    const a = await lbp.evaluate(() => window.jevAnts.game.time);
+    await lbp.waitForTimeout(300);
+    return (await lbp.evaluate(() => window.jevAnts.game.time)) !== a;
+  };
+  const ranBefore = await runs();
+  await lbp.keyboard.press(" ");
+  await lbp.waitForTimeout(100);
+  check((await runs()) !== ranBefore, "and Space plays or pauses the game");
   await lbp.locator("canvas").first().focus();
   await lbp.keyboard.press("l");
   await until(
