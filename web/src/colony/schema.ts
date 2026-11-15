@@ -57,13 +57,17 @@ export function defineSchema<S extends object>(fields: readonly FieldOf<S>[]): S
       return s as S;
     },
     key(s) {
-      return fields
-        .map((f) => {
-          const v = read(s, f);
-          return f.key ? (f.key as (v: unknown) => string | null)(v) : String(v);
-        })
-        .filter((k) => k !== null)
-        .join("|");
+      // One pass, no arrays: the response lanes build a key per lookup in a replay (review of #199, N2).
+      let out = "";
+      let first = true;
+      for (const f of fields) {
+        const v = read(s, f);
+        const k = f.key ? (f.key as (v: unknown) => string | null)(v) : String(v);
+        if (k === null) continue;
+        out = first ? k : `${out}|${k}`;
+        first = false;
+      }
+      return out;
     },
     state(s) {
       const out: Record<PropertyKey, unknown> = {};
