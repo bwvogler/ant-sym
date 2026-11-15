@@ -6715,3 +6715,24 @@ Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defen
 
 - Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
+
+## 78. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
+
+**Basis:** [mutation-tree.md](mutation-tree.md), pure game design. **Owner (2026-11-15):** "What about these mutation upgrades reconsidered as a tech tree? Maybe a flatter cost, but dependencies?"; then the cost as *one price, rising per buy*, a *tree view* in the drawer, and, after a research pass for the edges was stopped by safeguards, "Try building it this way": the tree as design, with no research step (the adding-mechanics gate waived on that word).
+
+**The problem.** The 14 upgrades (26 levels) are a flat menu with no dependencies; each level's hand-set price (2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest, §50.13) does all the pacing, so the choice is mostly the cheapest item.
+
+**Decisions.**
+- One price for every level, rising with each level kept: `PRICE(n) = round(BASE · RATIO^n)`, first guess BASE 3, RATIO 1.38 (all 26 levels about 34,000 mutations, today's total) (owner: the shape; the numbers are tuned).
+- Levels need others first, by the table in the note; seven roots; the lethal levers last and still also on the menu (proposed: the owner edits the edges before code).
+- The drawer draws the tree; the list stays at phone width (owner).
+- No migration: saves stay keyed by upgrade id (owner, 2026-11-10: no backward compatibility).
+
+**Assays and targets.** Unit and soak tests for the price, the locks and the tree's guard (every need real, no cycle, every level reachable), each caught by a mutation. Pacing: about half of everything kept by 20 minutes (§50.13's aim), `progression.mjs --seconds 1200`. P1 (§63.4) on seeds 1–20 with `--hyphae --growth --flow`, against no hyphae on the same commit; BASE and RATIO chosen by the worst seed. The fungus golden is re-recorded (its game buys upgrades); the others stay bit-exact.
+
+**Cost.** None: no question, legend or cache key reads upgrade levels (`evolution.test.ts` pins the fungus key).
+
+**Beads.** `ja-52ui` (this); `ja-52ui.1` model, price and locks; `ja-52ui.2` the tree's edges; `ja-52ui.3` scripts and goldens; `ja-52ui.4` the drawer's tree view; `ja-52ui.5` text; `ja-52ui.6` pacing, P1 and tuning.
+
+**Still open.** The edges (owner); BASE and RATIO (measured); whether a level may need one of two others rather than both. When built, §50.13's price table is superseded.
+
