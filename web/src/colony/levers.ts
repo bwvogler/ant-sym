@@ -25,6 +25,8 @@ export interface Levers {
   clock: number;
   /** the calming cue the host gives off, 0..1: lowers the aggression it receives and gives (B1, Rickia's n-C23) */
   calm: number;
+  /** rouse (ja-rf5.18, docs/rouse.md: design): coming down its shaft, the host counts as this share of a finder to the ants waiting at the top */
+  rouse: number;
   /** added to the host's tolerance: it perceives fewer ants as strangers (B4); negative: more */
   tolerance: number;
   /** the fungal share of the host's odour, 0..MAX_MASK: the fungus's own odour, between the colonies' (B3/B7) */
@@ -59,6 +61,7 @@ export const AS_IS: Levers = {
   foreignFood: 0,
   clock: 1,
   calm: 0,
+  rouse: 0,
   tolerance: 0,
   mask: 0,
   lay: 1,
@@ -97,6 +100,8 @@ export interface Lever {
   hosts?: "workers" | "queen" | "both";
   /** the pheromone channels it acts on (ja-fnd.5.11): on a species that lacks all of them it does nothing (inertLevers) */
   channels?: readonly Channel[];
+  /** it acts only on a species whose finders invite (invitePace > 0: the desert ant); inert on one that doesn't (ja-rf5.18) */
+  invite?: true;
 }
 
 const five = (field: keyof Levers, v: readonly number[]): Partial<Levers>[] => v.map((x) => ({ [field]: x }));
@@ -241,6 +246,18 @@ export const LEVERS: readonly Lever[] = [
     brief: "a cue that calms the ants it meets",
     words: ["as is (none)", "some", "strong"],
     values: five("calm", [0, 0.4, 0.8]),
+    asIs: 0,
+  },
+  {
+    id: "rouse",
+    kind: "emit",
+    invite: true,
+    name: "rouse",
+    blurb:
+      "coming down its shaft, the host stirs the nestmates waiting at the top as a finder does: they go out on a false invitation (desert ants; design, docs/rouse.md)",
+    brief: "the host invites the nestmates waiting at its hole out, as a finder does (desert ants only)",
+    words: ["as is (none)", "some", "strong"],
+    values: five("rouse", [0, 0.5, 1]),
     asIs: 0,
   },
   {
@@ -486,7 +503,8 @@ export function leverFor(v: Lever, queen: boolean): boolean {
  * The levers that do nothing on a species with only these channels (ja-fnd.5.11): every channel a lever acts on is one the species lacks, so
  * there is no scent for it to bend. The Fungus panel can grey them (ja-fnd.5.12). null: the generic ant, which has every channel: none.
  */
-export function inertLevers(has: readonly Channel[] | null): string[] {
-  if (!has) return [];
-  return LEVERS.filter((v) => v.channels && v.channels.every((ch) => !has.includes(ch))).map((v) => v.id);
+export function inertLevers(has: readonly Channel[] | null, invites = false): string[] {
+  return LEVERS.filter(
+    (v) => (v.invite && !invites) || (has !== null && v.channels !== undefined && v.channels.every((ch) => !has.includes(ch))),
+  ).map((v) => v.id);
 }

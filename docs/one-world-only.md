@@ -172,17 +172,17 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | `regulateStop` A5b | yes: §48.2, §48.4 | `onPlaneAssay(regulateStop, gateProbe)` | covered | plane 8/10 |
 | `pass` A6 | yes: §42.2, §46.4, §49.3, §54.3 | `passAssay(onPlane)` | covered, needs a new setup | **plane 5/10**: fought in the tunnels (one-world.md §5 says U6b should revisit). Both sides run on `stanceGate: 0` with `stance: always("raid")` (`experiment.ts:935-941`), which the twin keeps (`onPlane` swaps only the map, `:1596-1605`). The attackers also march at the defenders' hole by the colony field (`steer.ts:425`; "every attacker marches at the defenders' hole (raidGate 0)", `:932-941`). With the broadcast gone (owner, 2026-11-14), A6 needs a new setup and baseline, like A13 (risk 1b): the harness walks the attackers to the hole (review of #184 D2), and the defenders get a setup that still forms a battle at the pass. PRD §54.2 gives the reason, `experiment.ts:935-936` the numbers: with their own stance, defenders 40 cells from home turned away from the pass (gain 1.64 against 1.95) |
 | `open` A6 control | report only (part of A6) | `onPlaneAssay(open)` | covered | |
-| `raidFind` A11 | yes: §49.3, §49.7, §54.3 | none: `ONE_PENDING` "U6b: raids by trail on one world" | **port** | slow guard `slow/raidFind.test.ts` |
-| `raidStop` A12 | yes: §49.3, §49.7, §54.3 | none: `ONE_PENDING` (same reason) | **port** | slow guard `slow/raidStop.test.ts` |
+| `raidFind` A11 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210, PRD §51 "U6b built") | **ported** | slow guard `slow/raidFind.test.ts` |
+| `raidStop` A12 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210) | **ported** | slow guard `slow/raidStop.test.ts` |
 | `contact` A9 | yes: §46.4, §54.3 | `onPlaneAssay(contact)` | covered | **plane 3/10** (worst 9.99 lost per 100 food, PRD §58's latest one-world run) |
 | `defendHome` A13 | yes: §54.3 (15/20; food 0.63, broadcast 0.62) | **none**, in neither `ONE_ASSAYS` nor `ONE_PENDING` | **port**, needs a new setup | its `broadcast` arm uses `stanceGate: 0`, the colony-wide stance S2 deletes, so the score needs a new control. The war party is a broadcast raider in every arm (`rivalStance: always("raid")`, `rival: { raidGate: 0, stanceGate: 0 }`, `experiment.ts:1256-1257`): it marches at the colony's hole by `steer.ts:425`, which reads the colony `stance` field. Decided (owner, 2026-11-14), review of #184 D2: the assay harness walks the attackers to the hole itself, and colony code keeps no march by coordinates (risk 1) |
 | `faintAlarm` A10 | yes: §46.4 | `onPlaneAssay(faintAlarm)` | covered | plane 0/10 (legacy 3/10–5/20; the slow test is `todo` ja-je8) |
 | `game` G | yes: §42.2, §46.4 | `game1` (G1) | covered | G1 slow guard on seeds 4, 5, 9 passes (route memory, §59) |
 | `gameTop` G′ | yes: §42.2, §46.4 (G′ table) | none | **delete** | report-only bench bed on `OPEN_WORLD`, no queen. G1 replaces it as the whole-game measure |
 | `nestFlow` A8 | yes: §43.4, §46.4 (report only) | `nestFlowOne` | covered | one world: beyond 0.77 (worst 0.37) against 1.00 (one-world.md §5) |
-| `lifecycle` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §71.2) | solo side game with the fungus landed; → `generateOneWorld` solo |
-| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | `lifecycleOne` | **ported** (PRD §71.2) | as above |
-| `lifecycle-scent` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §71.2) | as above |
+| `lifecycle` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §74.2) | was a solo side game with the fungus landed; now a solo `generateOneWorld` (the side-view versions stay in `ASSAYS` until step 4) |
+| `lifecycle-signal` L | yes: §50.19, §50.21 (table), seeds 11–20 too | `lifecycleOne` | **ported** (PRD §74.2) | as above |
+| `lifecycle-scent` L | yes: §50.19, §50.21 | `lifecycleOne` | **ported** (PRD §74.2) | as above |
 
 ## 3. Slow guards (`tests/slow/*.test.ts`)
 
@@ -246,7 +246,7 @@ Per-test totals, counted roughly from the notes: about **97 port**, about **28 c
 About 60 of the ports are in-nest mechanics (curtain): chambers, brood, queen, gynes, food flow, hunger, zoning.
 For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `smallOne()` and re-deriving cells in the curtain, since the curtain runs the side view's nest code.
 
-**Assays** (20 in `ASSAYS`): covered 13 (A1, A2a, A2b, A3, A4, A5, A5b, A6, A6-open, A9, A10, G → G1, A8 → nestFlowOne); port 6 (A11, A12, A13, L ×3); delete 1 (G′).
+**Assays** (20 in `ASSAYS`): covered 13 (A1, A2a, A2b, A3, A4, A5, A5b, A6, A6-open, A9, A10, G → G1, A8 → nestFlowOne); ported 5 (A11 and A12 by #210, L ×3 by #211); port 1 (A13); delete 1 (G′).
 **Slow guards** (12 files, G1's three as one guard): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
 
 **Riskiest: a PRD baseline and no one-world coverage**
@@ -254,7 +254,7 @@ For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `s
 
    1b. **A6 `pass`** (§42.2, §46.4, §49.3, §54.3): "covered" by `passAssay(onPlane)`, but both sides are broadcast raiders (`stanceGate: 0`), and the attackers march at the defenders' hole by the same branch. Once the broadcast goes it needs a new setup and baseline.
 2. **A11 `raidFind`, A12 `raidStop`** (§49.3, §49.7, §54.3): pending since U6b. These are the slow guards `raidFind.test`/`raidStop.test`. (`ja-d6c`, the raid trail on one world's surface, is closed: raids from a scout's trail run on the plane since `ja-web`.)
-3. **L lifecycle ×3** (§50.19, §50.21): gynes, flights and daughters. The only measure of them, plus `soak/royal.test.ts`'s ~12 tests, all in the side nest. No one-world test rears a gyne.
+3. **L lifecycle ×3** (§50.19, §50.21): gynes, flights and daughters. The only measure of them, plus `soak/royal.test.ts`'s ~12 tests, all in the side nest. The three now run on one world (PRD §74.2, where one world rears far fewer gynes: `ja-lp4.6.12`), but still no test rears a gyne; that stays with the `soak/royal` port.
 4. **A5 and A9 as slow guards**: the legacy arena passes 10/10, the plane 0/10 and 3/10. Porting the slow guard as-is fails, so S2 step 2 must re-mark them with the owner (the worst-seed rule).
 5. **Side economy hour** (`slow/economy.test.ts`, PRD §41/§50.18; ja-xu6): the only long-run nest-economy guard.
 6. **Unity in a real game** (`soak/recognition*.test.ts`, PRD §53): its one-world twin is skipped (ja-lp4.6.6).

@@ -294,6 +294,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
   // A single-map game saves none of one world's parts (`world`, a colony's or the fungus's `layers`): held here by name.
   const game = [
     "colonies",
+    "crayons",
     "flights",
     "founded",
     "fungus",
@@ -319,6 +320,7 @@ test("a single-map save's shape: the game's keys with the grids, colony saves as
     "evolution",
     "hosts",
     "hyphae",
+    "links",
     "menu",
     "params",
     "rule",

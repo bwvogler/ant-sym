@@ -144,6 +144,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
 1. **The situation schema as data.**
    - A table of fields (name, values, legend line) generates the encoder, the decoder, `SITUATIONS`, the cache key, the state sent to Jev, `COLONY_LEGEND` and the `policyText` rows.
    - A snapshot test proves every string is byte-identical to today's.
+   - The response lanes' situation too (`ja-fnd.5.6`): `Touch`'s 14 fields are declared once (`responses.ts` `TOUCH_SCHEMA`), and `touchKey`, each hook's `responseKey` and `RESPONSE_LEGEND` come from them. A field's `key` may give null to leave itself out of the key (quality, when fair). `tests/unit/touchSchema.test.ts` checks every key against the hand-written ones over all 28,800 combinations of the key's fields and pins the legend's hash. `packResponseRequest` still picks each lane's fields by hand: the order of the ants' fields in the request is part of what Jev reads.
 2. **A lane registry (`LaneSpec`)**, declared once in `colony/lanes.ts` (one file: three rows do not need a directory; slices in `ja-fnd.5.2`). Each lane lists:
    - its name, id prefix, context and version
    - its schema, question, pack/read/valid and local rule
@@ -153,6 +154,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
 
    Everything else loops over the registry:
    - `ui/colonyJev.ts` keeps only the runtime state.
+     Built for the client's lanes (`ja-fnd.5.7`): the fungus and growth lanes are their rows with the client's menu, view and local rule bound in, as the ants' are their rows with the species' words; `seed` checks a context's answers by its row (`#validFor`), not a lane built for the purpose; and the state's per-lane counters are one record, `state.lanes[name] = { asked, cached }`, so a lane added to the registry gets its counters without a new field.
    - `prompt.ts`, the token estimates, Learn, the follow card and `precache` read from it.
    - The response hooks become entries in it.
 3. **A `Species` descriptor** (designed in [species.md](species.md): three tiers, tier 1 first, one species per game first; slices in `ja-fnd.5.3`) with:

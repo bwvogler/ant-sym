@@ -9,8 +9,8 @@
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
-// whole one-world game. The ids are the legacy ones; those not rerun yet (ONE_PENDING: A11, A12) are listed
-// with why. Without --one, `game1` still names G1.
+// whole one-world game. The ids are the legacy ones (U6b added A11 and A12); an assay listed in
+// ONE_PENDING, none now, is reported with why it is not rerun. Without --one, `game1` still names G1.
 //
 // --species <id> plays every run's colonies as that species (colony/species.ts SPECIES, e.g. desert); --set's colony values
 // still apply over its own. Not with --policy (a replayed cache holds the generic ant's answers).

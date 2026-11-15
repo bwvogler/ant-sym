@@ -256,6 +256,28 @@ export interface ColonyParams {
   /** One world's plane, with routeMemory: places an ant stores (when full it keeps every second and doubles its spacing). Read when the colony is built (the arrays' size). */
   routeMax: number;
   /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where a retrace joins the stored way out. 0 = at
+   * its newest place (back where it picked up). 1 = once its vector has run out near home (it reached its belief, found no hole
+   * and is searching there), at the nearest stored place it can see (a clear straight line), else its newest; a stall before
+   * that, at or near the pickup, still starts from its newest place. A route is taken up at the stage reached (Freas & Spetch
+   * 2024), and a zero-vector ant backtracks only a short way before it searches (Wystrach et al. 2013). 2 = the nearest place in
+   * view at every retrace (the first build: A2b lost seeds 9, 23 and 24 of 30). Steering only.
+   */
+  routeJoin: number;
+  /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): where the search goes once a retrace is over.
+   * 0 = round its vector's end, as before the retrace; 1 = afresh (from SEARCH_START) round its first stored place, the
+   * familiar place nearest its hole (near the nest, remembered views outweigh a vector run down: Bregy, Sommer & Wehner
+   * 2008). Steering only.
+   */
+  routeEnd: number;
+  /**
+   * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): 1 = an ant walking out in `fight` mode stores its
+   * places too, as an explorer does (a fighter that then finds food had no way out to retrace: G1 seed 3); 0 = only exploring and
+   * following. The literature is silent on fighters (design). Steering only.
+   */
+  routeFight: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -404,6 +426,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,
+  routeJoin: 0,
+  routeEnd: 1,
+  routeFight: 0,
   raidGate: 1,
   raidLay: 1,
   findAt: 0.3,
