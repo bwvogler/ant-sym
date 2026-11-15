@@ -26,7 +26,10 @@ test("a “?” on the policy opens the Lab's Policy tab at its section, and clo
   assert.deepEqual(learnTarget(), { tab: "nest" }, "the Codex's own tabs still open the Codex");
   assert.deepEqual(labTarget(), { tab: "policy", id: "fungus" }, "and leave the Lab as it was");
   closeLearn();
-  openLab({ tab: "levers" });
+  const levers = { tab: "levers" } as const;
+  openLab(levers);
+  openLab(levers);
   assert.deepEqual(labTarget(), { tab: "levers" });
+  assert.notEqual(labTarget(), levers, "a copy each call: the same target opened twice still reads as a new press");
   closeLab();
 });
