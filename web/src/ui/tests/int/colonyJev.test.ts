@@ -1076,6 +1076,9 @@ test("a lane's asked counts what it sent, less what came back busy; a new run st
   }) as typeof fetch;
   const j = make();
   const c = colony();
+  // Half the ants tired, so the first request (the one held, then busy) carries more than one situation: a rollback by 1
+  // instead of by the request's size would otherwise pass (review of #221, S1).
+  for (let i = 0; i < c.n; i += 2) c.tired[i] = 1;
   j.attach(c);
   await j.start();
   run(c, 2);
@@ -1084,6 +1087,7 @@ test("a lane's asked counts what it sent, less what came back busy; a new run st
   const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
   await tick(30); // the first mode request is out, held
   assert.ok(sizes.length >= 1);
+  assert.ok(sizes[0]! >= 2, `the busy request carries more than one situation (${sizes[0]})`);
   assert.equal(j.state.lanes.mode.asked, sum(sizes), "counted when sent");
   gate.resolve(); // busy: its situations are taken back off the count
   await tick(0);
