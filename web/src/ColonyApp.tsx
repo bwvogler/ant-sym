@@ -454,9 +454,10 @@ export default function ColonyApp() {
     (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => apply(foundOnWords(game, jev, f, d, at)),
     [game, jev, apply],
   );
+  // The pen's side and distance chooser is the side view's: it goes with the page's view code (S2.3e); she flies as the game says.
   const foundHers = useCallback(
-    (d: DoctrineChoice, at: Landing) => {
-      if (flight) foundOn(flight, d, game.landingAt(flight.mother, at.side, at.distance) ?? game.landing(flight.mother));
+    (d: DoctrineChoice, _at: Landing) => {
+      if (flight) foundOn(flight, d, game.landing(flight.mother));
     },
     [flight, game, foundOn],
   );

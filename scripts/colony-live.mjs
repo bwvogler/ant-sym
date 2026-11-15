@@ -1,7 +1,6 @@
 // Live, real spend (hard budget): ask Jev the colony's questions for every
 // situation an offline game meets, and compare its answers with the local
-// rule. One headless game (experiment.runGame: the page's side view by
-// default, --top for the top-down map; the local rule and local responses,
+// rule. One headless game (experiment.runGame: the page's one world, generateOneWorld(seed); the local rule and local responses,
 // alarm painted about every 20 s) collects the distinct situations of each
 // lane: ant modes, stances, and the get/carry/drop/trail responses
 // (colonyBrain.RESPONSE_HOOKS, keyed by colonyBrain.responseKey). Then, per
@@ -24,7 +23,7 @@
 // JEV_API_KEY comes from the environment and is never printed.
 //
 // Usage: node scripts/colony-live.mjs <all|mode|stance|get,carry,drop,trail> [--budget 0.10] [--seconds 300]
-//        [--seed 1] [--ants 600] [--top] [--doctrines forage,cautious,warlike] [--from <cache>] [--dry]
+//        [--seed 1] [--ants 600] [--doctrines forage,cautious,warlike] [--from <cache>] [--dry]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { JevClient } from "../web/server/jev.ts";
@@ -43,10 +42,8 @@ import {
   STANCE_BRAIN_VERSION,
   localResponses,
   responses,
-  generateSideWorld,
-  generateWorld,
+  generateOneWorld,
   mulberry32,
-  OPEN_WORLD,
   worldExtent,
   pick,
   topOf,
@@ -66,7 +63,6 @@ const opts = {
   seconds: 300,
   seed: 1,
   ants: 600,
-  top: false,
   doctrines: "forage,cautious,warlike",
   from: null,
   dry: false,
@@ -85,8 +81,7 @@ for (let k = 0; k < args.length; k++) {
     opts.ants = Number(args[++k]);
     given.add("ants");
   } else if (a === "--top") {
-    opts.top = true;
-    given.add("top");
+    throw new Error("--top: the top-down map is gone (one world is the only game, S2.3d)");
   } else if (a === "--doctrines") opts.doctrines = args[++k];
   else if (a === "--from") opts.from = args[++k];
   else if (a === "--dry") opts.dry = true;
@@ -147,7 +142,8 @@ const doctrines = base
       if (!d) throw new Error(`no doctrine ${id} (have ${DOCTRINES.map((x) => x.id).join(", ")})`);
       return d;
     });
-const view = base?.view ?? (opts.top ? "top" : "side");
+// One world asks the fungus lane under the "side" context (the page's: it has a nest), the one the shipped answers are keyed by.
+const view = "side";
 
 // 1. Offline: the distinct situations of each lane from one game: on the local rule, or (--from) on the cache,
 // collecting only the situations it has no answer for.
@@ -169,8 +165,8 @@ const brain = (lane) => (s, draw) => {
   note(lane, s);
   return LANES[lane].local(s);
 };
-const map = view === "top" ? generateWorld(opts.seed, OPEN_WORLD) : generateSideWorld(opts.seed);
-const extent = worldExtent(map);
+const world = generateOneWorld(opts.seed);
+const extent = worldExtent(world.plane);
 const paint = mulberry32(opts.seed + 99);
 /** @type {import("../web/src/colony/experiment.ts").Event[]} */
 const events = [];
@@ -179,7 +175,7 @@ for (let t = 0; t < opts.seconds; t += DT)
     events.push({ at: t, kind: "paint", channel: "alarm", x: paint() * extent.w, y: paint() * extent.h, r: 3, amount: 12 });
 const { game } = runGame({
   seed: opts.seed,
-  map,
+  map: world,
   game: { antCount: opts.ants, rivalAnts: opts.ants },
   sides: {
     policy: brain("mode"),
@@ -190,7 +186,7 @@ const { game } = runGame({
   events,
 });
 console.log(
-  `offline (${view} view): seed ${opts.seed}, ${opts.ants} + ${opts.ants} ants, ${opts.seconds} s${base ? `, replaying ${opts.from}` : ""} · food home ${game.colonies.map((c) => c.stored).join(" / ")} · ${base ? "situations the cache lacks" : "situations met"}: ${chosen.map((l) => `${l} ${met[l].size}`).join(", ")}`,
+  `offline (one world): seed ${opts.seed}, ${opts.ants} + ${opts.ants} ants, ${opts.seconds} s${base ? `, replaying ${opts.from}` : ""} · food home ${game.colonies.map((c) => c.stored).join(" / ")} · ${base ? "situations the cache lacks" : "situations met"}: ${chosen.map((l) => `${l} ${met[l].size}`).join(", ")}`,
 );
 
 // 2. Live, per doctrine and lane, within the budget.

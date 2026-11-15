@@ -8,11 +8,10 @@
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
-// --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
-// (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
-// the rng this script always used, so earlier figures reproduce. --one plays one world (generateOneWorld(seed), gameRng(seed);
-// docs/one-world.md), its alarm painted on the plane: each ant keeps its own stance, and `leave` is asked of the foragers
-// held at the gate at the top of their shafts (ja-web, PRD §48.6), so the leave lane is counted like the others.
+// It plays one world (generateOneWorld(seed), gameRng(seed); docs/one-world.md), its alarm painted on the plane: each ant keeps
+// its own stance, and `leave` is asked of the foragers held at the gate at the top of their shafts (ja-web, PRD §48.6), so the
+// leave lane is counted like the others. --one is accepted and ignored: one world is the only game (S2.3d); the side view and
+// the top-down map this once played are gone, so figures from before are not comparable.
 //
 // The ant's response lanes (get, carry, drop, trail: colonyBrain.RESPONSE_HOOKS)
 // are estimated too, as if each were asked like the modes; they are not asked
@@ -21,7 +20,7 @@
 // --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule, and its stance lane only if it has one; the
 // generic ant without it. Known here: generic, desert (docs/desert-ant.md).
 //
-// Usage: node scripts/colony-cost.mjs [--side | --one] [--species <id>] [minutes=10] [ants=600] [seed=1]
+// Usage: node scripts/colony-cost.mjs [--species <id>] [minutes=10] [ants=600] [seed=1]
 import {
   LANES,
   PLANE,
@@ -36,8 +35,6 @@ import {
   Game,
   gameRng,
   generateOneWorld,
-  generateSideWorld,
-  generateWorld,
   mulberry32,
   worldExtent,
   GENERIC_ANT,
@@ -47,8 +44,6 @@ import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
-const side = process.argv.includes("--side");
-const one = process.argv.includes("--one");
 const KNOWN = { generic: GENERIC_ANT, desert: DESERT_ANT };
 const sAt = process.argv.indexOf("--species");
 const speciesId = sAt >= 0 ? process.argv[sAt + 1] : "generic";
@@ -56,14 +51,14 @@ const species = KNOWN[speciesId];
 if (!species) throw new Error(`--species: no "${speciesId}" (known: ${Object.keys(KNOWN).join(", ")})`);
 const [minutes = 10, ants = 600, seed = 1] = process.argv
   .slice(2)
-  .filter((a, k, all) => a !== "--side" && a !== "--one" && a !== "--species" && all[k - 1] !== "--species")
+  .filter((a, k, all) => a !== "--one" && a !== "--species" && all[k - 1] !== "--species")
   .map(Number);
 const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const world = one ? generateOneWorld(seed) : side ? generateSideWorld(seed) : generateWorld(seed);
-const extent = worldExtent("plane" in world ? world.plane : world);
+const world = generateOneWorld(seed);
+const extent = worldExtent(world.plane);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -140,7 +135,7 @@ const hooks = Object.fromEntries(
     ),
   ]),
 );
-const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
+const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, gameRng(seed), {
   policy: modes.policy,
   ...(stances ? { stance: stances.policy } : {}),
   responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
@@ -188,7 +183,7 @@ for (const d of plan) {
       next = t + BATCH_EVERY;
     }
     // The fungus paints a blot of alarm somewhere every ~20 s.
-    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, ...(one ? [PLANE] : [])); // world units: rows are R apart
+    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, PLANE); // world units: rows are R apart
   }
   flush();
   phases.push({
@@ -203,7 +198,7 @@ for (const d of plan) {
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
 console.log(
-  `game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}${species === GENERIC_ANT ? "" : `, ${species.name}`}${stances ? "" : ", no stance lane"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
+  `game cost, offline (one world${species === GENERIC_ANT ? "" : `, ${species.name}`}${stances ? "" : ", no stance lane"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
 );
 console.log(
   `you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`,

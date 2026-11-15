@@ -39,7 +39,6 @@ export class AntStep {
   nursing = false;
   outward = false;
   reporting = false;
-  gate = false;
   goal!: Nest;
   nest!: Nest;
   x0 = 0;
@@ -48,8 +47,6 @@ export class AntStep {
   prevMode = 0;
   item!: Item;
   resp!: Responses;
-  waiting = false;
-  rolled = false;
   fleeFrom: number | null = null;
   map!: WorldMap;
   ph!: Pheromones;
@@ -63,7 +60,6 @@ export class AntStep {
 
 /** One layer's gates for a tick (Colony.tick): whether it gates leaving, raids by trail and each ant's own stance, and their leaks. */
 export interface Gates {
-  gate: boolean;
   /** one world's curtain (ja-web): outgoing foragers are held at the top of their own shaft (the gate) and asked `leave` there */
   hold: boolean;
   /** whether `met` leaks on this layer: where the colony gates leaving (one world: on both layers, so it fades on a trip out too) */
@@ -85,13 +81,11 @@ export interface Gates {
  * own stance stay the plane's.
  */
 export function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: number): Gates {
-  const gate = p.leaveGate > 0 && open && !one;
   const hold = p.leaveGate > 0 && one && !open;
   const leak = p.leaveGate > 0 && (open || one);
   const rgate = p.raidGate > 0 && open;
   const sgate = p.stanceGate > 0 && open;
   return {
-    gate,
     hold,
     leak,
     metLeak: leak ? Math.exp((-dt * Math.LN2) / MET_HALF) : 1,

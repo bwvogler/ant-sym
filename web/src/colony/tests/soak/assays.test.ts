@@ -13,8 +13,8 @@ import { oneColony, smallOne } from "../builders.ts";
 // make them pass (docs/PRD.md §42). Full sweeps: npm run exp.
 
 test("runGame: the same seed gives the same numbers", () => {
-  const a = runAssay(deplete, 3, {}, 90).metrics;
-  const b = runAssay(deplete, 3, {}, 90).metrics;
+  const a = runAssay(oneAssay("deplete"), 3, {}, 90).metrics;
+  const b = runAssay(oneAssay("deplete"), 3, {}, 90).metrics;
   assert.deepEqual(a, b);
 });
 

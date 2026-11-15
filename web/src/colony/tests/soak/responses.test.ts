@@ -653,28 +653,3 @@ test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none
   assert.equal(g.s0?.raid, undefined, "only the leave lane is sent either");
   assert.equal(g.s0?.crowd, undefined);
 });
-
-test("leave (behaviour MR 5): a rested forager home waits until nestmates come home with food; a scout goes anyway", () => {
-  // Ant 0 is home, rested, in "return". Ant 1, if there, comes home beside it with food once a second and puts it down.
-  const run = (returns: boolean, scoutRate: number) => {
-    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 1, scoutRate }, mulberry32(3));
-    put(c, 0, 6, 6);
-    c.mode[0] = 2; // return
-    if (!returns) c.alive[1] = 0;
-    for (let k = 0; k < 30 * 20; k++) {
-      if (returns && k % 30 === 0) {
-        c.x[1] = c.x[0]!;
-        c.y[1] = c.y[0]!;
-        c.carrying[1] = 1;
-        c.mode[1] = 2;
-      }
-      c.tick(1 / 30);
-      if (c.mode[0] !== 2) return k / 30;
-    }
-    return Infinity;
-  };
-  assert.equal(run(false, 0), Infinity, "with nobody coming home with food and no scouting, it waits, and stays in the nest");
-  const met = run(true, 0);
-  assert.ok(met < 10, `nestmates coming home with food send it out (${met.toFixed(1)} s)`);
-  assert.ok(run(false, 5) < 2, "a high scout rate sends it out with no returns");
-});

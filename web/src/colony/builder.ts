@@ -150,24 +150,20 @@ export function guarded(game: Game, layer: number): Set<number> {
   const out = new Set<number>();
   const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
   const add = (x: number, y: number) => out.add(key(x, y));
-  const one = game.layers.length === 1;
   for (const c of game.colonies) {
-    // Its own hole: the plane cell over it above, the crust's cell below; on one map, its nest (and the side view's entrance).
+    // Its own hole: the plane cell over it above, the crust's cell below.
     const h = c.holeCells[c.params.nest];
-    const holes: { x: number; y: number }[] = [];
-    if (one) {
-      holes.push({ x: c.nest.x, y: c.nest.y });
-      if (c.nest.entrance) holes.push(c.nest.entrance);
-    } else if (h)
-      holes.push(layer === PLANE ? { x: centreX(h.px, h.py), y: centreY(h.py) } : { x: centreX(h.col, h.row), y: centreY(h.row) });
-    for (const p of holes) disc(map, p.x, p.y, BUILD.holeGuard, add);
+    if (h) {
+      const p = layer === PLANE ? { x: centreX(h.px, h.py), y: centreY(h.py) } : { x: centreX(h.col, h.row), y: centreY(h.row) };
+      disc(map, p.x, p.y, BUILD.holeGuard, add);
+    }
     for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i] || (!one && c.layer[i] !== layer)) continue;
+      if (!c.alive[i] || c.layer[i] !== layer) continue;
       c.antCell(i);
       add(CELL[0], CELL[1]);
     }
-    // Brood and the queen lie underground (the curtain in one world).
-    if (one || layer === CURTAIN) {
+    // Brood and the queen lie underground (the curtain).
+    if (layer === CURTAIN) {
       for (const b of c.brood.items) add(b.x, b.y);
       if (c.queen?.alive) {
         cellOf(c.queen.x, c.queen.y);

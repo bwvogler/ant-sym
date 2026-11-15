@@ -26,9 +26,6 @@ export const LEAVE_NOW = 1;
 /** leave answered "soon" */
 export const LEAVE_SOON = 0.2;
 
-/** how far out a waiting forager mills, as a share of the nest's radius (behaviour MR 5) */
-export const WAIT_RIM = 0.9;
-
 /**
  * One world (ja-web): the gate is the top of the ant's own shaft, cells within this many steps of its hole along its
  * tunnels. An outgoing forager is held there, milling, until it is asked out (`leave`) or has a pass.

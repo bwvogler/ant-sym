@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AUTOSAVE, describe, memorySaves, newestReadable, readable, record } from "../saves.ts";
-import { Game, generateWorld, mulberry32, OPEN_WORLD, generateOneWorld } from "../../colony/index.ts";
+import { Game, mulberry32, generateOneWorld } from "../../colony/index.ts";
 
 /** A small one-world game: the page plays one world only (PRD §55), so only its saves are offered. */
 const small = (seed: number) =>
@@ -52,10 +52,11 @@ test("a save from another version is listed but never offered or loaded: Continu
 });
 
 test("a save from a single map (the side view or the open surface) is listed but never offered: the page plays one world (PRD §55)", () => {
-  const g = new Game(generateWorld(4, { ...OPEN_WORLD, size: { w: 120, h: 80 } }), { antCount: 30, rivalAnts: 30 }, mulberry32(4));
+  // No Game can make one now: a single map's save is a one-world save without its `world` (what a record from before S2 holds).
+  const { world: _world, ...single } = small(4).save();
   const settings = { species: "generic", seed: 4, antCount: 30, rival: true, generation: 0 };
   const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
-  const flat = { ...record(AUTOSAVE, settings, player, g.save(), "1. land"), savedAt: 2000 };
+  const flat = { ...record(AUTOSAVE, settings, player, single as unknown as ReturnType<Game["save"]>, "1. land"), savedAt: 2000 };
   const one = { ...record(1, settings, player, small(4).save(), "1. land"), savedAt: 1000 };
   assert.equal(readable(flat), false);
   assert.equal(newestReadable([flat, one]), one, "Continue skips it for the newest one-world save");

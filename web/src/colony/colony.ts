@@ -105,7 +105,6 @@ export {
   T_EGG,
   T_LARVA,
   T_PUPA,
-  WAIT_RIM,
   WAIT_STEPS,
   WALL_LOST,
 } from "./tuning.ts";
@@ -427,12 +426,6 @@ export class Colony {
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   storedSeen = 0;
-  /**
-   * Foragers home with food, per cell where each put it down, keyed by cellKey (behaviour MR 5): `returning` fills
-   * this tick, `returned` holds last tick's, which the waiting ants round each one meet, once each.
-   */
-  returning = new Map<number, number>();
-  returned = new Map<number, number>();
   /**
    * One world (ja-web): carriers that came down the colony's hole with food this tick, and last tick's, which every ant
    * held at the top of the shaft meets (each carrier walks down past all of them). Not by cell: the returns above are
@@ -1426,15 +1419,8 @@ export class Colony {
     // layer (gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
     const one = this.line !== null;
     const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, one, dt)) : null;
-    let { gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } =
+    let { hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } =
       layerGates?.[this.cur] ?? gatesFor(p, this.entrance === null, one, dt);
-    // Activation (behaviour MR 5): last tick's returns with food are what the waiting foragers round them meet this tick.
-    if (gate || layerGates?.some((g) => g.gate)) {
-      const seen = this.returned;
-      this.returned = this.returning;
-      this.returning = seen;
-      seen.clear();
-    }
     // One world (ja-web): last tick's carriers down the hole are what the ants held at its top meet this tick.
     if (layerGates?.some((g) => g.hold)) {
       this.holeSeen = this.holeIn;
@@ -1456,7 +1442,6 @@ export class Colony {
     s.map = map;
     s.ph = ph;
     s.home = home;
-    s.gate = gate;
     s.hold = hold;
     s.leak = leak;
     s.metLeak = metLeak;
@@ -1472,11 +1457,10 @@ export class Colony {
         this.bind(this.layer[i]);
         ({ map, ph } = this);
         home = this.nest;
-        ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
+        ({ hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
         s.map = map;
         s.ph = ph;
         s.home = home;
-        s.gate = gate;
         s.hold = hold;
         s.leak = leak;
         s.metLeak = metLeak;
@@ -1510,14 +1494,11 @@ export class Colony {
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
     for (const L of this.layers) L.ph.advance(dt);
-    // Growth: in the side view, the queen and brood (nestLife); elsewhere the larder turns into ants while there is room.
+    // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.queen) {
       nestLife(this, dt);
       middenSmell(this, dt);
-    } else {
-      if (p.mortalWithoutQueen) ageWorkers(this, dt);
-      while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
-    }
+    } else if (p.mortalWithoutQueen) ageWorkers(this, dt);
   }
 
   /** This colony's state for a save (colonySave.ts saveColony). */

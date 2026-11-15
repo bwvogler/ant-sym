@@ -39,8 +39,6 @@ export const COLONY_STATE = [
   "goalY",
   "holeX",
   "storedSeen",
-  "returning",
-  "returned",
   "holeIn",
   "holeSeen",
   "s",
