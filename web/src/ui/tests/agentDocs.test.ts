@@ -23,6 +23,20 @@ test("CLAUDE.md stays within its budget and points at the agent guide", () => {
   assert.ok(text.includes("docs/agent-guide.md"), "CLAUDE.md links docs/agent-guide.md");
 });
 
+// Three sessions started slow.yml by hand on PR branches, one citing CLAUDE.md's "run before merging colony changes", while
+// the label that does it for a PR was written only in the steward skill (ja-w7ef.17): the way is named where agents look.
+test("the slow guards' way onto a PR (the slow-guards label) is named in CLAUDE.md and in the steward skill's description", () => {
+  const claude = readFileSync(join(ROOT, "CLAUDE.md"), "utf8");
+  const line = claude.split("\n").find((l) => l.startsWith("npm run test:slow"));
+  assert.match(line ?? "", /slow-guards/, "CLAUDE.md's test:slow line names the label");
+  assert.match(line ?? "", /not a dispatch/, "and says a PR is not run by a dispatch");
+  const steward = readFileSync(join(ROOT, ".claude/skills/steward/SKILL.md"), "utf8");
+  const description = /^description:\s*"?(.+?)"?\s*$/m.exec(steward)?.[1] ?? "";
+  assert.match(description, /slow-guards/, "the steward skill's description names the label");
+  const slowYml = readFileSync(join(ROOT, ".github/workflows/slow.yml"), "utf8");
+  assert.match(slowYml, /Not for a PR's branch/, "slow.yml's header keeps the dispatch for branches with no PR");
+});
+
 test("the agent guide names files and symbols that exist", () => {
   const guide = readFileSync(join(ROOT, "docs/agent-guide.md"), "utf8");
   const named: [string, string[]][] = [

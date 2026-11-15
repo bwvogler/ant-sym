@@ -137,6 +137,40 @@ In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50,
 - **Off:** `piErrorLaw` 0, today's odometer, bit for bit.
 - **Built off** (2026-11-15, PRD §79): law 1 holds G1's guard better and its defenders die nearer home (median 20–25 cells out against 55–59), but the weakest colony carries 8–13 % less food and S1's short-trip searches, now facing 25 % misses, bring fewer home in 600 s. The default is the owner's call.
 
+## Sizing the search to the vector's error (ja-lp4.20)
+
+*Added 2026-11-15 for `ja-lp4.20` (PRD §79.2), against code at `e2b47fd6`. Labels as in the section above. No full text could be fetched this session either (PMC and the Zürich and ANU repositories were refused), so every search-width claim below is from abstracts or search summaries.*
+
+**The problem.** With `piErrorLaw` 1 the vector misses by 35 % of the distance at 25 cells out and 18 % at 100 (above), against today's flat 8.3 % of a straight trip. The search round the vector's end did not change with it: U3b's spiral starts at `SEARCH_START` (3 cells) and grows 1.6× a turn whatever the trip. A geometric spiral's turns are 0.6 × its reach apart, so past about 20 cells out they are further apart than the 12 cells an ant sweeps (sight 6 either side), and a hole beyond that can lie between two turns. S1's short trips (σ ≈ 15 cells at T = 100 under law 1, against 7 under law 0) are where it shows.
+
+**What each source gives:**
+- **Wehner & Srinivasan 1981** (**abs**): loops of ever-increasing size, starting and ending at the origin; the search density depends only on the distance from it and falls quickly. No width per trip.
+- **Müller & Wehner 1994** (**abs**): a spiral search programme underlies the loops. No growth law in what was read.
+- **Merkle, Knaden & Wehner 2006** (**abs**; the medians of the miss **cit**, via Goldschmidt et al. 2017): longer trips give larger errors, and the ants "adapt their systematic search strategy to their increasing uncertainty by extending their search pattern". The miss medians (1.27, 2.45, 2.47 m at 5, 10, 20 m) are the error law above; the search widths are in its figures, not obtained.
+- **Merkle & Wehner 2010** (search summary only, **unverified**): the width of the search density profile depends on the distance out (the vector's length), not on how winding the outbound path was. No numbers obtained.
+- **Vickerstaff & Merkle 2012** (**abs**): a Bayesian model in which the ant searches by its own estimate of its path-integration error produces broader search patterns as that uncertainty grows, as the ants do; it beats Lévy loops, a spiral and an anchored random search on efficiency at error rates below 0.02 m²/s. No width multiple.
+- **Pfeffer, Wahl & Wolf 2020** (**FT**, earlier session): search medians 8.9–11.0 m at a 10 m vector, a 1-D channel: where the search centres, not its width.
+
+So the shape is sourced (the search's size grows with the vector's own error, set by the distance out), and its multiples are not: **design**.
+
+**The rule** (`searchScale`, off = 0). On the plane, round where the vector ran out, U3b's quarter-turn spiral is sized by the vector's own error σ = `PI_DRIFT_2D` × piSpan (per axis: with law 1, `PI_SPAN_GAIN` × √(`piErrorAt` × reach) × 0.1/√2; with law 0, the odometer's):
+
+> point n reaches max(`SEARCH_START`, σ × (`searchScale` + `searchScaleStep` × n/4)), a quarter turn on from the last
+
+- **σ:** sourced in shape (Merkle 2006; Merkle & Wehner 2010; Vickerstaff & Merkle 2012). It is the same σ the loops (`searchLoops`) use.
+- **An even spiral** (each turn `searchScaleStep` σ further, not 1.6× the last): **design**, so the turns do not outrun sight at the reach where the misses are. Müller & Wehner 1994's spiral gives no law.
+- **`searchScale` 1, `searchScaleStep` 0.5:** **design**, chosen on S1 (seeds 1–4, nine pairs of 0.25 / 0.5 / 1, by the worst seed; PRD §79.2). With law 1 at 100 cells out (σ = 15) the first point is 15 cells out and each turn 7.5 further; at 600 out (σ = 37), 37 and 18. The centre is not left unsearched: the ant walks through it to its first point, and its mound's smell (above) pulls it in near the hole.
+- **`SEARCH_START`** stays the floor (an ant with no error still circles at 3 cells).
+- **Not round a stored place:** an ant that retraced its route (`routeEnd`) searches round its first stored place, which it saw; that search keeps U3b's spiral.
+- **Unchanged:** the stall rule (`SEARCH_STALL` moves it to the next point), the cap at the plane's longer side, the side view's and top-down search, `siteAim`'s search round a food spot.
+- **Cost:** none in Jev (no situation, legend or question changes); one `sqrt` a search point.
+
+**Against:**
+- The real search is loops that return to the origin (Wehner & Srinivasan 1981), not a spiral; the loops (`searchLoops`) are built and scale by the same σ, but lost G1 and A1 in `ja-lp4.11` (PRD §56).
+- A searcher whose detection is certain within its sight gains nothing from wider turns: the optimal sweep for a sure detector is turns 2 × sight apart whatever σ, and σ only sets how far out it needs to go. The ants' wider searches fit uncertain detection (Vickerstaff & Merkle 2012's model weighs both). Which matters more in the game is what S1 and G1 measure.
+
+**Built off** (2026-11-15, PRD §79.2). With law 1 the scaled search wins S1 back: home in 600 s on the worst seed at 100 / 200 / 400 / 600 cells out, 100 / 95 / 90 / 85 % (seeds 1–10) against law 0's 100 / 95 / 72.5 / 77.5 %, and the median time home at 600 cells out falls from 112 s to 45–51 s. G1 does not follow: its guard holds (8–9 of 10 seeds within 2) and defenders still die near home, but the weakest colony carries less than under law 0 (1,445 against 1,754 on seeds 1–10, 1,015 against 1,333 on 11–20), less even than law 1 with today's spiral. A2b's rich-patch choice falls (9 → 6 of 10). So both stay off, and the weakest colony's loss under law 1 is not the search's to fix.
+
 ## What was not found
 
 - Any full text: blocked by the network policy (see the header).
