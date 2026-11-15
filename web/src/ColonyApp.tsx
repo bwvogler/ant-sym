@@ -76,6 +76,7 @@ import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
+import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
 import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 
@@ -425,46 +426,25 @@ export default function ColonyApp() {
   // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
   const [devPen, setDevPen] = useState(false);
   const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
-  const settle = useCallback(
-    (f: Flight, k: number) => {
-      // Lost: the game says why (Game.lastLoss; one world's founding rule, docs/one-world.md §3).
-      const why = k < 0 && game.lastLoss?.flight === f ? game.lastLoss.reason : null;
-      if (k < 0)
-        pushToast(
-          game.colonies.length >= MAX_COLONIES
-            ? `A new queen from ${colonyName(f.mother)} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`
-            : why
-              ? `A new queen from ${colonyName(f.mother)} was lost: ${why}.`
-              : `A new queen from ${colonyName(f.mother)} found no room to land, and was lost.`,
-          "warn",
-        );
-      if (!game.flights.length) {
+  // The founding rules are ui/flight.ts's (ja-fnd.6.2); the page shows what they return and resumes once no queen is in the air.
+  const apply = useCallback(
+    (r: Founded) => {
+      if (r.notice) pushToast(r.notice.text, r.notice.tone);
+      if (r.resume) {
         update({ playing: true });
         setDevPen(false); // the dev hook's pen was for that flight only
       }
     },
-    [game, update],
+    [update],
   );
   useEffect(() => {
     if (!flight || !gate || gate.open) return;
-    const k = game.found(flight);
-    if (k >= 0) {
-      jev.foundWith(k, jev.doctrines[flight.mother] ?? jev.doctrines[0]!);
-      pushToast(`${gate.reason} Her colony is ${colonyName(k)}.`, "info");
-    }
-    settle(flight, k);
-  }, [flight, gate, game, jev, settle]);
+    apply(foundOnMothers(game, jev, jev.doctrines, flight, gate.reason));
+  }, [flight, gate, game, jev, apply]);
   /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
   const foundOn = useCallback(
-    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => {
-      const k = game.found(f, at);
-      if (k >= 0) {
-        jev.foundWith(k, d);
-        pushToast(`${colonyName(k)} is founded, on your words.`, "good");
-      }
-      settle(f, k);
-    },
-    [game, jev, settle],
+    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => apply(foundOnWords(game, jev, f, d, at)),
+    [game, jev, apply],
   );
   const foundHers = useCallback(
     (d: DoctrineChoice, at: Landing) => {

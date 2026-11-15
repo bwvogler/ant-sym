@@ -647,7 +647,8 @@ export class Game {
     if (world) {
       // A save's re-founding (f.nest) grows the line where the founding went (f.spot), as it was then: no search again.
       if (f.nest && !f.spot) throw new Error("addColony: a save's founding needs its spot (one world)");
-      if (f.nest) {
+      if (f.nest || f.spot) {
+        // (a save's re-founding, or a spot settleAt already gave: tryFoundBeyond)
         cellOf(f.x, f.y); // (as before settleAt: the scratch cell left where it was)
         spot = f.spot;
       } else {
@@ -725,20 +726,27 @@ export class Game {
   /**
    * The lab's founding in one world (U4a; the page reaches it from U5): a colony of `antCount` ants at the first
    * colony's odour (kin), founded FLIGHT_2D past the line's `end` hole, straight on along its end segment, moved by
-   * addColony to the nearest spot the founding rule allows. Returns its index; throws "no room" when there is none.
+   * addColony to the nearest spot the founding rule allows. Returns its index, or why there is none (NO_ROOM) with the
+   * game left as it was: a typed result the lab shows (ja-fnd.6.2), where foundBeyond throws.
    */
-  foundBeyond(end: End, antCount = 30): number {
+  tryFoundBeyond(end: End, antCount = 30): { ok: true; k: number } | { ok: false; reason: string } {
     const world = this.world;
-    if (!world) throw new Error("foundBeyond: one world only (the side view's lab founds between the nests)");
+    if (!world) return { ok: false, reason: "one world only (the side view's lab founds between the nests)" };
     const holes = world.line.holes;
     const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
     const [ux, uy] = outward(holes, end);
-    return this.addColony({
-      x: centreX(v.x, v.y) + FLIGHT_2D * ux,
-      y: centreY(v.y) + FLIGHT_2D * uy,
-      antCount,
-      odour: this.player.nestOdour,
-    });
+    const at = { x: centreX(v.x, v.y) + FLIGHT_2D * ux, y: centreY(v.y) + FLIGHT_2D * uy };
+    const s = this.settleAt(at);
+    if (s.ok === false) return s;
+    return { ok: true, k: this.addColony({ ...at, antCount, odour: this.player.nestOdour, spot: { cell: s.cell, end: s.end } }) };
+  }
+
+  /** tryFoundBeyond, throwing ("addColony: " and the reason) where there is no room: for scripts and tests that expect a colony. */
+  foundBeyond(end: End, antCount = 30): number {
+    if (!this.world) throw new Error("foundBeyond: one world only (the side view's lab founds between the nests)");
+    const r = this.tryFoundBeyond(end, antCount);
+    if (r.ok === false) throw new Error(`addColony: ${r.reason}`);
+    return r.k;
   }
 
   /**
