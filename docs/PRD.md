@@ -5347,7 +5347,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off), ×2 since 2026-11-15**: see the decisions below; at ×2 the half-life is about 12 s. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5378,7 +5378,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
 
-**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off)** (re-chosen as ×2 below). Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -5391,6 +5391,29 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
 
 With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
+
+**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on #215's head (`eea04cca`: `main` at `4b114fbc`, after the fungus answers #202 re-shipped, with only `sun` changed), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a no-hyphae run on the same commit. Seconds to a quarter of the hosts:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 203 | 307 | 214 | 133 | 153 | 551 | 303 | 587 | 243 | 250 |
+| sun ×1 | 199 | 279 | 210 | 128 | 146 | 307 | 278 | 373 | **272** | 233 |
+| sun ×2 | 199 | 329 | 210 | 128 | 138 | 290 | 278 | 373 | 206 | 233 |
+| sun ×4 | 199 | 330 | 210 | 129 | 146 | 290 | 278 | 373 | 205 | 233 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 440 | 249 | 184 | 18 | 332 | 395 | 225 | 333 | 257 | 408 |
+| sun ×1 | 400 | 226 | 158 | 18 | 264 | 406 | 226 | 217 | 235 | 361 |
+| sun ×2 | 400 | 226 | 158 | 18 | 283 | 406 | 226 | 217 | 230 | 364 |
+| sun ×4 | 400 | 226 | 158 | 18 | 261 | 406 | 226 | 228 | 217 | 361 |
+
+- **×1 misses P1:** seed 9 is 12 % slower than without hyphae (243 → 272 s), and the median of seeds 1–10 is worse (252.5 s against 246.5 s).
+- **×2 holds it on seeds 1–20.** Its slowest seed is seed 2, +7.2 % (307 → 329 s); seed 16 is +2.8 %. Medians: 221.5 s on seeds 1–10 and 228 s on 11–20, against 246.5 and 294.5 s without hyphae. Worst seeds: 373 s against 587 s, and 406 s against 440 s.
+- **×2 and ×4 are within a few seconds** on every seed but 5 and 18 (×2 faster: 138 against 146 s, 217 against 228) and 15 and 19 (×4 faster: 261 against 283 s, 217 against 230); both pass, with the same worst seeds. ×2 is the milder change from the soil's fade.
+- **Before #202** (`main` at `3c79e0fb`, the same command) the ordering was the same: ×1 missed P1 on seed 9 (334 → 418 s, +25 %) and ×2 and ×4 held it, but with seeds 16 and 11 within a point of the 10 % line at ×2 (+9.3 %, +9.2 %). *Stalks* given at landing was measured only there: ×1 (worst +9.3 %) and ×4 (worst +9.3 %) both held P1; ×2 with *Stalks* was not run.
+- **Measured before #214**, which landed on `main` after these runs and moved this game though its goldens pass (seed 3 without hyphae, 300 s: 214 s at `b1ab72d`, 284 s at `fbf6415`; review of #215). Not re-measured; seed 3 at ×2 on #215 merged into `02a78fb` is 267 s, still faster than without hyphae. P1 is re-checked once that change is settled (`ja-q4ca`).
+- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; any other factor fails it. The guide's mutations entry says what the sun does. No sense, action, legend or question changed: no Jev cost change.
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
