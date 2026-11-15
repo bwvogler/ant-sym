@@ -6,19 +6,19 @@ import { CELL, cellOf } from "../../hex.ts";
 import { atHome } from "../../homing.ts";
 import { responses, type Touch } from "../../responses.ts";
 import { RETURN } from "../../vocab.ts";
+import { onMiddenRing } from "../../dig.ts";
+import { MIDDEN_MIN } from "../../tuning.ts";
 import { mulberry32 } from "../../world.ts";
-import { smallOne } from "../builders.ts";
+import { oneColony, smallOne } from "../builders.ts";
 
 // Guards for moved code that the golden masters do not reach (reviews of #133 and #136; ja-fnd.4.8): each test fails if the
-// wiring it names is cut, where every other tier stays green. In one world's curtain, where the nest is (S2.3c). (onMiddenRing's
-// was covered by int/oneWorldMoundGates, and went with the side view.)
+// wiring it names is cut, where every other tier stays green. In one world's curtain, where the nest is, and onMiddenRing's on
+// the plane, where the midden is (S2.3c).
 
 /** A one-world colony of one ant, bound to its curtain, the ant underground at its queen. */
 function atQueen(): Colony {
   const w = smallOne(2);
   const c = new Colony(w.curtain, { antCount: 1, maxAnts: 1 }, mulberry32(1), undefined, undefined, { plane: w.plane, line: w.line });
-  c.bind(CURTAIN);
-  c.layer[0] = CURTAIN;
   c.under[0] = 1;
   c.x[0] = c.queen!.x;
   c.y[0] = c.queen!.y;
@@ -66,4 +66,19 @@ test("atHome: in its royal chamber, yes; in a chamber of another mark, or out of
   c.x[0] = c.nest.x;
   c.y[0] = c.nest.y; // up on the plane, at its hole
   assert.equal(atHome(c, 0), false, "out of its nest");
+});
+
+test("onMiddenRing: on the plane, out from home by MIDDEN_MIN or more, yes; short of it, no", () => {
+  const { c } = oneColony(1, { maxAnts: 1 });
+  c.bind(PLANE);
+  c.layer[0] = PLANE;
+  c.under[0] = 0;
+  c.odoSurf[0] = 0; // its vector says home is its hole
+  const at = (d: number) => {
+    c.x[0] = c.nest.x + d;
+    c.y[0] = c.nest.y;
+    return onMiddenRing(c, 0, 0, 0);
+  };
+  assert.equal(at(MIDDEN_MIN - 0.5), false, "just short of the ring");
+  assert.equal(at(MIDDEN_MIN + 0.5), true, "just past it");
 });

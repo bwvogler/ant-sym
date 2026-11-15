@@ -1,6 +1,6 @@
 // Test builders shared by the colony tests: the small maps and games, the step loop and the hand-placed colonies
 // that used to be copied file to file (S0b, ja-fnd.1.3). A test whose setup differs keeps its own and says why.
-import { LIFESPAN, MIDDLE, Colony, CURTAIN, type ColonyParams, type HoleCell } from "../colony.ts";
+import { LIFESPAN, MIDDLE, Colony, type ColonyParams, type HoleCell } from "../colony.ts";
 import { type Policy } from "../vocab.ts";
 import type { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
@@ -85,8 +85,9 @@ export function broodChamber(map: WorldMap) {
 /** Seed `seed`'s one world with a 160 × 100 plane. */
 export const smallOne = (seed = 7): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
 /**
- * A bare colony of `n` ants (room for `n + 4`) on seed 2's small one world, bound to its curtain, its ants in the nest with
- * the queen: what the side map's bare colonies were for the nest's tests (S2.3c). `map` is the curtain.
+ * A bare colony of `n` ants (room for `n + 4`) on seed 2's small one world, bound to its curtain (as a one-world colony is
+ * built), its ants in the nest with the queen: what the side map's bare colonies were for the nest's tests (S2.3c). `map` is the
+ * curtain; `seed` seeds the colony's random numbers, not the world.
  */
 export function oneColony(
   n = 1,
@@ -99,7 +100,6 @@ export function oneColony(
     plane: w.plane,
     line: w.line,
   });
-  c.bind(CURTAIN);
   return { map: w.curtain, c };
 }
 /** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
