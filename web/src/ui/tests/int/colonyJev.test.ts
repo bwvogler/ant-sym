@@ -1076,22 +1076,25 @@ test("a lane's asked counts what it sent, less what came back busy; a new run st
   }) as typeof fetch;
   const j = make();
   const c = colony();
+  // Half the ants tired, so the first request (the one held, then busy) carries more than one situation: a rollback by 1
+  // instead of by the request's size would otherwise pass (review of #221, S1).
+  for (let i = 0; i < c.n; i += 2) c.tired[i] = 1;
   j.attach(c);
   await j.start();
   run(c, 2);
+  // Other mode requests may go out while the first is held (a cycle every few ms): the count is checked against every request sent
+  // so far, not a fixed number.
+  const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
   await tick(30); // the first mode request is out, held
-  assert.equal(sizes.length, 1);
-  assert.equal(j.state.lanes.mode.asked, sizes[0], "counted when sent");
+  assert.ok(sizes.length >= 1);
+  assert.ok(sizes[0]! >= 2, `the busy request carries more than one situation (${sizes[0]})`);
+  assert.equal(j.state.lanes.mode.asked, sum(sizes), "counted when sent");
   gate.resolve(); // busy: its situations are taken back off the count
   await tick(0);
-  assert.equal(j.state.lanes.mode.asked, 0, "a busy request's situations are not counted as asked");
+  assert.equal(j.state.lanes.mode.asked, sum(sizes.slice(1)), "a busy request's situations are not counted as asked");
   await tick(60); // asked again, answered
   assert.ok(sizes.length >= 2, "asked again after busy");
-  assert.equal(
-    j.state.lanes.mode.asked,
-    sizes.slice(1).reduce((a, b) => a + b, 0),
-    "every request but the busy one",
-  );
+  assert.equal(j.state.lanes.mode.asked, sum(sizes.slice(1)), "every request but the busy one");
   const cached = j.state.lanes.mode.cached;
   assert.ok(cached > 0);
   await j.stop();

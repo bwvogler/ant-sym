@@ -11,7 +11,7 @@ import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
+import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
@@ -1086,6 +1086,65 @@ export const pockets: Assay = {
 };
 
 /**
+ * slow/economy.test's map: the tests' small side map (256 × 160) with one nest and 0.3 of its food, about the full
+ * game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
+ */
+export function economyMap(seed: number): WorldMap {
+  const map = generateSideWorld(((seed - 1) % 4) + 1, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
+  let total = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = 0; x < map.size.w; x++) {
+      const v = map.food.get(x, y) * 0.3;
+      map.food.set(x, y, v);
+      total += v;
+    }
+  map.foodTotal = map.foodLeft = total;
+  return map;
+}
+
+/** Workers and larvae starved by the end, and births, of the first colony. */
+function starvedProbe(): Probe {
+  return {
+    tick() {},
+    summary(game) {
+      const c = game.player;
+      return { diedHungry: c.diedHungry, broodStarved: c.broodStarved, diedOld: c.diedOld };
+    },
+  };
+}
+
+/**
+ * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §74): slow/economy.test's hour as an assay.
+ * A colony of 110 on that test's map; its founders age as one cohort, so for a stretch it has no young ants and its
+ * larvae are fed only if old ants come to them. `starved` is the most larvae at once waiting over 120 s, unfed, with
+ * food enough for them in the nest (nestFlowProbe's measure, sampled every 30 s). Target: no seed above 8, the
+ * economy test's bound and ja-rvli's acceptance; workers starved, workers alive and food stored are the guards.
+ */
+export const larvae: Assay = {
+  id: "larvae",
+  title: "Larvae fed when the young are gone: the most larvae left waiting beside food in an hour",
+  target:
+    "no seed above 8 larvae waiting over 120 s beside enough food (slow/economy.test, ja-rvli); no worker starved; workers alive and food stored not worse",
+  seconds: 3600,
+  spec: (seed) => ({
+    seed,
+    map: economyMap,
+    seconds: 3600,
+    game: { antCount: 110, rival: false },
+    probes: [nestFlowProbe(), starvedProbe()],
+  }),
+  score: (r) => ({
+    waiting: r.metrics.starved as number,
+    ants: r.metrics["you.ants"] as number,
+    births: r.metrics["you.births"] as number,
+    stored: r.metrics["you.stored"] as number,
+    diedHungry: r.metrics.diedHungry as number,
+    broodStarved: r.metrics.broodStarved as number,
+    pass: (r.metrics.starved as number) <= 8 && r.metrics.diedHungry === 0 ? 1 : 0,
+  }),
+};
+
+/**
  * New queens (ja-lo8.9, royal.ts), on the first colony of a solo side-view game: when the fungus reaches the queen,
  * when the first gyne is reared, how many are culled, when the first alate flies, and when the first daughter's first
  * worker ecloses and first goes out. `arm` forces one of the fungus's queen levers in every host from the start, so
@@ -1093,7 +1152,7 @@ export const pockets: Assay = {
  * every worker's perception of her scent at "damp" (0.3); "none" forces nothing (the fungus lands and plays the local
  * rule, which pulls neither: dilution alone).
  */
-export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
+export function lifecycleProbe(arm: "none" | "signal" | "scent", one = false): Probe {
   const at: Record<string, number> = { queen: NaN, gyne: NaN, flight: NaN, daughter: NaN, daughterWorker: NaN, daughterOut: NaN };
   const first = (k: string, t: number) => {
     if (Number.isNaN(at[k])) at[k] = t;
@@ -1114,7 +1173,8 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
       if (!d.founding) first("daughterWorker", t);
       if (Number.isNaN(at.daughterOut as number))
         for (let i = 0; i < d.n; i++)
-          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R))) {
+          // Out: on the ground above its nest (the side view), or up on the plane (one world).
+          if (d.alive[i] && (one ? d.layer[i] === PLANE : isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R)))) {
             first("daughterOut", t);
             break;
           }
@@ -1132,17 +1192,19 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
   };
 }
 
-function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
+/** The lifecycle assay for one arm: on a solo side-view game, or (`one`) on a solo one world (S2.2b, ja-fnd.3.2.2). */
+function lifecycleAssay(arm: "none" | "signal" | "scent", one = false): Assay {
   const id = arm === "none" ? "lifecycle" : `lifecycle-${arm}`;
   return {
     id,
-    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
+    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}${one ? " (one world)" : ""}`,
     target:
       "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
     seconds: 1800,
     spec: (seed) => ({
       seed,
       seconds: 1800,
+      ...(one ? { map: (s: number) => generateOneWorld(s) } : {}),
       game: { antCount: 600, rival: false },
       events: [
         {
@@ -1155,7 +1217,7 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
             ),
         },
       ],
-      probes: [lifecycleProbe(arm)],
+      probes: [lifecycleProbe(arm, one)],
     }),
     score: (r) =>
       Object.fromEntries(
@@ -1167,6 +1229,8 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
 export const lifecycle = lifecycleAssay("none");
 export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
+/** The three on one world (ONE_ASSAYS, same ids): the alates fly from the plane and their daughters dig in the curtain. */
+export const lifecycleOne = (["none", "signal", "scent"] as const).map((arm) => lifecycleAssay(arm, true));
 
 export const ASSAYS: Assay[] = [
   bridge,
@@ -1187,6 +1251,7 @@ export const ASSAYS: Assay[] = [
   gameTop,
   nestFlow,
   pockets,
+  larvae,
   lifecycle,
   lifecycleSignal,
   lifecycleScent,
@@ -1223,6 +1288,8 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * plane. A5, A5b (ja-web), A11 and A12 (U6b) count outside on the plane, past the disc round the hole, and report the ants
  * held at the gate at the top of the shaft (gateProbe). A11 and A12 run their controls (no trail, straight at the hole,
  * a forage stance) on the plane too; their raiders are recruited at the gate (ja-web), so a recruit in the curtain is home.
+ * Also the one-world assays of their own (S1, F1, R1), the desert ant's, the builder's, and the lifecycle assays (L ×3,
+ * lifecycleOne) on a solo one world, 30 minutes each.
  */
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
@@ -1245,6 +1312,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertTrips,
   desertHeat,
   ...BUILDER_ASSAYS,
+  ...lifecycleOne,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */

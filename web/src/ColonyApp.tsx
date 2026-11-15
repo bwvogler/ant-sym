@@ -60,12 +60,15 @@ import Help from "./ui/Help.tsx";
 import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
 import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
+import Specimens from "./ui/Specimens.tsx";
+import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./ui/specimens.ts";
 import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
+import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
@@ -109,6 +112,10 @@ export default function ColonyApp() {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
+  // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game.
+  const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
+  const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
+  const setSpecimens = useCallback((list: Specimen[]) => setPinned({ token: gameToken, list }), [gameToken]);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -271,6 +278,16 @@ export default function ColonyApp() {
     setLensOn((on) => !on);
     clearProbe();
   }, []);
+  /** Follow ant f, the camera taken to whichever view it is in. */
+  const goTo = useCallback(
+    (f: Followed) => {
+      const c = game.colonies[f.k];
+      if (!c) return;
+      if (oneWorld) showAt(c.layer[f.i] === CURTAIN ? CURTAIN : PLANE, c.x[f.i]!, c.y[f.i]!);
+      setFollowed(f);
+    },
+    [game, oneWorld, showAt, setFollowed],
+  );
   /** Follow the next host of yours (the key f): each press the next infected ant, in whichever view it is. */
   const hostTurn = useRef(0);
   const followHost = useCallback(() => {
@@ -282,11 +299,39 @@ export default function ColonyApp() {
       pushToast("No host yet: the fungus is in no ant.", "info");
       return;
     }
-    const h = hosts[hostTurn.current++ % hosts.length]!;
-    const c = game.colonies[h.k]!;
-    if (oneWorld) showAt(c.layer[h.i] === CURTAIN ? CURTAIN : PLANE, c.x[h.i]!, c.y[h.i]!);
-    setFollowed(h);
-  }, [game, oneWorld, showAt, setFollowed]);
+    goTo(hosts[hostTurn.current++ % hosts.length]!);
+  }, [game, goTo]);
+  /** Pin the followed ant as a specimen, or unpin it; a fourth replaces the oldest, and a notice says so. */
+  const togglePin = useCallback(
+    (f: Followed) => {
+      if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
+      // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
+      // It is said here: the watch won't see it again.
+      const { kept, gone } = living(specimens, game.colonies);
+      for (const g of gone)
+        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info");
+      const r = pin(kept, f);
+      setSpecimens(r.list);
+      if (r.dropped)
+        pushToast(
+          `Three specimens at most: ${specimenLabel(r.dropped.no)}, ant #${r.dropped.i} of ${colonyName(r.dropped.k)}, is unpinned.`,
+          "info",
+        );
+    },
+    [specimens, setSpecimens, game],
+  );
+  // A specimen that dies leaves the list, with a notice (checked once a second: the rows show nothing once it is gone).
+  useEffect(() => {
+    if (!specimens.length) return;
+    const t = setInterval(() => {
+      const { kept, gone } = living(specimens, game.colonies);
+      if (!gone.length) return;
+      setSpecimens(kept);
+      for (const f of gone)
+        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info");
+    }, 1000);
+    return () => clearInterval(t);
+  }, [specimens, game, setSpecimens]);
   // The page's keys (ui/keys.ts): one handler, one table, which the shortcuts sheet reads.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -449,6 +494,7 @@ export default function ColonyApp() {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
       game,
+      notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
       follow: (k: number, i: number) => {
         const c = game.colonies[k];
         if (!c || !c.alive[i]) return false;
@@ -606,6 +652,7 @@ export default function ColonyApp() {
           onLink={onLink}
           onCross={onCross}
           api={field}
+          specimens={specimens}
           pen={pen}
           lens={lensOn}
           onProbe={offerProbe}
@@ -692,19 +739,23 @@ export default function ColonyApp() {
             </span>
           )}
         </div>
-        <div
-          className={`pointer-events-auto flex min-w-0 basis-full items-center px-3 py-2 text-[13px] text-fg-2 sm:flex-1 sm:basis-0 ${FLOAT}`}
-          aria-label="goal"
-        >
-          <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
-            {clock(stats?.time ?? 0)}
-          </span>
-          {slow && (
-            <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
-              {stats!.pace.toFixed(1)}×
+        {/* The goal, and the bell at the top right: on a phone they share the second row. */}
+        <div className="flex min-w-0 basis-full items-stretch gap-2 sm:flex-1 sm:basis-0">
+          <div
+            className={`pointer-events-auto flex min-w-0 flex-1 items-center px-3 py-2 text-[13px] text-fg-2 ${FLOAT}`}
+            aria-label="goal"
+          >
+            <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
+              {clock(stats?.time ?? 0)}
             </span>
-          )}
-          <span className="truncate">{goalLine(stats)}</span>
+            {slow && (
+              <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
+                {stats!.pace.toFixed(1)}×
+              </span>
+            )}
+            <span className="truncate">{goalLine(stats)}</span>
+          </div>
+          <Notices />
         </div>
       </div>
 
@@ -799,9 +850,9 @@ export default function ColonyApp() {
         </Drawer>
       )}
 
-      {/* The inspector: the queen's pen while she flies, else the followed ant. A sheet on a phone; below 1024 px it waits
-          while a drawer is open, so the two never overlap. */}
-      {!building && (penCard || followed) && (
+      {/* The inspector: the queen's pen while she flies, else the specimens and the followed ant. A sheet on a phone; below
+          1024 px it waits while a drawer is open, so the two never overlap. */}
+      {!building && (penCard || followed || specimens.length > 0) && (
         <div
           className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
         >
@@ -815,16 +866,31 @@ export default function ColonyApp() {
               onFound={foundHers}
               place={{ radius: circle.r, onWords, onFly }}
             />
-          ) : followed ? (
-            <AntCard
-              followed={followed}
-              colonies={game.colonies}
-              fungus={game.fungus}
-              explain={jev.explain}
-              explainFungus={jev.explainFungus}
-              onClose={() => setFollowed(null)}
-              fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
-            />
+          ) : followed || specimens.length ? (
+            <>
+              {specimens.length > 0 && (
+                <Specimens
+                  list={specimens}
+                  colonies={game.colonies}
+                  followed={followed}
+                  onFollow={goTo}
+                  onUnpin={(f) => setSpecimens(unpin(specimens, f))}
+                />
+              )}
+              {followed && (
+                <AntCard
+                  followed={followed}
+                  colonies={game.colonies}
+                  fungus={game.fungus}
+                  explain={jev.explain}
+                  explainFungus={jev.explainFungus}
+                  onClose={() => setFollowed(null)}
+                  fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
+                  pinned={specimens.some((s) => sameAnt(s, followed))}
+                  onPin={() => togglePin(followed)}
+                />
+              )}
+            </>
           ) : null}
         </div>
       )}
@@ -881,7 +947,7 @@ export default function ColonyApp() {
       />
       {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
       {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-      <Toasts />
+      <Toasts place={building ? "top" : "bottom"} />
       {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
       {flight && gate?.open && !circle && (
         <QueenPen

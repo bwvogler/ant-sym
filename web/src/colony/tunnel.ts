@@ -98,7 +98,7 @@ export function fetches(col: Colony, i: number): boolean {
   // With restFetch (ja-4rfr), its own hunger too: a worker hungry enough to beg goes for food. Without it, the old felt
   // their nestmates' hunger just under THETA_OLD while starving themselves, and climbed out to forage, and died.
   if (col.params.restFetch > 0 && col.energy[i] < ADULT_BEG_BELOW) return true;
-  return col.need[i] >= (col.band(i) === 2 ? THETA_OLD : NEED_FETCH);
+  return col.need[i] >= (col.band(i) === 2 && !col.reverts(i) ? THETA_OLD : NEED_FETCH);
 }
 
 /**
@@ -323,8 +323,15 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // kept, to take some on to where it is wanted (port). (Reception's marks too drew fetchers to an empty reception.)
     dir = toFood(col, cx, cy, dir);
     col.digAim[i] = NaN;
-  } else if (mode === EXPLORE && col.queen && col.band(i) === 0 && !isSky(map, cx, cy) && toBrood(col, cx, cy, dir) >= 0) {
-    // A young ant keeps with the queen and brood (slice 6): along their marks, deeper into the nest.
+  } else if (
+    mode === EXPLORE &&
+    col.queen &&
+    (col.band(i) === 0 || col.reverts(i)) &&
+    !isSky(map, cx, cy) &&
+    toBrood(col, cx, cy, dir) >= 0
+  ) {
+    // A young ant keeps with the queen and brood (slice 6): along their marks, deeper into the nest. So does an old one
+    // reverted to nursing (ja-7r7x).
     dir = toBrood(col, cx, cy, dir);
     col.digAim[i] = NaN;
   } else if (mode === EXPLORE && ent && col.outbound(i) && !isSky(map, cx, cy) && climbOut(col, cx, cy) >= 0) {

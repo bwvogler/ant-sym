@@ -33,6 +33,7 @@ import { blocked, groundTop, isSky, rockAt, type Nest, type WorldMap } from "./w
 import type { Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
+  BROOD_MET_MIN,
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
@@ -44,6 +45,7 @@ import {
   INTAKE_WINDOW,
   MIDDEN_AT,
   RECEPTION_MIN,
+  REVERT_BELOW,
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
@@ -368,6 +370,8 @@ export class Colony {
   handedOn = 0;
   /** food porters are carrying between chambers: still the colony's (the queen's reserve and the strategist count it) */
   inJaws = 0;
+  /** food in the crops of the colony's ants (cropFeed, ja-638i): still the colony's, like inJaws */
+  inCrops = 0;
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead not yet on the midden: where each lies (a cell), who carries it (−1 none), when it died, its fungus */
   readonly corpses: Corpse[] = [];
@@ -455,6 +459,12 @@ export class Colony {
   foreign: Pheromones | null = null;
   /** what can be felt by touch on each cell this tick (hunger.ts): begging larvae, a hungry queen, need passed on; rebuilt every tick, not saved */
   felt = new FeltGrid();
+  /** where the young (age band 0) are underground this tick, for youngMet (task reversion, ja-7r7x); filled only with revert on */
+  youngs = new FeltGrid();
+  /** where brood lies this tick, for broodMet (task reversion, ja-7r7x); filled only with revert on */
+  broods = new FeltGrid();
+  /** the fullest crop on each cell this tick (cropFeed, ja-638i) */
+  cropDonors = new DonorGrid();
   /** the best-fed ant on each cell this tick, for food shared by mouth (hunger.ts); rebuilt every tick, not saved */
   donors = new DonorGrid();
   /** what the ants on each cell carry of the queen's scent, for the mean they share by contact (royal.ts); rebuilt every tick, not saved */
@@ -790,7 +800,7 @@ export class Colony {
   spare(): number {
     if (!this.queen) return this.larder;
     if (!this.orphaned && this.population + this.brood.size < this.params.maxAnts) return 0; // orphaned, it will never grow: its food is spare
-    return this.larder + this.inJaws - this.brood.owed();
+    return this.larder + this.inJaws + this.inCrops - this.brood.owed();
   }
 
   /** The queen dies (a raider at her side; later, the fungus): the colony is orphaned, it lays no more eggs. */
@@ -812,7 +822,22 @@ export class Colony {
   mayGoOut(i: number): boolean {
     // The young never; the rest may (the middle-aged dig and carry inside, the old climb out to forage: outbound). A hard
     // limit on the middle-aged (out only while foragers were short) kept a crowd of them at the hole being put back.
-    return this.band(i) !== 0;
+    // An old ant reverted to nursing (ja-7r7x) stays in like the young.
+    return this.band(i) !== 0 && !this.reverts(i);
+  }
+
+  /**
+   * Whether old ant i has reverted to nursing (task reversion, ja-7r7x, docs/task-reversion.md): at home underground, it
+   * has met almost no young nestmates lately (`youngMet` below REVERT_BELOW) but has met brood (`broodMet` at least
+   * BROOD_MET_MIN), and it is among the share `revert` of the
+   * old that revert at all (its own threshold, drawn from its index). It then nurses as the young do.
+   */
+  reverts(i: number): boolean {
+    const share = this.params.revert;
+    if (share <= 0 || this.queen === null || this.under[i] !== 1 || this.youngMet[i] >= REVERT_BELOW || this.broodMet[i] < BROOD_MET_MIN)
+      return false;
+    if (this.band(i) !== 2) return false;
+    return ((i + 1) * 0.6180339887498949) % 1 < share;
   }
 
   /** The other colonies' holes (or nests, on a top-down map), and the raid target if the game set no others. */
@@ -891,7 +916,7 @@ export class Colony {
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
-    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i);
+    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i) && !this.reverts(i);
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
@@ -910,7 +935,7 @@ export class Colony {
    * digs alone and whatever the nest's room (move.ts and hug's start still damp it); it builds no chambers.
    */
   forageDigs(i: number): boolean {
-    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2;
+    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2 && !this.reverts(i);
   }
 
   /** Whether the colony has lost its queen (the side view; the top-down maps have none to lose). */
