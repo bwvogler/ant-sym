@@ -5933,8 +5933,14 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - No setting beats main: every one has 3–9 seeds over the bound, with no trend. Reversion and begging both happen, and the larvae still wait.
 - In a failing seed (10, `revert` 1), 10–15 young ants are alive throughout, so nobody reverts. Larvae wait in three brood chambers with no food in them, while 300+ food lies in the store. Only 1–3 ants are carrying food at a time. The bottleneck is carrying food from the store to the brood chambers, not who is beside the brood.
 
+**Traced (seed 10, `owedBeg` 0.15, minute samples from 2,600 to 3,100 s).**
+- Every waiting larva lies in one brood chamber, and porters do deliver there, at 7–30 food a minute. The larvae there are owed 25–58 food, so they fall behind; few starve (3 larvae over the 16 seeds on main), they wait.
+- Porters start only within two cells of a stocked store. Here all 300+ food lies in a single store of 3 cells at a tunnel's end.
+- Up to 54 ants feel enough need to fetch, and most can read the store's mark, but at any sample none are at the store: they queue on the way.
+- More fetchers (reversion, begging) join the same queue, so neither moves the assay. The limit is getting food out of a small store, not who is by the brood.
+
 **Still open.**
-- What limits carrying food to the brood (porters start only beside food; larvae are fed only from food lying in their chamber).
+- How food should get from the stores to the brood faster: bigger or more stores, porters carrying more, or nurses feeding larvae by mouth from their own crops (trophallaxis) rather than only from food lying in the chamber. The last is a new mechanic, with research first.
 - The share of old ants that can revert (owner's call; no measured share).
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
