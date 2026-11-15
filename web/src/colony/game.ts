@@ -373,8 +373,13 @@ export class Game {
     this.layers = one ? [one.plane, one.curtain] : [map];
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
-    this.recognition = new Recognition(this.params.recognition);
-    this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(this.params.recognition)));
+    // Fights are judged by the recognition's tolerance: a species' own (the invasive garden ant's one supercolony: ja-e668.3) unless the game
+    // names one. Every colony of a game is its species, so the game takes it from there.
+    const tol = this.params.species.params.tolerance;
+    const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
+    this.recognition = new Recognition(recognition);
+    // Every layer's recognition (one world's curtain too) takes the same tolerance.
+    this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
     const mine = new Colony(
@@ -930,7 +935,8 @@ export class Game {
         const o = c.odour[i];
         if (live.some((other) => other !== c && Math.abs(o - other.nestOdour) <= tol)) near++;
       }
-    const recognition = Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
+    // With a tolerance of 1 (one supercolony) every gap is within it: recognition is whole.
+    const recognition = tol >= 1 ? 1 : Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
     const unified = gap <= tol && quiet >= QUIET && (met >= MET || this.#haveMet) && live.every((c) => !Game.beaten(c));
     return {
       gap,
