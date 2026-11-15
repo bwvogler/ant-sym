@@ -51,6 +51,7 @@ Mechanic: <name>
 
 Find what real organisms do, from primary sources. Follow [reference/research.md](reference/research.md) for the search method, the rigour rules and the note template. Key rules:
 - Primary papers (journal, PMC, DOI) over reviews; reviews over press. Name species, authors and years in the text.
+- Search and read through the APIs in research.md's "Where to search" (Europe PMC, PubMed, Semantic Scholar, Crossref); many publisher pages are bot-walled from here.
 - A number read only in an abstract or a citing paper is marked **unverified**. A claim from memory is marked "(from memory; not fetched)". Say what you could not reach.
 - Record what contradicts the idea, and what the biology does *not* show. A mechanic with no biological basis is marked **design**, never passed off as biology.
 - A new sense (anything not in vision.md's sense table) needs this note before anything else.
