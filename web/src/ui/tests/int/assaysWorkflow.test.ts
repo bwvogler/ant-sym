@@ -60,6 +60,7 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
       SET: "",
       SECONDS_IN: "",
       SPECIES: "",
+      POLICY: "",
       ...inputs,
     };
     const r = await exec("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", script], { cwd: dir, env }).then(
@@ -75,10 +76,11 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     SET: "colony.routeStep=3,4 game.fight.rate=1",
     SECONDS_IN: "60",
     SPECIES: "desert",
+    POLICY: "experiments/caches/draw-top-forage.json",
   });
   assert.equal(good.code, 0, good.out);
   assert.match(good.out, /^seeds=\[1,2,3,7\]$/m);
-  assert.match(good.out, /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert$/m);
+  assert.match(good.out, /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert --policy cache:experiments\/caches\/draw-top-forage\.json$/m);
   const bads: Record<string, string>[] = [
     { ASSAYS: "a; rm -rf /" },
     { ASSAYS: "all merge" },
@@ -88,6 +90,10 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     { SET: "*" },
     { SPECIES: "../x" },
     { SECONDS_IN: "1 2" },
+    { POLICY: "/etc/passwd" },
+    { POLICY: "experiments/caches/../../x.json" },
+    { POLICY: "experiments/caches/a b.json" },
+    { POLICY: "experiments/caches/x.json; id" },
   ];
   for (const bad of bads) {
     const r = await plan(bad);
