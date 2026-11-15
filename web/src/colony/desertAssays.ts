@@ -376,8 +376,8 @@ export const D5_SECONDS = 1200;
  * (owner, review of #155 D1): the hot-adapted Cataglyphis forage at the hottest hours, close to their limit (desert-heat.md §1), and the sun's
  * height sets the nest's day (Amor 2011, unverified). Pass, all four: more ants out on the plane at noon (the daylight's middle quarter) than in
  * the low sun (its first and last eighth); at night (the sun down) no more setting out (not on their way home) than a tenth of those out at
- * noon, and no more out at all (lost homers too: ja-rf5.14, owner 2026-11-15) than a tenth of noon; heat deaths a day no more than 16 % of the colony (C. bicolor loses about 16 % of its foragers a day to every cause: Schmid-Hempel &
- * Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in every 30 s while the sun is high, after the first minute.
+ * noon, and no more out at all (lost homers too: ja-rf5.14, owner 2026-11-15) than a tenth of noon; heat deaths a day no more than 16 % of
+ * the colony (C. bicolor loses about 16 % of its foragers a day to every cause: Schmid-Hempel & Schmid-Hempel 1984, a summary, unverified); and no cliff: food picked up in every 30 s while the sun is high, after the first minute.
  */
 export const desertHeat: Assay = {
   id: "d5",
