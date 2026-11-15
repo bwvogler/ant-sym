@@ -57,7 +57,13 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
   // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
   if (c.params.invitePace > 0) t.returns = paceReturns(c.params, c.pace[i]);
-  t.raid = raidSmelt(c, i);
+  // t.raid is worked out when a response reads it (Colony.raidOf). Reading it here left the shared CELL on its last sensor
+  // tip, where the callers after touch() go on reading CELL (arrive takes food at CELL): kept as it was, bit for bit.
+  if (c.params.raidGate > 0 && c.entrance === null && c.ph.live("raid")) {
+    const h = c.heading[i] + c.params.sensorAngle;
+    const d = c.params.sensorDistance;
+    cellOf(c.x[i] + Math.cos(h) * d, c.y[i] + Math.sin(h) * d);
+  }
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;
 }
