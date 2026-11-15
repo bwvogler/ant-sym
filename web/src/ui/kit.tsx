@@ -125,7 +125,20 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
  * preventDefault) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
-export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
+export function Drawer({
+  label,
+  title,
+  onClose,
+  children,
+  wide = false,
+}: {
+  label: string;
+  title: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  /** wider on a large screen (the Mutations drawer's tree) */
+  wide?: boolean;
+}) {
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     return () => {
@@ -144,7 +157,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   return (
     <section
       aria-label={label}
-      className={`panel-in pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none sm:w-[22rem] ${FLOAT}`}
+      className={`panel-in pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none ${wide ? "sm:w-[22rem] lg:w-[32rem]" : "sm:w-[22rem]"} ${FLOAT}`}
     >
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <h2 className="text-[15px] font-semibold text-fg">{title}</h2>

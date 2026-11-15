@@ -2,7 +2,7 @@
 // (colony/evolution.ts UPGRADES) and the lever table (colony/levers.ts LEVERS), so a level's numbers and a lever's name
 // can't drift from what the game does; only the "why it matters" lines are written here. `ui/tests/upgradeText.test.ts`
 // fails when an upgrade, a level or a lever has no explanation.
-import { KNOT, LEVERS, STALK, type Lever, type Trait, type Upgrade } from "../colony/index.ts";
+import { KNOT, LEVERS, STALK, nextCost, unmet, upgrade, type Lever, type Need, type Trait, type Upgrade } from "../colony/index.ts";
 
 /** One level of an upgrade: its name, and what it means (the numbers are the table's). */
 export interface LevelText {
@@ -116,15 +116,24 @@ export function upgradeTip(u: Upgrade): UpgradeTip {
 
 export const UPGRADE_IDS_WITH_WHY: readonly string[] = Object.keys(WHY);
 
-/** The tooltip for the next level of an upgrade: what you get for the mutations. */
-export function nextLevelTip(u: Upgrade, level: number): { step: string; line: string; cost: number } | null {
-  const cost = u.costs[level];
-  const next = levelTexts(u)[level + 1];
-  return cost === undefined || !next ? null : { step: next.step, line: next.line, cost };
+/** A level another needs, in words: "Persistence: clears slowly". */
+export function needText(n: Need): string {
+  const u = upgrade(n.id);
+  return `${u.name}: ${u.steps[n.level]}`;
+}
+
+/** The tooltip for the next level of an upgrade at these levels: what you get, its price, and what it still needs. */
+export function nextLevelTip(
+  u: Upgrade,
+  levels: Readonly<Record<string, number>>,
+): { step: string; line: string; cost: number; needs: string[] } | null {
+  const cost = nextCost(levels, u.id);
+  const next = levelTexts(u)[(levels[u.id] ?? 0) + 1];
+  return cost === null || !next ? null : { step: next.step, line: next.line, cost, needs: unmet(levels, u.id).map(needText) };
 }
 
 /** Tooltips for the panel's two top figures. */
 export const MUTATION_TIP =
-  "A mutation is one change the fungus can keep. Every bit of new fungus (its mycelium growing on the ground, and load passing from ant to ant) is a chance to mutate, so the faster it grows, the faster they come. You choose which upgrade gets them, and each level asks more than the one before. In real fungi mutations are random and selection keeps what works; here you do the keeping. The figure after is how many a minute it is making now.";
+  "A mutation is one change the fungus can keep. Every bit of new fungus (its mycelium growing on the ground, and load passing from ant to ant) is a chance to mutate, so the faster it grows, the faster they come. You choose which upgrade gets them. Some levels need others kept first, and every level costs the same price, which rises with each one you keep. In real fungi mutations are random and selection keeps what works; here you do the keeping. The figure after is how many a minute it is making now.";
 export const BODY_TIP =
   "Mycelium: the fungus growing on the ground by the hole, which puts out spores. In ants: the fungus carried by hosts, in all. Both are in units of fungus; the mycelium's mass is capped by the Mycelium upgrade.";
