@@ -20,6 +20,10 @@ import {
   oneArena,
   onPlane,
   outingProbe,
+  ONE_PENDING,
+  raidFindAssay,
+  raidProbe,
+  raidStopAssay,
   R1_ANTS,
   R1_DETOUR,
   R1_FAR,
@@ -373,4 +377,65 @@ test("nestFlowProbe reads the curtain's chambers in one world (A8)", () => {
   g.time = 300;
   probe.tick(g, 1);
   assert.equal(probe.summary(g).beyond, 1, "the food lies past reception, in the royal chamber");
+});
+
+test("raidProbe in one world (A11): reach and stuck on the plane only, a recruit in the curtain is home, the trail read at the hole", () => {
+  const g = oneGame();
+  const c = g.player;
+  const own = at(12, 20);
+  const rival = at(48, 20);
+  const mid = at(30, 20);
+  const probe = raidProbe(own, rival);
+  for (let i = 5; i < c.n; i++) c.alive[i] = 0;
+  for (let i = 0; i < 5; i++) c.recruited[i] = 0;
+  // Ant 0, recruited on the plane by the rival's hole, reached it; ant 1, recruited in the curtain at the same x, y, is home.
+  c.recruited[0] = 1;
+  c.recruited[1] = 1;
+  put(c, 0, PLANE, rival.x + 1, rival.y);
+  put(c, 1, CURTAIN, rival.x + 1, rival.y);
+  // Ant 2 mid-field on the plane; ant 3 on the plane, then down in the curtain at the same x, y; ant 4 the other way round.
+  put(c, 2, PLANE, mid.x, mid.y);
+  put(c, 3, PLANE, mid.x, mid.y + 6);
+  put(c, 4, CURTAIN, mid.x, mid.y - 6);
+  // The raid trail where it ends at the colony's hole, on the plane.
+  c.paint("raid", own.x, own.y, 2, 1, PLANE);
+  g.time = 20;
+  probe.tick(g, 1);
+  put(c, 2, PLANE, mid.x + 5, mid.y);
+  put(c, 3, CURTAIN, mid.x, mid.y + 6);
+  put(c, 4, PLANE, mid.x, mid.y - 6);
+  g.time = 40;
+  probe.tick(g, 1);
+  const m = probe.summary(g);
+  assert.equal(m.reached, 1 / c.params.antCount, "the plane recruit by the rival's hole, not the curtain one");
+  assert.equal(m.recruited, 2 / c.params.antCount);
+  assert.equal(m.recruitedAtHome, 0.5, "the curtain recruit is home");
+  // Second sample: ant 2 moved 5 (not stuck), ant 3 now underground, ant 4 just up (no plane sample before): 0 of 1 stuck.
+  assert.equal(m.stuck, 0, "neither the ant gone down nor the one just up is stuck on the plane");
+  assert.ok(m.nestRaid > 0 && m.nestSmelt === 1, `the trail at the hole: ${m.nestRaid}`);
+});
+
+test("A11 and A12 run on one world: in ONE_ASSAYS, none pending", () => {
+  for (const id of ["raidFind", "raidStop"]) {
+    const a = ONE_ASSAYS.find((x) => x.id === id);
+    assert.ok(a && isOneWorld(specMap(a.spec(1))), id);
+  }
+  assert.deepEqual(ONE_PENDING, {});
+});
+
+test("A11 and A12 remap their control runs too (deaf, straight; forage), so a gain or share compares runs on the same arena", () => {
+  // Review of #210 (S1): taking the remap out of a control run passed every other test here.
+  for (const [make, runs] of [
+    [raidFindAssay, 3],
+    [raidStopAssay, 2],
+  ] as const) {
+    let calls = 0;
+    const assay = make((spec: RunSpec) => {
+      calls++;
+      return { ...spec, seconds: 1 };
+    });
+    const { game, result } = runGame(assay.spec(1));
+    assay.score(result, game);
+    assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
+  }
 });
