@@ -369,6 +369,8 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     }
   } else if (memoryLead) {
     // Memory over the trail (Grüter, Czaczkes & Ratnieks 2011): back to where it found food, as site fidelity steers.
+    // This comes before the explorer's plume branches below (food, aphid) on purpose: with the weight at +1 a remembering ant keeps to its
+    // find over a smelled plume too, unless food is in sight (SEEN). Only with steering on (review of #259, N1).
     h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
   } else if (mode === FOLLOW && col.staysIn(i)) {
     // An inside worker (zoned by age) doesn't follow a food trail: it leads out, where it may not go. It explores.
