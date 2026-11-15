@@ -6130,6 +6130,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - chapter goals keep counting, and the tutorial doesn't start in builder mode;
 - the little-hands tray is a switch inside the builder;
 - sounds come from WebAudio plus speechSynthesis.
+- Dig opens any rock, the map's own as well as the builder's, on both layers (owner, 2026-11-15; D1 of #204's review): a child can take down a wall without Undo. The note's tool table said "not rock"; the code always did this, and the table now says so.
 
 Merging is not delegated: PRs wait for the owner.
 
