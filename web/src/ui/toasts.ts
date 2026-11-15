@@ -18,6 +18,20 @@ export interface Notice extends Toast {
   read: boolean;
 }
 
+/** Where the notices sit (Toasts' `place`). */
+export type ToastPlace = "bottom" | "top" | "lab" | "sheet" | "sheet-lab";
+
+/**
+ * Where notices go for what is on screen (PRD §69.9). The builder's tray fills the bottom, so they go under the HUD. Lab
+ * mode's workbench is the map's foot, so they sit above it. An open drawer is a bottom sheet on a phone, which they would
+ * cover (review of #182, N10): there they wait in the bell instead, and everywhere else they keep the place they would have had.
+ */
+export function toastPlace(on: { building: boolean; drawer: boolean; lab: boolean }): ToastPlace {
+  if (on.building) return "top";
+  if (on.drawer) return on.lab ? "sheet-lab" : "sheet";
+  return on.lab ? "lab" : "bottom";
+}
+
 /** How long a notice stays, in milliseconds. */
 export const TOAST_MS = 7000;
 /** At most this many at once: the oldest goes first. */

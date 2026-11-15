@@ -6016,12 +6016,33 @@ The Codex was the field guide, the nest and the policy. The policy is about how 
   - A "?" moves focus to the section it opened, so pressing one by key lands there (review of #237, S1).
   - Escape, with focus in the Lab, closes it and gives the map the focus (the owner, D1 on #237). This replaces the Codex's Escape after a "?".
   - One Escape closes one thing. A chart's crosshair takes it first, and the Lab leaves it alone while a tooltip or a dialog that takes Escape is open (not the tutorial's coach card, which takes none).
-  - Opening the Lab takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
+  - Opening the Lab by `l`, the palette or Settings takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
 - **The Codex** keeps two tabs: the field guide and the nest. Its ids stay `learn-…`, and the Lab's policy sections are `lab-…`, so the two never share one.
 - **Two chart fixes** from #226's re-review (`ja-mvo9.4.1`):
   - Escape on a focused chart is taken only while it puts a crosshair away. Otherwise it passes on, so an open drawer closes (`chartKey`, pure and tested).
   - A lone value (a colony founded at the latest sample) draws a dot (`linePath`'s `h0`).
 - **Unchanged:** the simulation, and every legend and question, so no Jev cost change.
+
+### 69.9 S5: polish (ja-mvo9.5)
+
+The last stage of the page reorganisation: what makes it feel finished. The simulation, every legend and question, and the golden masters are unchanged.
+
+- **Appearance.** Settings has System / Light / Dark.
+  - The choice is kept per browser (`ui/theme.ts`, the key `jevants.theme`) and shown as `data-theme` on `<html>`.
+  - `index.html` applies it before the first paint, so a chosen theme never flashes the other one.
+  - `index.css` holds the dark variables twice, under the system's preference (unless light is chosen) and under `data-theme="dark"`. `ui/tests/theme.test.ts` holds the copies equal.
+  - The canvas watches the attribute and recolours, as it does for the system's setting.
+  - The palette lists "Appearance: …" for each.
+- **Motion.** A drawer arrives from the rail's side, the inspector and the Codex from the right, a sheet up from the tab bar on a phone: a 170 ms fade and a few pixels, sideways only from sm up, switched off by `prefers-reduced-motion`. The Lab is not animated, because it resizes the map's canvas.
+- **Accessibility, measured.**
+  - axe-core 4.10 was run over the start screen, every drawer, both Codex tabs, the palette, the shortcuts sheet, the builder and every Lab tab, in light, dark and at 390 px (33 states). It found no structural problem, only contrast and keyboard access.
+  - `--fg-3` was 4.38:1 (light) and 4.43:1 (dark) on the ground. It is now 4.88 and 5.76 there, and at least 4.5:1 on paper, panel and the raised surface in both themes (`#6f6a63`, `#958f88`).
+  - The Codex badge's white text on the dark spore purple was 2.3:1. It is now `--spore-ink`, near-black in dark.
+  - A struck-through (inert) lever lost its extra `opacity-50`.
+  - The three sideways-scrolling tables (colonies, history, a nest's chambers) are keyboard-focusable named regions.
+  - `ui/tests/theme.test.ts` computes the text tokens' contrast on every surface, in both themes, so a palette edit that drops under 4.5:1 fails a test.
+- **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card drops its text for its title and buttons, so a tall sheet is not reached. From sm up, nothing changes.
+- **Not in this stage:** one colony palette for the map and the charts (`ja-mvo9.9`), and the builder's Codex entries opening on first use of each tool (`ja-mvo9.7`).
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 

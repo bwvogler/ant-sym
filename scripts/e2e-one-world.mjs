@@ -42,6 +42,8 @@
 //     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
 //     paused (off while playing); each tab; the aim's "?" opens the Policy tab at its section (§69.8), and the Codex
 //     keeps only the guide and the nest; l closes it.
+//  16. Polish (PRD §69.9): Appearance (set, kept across a reload, the palette, System clears it), a drawer's motion and its
+//     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1867,7 +1869,8 @@ try {
   check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "the Lab's × gives the map the focus");
   await lbp.keyboard.press("l");
   await bench.waitFor({ timeout: 3000 });
-  // Opening the Lab takes no focus: from nowhere (as after Start), l then Space still pauses (review of #237, S1).
+  // Opening the Lab takes no focus: from nowhere (as after Start), l then Space still works (the step control paused the
+  // game above, so here Space plays it; review of #237, S1).
   await lbp.keyboard.press("l");
   await until(() => bench.count().then((n) => n === 0), "l closes the Lab", 3000, 50);
   await lbp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
@@ -1896,6 +1899,96 @@ try {
   );
   check(true, "l closes the Lab and gives the map back the screen");
   await bctx2.close();
+
+  // ——— 16. Polish (PRD §69.9): appearance, motion, notices on a phone ———
+  section("16. polish");
+  const plctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, colorScheme: "light" });
+  const plp = await plctx.newPage();
+  plp.on("pageerror", (e) => errors.push(String(e)));
+  await plp.goto(url);
+  await plp.getByLabel("world seed").fill(String(SEED));
+  await plp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => plp.evaluate(() => !!window.jevAnts?.game.world), "a game for the polish checks", 20_000, 100);
+  const theme = () => plp.evaluate(() => [document.documentElement.dataset.theme ?? null, localStorage.getItem("jevants.theme")]);
+  const paper = () => plp.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--paper").trim());
+  const lightPaper = await paper();
+  const pnav = plp.getByRole("navigation", { name: "panels" });
+  await pnav.getByRole("button", { name: "Settings", exact: true }).click();
+  check(
+    (await plp.getByRole("group", { name: "appearance" }).getByRole("button", { name: "System" }).getAttribute("aria-pressed")) === "true",
+    "Settings → Appearance starts on System",
+  );
+  // Motion: a drawer arrives with its animation, from the rail's side.
+  check(
+    (await plp.getByRole("region", { name: "settings" }).evaluate((e) => getComputedStyle(e).animationName)) === "panel-in-left",
+    "a drawer slides in from the rail's side",
+  );
+  await plp.getByRole("group", { name: "appearance" }).getByRole("button", { name: "Dark" }).click();
+  const darkPaper = await paper();
+  check(JSON.stringify(await theme()) === JSON.stringify(["dark", "dark"]), "Dark: data-theme on the page, and kept");
+  check(darkPaper !== lightPaper, `and the page is dark on a light system (${lightPaper} → ${darkPaper})`);
+  await plp.reload();
+  check((await theme())[0] === "dark", "a reload keeps it, before the first paint");
+  await plp
+    .getByRole("button", { name: "Start without the tutorial", exact: true })
+    .click({ timeout: 2000 })
+    .catch(() => {});
+  await plp.keyboard.press("Control+k");
+  await plp.keyboard.type("Appearance: light");
+  await plp.keyboard.press("Enter");
+  await until(async () => (await theme())[0] === "light", "the palette sets Light", 3000, 50);
+  check((await paper()) === lightPaper, "the palette: Appearance: light, and the page is light again");
+  await plp.keyboard.press("Control+k");
+  await plp.keyboard.type("Appearance: system");
+  await plp.keyboard.press("Enter");
+  await until(async () => (await theme())[0] === null, "the palette sets System", 3000, 50);
+  check(JSON.stringify(await theme()) === JSON.stringify([null, null]), "System: no data-theme, nothing kept");
+  await plctx.close();
+  // Reduced motion: no animation on a drawer.
+  const rctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, reducedMotion: "reduce" });
+  const rp = await rctx.newPage();
+  rp.on("pageerror", (e) => errors.push(String(e)));
+  await rp.goto(url);
+  await rp.getByLabel("world seed").fill(String(SEED));
+  await rp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => rp.evaluate(() => !!window.jevAnts?.game.world), "a game for the reduced-motion check", 20_000, 100);
+  await rp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Settings", exact: true }).click();
+  check(
+    (await rp.getByRole("region", { name: "settings" }).evaluate((e) => getComputedStyle(e).animationName)) === "none",
+    "with reduced motion a drawer just appears",
+  );
+  await rctx.close();
+  // A phone: an open sheet takes the screen, so a notice waits in the bell; closed, it shows.
+  const hctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const hp = await hctx.newPage();
+  hp.on("pageerror", (e) => errors.push(String(e)));
+  await hp.goto(url);
+  await hp.getByLabel("world seed").fill(String(SEED));
+  await hp.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  await until(() => hp.evaluate(() => !!window.jevAnts?.game.world), "a game for the phone checks", 20_000, 100);
+  await hp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Colonies", exact: true }).tap();
+  await hp
+    .getByRole("region", { name: "colonies" })
+    .waitFor({ timeout: 3000 })
+    .catch(() => {});
+  await hp.evaluate(() => window.jevAnts.notify("A notice behind a sheet.", "good"));
+  await hp.waitForTimeout(300);
+  check(
+    !(await hp.getByRole("button", { name: "A notice behind a sheet. (dismiss)" }).isVisible()),
+    "on a phone an open sheet is not covered: the notice waits in the bell",
+  );
+  await hp
+    .getByRole("button", { name: /^Close/ })
+    .first()
+    .tap();
+  await hp.evaluate(() => window.jevAnts.notify("A notice over the map.", "info"));
+  await until(
+    () => hp.getByRole("button", { name: "A notice over the map. (dismiss)" }).isVisible(),
+    "with no sheet open, the notice shows",
+    3000,
+    50,
+  );
+  await hctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

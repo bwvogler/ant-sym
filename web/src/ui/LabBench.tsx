@@ -45,7 +45,8 @@ export default function LabBench(
   const tab = target.tab === "journal" && !journal ? "history" : target.tab;
   const setTab = (t: LabTab) => openLab({ tab: t });
   const body = useRef<HTMLDivElement>(null);
-  // The target the Lab opened with: opening takes no focus, so Space still plays and pauses (review of #237, S1).
+  // The target the Lab opened with: opening it by l, the palette or Settings takes no focus, so Space still plays and
+  // pauses (review of #237, S1). A "?" is the other way in, and it focuses its section.
   const opened = useRef(target);
   // A target section (a "?" on the policy) is scrolled to once its tab has rendered, and takes the keyboard's focus, so a
   // "?" pressed by key lands where it opened (review of #237, S1); a tab of its own starts at the top.
@@ -249,7 +250,12 @@ function HistoryTab({ history }: { history: History }) {
       </div>
       <details className="mt-3 text-xs">
         <summary className="cursor-pointer text-fg-3 hover:text-fg-2">As a table</summary>
-        <div className="mt-2 overflow-x-auto">
+        <div
+          className="mt-2 overflow-x-auto focus-visible:outline-2 focus-visible:outline-accent"
+          tabIndex={0}
+          role="region"
+          aria-label="history table"
+        >
           <table className="font-mono tabular-nums">
             <thead className="text-fg-3">
               <tr>

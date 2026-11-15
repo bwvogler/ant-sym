@@ -510,6 +510,9 @@ export default function ColonyField({
     retheme();
     const mq = matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", retheme);
+    // The player's own choice (Settings → Appearance) is data-theme on <html>.
+    const themeWatch = new MutationObserver(retheme);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const fitCanvas = () => {
       const d = Math.min(2, window.devicePixelRatio || 1);
@@ -1663,6 +1666,7 @@ export default function ColonyField({
       off();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
+      themeWatch.disconnect();
       canvas.removeEventListener("wheel", wheel);
     };
     // `count`: a colony founded mid-game is pushed onto the same array (Game.addColony). The view is read each frame
