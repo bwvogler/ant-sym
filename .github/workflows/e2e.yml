@@ -61,6 +61,26 @@ jobs:
           npm install --no-save --no-package-lock --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
           echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      # The page's font is the system stack (index.css --font-sans). Sessions map it to Inter (fonts-inter and
+      # /etc/fonts/conf.d/56-prefer-inter.conf there), and the script's layout checks were written against that. The runner's
+      # default (DejaVu Sans) is wider: the 360 px HUD bar ran 5 px into the gutter on the first run (#233). Same mapping here.
+      - name: inter as the system font, as in sessions
+        run: |
+          sudo apt-get install -y --no-install-recommends fonts-inter
+          sudo tee /etc/fonts/conf.d/56-prefer-inter.conf > /dev/null <<'EOF'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+          <fontconfig>
+            <alias><family>system-ui</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>ui-sans-serif</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>-apple-system</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>Segoe UI</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>Roboto</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>sans-serif</family><prefer><family>Inter</family></prefer></alias>
+          </fontconfig>
+          EOF
+          fc-cache -f > /dev/null
+          echo "sans-serif: $(fc-match sans-serif), system-ui: $(fc-match system-ui), Roboto: $(fc-match Roboto)"
       - name: e2e one world
         env:
           E2E_SHOTS: ${{ runner.temp }}/e2e/shots
