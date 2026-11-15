@@ -22,6 +22,8 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
   "builder-wall": { cue: "start", hint: "open from the start" },
   "builder-dig": { cue: "start", hint: "open from the start" },
   "builder-rain": { cue: "start", hint: "open from the start" },
+  "builder-tweezers": { cue: "start", hint: "open from the start" },
+  "builder-noentry": { cue: "start", hint: "open from the start" },
   jobs: { cue: "host", hint: "your first host" },
   "food-trail": { cue: "hostCarrying", hint: "a host carrying food home" },
   "food-quality": { cue: "hostCarrying", hint: "a host carrying food home" },

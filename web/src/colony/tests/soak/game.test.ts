@@ -340,7 +340,7 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
 
 test("each ant's own stance (docs/stance.md): alarm near home makes it defend, the same far out doesn't; 'raid' makes a scout; a crowded home is felt", () => {
   // Alarm round one ant, kept up for 2 s: on home ground (within homeGround of its nest) it defends; 30 cells out it forages.
-  // Home ground is by its own vector (ja-k4k.6.2): `off` cells of believed error put the hole it would defend that far east.
+  // Home ground by sight of its hole, else by its vector (ja-k4k.6.2): `off` cells of error put the hole it would defend that far east.
   const threatened = (cx: number, off = 0) => {
     const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, wander: 0 }, mulberry32(13), () => "return");
     c.odoSurf[0] = off;
@@ -357,6 +357,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(threatened(34), "forage", "far out");
   // By sight where it sees its hole, else by its vector (ja-k4k.6.2, review of #180 S1).
   assert.equal(threatened(8, 30), "defend", "it sees its hole: its vector doesn't matter");
+  assert.equal(threatened(11, 30), "defend", "7 cells off, it sees its hole down a clear line (NEST_SIGHT)");
   assert.equal(threatened(13, 0), "defend", "out of sight, inside home ground by its vector");
   assert.equal(threatened(13, 30), "forage", "out of sight, its vector says home is 30 cells off");
   // The colony's own stance is not read: a defend broadcast makes no one defend (review of #53, N2).

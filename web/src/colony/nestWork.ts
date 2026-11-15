@@ -203,7 +203,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       }
     }
-    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"))) return false;
+    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) return false;
     col.carrying[i] = 0;
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
@@ -329,7 +329,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
       if (to < 0) to = royal;
       if (to < 0) return;
-      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"))) return;
+      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"), col.antDraw(i))) return;
       b.held = i;
       if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
       b.chamber = -1;
@@ -361,7 +361,7 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
   if (outside ? Math.abs(cx - col.entranceCol) > MIDDEN_NEAR : col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
   for (const k of col.corpses)
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
-      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"))) return;
+      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"), col.antDraw(i))) return;
       k.held = i;
       clearPellet(col, i);
       col.corpse[i] = 1;
@@ -448,6 +448,8 @@ export function nestLife(col: Colony, dt: number): void {
       if (strangers >= ENEMY && col.rng() < 1 - Math.exp(-QUEEN_FIGHT * strangers * dt)) q.alive = false;
     }
   }
+  // Brood odour (ja-k4k.15, docs/brood-odour.md): each brood item lying in the nest gives off its own short-range scent.
+  if (p.broodOdour > 0) for (const b of col.brood.items) if (b.held < 0) col.ph.depositCell("broodOdour", b.x, b.y, p.broodOdour * dt);
   // The fungus's crown (nest slice 8, lethal): a host running it kills the queen and the brood it touches, each at
   // CROWN_RATE × its regicide (its load) a second: the spores it passes on as it tends them (at once, spores painted
   // on the royal chamber orphaned the colony in its first second; from a high load only, grooming kept every host

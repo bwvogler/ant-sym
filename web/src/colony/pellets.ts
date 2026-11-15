@@ -64,7 +64,7 @@ export function pickLoose(c: Colony, i: number, cx: number, cy: number, enemy: b
     const steep = groundTop(map, tx + out) - ty >= 1;
     const fill = u < LOOSE_FILL_PICK;
     if (!fill && !steep) continue;
-    if (!c.responses.get(touch(c, i, enemy, c.mode[i], "none", "soil"))) return false;
+    if (!c.responses.get(touch(c, i, enemy, c.mode[i], "none", "soil"), c.antDraw(i))) return false;
     if (!takeLoose(map, tx, ty)) continue;
     takeUpLoose(c, i, tx, fill);
     return true;

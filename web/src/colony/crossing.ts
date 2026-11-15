@@ -117,6 +117,8 @@ export function crossUp(c: Colony, i: number, cx: number, cy: number): void {
     c.odoSurf[i] = 0;
     c.driftSurf[i] = gauss(c.rng) * PI_DRIFT_2D;
     c.driftSurfY[i] = gauss(c.rng) * PI_DRIFT_2D;
+    c.carriedX[i] = 0; // a fresh trip: nothing carried yet (builder.ts moveAnt)
+    c.carriedY[i] = 0;
     routeClear(c, i); // a fresh trip out: no places of the last
   }
   c.lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh

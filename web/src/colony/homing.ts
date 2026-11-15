@@ -283,8 +283,9 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   // routeEnd (ja-lp4.6.3.1): its retrace over, it searches round its first stored place, not its vector's end.
   const atFirst = p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0;
   const at0 = atFirst ? (i * c.routePlaces.length) / c.n : 0;
-  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i];
-  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i];
+  // carried: how far the builder's tweezers moved it (0 unless a child did): home believed that far off too.
+  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i] + c.carriedX[i];
+  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i] + c.carriedY[i];
   if (p.searchLoops > 0 && s !== 0) {
     // Loops (ja-lp4.11): loop k heads searchTurn × k on from the first; out to its reach at the heading − half its
     // width, across to + half, then back to where the vector ran out.
@@ -540,8 +541,8 @@ export function targetHole(c: Colony, x: number, y: number, hy: number): boolean
  */
 export function fromHomePlane(c: Colony, i: number): number {
   const odo = c.odoSurf[i];
-  const bx = c.nest.x + odo * c.driftSurf[i];
-  const by = c.nest.y + odo * c.driftSurfY[i];
+  const bx = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
+  const by = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
   return Math.hypot(c.x[i] - bx, c.y[i] - by);
 }
 

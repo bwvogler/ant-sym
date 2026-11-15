@@ -6,7 +6,7 @@ import { type ColonyParams, type Layer, PLANE } from "./colony.ts";
 import { FAINT, MODES, type Mode, type Stance } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
-import { R } from "./hex.ts";
+import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
@@ -26,6 +26,7 @@ import {
   gateProbe,
   occupancyProbe,
   onLayer,
+  marchProbe,
   onPlane,
   runGame,
   type Probe,
@@ -523,6 +524,31 @@ function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   };
 }
 export const pass = passAssay((spec) => spec);
+
+/**
+ * A6 on one world with no colony-wide stance (S2.2c, owner's D2 on #184): the arena made the plane, the attackers (colony 0)
+ * in fight mode with their own stance, walked to the defenders' hole by the harness (marchProbe) instead of marching at its
+ * coordinates; the defenders with their own stance. The same for the open control, so the gain compares like with like.
+ */
+export const passWalked: Assay = {
+  ...passAssay((spec) => walked(onPlane(spec), 0, 1)),
+  title: `${pass.title} (one world, attackers walked)`,
+};
+
+/** A battle spec with its colony-wide stances taken off (no stance policy, no stanceGate 0) and side `k` walked at side `to`'s hole. */
+function walked(spec: RunSpec, k: number, to: number): RunSpec {
+  const { stance: _s, rivalStance: _r, colony, rival, ...sides } = spec.sides ?? {};
+  const own = (p?: Partial<ColonyParams>) => {
+    if (!p) return undefined;
+    const { stanceGate: _g, ...rest } = p;
+    return rest;
+  };
+  return {
+    ...spec,
+    sides: { ...sides, ...(own(colony) ? { colony: own(colony) } : {}), ...(own(rival) ? { rival: own(rival) } : {}) },
+    probes: [...(spec.probes ?? []), marchProbe(k, to)],
+  };
+}
 export const open: Assay = {
   id: "open",
   title: "A6 control: the same battle on open ground",
@@ -839,6 +865,51 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     ],
   };
 }
+/**
+ * A13 on one world with no colony-wide stance (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with
+ * its own stance, walked to the colony's hole by the harness (marchProbe). The broadcast arm has no one-world twin (the
+ * colony-wide stance is what S2 deletes); in its place `noDefence` is the same battle with nobody defending (defendAt ∞).
+ * Design mark (owner, 2026-11-15, S2.2c): food at least DEFEND_FOOD of the no-defence colony's, and at least half the war
+ * party killed: defending by its senses should cost the colony no more than not defending, and stop the raiders.
+ */
+/** One arm of A13 on one world: the war party (colony 1) walked at the colony's hole. The spec and both controls use it. */
+const defendArm = (seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec =>
+  walked(onPlane(defendSpec(seed, sealed, colony)), 1, 0);
+
+export const defendWalked: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses (one world, the war party walked)",
+  target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => defendArm(seed, false),
+  score: (r, game) => {
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => runGame(defendArm(r.seed, sealed, colony)).result.metrics;
+    const stored = r.metrics["you.stored"];
+    const control = run(true)["you.stored"];
+    const none = run(false, { defendAt: Infinity });
+    const killed = r.metrics["rival.losses"];
+    const vsNone = control > 0 && none["you.stored"] > 0 ? stored / none["you.stored"] : NaN;
+    const half = game.params.rivalAnts / 2;
+    const lost = r.metrics["you.losses"];
+    return {
+      stored,
+      control,
+      foodShare: control > 0 ? stored / control : NaN,
+      noDefence: none["you.stored"] / Math.max(1, control),
+      vsNone,
+      noDefenceKilled: none["rival.losses"],
+      noDefenceLost: none["you.losses"],
+      killed,
+      lost,
+      exchange: killed / Math.max(1, lost),
+      fightNear: r.metrics.fightNear as number,
+      atPile: r.metrics.atPile as number,
+      marched: r.metrics.marched as number,
+      pass: vsNone >= DEFEND_FOOD && killed >= half ? 1 : 0,
+    };
+  },
+};
+
 export const defendHome: Assay = {
   id: "defendHome",
   title: "A13 defence from senses: the nest is defended, the far pile still worked",
@@ -1019,6 +1090,75 @@ export const nestFlow: Assay = {
     starved: r.metrics.starved as number,
     firstBirth: r.metrics.firstBirth as number,
     portTrips: r.metrics.portTrips as number,
+  }),
+};
+
+/**
+ * Where the young sit (ja-k4k.15; docs/brood-odour.md): every 30 s from 120 s on, for the first colony's ants underground,
+ * the mean hex distance to the nearest brood item lying in the nest (not held), by band (young, middle-aged), and to the
+ * queen (world units, about a cell each). `margin` is the middle-aged's distance to the brood less the young's: positive when the young keep nearer it.
+ */
+export function nurseZoneProbe(): Probe {
+  let nextAt = 120;
+  const toBrood = [0, 0];
+  const toQueen = [0, 0];
+  const counts = [0, 0];
+  return {
+    tick(game) {
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 30;
+      const c = game.player;
+      // One world: the nest is in the curtain (game.map is the plane).
+      const map = game.world?.curtain ?? game.map;
+      const lying = c.brood.items.filter((b) => b.held < 0);
+      const q = c.queen;
+      if (lying.length === 0 || !q?.alive) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || !c.under[i]) continue;
+        const band = c.band(i);
+        if (band > 1) continue;
+        c.antCell(i);
+        const ax = CELL[0];
+        const ay = CELL[1];
+        if (isSky(map, ax, ay)) continue;
+        let near = Infinity;
+        for (const b of lying) near = Math.min(near, hexDistance(ax, ay, b.x, b.y));
+        toBrood[band]! += near;
+        toQueen[band]! += Math.hypot(c.x[i]! - q.x, c.y[i]! - q.y);
+        counts[band]!++;
+      }
+    },
+    summary() {
+      const young = counts[0] ? toBrood[0]! / counts[0] : NaN;
+      const middle = counts[1] ? toBrood[1]! / counts[1] : NaN;
+      return {
+        youngToBrood: young,
+        middleToBrood: middle,
+        margin: middle - young,
+        youngToQueen: counts[0] ? toQueen[0]! / counts[0] : NaN,
+        middleToQueen: counts[1] ? toQueen[1]! / counts[1] : NaN,
+      };
+    },
+  };
+}
+
+/**
+ * Nurse zone (ja-k4k.15.1): the young keep to the brood. Workers are drawn to brood odour and the brood pile holds nurses
+ * (Glancey & Dickens 1988; Sendova-Franks & Franks 1995); in *P. badius* over 90 % of workers below 70 cm are young,
+ * where the brood lies (Tschinkel & Hanley 2017). The side view, one colony of 600, 600 s.
+ */
+export const nurseZone: Assay = {
+  id: "nurseZone",
+  title: "Nurse zone: the young keep nearer the brood than the middle-aged",
+  target: "margin (middle-aged's mean distance to the nearest brood less the young's, cells) > 0; report the distances to the queen",
+  seconds: 600,
+  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rival: false }, probes: [nurseZoneProbe()] }),
+  score: (r) => ({
+    youngToBrood: r.metrics.youngToBrood as number,
+    middleToBrood: r.metrics.middleToBrood as number,
+    margin: r.metrics.margin as number,
+    youngToQueen: r.metrics.youngToQueen as number,
+    pass: (r.metrics.margin as number) > 0 ? 1 : 0,
   }),
 };
 
@@ -1250,6 +1390,7 @@ export const ASSAYS: Assay[] = [
   game,
   gameTop,
   nestFlow,
+  nurseZone,
   pockets,
   larvae,
   lifecycle,
@@ -1294,8 +1435,8 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
-  { ...passAssay(onPlane), title: `${pass.title} (one world)` },
-  onPlaneAssay(open),
+  passWalked,
+  { ...open, title: `${open.title} (one world, attackers walked)`, spec: (s) => walked(onPlane(open.spec(s)), 0, 1) },
   { ...raidFindAssay(onPlaneGated), title: `${raidFind.title} (one world)` },
   { ...raidStopAssay(onPlaneGated), title: `${raidStop.title} (one world)` },
   onPlaneAssay(contact),
@@ -1313,6 +1454,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertHeat,
   ...BUILDER_ASSAYS,
   ...lifecycleOne,
+  defendWalked,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */

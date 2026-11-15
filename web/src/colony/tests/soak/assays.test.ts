@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
-import { alarm, deplete, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { Colony, LIFESPAN } from "../../colony.ts";
+import { centreX, centreY } from "../../hex.ts";
+import { alarm, deplete, nurseZoneProbe, runAssay, runGame, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../../world.ts";
@@ -78,6 +79,35 @@ for (const seed of [1, 2]) {
     assert.equal(m.pass, 1, `scatter ${m.scatter}, recoverAfter ${m.recoverAfter}`);
   });
 }
+
+test("nurseZoneProbe: a young ant on the brood and a middle-aged one five cells off give a margin of 5 (ja-k4k.15.1; review of #192, N7)", () => {
+  const map = generateSideWorld(2);
+  const g = new Game(map, { antCount: 2, rival: false }, gameRng(1));
+  const c = g.player;
+  const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
+  const y = royal.floorRow - 2;
+  const x = royal.x0 + 1;
+  c.brood.items.length = 0;
+  c.brood.add(x, y, royal.id);
+  // A held item is in a nurse's jaws: not where the brood lies, so the probe leaves it out.
+  c.brood.add(x + 5, y, royal.id).held = 0;
+  for (let i = 0; i < c.n; i++) c.alive[i] = i < 2 ? 1 : 0;
+  c.age[0] = 0.02 * LIFESPAN;
+  c.age[1] = 0.22 * LIFESPAN;
+  c.under[0] = c.under[1] = 1;
+  c.x[0] = centreX(x, y);
+  c.y[0] = centreY(y);
+  c.x[1] = centreX(x + 5, y);
+  c.y[1] = centreY(y);
+  assert.deepEqual([c.band(0), c.band(1)], [0, 1], "a young and a middle-aged ant (the test's own check)");
+  const probe = nurseZoneProbe();
+  g.time = 120;
+  probe.tick(g, 0);
+  const m = probe.summary(g);
+  assert.equal(m.youngToBrood, 0);
+  assert.equal(m.middleToBrood, 5);
+  assert.equal(m.margin, 5);
+});
 
 test("heldProbe: a carrier that won't put its food down at home counts as carrying, though the nest resets its clock", () => {
   const top = (seed: number) => generateWorld(seed, { ...OPEN_WORLD, size: { w: 80, h: 50 } });

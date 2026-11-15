@@ -159,7 +159,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
-    const answer = resp.contact(touch(col, i, true, mode, item));
+    const answer = resp.contact(touch(col, i, true, mode, item), col.antDraw(i));
     if (answer === "fight" && !reporting) {
       if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
     } else {

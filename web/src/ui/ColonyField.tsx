@@ -135,12 +135,14 @@ interface Props {
 
 /** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
 export interface FieldBuild {
-  /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever) */
-  tool: BuildTool | null;
+  /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever); "tweezers": a touch on an ant lifts it */
+  tool: BuildTool | "tweezers" | null;
   /** smell vision (owner, PRD §73): every colony's trails and alarm, everywhere, each trail in its colony's tone */
   smell: boolean;
   /** a piece of a stroke at world points on `layer` (PLANE, CURTAIN, or 0 on one map); `first`: a new drag begins */
   onStroke: (layer: number, points: { x: number; y: number }[], first: boolean) => void;
+  /** the tweezers carry colony k's ant i to world (x, y) on the plane; `first`: a new lift begins */
+  onTweeze?: (k: number, i: number, x: number, y: number, first: boolean) => void;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -237,7 +239,15 @@ interface ChunkCanvas {
 }
 
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
-type Gesture = { kind: "pan" | "pinch" | "mini" | "paint" | "none"; moved: number; button: number; sx: number; sy: number };
+type Gesture = {
+  kind: "pan" | "pinch" | "mini" | "paint" | "tweeze" | "none";
+  moved: number;
+  button: number;
+  sx: number;
+  sy: number;
+  /** the ant the tweezers hold */
+  ant?: Followed;
+};
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
 export default function ColonyField({
@@ -1770,6 +1780,14 @@ export default function ColonyField({
     if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
+    } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
+      // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
+      const ant = world && shown.current === PLANE ? pick(x, y) : null;
+      if (ant) {
+        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant };
+        const [wx, wy] = toWorld(camera(), viewport(), x, y);
+        buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+      } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
     } else if (e.button === 0 && buildRef.current?.tool) {
       // A tool in hand: the touch builds where it lands (a tap places), and a drag carries on painting.
       gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
@@ -1819,6 +1837,10 @@ export default function ColonyField({
         ],
         false,
       );
+    else if (g.kind === "tweeze" && g.ant) {
+      const [wx, wy] = toWorld(camera(), viewport(), x, y);
+      buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+    }
     pointers.current.set(e.pointerId, { x, y });
   };
 

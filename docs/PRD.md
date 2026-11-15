@@ -5761,6 +5761,20 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 
 **Cost.** None per hour: no legend, question or schema changed, and Jev bills input tokens only.
 
+### 68.1 The response lanes draw too (ja-m7rr, 2026-11-15)
+
+**Why.** §68 drew the mode only. The six response lanes (`get`, `carry`, `drop`, `trail`, `contact`, `leave`) still kept Jev's top answer, so every ant in one situation fought, fled or laid the same trail together. Jev's choices come with probabilities, and a noul is itself the probability of yes (§4).
+
+**What changed.**
+- `readResponse` keeps a choice the way the mode is kept (`fight=0.62,flee=0.38`) and a noul as `true=0.9,false=0.1`, with the likelier answer first (exactly ½ is still no) and `true=1` when certain. `RESPONSE_BRAIN_VERSION` 12: version-11 caches kept a boolean or a bare choice, and replays refuse them.
+- **Each ant keeps its draw.** The hooks are asked every step, not once per situation. A fresh draw each step would flip a fighter between fight and flee every step, and a carrier with a 10 % "put down" would drop its load within a few steps. So the colony hands each hook the ant's own draw (`Colony.antDraw(i)`, `weighted.ts` `AntDraw`). That draw is a hash of a salt, the ant (slot and `gen`), a time window and the hook and situation key. An ant gets the same draw for as long as its situation lasts, and different ants and situations get independent ones. It changes every `reroll` seconds, each ant at its own phase; with `reroll` 0 it never changes. `sampleTemp` applies, as for the mode.
+- The salt is one number from the colony's rng, taken the first time a response is drawn and saved with the game (`drawSalt`). The local responses never draw, so a game on them takes nothing extra from the rng and the golden masters stay bit-exact.
+- `colony-live.mjs` replays and keeps the weighted answers and compares Jev's own answer with the local rule's. `ablate.mjs` groups by Jev's own answer. `experiment.mjs --policy cache:` draws through `responsesFromAnswers`.
+
+**What it changes in play.** Nothing on the page yet: the page doesn't ask the response lanes, so they play the local rule (ja-m7rr's note). The change shows in live checks and their replays, and on the page once a response lane is asked there.
+
+**Cost.** None per hour: no legend, question or schema changed. To measure it, a live check of the six lanes on the top-down map (`colony-live.mjs get,carry,drop,trail,contact,leave --top`, 62 situations per doctrine) is estimated at 86k input tokens, about $0.0036 for the three doctrines.
+
 ## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
 
 The owner asked for the map to fill the screen, with drawers and panels for the controls and menus, and with learning and deep experimentation kept but somewhat buried. From a brainstorm of five directions they picked four to combine:
@@ -6309,6 +6323,68 @@ Merging is not delegated: PRs wait for the owner.
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
 
+### 73.3 Slice 2: tweezers, a real-ant no-entry sign, and what happened (design, ja-b3us, 2026-11-15)
+
+**Research basis:** [builder.md](builder.md) "Slice 2".
+- Displaced desert ants run off their whole home vector, then search in loops centred there (Wehner & Srinivasan 1981, **unverified**).
+- "No entry" turns trail followers away at forks: 71 % took the other branch (Robinson et al. 2005).
+
+**Decisions.**
+- Tweezers, no-entry paint and notices of what happened, in one PR (owner, 2026-11-15).
+- No entry is the real-ant stop sign: trail followers turn away, wanderers don't (owner, 2026-11-15, over a made-up fence).
+
+**The mechanic.**
+- **Tweezers:** `Builder.moveAnt` sets an ant down elsewhere on the plane, and shifts its belief of home (`carriedX`, `carriedY`) by the same distance, so it runs its old vector.
+- **No-entry paint:** every colony's `noEntry` along the stroke, topped up as a crayon line is. Followers read it at `NO_ENTRY_PAINTED` (4) while `noEntryAvoid` is 0, and the ants still lay none. **Off:** with no paint the field never wakes, so nothing changes.
+- **`Builder.watch`:** says, once each, when sugar is found and when it is gone, when a crayon line is followed, and when a moved ant gets home or dies.
+
+**Assays and targets.**
+- B7 `noEntryFork`: ≥ 70 % on the unpainted branch in ≥ 8 of 10 seeds.
+- B8 `tweezers`: report the share that reach their would-be home before home, and the share home in 300 s.
+
+**Cost:** none. No lane, field, legend or question changes.
+
+**Beads:**
+- `ja-b3us` (this);
+- `.1` assays;
+- `.2` the tools and `watch`;
+- `.3` the tray, notices and Learn.
+
+**Built (ja-b3us.1–.3, 2026-11-15).**
+- **Tweezers** (`Builder.moveAnt`):
+  - two new per-ant arrays, `carriedX` and `carriedY` (0 unless a child moved the ant), cleared with the vector up out of its own hole (`crossing.ts`);
+  - added wherever the believed home is read: `believePlane`, `fromHomePlane`, the site memory (`plane.ts`) and the spoil spreader (`dig.ts`);
+  - `putAnt` clears the ant's steering caches as a crossing does.
+  - Undo carries it back.
+  - The tray's 🤏 lifts the ant under the finger on the top view and carries it along the drag; with no ant there the finger pans.
+- **No-entry paint** (🚫):
+  - a painted line on every colony's `noEntry` (`CrayonLine.channel`, `colony` −1), topped up as a crayon is;
+  - `steer.ts` reads it at `NO_ENTRY_PAINTED` 4 while `noEntryAvoid` is 0;
+  - it is hidden, as the crayon is, for a species with no food trail.
+- **`Builder.watch`:** the page reads it once a second, builds kept or not. It raises notices for the bell:
+  - "An ant found your sugar!";
+  - "…all gone";
+  - "N ants are following your crayon line!";
+  - "The ant you moved found its way home in N s!";
+  - "…didn't make it home".
+- **Undone builds are forgotten.**
+- **Learn:** the tweezers and the no-entry sign entries, with their Codex rows.
+
+**Assays,** seeds 1–10, held-out seeds 11–20:
+
+| Id | Result |
+|---|---|
+| B7 `noEntryFork` | share on the unpainted branch: median **0.75**, 9/10 ≥ 0.70 (seed 1 at 0.69); seeds 11–20 **10/10** (0.76–0.82). Control, no sign (`noEntryForkBare`): 0.49 (0.47–0.54). Robinson et al. 2005: 71 %. `NO_ENTRY_PAINTED` 4 was not tuned. |
+| B8 `tweezers` | carriers moved 30–60 sideways (median 18.5 a seed): **92 %** (70–100 %) came within 6 of where home would be before finding home; **100 %** home within 300 s, median **36.5 s** (18–50.5) after the move. Their stored route is dropped (`routeClear`, review of #229): kept, most walked back by it and were home in 20.5 s |
+
+**Checks.**
+- Golden masters are bit-exact.
+- `tests/int/builder.test.ts` has 24 tests: tweezers (belief moved exactly, undo, refusals), no-entry (every colony, topped up, undo), and `watch` (each event once, nothing for an undone build).
+- `npm run e2e` step 11 adds a no-entry drag (every colony's sign wakes) and a tweezers drag (the ant and its belief move), at 390 and 768 px.
+- The ant table's tests count 131 arrays; the reset fixture adds the two rows.
+
+**Cost:** none. No lane, field, legend or question changes, and `noEntry` was already sensed.
+
 ## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
 
 **Research basis:** [task-reversion.md](task-reversion.md):
@@ -6506,3 +6582,108 @@ Measured on main at `fbf6415`, as §76.1. Median (min–max) over seeds 1–10; 
 - **One world rears far fewer gynes** than the side view did: four seeds in ten rear none with the signal damped (seven in ten on 11–20). The levers still bite, so this is the colony's, not the port's (`ja-lp4.6.12`).
 - **The tick** is 6.0–8.5 ms median (one solo colony of ~880 ants). Each run is 30 minutes of game, about 5 minutes of CPU: `npm run exp -- all --one` now runs these three too, which roughly doubles a full one-world sweep.
 - **First measured on `9620499`** (before #198 and #201): signal 0.5 (0–4) gynes on 5/10 seeds, scent 1.5 (0–5) on 8/10.
+
+### 76.3 A6 and A13 with the attackers walked by the harness (`ja-fnd.3.2.3`)
+
+Both assays' attackers used to be broadcast raiders (`stanceGate: 0`, stance raid) that marched at the defenders' hole's coordinates (`steer.ts:425`), off the colony stance field S2 deletes. The owner (review of #184, D2) chose a harness device instead: `marchProbe(k, to)` (`harness.ts`) walks colony `k`'s ants on the plane to colony `to`'s hole along the open ground's way round, turning each one toward the cell two steps on, every tick, as R1's walk out does. It lets go of an ant with a stranger within its enemy range + 1 cell, so the fight is the ants' own, and of one within `MARCH_REACH` (3) steps of the hole; ants in the curtain come up by their own rules. Every side keeps each ant's own stance (no stance policy, no `stanceGate: 0`). The legacy arena versions are unchanged until step 4.
+
+- **A6 (owner, 2026-11-15):** the walked setup replaces the one-world A6 and its open control (`passWalked`); the mark is unchanged (the defenders' exchange in the pass ≥ 1.5 × the open battle's).
+- **A13 (owner, 2026-11-15):** the broadcast arm has no one-world twin. Its place goes to the same battle with nobody defending (`defendAt` ∞). Mark: food at least `DEFEND_FOOD` (0.9) of the no-defence colony's, and at least half the war party (40 of 80) killed (`defendWalked`, now in `ONE_ASSAYS`).
+
+Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defendHome --one --seeds 1-20`); seeds 1–2 rechecked on `7f2e833`, the main this lands on (review of #230): A6 and A13's seed 1 are the same, A13's seed 2 moved to 0.71 / 42 killed (from 0.62 / 41; still failing); seeds 3–20 not re-measured there. A13 reports its key metric as `vsNone` (food ÷ no-defence food):
+
+| assay | seeds 1–10 | seeds 11–20 | key metric: median, worst (seed) | seeds 1, 2 | before (§76.1, broadcast) |
+|---|---|---|---|---|---|
+| A6 pass, walked | 3/10 | 1/10 | gain 0.96, 0.60 (14) | 1.79, 0.64 | 12/20, gain 2.10 |
+| A13 defendHome, walked | 3/10 | 5/10 | food ÷ no-defence food 1.04, 0.57 (1); killed 41, 27 (4) | 0.57 / 39, 0.62 / 41 (on `fbf6415`; 0.71 / 42 on `7f2e833`) | not on one world |
+
+- **A6 is worse walked:** 4/20 against 12/20 with the broadcast march. A median 24 % of the attackers reach the hole (2–34 %): the rest meet defenders on the way or wander once let go, and the battle seldom forms at the pass. `ja-lp4.6.5` tracks A6 on one world.
+- **A13: defending pays nothing over not defending.** The colony stores 0.92 (0.45–1.49) of the sealed control's food; with nobody defending, 0.89 (0.71–1.50); both kill a median 41 raiders. A median 7 % of the war party reaches the hole. `ja-lp4.6.20`.
+- **Under the marks rule (§76.1)** both fail, so the gate tests (`ja-fnd.3.2.5`, not yet built) guard today's worst seed: A6 gain ≥ 0.60 (replacing §76.1's 0.80, which was the broadcast A6's), A13 food ÷ no-defence food ≥ 0.57 and killed ≥ 27.
+- **Cost:** none. No situation, legend or question changed.
+
+## 77. Young ants keep to the brood by its odour, not the queen's position (built, off, ja-k4k.15, 2026-11-15)
+
+**Research basis:** [brood-odour.md](brood-odour.md).
+- **Ant queen pheromones are mostly non-volatile contact signals,** fertility signals that suppress workers' laying (Holman et al. 2010, *Lasius niger*). A queen volatile attracts workers only in the fire ant, with no measured range (Lofgren et al. 1983, **unverified**); the pharaoh ant's is weak (Oliveira et al. 2020).
+- **Workers go toward air from larvae** (Glancey & Dickens 1988, *S. invicta*, **unverified**), and young and old workers respond differently to larval and adult odours, the young by inference toward the larvae's (Kohlmeier et al. 2018).
+- **The brood pile holds nurses.** Care follows how far a worker's zone overlaps the brood (Sendova-Franks & Franks 1995, **unverified**). Climate, not odour, sets where brood should lie.
+
+**The problem (measured).** A young ant in a chamber turns toward the queen's exact x,y (`steer.ts`; gap row "Steering in a chamber: to the queen", `ja-k4k.2.1`). PR #192 replaced it with a climb of floor marks every ant lays. Over 20 seeds of `economy.test`'s setup (world 1 n = 1–7, 9–12; world 2 n = 0, 2–9):
+
+| `economy.test` setup, 20 seeds | collapses | worst stranded | seeds over 5 |
+|---|---|---|---|
+| `BROOD_MIN` alone | 0 | 10 | 2 |
+| `BROOD_MIN` + #192's royal-mark climb | 1 (5 workers, all old) | 25 | 4 |
+
+#192 also failed `side.test` #16's guard: rival held foragers 3 against a bound of 2.
+- The royal and brood marks summed failed `chambers.test`: game 6's floor growth was ×1.25 against a bound of ×1.5.
+
+**Decisions.**
+- **The cue is brood odour** (owner, 2026-11-14), chosen over the queen's carried scent and a queen volatile.
+- **No queen attractant** (owner, 2026-11-15): no ant steers toward the queen by scent; a fire-ant-like species may get an airborne queen attractant later. Her contact pheromone (`ja-lo8.9`) stays as built, for caste and the fungus's queen-signal and queen-scent levers.
+- **First build only band-0 ants, as today's zoning** (proposed). Age-graded thresholds go to `ja-k4k.1`.
+
+**The mechanic.** Brood items lay a short-range `broodOdour` field on their cells: fast evaporation, a little diffusion, about two or three cells of reach (**design**). A young ant in a chamber climbs it at its three antennae through open ground, and searches where it smells none.
+- **Off:** `broodClimb` 0 keeps the queen's x,y, main bit for bit.
+- **Retires:** the queen's x,y read (`ja-k4k.2.1`), and #192's royal-mark climb.
+
+**Play.** The youngest ants gather on the brood piles rather than ringing the queen. There is no new player lever: a fungus lever on brood-odour perception is an open design question (`ja-k4k.15.4`). No Jev cost.
+
+**Assays and targets.**
+- A new nurse-zone assay (`ja-k4k.15.1`) lands first with no behaviour change. It measures underground ants' mean distance to the nearest brood item by band, and to the queen. Target: the young nearer the brood than the middle-aged, by at least main's margin, on seeds 1–10 by the worst seed and confirmed on 11–20.
+- **Guards:**
+  - `economy.test`'s setup over 20 seeds no worse than main: no collapse, seeds over 5 no more than main's.
+  - `chambers.test`, `side.test` and `economy.test` in `slow.yml`.
+  - The side `game` assay.
+
+**Cost (estimated).** Steering only: no new situation field, $0 an hour. One deposit per brood item and three reads per young ant in a chamber; the bench target is under 2% of the side-view tick.
+
+**Beads.** `ja-k4k.15` (this):
+- `ja-k4k.15.1`: the assay.
+- `ja-k4k.15.2`: the field, off by default.
+- `ja-k4k.15.3`: the climb, built off (merged with #192).
+- `ja-k4k.15.5`: turning it on, after `ja-rvli`. It holds the settings, the steps and the guards; `ja-k4k.2.1` closes with it.
+- `ja-k4k.15.4`: the fungus lever question, P4.
+
+**Still open.** The field's reach and rates (design). Whether nurses should drop brood where the odour is strongest (piles by positive feedback; `ja-k4k.4`). A fire-ant-like queen volatile as a species option.
+### 77.1 The nurse-zone assay, measured on main (ja-k4k.15.1, no behaviour change)
+
+- **`nurseZone`** (`experiment.ts`): the side view, one colony of 600 for 600 s. Every 30 s from 120 s on, it takes the young's and the middle-aged's mean hex distance, underground, to the nearest brood item lying in the nest, and to the queen.
+  - `margin` is the middle-aged's distance to the brood less the young's.
+  - It passes when the margin is above 0.
+- **Main, seeds 1–20** (this branch, bit for bit main):
+  - pass 13/20
+  - margin: median 0.18 cells, worst −1.74 (seed 9), best 6.30
+  - the young's distance to the brood: median 12.7 (8.7–25.0); to the queen: median 12.2 (9.0–18.2)
+- **Reading:** the young sit about as near the queen as the brood, and barely nearer the brood than the middle-aged. Since #201 the brood lies in brood chambers away from the queen, while the young still steer to her position. That is the gap the climb is meant to close. The build's target: the margin above main's at the worst seed, on seeds 1–10 and 11–20.
+- **The economy guard:** `scripts/lab/economy-strand.mjs` runs `economy.test`'s own hour on any seed. It reports the worst stranding, where those larvae lay and the bands at that moment, and flags a collapse. Main's figures on its 20 seeds are in §71: no collapse, worst 10, 2 seeds over 5.
+
+### 77.2 The field and the climb, built off (ja-k4k.15.2, ja-k4k.15.3)
+
+- **The field** (`broodOdour`, ja-k4k.15.2): each lying brood item lays `broodOdour` a second on its cell. The channel evaporates 0.3 and spreads 0.3, and doesn't cross rock.
+  - Off (0) lays nothing; the goldens hold bit for bit.
+  - At 1, a single egg reads 0.19 one cell out and a pile of 20 reads 0.26 two cells out (`FAINT` is 0.05).
+  - Bench, `nestFlow` seeds 1–4: 3.08 → 3.10 ms a tick at the median with it on.
+- **The climb** (`broodClimb`, ja-k4k.15.3): a young ant in a chamber climbs the odour at its three antennae and searches where it smells none. Off (0) is the queen's position; the goldens hold.
+
+**`nurseZone`, seeds 1–10, with `broodOdour` 1 and `broodClimb` 1** (main: pass 7/10, margin median about 0.2, worst −1.74):
+
+| channel (evaporation, diffusion) | pass | margin median | worst |
+|---|---|---|---|
+| 0.3, 0.3 | 5/10 | −0.24 | |
+| 0.1, 0.5 | 7/10 | 0.79 | |
+| 0.03, 0.5 | 8/10 | 2.43 | −0.90 |
+
+- At 0.3, 0.3, a probe found only 10% of a young ant's exploring ticks underground reach the chamber climb, and in it it smelt brood 10% of the time.
+- At 0.03, 0.5, the young sit 9.8 cells from the brood against main's 12.7.
+
+**The economy guard fails** (0.03, 0.5; `scripts/lab/economy-strand.mjs`, the 20 seeds of §71):
+
+| | collapses | worst stranded | seeds over 5 |
+|---|---|---|---|
+| main | 0 | 10 | 2 |
+| the climb | 2 (world 1 n = 4: 65 workers; n = 2: 68) | 71 | 4 |
+
+- Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
+- #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
