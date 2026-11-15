@@ -5,21 +5,21 @@
       "aim": "peace",
       "context": "fungus-v8-side-153cd1a5",
       "file": "fungus-peace.json",
-      "answers": 132
+      "answers": 193
     },
     {
       "lane": "fungus",
       "aim": "spread",
       "context": "fungus-v8-side-80d1e59a",
       "file": "fungus-spread.json",
-      "answers": 132
+      "answers": 193
     },
     {
       "lane": "fungus",
       "aim": "unite",
       "context": "fungus-v8-side-bb724482",
       "file": "fungus-unite.json",
-      "answers": 132
+      "answers": 193
     },
     {
       "lane": "growth",
