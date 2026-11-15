@@ -960,6 +960,7 @@ export class Colony {
     const clump = clumpAt(o.clumps, cx, cy);
     if (!clump || this.rng() >= this.params.aphidPrey) return false;
     clump.eaten += 1;
+    this.map.foodTotal += 1; // food the map never held, counted as honeydew is, so the stats' share stays a share (review of #243, N4)
     return true;
   }
 

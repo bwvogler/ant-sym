@@ -146,7 +146,7 @@ Most of it is the clump's body, not an ant's choice. What the ants do with it ru
 | an aphid in contact | Cuticular hydrocarbons (contact) | `get`: an aphid taken home as food | a small share of takes at the clump (**design**) | `aphidPrey` 0 | nothing; larval demand left to `ja-nzkg.7` |
 
 **The clump (body, not choice).**
-- A per-cell aphid count on the plane (`map.aphids`), put down by the builder's aphid tool.
+- The clumps on the plane (`Game.aphids`, aphids.ts: each a list of cells, a start count, an age and its aphids eaten), put down by the builder's aphid tool.
 - Each aphid cell makes honeydew: ordinary food of a sugar's quality, refilled at a rate by its aphids up to a cap. Tending raising the flow is measured (more frequent droplets, Yao & Akimoto), but no ratio was read, so it is left out of the first build.
 - Its aphids grow, then crash: a few game minutes (**design**; real colonies over weeks).
 - The aphids stay where they are put. Their slowing on ant marks (Oliver et al. 2007) is not built.
@@ -155,7 +155,7 @@ Most of it is the clump's body, not an ant's choice. What the ants do with it ru
 
 **Species.** The generic ant tends (*L. niger* is the model tending ant); *L. neglectus* too. The desert ant takes no honeydew: the tool is hidden for it, as the crayon is for a species with no food trail.
 
-**Cost.** No new situation field and no new lane: steering, body and an existing stance test. A cached game still spends nothing. The plume's rebuild is the one new tick cost (`plume.ts`: about 10 ms a build on one world's plane, every 4 s while food changes): measure it with clumps down.
+**Cost.** No new situation field and no new lane: steering, body and an existing stance test. A cached game still spends nothing. The aphid odour is rebuilt every tick while a clump lives: about 25 µs a build on one world's plane (512 × 368), under 1 % of a tick, measured in the review of #243.
 
 **Assays** (`builderAssays.ts`, `ja-nzkg.1`, before any behaviour):
 

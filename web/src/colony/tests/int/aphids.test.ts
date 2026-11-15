@@ -47,10 +47,14 @@ test("a clump makes honeydew at its aphids' rate, on its emptiest cell, never pa
   assert.equal(c.start, cells * APHID.perCell);
   const before = map.foodTotal;
   const w = { aphids: g.aphids, layers: g.layers };
-  // One second: start × honey units owed; whole units laid.
-  stepAphids(w, 1);
+  // Ten seconds: start × life × honey owed each second, in whole units laid (well under the cap; review of #243, S2).
+  let owed = 0;
+  for (let t = 1; t <= 10; t++) {
+    stepAphids(w, 1);
+    owed += c.start * aphidLife(t) * APHID.honey;
+  }
   const made = map.foodTotal - before;
-  assert.equal(made, Math.floor(c.start * aphidLife(1) * APHID.honey + 1e-9));
+  assert.ok(made > 0 && made === Math.floor(owed + 1e-9), `made ${made}, owed ${owed}`);
   // Long enough that every cell would overflow: each holds no more than the cap.
   for (let k = 0; k < 200; k++) stepAphids(w, 0.5);
   for (let k = 0; k < c.cells.length; k += 2) assert.ok(map.food.get(c.cells[k]!, c.cells[k + 1]!) <= APHID.cellCap);
@@ -228,6 +232,8 @@ test("watch: aphids found, some eaten, all gone, each said once; an undone clump
   // An ant of colony 0 carrying food on one of its cells: found.
   const i = [...Array(c.n).keys()].find((j) => c.alive[j])!;
   c.putAnt(i, PLANE, centreX(clump.cells[0]!, clump.cells[1]!), centreY(clump.cells[1]!));
+  c.carrying[i] = 0;
+  assert.deepEqual(b.watch(), [], "an ant there with empty jaws has not found it");
   c.carrying[i] = 1;
   assert.deepEqual(b.watch(), [{ kind: "aphidsFound", colony: 0 }]);
   assert.deepEqual(b.watch(), [], "once");
@@ -241,4 +247,85 @@ test("watch: aphids found, some eaten, all gone, each said once; an undone clump
   b.apply({ tool: "aphids", layer: PLANE, points: [o] });
   assert.ok(b.undo());
   assert.deepEqual(b.watch(), []);
+});
+
+test("contact is the clump's cells and the ring beside them, no further (review of #243, N5)", () => {
+  const g = game();
+  const c = g.colonies[0]!;
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [openSpot(g)] });
+  for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
+  const dist = g.aphidOdour.dist!;
+  const map = g.layers[PLANE] as WorldMap;
+  const { w } = map.size;
+  /** A cell at `d` steps from the clump. */
+  const at = (d: number) => {
+    const k = dist.findIndex((v) => v === d);
+    assert.ok(k >= 0, `a cell ${d} from the clump`);
+    const col = k % w;
+    const y = (k - col) / w;
+    return pt(col + map.x0, y);
+  };
+  const i = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === PLANE)!;
+  c.bind(PLANE);
+  for (const [d, want] of [
+    [0, true],
+    [1, true],
+    [2, false],
+  ] as const) {
+    const p = at(d);
+    c.x[i] = p.x;
+    c.y[i] = p.y;
+    assert.equal(c.atAphids(i), want, `${d} from the clump`);
+  }
+  c.bind(c.home);
+});
+
+test("a clump whose cells are all full makes nothing, and owes nothing after (review of #243, N5)", () => {
+  const g = game();
+  const map = g.layers[PLANE] as WorldMap;
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [openSpot(g)] });
+  const c = g.aphids[0]!;
+  const w = { aphids: g.aphids, layers: g.layers };
+  for (let k = 0; k < c.cells.length; k += 2) map.food.set(c.cells[k]!, c.cells[k + 1]!, APHID.cellCap);
+  const before = map.foodTotal;
+  stepAphids(w, 30);
+  assert.equal(map.foodTotal, before);
+  assert.equal(c.owed, 0, "what is not taken is not made");
+});
+
+test("an aphid taken is carried home as food of quality 1, not honeydew's (review of #243, N5)", () => {
+  const g = game();
+  const c = g.colonies[0]!;
+  c.params.aphidPrey = 1;
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [openSpot(g)] });
+  for (let k = 0; k < 30 * 3; k++) g.tick(1 / 30);
+  const clump = g.aphids[0]!;
+  const map = g.layers[PLANE] as WorldMap;
+  let cell = -1;
+  for (let k = 0; k < clump.cells.length && cell < 0; k += 2) if (map.food.get(clump.cells[k]!, clump.cells[k + 1]!) > 0) cell = k;
+  assert.ok(cell >= 0, "honeydew on a cell");
+  const x = clump.cells[cell]!;
+  const y = clump.cells[cell + 1]!;
+  // Empty-jawed foragers set down on that cell: within a few ticks one takes, and with chance 1 it takes an aphid.
+  const outs = [...Array(c.n).keys()].filter((j) => c.alive[j] && c.layer[j] === PLANE && !c.carrying[j]).slice(0, 5);
+  const eaten0 = clump.eaten;
+  for (let t = 0; t < 10 && clump.eaten === eaten0; t++) {
+    for (const j of outs) if (!c.carrying[j]) c.putAnt(j, PLANE, centreX(x, y), centreY(y));
+    g.tick(1 / 30);
+  }
+  assert.ok(clump.eaten > eaten0, "an aphid was taken");
+  const taker = outs.find((j) => c.carrying[j]);
+  assert.ok(taker !== undefined);
+  assert.equal(c.quality[taker!], 1);
+});
+
+test("a loaded game's clumps are watched: gone, they say so (review of #243, N7)", () => {
+  const g = game();
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [openSpot(g)] });
+  const h = game();
+  h.load(JSON.parse(JSON.stringify(g.save())));
+  const b = new Builder(h);
+  assert.deepEqual(b.watch(), [], "found and eaten are not said again for a loaded clump");
+  h.aphids.length = 0;
+  assert.deepEqual(b.watch(), [{ kind: "aphidsGone" }]);
 });

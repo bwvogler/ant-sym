@@ -349,7 +349,7 @@ export class Game {
   crayons: CrayonLine[] = [];
   /** The builder's aphid clumps (aphids.ts, ja-nzkg.2): each makes honeydew as it grows and crashes; none unless a child put one down. */
   aphids: AphidClump[] = [];
-  /** The clumps' odour in the air (aphids.ts, ja-nzkg.3), shared by the colonies; rebuilt from the clumps, not saved. */
+  /** The clumps' odour in the air (aphids.ts, ja-nzkg.3), shared by the colonies; rebuilt each tick from the clumps and the map, not saved. */
   readonly aphidOdour = aphidOdour();
   /**
    * Per colony: the fungus has been in its queen (ja-lo8.7), so its doctrine is open to the player from then on (PRD
@@ -1019,7 +1019,7 @@ export class Game {
       stepAphids(this, dt);
       const layer = this.layers.length > 1 ? PLANE : 0;
       const range = Math.max(0, ...this.colonies.map((c) => c.params.aphidPlume));
-      updateAphidOdour(this.aphidOdour, this.aphids, layer, this.layers[layer]!, range, this.time);
+      updateAphidOdour(this.aphidOdour, this.aphids, layer, this.layers[layer]!, range);
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }

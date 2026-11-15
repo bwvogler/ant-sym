@@ -6794,7 +6794,7 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 
 **Assays and targets** (`ja-nzkg.1`, first, no behaviour change): B9 `aphidsFound` (sooner with the plume), B10 `aphidsRenewable` (more than the same cells of sugar, and a trail), B11 `tendersDefend` (more fights at the clump than away from home), B12 `aphidsEaten` (fewer aphids with ants: report).
 
-**Cost (estimated).** None in Jev: no situation field, no lane. Tick: the plume rebuild (about 10 ms a build on one world's plane, at most every 4 s while food changes) and a refill pass over aphid cells; measured in the build.
+**Cost (estimated).** None in Jev: no situation field, no lane. Tick: the odour's rebuild (estimated here at the food plume's 10 ms; measured at 25 µs a build, every tick while a clump lives: §78.2) and a refill pass over aphid cells.
 
 **Beads.** `ja-nzkg` (this); `.1` assays; `.2` the clump and the tool; `.3` the plume; `.4` tenders defend; `.5` aphids eaten; `.6` tray, notices and Learn; `.7` research: a forager's cue for larval hunger.
 
@@ -6815,7 +6815,7 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 
 ### 78.2 The aphid plume (ja-nzkg.3)
 
-**Built.** `aphidPlume` (params.ts, 8 cells; the desert ant's 0: it takes no honeydew). The game keeps one plume (`AphidOdour`, aphids.ts), spread with `plume.ts`'s `spread` from every living aphid cell out to the farthest any colony smells, rebuilt each `PLUME_EVERY` period and whenever the clumps' living cells change; it is shared by the colonies and not saved (rebuilt from the saved clumps). An outside ant with empty jaws climbs it (`Colony.smellsAphids`, the branch after the food plume in `steer.ts`), as the desert ant climbs its food's. Steering only: no situation field, no Jev cost. With no clump, the plume is null and the branch is never taken (goldens bit-exact). `plumeAt` now reads 0 past the reader's range (the desert ant's is built to its own range, so its values are unchanged).
+**Built.** `aphidPlume` (params.ts, 8 cells; the desert ant's 0: it takes no honeydew). The game keeps one plume (`AphidOdour`, aphids.ts), spread with `plume.ts`'s `spread` from every living aphid cell out to the farthest any colony smells, rebuilt every tick while a clump lives (about 25 µs a build); it is shared by the colonies and not saved, since a loaded game builds the same one from the same clumps and map. (Built first each `PLUME_EVERY` period, a save made within one of a terrain change near a clump loaded a different odour: review of #243, S1.) An outside ant with empty jaws climbs it (`Colony.smellsAphids`, the branch after the food plume in `steer.ts`), as the desert ant climbs its food's. Steering only: no situation field, no Jev cost. With no clump, the plume is null and the branch is never taken (goldens bit-exact). `plumeAt` now reads 0 past the reader's range (the desert ant's is built to its own range, so its values are unchanged).
 
 **B9, the plume against a blind search** (`--set colony.aphidPlume=0,8`): first find sooner with it on **10 of seeds 1–10** (median 9.9 → 7.9 s; worst seed 15.4 → 11.9 s) and **7 of 11–20** (8.5 → 7.8 s). Passes. B10 holds with it (median 1,190 food home, 68 ants on the line, seeds 1–4); no tick cost measured beyond the noise (3.0 ms against 3.2). `tests/slow/assays.test.ts` holds seeds 1, 6 and 7.
 

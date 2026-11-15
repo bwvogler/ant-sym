@@ -266,6 +266,8 @@ export class Builder {
 
   constructor(game: Game) {
     this.game = game;
+    // Clumps already in the game (a loaded save) are watched to their end, said found and eaten already (review of #243, N7).
+    for (const c of game.aphids) this.#clumps.set(c, { found: true, eaten: c.eaten >= APHIDS_EATEN_SAID });
   }
 
   get canUndo(): boolean {
@@ -410,6 +412,8 @@ export class Builder {
         for (let k = 0; k < clump.cells.length; k += 2) on.add((clump.cells[k + 1]! + 0x8000) * 0x10000 + (clump.cells[k]! + 0x8000));
         game.colonies.forEach((c, k) => {
           for (let i = 0; i < c.n && !said.found; i++) {
+            // An ant carrying food on the clump. One crossing it with sugar would say so too (honeydew is sugar's quality): rare,
+            // and only a notice (review of #243, N6).
             if (!c.alive[i] || !c.carrying[i] || (game.world && c.layer[i] !== clump.layer)) continue;
             c.antCell(i);
             if (on.has((CELL[1] + 0x8000) * 0x10000 + (CELL[0] + 0x8000))) {
@@ -617,6 +621,7 @@ export class Builder {
         const at = game.aphids.indexOf(c.clump);
         if (at >= 0) game.aphids.splice(at, 1);
       } else if (c.kind === "aphidsMore") {
+        // A drag's pieces share one undo with the clump it began: this shrinks a clump the same undo then removes (defensive).
         const drop = new Set<number>();
         for (let j = 0; j < c.cells.length; j += 2) drop.add((c.cells[j + 1]! + 0x8000) * 0x10000 + (c.cells[j]! + 0x8000));
         const kept: number[] = [];
