@@ -71,7 +71,7 @@ test("a lethal reach upgrade reads as off or free, a graded one as none, one ste
 test("the next level's tooltip carries its price, its meaning and what it still needs, and is absent at the top", () => {
   const u = UPGRADES.find((x) => x.id === "infectivity")!;
   const n = nextLevelTip(u, {})!;
-  assert.equal(n.cost, 3);
+  assert.equal(n.cost, 1);
   assert.equal(n.step, "fair");
   assert.match(n.line, /15 %/);
   assert.deepEqual(n.needs, []);

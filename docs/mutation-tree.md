@@ -7,7 +7,7 @@ Today the fungus has 14 upgrades with 26 levels to buy (`web/src/colony/evolutio
 ## The price
 
 - **One price for every level, rising with each level kept** (owner, 2026-11-15): `PRICE(n) = round(BASE · RATIO^n)`, `n` the number of levels kept so far.
-- First guess BASE 3, RATIO 1.38: the first level costs 3, the tenth about 75, the twentieth about 1,900, and all 26 about 34,000 together, today's total. Tuned against pacing and P1 (below).
+- Chosen (owner, 2026-11-15, PRD §78.1): BASE 1, RATIO 1.5. The first six levels cost 1, 2, 2, 3, 5 and 8 (21 in all, as the old first levels did); the tenth 38, the twentieth about 2,200, the last about 25,000. It held P1 on seeds 1–20; the first guess, 3 and ×1.38, did not.
 - What it changes: a first level of the strongest upgrade no longer costs thousands just for what it is; it costs whatever the next level costs. The tree's depth carries the pacing the price list carried: a strong level is late because what it needs comes first.
 
 **In the game:** the panel shows one "next level" price for everything buyable; keeping any level raises it for all.

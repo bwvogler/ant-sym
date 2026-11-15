@@ -6734,5 +6734,24 @@ Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defen
 
 **Beads.** `ja-52ui` (this); `ja-52ui.1` model, price and locks; `ja-52ui.2` the tree's edges; `ja-52ui.3` scripts and goldens; `ja-52ui.4` the drawer's tree view; `ja-52ui.5` text; `ja-52ui.6` pacing, P1 and tuning.
 
-**Still open.** The edges (owner); BASE and RATIO (measured); whether a level may need one of two others rather than both. When built, §50.13's price table is superseded.
+**Still open.** Whether a level may need one of two others rather than both; the late levels' price (below).
+
+### 78.1 Built, and the price chosen (2026-11-15)
+
+**Built** (`ja-52ui.1`–`.5`): `Upgrade.needs` replaces the price lists, checked at load (every need a real level, no cycle, every level reachable); `price(kept)`, `unmet`, `canKeep` and `pathTo` in `evolution.ts`; the drawer's tree (`ui/UpgradeTree.tsx`: branches, each upgrade a row of its levels, lines in lanes from a level to what needs it, dashed until met) on a screen 1024 px or wider, the list with "needs …" on a phone; the badge and notice count only levels that can be kept; `progression.mjs` and the goldens keep what a level needs first, and `--price base,ratio` sweeps the price. §50.13's price table is superseded.
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, with and without `--hyphae --growth --flow`, seeds 1–20; `main` at `5a64619` for reference; seconds to a quarter of the hosts):
+
+| | median 1–10 | median 11–20 | worst seed |
+|---|---|---|---|
+| `main`, no hyphae | 246.5 | 294.5 | 587 s (seed 8) |
+| `main`, hyphae | 221.5 | 228 | 406 s (seed 16) |
+| tree at 1, ×1.5, no hyphae | 222.5 | 194 | 525 s (seed 8) |
+| tree at 1, ×1.5, hyphae | 216.5 | 158.5 | 437 s (seed 11) |
+
+- **1, ×1.5 holds P1** (§63.4) on seeds 1–20: the slowest seed with hyphae is +3.3 % (seed 11, 423 → 437 s); every other seed is within 0.4 % or faster. Both games reach a quarter sooner than on `main`. Its first six levels cost 21 in all, as the old list's first levels did.
+- **3, ×1.38** (the first guess) fails: seed 9 +50 %, seed 1 +37 %, seed 2 +33 %, seed 12 +12 %, and both games are slower than `main`. **2, ×1.3** fails on seed 9 (+12 %, seeds 1–10).
+- **Pacing at 20 minutes** (seeds 1–4, hyphae): the 20 levels in the script's order are all kept by 466–679 s. From the 21st level on a level costs 3,300 to 25,000, so the last levels a player picks (often *Crown*, the *Odour weapon*, *Knots* or *Stalks*) are out of reach in a 20-minute game: the order matters, and the tree's end is far.
+- **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
+- **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
 

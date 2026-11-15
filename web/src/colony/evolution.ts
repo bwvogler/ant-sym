@@ -69,8 +69,8 @@ export const MUTATION = 0.25;
 /** Seconds over which the panel's mutation rate is averaged. */
 const RATE_TAU = 20;
 
-/** Every level costs one price, which rises with each level kept: round(base · ratio^kept) (ja-52ui, PRD §78; design, tuned). */
-export const PRICE = { base: 3, ratio: 1.38 };
+/** Every level costs one price, which rises with each level kept: round(base · ratio^kept) (ja-52ui, PRD §78). Owner (2026-11-15): 1, ×1.5, which held P1 on seeds 1–20; 3, ×1.38 and 2, ×1.3 did not. */
+export const PRICE = { base: 1, ratio: 1.5 };
 
 /** The price of the next level of anything, after `kept` levels have been kept. */
 export function price(kept: number): number {
