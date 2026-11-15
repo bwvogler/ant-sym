@@ -202,6 +202,8 @@ test("a line's path: a null breaks it, and a lone value draws a dot (review of #
 test("a chart's keys: Escape is the chart's only while a crosshair shows (review of #237, S2)", () => {
   assert.equal(chartKey("Escape", 4, 9), -1, "a crosshair: Escape puts it away");
   assert.equal(chartKey("Escape", -1, 9), null, "none: Escape passes on, to an open drawer");
+  assert.equal(chartKey("Escape", 0, 9), -1, "a crosshair at the first sample is one too");
+  assert.equal(chartKey("ArrowRight", -1, 9), 9, "either arrow starts at now");
   assert.equal(chartKey("ArrowLeft", -1, 9), 9, "the first arrow starts at now");
   assert.equal(chartKey("ArrowLeft", 0, 9), 0, "and stops at the start");
   assert.equal(chartKey("ArrowRight", 9, 9), 9, "and at now");

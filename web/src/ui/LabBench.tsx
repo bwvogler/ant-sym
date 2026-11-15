@@ -52,8 +52,23 @@ export default function LabBench(
     if (el) {
       el.scrollIntoView({ block: "start" });
       el.querySelector("summary")?.focus({ preventScroll: true });
-    } else body.current?.scrollTo({ top: 0 });
+    } else {
+      body.current?.scrollTo({ top: 0 });
+      // A button that swapped the tab under it (the Policy tab's "the Levers tab") leaves focus nowhere: the tab takes
+      // it, so the keyboard stays in the Lab (review of #237, N2).
+      if (document.activeElement === document.body)
+        document.querySelector<HTMLElement>('[aria-label="lab tabs"] [aria-selected="true"]')?.focus({ preventScroll: true });
+    }
   }, [target]);
+  // However the Lab closes (Escape, ×, l, the palette), a focus left nowhere goes to the map, so its keys work at once
+  // (review of #237, N4; as the Drawer gives focus back).
+  useEffect(
+    () => () => {
+      if (document.activeElement === document.body || document.activeElement === null)
+        document.querySelector<HTMLElement>("main canvas")?.focus({ preventScroll: true });
+    },
+    [],
+  );
   // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
   const [, setSteps] = useState(0);
   // A queen in flight waits for the page to found her (the pen), as play does.
@@ -63,13 +78,13 @@ export default function LabBench(
     <section
       aria-label="lab"
       // Escape, with focus in the Lab, closes it (the owner, D1 on #237): one Escape, one thing, so not when a chart's
-      // crosshair took it (defaultPrevented) or a tooltip or dialog is open above. The map takes the focus back.
+      // crosshair took it (defaultPrevented) or a tooltip or dialog that takes Escape is open above (not the tutorial's
+      // coach card, which takes none: review of #237, S1). The map takes the focus back (the effect above).
       onKeyDown={(e) => {
         if (e.key !== "Escape" || e.defaultPrevented) return;
-        if (document.querySelector('[role="tooltip"], [role="dialog"]')) return;
+        if (document.querySelector('[role="tooltip"], [role="dialog"]:not([aria-label="tutorial"])')) return;
         e.preventDefault();
         closeLab();
-        document.querySelector<HTMLElement>("main canvas")?.focus({ preventScroll: true });
       }}
       className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground"
     >

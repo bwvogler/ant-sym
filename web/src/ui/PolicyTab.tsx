@@ -92,12 +92,12 @@ export default function PolicyTab(props: PolicyProps & { focus?: string; ping: o
             )}
           </h3>
           {props.game.revealed[k] ? (
-            <p id={`learn-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
+            <p id={`lab-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
               {d.text}
             </p>
           ) : (
             <p
-              id={`learn-doctrine-${k}`}
+              id={`lab-doctrine-${k}`}
               className="rounded-md border border-dashed border-line px-2 py-1.5 text-[13px] leading-snug text-fg-3"
             >
               Closed to you: reach the {colonyName(k)} colony's queen to read its mind.

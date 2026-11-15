@@ -1766,7 +1766,27 @@ try {
     JSON.stringify(await codexTabs.allTextContents()) === JSON.stringify(["Field guide", "Nest"]),
     "the Codex keeps the field guide and the nest",
   );
-  await lbp.getByRole("button", { name: "Close the Codex" }).click();
+  // One Escape, one thing: with the Codex open over it, Escape in the Lab closes the Codex and leaves the Lab.
+  await bench.getByRole("tab", { name: "World" }).focus();
+  await lbp.keyboard.press("Escape");
+  await until(
+    () =>
+      lbp
+        .getByRole("dialog", { name: "Codex" })
+        .count()
+        .then((n) => n === 0),
+    "Escape closes the Codex first",
+    3000,
+    50,
+  );
+  check((await bench.count()) === 1, "with the Codex over the Lab, Escape closes the Codex and leaves the Lab");
+  // The Lab's ×, by key, gives the map the focus as Escape does.
+  await bench.getByRole("button", { name: "Close the Lab" }).focus();
+  await lbp.keyboard.press("Enter");
+  await until(() => bench.count().then((n) => n === 0), "the × closes the Lab", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "the Lab's × gives the map the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
   await lbp.locator("canvas").first().focus();
   await lbp.keyboard.press("l");
   await until(
