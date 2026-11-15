@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aphidsFound, desertFirstFind, desertInvitation, desertNoTrail, oneAssay, runAssay, crayonLine, wall } from "../../experiment.ts";
+import {
+  aphidsEaten,
+  aphidsFound,
+  desertFirstFind,
+  desertInvitation,
+  desertNoTrail,
+  oneAssay,
+  runAssay,
+  crayonLine,
+  wall,
+} from "../../experiment.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 
 // The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42), on one world (their
@@ -101,6 +111,14 @@ test("B9 aphid odour brings the first find of a clump sooner than a blind search
     const blind = first(true);
     assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the aphid plume, ${blind} s blind`);
   }
+});
+
+// ja-nzkg.5 (PRD §78.4): ants eat a few aphids. With aphidPrey 0.05, 23 % of a clump's aphids at 240 s were eaten on seeds 1–4
+// (18–27 %) and 21 % on 11–20 (Oliver et al. 2012: 20 % fewer); with 0, none.
+test("B12 ants eat some of a clump's aphids, as many as a fifth", () => {
+  const share = runAssay(aphidsEaten, 1).metrics.eatenShare as number;
+  assert.ok(share > 0.1 && share < 0.4, `eaten share ${share}`);
+  assert.equal(runAssay(aphidsEaten, 1, { colony: { aphidPrey: 0 } }).metrics.aphidsEaten, 0);
 });
 
 test(

@@ -6833,3 +6833,17 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 | 1, seeds 11–20 | **0.94** (0.82–0.98) | 0.10 | 69 |
 
 Higher at the clump with it on in 10 of 10 held-out seeds. Gaber et al. 2024 found 90 % of caretakers biting. Their "other ants", 76 %, were still on the aphids' plant: the game's away share (a forager meeting a stranger far from anything, which flees) is not that comparison. The cost is the risk the plan named: a clump between nests is fought over, and each colony loses about half as many again in 5 minutes. The fights stay at the clump: the away share does not rise.
+
+### 78.4 A few aphids eaten (ja-nzkg.5)
+
+**Built.** `aphidPrey` (params.ts, 0.05; the desert ant's 0). When an ant takes food on a living aphid cell (`arrive.ts`, the plane), `Colony.preyAphid` takes one of the aphids instead with that chance: the clump's `eaten` goes up by one, the honeydew stays on the cell, and the ant carries the aphid home as food of quality 1. It draws a number only on an aphid cell, so a game with no clump is main bit for bit. The rate is not yet tied to the colony's hunger: a forager at the clump can't sense its larvae (`ja-nzkg.7`).
+
+**B12 `aphidsEaten`** (a clump worked by 300 ants; at 240 s, the share of its aphids eaten):
+
+| aphidPrey | seeds 1–4 | seeds 11–20 |
+|---|---|---|
+| 0 | 0 | — |
+| 0.02 | 0.11 (0.08–0.15) | — |
+| **0.05** | **0.23** (0.18–0.27) | **0.21** (0.16–0.29) |
+
+Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found with ants and larvae (118 against 147, 20 % fewer, after 7 days). Food home is unchanged within the noise (939 against 914). `tests/slow/assays.test.ts` holds seed 1 between 0.1 and 0.4, and none eaten at 0.

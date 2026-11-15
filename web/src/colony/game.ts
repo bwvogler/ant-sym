@@ -1020,6 +1020,7 @@ export class Game {
       const layer = this.layers.length > 1 ? PLANE : 0;
       const range = Math.max(0, ...this.colonies.map((c) => c.params.aphidPlume));
       updateAphidOdour(this.aphidOdour, this.aphids, layer, this.layers[layer]!, range, this.time);
+      this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
     for (const c of this.colonies) c.tick(dt);

@@ -183,3 +183,36 @@ test("tenders defend: an ant touching a clump stands on a threat, as on home gro
   assert.equal(run(14, 1), "forage", "far off it, away from home, it doesn't");
   assert.equal(run(0, 0), "forage", "tendDefend 0: not even on the clump");
 });
+
+test("aphids eaten: a take on a living aphid cell is an aphid with the chance aphidPrey; the honeydew stays; elsewhere never", () => {
+  const g = game();
+  const c = g.colonies[0]!;
+  const map = g.layers[PLANE] as WorldMap;
+  const o = openSpot(g);
+  new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [o] });
+  g.tick(1 / 30);
+  const clump = g.aphids[0]!;
+  const [x, y] = [clump.cells[0]!, clump.cells[1]!];
+  c.bind(PLANE);
+  c.params.aphidPrey = 1;
+  const food = map.food.get(x, y);
+  assert.ok(c.preyAphid(x, y), "certain at chance 1");
+  assert.equal(clump.eaten, 1);
+  assert.equal(map.food.get(x, y), food, "the honeydew stays");
+  // Off the clump (a cell beside it is not an aphid cell): never, whatever the chance.
+  let off: [number, number] | null = null;
+  for (let dx = 1; dx < 12 && !off; dx++) {
+    const cx = x + dx;
+    if (!clumpCellsOf(clump).has(`${cx},${y}`)) off = [cx, y];
+  }
+  assert.ok(off && !c.preyAphid(off[0], off[1]));
+  c.params.aphidPrey = 0;
+  assert.ok(!c.preyAphid(x, y), "aphidPrey 0: never");
+  c.bind(c.home);
+});
+
+function clumpCellsOf(clump: AphidClump): Set<string> {
+  const s = new Set<string>();
+  for (let k = 0; k < clump.cells.length; k += 2) s.add(`${clump.cells[k]},${clump.cells[k + 1]}`);
+  return s;
+}

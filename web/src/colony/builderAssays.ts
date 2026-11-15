@@ -13,7 +13,9 @@
 //   B9 aphidsFound      a clump of aphids far from the hole: how soon is it first found? (docs/aphids.md, PRD §78)
 //   B10 aphidsRenewable a clump against sugar on the same cells: which brings more home over 5 minutes, and is a trail laid?
 //   B11 tendersDefend   two colonies meet at a clump between them: what share of ants in contact with a rival stand and fight there?
+//   B12 aphidsEaten     a clump worked by a colony: how many of its aphids do the ants eat? (report; Oliver et al. 2012)
 
+import { aphidCount } from "./aphids.ts";
 import { Builder, type Stroke } from "./builder.ts";
 import type { Game } from "./game.ts";
 import { centreX, centreY } from "./hex.ts";
@@ -672,6 +674,39 @@ export const tendersDefend: Assay = {
   score: () => ({}),
 };
 
+/**
+ * B12: a clump up the arena from the hole, worked by the colony: at 240 s (past its peak, before its crash ends), its aphids
+ * eaten and those left. Report: against aphidPrey 0, the share fewer (Oliver, Leather & Cook 2012: 118 against 147 aphids
+ * with ants and larvae after 7 days, 20 % fewer; Jossart et al. 2025 saw none eaten in 10 days).
+ */
+export const aphidsEaten: Assay = {
+  id: "aphidsEaten",
+  title: "B12 a clump of aphids worked by a colony: how many do the ants eat? (report)",
+  target:
+    "report: aphids left at 240 s against aphidPrey 0 (Oliver, Leather & Cook 2012: 20 % fewer with ants and larvae after 7 days; Jossart et al. 2025: none in 10 days)",
+  seconds: 240,
+  spec: (seed) => {
+    let out = { eaten: NaN, left: NaN };
+    return onPlane({
+      seed,
+      seconds: 240,
+      map: () => new Arena(100, 100, true).build([NEST]),
+      game: { antCount: 300, rival: false },
+      events: [strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(CLUMP) })],
+      probes: [
+        {
+          tick: (g) => {
+            const c = g.aphids[0];
+            if (c) out = { eaten: c.eaten, left: aphidCount(c) };
+          },
+          summary: () => ({ aphidsEaten: out.eaten, aphidsLeft: out.left, eatenShare: out.eaten / (out.eaten + out.left) }),
+        },
+      ],
+    });
+  },
+  score: () => ({}),
+};
+
 export const BUILDER_ASSAYS: Assay[] = [
   crayonLine,
   wall,
@@ -686,4 +721,5 @@ export const BUILDER_ASSAYS: Assay[] = [
   aphidsRenewable,
   aphidsRenewableSugar,
   tendersDefend,
+  aphidsEaten,
 ];

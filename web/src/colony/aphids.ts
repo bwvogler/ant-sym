@@ -129,9 +129,20 @@ export interface AphidOdour {
   sum: number;
   /** how far it was built out */
   range: number;
+  /** the game's clumps (Game.aphids), for an ant that takes an aphid to find whose it is */
+  clumps: AphidClump[];
 }
 
-export const aphidOdour = (): AphidOdour => ({ dist: null, epoch: -1, cells: 0, sum: 0, range: 0 });
+export const aphidOdour = (): AphidOdour => ({ dist: null, epoch: -1, cells: 0, sum: 0, range: 0, clumps: [] });
+
+/** The living clump with cell (x, y), or null. */
+export function clumpAt(clumps: readonly AphidClump[], x: number, y: number): AphidClump | null {
+  for (const c of clumps) {
+    if (aphidCount(c) < 1) continue;
+    for (let k = 0; k < c.cells.length; k += 2) if (c.cells[k] === x && c.cells[k + 1] === y) return c;
+  }
+  return null;
+}
 
 /** Bring the game's aphid odour up to date over `map` (the plane) out to `range` cells, at game time `t`. */
 export function updateAphidOdour(

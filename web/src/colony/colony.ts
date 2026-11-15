@@ -7,7 +7,7 @@ export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { heatStep } from "./heat.ts";
 import { plumeAt, updatePlume } from "./plume.ts";
-import type { AphidOdour } from "./aphids.ts";
+import { clumpAt, type AphidOdour } from "./aphids.ts";
 import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
   type CellCounts,
@@ -945,6 +945,22 @@ export class Colony {
     if (col < 0 || row < 0 || col >= w || row >= h) return false;
     const d = dist[row * w + col]!;
     return d >= 0 && d <= 1;
+  }
+
+  /**
+   * Whether an ant taking food at cell (cx, cy) takes an aphid instead (docs/aphids.md finding 6, ja-nzkg.5): on a living aphid
+   * cell, with the chance aphidPrey; the clump loses the aphid and the honeydew stays. Draws a number only on an aphid cell.
+   */
+  preyAphid(cx: number, cy: number): boolean {
+    const o = this.aphidOdour;
+    if (this.params.aphidPrey <= 0 || !o?.dist) return false;
+    const { w, h } = this.map.size;
+    const col = cx - this.map.x0;
+    if (col < 0 || cy < 0 || col >= w || cy >= h || o.dist[cy * w + col] !== 0) return false;
+    const clump = clumpAt(o.clumps, cx, cy);
+    if (!clump || this.rng() >= this.params.aphidPrey) return false;
+    clump.eaten += 1;
+    return true;
   }
 
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */
