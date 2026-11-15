@@ -208,7 +208,7 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
 | slow/raidFind.test.ts | O (`oneAssay("raidFind")`) | A11, seeds 1–10 | **ported** (PRD §76.4) | |
 | slow/raidStop.test.ts | O (`oneAssay("raidStop")`) | A12, seeds 1–2 | **ported** (PRD §76.4) | |
-| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | **deleted** (S2.3c: G1 green on every PR since; its references now name G1) | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
+| slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | **deleted** (S2.3c: G1 green on every PR since; its references now name G1; its porter todo, ja-3po, moved to G1's file. G1 measures the same and bounds each seed at 2, but passes with 5 of 10 seeds within and none at 10, where slow/side needed both its seeds within) | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
 
 ### Golden masters
 

@@ -11,21 +11,17 @@ import { smallOne } from "../builders.ts";
 // died of old age within about an hour: food piled up in a one- or two-cell reception chamber while the larvae starved,
 // and a worker lived half an hour.
 //
-// The full game (768 × 368, 600 ants a colony) takes about 10 minutes to run an hour, too slow for the suite. This is the
-// tests' small map (256 × 160) with one colony of 110 ants (165 at most) and 0.3 of the map's food, about the full game's
-// food per ant (27,840 for 1,200 founders there; 2,190 for 110 here). It still shows the dynamics: the founders die of
-// age within the hour; the colony digs its reception and brood chambers; it brings home all the food it can reach by
-// about 2,400 s and lives on its larder after. Measured (`node scripts/lab/economy-bench.mjs 2 3600 110 1 1200 <root> 1 0.3`):
-// at 3,600 s this branch has 152 workers (167 born, 125 dead of age); with a lifespan of 1,800 s, 20; with the food flow
-// as it was (food to a reception of any size, porters only from reception and stores, no forager handing on), 130, with
-// 30 larvae unfed for over two minutes beside 117 food in the nest (none on this branch until the last minute, when the
-// larder is down to 33: 2). `scripts/lab/economy-bench.mjs` measures the full game. With energy and hunger (ja-xu6.1, PRD
-// §50.18) adults eat too (38 food in the hour here): 148 workers (159 born, 121 dead of age), 6 larvae once stranded, none starved.
+// The full game takes minutes to run an hour, too slow for the suite. This is a small one world (a 160 × 100 plane over its
+// curtain) with one colony of 110 ants (165 at most) and 0.3 of both layers' food (world 2: 853 + 1,732; world 1: 1,598 +
+// 2,182). It still shows the dynamics: the founders die of age within the hour, the colony digs its reception and brood
+// chambers, and it lives on its larder once the food it can reach is home. The side view's history (nest 9, F2, ja-xu6.1)
+// is in PRD §41 and §50.18. ja-xu6's response (old ants feel the brood's hunger and carry food to it) is guarded at unit
+// level by unit/hunger.test.ts: in these games nothing begs (review of #248, S3).
 
 /**
  * An hour of a small one world, one colony of 110 on 0.3 of the world's food, both layers (world `w`, the game seeded
  * w × 7919 + nudge). Measured on one world (S2.3c): world 2, 162 workers at 3,600 s (175 born, 123 dead of age), none
- * stranded or starved; world 1 + 1, 163 (172 born, 119 dead of age), the same. About 105 s each.
+ * stranded or starved; world 1 + 1, 163 (172 born, 119 dead of age), the same. About 95 s each.
  */
 function hour(w: number, nudge: number) {
   const ants = 110;
@@ -72,12 +68,11 @@ test(
 );
 
 test(
-  "ja-xu6: when the young run out, old ants feel the brood's hunger and carry food to it (world 1, seeding + 1: collapsed on main)",
+  "a second world's hour (world 1, seeding + 1): the founders replaced, the larvae fed, the size held, none starved",
   { timeout: 600_000 },
   () => {
-    // On main this world collapsed: births stalled, the colony aged until no ant (the old never ported or nursed) carried
-    // food to the brood, and 15 larvae at once starved beside a full larder; 77 workers were left at 3,600 s. With energy
-    // and hunger felt by touch (ja-xu6.1, hunger.ts), the old answer it: 161 workers, at most 1 larva waiting.
+    // On the side view this world collapsed before ja-xu6 (the old never carried food to the brood); on one world nothing
+    // begs here, so it repeats the first test's checks on another world (review of #248, S3, D1).
     const { ants, c, stranded } = hour(1, 1);
     assert.ok(c.births >= c.diedOld, `born ${c.births} against ${c.diedOld} dead of age`);
     assert.ok(stranded <= 5, `${stranded} larvae at once waited over two minutes, with food enough for them lying in the nest`);

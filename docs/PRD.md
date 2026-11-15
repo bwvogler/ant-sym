@@ -2559,7 +2559,7 @@ The basis is `docs/tiredness.md`:
 - **A raider standstill** (re-review of #36): in `side-bench` seed 6, colony 1, from 500 to 550 s, up to ~300 fighters stand still for 20 s or more on the surface between the nests, then disperse. That is 10,253 ant-seconds stuck on the ground against `main`'s 104. Losses on that seed are below `main`'s. Bead filed.
 - **Porters: mostly a measurement artefact** (re-review of #36). `side-bench`'s porter count read `since`, which `#becomePorter` doesn't reset, so a forager that had rested inside over 120 s counted the moment it took food on. It now uses its own hold clock: on `side-bench 1-6 600 600 2`, 0 porters held over 120 s at the end on both MR 3.1 and `main` (peaks 3 and 1). The "1 → 20" first reported was the old clock.
   - A jam was real on af0a548 (seed 6: 9 at the end); fighting tiring removed it.
-  - `heldProbe`'s `maxPorting` (own clock) is at most 6 on G seeds 1–10 and 0 on 11–20; Cautious's replay reaches 49. ja-3po keeps those, and `slow/side.test` keeps a todo guard.
+  - `heldProbe`'s `maxPorting` (own clock) is at most 6 on G seeds 1–10 and 0 on 11–20; Cautious's replay reaches 49. ja-3po keeps those, and `slow/g1/oneWorldG1.test` keeps a todo guard (in `slow/side.test` until S2.3c).
 - **Legend** (`COLONY_BRAIN_VERSION` 5, `RESPONSE_BRAIN_VERSION` 4; stance unchanged). The legend now says:
   - that tired means a long unsuccessful search, rested only by staying inside;
   - that going home tired is how the colony stops searching where food has run out;

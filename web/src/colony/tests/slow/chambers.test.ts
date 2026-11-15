@@ -4,6 +4,7 @@ import { CHAMBER_MIN_DEPTH, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { nx, ny } from "../../hex.ts";
 import { groundTop, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { CHAMBER_GAP, CHAMBER_GAP_GROWTH } from "../../tuning/nest.ts";
 import { smallOne } from "../builders.ts";
 
 // Nest slice 2 (docs/nest-and-home.md §3.2): whole-colony chamber tests, too slow for `npm test`'s 60 s per file
@@ -59,6 +60,10 @@ function crowdedGames() {
     const g = new Game(w, { antCount: 400, rival: false }, mulberry32(seed));
     const ch = map.chambers!;
     const floor0 = ch.floorOf[0]!;
+    // A filled chamber cell leaves its chamber as it is filled (fillCell releases it), so count the releases (review of #248, S1).
+    let released = 0;
+    const release = ch.release.bind(ch);
+    ch.release = (x, y) => (released++, release(x, y));
     // Every ant middle-aged, a digger: this is about how chambers are dug, not who digs (slice 6 zones digging by age).
     for (let i = 0; i < g.player.n; i++) {
       g.player.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
@@ -75,6 +80,7 @@ function crowdedGames() {
     for (let y = 0; y < map.size.h; y++)
       for (let x = map.x0; x < map.x0 + map.size.w; x++)
         if (ch.at(x, y) >= 0) assert.equal(rockAt(map, x, y), OPEN, `game ${seed}: chamber cell (${x}, ${y}) filled`);
+    assert.equal(released, 0, `game ${seed}: ${released} chamber cells filled`);
     // The gap from a chamber to the one above it (in the same stack: overlapping columns) grows with depth: the imposed rule.
     const gaps = mine
       .map((b) => {
@@ -84,6 +90,10 @@ function crowdedGames() {
       })
       .filter((x) => x.gap < Infinity)
       .sort((p, q) => p.depth - q.depth);
+    // Each stacked pair keeps the rule's own minimum, CHAMBER_GAP + CHAMBER_GAP_GROWTH × depth, less a row (depth is read at
+    // the chamber's middle column, not where it started): with the growth off, 3-7 pairs a game break it (review of #248, S2).
+    const tight = gaps.filter((p) => p.gap < CHAMBER_GAP + CHAMBER_GAP_GROWTH * p.depth - 1);
+    assert.equal(tight.length, 0, `game ${seed}: ${tight.length} stacked chambers closer than the spacing rule`);
     const half = Math.floor(gaps.length / 2);
     const mean = (xs: { gap: number }[]) => xs.reduce((s, x) => s + x.gap, 0) / xs.length;
     stacked.push(gaps.length);
