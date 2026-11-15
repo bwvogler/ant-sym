@@ -11,9 +11,9 @@ const TONE = {
  * The notices raised with pushToast, each gone after TOAST_MS, on a tap, or swiped away (owner, 2026-11-15): sideways
  * or down. A finger held on one stops its clock, and lifting a hold leaves it. A swiped notice is still in the log
  * behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar, "top" under the HUD (while the builder's tray
- * fills the bottom).
+ * fills the bottom), "lab" above Lab mode's workbench, at the map's foot (PRD §69.7).
  */
-export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" }) {
+export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" | "lab" }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   // While the bell's list is open they are in it: none over it.
   const hidden = useSyncExternalStore(subscribeToasts, noticesOpen, noticesOpen);
@@ -21,7 +21,11 @@ export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" 
   return (
     <div
       className={`pointer-events-none fixed inset-x-0 z-50 flex flex-col items-center gap-2 px-4 ${
-        place === "top" ? "top-[7.5rem] sm:top-[4.5rem]" : "bottom-20 lg:bottom-32"
+        place === "top"
+          ? "top-[7.5rem] sm:top-[4.5rem]"
+          : place === "lab"
+            ? "bottom-[calc(42dvh+5rem)] lg:bottom-[calc(42dvh+8rem)]"
+            : "bottom-20 lg:bottom-32"
       }`}
       role="status"
       aria-live="polite"
