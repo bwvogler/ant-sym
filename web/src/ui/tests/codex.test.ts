@@ -1,7 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { centreX, centreY, CURTAIN, INFECTED, MODES, PLANE } from "../../colony/index.ts";
-import { ALL_KEY, cues, listed, loadAll, loadSeen, newlyOpen, saveAll, saveSeen, SEEN_KEY, UNITY_SEEN, UNLOCK } from "../codex.ts";
+import {
+  ALL_KEY,
+  codexNumbers,
+  cues,
+  listed,
+  loadAll,
+  loadSeen,
+  newlyOpen,
+  saveAll,
+  saveSeen,
+  SEEN_KEY,
+  UNITY_SEEN,
+  UNLOCK,
+} from "../codex.ts";
 import { GUIDE } from "../guide.ts";
 import { buildGame } from "../useColony.ts";
 
@@ -136,4 +149,15 @@ test("one notice names what opened together", () => {
   assert.equal(listed(["Home trail", "Choosing a branch"]), "Home trail and Choosing a branch");
   assert.equal(listed(["a", "b", "c"]), "a, b and c");
   assert.equal(listed([]), "");
+});
+
+test("the game's numbers from the page's stats: the odours' gap only while two colonies stand (review of #206, N4, N9)", () => {
+  const side = (population: number, losses = 0) => ({ population, losses });
+  assert.deepEqual(codexNumbers(null), { deaths: 0, unityGap: 1, mutations: 0 }, "before the first stats");
+  const st = { sides: [side(40, 2), side(30, 1)], unity: { gap: 0.4 }, evolution: { mutations: 3 } };
+  assert.deepEqual(codexNumbers(st), { deaths: 3, unityGap: 0.4, mutations: 3 });
+  // A wipe-out: Game.unity's gap is 0 once fewer than two stand; that is not the odours drawing together.
+  assert.equal(codexNumbers({ ...st, sides: [side(40), side(0, 30)], unity: { gap: 0 } }).unityGap, 1);
+  assert.equal(codexNumbers({ ...st, sides: [side(40), side(0), side(12)] }).unityGap, 0.4, "a third colony still standing: two stand");
+  assert.equal(codexNumbers({ ...st, evolution: null }).mutations, 0);
 });

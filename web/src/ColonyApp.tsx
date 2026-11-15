@@ -14,12 +14,16 @@ import {
   cellOf,
   GENERIC_ANT,
   INFECTED,
+  Builder,
 } from "./colony/index.ts";
+import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
+import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
+import { play, say, setSoundOn, soundOn } from "./ui/sounds.ts";
 import { sunChip } from "./ui/sun.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
-import ColonyField, { type FieldApi, type FieldPen } from "./ui/ColonyField.tsx";
+import ColonyField, { type FieldApi, type FieldBuild, type FieldPen } from "./ui/ColonyField.tsx";
 import DetailsScreen, { BareCards, Colonies, SavedGames, type DetailsProps } from "./ui/DetailsScreen.tsx";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
 import type { Followed } from "./ui/follow.ts";
@@ -69,7 +73,7 @@ import type { DoctrineChoice } from "./ui/useColonyJev.ts";
 import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
-// clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, Learn,
+// clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, the Codex,
 // settings; a tab bar on a phone); the followed ant or the queen's pen in an inspector at its right. The fungus is the
 // player: you shape its policy in words (its aim); Jev reads them and decides what the fungus does in each host it
 // lives in. Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md). The lab and the full
@@ -111,7 +115,7 @@ export default function ColonyApp() {
     followedNow.current = followed;
   }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
-  // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Learn says how many are new.
+  // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Codex says how many are new.
   useCodexWatch(game, onFrame, stats);
   const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
@@ -132,6 +136,103 @@ export default function ColonyApp() {
   // The species' own guide entry, if it has one (the HUD's sun chip links to it).
   const ownEntry = GUIDE.find((e) => e.species === game.params.species.id)?.id;
   const pointsAt = tut.card?.highlight;
+  // The builder (docs/builder.md, PRD §73, ja-kjj8): a child's tools over the world, on or off at any point in a game. Its
+  // builds go into the game itself, so a save keeps them; its undo is this page's, per game.
+  const builder = useMemo(() => new Builder(game), [game]);
+  const [building, setBuilding] = useState(false);
+  const [toolKey, setToolKey] = useState<string>("move");
+  const [little, setLittle] = useState(false);
+  const [smell, setSmell] = useState(true);
+  const [demo, setDemo] = useState<{ tool: TrayTool; at: number } | null>(null);
+  const [, setBuilt] = useState(0);
+  const lastSound = useRef(0);
+  // Colonies founded mid-game join the same array (Game.addColony): its length is what changes.
+  const colonyCount = game.colonies.length;
+  const trails = game.player.ph.has("food");
+  const tray = useMemo(
+    () =>
+      trayItems(
+        little,
+        Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
+        trails,
+      ),
+    [little, colonyCount, trails],
+  );
+  const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
+  const pickTool = useCallback((it: TrayItem) => {
+    setToolKey(it.key);
+    play(it.tool);
+    say(it.label);
+    if (!seenTools().has(it.tool)) {
+      markSeen(it.tool);
+      setDemo({ tool: it.tool, at: Date.now() });
+    }
+  }, []);
+  useEffect(() => {
+    if (!demo) return;
+    const t = setTimeout(() => setDemo(null), 1700);
+    return () => clearTimeout(t);
+  }, [demo]);
+  const toggleBuilding = useCallback(() => {
+    setBuilding((on) => {
+      play(on ? "off" : "on");
+      if (!on) {
+        // Zoomed out, a finger's stroke spans hundreds of cells: the builder opens close in (LINK_ZOOM's ≥ 8 px a cell),
+        // on the colony the fungus landed by, unless the view is close already.
+        const v = controls.view === "above" ? PLANE : CURTAIN;
+        const cam = field.current?.camera(v);
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (!cam || cam.zoom < 6 * dpr) {
+          const nest = game.colonies[game.landed?.colony ?? 0]?.layers[v]?.nest ?? game.colonies[0]?.nest;
+          if (nest) field.current?.centreOn(v, nest.x, nest.y, { close: true });
+        }
+      }
+      return !on;
+    });
+    setDrawer(null);
+  }, [controls.view, game]);
+  const undoBuild = useCallback(() => {
+    if (builder.undo()) {
+      play("undo");
+      setBuilt((n) => n + 1);
+    }
+  }, [builder]);
+  const build: FieldBuild | null = useMemo(
+    () =>
+      building
+        ? {
+            tool: picked.tool === "move" ? null : picked.tool,
+            smell: smell && !little,
+            onStroke: (layer, points, first) => {
+              if (picked.tool === "move") return;
+              if (first) builder.begin();
+              const n = builder.apply({ tool: picked.tool, layer, points, colony: picked.colony ?? 0 }, true);
+              // A sound for the first touch, and now and then while a drag changes the ground.
+              const now = performance.now();
+              if (first || (n > 0 && now - lastSound.current > 220)) {
+                lastSound.current = now;
+                play(picked.tool);
+              }
+              if (first || n > 0) setBuilt((k) => k + 1);
+            },
+          }
+        : null,
+    [building, picked, smell, little, builder],
+  );
+  // Ctrl/⌘+Z undoes a stroke while building; Escape leaves the builder.
+  useEffect(() => {
+    if (!building) return;
+    const key = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoBuild();
+      } else if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[role="dialog"]')) toggleBuilding();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [building, undoBuild, toggleBuilding]);
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
     // From lg (1024 px) the aim is the bar under the map, outlined where it is; narrower it is in The fungus drawer, opened
@@ -202,7 +303,7 @@ export default function ColonyApp() {
         SPEEDS,
       );
       if (!a) return;
-      // Over a dialog that has the page (the palette, the sheet, Details, Learn, the start, the queen's pen) only the
+      // Over a dialog that has the page (the palette, the sheet, Details, the Codex, the start, the queen's pen) only the
       // palette's key works: the game's keys wait.
       if (a.kind !== "palette" && document.querySelector(BLOCKING)) return;
       e.preventDefault();
@@ -509,7 +610,9 @@ export default function ColonyApp() {
           lens={lensOn}
           onProbe={offerProbe}
           toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
+          build={build}
         />
+        {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
       </div>
 
       {/* The HUD: time and the goal, over the map's top edge. */}
@@ -605,11 +708,31 @@ export default function ColonyApp() {
         </div>
       </div>
 
-      {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. */}
+      {/* The rail: each drawer, the Codex, Settings. A tab bar along the bottom on a phone. The builder's tray takes its place. */}
+      {building && (
+        <BuilderTray
+          items={tray}
+          picked={picked.key}
+          little={little}
+          smell={smell}
+          canUndo={builder.canUndo}
+          odours={game.colonies.map((c) => c.nestOdour)}
+          onPick={pickTool}
+          onUndo={undoBuild}
+          onLittle={() => {
+            setLittle((l) => !l);
+            setToolKey("move");
+          }}
+          onSmell={() => setSmell((v) => !v)}
+          onExit={toggleBuilding}
+        />
+      )}
       <nav
         aria-label="panels"
+        hidden={building}
         className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:flex-col sm:gap-1 ${FLOAT}`}
       >
+        <IconButton icon="build" label="Builder" onClick={toggleBuilding} />
         <IconButton icon="fungus" label="The fungus" active={drawer === "fungus"} onClick={() => toggle("fungus")} />
         <IconButton
           icon="evolve"
@@ -678,7 +801,7 @@ export default function ColonyApp() {
 
       {/* The inspector: the queen's pen while she flies, else the followed ant. A sheet on a phone; below 1024 px it waits
           while a drawer is open, so the two never overlap. */}
-      {(penCard || followed) && (
+      {!building && (penCard || followed) && (
         <div
           className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[55dvh] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100dvh-6rem)] sm:w-[26rem] lg:max-h-[calc(100dvh-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
         >
@@ -706,16 +829,18 @@ export default function ColonyApp() {
         </div>
       )}
 
-      <AimBar
-        aim={jev.aim}
-        setAim={jev.setAim}
-        draftAim={jev.draftAim}
-        lock={jev.lock}
-        tokens={TOKENS_PER_FUNGAL_SITUATION}
-        leftOpen={drawer !== null}
-      />
+      {!building && (
+        <AimBar
+          aim={jev.aim}
+          setAim={jev.setAim}
+          draftAim={jev.draftAim}
+          lock={jev.lock}
+          tokens={TOKENS_PER_FUNGAL_SITUATION}
+          leftOpen={drawer !== null}
+        />
+      )}
 
-      {tut.tutorial && tut.card && (
+      {!building && tut.tutorial && tut.card && (
         <TutorialCard
           step={tut.tutorial.step}
           card={tut.card}
@@ -829,6 +954,7 @@ function Settings({
         </div>
         <p className="mt-1.5 text-xs text-fg-3">Only where your hosts have smelled them lately.</p>
       </div>
+      <SoundSetting />
       <div>
         <SectionHead>Keys</SectionHead>
         <Button className="mt-2 w-full" onClick={openShortcuts}>
@@ -853,6 +979,30 @@ function Settings({
       >
         The source and the research notes, on GitHub <Icon name="external" className="size-3.5" />
       </a>
+    </div>
+  );
+}
+
+/** The builder's sounds and spoken tool names (PRD §73): on unless turned off, per browser. */
+function SoundSetting() {
+  const [on, setOn] = useState(soundOn);
+  return (
+    <div>
+      <SectionHead>Sounds</SectionHead>
+      <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="sounds">
+        {([true, false] as const).map((v) => (
+          <button
+            key={String(v)}
+            type="button"
+            className={`flex-1 ${seg(on === v)}`}
+            aria-pressed={on === v}
+            onClick={() => (setSoundOn(v), setOn(v))}
+          >
+            {v ? "on" : "off"}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-xs text-fg-3">The builder&apos;s tool sounds, and each tool&apos;s name said aloud.</p>
     </div>
   );
 }

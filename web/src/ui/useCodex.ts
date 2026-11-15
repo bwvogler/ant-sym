@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Game } from "../colony/index.ts";
-import { cues, listed, loadAll, loadSeen, newlyOpen, saveAll, saveSeen, UNLOCK } from "./codex.ts";
+import { codexNumbers, cues, listed, loadAll, loadSeen, newlyOpen, saveAll, saveSeen, UNLOCK } from "./codex.ts";
 import { guideFor } from "./guide.ts";
 import { pushToast } from "./toasts.ts";
 import type { ColonyStats } from "./useColony.ts";
@@ -82,16 +82,10 @@ export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => voi
       const t = performance.now();
       if (t - last < EVERY_MS || state.held) return;
       last = t;
-      const st = now.current;
-      const g = {
-        deaths: st ? st.sides.reduce((n, s) => n + s.losses, 0) : 0,
-        // Unity's gap is 0 once fewer than two colonies stand (Game.unity): a wipe-out is not the odours drawing together (N4).
-        unityGap: st && st.sides.filter((s) => s.population > 0).length >= 2 ? st.unity.gap : 1,
-        mutations: st?.evolution?.mutations ?? 0,
-      };
-      const open = newlyOpen(ids, state.seen, cues(game.colonies, g));
+      const open = newlyOpen(ids, state.seen, cues(game.colonies, codexNumbers(now.current)));
       if (!open.length) return;
-      // With what another tab has saved since (N5): each tab adds to the notebook, none overwrites it.
+      // With what another tab has saved since (N5): each tab adds to the notebook, none overwrites it. Untested: the e2e
+      // drives one tab.
       const seen = new Set([...loadSeen(storage), ...state.seen, ...open]);
       saveSeen(storage, seen);
       const told = open.filter((id) => (UNLOCK[id]?.cue ?? "start") !== "start");

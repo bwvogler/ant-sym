@@ -4192,6 +4192,14 @@ The owner asked for the top-down view and the side view to be two views of one g
 
 **`ja-web` built (2026-11-10).** Activation at the top of each shaft: every outgoing forager is held at a gate within `WAIT_STEPS` of its own hole and asked `leave` there; carriers have a pass; held ants smell the raid trail at their hole. A5b passes 7/10 on one world, A5 0/10 (the middle-aged go out unheld); G1's food carried down is unchanged and raids return; the tick at 1,200 + 1,200 is over the 10 ms gate (10.7–10.8 ms in the second half), and the slow unity guard (seed 3) no longer unifies (skipped behind `ja-lp4.6.6`). §48.6; `one-world.md` §5, "ja-web as built".
 
+**U6b built (`ja-lp4.6.2`, 2026-11-14): the final one-world baselines.** A11 and A12 run on one world (`ONE_ASSAYS`; nothing pending); no behaviour change, the golden masters bit-exact. Seeds 1–10 on `main` (`74a3d822`); the full table, with U6a's and ja-web's beside it, is `one-world.md` §5, "U6b as built".
+- **Assays:** A1 10/10, A2a 10/10, A2b 9/10, A3 10/10, A4 10/10, A5 0/10, A5b 9/10, A6 5/10, A9 5/10, A10 0/10; **A11 10/10** (gain median 4.14, worst 2.47), **A12 8/10** (median 0.84; seeds 7 and 8 at 0.41 and 0.49, accepted as the baseline by the owner, `ja-lp4.6.10`).
+- **A6 is a fight at the nest:** every defender dies on 6 of 10 seeds and 413 of 821 defender deaths are in the curtain. Raiders keep going down a rival's shaft (owner, 2026-11-14); what A6 measures on one world stays open (`ja-lp4.6.5`).
+- **G1:** 6 of seeds 1–10 within 2, worst 6 (seed 7). #205's guard asks for 5. Raids: 166 scouts, 42 finds, 13 recruits, recruits on 4 seeds (`ja-lp4.6.9`).
+- **Unity:** peaks 0.02–0.23 % at 300 + 300 and 0.42–0.56 % at 600 + 600 in 600 s; nobody unifies (`ja-lp4.6.6`).
+- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`).
+- **Cost:** none: no situation, legend or question changed.
+
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
 
 The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
@@ -4403,7 +4411,7 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 
 ## 55. The page plays one world only (ja-97n, 2026-11-10)
 
-The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines are still open. Only the UI changed:
+The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines followed (§51, "U6b built", 2026-11-14). Only the UI changed:
 
 - `buildGame` always builds `generateOneWorld(seed)`. `ColonyControls`, the saved settings (`GameSettings`) and `hasNests` no longer carry a ground. Saves made before this change will not load into the same world; there is no migration, because nobody plays yet.
 - The Nest tab, the fungus panel's nest upgrades and the notices no longer check whether the map has nests. The Nest tab's "Switch to the side view" empty state is gone.
@@ -4952,7 +4960,7 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Built** (`levers.ts` `rouse`, emit, none 0 / some 0.5 / strong 1 × the host's load; the ants' `rouse` array, reset with the host's levers; `crossing.ts`: a host going down its own hole with nothing found adds its `rouse` to the passes the waiting ants meet, only where `invitePace` > 0). In the **Trails** upgrade's reach, beside trail, leak and alarm laid. **Off the default menu** (`DEFAULT_MENU` leaves out levers that need an invitation), and **on in a desert game** (`menuFor`, owner 2026-11-14): a generic game's fungus requests don't ask a lever that does nothing. `inertLevers(has, invites)`: inert on a species whose finders don't invite (the generic ant), greyed on the Details screen. Goldens bit-exact.
 - **Measured** (seeds 1–5, one world, 240 s, the fungus landed in the player's colony, rouse strong against none, rich map): the waiting ants meet **+4.6 %** passes and held ants leave about 0.5 s sooner, but **departures fall 0.6 %** (fewer on 4 of 5 seeds). **Why** (ja-rf5.19): 85–90 % of departures are finders cycling straight back out; about one ant waits at the gate and all of them leave anyway (145/145), so a pass only makes one leave sooner; even no gate wait at all gives no more departures (1,799 against 1,837). Variants (rouse at every crossing, or on finders' passes too) moved departures −1.0 % to +0.2 %. Only on a scarce map (1–13 held) does rouse add departures, +0.5 % to +3.8 %. "Strong" expresses only 0.3–0.5 of a finder per host. **The owner chose to merge it as it is and say so (2026-11-14)**; a lever that moves departures must act on a pool that exists (the host itself, or hot foragers cooling inside), a new mechanic, ja-rf5.21 ("strong"'s weak expression: ja-rf5.20).
 - **Re-shipped:** the fungus lane's answers under the new legend (`precache.mjs --lanes fungus`, then `--fungus-also` with main's earlier bundles for the 36 situations a fresh recording didn't meet): 132 situations per preset aim, **$0.0092 + $0.0036**, about 760–784 real tokens a question. The fungus legend gained the lever (1,939 → 2,039 characters), so every fungus request is about **+2 %** longer (4,941 → 5,041 characters in the default request) and the lane's $/h rises by about that.
-- **Desert games and the shipped answers:** a fungus answer is keyed by the levers asked, and the shipped answers were asked under the default menu (no rouse). A desert game asks with rouse on, so its workers' situations miss them (about 1 % of its fungus lookups hit, queen lookups only; review of #202, seeds 1–3): without Jev (the Pages build with no backend) a desert game's fungus plays the local rule for workers; with a run on, it asks about 50 situations an aim (≈ $0.002). Shipping answers under the desert menu is the owner's choice.
+- **Desert games and the shipped answers** (ja-rf5.22, owner's option (c), 2026-11-15): a fungus answer is keyed by the levers asked, and a desert game asks with rouse on, so the answers asked under the default menu missed its workers (about 1 % of its lookups hit, queen lookups only). `precache.mjs --species desert --lanes fungus` records the situations a page desert game meets (seeds 1–3, landing by each colony, 300 s) and asks them under the desert menu, into the same bundles (same context): 61 situations an aim, 183 answers, **$0.0063** (estimated $0.0058), about 826 real tokens a question. Each aim now ships 193 answers. Measured on seeds 1, 4, 5, 6 (4–6 not recorded): a desert game's fungus lookups hit **99.9–100 %**; a generic game's keys are unchanged. `ui/tests/precache.test.ts` holds that every aim ships the desert menu's answers.
 - **Tests:** `tests/soak/rouse.test.ts` (the levels set the share; off the default menu; inert without an invitation; in a game, more passes roused than not; on a species without an invitation, none; a carrier adds exactly one finder's pass; the share scales with load). Mutations, each failing it: the crossing not adding rouse; the invitation guard removed; carriers adding rouse; the load scaling dropped.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
@@ -5806,13 +5814,14 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
 - **Entries open on first sight.** Each guide entry waits, named and numbered, until the game first shows the player what it is about through the fungus's hosts. Then it opens.
   - **Cues:** the pure `ui/codex.ts` reads a cue from the game twice a second (`cues`); its `UNLOCK` table says which cue opens which entry and what the locked card tells the player to look for.
     - The fungus, its senses, how the mycelium feeds its tips, the line and the curtain, and a species' own entry are open from the start.
+    - The builder's five tools' entries are open from the start for now; each opening on the tool's first use is ja-mvo9.7 (owner, review of #206, D2).
     - A first host opens Jobs by age.
     - A host carrying food opens the food trail, tasting food, forager trips, the way home and route memory.
     - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.
     - A host underground opens chambers, finding the way inside, the queen and brood.
     - Alarm where a host stands, at the field's own threshold, opens alarm.
     - A host meeting strangers (its own contact, `foes`: not the policy's fight mode, which a host may never take) opens strangers and battles; a tired host opens tiredness and rest.
-    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand), one colony.
+    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand: `codexNumbers`), one colony.
   - A dead host shows nothing: a dead slot keeps its load.
   - `codex.test` holds every guide entry in `UNLOCK`, so a new entry must say how it opens.
 - **What the player sees:**
@@ -6073,3 +6082,141 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 
 **Cost.** The growth legend grew by about 185 characters (~46 tokens), sent once a request. Over a precache request's 48 situations that is about 1 token a question (~333 measured), but a small in-game request carries all of it. Re-shipped for $0.0020. No other lane is touched, and cached games spend nothing.
 
+## 73. Builder mode: a child changes the world, and the ants answer from their senses (design, ja-kjj8, 2026-11-14)
+
+**Research basis:** [builder.md](builder.md):
+- Drawn trails are followed for a while and then fade: an Argentine ant line with the full blend drew 5.0 ± 0.6 ants along its whole length in 2 min, against 0.2 ± 0.1 with one compound alone (Choe et al. 2012). A drawn circle is left after about half of it (*Lasius flavus*, Butterfield et al. 2025). Mills are an army-ant failure (Delsuc 2003).
+- A blocked route is rerouted: 18 of 21 *Pheidole* colonies moved to the long branch (Dussutour et al. 2009), and 73–93 % of Argentine ant colonies found the shortest remaining path (Reid et al. 2011). An established trail can hold against a better source added later (Beckers et al. 1990, **unverified**).
+- Young children: 7–8-year-olds pinch-zoomed successfully 13 % of the time under strict scoring (Yadav et al. 2020, full text). Pre-readers follow audio and demonstrations rather than symbols (Hiniker et al. 2015, 2016, **unverified**). No study shows rain removing trail pheromone, so the rain tool is **design**.
+
+**The problem.** The player has no way to change the world. The lure and alarm brushes went in §50.1 (they painted only the first colony's fields), and the spore brush went in §50.15 (it skipped the fungus's progression). The owner wants a creative mode for their children, like Minecraft's creative mode, that can be turned on or off at any point in a normal game.
+
+**Decisions.**
+- A separate mode, on or off at any point in a normal game (owner, 2026-11-14).
+- Players: a 7-year-old who reads and a younger sibling who can't, on a phone or tablet (owner).
+- Ants can die (owner).
+- What the child builds carries into the normal game's save (owner).
+- No fungus powers in the builder, and it spends no Jev of its own (owner).
+- The first slice of tools: Move, Dig, Dirt, Rock, Sugar, Crumb, a trail crayon per colony, Rain, Undo and Smell vision, plus a little-hands tray and sounds (owner said go, 2026-11-14).
+- One-finger Move as the main way to move the map, with two-finger pan kept for adults (proposed, from Yadav et al. 2020).
+- Rock and dirt never cover a hole, an ant or brood (proposed).
+
+**The mechanic.** Player tools that edit the world, as pure functions in `colony/builder.ts` (the table in builder.md): `digCell`, `fillCell`, a new `placeRock`, `dropFood` at quality 1.5 or 0.5, `Pheromones.deposit` on one colony's food channel, and a new `Pheromones.clear` for rain. (As built, §73.1: rock is set beside `fillCell` in `setTerrain`, and rain clears each channel's field in place; neither became a new function.) Undo journals the cells each stroke changed. A stroke is applied between ticks and draws no random numbers.
+- **Off:** no stroke means main bit for bit.
+- **What it retires or adds:** no ant choice changes. The ants answer through senses already in vision.md's table (trail, taste, soil faces). No gap row is added or closed.
+
+**Play.** The child sees each tool at once and the ants' answer within seconds at 4×: followers on a crayon line, a crowd at the sugar, a detour round a rock, a stall after rain. The builder grows no mycelium, doses no ant and unlocks nothing, so it can't skip the fungus's progression as the spore brush did. It changes the world the fungus works in. Chapter goals keep counting (proposed).
+
+**Assays and targets.** Assays B1–B6 land first, with no behaviour change:
+- B1, a crayon line followed: design mark ≥ 3× the no-pheromone ablation, after Choe et al.
+- B2, a rock wall across a trail: food comes home again by another way in ≥ 8 of 10 seeds, after Dussutour et al.
+- B3 (rain), B4 (late sugar), B5 (crayon circle) and B6 (filled tunnel) are report only.
+- A2b already covers sugar against crumb placed together (≥ 70 % to the rich side).
+
+**Cost (estimated).** No new lane, situation field, legend or question, so tokens per question are unchanged and a cached game spends nothing. Edited worlds may reach situations a plain game seldom does. A run that is on asks for them under the daily budget. The figure is measured once the tools exist (`npm run colony-cost` on a scripted builder session).
+
+**Beads.** `ja-kjj8` (this), then in build order:
+- `ja-kjj8.1` assays B1–B6;
+- `ja-kjj8.2` the pure tools;
+- `ja-kjj8.3` the tray and gestures;
+- `ja-kjj8.4` smell vision;
+- `ja-kjj8.5` little hands and sounds;
+- `ja-kjj8.6` Learn entries.
+
+**Owner's calls (2026-11-14), all as proposed:**
+- smell vision shows every colony's trails while building, and §65 holds with the builder off;
+- a crayon line fades at the home trail's rate (t½ ≈ 35 s);
+- rock and dirt never cover a hole, an ant or brood;
+- chapter goals keep counting, and the tutorial doesn't start in builder mode;
+- the little-hands tray is a switch inside the builder;
+- sounds come from WebAudio plus speechSynthesis.
+
+Merging is not delegated: PRs wait for the owner.
+
+**Still open.**
+- Owner's calls (builder.md "Open questions"), decided above:
+  - smell vision against §65 (proposed: every trail, only while building);
+  - how long a crayon line lasts (proposed: the home trail's rate, t½ ≈ 35 s);
+  - holes protected (proposed: yes);
+  - chapter goals and the tutorial while building;
+  - the little-hands tray as a switch or a start-screen button;
+  - sounds by WebAudio and speechSynthesis.
+- To measure: B1–B6 on seeds 1–10, the tick cost of a sugar flood, and the gesture rules on a real phone and tablet.
+
+### 73.1 The tools and the assays (ja-kjj8.1, ja-kjj8.2, 2026-11-14)
+
+**Built.**
+- `colony/builder.ts`, pure, exported from `colony/index.ts`. `Builder.apply(stroke)` and `undo()` cover dig, dirt, rock, sugar, crumb, crayon and rain.
+- **Terrain** goes through `digCell` and `fillCell`, so `dug` and `filled` move and the way-out field is rebuilt (`homing.ts` keys it on them).
+- **The plane has no soil,** so dirt there is rock.
+- **Dirt the builder puts down is not a fresh pellet** (`filledAt` −∞), so it doesn't draw builders by its scent.
+- **Guards:** no dirt or rock within 2 cells of any colony's hole, on an ant, on brood or the queen, or over food.
+- **Crayon lines** are `Game.crayons`. They are topped up each tick to 4 × ½^(age/35 s) and dropped below FAINT, about 3.7 min. They are saved with the game.
+- **Rain** zeroes food, home, alarm, no-entry and raid for every colony under the cloud, and the crayon cells there.
+- **Undo** keeps 20 strokes and puts back what is still the stroke's own: soil an ant has dug since stays dug, and sugar eaten stays eaten. So it is not bit-exact, by design (the bead's acceptance is updated to match).
+- **Tests:** `tests/int/builder.test.ts`, 18 tests (too slow for the unit tier). Mutations caught: dropping the guard, dropping the "never bury food" check, and (review of #204) undo onto an ant or over food, an unguarded queen, `holeGuard` 0, a crayon not topped up but piled on, a crayon undo that leaves its trail, a crayon drag split into lines, builder food left out of `foodTotal`, and undo that reopens a filled chamber's cells without giving them back to the chamber (review of #204, N7: since §71 a brood chamber under 4 cells gets no brood).
+- **Bit-exact:** with no stroke, `Game.tick` only checks an empty list, and the golden masters are unchanged.
+
+**Assays** (`colony/builderAssays.ts`, in `ONE_ASSAYS`; `npm run exp -- <id> --one`), seeds 1–10:
+
+| Id | What | Result |
+|---|---|---|
+| B1 `crayonLine` | ants on a crayon line out from the hole across empty ground ÷ on its undrawn mirror, 10–70 s after drawing | median **6.4×**, worst 4.3: passes ≥ 3× in **10/10**. Per seed: 4.4, 4.3, 5.7, 8.7, 5.7, 10.4, 4.9, 8.3, 7.1, 7.9. A first version had a food pile beyond each line: a pile found on the undrawn side laid its own trail and swamped the cue (6/10 passed, seeds 2, 3, 5, 7 under 3×), so the arena has no food, as Choe et al.'s line led to none. |
+| B2 `wall` | delivery 150–270 s after a 31-cell rock wall across the trail ÷ before | median **0.14** (0.04–0.16): **fails 0/10**. Without a wall, the same span runs at a median ≈ 1.0 (0.26–1.61). Carriers stall at the wall; filed as `ja-y94o` (a new behaviour, through adding-mechanics), `todo` in `tests/slow/assays.test.ts`. |
+| B3 `rain` | delivery in the 30 s after rain along the trail ÷ before; 90–210 s after ÷ before | dip median 0.87 (0.41–1.21); after 0.98 (0.45–1.55). Rain barely slows the colony: carriers home by vector and route memory, and the pile is found again at once. |
+| B4 `lateSugar` | the sugar's share of food carried in the 180 s after it is dropped beside a worked crumb pile | median **0.02** (0.01–0.05) of 1,343 carried; 444 sugar put. The colony stays on the crumbs, as Beckers et al. 1990's *Lasius* did. |
+| B5 `crayonRing` | ants per unit length on a crayon ring round the hole ÷ on a ring just outside it | 93× (66–116) in its first 30 s, 11× (4.9–23) at 30–90 s, 1.7× (1.5–3.3) at 90–180 s. Ants crowd it, then leave; no mill. |
+| B6 `fillShaft` | dirt over the colony's largest chamber at 60 s (the queen's, so early); share re-dug 240 s later | 49 of 73 cells filled (46–67; the guards spare the queen, brood and ants), **39 %** (14–52 %) dug out again |
+
+**For play:**
+- B1 and B5 show the crayon working.
+- B4 says a child's sugar dropped late is mostly ignored until scouts find it, which is real ant behaviour; the Learn entry says so.
+- B2 says a wall stops a trail for minutes. Undo or the dig tool opens it again, but rerouting is the ants' gap (`ja-y94o`).
+
+**Cost:** no lane, field, legend or question changed, so tokens per question are unchanged.
+
+### 73.2 The tray, smell vision, little hands, sounds, Learn (ja-kjj8.3–.6, 2026-11-14)
+
+**Built.**
+- **The shovel button** ("Builder") leads the rail, or the tab bar on a phone, and turns the builder on and off at any point in a game.
+  - **On:** the tray takes the tab bar's place along the screen's bottom edge, and the drawers close.
+  - **Hidden while building:** the inspector, the aim bar and the tutorial's card.
+  - **Unchanged:** the HUD (pause, speed, above and below) and the game itself, which keeps running.
+  - **Opening zoomed out:** the view first zooms to ≥ 8 px a cell on the colony the fungus landed by. Zoomed all the way out, one finger's stroke spanned hundreds of cells (1,566 rock cells in the first e2e run).
+- **The tray** (`ui/BuilderTray.tsx`, pure parts in `ui/build.ts`):
+  - **Pictures are emoji:** ✋ ⛏️ 🟫 🪨 🍬 🍪 🖍️ 🌧️, then ↩️ undo, 👃 smell vision, 🧸 little hands and ✅ done. Names are only the accessible labels and the spoken words.
+  - **Sizes:** buttons are 64 px, 88 px in the little tray.
+  - **The tool in hand** grows (×1.1) and takes a thick ring, not a colour change alone.
+  - **Crayons:** one per colony (the first four), each with a band of its colony's tone. None for a species with no food trail (the desert ant).
+- **Gestures** (`ColonyField` `build`):
+  - **With a tool:** a touch builds where it lands and a drag paints. A drag is one undo, and a crayon drag is one line.
+  - **With Move:** the field is as ever (one finger pans, a tap follows an ant).
+  - **Two fingers** pinch and pan for an adult.
+  - **Palms:** a touch wider or taller than 60 px is set aside (design).
+  - **Keys:** Ctrl/⌘+Z undoes; Escape leaves the builder.
+- **Smell vision** (owner): while building and on (the default), every colony's food trail shows everywhere, each in its colony's tone, with the home trail and alarm as before. With the builder off, §65 holds. It is a picture only.
+- **Sugar and crumbs** draw in their own colours (candy pink, biscuit brown); food of quality 1 is unchanged.
+- **Little hands** (owner: a switch in the builder): Move, Sugar, Dig and Rain, at 88 px; no smell vision.
+- **First use:** the first time a tool is picked (per browser), a 👆 shows its gesture over the map, a tap or a drag, for 1.6 s. Reduced motion stills it.
+- **Sounds** (`ui/sounds.ts`, owner: WebAudio plus speechSynthesis):
+  - each tool has its own short sound, made in the browser;
+  - a tool's name is spoken when it is picked;
+  - nothing plays before a touch;
+  - Settings → Sounds turns them off (per browser).
+- **Learn:** five entries (crayon, sugar and crumbs, rocks and walls, digging and filling, rain), each in the guide's shape and citing builder.md. The crayon's is hidden for a species with no food trail. builder.md is in the guide's notes.
+
+**Checks.**
+- `npm run e2e` step 11, at 390 and 768 px on a touch page:
+  - the tray is on the bottom edge in the tab bar's place, every button ≥ 64 px, and there is no sideways scroll;
+  - sugar by a tap, a rock wall and a crayon line by drags, one undo for the whole crayon drag;
+  - Move pans and builds nothing, and digging works below;
+  - Done gives the tab bar back;
+  - saved to a slot, reloaded and continued, the wall is still there.
+- `ui/tests/build.test.ts`: the tray's lists, its sizes and the palm rule.
+- `tests/int/builder.test.ts`: 18 tests.
+- `tests/soak/save.test.ts`: the save's keys now include `crayons`.
+
+**Not done:**
+- the gestures on a real phone and tablet with the children (the owner's);
+- the tick cost of a sugar flood (`npm run colony-bench`, not run);
+- `npm run colony-cost`: not rerun, since no lane, legend or question changed.

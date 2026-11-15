@@ -16,6 +16,12 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
   "one-world": { cue: "start", hint: "open from the start" },
   "desert-ant": { cue: "start", hint: "open from the start" },
   "mass-flow": { cue: "start", hint: "open from the start" }, // the mycelium grows from the landing
+  // The builder's tools: open from the start for now; each on its first use is ja-mvo9.7 (owner, review of #206, D2).
+  "builder-crayon": { cue: "start", hint: "open from the start" },
+  "builder-sugar": { cue: "start", hint: "open from the start" },
+  "builder-wall": { cue: "start", hint: "open from the start" },
+  "builder-dig": { cue: "start", hint: "open from the start" },
+  "builder-rain": { cue: "start", hint: "open from the start" },
   jobs: { cue: "host", hint: "your first host" },
   "food-trail": { cue: "hostCarrying", hint: "a host carrying food home" },
   "food-quality": { cue: "hostCarrying", hint: "a host carrying food home" },
@@ -40,8 +46,31 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
 /** The two nests' odours this far apart, or nearer (1 at the start: Unity.gap), counts as drawing together. */
 export const UNITY_SEEN = 0.9;
 
+/** The game's numbers the cues read. */
+export interface CodexNumbers {
+  deaths: number;
+  unityGap: number;
+  mutations: number;
+}
+
+/**
+ * The numbers from the page's stats (null before the first): deaths over every colony; the odours' gap only while two
+ * colonies stand, since Game.unity gives 0 once fewer do and a wipe-out is not the odours drawing together (review of
+ * #206, N4); mutations to keep.
+ */
+export function codexNumbers(
+  st: { sides: readonly { losses: number; population: number }[]; unity: { gap: number }; evolution: { mutations: number } | null } | null,
+): CodexNumbers {
+  if (!st) return { deaths: 0, unityGap: 1, mutations: 0 };
+  return {
+    deaths: st.sides.reduce((n, s) => n + s.losses, 0),
+    unityGap: st.sides.filter((s) => s.population > 0).length >= 2 ? st.unity.gap : 1,
+    mutations: st.evolution?.mutations ?? 0,
+  };
+}
+
 /** What the game shows now that the Codex counts, from the game's colonies and a few of its numbers. */
-export function cues(colonies: readonly Colony[], g: { deaths: number; unityGap: number; mutations: number }): Set<Cue> {
+export function cues(colonies: readonly Colony[], g: CodexNumbers): Set<Cue> {
   const out = new Set<Cue>(["start"]);
   if (g.deaths > 0) out.add("death");
   if (g.unityGap <= UNITY_SEEN) out.add("unity");

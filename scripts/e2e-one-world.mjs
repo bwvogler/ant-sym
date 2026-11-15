@@ -22,6 +22,8 @@
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
 //     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
 //     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
+//  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
+//     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1189,8 +1191,105 @@ try {
   );
   await nctx.close();
 
-  // ——— 11. The Codex (PRD §69.4): guide entries open as the game first shows what each is about ———
-  console.log("11. the Codex");
+  // ——— 11. The builder (docs/builder.md, PRD §73, ja-kjj8.3): on a phone and a tablet ———
+  // A shovel on the tab bar opens a tray of picture tools in its place: a tap places, a drag paints, Move pans, undo takes
+  // a whole drag back, below digs the curtain; the builds go into the game, so a save and a reload keep them.
+  for (const [w, h] of [
+    [390, 844],
+    [768, 1024],
+  ]) {
+    console.log(`11. the builder at ${w} px`);
+    const bctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+    const bp = await bctx.newPage();
+    bp.on("pageerror", (e) => errors.push(String(e)));
+    await bp.goto(url);
+    await bp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(() => bp.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "the builder page's game");
+    await bp.getByRole("button", { name: "Pause", exact: true }).tap();
+    await bp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Builder", exact: true }).tap();
+    const trayBox = await bp.getByRole("navigation", { name: "builder tools" }).boundingBox();
+    check(trayBox !== null && trayBox.y + trayBox.height > h - 4, "the tray sits on the screen's bottom edge");
+    check(!(await bp.getByRole("navigation", { name: "panels" }).isVisible()), "in place of the tab bar");
+    const sizes = await bp.$$eval('[aria-label="builder tools"] button', (bs) =>
+      bs.map((b) => Math.round(b.getBoundingClientRect().width)),
+    );
+    check(Math.min(...sizes) >= 64, `every tray button is at least 64 px (${Math.min(...sizes)})`);
+    check((await bp.evaluate(() => document.documentElement.scrollWidth)) === w, "no sideways scroll");
+    const fieldBox = await bp.locator("canvas").first().boundingBox();
+    const mx = fieldBox.x + fieldBox.width / 2;
+    // The whole map shows at first, centred in the field (it is wider than tall): strokes go about its middle.
+    const my = fieldBox.y + fieldBox.height / 2 - 20;
+    const g = (expr) => bp.evaluate(expr);
+    /** Pick a tray button; a tool is in hand once the field shows its cursor and a frame has passed (a finger takes longer). */
+    const tool = async (name) => {
+      await bp.getByRole("navigation", { name: "builder tools" }).getByRole("button", { name, exact: true }).tap();
+      if (["Undo", "Done building", "Move"].includes(name)) return;
+      await until(
+        () => bp.evaluate(() => document.querySelector("canvas").classList.contains("cursor-crosshair")),
+        `${name} in hand`,
+        3000,
+        20,
+      );
+      await bp.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    };
+    /** A drag with one pointer (Playwright's touchscreen only taps: the mouse makes the same pointer events). */
+    const drag = async (x0, y0, x1, y1) => {
+      await bp.mouse.move(x0, y0);
+      await bp.mouse.down();
+      await bp.mouse.move(x1, y1, { steps: 12 });
+      await bp.mouse.up();
+    };
+    const food0 = await g(() => window.jevAnts.game.layers[0].foodLeft);
+    await tool("Sugar");
+    // Taps along a row: one of them lands on open ground (a tap on rock puts nothing down).
+    for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my);
+    check((await g(() => window.jevAnts.view())) === "above", "taps that build follow no ant and switch no view");
+    check((await g(() => window.jevAnts.game.layers[0].foodLeft)) > food0, "a tap with sugar puts food down");
+    const walls0 = await g(() => window.jevAnts.game.layers[0].filled);
+    await tool("Rock");
+    await drag(mx - 90, my - 50, mx + 90, my - 50);
+    const walls1 = await g(() => window.jevAnts.game.layers[0].filled);
+    check(walls1 > walls0 + 5, `a drag with rock builds a wall (${walls1 - walls0} cells)`);
+    await tool("Trail crayon, Amber");
+    await drag(mx - 90, my + 40, mx + 90, my + 40);
+    const lines = await g(() => window.jevAnts.game.crayons.length);
+    check(lines === 1, `a crayon drag draws one line (${lines})`);
+    await tool("Undo");
+    check((await g(() => window.jevAnts.game.crayons.length)) === 0, "one undo takes the whole crayon drag back");
+    const cam0 = await g(() => window.jevAnts.camera("above"));
+    await tool("Move");
+    await until(
+      () => bp.evaluate(() => !document.querySelector("canvas").classList.contains("cursor-crosshair")),
+      "Move in hand",
+      3000,
+      20,
+    );
+    await bp.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await drag(mx, my, mx - 80, my - 40);
+    const cam1 = await g(() => window.jevAnts.camera("above"));
+    check(cam0 && cam1 && (cam0.x !== cam1.x || cam0.y !== cam1.y), "Move pans the map with one finger");
+    check((await g(() => window.jevAnts.game.layers[0].filled)) === walls1, "and builds nothing");
+    await bp.getByRole("button", { name: "below", exact: true }).tap();
+    const dug0 = await g(() => window.jevAnts.game.layers[1].dug);
+    await tool("Dig");
+    await drag(mx - 60, my + 60, mx + 60, my + 90);
+    check((await g(() => window.jevAnts.game.layers[1].dug)) > dug0, "below, a drag with dig opens the soil");
+    await tool("Done building");
+    check(await bp.getByRole("navigation", { name: "panels" }).isVisible(), "Done building gives the tab bar back");
+    // Save to a slot, reload, Continue: the wall is still there.
+    await bp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).tap();
+    await bp.getByRole("button", { name: "Save here" }).first().tap();
+    await until(async () => (await bp.getByText(/^Slot 1 · empty/).count()) === 0, "the save", 5000, 100);
+    const walls2 = await g(() => window.jevAnts.game.layers[0].filled);
+    await bp.reload();
+    await bp.getByRole("button", { name: "Continue" }).first().click();
+    await until(() => bp.evaluate(() => !!window.jevAnts?.game.world), "the game continued");
+    check((await g(() => window.jevAnts.game.layers[0].filled)) === walls2, "a saved game keeps the builds");
+    await bctx.close();
+  }
+
+  // ——— 12. The Codex (PRD §69.4): guide entries open as the game first shows what each is about ———
+  console.log("12. the Codex");
   const cctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const cp = await cctx.newPage();
   cp.on("pageerror", (e) => errors.push(String(e)));
@@ -1198,6 +1297,8 @@ try {
   await cp.getByLabel("world seed").fill(String(SEED));
   await cp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => cp.evaluate(() => window.jevAnts?.game.landed !== null), "a game for the Codex");
+  // Paused once the spores land: the game's own first host (~3 s) would race the checks below (review of #206, S4).
+  await cp.getByRole("button", { name: "Pause", exact: true }).click();
   const learnBtn = cp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true });
   const guide = cp.getByRole("dialog", { name: "Codex" });
   const locked = (title) => guide.getByRole("region", { name: `${title}, not yet seen` });
@@ -1290,6 +1391,7 @@ try {
   check((await locked("Jobs by age").count()) === 1, "started afresh: Jobs by age is locked again");
   await cp.waitForTimeout(1200);
   check((await locked("Jobs by age").count()) === 1, "and stays locked through this game, though a host is there");
+  check((await cp.evaluate(() => localStorage.getItem("jev-ants:codex-seen"))) === "[]", "and the notebook kept is empty too (S5)");
   await cctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
