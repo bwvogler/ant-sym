@@ -2,7 +2,7 @@
 
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
-import { cellKey, inReach } from "./grid.ts";
+import { cellKey, inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
@@ -106,7 +106,7 @@ export function sense(c: Colony, i: number, dx: number, dy: number, slot: number
   // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
   // With scentReach, so is scent: a tip out of reach (another tunnel, behind a wall) reads none (ja-uvhw).
   const hasFood = map.food.get(cx, cy) > 0;
-  const reach = hasFood || c.params.scentReach > 0 ? inReach(map, c.x[i], c.y[i], sx, sy) : true;
+  const reach = hasFood || c.params.scentReach > 0 ? inReachShared(map, c.x[i], c.y[i], sx, sy) : true;
   if (!reach && c.params.scentReach > 0) {
     s[slot] = s[slot + 3] = s[slot + 6] = 0;
     return;
