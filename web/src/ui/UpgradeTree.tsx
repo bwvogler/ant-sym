@@ -27,9 +27,12 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
   const box = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState<{ d: string; met: boolean }[]>([]);
   // Lines from each needed level to the level that needs it, measured off the drawn chips.
+  // The chips move only when a level changes, not on every stats update (a fresh `levels` object each time).
+  const levelsKey = UPGRADES.map((u) => levels[u.id] ?? 0).join();
   useLayoutEffect(() => {
     const el = box.current;
     if (!wide || !el) return setEdges([]);
+    const kept = levelsKey.split(",").map(Number);
     const measure = () => {
       const o = el.getBoundingClientRect();
       const at = (id: string, level: number) => el.querySelector<HTMLElement>(`[data-level="${id}:${level}"]`)?.getBoundingClientRect();
@@ -43,7 +46,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
           for (const n of ns) {
             const a = at(n.id, n.level);
             const b = at(u.id, k + 1);
-            if (a && b) pairs.push({ a, b, met: (levels[n.id] ?? 0) >= n.level });
+            if (a && b) pairs.push({ a, b, met: kept[UPGRADES.findIndex((x) => x.id === n.id)]! >= n.level });
           }
         });
       pairs.sort((p, q) => Math.abs(p.a.top - p.b.top) - Math.abs(q.a.top - q.b.top));
@@ -59,7 +62,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [wide, levels]);
+  }, [wide, levelsKey]);
 
   const row = (u: Upgrade) => {
     const level = levels[u.id] ?? 0;

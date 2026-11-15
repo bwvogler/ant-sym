@@ -465,28 +465,36 @@ export class Evolution {
 for (const u of UPGRADES)
   for (const id of u.levers ?? []) if (!LEVERS.some((v) => v.id === id)) throw new Error(`evolution: no lever "${id}"`);
 
-// The tree holds together (ja-52ui): each level lists what it needs, every need is a real level of another upgrade,
-// and keeping whatever can be kept reaches every level, so there is no cycle and no level out of reach.
-{
+/**
+ * Check that a table of upgrades holds together as a tree (ja-52ui): each level lists what it needs, every need is a real
+ * level of another upgrade, and keeping whatever can be kept reaches every level, so there is no cycle and no level out
+ * of reach. Throws on the first fault; run on UPGRADES at load.
+ */
+export function checkTree(upgrades: readonly Upgrade[]): void {
   const levels: Record<string, number> = {};
-  for (const u of UPGRADES) {
+  const unmetIn = (id: string) => {
+    const u = upgrades.find((x) => x.id === id)!;
+    return (u.needs[levels[id] ?? 0] ?? []).filter((n) => (levels[n.id] ?? 0) < n.level);
+  };
+  for (const u of upgrades) {
     levels[u.id] = 0;
     if (u.needs.length !== u.steps.length - 1)
       throw new Error(`evolution: ${u.id} lists needs for ${u.needs.length} levels, not ${u.steps.length - 1}`);
     for (const ns of u.needs)
       for (const n of ns) {
-        const v = UPGRADES.find((x) => x.id === n.id);
+        const v = upgrades.find((x) => x.id === n.id);
         if (!v || n.id === u.id || n.level < 1 || n.level >= v.steps.length)
           throw new Error(`evolution: ${u.id} needs no such level ${n.id} ${n.level}`);
       }
   }
   for (let moved = true; moved;) {
     moved = false;
-    for (const u of UPGRADES)
-      if (levels[u.id]! < u.steps.length - 1 && unmet(levels, u.id).length === 0) {
+    for (const u of upgrades)
+      if (levels[u.id]! < u.steps.length - 1 && unmetIn(u.id).length === 0) {
         levels[u.id]!++;
         moved = true;
       }
   }
-  for (const u of UPGRADES) if (levels[u.id] !== u.steps.length - 1) throw new Error(`evolution: ${u.id} can't reach its last level`);
+  for (const u of upgrades) if (levels[u.id] !== u.steps.length - 1) throw new Error(`evolution: ${u.id} can't reach its last level`);
 }
+checkTree(UPGRADES);

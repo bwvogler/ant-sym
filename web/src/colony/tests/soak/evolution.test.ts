@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { centreX, centreY, keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { BODY, canKeep, Evolution, MUTATION, pathTo, price, unmet, UPGRADES, upgrade } from "../../evolution.ts";
+import { BODY, canKeep, checkTree, Evolution, MUTATION, pathTo, price, unmet, UPGRADES, upgrade, type Upgrade } from "../../evolution.ts";
 import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../../fungus.ts";
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
@@ -178,6 +178,9 @@ test("the tree: a level that needs another can't be kept before it, and says wha
   assert.deepEqual(e.locked("senses"), [{ id: "trails", level: 1 }], "one need met, one still missing");
   assert.deepEqual(unmet(e.save().levels, "senses"), e.locked("senses"), "the pure form the page uses agrees");
   assert.equal(canKeep(e.save().levels, e.mutations, "senses"), false);
+  const c = e.cost("trails")!;
+  assert.equal(canKeep(e.save().levels, c, "trails"), true, "exactly the price is enough");
+  assert.equal(canKeep(e.save().levels, c - 1, "trails"), false, "one short is not");
   assert.ok(e.buy("trails") && e.buy("senses"));
   assert.deepEqual(
     pathTo({}, "crown"),
@@ -428,4 +431,42 @@ test("the fungus's save holds every private field it declares, or the field is d
   const two = new Fungus([arena(), arena()]).saveState();
   assert.deepEqual(Object.keys((two.layers as Record<string, unknown>[])[0]!).sort(), [...SPORE_LAYER_STATE].sort(), "a second map's keys");
   assert.ok(!("layers" in new Fungus(arena()).saveState()), "one map: no layers, the shape as it was");
+});
+
+test("the tree's check refuses a cycle, a level out of reach and a need that names no level (ja-52ui)", () => {
+  const up = (id: string, needs: { id: string; level: number }[][]): Upgrade => ({
+    id,
+    kind: "spread",
+    name: id,
+    blurb: "",
+    steps: ["none", ...needs.map((_, k) => `level ${k + 1}`)],
+    needs,
+  });
+  assert.doesNotThrow(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 1 }]])]), "b after a");
+  assert.throws(() => checkTree([up("a", [[{ id: "b", level: 1 }]]), up("b", [[{ id: "a", level: 1 }]])]), /can't reach/, "a cycle");
+  assert.throws(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 2 }]])]), /no such level/, "a level that isn't there");
+  assert.throws(() => checkTree([up("a", [[], [{ id: "c", level: 1 }]])]), /no such level/, "an upgrade that isn't there");
+  assert.doesNotThrow(() => checkTree(UPGRADES), "the game's own table");
+});
+
+test("the tree's edges are the design note's table (docs/mutation-tree.md, ja-52ui)", () => {
+  const edges = UPGRADES.flatMap((u) => u.needs.flatMap((ns, k) => ns.map((n) => `${u.id}${k + 1}<${n.id}${n.level}`)));
+  assert.deepEqual(edges, [
+    "infectivity2<persistence1",
+    "infectivity3<evasion1",
+    "knots1<mycelium1",
+    "knots2<mycelium2",
+    "stalks1<fruiting1",
+    "stalks2<fruiting2",
+    "evasion1<persistence1",
+    "evasion2<persistence2",
+    "stealth2<fruiting1",
+    "senses1<recognition1",
+    "senses1<trails1",
+    "royal1<recognition2",
+    "royal2<trails2",
+    "weapon1<infectivity2",
+    "crown1<royal2",
+    "crown1<weapon1",
+  ]);
 });

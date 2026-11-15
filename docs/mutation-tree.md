@@ -41,7 +41,7 @@ The lethal levers still need the menu as well, as today (`idle`, `ColonyApp.tsx`
 
 ## Play
 
-- **See:** the Mutations drawer draws the tree: branches as columns (body, mycelium, reach, lethal), each upgrade a column of its levels joined to what they need. A locked level is dim and says "needs Persistence: clears slowly"; the next level that can be kept shows the one price. At phone width it falls back to today's list with the lock text where the button was.
+- **See:** on a screen 1024 px or wider the Mutations drawer draws the tree: branches (body, mycelium and spores, reach, lethal), each upgrade a row of its levels, with a line from each needed level to the level that needs it, dashed until met. A locked level's button is dashed and its tooltip says "Needs Persistence: clears slowly first"; the next level that can be kept shows the one price. At phone width it falls back to the list, with "needs …" where the button was.
 - **Choose:** a path, not the cheapest item. Every buy raises the price of everything else, so a branch you open early costs the others.
 - **Progression:** seven cheap roots keep the weak start and a first choice within seconds of landing; the deep levels (virulent, most evasion, the queen's levers, the lethal ones) come late because of depth and price together.
 - **Cost:** none. No Jev question, legend or cache key reads upgrade levels; reach is applied after the answer.
@@ -49,8 +49,8 @@ The lethal levers still need the menu as well, as today (`idle`, `ColonyApp.tsx`
 
 ## Open questions
 
-- The edges: the owner edits the table before code.
-- BASE and RATIO: chosen from the pacing and P1 runs.
+- The edges: settled by the owner (2026-11-15), as in the table above.
+- BASE and RATIO: 1, ×1.5 (owner, 2026-11-15; PRD §78.1). Whether to cap or soften the price past about 20 levels is `ja-52ui.7`.
 - Whether a level may need either of two others (an "or") rather than both. Not in this draft.
 
 ## Sources
