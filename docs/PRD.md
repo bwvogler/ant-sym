@@ -6818,3 +6818,18 @@ Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the
 **Built.** `aphidPlume` (params.ts, 8 cells; the desert ant's 0: it takes no honeydew). The game keeps one plume (`AphidOdour`, aphids.ts), spread with `plume.ts`'s `spread` from every living aphid cell out to the farthest any colony smells, rebuilt each `PLUME_EVERY` period and whenever the clumps' living cells change; it is shared by the colonies and not saved (rebuilt from the saved clumps). An outside ant with empty jaws climbs it (`Colony.smellsAphids`, the branch after the food plume in `steer.ts`), as the desert ant climbs its food's. Steering only: no situation field, no Jev cost. With no clump, the plume is null and the branch is never taken (goldens bit-exact). `plumeAt` now reads 0 past the reader's range (the desert ant's is built to its own range, so its values are unchanged).
 
 **B9, the plume against a blind search** (`--set colony.aphidPlume=0,8`): first find sooner with it on **10 of seeds 1–10** (median 9.9 → 7.9 s; worst seed 15.4 → 11.9 s) and **7 of 11–20** (8.5 → 7.8 s). Passes. B10 holds with it (median 1,190 food home, 68 ants on the line, seeds 1–4); no tick cost measured beyond the noise (3.0 ms against 3.2). `tests/slow/assays.test.ts` holds seeds 1, 6 and 7.
+
+### 78.3 Tenders defend (ja-nzkg.4)
+
+**Built.** `tendDefend` (params.ts, 1; the desert ant's 0). `Colony.atAphids`: an ant on the plane on an aphid cell or one of the six beside it (the aphid plume's first step: contact). In `stance.ts`'s defend test such an ant counts as on home ground: a threat it senses there (strangers in reach, alarm) past `defendAt` makes it defend, so `contact` answers fight, and alarm turns its mode to fight (`localRules.ts`). It calls no one from the nest. Defending outside the nest already happens on home ground, so no new situation reaches a Jev lane: no cost. With no clump, or `tendDefend` 0, main bit for bit.
+
+**B11 `tendersDefend`** (two colonies of 200, 90 cells apart, a clump halfway; among ants in contact with a rival, the share standing and fighting; `--set colony.tendDefend=0,1 --set rival.tendDefend=0,1`):
+
+| tendDefend (both) | at the clump | away from homes and clump | losses a colony (300 s) |
+|---|---|---|---|
+| 0, seeds 1–4 | 0.00 (0–0.05) | 0.04 | 45 |
+| 1, seeds 1–4 | **0.92** (0.90–0.97) | 0.09 | 67 |
+| 0, seeds 11–20 | 0.00 (0–0.08) | 0.10 | 42 |
+| 1, seeds 11–20 | **0.94** (0.82–0.98) | 0.10 | 69 |
+
+Higher at the clump with it on in 10 of 10 held-out seeds. Gaber et al. 2024 found 90 % of caretakers biting. Their "other ants", 76 %, were still on the aphids' plant: the game's away share (a forager meeting a stranger far from anything, which flees) is not that comparison. The cost is the risk the plan named: a clump between nests is fought over, and each colony loses about half as many again in 5 minutes. The fights stay at the clump: the away share does not rise.

@@ -927,6 +927,26 @@ export class Colony {
     return true;
   }
 
+  /**
+   * Whether ant i touches a living aphid clump (docs/aphids.md finding 5, ja-nzkg.4): on the plane, on an aphid cell or one of
+   * the six beside it, by contact (the plume's first step). The clump in contact is a cuticular cue the sense table has.
+   */
+  atAphids(i: number): boolean {
+    const dist = this.aphidOdour?.dist;
+    if (!dist || (this.entrance !== null && (this.line === null || this.cur !== PLANE))) return false;
+    const keepX = CELL[0];
+    const keepY = CELL[1];
+    cellOf(this.x[i], this.y[i]);
+    const { w, h } = this.map.size;
+    const col = CELL[0] - this.map.x0;
+    const row = CELL[1];
+    CELL[0] = keepX;
+    CELL[1] = keepY;
+    if (col < 0 || row < 0 || col >= w || row >= h) return false;
+    const d = dist[row * w + col]!;
+    return d >= 0 && d <= 1;
+  }
+
   /** The turn up the food plume (smellsFood's answer, radians), read by the caller at once. */
   plumeTurn = 0;
   /** The food plume on the plane (ja-rf5.4, plume.ts PlumeState): built only for a species with foodPlume. */

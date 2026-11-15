@@ -161,3 +161,25 @@ test("the aphid odour: built from the living clumps, gone with them; an ant with
   g.tick(1 / 30);
   assert.equal(g.aphidOdour.dist, null);
 });
+
+test("tenders defend: an ant touching a clump stands on a threat, as on home ground; away from both it doesn't; tendDefend 0, never", () => {
+  const run = (off: number, tend: number) => {
+    const g = game();
+    const c = g.colonies[0]!;
+    c.params.tendDefend = tend;
+    const o = openSpot(g);
+    new Builder(g).apply({ tool: "aphids", layer: PLANE, points: [o] });
+    for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
+    const i = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === PLANE && !c.carrying[j]);
+    assert.ok(i !== undefined, "an ant out on the plane");
+    // Set down on the clump or `off` units east of it (still off home ground), with a threat well past defendAt.
+    c.putAnt(i!, PLANE, o.x + off, o.y);
+    c.threat[i!] = 20 * c.params.defendAt;
+    g.tick(1 / 30);
+    return c.stanceOf(i!);
+  };
+  assert.equal(run(0, 1), "defend", "on the clump it defends");
+  assert.equal(run(5, 1), "forage", "a few cells off it (smelling it, not touching it), it doesn't");
+  assert.equal(run(14, 1), "forage", "far off it, away from home, it doesn't");
+  assert.equal(run(0, 0), "forage", "tendDefend 0: not even on the clump");
+});

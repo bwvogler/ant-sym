@@ -12,12 +12,13 @@
 //   B6 fillShaft   dirt poured over the colony's largest chamber: do the ants dig it out? (report; Rajendran et al. 2026)
 //   B9 aphidsFound      a clump of aphids far from the hole: how soon is it first found? (docs/aphids.md, PRD §78)
 //   B10 aphidsRenewable a clump against sugar on the same cells: which brings more home over 5 minutes, and is a trail laid?
+//   B11 tendersDefend   two colonies meet at a clump between them: what share of ants in contact with a rival stand and fight there?
 
 import { Builder, type Stroke } from "./builder.ts";
 import type { Game } from "./game.ts";
 import { centreX, centreY } from "./hex.ts";
 import { generateOneWorld } from "./oneWorld.ts";
-import { CURTAIN, PLANE } from "./vocab.ts";
+import { CURTAIN, MODES, PLANE } from "./vocab.ts";
 import { OPEN, rockAt } from "./world.ts";
 import { type Assay, Arena, at, foodIn, mean, onLayer, onPlane, type Probe, type RunSpec } from "./harness.ts";
 
@@ -601,6 +602,76 @@ function renewableAssay(tool: "aphids" | "sugar"): Assay {
 export const aphidsRenewable = renewableAssay("aphids");
 export const aphidsRenewableSugar = renewableAssay("sugar");
 
+/**
+ * B11: two colonies, 90 cells apart, with a clump put down halfway between them, far off either's home ground. Among ants in
+ * contact with a rival (within 1.5 units), the share standing and fighting (the defend stance, or the fight mode) at the clump,
+ * against out in the open away from both homes and the clump. The mark is tendDefend's: at the clump, more than with it off,
+ * seed for seed (Gaber et al. 2024: L. niger caretakers bit an intruder more often than other ants, 90 % against 76 %).
+ */
+export const tendersDefend: Assay = {
+  id: "tendersDefend",
+  title: "B11 two colonies at a clump of aphids between them: do the ants touching it stand and fight?",
+  target:
+    "the share of ants in contact with a rival that fight at the clump > the same seed's with tendDefend 0, in most seeds (Gaber et al. 2024: 90 % of caretakers bit against 76 % of other ants; against rival ants: design)",
+  seconds: 300,
+  spec: (seed) => {
+    const nests = [
+      { x: 15, y: 30, r: 3 },
+      { x: 105, y: 30, r: 3 },
+    ];
+    const clump = at(60, 30);
+    const homes = nests.map((n) => at(n.x, n.y));
+    const tally = { atClump: 0, fightAtClump: 0, away: 0, fightAway: 0 };
+    let next = 6;
+    return onPlane({
+      seed,
+      seconds: 300,
+      map: () => new Arena(120, 60, true).build(nests),
+      game: { antCount: 200, rivalAnts: 200, rival: true },
+      events: [strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(clump) })],
+      probes: [
+        {
+          tick: (g) => {
+            if (g.time + 1e-9 < next) return;
+            next += 1;
+            const [a, b] = g.colonies;
+            if (!a || !b) return;
+            for (const [c, o] of [
+              [a, b],
+              [b, a],
+            ] as const)
+              for (let i = 0; i < c.n; i++) {
+                if (!c.alive[i] || !onLayer(g, c, i, PLANE)) continue;
+                const x = c.x[i]!;
+                const y = c.y[i]!;
+                let touch = false;
+                for (let j = 0; j < o.n && !touch; j++)
+                  touch =
+                    !!o.alive[j] && onLayer(g, o, j, PLANE) && Math.abs(o.x[j]! - x) < 1.5 && Math.hypot(o.x[j]! - x, o.y[j]! - y) < 1.5;
+                if (!touch) continue;
+                const fights = c.stanceOf(i) === "defend" || MODES[c.mode[i]!] === "fight";
+                if (Math.hypot(x - clump.x, y - clump.y) <= 4) {
+                  tally.atClump++;
+                  if (fights) tally.fightAtClump++;
+                } else if (homes.every((h) => Math.hypot(x - h.x, y - h.y) > 20) && Math.hypot(x - clump.x, y - clump.y) > 10) {
+                  tally.away++;
+                  if (fights) tally.fightAway++;
+                }
+              }
+          },
+          summary: () => ({
+            contactsAtClump: tally.atClump,
+            fightShareAtClump: tally.atClump ? tally.fightAtClump / tally.atClump : NaN,
+            contactsAway: tally.away,
+            fightShareAway: tally.away ? tally.fightAway / tally.away : NaN,
+          }),
+        },
+      ],
+    });
+  },
+  score: () => ({}),
+};
+
 export const BUILDER_ASSAYS: Assay[] = [
   crayonLine,
   wall,
@@ -614,4 +685,5 @@ export const BUILDER_ASSAYS: Assay[] = [
   aphidsFound,
   aphidsRenewable,
   aphidsRenewableSugar,
+  tendersDefend,
 ];
