@@ -3,7 +3,7 @@
 // spend: colony-cost.mjs and fungus-cost.mjs on the base and the head), the golden masters the PR re-records, and whether
 // its description says so. Pure text in, text out, so ui/tests/int/prNotes.test.ts feeds it fixtures.
 //
-// Usage: node scripts/pr-notes.mjs --changed <files.txt> --body <body.txt>
+// Usage: node scripts/pr-notes.mjs --changed <files.txt> --body <body.txt> [--cost-ran]
 //          [--colony-base <colony-cost output> --colony-head <…>] [--fungus-base <fungus-cost output> --fungus-head <…>]
 //
 // --changed lists the PR's files, one a line (git diff --name-only base...head); --body is its description. A cost pair
@@ -47,26 +47,27 @@ export function readFungusCost(text) {
   return { usdPerHour: j.usdPerHourAtThisPace ?? null, tokPerQuestion: j.tokensPerQuestion ?? null };
 }
 
-const usd = (v) => (v === null ? "–" : `$${v.toFixed(4)}`);
+const usd = (v) => (v === null ? "–" : `$${v.toFixed(5)}`); // colony-cost prints 5 decimals
 const tok = (v) => (v === null ? "–" : `${Math.round(v)}`);
 function delta(a, b, fmt) {
   if (a === null || b === null) return "–";
-  if (a === b) return "unchanged";
+  if (fmt(a) === fmt(b)) return "unchanged"; // as printed, so the table and the verdict agree
   const pct = a === 0 ? "" : ` (${b > a ? "+" : ""}${((100 * (b - a)) / a).toFixed(1)} %)`;
   return `${b > a ? "+" : "−"}${fmt(Math.abs(b - a))}${pct}`;
 }
 
 /**
- * The comment. `colony` and `fungus` are { base, head } of the readers' results, or null when not run.
- * @param {{ changed: string[], body: string, colony: null | { base: any, head: any }, fungus: null | { base: any, head: any } }} o
+ * The comment. `colony` and `fungus` are { base, head } of the readers' results, or null when not run. `costRan`: the
+ * workflow ran the estimates (a colony or shared change), so a missing pair means one failed.
+ * @param {{ changed: string[], body: string, colony: null | { base: any, head: any }, fungus: null | { base: any, head: any }, costRan?: boolean }} o
  */
-export function notes({ changed, body, colony, fungus }) {
+export function notes({ changed, body, colony, fungus, costRan = false }) {
   const out = [MARKER, "### What CLAUDE.md asks this PR to say", ""];
   // Jev cost.
   out.push("**Jev cost of a game** (offline estimates; no key, no spend):", "");
-  if (!colony && !fungus) out.push("Not run: the PR changes nothing under `web/src/colony/` or `web/shared/`.", "");
+  if (!colony && !fungus && !costRan) out.push("Not run: the PR changes nothing under `web/src/colony/` or `web/shared/`.", "");
   else {
-    out.push("| lane | base | head | change |", "|---|---|---|---|");
+    if (colony || fungus) out.push("| lane | base | head | change |", "|---|---|---|---|");
     const row = (name, a, b, f) => out.push(`| ${name} | ${f(a)} | ${f(b)} | ${delta(a, b, f)} |`);
     if (colony) {
       row("modes and stances, $/h", colony.base.usdPerHour, colony.head.usdPerHour, usd);
@@ -77,10 +78,30 @@ export function notes({ changed, body, colony, fungus }) {
       row("fungus, $/h", fungus.base.usdPerHour, fungus.head.usdPerHour, usd);
       row("fungus, tokens a question", fungus.base.tokPerQuestion, fungus.head.tokPerQuestion, tok);
     }
-    const moved =
-      (colony && (colony.base.usdPerHour !== colony.head.usdPerHour || colony.base.tokPerQuestion !== colony.head.tokPerQuestion)) ||
-      (fungus && fungus.base.usdPerHour !== fungus.head.usdPerHour);
-    out.push("", moved ? "The cost moved: CLAUDE.md asks the PR to note the new figure for that lane." : "No lane's cost moved.", "");
+    // Every figure in the table, compared as printed (review of #234, S2 and N5).
+    const FMT = { usdPerHour: usd, tokPerQuestion: tok, responsesUsdPerHour: usd };
+    const shown = (k, v) => (FMT[k] ?? String)(v);
+    const differs = (p) => p !== null && Object.keys(p.head).some((k) => shown(k, p.base[k]) !== shown(k, p.head[k]));
+    const unread = (p) => p !== null && Object.keys(p.head).every((k) => p.base[k] === null && p.head[k] === null);
+    out.push("");
+    for (const [name, p] of [
+      ["colony-cost", colony],
+      ["fungus-cost", fungus],
+    ])
+      if (unread(p))
+        out.push(`⚠ Couldn't read ${name}'s output on either side: scripts/pr-notes.mjs's reader may need its new wording.`, "");
+    if (costRan)
+      for (const [name, p] of [
+        ["colony-cost", colony],
+        ["fungus-cost", fungus],
+      ])
+        if (p === null) out.push(`⚠ ${name} didn't finish on the base or the head: see the PR notes job's log.`, "");
+    out.push(
+      differs(colony) || differs(fungus)
+        ? "The cost moved: CLAUDE.md asks the PR to note the new figure for that lane."
+        : "No lane's cost moved.",
+      "",
+    );
   }
   // Golden masters.
   const goldens = changed.filter(isGolden);
@@ -122,6 +143,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       body,
       colony: pair("--colony-base", "--colony-head", readColonyCost),
       fungus: pair("--fungus-base", "--fungus-head", readFungusCost),
+      costRan: args.includes("--cost-ran"),
     }),
   );
 }

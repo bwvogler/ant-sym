@@ -92,6 +92,27 @@ test("the directory CLAUDE.md files stay small, and the root one names the skill
 // backticked file path in CLAUDE.md, the agent guide, AGENTS.md, the skills and the reviewer agent must exist: a path
 // with a folder from the repo root or a folder a doc writes paths from, a bare name as some tracked file's name.
 // reference/history.md files tell what was, so they may name what is gone.
+/**
+ * The file paths a doc names in backticks: a `:line` or `#anchor` dropped, trailing punctuation dropped, `..` paths (the
+ * sibling repos) left out. Known misses, fine today: extensions outside the list (index.css, .jsonl) and paths written
+ * without backticks (a scan of those found none missing, review of #234).
+ */
+function pathsIn(text: string): string[] {
+  const out: string[] = [];
+  for (const [, raw] of text.matchAll(/`([^`\s]+)`/g)) {
+    const p = raw!.replace(/[:#].*$/, "").replace(/[),.]+$/, "");
+    if (/^[\w.@-]+(\/[\w.@-]+)*\.(ts|tsx|mjs|js|md|json|ya?ml|sh)$/.test(p) && !p.startsWith("..")) out.push(p);
+  }
+  return out;
+}
+test("the agent-doc path scan keeps file paths and drops line numbers, anchors, globs and sibling repos", () => {
+  assert.deepEqual(
+    pathsIn(
+      "see `web/src/colony/game.ts:292`, `docs/PRD.md#59`, `ci.yml`, `src/**/*.ts`, `../lingo-dojo/x.ts`, `npm run e2e` and `a.ts).`",
+    ),
+    ["web/src/colony/game.ts", "docs/PRD.md", "ci.yml", "a.ts"],
+  );
+});
 const NOT_IN_GIT: Record<string, string> = {
   "hooks/policy.ts": "in the sibling repo ../jev-router",
   "data/jev-budget.json": "the server's ledger, written at run time",
@@ -100,6 +121,8 @@ const NOT_IN_GIT: Record<string, string> = {
 test("the agent docs name files that exist", () => {
   const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
   const names = new Set(tracked.map((f) => basename(f)));
+  const trackedSet = new Set(tracked);
+  const isTracked = (p: string): boolean => trackedSet.has(p.replace(/^\.\//, "")) || tracked.some((f) => f.startsWith(`${p}/`));
   const skills = readdirSync(join(ROOT, ".claude/skills"));
   const docs = [
     "CLAUDE.md",
@@ -127,10 +150,10 @@ test("the agent docs name files that exist", () => {
   ];
   const missing: string[] = [];
   for (const doc of docs)
-    for (const [, raw] of readFileSync(join(ROOT, doc), "utf8").matchAll(/`([^`\s]+)`/g)) {
-      const p = raw!.replace(/[:#].*$/, "").replace(/[),.]$/, "");
-      if (!/^[\w.@-]+(\/[\w.@-]+)*\.(ts|tsx|mjs|js|md|json|ya?ml|sh)$/.test(p) || p.startsWith("..") || p in NOT_IN_GIT) continue;
-      const found = p.includes("/") ? bases(doc).some((b) => existsSync(join(ROOT, b, p))) : names.has(p);
+    for (const p of pathsIn(readFileSync(join(ROOT, doc), "utf8"))) {
+      if (p in NOT_IN_GIT) continue;
+      // Tracked, not merely on disk: an untracked local file passes here and fails in CI (review of #234, N6).
+      const found = p.includes("/") ? bases(doc).some((b) => isTracked(join(b, p))) : names.has(p);
       if (!found) missing.push(`${doc}: ${p}`);
     }
   assert.deepEqual(missing, [], "named in an agent doc but not in the repo: fix the path, or add it to NOT_IN_GIT with why");

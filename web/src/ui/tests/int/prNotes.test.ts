@@ -22,6 +22,7 @@ type Mod = {
     body: string;
     colony: null | { base: Cost; head: Cost };
     fungus: null | { base: Cost; head: Cost };
+    costRan?: boolean;
   }) => string;
 };
 const load = async (): Promise<Mod> => (await import(join(ROOT, "scripts/pr-notes.mjs"))) as Mod;
@@ -45,12 +46,12 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
   assert.match(quiet, /None changed\./);
 
   const flat = notes({ changed: [], body: "", colony: { base: same, head: same }, fungus: null });
-  assert.match(flat, /\| modes and stances, \$\/h \| \$0\.1900 \| \$0\.1900 \| unchanged \|/);
+  assert.match(flat, /\| modes and stances, \$\/h \| \$0\.19000 \| \$0\.19000 \| unchanged \|/);
   assert.match(flat, /No lane's cost moved\./);
 
   const dearer = { ...same, usdPerHour: 0.209, tokPerQuestion: 748 };
   const moved = notes({ changed: [], body: "", colony: { base: same, head: dearer }, fungus: null });
-  assert.match(moved, /\| modes and stances, \$\/h \| \$0\.1900 \| \$0\.2090 \| \+\$0\.0190 \(\+10\.0 %\) \|/);
+  assert.match(moved, /\| modes and stances, \$\/h \| \$0\.19000 \| \$0\.20900 \| \+\$0\.01900 \(\+10\.0 %\) \|/);
   assert.match(moved, /\| modes and stances, tokens a question \| 680 \| 748 \| \+68 \(\+10\.0 %\) \|/);
   assert.match(moved, /The cost moved: CLAUDE\.md asks the PR to note the new figure/);
   const fungusMoved = notes({
@@ -59,8 +60,25 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
     colony: null,
     fungus: { base: { usdPerHour: 0.04, tokPerQuestion: 984 }, head: { usdPerHour: 0.03, tokPerQuestion: 900 } },
   });
-  assert.match(fungusMoved, /\| fungus, \$\/h \| \$0\.0400 \| \$0\.0300 \| −\$0\.0100 \(-25\.0 %\) \|/);
+  assert.match(fungusMoved, /\| fungus, \$\/h \| \$0\.04000 \| \$0\.03000 \| −\$0\.01000 \(-25\.0 %\) \|/);
   assert.match(fungusMoved, /The cost moved/);
+  // Every figure counts, compared as printed (review of #234, S2, N5).
+  const responses = notes({ changed: [], body: "", colony: { base: same, head: { ...same, responsesUsdPerHour: 0.6 } }, fungus: null });
+  assert.match(responses, /The cost moved/, "a response lane's $/h");
+  const tokensOnly = { base: { usdPerHour: 0.04, tokPerQuestion: 770 }, head: { usdPerHour: 0.04, tokPerQuestion: 900 } };
+  assert.match(notes({ changed: [], body: "", colony: null, fungus: tokensOnly }), /The cost moved/, "the fungus's tokens a question");
+  const tiny = notes({ changed: [], body: "", colony: { base: same, head: { ...same, usdPerHour: 0.190001 } }, fungus: null });
+  assert.match(tiny, /\| \$0\.19000 \| \$0\.19000 \| unchanged \|/);
+  assert.match(tiny, /No lane's cost moved\./, "a change below what the table prints is no change");
+  const blank = { usdPerHour: null, tokPerQuestion: null, responsesUsdPerHour: null };
+  assert.match(
+    notes({ changed: [], body: "", colony: { base: blank, head: blank }, fungus: null }),
+    /⚠ Couldn't read colony-cost's output/,
+  );
+  // N4: the estimates ran, but a pair is missing: one failed, which the comment says instead of a red check.
+  const failed = notes({ changed: [], body: "", colony: { base: same, head: same }, fungus: null, costRan: true });
+  assert.match(failed, /⚠ fungus-cost didn't finish on the base or the head/);
+  assert.doesNotMatch(failed, /Not run/);
 
   const golden = "web/src/colony/tests/golden/oneWorldGolden.json";
   assert.ok(isGolden(golden) && isGolden("web/src/colony/tests/slow/golden.json") && !isGolden("web/src/colony/params.ts"));
@@ -82,5 +100,9 @@ test("pr-notes.yml passes pr-notes.mjs the flags it reads, and runs the cost onl
   assert.match(yml, /grep -qE '\^web\/\(src\/colony\|shared\)\/'/);
   // The description reaches bash as an environment variable, never spliced into the script.
   assert.match(yml, /BODY: \$\{\{ github\.event\.pull_request\.body \}\}/);
-  assert.doesNotMatch(yml, /run:[^\n]*\$\{\{ github\.event\.pull_request\.body/);
+  // Anywhere in the file, not only on a run: line: every run here is a `run: |` block (review of #234, S1).
+  for (const line of yml.split("\n").filter((l) => /github\.event\.pull_request\.(body|title|head\.ref)/.test(l)))
+    assert.match(line, /^\s+[A-Z_]+: \$\{\{ github\.event\.pull_request\.[\w.]+ \}\}$/, `only as an env value: ${line.trim()}`);
+  assert.match(yml, /persist-credentials: false/, "the write token stays out of .git/config");
+  assert.match(yml, /select\(\.user\.login == \\"github-actions\[bot\]\\"/, "only the bot's own comment is edited");
 });
