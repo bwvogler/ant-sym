@@ -5779,12 +5779,14 @@ Asked again, Jev kept its earlier choice in 81–87 % of situations; where it ch
 
 | Lane (situations) | Forage | Cautious | Warlike |
 |---|---|---|---|
-| trail (18) | 13 | 16 | 17 |
-| contact (21) | 16 | 11 | 17 |
+| trail (21) | 15 | 17 | 20 |
+| contact (35 / 26 / 34) | 21 | 12 | 25 |
 | leave (10) | 9 | 7 | 7 |
-| carry (7) | 1 | 4 | 4 |
+| carry (9) | 1 | 4 | 5 |
+| get (5) | 3 | 3 | 5 |
+| drop (2) | 2 | 2 | 2 |
 
-The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an ant meeting a stranger with even or better odds fights at 0.75–0.94, where the local rule flees. Several trail answers are near even, for example "none" 0.52 against "home" 0.48.
+The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an exploring ant meeting a stranger with even or better odds mostly fights (0.50–0.94 by alarm), where the local rule flees. Several trail answers are near even, for example "none" 0.52 against "home" 0.48.
 
 **Replayed** (free; `assays.yml` with `policy`, [runs 43721252762](https://github.com/bwvogler/ant-sym/actions/runs/43721252762), [43721255686](https://github.com/bwvogler/ant-sym/actions/runs/43721255686), [43721258448](https://github.com/bwvogler/ant-sym/actions/runs/43721258448)). `gameTop`, seeds 1–10, 600 s. The first colony plays the cache's response answers, either drawn (`sampleTemp` 1) or Jev's top answer (`sampleTemp` 0). Its mode is the local rule, since the caches hold no mode answers. Drawn ÷ top per seed: the median, the worst and best seeds, and how many seeds came out higher:
 
@@ -5796,7 +5798,7 @@ The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an
 
 - Food doesn't move under any doctrine: medians 0.99–1.03, with the spread of any change to play.
 - Under Cautious, drawing costs fewer ants on both sides in every seed (−19 % and −18 % at the median). With odds kept, some ants act on the less likely contact answer instead of every ant doing the same, and fewer fights follow.
-- Under Warlike the losses lean the same way (0.89 and 0.88) but swing by seed. Under Forage nothing moves.
+- Under Warlike the losses lean the same way (0.89 and 0.88) but swing by seed. The Warlike cache also lacks some situations the 600 s games reach: the local rule played 21 % of contact lookups in the top arm and 43 % of get lookups in the drawn arm (review of #239). So this row is the weakest of the three. Forage and Cautious stay under 5 % in every lane. Under Forage nothing moves.
 - Unlike the mode draws (§68), drawing the responses costs no food.
 
 ## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
