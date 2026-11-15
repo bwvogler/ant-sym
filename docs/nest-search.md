@@ -100,7 +100,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 **The sources:**
 - ***C. fortis* median miss: 1.27 m after 5 m (25 %), 2.45 m after 10 m (25 %), 2.47 m after 20 m (12 %)**, 50–53 ants each (Merkle, Knaden & Wehner 2006, Fig. 3B, as tabled by Goldschmidt et al. 2017, **cit**: Goldschmidt read in full, Merkle's figure not). From 5 to 20 m the miss grows as distance^0.48; the 10 m point sits above that line.
 - **Between-ant SD about 1.6 m (16 %) after a 10 m channel** (*C. fortis* and *C. bombycina*, Pfeffer, Wahl & Wolf 2020, **FT**, figure read off its plots in `ja-lp4.14`'s research). A one-dimensional channel: distance error only.
-- **Uncertainty grows like √distance:** in a path-integration model fitted to the ants, the area of uncertainty grows by a constant amount per unit walked (> 310 cm² per cm), so its radius grows like the square root (Heinze, Narendra & Cheung 2018, **FT** in the research session; Europe PMC refused the re-read here).
+- **A model where uncertainty grows like √distance:** Heinze, Narendra & Cheung 2018 (**FT**) assume a circular Gaussian whose area grows by a constant per unit walked, and fit that constant (> 310 cm² per cm) to Wehner & Srinivasan 1981's search data. The √ is the model's premise, not something it tests.
 - **Search width follows the distance out, not the path's tortuosity** (Merkle & Wehner 2010, search summary only, **unverified**).
 - **Distance is underestimated, more so further out** (Sommer & Wehner 2004, **abs**). Not built (below).
 
@@ -109,7 +109,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 > miss = span × (driftSurf, driftSurfY), span = `PI_SPAN_GAIN` × √(`piErrorAt` × reach)
 
 - **reach** (`reachSurf`): the farthest the ant has been, straight, from its own hole since it came up it, counted where the odometer is (every mode but the walk home), by its own walking (a child's tweezers don't count). Not the current distance: then the error would vanish as the ant neared home, and the vector would always lead it in. The sources measured ants walked straight out to a feeder, where the farthest point is the feeder's distance. Using the farthest point for a winding path is **design**, read from Merkle & Wehner 2010.
-- **√:** Heinze 2018 (the model's shape) and Merkle 2006 (5 → 20 m: ×1.94 for ×4).
+- **√: design.** Consistent with Merkle 2006's end points (5 → 20 m: ×1.94 for ×4) and Heinze 2018's model, but Merkle's three points do not single it out: 5 → 10 m grows almost linearly (exponent 0.95), 10 → 20 m is almost flat (0.01). At 10 m the law gives 17.7 % where Merkle measured 25 %.
 - **`PI_MISS_AT` = 0.25:** the median miss is 25 % of the distance at `piErrorAt` out (Merkle 2006 at 5 m). `PI_SPAN_GAIN` = 0.25 / (0.1 × √ln 2) ≈ 3.0 converts it to the drift's scale (the median length of a 2D drift with parts of σ 0.1/√2 is 0.1√ln 2).
 - **`piErrorAt` = 50 cells stands for 5 m: design.** The docs give 1 cell ≈ 1 body length but keep ratios, not sizes ([ant-communication](ant-communication.md): the map is a zoomed-in patch). Taken literally (1 cell ≈ 1 cm, `piErrorAt` 500), every game trip would be under 5 m, where no miss was measured, and the √ law would put the miss at 79 % of the distance at 50 cells. At 50 the game's trips (25–200 cells out) map onto 2.5–20 m, the range measured. The setting is there for the owner to change.
 
@@ -118,7 +118,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 | distance out (cells) | 25 | 50 | 100 | 200 |
 |---|---|---|---|---|
 | law 1 | 35 % | 25 % | 17.7 % | 12.5 % |
-| sources (that distance ×10 cm) | none below 5 m | 25 % (Merkle) | 25 % (Merkle), ~19 % (Pfeffer's 16 % SD as a 2D median) | 12 % (Merkle) |
+| sources (that distance ×10 cm) | none below 5 m | 25 % (Merkle) | 25 % (Merkle), ~19 % (Pfeffer's 16 % SD as a 2D median: the conversion, assuming the same spread across the path as along it, is design) | 12 % (Merkle) |
 | law 0, a straight trip | 8.3 % | 8.3 % | 8.3 % | 8.3 % |
 
 In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50, 100 and 200 cells (law 0: 13–17 %, with a long tail from winding paths). Every figure is in PRD §78.

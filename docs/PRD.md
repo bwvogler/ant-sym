@@ -6829,14 +6829,14 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 **Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
 - *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
 - Between-ant SD about 16 % after 10 m (Pfeffer, Wahl & Wolf 2020, full text).
-- Uncertainty grows like √distance (Heinze, Narendra & Cheung 2018, full text).
+- A path-integration model whose uncertainty grows like √distance, fitted to search data (Heinze, Narendra & Cheung 2018, full text; the √ is the model's premise, not a finding).
 - Search width follows distance out, not the path's tortuosity (Merkle & Wehner 2010, **unverified**).
 
 **The problem (measured, `ja-lp4.14`).** The plane's error was the odometer × one drift a trip (`PI_DRIFT` 0.1): linear in the path, and fighting, defending and winding all added. Defence is gated by the vector (`homeDistPlane` ≤ `homeGround`, Knaden & Wehner 2004; Bollig et al. 2026), so ants far out after long winding paths believed themselves home and defended there. G1 seeds 1–10 on main: 41 defenders died, a median 55 cells from their hole (88 % more than 20 out).
 
 **The law** (`piErrorLaw` 1). The same two drift draws a trip; they are multiplied by `PI_SPAN_GAIN` × √(`piErrorAt` × reach) instead of the odometer, reach (`reachSurf`) being the farthest the ant has walked, straight, from its own hole this trip. The median miss is `PI_MISS_AT` (0.25) × √(`piErrorAt` × reach).
-- **Sourced:** the √ (Heinze 2018; Merkle 2006's 5 → 20 m), the 25 % (Merkle 2006), distance out rather than path (Merkle & Wehner 2010).
-- **Design:** `piErrorAt` 50 cells for 5 m (the map keeps ratios: 2.5–20 m for the game's 25–200-cell trips); the farthest point as "distance out" for a winding path; reach counted in every mode but the walk home, as the odometer is.
+- **Sourced:** the 25 % miss at 5 m and 12 % at 20 m (Merkle 2006, as tabled by Goldschmidt 2017).
+- **Design:** the √ growth, consistent with Merkle's end points (5 → 10 m is near linear, 10 → 20 m near flat) and with Heinze 2018's model, which assumes it rather than measures it; distance out rather than the path, read from an unverified summary of Merkle & Wehner 2010; `piErrorAt` 50 cells for 5 m (the map keeps ratios: 2.5–20 m for the game's 25–200-cell trips); the farthest point as "distance out" for a winding path; reach counted in every mode but the walk home, as the odometer is.
 - **Fighting and defending** add only by taking the ant further out than it has been.
 - **Draws:** unchanged in number and order. Off (0) is main bit for bit: the goldens, and G1 seed 3's per-tick hash over 120 s against `5a646196`.
 - **Not built:** the distance shortfall (Sommer & Wehner 2004), the path-shape bias (Müller & Wehner 1988), the food vector's error, the side view.
