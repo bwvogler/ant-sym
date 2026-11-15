@@ -182,7 +182,10 @@ async function saveFailure() {
     if (TRACE) {
       mkdirSync(TRACE, { recursive: true });
       const path = join(TRACE, `failed-${i + 1}.zip`);
-      await c.tracing.stop({ path }).then(() => console.error(`  saved ${path}`));
+      await c.tracing.stop({ path }).then(
+        () => console.error(`  saved ${path}`),
+        (err) => console.error(`  no trace of context ${i + 1}: ${err}`),
+      );
     }
   }
 }
@@ -1713,7 +1716,7 @@ try {
   await nctx2.close();
 
   // ——— 15. Lab mode (PRD §69.7): a workbench under the map; history charts, a step control, the game's numbers ———
-  console.log("15. Lab mode");
+  section("15. Lab mode");
   const bctx2 = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const lbp = await bctx2.newPage();
   lbp.on("pageerror", (e) => errors.push(String(e)));

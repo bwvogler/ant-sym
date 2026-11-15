@@ -50,12 +50,29 @@ test("e2e.yml runs on PRs that touch the page, the guard, its helpers or itself,
     "web/server/api.ts",
     "web/index.html",
     "web/public/precache/x.json",
+    "web/shared/jev.ts",
+    "web/vite.config.ts",
+    "web/package.json",
+    "web/package-lock.json",
+    "web/tsconfig.app.json",
+    "package.json",
   ]) {
     assert.ok(runs(path), `a PR touching ${path} runs the e2e`);
   }
-  for (const path of ["web/src/ui/tests/ciShards.test.ts", "web/src/colony/tests/unit/x.test.ts", "docs/PRD.md"]) {
+  for (const path of [
+    "web/src/ui/tests/ciShards.test.ts",
+    "web/src/colony/tests/unit/x.test.ts",
+    "web/server/tests/jev.test.ts",
+    "docs/PRD.md",
+  ]) {
     assert.ok(!runs(path), `a PR touching only ${path} does not`);
   }
+});
+
+test("every e2e step heading goes through section(), so a failure names its step (review of #233, S1)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.doesNotMatch(script, /console\.log\(["`]\d/, "a numbered heading printed with console.log");
+  assert.match(script, /section\("15\. Lab mode"\)/);
 });
 
 test("e2e.yml installs one exact Playwright version", () => {

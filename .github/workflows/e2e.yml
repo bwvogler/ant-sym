@@ -28,6 +28,8 @@ on:
       - "web/vite.config.ts"
       - "web/package.json"
       - "web/package-lock.json"
+      - "web/tsconfig*.json"
+      - "package.json"
       - "scripts/e2e-one-world.mjs"
       - "scripts/lib/**"
       - ".github/workflows/e2e.yml"
@@ -66,6 +68,7 @@ jobs:
       # default (DejaVu Sans) is wider: the 360 px HUD bar ran 5 px into the gutter on the first run (#233). Same mapping here.
       - name: inter as the system font, as in sessions
         run: |
+          sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends fonts-inter
           sudo tee /etc/fonts/conf.d/56-prefer-inter.conf > /dev/null <<'EOF'
           <?xml version="1.0"?>
