@@ -1,0 +1,93 @@
+# What CLAUDE.md asks every PR to say, worked out for it (ja-w7ef.7, ja-w7ef.6): the Jev cost of a game on the base and
+# the head (colony-cost.mjs and fungus-cost.mjs, offline: no key, no spend), the golden masters it re-records, and
+# whether its description says so. scripts/pr-notes.mjs writes it as one comment, which this job edits on every push
+# rather than adding another; an agent reads it with get_comments. It informs: a cost estimate that fails is reported in
+# the comment (--cost-ran), not as a red check.
+# The cost runs only when web/src/colony/ or web/shared/ changed (about 3 minutes for both on the base and the head).
+name: PR notes
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-notes-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  notes:
+    # A fork's token can't comment, so fork PRs are skipped.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE: ${{ github.event.pull_request.base.sha }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+      # The game each cost estimate plays; the same on both sides, so the change is the code's (colony-cost --help).
+      COLONY_COST_ARGS: --one 5 600 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # The write-scoped token stays out of .git/config while npm ci runs install scripts; nothing here needs it.
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: changed files
+        id: changed
+        run: |
+          git diff --name-only "$BASE...$HEAD" > "$RUNNER_TEMP/changed.txt"
+          if grep -qE '^web/(src/colony|shared)/' "$RUNNER_TEMP/changed.txt"; then echo "cost=true" >> "$GITHUB_OUTPUT"; fi
+      - name: cost on the head
+        if: steps.changed.outputs.cost == 'true'
+        continue-on-error: true
+        run: |
+          # shellcheck disable=SC2086
+          node scripts/colony-cost.mjs $COLONY_COST_ARGS > "$RUNNER_TEMP/colony-head.txt"
+          node scripts/fungus-cost.mjs > "$RUNNER_TEMP/fungus-head.txt"
+      - name: cost on the base
+        if: steps.changed.outputs.cost == 'true'
+        continue-on-error: true
+        run: |
+          git worktree add -q "$RUNNER_TEMP/base" "$BASE"
+          npm --prefix "$RUNNER_TEMP/base/web" ci
+          cd "$RUNNER_TEMP/base"
+          # A script the base doesn't have yet leaves its pair out of the comment, not the job red.
+          # shellcheck disable=SC2086
+          node scripts/colony-cost.mjs $COLONY_COST_ARGS > "$RUNNER_TEMP/colony-base.txt" || rm -f "$RUNNER_TEMP/colony-base.txt"
+          node scripts/fungus-cost.mjs > "$RUNNER_TEMP/fungus-base.txt" || rm -f "$RUNNER_TEMP/fungus-base.txt"
+      - name: comment
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          COST_RAN: ${{ steps.changed.outputs.cost }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BODY" > "$RUNNER_TEMP/body.txt"
+          args=(--changed "$RUNNER_TEMP/changed.txt" --body "$RUNNER_TEMP/body.txt")
+          if [ "$COST_RAN" = "true" ]; then args+=(--cost-ran); fi
+          for lane in colony fungus; do
+            if [ -s "$RUNNER_TEMP/$lane-base.txt" ] && [ -s "$RUNNER_TEMP/$lane-head.txt" ]; then
+              args+=("--$lane-base" "$RUNNER_TEMP/$lane-base.txt" "--$lane-head" "$RUNNER_TEMP/$lane-head.txt")
+            fi
+          done
+          node scripts/pr-notes.mjs "${args[@]}" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
+          marker=$(node -e 'import("./scripts/pr-notes.mjs").then((m) => console.log(m.MARKER))')
+          # Only this job's own comment: the bot's, starting with the marker.
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$RUNNER_TEMP/notes.md" > /dev/null
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$RUNNER_TEMP/notes.md" > /dev/null
+          fi
