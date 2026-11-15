@@ -321,7 +321,7 @@ export const ANT_FIELDS = {
   youngMet: { type: Float32Array, fill: 1, reset: "spawn" },
   // ——— larval feeding by mouth (ja-638i, PRD §72), last for the same reason ———
   /** food in its crop (food units, up to params.cropFeed): filled at the stores, passed mouth to mouth, fed to larvae */
-  crop: { type: Float32Array, reset: "spawn" },
+  crop: { type: Float64Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };
