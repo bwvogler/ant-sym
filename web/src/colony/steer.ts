@@ -26,6 +26,12 @@ import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
 import { mill, onMLine, siteAim } from "./plane.ts";
 
+/**
+ * How hard a follower shies from "no entry" a child painted (builder.ts), while its colony's own noEntryAvoid is 0: the
+ * value PRD §45 tested (docs/builder.md "Slice 2"; Robinson et al. 2005: 71 % took the unmarked branch).
+ */
+export const NO_ENTRY_PAINTED = 4;
+
 export function steer(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
   const rng = s.rng;
@@ -343,11 +349,14 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       let gl = fl;
       let gf = ff;
       let gr = fr;
-      if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
+      // With the colony's own off (noEntryAvoid 0: it lays none), only the builder's paint can wake the field: read at
+      // NO_ENTRY_PAINTED (docs/builder.md "Slice 2"). With no paint the field never wakes, so nothing here runs.
+      const avoid = p.noEntryAvoid > 0 ? p.noEntryAvoid : NO_ENTRY_PAINTED;
+      if (ph.live("noEntry") && outside) {
         const x = col.x[i];
         const y = col.y[i];
         const d = p.sensorDistance;
-        const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
+        const ne = (b: number) => avoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
         if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
         if (gf < SEEN) gf = Math.max(0, gf - ne(h));
         if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));

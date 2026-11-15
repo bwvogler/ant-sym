@@ -9,7 +9,7 @@ test("the full tray: every tool, a crayon per colony named for it, Move first", 
   assert.equal(items[0]?.tool, "move");
   assert.deepEqual(
     items.map((it) => it.key),
-    ["move", "dig", "dirt", "rock", "sugar", "crumb", "crayon-0", "crayon-1", "rain"],
+    ["move", "tweezers", "dig", "dirt", "rock", "sugar", "crumb", "crayon-0", "crayon-1", "noEntry", "rain"],
   );
   assert.equal(items.find((it) => it.key === "crayon-1")?.label, "Trail crayon, Amber");
   assert.equal(items.find((it) => it.key === "crayon-1")?.colony, 1);
@@ -26,9 +26,10 @@ test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => 
   assert.ok(LITTLE.every((t) => FULL.includes(t)));
 });
 
-test("at most four crayons; none for a species with no food trail", () => {
+test("at most four crayons; no crayon and no no-entry sign for a species with no food trail", () => {
   assert.equal(trayItems(false, ["a", "b", "c", "d", "e", "f"]).filter((it) => it.tool === "crayon").length, 4);
   assert.equal(trayItems(false, ["Ink", "Amber"], false).filter((it) => it.tool === "crayon").length, 0);
+  assert.equal(trayItems(false, ["Ink", "Amber"], false).filter((it) => it.tool === "noEntry").length, 0, "nor a no-entry sign");
 });
 
 test("a palm is a touch wider or taller than a fingertip; a mouse or pen never is", () => {

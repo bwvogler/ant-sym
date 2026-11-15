@@ -6309,3 +6309,38 @@ Merging is not delegated: PRs wait for the owner.
 - `.1` assays;
 - `.2` the tools and `watch`;
 - `.3` the tray, notices and Learn.
+
+**Built (ja-b3us.1–.3, 2026-11-15).**
+- **Tweezers** (`Builder.moveAnt`):
+  - two new per-ant arrays, `carriedX` and `carriedY` (0 unless a child moved the ant), cleared with the vector up out of its own hole (`crossing.ts`);
+  - added wherever the believed home is read: `believePlane`, `fromHomePlane`, the site memory (`plane.ts`) and the spoil spreader (`dig.ts`);
+  - `putAnt` clears the ant's steering caches as a crossing does.
+  - Undo carries it back.
+  - The tray's 🤏 lifts the ant under the finger on the top view and carries it along the drag; with no ant there the finger pans.
+- **No-entry paint** (🚫):
+  - a painted line on every colony's `noEntry` (`CrayonLine.channel`, `colony` −1), topped up as a crayon is;
+  - `steer.ts` reads it at `NO_ENTRY_PAINTED` 4 while `noEntryAvoid` is 0;
+  - it is hidden, as the crayon is, for a species with no food trail.
+- **`Builder.watch`:** the page reads it once a second, builds kept or not. It raises notices for the bell:
+  - "An ant found your sugar!";
+  - "…all gone";
+  - "N ants are following your crayon line!";
+  - "The ant you moved found its way home in N s!";
+  - "…didn't make it home".
+- **Undone builds are forgotten.**
+- **Learn:** the tweezers and the no-entry sign entries, with their Codex rows.
+
+**Assays,** seeds 1–10, held-out seeds 11–20:
+
+| Id | Result |
+|---|---|
+| B7 `noEntryFork` | share on the unpainted branch: median **0.75**, 9/10 ≥ 0.70 (seed 1 at 0.69); seeds 11–20 **10/10** (0.76–0.82). Control, no sign (`noEntryForkBare`): 0.49 (0.47–0.54). Robinson et al. 2005: 71 %. `NO_ENTRY_PAINTED` 4 was not tuned. |
+| B8 `tweezers` | carriers moved 30–60 sideways (median 18.5 a seed): **81 %** (52–89 %) came within 6 of where home would be before finding home; **100 %** home within 300 s, median 20.5 s after the move |
+
+**Checks.**
+- Golden masters are bit-exact.
+- `tests/int/builder.test.ts` has 24 tests: tweezers (belief moved exactly, undo, refusals), no-entry (every colony, topped up, undo), and `watch` (each event once, nothing for an undone build).
+- `npm run e2e` step 11 adds a no-entry drag (every colony's sign wakes) and a tweezers drag (the ant and its belief move), at 390 and 768 px.
+- The ant table's tests count 131 arrays; the reset fixture adds the two rows.
+
+**Cost:** none. No lane, field, legend or question changes, and `noEntry` was already sensed.

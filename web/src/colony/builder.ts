@@ -14,17 +14,17 @@
 
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import type { Game } from "./game.ts";
-import type { Channel } from "./pheromone.ts";
+import type { Channel, Pheromones } from "./pheromone.ts";
 import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
 import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
 
-export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "crayon" | "rain";
-export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "crayon", "rain"];
+export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "crayon" | "noEntry" | "rain";
+export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "crayon", "noEntry", "rain"];
 
 /** The tools' sizes and amounts (design marks; docs/builder.md "The mechanic"). Radii in world units. */
 export const BUILD = {
   /** each tool's brush radius */
-  radius: { dig: 1.6, dirt: 1.6, rock: 1.6, sugar: 1.6, crumb: 1.6, crayon: 1.1, rain: 6 } as Record<BuildTool, number>,
+  radius: { dig: 1.6, dirt: 1.6, rock: 1.6, sugar: 1.6, crumb: 1.6, crayon: 1.1, noEntry: 1.6, rain: 6 } as Record<BuildTool, number>,
   /** food put on each cell a sugar or crumb stroke touches: the world's own piles' (DEFAULT_WORLD.foodPerCell) */
   foodPerCell: 12,
   /** the most food a cell may hold from the builder, so a finger held on one spot doesn't heap a mountain */
@@ -54,10 +54,15 @@ export interface Stroke {
   colony?: number;
 }
 
-/** A crayon line: kept topped up to `level(age)` on its cells until it fades below FAINT. Saved with the game. */
+/**
+ * A crayon line: kept topped up to `level(age)` on its cells until it fades below FAINT. Saved with the game. `channel`:
+ * "food" for a crayon (absent in saves before slice 2), "noEntry" for the no-entry paint, which is every colony's
+ * (`colony` −1; docs/builder.md "Slice 2").
+ */
 export interface CrayonLine {
   colony: number;
   layer: number;
+  channel?: "food" | "noEntry";
   /** cell x, y pairs */
   cells: number[];
   age: number;
@@ -76,18 +81,30 @@ export function stepCrayons(game: Game, dt: number): void {
     line.age += dt;
     const level = crayonLevel(line.age);
     if (level < FAINT) continue;
-    const ph = game.colonies[line.colony]?.layers[line.layer]?.ph;
-    if (!ph) continue;
-    const f = ph.fields.food;
-    for (let k = 0; k < line.cells.length; k += 2) {
-      const x = line.cells[k] as number;
-      const y = line.cells[k + 1] as number;
-      const v = f.get(x, y);
-      if (v < level) ph.depositCell("food", x, y, level - v);
+    const ch = line.channel ?? "food";
+    for (const ph of linePheromones(game, line)) {
+      const f = ph.fields[ch];
+      for (let k = 0; k < line.cells.length; k += 2) {
+        const x = line.cells[k] as number;
+        const y = line.cells[k + 1] as number;
+        const v = f.get(x, y);
+        if (v < level) ph.depositCell(ch, x, y, level - v);
+      }
     }
     lines[keep++] = line;
   }
   lines.length = keep;
+}
+
+/** The fields a line is laid in: its colony's on its layer, or every colony's for the no-entry paint (colony −1). */
+export function linePheromones(game: Game, line: CrayonLine): Pheromones[] {
+  const out: Pheromones[] = [];
+  game.colonies.forEach((c, k) => {
+    if (line.colony !== -1 && line.colony !== k) return;
+    const ph = c.layers[line.layer]?.ph;
+    if (ph && ph.has(line.channel ?? "food")) out.push(ph);
+  });
+  return out;
 }
 
 /** The map a stroke's layer is. */
@@ -163,7 +180,26 @@ type Change =
   | { kind: "crayon"; line: CrayonLine }
   | { kind: "crayonMore"; line: CrayonLine; cells: number[] }
   | { kind: "rain"; colony: number; layer: number; channel: Channel; x: number; y: number; was: number }
-  | { kind: "rainLine"; line: CrayonLine; cells: number[]; at: number };
+  | { kind: "rainLine"; line: CrayonLine; cells: number[]; at: number }
+  | { kind: "ant"; colony: number; i: number; gen: number; dx: number; dy: number };
+
+/** What `Builder.watch` says the ants did with a build (docs/builder.md "Slice 2"): each said once. */
+export type BuildEvent =
+  | { kind: "foodFound"; tool: "sugar" | "crumb" }
+  | { kind: "foodGone"; tool: "sugar" | "crumb" }
+  | { kind: "lineFollowed"; colony: number; ants: number }
+  | { kind: "antHome"; colony: number; seconds: number }
+  | { kind: "antLost"; colony: number };
+
+/** Ants on a crayon line at once for `watch` to say it is followed. */
+export const FOLLOWED_AT = 3;
+
+/** A sugar or crumb stroke being watched: its cells, what each held before, what it added. */
+interface FoodWatch {
+  tool: "sugar" | "crumb";
+  cells: { map: WorldMap; x: number; y: number; before: number; added: number }[];
+  found: boolean;
+}
 
 /** Change a cell's terrain the way the ants' own digging and filling does, so the maps' counts and caches follow. */
 function setTerrain(map: WorldMap, x: number, y: number, to: number): boolean {
@@ -198,6 +234,9 @@ export class Builder {
   readonly game: Game;
   #undo: Change[][] = [];
   #joinable = false;
+  #food: FoodWatch[] = [];
+  #followed = new WeakSet<CrayonLine>();
+  #moved: { colony: number; i: number; gen: number; at: number }[] = [];
 
   constructor(game: Game) {
     this.game = game;
@@ -215,15 +254,25 @@ export class Builder {
     const last = this.#undo[this.#undo.length - 1];
     // A crayon drag goes on as one line: its pieces extend the line the drag began.
     const tail = join && this.#joinable ? last?.[last.length - 1] : undefined;
+    const lineColony = stroke.tool === "noEntry" ? -1 : (stroke.colony ?? 0);
     const extend =
       (tail?.kind === "crayon" || tail?.kind === "crayonMore") &&
-      tail.line.colony === (stroke.colony ?? 0) &&
+      tail.line.colony === lineColony &&
+      (tail.line.channel ?? "food") === (stroke.tool === "noEntry" ? "noEntry" : "food") &&
       tail.line.layer === stroke.layer &&
       this.game.crayons.includes(tail.line)
         ? tail.line
         : undefined;
     const changes = this.#apply(stroke, extend);
     if (!changes.length) return 0;
+    if (stroke.tool === "sugar" || stroke.tool === "crumb") {
+      const cells = changes.flatMap((c) =>
+        c.kind === "food" ? [{ map: c.map, x: c.x, y: c.y, before: c.map.food.get(c.x, c.y) - c.added, added: c.added }] : [],
+      );
+      const w = this.#food[this.#food.length - 1];
+      if (join && this.#joinable && w && w.tool === stroke.tool && !w.found) w.cells.push(...cells);
+      else this.#food.push({ tool: stroke.tool, cells, found: false });
+    }
     if (join && last && this.#joinable) last.push(...changes);
     else {
       this.#undo.push(changes);
@@ -231,6 +280,95 @@ export class Builder {
     }
     this.#joinable = true;
     return changes.length;
+  }
+
+  /**
+   * The tweezers (docs/builder.md "Slice 2"): set colony k's ant i down at world (x, y) on the plane, as a finger lets
+   * go. Its belief of home moves by as much (carriedX, carriedY), so it runs its old vector and searches where that
+   * ends, as a displaced desert ant does. Plane only, one world only, open ground only. `join`: the same drag goes on.
+   * False if it could not be moved.
+   */
+  moveAnt(k: number, i: number, x: number, y: number, join = false): boolean {
+    const game = this.game;
+    const c = game.colonies[k];
+    if (!game.world || !c || !c.alive[i] || c.layer[i] !== PLANE) return false;
+    const map = layerMap(game, PLANE);
+    cellOf(x, y);
+    if (!buildable(map, CELL[0], CELL[1]) || rockAt(map, CELL[0], CELL[1]) !== OPEN) return false;
+    const dx = x - c.x[i]!;
+    const dy = y - c.y[i]!;
+    if (dx === 0 && dy === 0) return false;
+    c.putAnt(i, PLANE, x, y);
+    c.carriedX[i] += dx;
+    c.carriedY[i] += dy;
+    const change: Change = { kind: "ant", colony: k, i, gen: c.gen[i]!, dx, dy };
+    const last = this.#undo[this.#undo.length - 1];
+    if (join && last && this.#joinable) last.push(change);
+    else {
+      this.#undo.push([change]);
+      if (this.#undo.length > BUILD.undoDepth) this.#undo.shift();
+    }
+    this.#joinable = true;
+    this.#moved = this.#moved.filter((m) => !(m.colony === k && m.i === i));
+    this.#moved.push({ colony: k, i, gen: c.gen[i]!, at: game.time });
+    return true;
+  }
+
+  /**
+   * What the ants did with the builds since the last call, each said once (docs/builder.md "Slice 2"): sugar or crumbs
+   * found and gone, a crayon line followed by FOLLOWED_AT or more, a moved ant home (down a hole) or dead. Reads the
+   * game, never changes it. The page calls it once a second.
+   */
+  watch(): BuildEvent[] {
+    const game = this.game;
+    const out: BuildEvent[] = [];
+    this.#food = this.#food.filter((w) => {
+      let left = 0;
+      let all = 0;
+      for (const c of w.cells) {
+        all += c.added;
+        left += Math.max(0, Math.min(c.added, c.map.food.get(c.x, c.y) - c.before));
+      }
+      if (!w.found && left < all - 0.5) {
+        w.found = true;
+        out.push({ kind: "foodFound", tool: w.tool });
+      }
+      if (left <= 0.5) {
+        out.push({ kind: "foodGone", tool: w.tool });
+        return false;
+      }
+      return true;
+    });
+    for (const line of game.crayons) {
+      if ((line.channel ?? "food") !== "food" || this.#followed.has(line)) continue;
+      const c = game.colonies[line.colony];
+      if (!c) continue;
+      const on = new Set<number>();
+      for (let k = 0; k < line.cells.length; k += 2) on.add((line.cells[k + 1]! + 0x8000) * 0x10000 + (line.cells[k]! + 0x8000));
+      let n = 0;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (game.world && c.layer[i] !== line.layer)) continue;
+        c.antCell(i);
+        if (on.has((CELL[1] + 0x8000) * 0x10000 + (CELL[0] + 0x8000))) n++;
+      }
+      if (n >= FOLLOWED_AT) {
+        this.#followed.add(line);
+        out.push({ kind: "lineFollowed", colony: line.colony, ants: n });
+      }
+    }
+    this.#moved = this.#moved.filter((m) => {
+      const c = game.colonies[m.colony];
+      if (!c || !c.alive[m.i] || c.gen[m.i] !== m.gen) {
+        out.push({ kind: "antLost", colony: m.colony });
+        return false;
+      }
+      if (c.layer[m.i] !== PLANE) {
+        out.push({ kind: "antHome", colony: m.colony, seconds: game.time - m.at });
+        return false;
+      }
+      return true;
+    });
+    return out;
   }
 
   /** A new drag begins: the next stroke starts a new undo even if it says join (and its first piece changed nothing). */
@@ -271,9 +409,16 @@ export class Builder {
         map.foodTotal += add; // counted, as regrowth's food is (game.ts), so the stats' share stays a share
         out.push({ kind: "food", map, x, y, added: add, quality: q });
       }
-    } else if (tool === "crayon") {
-      const ph = game.colonies[colony]?.layers[layer]?.ph;
-      if (!ph) return out;
+    } else if (tool === "crayon" || tool === "noEntry") {
+      // A crayon is one colony's food trail; the no-entry paint is every colony's "no entry" (docs/builder.md "Slice 2").
+      const probe: CrayonLine = {
+        colony: tool === "noEntry" ? -1 : colony,
+        layer,
+        cells: [],
+        age: 0,
+        channel: tool === "noEntry" ? "noEntry" : "food",
+      };
+      if (!linePheromones(game, probe).length) return out;
       const open: number[] = [];
       for (let k = 0; k < cells.length; k += 2) {
         const x = cells[k] as number;
@@ -294,7 +439,8 @@ export class Builder {
         out.push({ kind: "crayonMore", line: extend, cells: added });
         return out;
       }
-      const line: CrayonLine = { colony, layer, cells: open, age: 0 };
+      const line: CrayonLine = { ...probe, cells: open };
+      if (line.channel === "food") delete line.channel; // a crayon's line saves as before
       game.crayons.push(line);
       stepCrayons(game, 0); // drawn at once, before the next tick
       out.push({ kind: "crayon", line });
@@ -340,6 +486,10 @@ export class Builder {
     this.#joinable = false;
     const changes = this.#undo.pop();
     if (!changes) return false;
+    // Undone builds are not watched: no "all gone" for sugar a child took back, no "home" for an ant put back.
+    const undoneFood = new Set(changes.flatMap((c) => (c.kind === "food" ? [`${c.x},${c.y}`] : [])));
+    if (undoneFood.size) this.#food = this.#food.filter((w) => !w.cells.some((c) => undoneFood.has(`${c.x},${c.y}`)));
+    for (const c of changes) if (c.kind === "ant") this.#moved = this.#moved.filter((m) => !(m.colony === c.colony && m.i === c.i));
     const game = this.game;
     const guards = new Map<number, Set<number>>();
     const guardOf = (map: WorldMap) => {
@@ -369,13 +519,14 @@ export class Builder {
       } else if (c.kind === "crayon") {
         const at = game.crayons.indexOf(c.line);
         if (at >= 0) game.crayons.splice(at, 1);
-        const f = game.colonies[c.line.colony]?.layers[c.line.layer]?.ph.fields.food;
-        if (!f) continue;
         const level = crayonLevel(c.line.age);
-        for (let j = 0; j < c.line.cells.length; j += 2) {
-          const x = c.line.cells[j] as number;
-          const y = c.line.cells[j + 1] as number;
-          f.set(x, y, Math.max(0, f.get(x, y) - level));
+        for (const ph of linePheromones(game, c.line)) {
+          const f = ph.fields[c.line.channel ?? "food"];
+          for (let j = 0; j < c.line.cells.length; j += 2) {
+            const x = c.line.cells[j] as number;
+            const y = c.line.cells[j + 1] as number;
+            f.set(x, y, Math.max(0, f.get(x, y) - level));
+          }
         }
       } else if (c.kind === "crayonMore") {
         const drop = new Set<number>();
@@ -387,11 +538,23 @@ export class Builder {
           if (!drop.has((y + 0x8000) * 0x10000 + (x + 0x8000))) kept.push(x, y);
         }
         c.line.cells = kept;
-        const f = game.colonies[c.line.colony]?.layers[c.line.layer]?.ph.fields.food;
         const level = crayonLevel(c.line.age);
-        if (f)
+        for (const ph of linePheromones(game, c.line)) {
+          const f = ph.fields[c.line.channel ?? "food"];
           for (let j = 0; j < c.cells.length; j += 2)
             f.set(c.cells[j]!, c.cells[j + 1]!, Math.max(0, f.get(c.cells[j]!, c.cells[j + 1]!) - level));
+        }
+      } else if (c.kind === "ant") {
+        // Back where the finger picked it up, if it is still that ant, on the plane, and the ground there is open.
+        const col = game.colonies[c.colony];
+        if (!col || !col.alive[c.i] || col.gen[c.i] !== c.gen || col.layer[c.i] !== PLANE) continue;
+        const bx = col.x[c.i]! - c.dx;
+        const by = col.y[c.i]! - c.dy;
+        cellOf(bx, by);
+        if (rockAt(layerMap(game, PLANE), CELL[0], CELL[1]) !== OPEN) continue;
+        col.putAnt(c.i, PLANE, bx, by);
+        col.carriedX[c.i] -= c.dx;
+        col.carriedY[c.i] -= c.dy;
       } else if (c.kind === "rain") {
         const ph = game.colonies[c.colony]?.layers[c.layer]?.ph;
         if (ph && ph.fields[c.channel].get(c.x, c.y) < c.was)

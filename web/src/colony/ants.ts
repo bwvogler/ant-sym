@@ -319,6 +319,13 @@ export const ANT_FIELDS = {
   // ——— the fungus's rouse (ja-rf5.18), last for the same reason ———
   /** rouse (ja-rf5.18, the fungus's): coming down its shaft, it counts as this share of a finder to the ants waiting at the top */
   rouse: { type: Float32Array, reset: "asIs" },
+  /**
+   * How far the builder's tweezers carried ant i on the plane this trip (docs/builder.md "Slice 2"): its belief of home
+   * moves by as much, so it runs its old vector, as a displaced desert ant does (Wehner & Srinivasan 1981). 0 unless
+   * a child moved it; cleared with the vector up out of its own hole.
+   */
+  carriedX: { type: Float32Array, reset: "spawn" },
+  carriedY: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

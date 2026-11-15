@@ -108,6 +108,12 @@ export function play(cue: Cue): void {
     case "rain":
       noise(a, 0.5, 4000, "highpass", 0.15);
       break;
+    case "tweezers":
+      tone(a, 1500, 2400, 0.06, "triangle", 0.12);
+      break;
+    case "noEntry":
+      tone(a, 220, 180, 0.18, "square", 0.05);
+      break;
     case "undo":
       tone(a, 900, 300, 0.2, "sine", 0.12);
       break;

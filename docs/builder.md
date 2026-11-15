@@ -281,7 +281,12 @@ This is design: no paper. It reads the game, never steers it.
 
 ### Open, slice 2
 
-- How strong the painted sign is (`NO_ENTRY_PAINTED` 4) is tuned on B7.
+- How strong the painted sign is (`NO_ENTRY_PAINTED` 4) was to be tuned on B7, but it needed no tuning. B7 passes 9/10 on seeds 1–10 and 10/10 on 11–20 (PRD §73.3).
+
+### What slice 2 built (PRD §73.3)
+
+- **B7:** with the sign on one branch of a crayon fork, a median 75 % of the ants on the fork took the other branch, against 49 % with no sign. Robinson et al. found 71 %.
+- **B8:** of carriers moved 30–60 sideways, 81 % walked to where home would be by their old vector before finding home. All were home within 300 s (median 20 s), as Wehner & Srinivasan's displaced ants were.
 
 ## Sources
 
