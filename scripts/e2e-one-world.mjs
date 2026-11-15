@@ -40,7 +40,8 @@
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
 //  15. Lab mode (PRD §69.7): l opens it under the map, which shares the screen; the history's charts, their crosshair (by
 //     pointer and by arrow keys) and table; a notice above it; the step control a tick and a second at a time while
-//     paused (off while playing); each tab; l closes it.
+//     paused (off while playing); each tab; the aim's "?" opens the Policy tab at its section (§69.8), and the Codex
+//     keeps only the guide and the nest; l closes it.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1742,6 +1743,20 @@ try {
     await bench.getByRole("tab", { name: tab }).click();
     check((await bench.getByRole("region", { name: card }).count()) === 1, `the ${tab} tab`);
   }
+  // The policy is the Lab's Policy tab (PRD §69.8): a "?" on the policy opens it at its section, and the Codex has none.
+  await lbp.getByRole("button", { name: "Lab: how the fungus decides" }).first().click();
+  check(
+    (await bench.getByRole("tab", { name: "Policy" }).getAttribute("aria-selected")) === "true" &&
+      (await bench.locator("details#learn-fungus").evaluate((d) => d.open)),
+    "the aim's “?” opens the Lab's Policy tab at the fungus's section",
+  );
+  await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
+  const codexTabs = lbp.getByRole("dialog", { name: "Codex" }).getByRole("tab");
+  check(
+    JSON.stringify(await codexTabs.allTextContents()) === JSON.stringify(["Field guide", "Nest"]),
+    "the Codex keeps the field guide and the nest",
+  );
+  await lbp.getByRole("button", { name: "Close the Codex" }).click();
   await lbp.locator("canvas").first().focus();
   await lbp.keyboard.press("l");
   await until(

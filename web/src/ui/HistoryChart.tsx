@@ -1,6 +1,6 @@
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { clock } from "./clock.ts";
-import { endLabels, nearestSample, type Sample } from "./history.ts";
+import { endLabels, linePath, nearestSample, type Sample } from "./history.ts";
 
 // One of Lab mode's history charts (PRD §69.7): a line chart of a measure over game time, small multiples sharing the
 // time axis. The dataviz skill's specs: 2 px lines with round joins, recessive hairline grid, a legend for two or more
@@ -14,21 +14,6 @@ export interface Series {
   color: string;
   /** one a sample; null where there is none (a gap, not 0) */
   values: readonly (number | null)[];
-}
-
-/** A line's path: a move to the start of each run of values, so a null breaks it. */
-function pathOf(values: readonly (number | null)[], px: (i: number) => number, py: (v: number) => number): string {
-  let d = "";
-  let open = false;
-  values.forEach((v, i) => {
-    if (v === null) {
-      open = false;
-      return;
-    }
-    d += `${open ? "L" : "M"}${px(i).toFixed(1)},${py(v).toFixed(1)}`;
-    open = true;
-  });
-  return d;
 }
 
 const H = 120;
@@ -90,7 +75,7 @@ export default function HistoryChart({
             ? 0
             : e.key === "End"
               ? last
-              : e.key === "Escape"
+              : e.key === "Escape" && hover >= 0
                 ? -1
                 : null;
     if (to === null) return;
@@ -143,7 +128,7 @@ export default function HistoryChart({
           {series.map((s) => (
             <path
               key={s.name}
-              d={pathOf(s.values, (i) => x(samples[i]!.t), y)}
+              d={linePath(s.values, (i) => x(samples[i]!.t), y)}
               fill="none"
               stroke={s.color}
               strokeWidth={2}

@@ -77,6 +77,24 @@ export function perColony(samples: readonly Sample[], pick: (s: Sample) => reado
   return samples.map((s) => pick(s)[k] ?? null);
 }
 
+/**
+ * A chart line's SVG path: a move to the start of each run of values, so a null breaks it, and a zero-length h0 after
+ * each move, so a lone value (a colony founded at the latest sample) draws a dot under its round cap.
+ */
+export function linePath(values: readonly (number | null)[], px: (i: number) => number, py: (v: number) => number): string {
+  let d = "";
+  let open = false;
+  values.forEach((v, i) => {
+    if (v === null) {
+      open = false;
+      return;
+    }
+    d += `${open ? "L" : "M"}${px(i).toFixed(1)},${py(v).toFixed(1)}${open ? "" : "h0"}`;
+    open = true;
+  });
+  return d;
+}
+
 /** A round top for a chart's y axis: 1, 2 or 5 times a power of ten, at least the largest value (and at least `floor`). */
 export function niceMax(values: readonly (number | null)[], floor = 1): number {
   const m = Math.max(floor, ...values.filter((v) => v !== null));

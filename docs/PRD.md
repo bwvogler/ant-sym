@@ -5959,10 +5959,33 @@ Stage 4 goes out in two PRs. This first half builds Lab mode and retires the Det
   - the mutations to keep.
 
   Each chart follows the dataviz skill: 2 px lines, a hairline grid, a legend for two or more lines, a name at each line's end where it clears the others, a crosshair that snaps to the nearest sample and reads out every line, and "As a table" under them.
-- **Colour.** Each colony has a fixed slot of a categorical palette (`--series-1` to `--series-6`), validated with the skill's validator on `--paper` in both themes: adjacent CVD ΔE ≥ 8.4, normal-vision ≥ 19.3. The colony tones the map uses failed as a chart palette: near-black Ink, and greys below the chroma floor. Three light slots sit under 3:1 contrast, so the names and the table carry identity.
+- **Colour.** Each colony has a fixed slot of a categorical palette (`--series-1` to `--series-6`), validated with the skill's validator on `--ground`, the workbench's surface, in both themes: every check passes. The colony tones the map uses failed as a chart palette: near-black Ink, and greys below the chroma floor. Four light slots sit under 3:1 contrast, so the names and the table carry identity. One colony palette for the map and the charts is S5's (`ja-mvo9.9`, the owner's call on #226).
 - **Not built:** the plan's stance-mix chart. Stances are per ant, and the colonies' stance line is in the Colonies drawer; it can come later.
 - **Retired:** the Details screen. Its places now say Lab: the policy lock's "Lab → Jev → Resume Jev", Settings' "Lab mode", the palette.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+### 69.8 S4b: the policy moves into the Lab (ja-mvo9.4, second half)
+
+The Codex was the field guide, the nest and the policy. The policy is about how the game decides, not what the player sees, so it moves to Lab mode beside the history and the levers.
+
+- **Lab mode's Policy tab** (`ui/PolicyTab.tsx`, moved from the Codex) holds:
+  - each colony's doctrine, read only and closed until its queen is reached;
+  - the fungus's aim, as a quote;
+  - the four explainers: how an ant chooses, how the fungus chooses, what Jev is sent, and the small responses.
+- **One home for each control.** The lever menu and the local rule's two settings (hide, cull) were in the Policy tab and the Levers tab. They are now only in Levers, and the Policy tab says where they are. The aim stays in the aim bar.
+- **A "?" on the policy opens the Lab.** Every link that opened the Codex's Policy tab now opens the Lab at its Policy tab, with the named section opened and scrolled to. Its label says "Lab: …", not "Codex: …". This covers:
+  - the aim's "?";
+  - the followed ant's "why?" and its situation chips;
+  - the Jev, Levers and doctrine cards.
+- **How it is built:**
+  - A small store (`ui/labStore.ts`, like the Codex's `learn.ts`) holds whether the Lab is open and at which tab.
+  - `openLearn({ tab: "policy" })` routes there and closes the Codex, which would cover it.
+  - The key `l`, the palette and Settings toggle the Lab through it.
+- **The Codex** keeps two tabs: the field guide and the nest.
+- **Two chart fixes** from #226's re-review (`ja-mvo9.4.1`):
+  - Escape on a focused chart is taken only while it puts a crosshair away. Otherwise it passes on, so an open drawer closes.
+  - A lone value (a colony founded at the latest sample) draws a dot (`linePath`'s `h0`).
+- **Unchanged:** the simulation, and every legend and question, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 

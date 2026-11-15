@@ -1,20 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clock, clockTicks } from "./clock.ts";
 import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
 import { Icon } from "./kit.tsx";
 import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
+import { closeLab, type LabTab, type LabTarget, openLab, useLab } from "./labStore.ts";
 import { colonyName } from "./names.ts";
+import PolicyTab, { type PolicyProps } from "./PolicyTab.tsx";
 
 // Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
 // this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
 // levers, the numbers, the journal; and a step control, to take the game a tick or a second at a time while paused.
-// The key l, the palette or Settings toggle it; it replaced the Details screen.
+// The key l, the palette or Settings toggle it; it replaced the Details screen. Its tab lives in the Lab store
+// (labStore.ts), so a "?" on the policy anywhere opens the Policy tab at its section (PRD §69.8).
 
-type Tab = "history" | "world" | "jev" | "levers" | "numbers" | "journal";
-
-const TABS: [Tab, string][] = [
+const TABS: [LabTab, string][] = [
   ["history", "History"],
+  ["policy", "Policy"],
   ["world", "World"],
   ["jev", "Jev"],
   ["levers", "Levers"],
@@ -24,6 +26,8 @@ const TABS: [Tab, string][] = [
 
 /** Colony k's line colour in the charts: a fixed slot per colony (never by rank), the validated --series palette. */
 const seriesColor = (k: number) => `var(--series-${(k % 6) + 1})`;
+/** The Lab as it opens, by l, the palette or Settings. */
+const HISTORY: LabTarget = { tab: "history" };
 const pct = (v: number) => `${Math.round(100 * v)}%`;
 const whole = (v: number) => String(Math.round(v));
 
@@ -32,11 +36,21 @@ export default function LabBench(
     history: History;
     /** step the game n ticks of 1/30 s (useColony.step) */
     step: (n: number) => void;
-    onClose: () => void;
+    /** what the Policy tab reads */
+    policy: PolicyProps;
   },
 ) {
-  const { history, step, onClose, controls, update, journal, game } = props;
-  const [tab, setTab] = useState<Tab>("history");
+  const { history, step, controls, update, journal, game } = props;
+  const target = useLab() ?? HISTORY;
+  const tab = target.tab === "journal" && !journal ? "history" : target.tab;
+  const setTab = (t: LabTab) => openLab({ tab: t });
+  const body = useRef<HTMLDivElement>(null);
+  // A target section (a "?" on the policy) is scrolled to once its tab has rendered; a tab of its own starts at the top.
+  useEffect(() => {
+    const el = target.id ? document.getElementById(`learn-${target.id}`) : null;
+    if (el) el.scrollIntoView({ block: "start" });
+    else body.current?.scrollTo({ top: 0 });
+  }, [target]);
   // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
   const [, setSteps] = useState(0);
   // A queen in flight waits for the page to found her (the pen), as play does.
@@ -99,16 +113,26 @@ export default function LabBench(
         <button
           type="button"
           className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg max-sm:order-2 max-sm:ml-auto"
-          onClick={onClose}
+          onClick={closeLab}
           aria-label="Close the Lab"
           title="Close the Lab (l)"
         >
           <Icon name="close" className="size-4" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" role="tabpanel" aria-label={TABS.find(([t]) => t === tab)?.[1]}>
+      <div
+        ref={body}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-fg-2"
+        role="tabpanel"
+        aria-label={TABS.find(([t]) => t === tab)?.[1]}
+      >
         {tab === "history" && <HistoryTab history={history} />}
-        {tab !== "history" && (
+        {tab === "policy" && (
+          <div className="max-w-3xl">
+            <PolicyTab {...props.policy} focus={target.id} ping={target} />
+          </div>
+        )}
+        {tab !== "history" && tab !== "policy" && (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
             {tab === "world" && <World {...props} />}
             {tab === "jev" && <JevCard {...props} />}

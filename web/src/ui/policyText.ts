@@ -1,6 +1,6 @@
 import { modeSchema, type Mode, type Situation, type Species } from "../colony/index.ts";
 
-// The local rules in words, for the Learn drawer's Policy tab. Each mode and
+// The local rules in words, for Lab mode's Policy tab (PolicyTab.tsx). Each mode and
 // stance rule is a row the drawer shows ("when …, then …") with the test it
 // stands for; tests/policyText.test.ts walks every situation and checks that
 // the rows, read top to bottom, give exactly what localPolicy and localStance
