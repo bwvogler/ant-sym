@@ -6040,7 +6040,7 @@ The last stage of the page reorganisation: what makes it feel finished. The simu
   - `index.css` holds the dark variables twice, under the system's preference (unless light is chosen) and under `data-theme="dark"`. `ui/tests/theme.test.ts` holds the copies equal.
   - The canvas watches the attribute and recolours, as it does for the system's setting.
   - The palette lists "Appearance: …" for each.
-- **Motion.** A drawer arrives from the rail's side, the inspector and the Codex from the right, a sheet up from the tab bar on a phone: a 170 ms fade and a few pixels, sideways only from sm up, switched off by `prefers-reduced-motion`. The Lab is not animated, because it resizes the map's canvas.
+- **Motion.** A drawer, the inspector, the Codex and a phone's sheet arrive with a 170 ms fade, switched off by `prefers-reduced-motion`. It is opacity only: a first version also slid the panel a few pixels, and CI's browser test (on a slower runner than a dev machine) then met tooltips and taps against a panel that was still moving. The Lab is not animated, because it resizes the map's canvas.
 - **Accessibility, measured.**
   - axe-core 4.10 was run over the start screen, every drawer, both Codex tabs, the palette, the shortcuts sheet, the builder and every Lab tab, in light, dark and at 390 px (33 states). It found no structural problem, only contrast and keyboard access.
   - `--fg-3` was 4.38:1 (light) and 4.43:1 (dark) on the ground. It is now 4.88 and 5.76 there, and at least 4.5:1 on paper, panel and the raised surface in both themes (`#6f6a63`, `#958f88`).

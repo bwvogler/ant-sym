@@ -214,45 +214,21 @@ input[type="checkbox"] {
     transform: translate(-90px, 0);
   }
 }
-/* A panel arriving (PRD §69.9): a drawer from the rail's side, the inspector and the Codex from the right, a sheet up from
-   the tab bar on a phone. A short fade and a few pixels, sideways only from sm up, so nothing moves vertically where a
-   measurement or a click might land. The Lab is not animated: it resizes the map's canvas. */
-@keyframes panel-in-up {
+/* A panel arriving (PRD §69.9): a drawer, the inspector, the Codex, a sheet: a short fade. Opacity only, so nothing is ever
+   off its place while it runs: a tooltip opened, a click made or a measurement taken in those 170 ms finds every panel and
+   the controls in it where they will stay (a first version slid a few pixels, and CI's browser test, on a slow runner,
+   met tooltips and taps against the moving panel). The Lab is not animated: it resizes the map's canvas. */
+@keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateY(14px);
-  }
-}
-@keyframes panel-in-left {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-}
-@keyframes panel-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
   }
 }
 .panel-in {
-  animation: panel-in-up 170ms ease-out;
-}
-.panel-in-right {
-  animation: panel-in-up 170ms ease-out;
-}
-@media (min-width: 640px) {
-  .panel-in {
-    animation-name: panel-in-left;
-  }
-  .panel-in-right {
-    animation-name: panel-in-right;
-  }
+  animation: panel-in 170ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
   [class*="animate-[builder-"],
-  .panel-in,
-  .panel-in-right {
+  .panel-in {
     animation: none !important;
   }
 }

@@ -1925,8 +1925,8 @@ try {
   );
   // Motion: a drawer arrives with its animation, from the rail's side.
   check(
-    (await plp.getByRole("region", { name: "settings" }).evaluate((e) => getComputedStyle(e).animationName)) === "panel-in-left",
-    "a drawer slides in from the rail's side",
+    (await plp.getByRole("region", { name: "settings" }).evaluate((e) => getComputedStyle(e).animationName)) === "panel-in",
+    "a drawer fades in (opacity only: nothing moves under a tap)",
   );
   await plp.getByRole("group", { name: "appearance" }).getByRole("button", { name: "Dark" }).click();
   const darkPaper = await paper();

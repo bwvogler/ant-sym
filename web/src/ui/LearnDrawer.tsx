@@ -65,7 +65,7 @@ export default function LearnDrawer(props: Props) {
       tabIndex={-1}
       role="dialog"
       aria-label="Codex"
-      className="panel-in-right fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
+      className="panel-in fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
     >
       <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
         <h2 className="font-semibold text-fg">Codex</h2>
