@@ -3574,7 +3574,7 @@ No change to the colony lanes: their requests are byte-identical, and the golden
   - In the side view it digs a hole in the column under x, with the world's own shaft and founding royal chamber (`world.foundNest`, exported from `digNest`). Top-down, it places a nest's disc.
   - It adds a `Colony` of that many workers at that odour (its queen in the side view), then rewires every colony: grids, burials, enemies, the other nests, raids.
   - **Kin.** A daughter at her mother's odour is kin, and is not raided by her.
-- **Saves.** `Game.founded` records each founding. A save re-founds them on a fresh map before pouring the state back, and stays bit-exact (`tests/addColony.test.ts`).
+- **Saves.** `Game.founded` records each founding. A save re-founds them on a fresh map before pouring the state back, and stays bit-exact (`tests/addColony.test.ts`; on one world `int/oneWorldSave` "foundings replay").
 - **Unity for any number of colonies.** The gap is the widest between any two standing nests' odours, and mixing counts ants within tolerance of another colony's nest. With two colonies it is the same as before.
 - **The page draws any number of colonies.**
   - The field, the minimap, picking and the nest buttons (one per colony; `n` cycles them) take the colonies list.
