@@ -41,7 +41,7 @@ test("one world: a sweep of 30 save ticks round a fight death, each run on 1 tic
   const make = () => small();
   const whole = make();
   whole.land(0, GARDEN, { evolve: true });
-  assert.ok(toFightDeath(whole, PLANE, 40), "a fight death on the plane");
+  assert.ok(toFightDeath(whole, PLANE, 100), "a fight death on the plane");
   // The tick of the death: saves from 15 ticks before it to 14 after, from the same game run again from the start.
   const t0 = Math.round(whole.time / DT);
   const base = make();

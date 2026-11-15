@@ -548,6 +548,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (built, off for now).",
   },
   {
+    note: "brood-odour",
+    title: "Brood odour",
+    covers: "The young keep to the brood by its smell, not to the queen: queen pheromones are mostly contact signals.",
+  },
+  {
     note: "activation",
     title: "Activation",
     covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake.",

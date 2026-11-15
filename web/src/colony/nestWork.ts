@@ -448,6 +448,8 @@ export function nestLife(col: Colony, dt: number): void {
       if (strangers >= ENEMY && col.rng() < 1 - Math.exp(-QUEEN_FIGHT * strangers * dt)) q.alive = false;
     }
   }
+  // Brood odour (ja-k4k.15, docs/brood-odour.md): each brood item lying in the nest gives off its own short-range scent.
+  if (p.broodOdour > 0) for (const b of col.brood.items) if (b.held < 0) col.ph.depositCell("broodOdour", b.x, b.y, p.broodOdour * dt);
   // The fungus's crown (nest slice 8, lethal): a host running it kills the queen and the brood it touches, each at
   // CROWN_RATE × its regicide (its load) a second: the spores it passes on as it tends them (at once, spores painted
   // on the royal chamber orphaned the colony in its first second; from a high load only, grooming kept every host
