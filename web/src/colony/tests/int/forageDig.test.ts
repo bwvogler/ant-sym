@@ -8,7 +8,7 @@ import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../../worl
 import { SMALL_SIDE, ageOf } from "../builders.ts";
 
 // forageDig (ja-16rp, PRD §70) at the dig face: what a bout lets an old forager do that the nest's own diggers (the
-// middle-aged) don't, and what it doesn't let it do. tests/unit/forageDig.test.ts has who takes a bout and when it ends.
+// middle-aged) don't, and what it doesn't let it do. tests/int/forageDigBout.test.ts has who takes a bout and when it ends.
 // World 2 of SMALL_SIDE; each ant's age (and bout) held for the whole run.
 
 const cellsDugSince = (c: Colony, t0: number) => {
