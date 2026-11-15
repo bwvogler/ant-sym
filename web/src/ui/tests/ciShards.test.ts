@@ -15,12 +15,19 @@ const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
 const globs = (cmd: string): string[] => cmd.split(/\s+/).filter((w) => w.endsWith(".test.ts"));
 const timeout = (cmd: string): string | undefined => /--test-timeout=(\d+)/.exec(cmd)?.[1];
 const script = (name: string): string => scripts[name] ?? assert.fail(`web/package.json has no ${name} script`);
-/** The `run:` line of the ci.yml step whose name starts with `name` (other keys such as `if:` may come between). */
-const step = (name: string): string => {
-  const at = ci.indexOf(`- name: ${name}`);
-  const m = at < 0 ? null : /^\s+run: (.+)$/m.exec(ci.slice(at).split(/\n\s+- /)[0] ?? "");
-  return m?.[1] ?? assert.fail(`ci.yml has no step named "${name} …" with a run:`);
+/** A workflow step's block, from its `- name: <name> …` line to the next step (`env:` or `if:` may sit before its `run:`). */
+const block = (yml: string, name: string, file: string): string => {
+  const at = yml.indexOf(`- name: ${name}`);
+  return at < 0 ? assert.fail(`${file} has no step named "${name} …"`) : (yml.slice(at).split(/\n\s+- /)[0] ?? "");
 };
+/** The `run:` line of a workflow step whose name starts with `name`. */
+const runOf = (yml: string, name: string, file: string): string =>
+  /^\s+run: (.+)$/m.exec(block(yml, name, file))?.[1] ?? assert.fail(`${file}'s "${name} …" step has no run:`);
+const step = (name: string): string => runOf(ci, name, "ci.yml");
+const slowYml = readFileSync(join(ROOT, ".github/workflows/slow.yml"), "utf8");
+/** Both reporters, as ci.yml has run them since #175: spec for people, scripts/ci-report.mjs for ::error lines and durations. */
+const REPORTERS =
+  "--test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout";
 
 test("ci.yml's int-and-golden step runs test:int's and test:golden's files, at their per-file limit", () => {
   const run = step("int and golden");
@@ -73,11 +80,39 @@ test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
 
 // slow.yml runs test:slow sharded, on a schedule and on labelled colony PRs (ja-w7ef.4), with the same kind of copied globs.
 test("slow.yml's step runs test:slow's files at its per-file limit, sharded by the matrix", () => {
-  const slow = readFileSync(join(ROOT, ".github/workflows/slow.yml"), "utf8");
-  const run =
-    /- name: slow guards[^\n]*\n\s+run: (.+)\n\s+working-directory: web$/m.exec(slow)?.[1] ??
-    assert.fail("slow.yml has no 'slow guards' step running in web/");
+  const run = runOf(slowYml, "slow guards", "slow.yml");
+  assert.match(block(slowYml, "slow guards", "slow.yml"), /^\s+working-directory: web$/m);
   assert.deepEqual(globs(run), globs(script("test:slow")));
   assert.equal(timeout(run), timeout(script("test:slow")));
   assert.match(run, /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /);
+});
+
+test("every sharded test step runs both reporters, so a failure prints its ::error line and the files their times (ja-w7ef.11)", () => {
+  for (const [yml, name, file] of [
+    [ci, "int and golden", "ci.yml"],
+    [ci, "soak", "ci.yml"],
+    [slowYml, "slow guards", "slow.yml"],
+  ] as const) {
+    const b = block(yml, name, file);
+    assert.ok(runOf(yml, name, file).includes(REPORTERS), `${file} "${name}" runs spec and ci-report`);
+    assert.match(b, /TEST_DURATIONS_FILE: /, `${file} "${name}" writes its durations`);
+  }
+});
+
+// The nightly tiers job (ja-w7ef.10) times each unit and int file alone against its tier's line (docs/agent-guide.md,
+// Tests: unit under ~1.5 s, int to 12 s). Its globs and lines are copies; these hold them.
+test("slow.yml's tiers job times test:unit's and test:int's files alone, against the agent guide's lines", () => {
+  for (const [name, npm, tier] of [
+    ["unit files alone", "test:unit", "unit:1500:int"],
+    ["int files alone", "test:int", "int:12000:soak"],
+  ] as const) {
+    const guide = readFileSync(join(ROOT, "docs/agent-guide.md"), "utf8");
+    assert.match(guide, /under about 1\.5 s `unit\/`, to 12 s `int\/`, over that `soak\/`/, "the agent guide's lines are 1.5 s and 12 s");
+    const run = runOf(slowYml, name, "slow.yml");
+    assert.deepEqual(globs(run), globs(script(npm)), name);
+    assert.equal(timeout(run), timeout(script(npm)), name);
+    assert.match(run, /--test-concurrency=1 /, `${name}: one file at a time, or the times aren't "alone"`);
+    assert.ok(run.includes(REPORTERS), name);
+    assert.match(block(slowYml, name, "slow.yml"), new RegExp(`TEST_TIER: ${tier}$`, "m"), name);
+  }
 });

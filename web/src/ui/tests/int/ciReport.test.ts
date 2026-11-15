@@ -103,3 +103,29 @@ test("ci-report: a file's time is its own test:complete, module loading included
   ]);
   assert.equal(s.durations.get(file), 9000);
 });
+
+test("ci-report: TEST_TIER warns of a file over its tier's line, timed alone, and names the tier it belongs in", async () => {
+  type Mod = {
+    summarise: (events: { type: string; data: unknown }[]) => unknown;
+    render: (s: unknown, o: { limitMs: number; title: string; root: string; tier: unknown }) => { markdown: string; annotations: string[] };
+    parseTier: (v: string | undefined) => unknown;
+  };
+  const { summarise, render, parseTier } = (await import(REPORTER)) as Mod;
+  const ev = (name: string, ms: number) => ({
+    type: "test:complete",
+    data: { nesting: 0, file: `/w/web/${name}`, name, details: { duration_ms: ms } },
+  });
+  const s = summarise([ev("src/a.test.ts", 13_000), ev("src/b.test.ts", 11_000)]);
+  const out = render(s, { limitMs: 60_000, title: "int alone", root: "/w/web", tier: parseTier("int:12000:soak") });
+  assert.deepEqual(
+    out.annotations.filter((a) => a.includes("tier")),
+    [
+      "::warning file=src/a.test.ts,title=over the int tier's line::src/a.test.ts took 13.0 s alone, over int's 12.0 s line: move it to soak/ (docs/agent-guide.md, Tests)",
+    ],
+  );
+  assert.match(out.markdown, /Over int's 12\.0 s line, alone \(move to soak\/\):\n- src\/a\.test\.ts: 13\.0 s/);
+  const none = render(s, { limitMs: 60_000, title: "int", root: "/w/web", tier: null });
+  assert.ok(!none.annotations.some((a) => a.includes("tier")) && !none.markdown.includes("line"), "no TEST_TIER, no tier check");
+  assert.equal(parseTier(undefined), null);
+  assert.throws(() => parseTier("int:12s"), /want <tier>:<ms>:<next>/);
+});

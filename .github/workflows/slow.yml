@@ -50,6 +50,60 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
+      # The reporter (scripts/ci-report.mjs, as in ci.yml): an ::error per failure after the spec totals, and per-file times.
       - name: slow guards, shard ${{ matrix.shard }}/${{ strategy.job-total }}
-        run: node --test --test-timeout=1200000 --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/slow/*.test.ts
+        env:
+          TEST_REPORT_TITLE: slow guards, shard ${{ matrix.shard }}/${{ strategy.job-total }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/slow-${{ matrix.shard }}.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=1200000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/colony/tests/slow/*.test.ts
         working-directory: web
+      - name: durations artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: slow-durations-${{ matrix.shard }}
+          path: ${{ runner.temp }}/durations/
+          retention-days: 30
+          if-no-files-found: ignore
+          overwrite: true
+
+  # Each unit and int file timed alone (--test-concurrency=1), against its tier's line in docs/agent-guide.md (Tests):
+  # a ::warning names a file over it and the tier it belongs in (ja-w7ef.10). CI's shards run files side by side, so their
+  # times overstate: fungus.test.ts took 16.4 s there and 8.6 s alone. Nightly and on demand only; it fails only if a test does.
+  # The globs are copies of web/package.json's test:unit and test:int; ui/tests/ciShards.test.ts holds them equal.
+  tiers:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: unit files alone
+        env:
+          TEST_REPORT_TITLE: unit files alone (line 1.5 s)
+          TEST_TIER: unit:1500:int
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/unit-alone.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-concurrency=1 --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout server/tests/*.test.ts worker/tests/*.test.ts src/ui/tests/*.test.ts src/colony/tests/unit/*.test.ts
+        working-directory: web
+      - name: int files alone
+        if: ${{ !cancelled() }}
+        env:
+          TEST_REPORT_TITLE: int files alone (line 12 s)
+          TEST_TIER: int:12000:soak
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/int-alone.json
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-concurrency=1 --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts
+        working-directory: web
+      - name: durations artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: tier-durations
+          path: ${{ runner.temp }}/durations/
+          retention-days: 30
+          if-no-files-found: ignore
+          overwrite: true
