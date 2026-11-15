@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GENERIC_ANT, speciesById } from "../../species.ts";
-import { NEGLECTUS_ANT, NEGLECTUS_MODE_WORDS, NEGLECTUS_TOLERANCE } from "../../neglectus.ts";
+import { NEGLECTUS_ANT, NEGLECTUS_MODE_WORDS, NEGLECTUS_TOLERANCE, neglectusPolicy } from "../../neglectus.ts";
+import { localPolicy } from "../../localRules.ts";
+import { decodeSituation, SITUATIONS } from "../../situation.ts";
 import { MODE_WORDS, policyContext, DOCTRINES } from "../../colonyBrain.ts";
 import { Game, gameRng } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -17,6 +19,16 @@ test("the invasive garden ant is a species the page can name, with its own mode 
   assert.notEqual(policyContext(forage, NEGLECTUS_MODE_WORDS), policyContext(forage, MODE_WORDS), "its words ask under their own context");
   // One population has no one to fight (owner, review of #244 D1): its words offer no fight (ja-e668.11 brings it back in mixed worlds).
   assert.deepEqual(Object.keys(NEGLECTUS_MODE_WORDS.criteria).sort(), ["explore", "follow", "return"]);
+  // Its local rule offers only those: where the generic rule would fight, it explores; elsewhere it is the generic rule.
+  let fights = 0;
+  for (let c = 0; c < SITUATIONS; c++) {
+    const sit = decodeSituation(c);
+    const g = localPolicy(sit);
+    if (g === "fight") fights++;
+    assert.equal(neglectusPolicy(sit), g === "fight" ? "explore" : g);
+  }
+  assert.ok(fights > 0, "the generic rule fights somewhere (the check is not vacuous)");
+  assert.equal(NEGLECTUS_ANT.policy, neglectusPolicy);
 });
 
 test("its tolerance reaches recognition, where fights are judged; the generic ant's and a game's own stay as they were", () => {

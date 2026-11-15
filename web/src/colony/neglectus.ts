@@ -3,9 +3,10 @@
 // come later (ja-e668.4–.6); its graded aggression between populations is ja-e668.10.
 
 import { COLONY_LEGEND, MODE_CRITERIA, STANCE_WORDS } from "./colonyBrain.ts";
+import { localPolicy } from "./localRules.ts";
 import { localResponses } from "./responses.ts";
 import { SPECIES, type Species } from "./species.ts";
-import type { LaneWords, Mode } from "./vocab.ts";
+import type { LaneWords, Mode, Policy } from "./vocab.ts";
 
 /**
  * Its tolerance: one supercolony (owner, 2026-11-15). Within one *L. neglectus* population nests don't fight at all, and nestmates are
@@ -17,12 +18,18 @@ export const NEGLECTUS_TOLERANCE = 1;
 /**
  * Its mode lane's words: the generic ant's legend, with no `fight` (owner, 2026-11-15: realistic). Within one population nests show no
  * aggression at all (Cremer et al. 2008; Ugelvig et al. 2008, full text), and a game of one species is one population here, so an ant has no
- * one to fight. Fighting comes back with rival populations (ja-e668.10) or other species in a mixed world (bead under ja-e668).
+ * one to fight. Fighting comes back with rival populations (ja-e668.10) or other species in a mixed world (ja-e668.11).
  */
 export const NEGLECTUS_MODE_WORDS: LaneWords<Mode> = {
   legend: COLONY_LEGEND,
   criteria: { explore: MODE_CRITERIA.explore, follow: MODE_CRITERIA.follow, return: MODE_CRITERIA.return },
   version: 2,
+};
+
+/** Its local rule: the generic ant's, offering only its words' modes (species.ts): a `fight` it would choose is read as explore (review of #244, N4). */
+export const neglectusPolicy: Policy = (s) => {
+  const m = localPolicy(s);
+  return m === "fight" ? "explore" : m;
 };
 
 export const NEGLECTUS_ANT: Species = {
@@ -31,6 +38,7 @@ export const NEGLECTUS_ANT: Species = {
   params: { tolerance: NEGLECTUS_TOLERANCE },
   responses: localResponses,
   lanes: { mode: NEGLECTUS_MODE_WORDS, stance: STANCE_WORDS },
+  policy: neglectusPolicy,
 };
 
 // The page can play it (the start screen's species choice): a save names it by id (species.ts SPECIES).
