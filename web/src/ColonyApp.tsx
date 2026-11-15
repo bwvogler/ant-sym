@@ -71,6 +71,7 @@ import Palette, { type Runnable } from "./ui/Palette.tsx";
 import Shortcuts from "./ui/Shortcuts.tsx";
 import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
+import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
@@ -82,7 +83,7 @@ import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
 // settings; a tab bar on a phone); the followed ant or the queen's pen in an inspector at its right. The fungus is the
 // player: you shape its policy in words (its aim); Jev reads them and decides what the fungus does in each host it
 // lives in. Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md). The lab and the full
-// numbers are Lab mode's (the key l, the palette, Settings): a workbench under the map (PRD §69.6).
+// numbers are Lab mode's (the key l, the palette, Settings): a workbench under the map (PRD §69.7).
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 
@@ -101,7 +102,7 @@ export default function ColonyApp() {
   const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = useColony();
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
-  // Lab mode (PRD §69.6): the map shares the screen with a workbench of the game's numbers, levers, history and steps.
+  // Lab mode (PRD §69.7): the map shares the screen with a workbench of the game's numbers, levers, history and steps.
   const [lab, setLab] = useState(false);
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
@@ -123,7 +124,7 @@ export default function ColonyApp() {
     followedNow.current = followed;
   }, [followed]);
   useNotices(stats, jev.lock, jev.state.phase, controls.menu);
-  // The Lab's history (PRD §69.6): the game sampled once a game second from its start, whether or not the Lab is open.
+  // The Lab's history (PRD §69.7): the game sampled once a game second from its start, whether or not the Lab is open.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh history for each game: `game` is the key, not an input
   const history = useMemo(() => new History(), [game]);
   useEffect(
@@ -508,6 +509,7 @@ export default function ColonyApp() {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
       game,
+      notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
       follow: (k: number, i: number) => {
         const c = game.colonies[k];
         if (!c || !c.alive[i]) return false;
@@ -648,7 +650,7 @@ export default function ColonyApp() {
     ].map((c) => ({ ...c, run: () => (clearProbe(), c.run()) }));
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
-      {/* The stage: the map and all over it. In Lab mode it gives the workbench the bottom of the screen (PRD §69.6). */}
+      {/* The stage: the map and all over it. In Lab mode it gives the workbench the bottom of the screen (PRD §69.7). */}
       <div className={`absolute inset-x-0 top-0 ${lab ? "bottom-[42dvh]" : "bottom-0"}`}>
         <div className="absolute inset-0">
           <ColonyField
@@ -753,19 +755,23 @@ export default function ColonyApp() {
               </span>
             )}
           </div>
-          <div
-            className={`pointer-events-auto flex min-w-0 basis-full items-center px-3 py-2 text-[13px] text-fg-2 sm:flex-1 sm:basis-0 ${FLOAT}`}
-            aria-label="goal"
-          >
-            <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
-              {clock(stats?.time ?? 0)}
-            </span>
-            {slow && (
-              <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
-                {stats!.pace.toFixed(1)}×
+          {/* The goal, and the bell at the top right: on a phone they share the second row. */}
+          <div className="flex min-w-0 basis-full items-stretch gap-2 sm:flex-1 sm:basis-0">
+            <div
+              className={`pointer-events-auto flex min-w-0 flex-1 items-center px-3 py-2 text-[13px] text-fg-2 ${FLOAT}`}
+              aria-label="goal"
+            >
+              <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
+                {clock(stats?.time ?? 0)}
               </span>
-            )}
-            <span className="truncate">{goalLine(stats)}</span>
+              {slow && (
+                <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
+                  {stats!.pace.toFixed(1)}×
+                </span>
+              )}
+              <span className="truncate">{goalLine(stats)}</span>
+            </div>
+            <Notices />
           </div>
         </div>
 
@@ -956,7 +962,7 @@ export default function ColonyApp() {
         />
         {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
         {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-        <Toasts raised={lab} />
+        <Toasts place={building ? "top" : lab ? "lab" : "bottom"} />
         {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
         {flight && gate?.open && !circle && (
           <QueenPen

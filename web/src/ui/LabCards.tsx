@@ -22,7 +22,7 @@ import { tokensPerQuestion } from "./prompt.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
-// The cards the game does not need on its main screen (ja-lo8.2; once the Details screen, retired by Lab mode, PRD §69.6):
+// The cards the game does not need on its main screen (ja-lo8.2; once the Details screen, retired by Lab mode, PRD §69.7):
 // the colonies' numbers, Jev's spend and caches, the unity and infection figures, the world's settings, the levers (the
 // fungus's menu, each colony's doctrine, the foundings), saved games, debug and the journal. Each shows in its home: a
 // drawer (BareCards: the drawer has the frame) or a tab of Lab mode's workbench.

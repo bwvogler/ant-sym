@@ -1,6 +1,6 @@
 import type { Colony, Fungus } from "../colony/index.ts";
 
-// Lab mode's history (PRD §69.6, ja-mvo9.4): the game sampled once a sim-second, for the History tab's charts. Pure, so
+// Lab mode's history (PRD §69.7, ja-mvo9.4): the game sampled once a sim-second, for the History tab's charts. Pure, so
 // `node --test` covers it. The buffer keeps the whole game in at most HISTORY_POINTS samples: when it fills, every other
 // sample goes and the interval doubles, so a long game reads at a coarser grain rather than losing its start.
 

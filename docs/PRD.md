@@ -5347,7 +5347,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off), ×2 since 2026-11-15**: see the decisions below; at ×2 the half-life is about 12 s. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5378,7 +5378,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
 
-**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off)** (re-chosen as ×2 below). Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -5391,6 +5391,29 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
 
 With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
+
+**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on #215's head (`eea04cca`: `main` at `4b114fbc`, after the fungus answers #202 re-shipped, with only `sun` changed), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a no-hyphae run on the same commit. Seconds to a quarter of the hosts:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 203 | 307 | 214 | 133 | 153 | 551 | 303 | 587 | 243 | 250 |
+| sun ×1 | 199 | 279 | 210 | 128 | 146 | 307 | 278 | 373 | **272** | 233 |
+| sun ×2 | 199 | 329 | 210 | 128 | 138 | 290 | 278 | 373 | 206 | 233 |
+| sun ×4 | 199 | 330 | 210 | 129 | 146 | 290 | 278 | 373 | 205 | 233 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 440 | 249 | 184 | 18 | 332 | 395 | 225 | 333 | 257 | 408 |
+| sun ×1 | 400 | 226 | 158 | 18 | 264 | 406 | 226 | 217 | 235 | 361 |
+| sun ×2 | 400 | 226 | 158 | 18 | 283 | 406 | 226 | 217 | 230 | 364 |
+| sun ×4 | 400 | 226 | 158 | 18 | 261 | 406 | 226 | 228 | 217 | 361 |
+
+- **×1 misses P1:** seed 9 is 12 % slower than without hyphae (243 → 272 s), and the median of seeds 1–10 is worse (252.5 s against 246.5 s).
+- **×2 holds it on seeds 1–20.** Its slowest seed is seed 2, +7.2 % (307 → 329 s); seed 16 is +2.8 %. Medians: 221.5 s on seeds 1–10 and 228 s on 11–20, against 246.5 and 294.5 s without hyphae. Worst seeds: 373 s against 587 s, and 406 s against 440 s.
+- **×2 and ×4 are within a few seconds** on every seed but 5 and 18 (×2 faster: 138 against 146 s, 217 against 228) and 15 and 19 (×4 faster: 261 against 283 s, 217 against 230); both pass, with the same worst seeds. ×2 is the milder change from the soil's fade.
+- **Before #202** (`main` at `3c79e0fb`, the same command) the ordering was the same: ×1 missed P1 on seed 9 (334 → 418 s, +25 %) and ×2 and ×4 held it, but with seeds 16 and 11 within a point of the 10 % line at ×2 (+9.3 %, +9.2 %). *Stalks* given at landing was measured only there: ×1 (worst +9.3 %) and ×4 (worst +9.3 %) both held P1; ×2 with *Stalks* was not run.
+- **Measured before #214**, which landed on `main` after these runs and moved this game though its goldens pass (seed 3 without hyphae, 300 s: 214 s at `b1ab72d`, 284 s at `fbf6415`; review of #215). Not re-measured; seed 3 at ×2 on #215 merged into `02a78fb` is 267 s, still faster than without hyphae. P1 is re-checked once that change is settled (`ja-q4ca`).
+- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; any other factor fails it. The guide's mutations entry says what the sun does. No sense, action, legend or question changed: no Jev cost change.
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
@@ -5864,10 +5887,40 @@ The second half of stage 3: a few ants kept to watch and compare, the notebook's
 - **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring, drawn over them.
 - The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
 - **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
+
+### 69.6 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
+
+The owner, playing on a phone, found the green notices at the bottom in the way: "let me swipe them away and check them later in some notifications in the top right."
+
+- **Swipe away** (`ui/Toasts.tsx`):
+  - a tap, or a swipe of 60 px sideways or down, takes a notice off the field (`swipeOutcome`, pure and tested);
+  - a smaller drag slides it back;
+  - its timer waits while a finger holds it.
+  - Before, on a phone the notices took no touch at all (`max-sm:pointer-events-none`), so they couldn't even be tapped away.
+- **The bell** (`ui/Notices.tsx`): at the top right, beside the goal; on a phone it shares the goal's row.
+  - Every notice raised goes in a log (`toasts.ts` `noticeLog`), newest first, at most 50. The log lasts the visit and is not saved.
+  - A badge counts the ones not yet seen. Opening the list marks them seen.
+  - The list gives each notice's tone, its words and how long ago; Clear empties it.
+  - Escape or a press outside closes it.
+- **While building,** the notices show under the HUD instead of over the builder's tray.
+- **Review of #219:**
+  - one Escape closes the list and not a dialog opened over it;
+  - a press held past 0.5 s is a hold to read, so lifting it leaves the notice (`HOLD_MS`);
+  - the field's notices hide while the list is open (they are in it), and closing it clears them from the field;
+  - the bell is announced as opening a list (`aria-expanded`), not as a toggle.
+- **Checks:**
+  - `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, the swipe and hold rule, and `ago`'s boundaries.
+  - `npm run e2e` step 14 runs at 390 px by real touch (CDP touch events):
+    - a swipe and a slide back;
+    - a hold past 7 s;
+    - Escape over a drawer, and a tap outside;
+    - toasts above the builder's tray.
+  - Without `touch-none`, its swipe check fails.
+- **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 
-### 69.6 S4a: Lab mode, the workbench under the map (ja-mvo9.4, first half)
+### 69.7 S4a: Lab mode, the workbench under the map (ja-mvo9.4, first half)
 Stage 4 goes out in two PRs. This first half builds Lab mode and retires the Details screen. Moving the Codex's Policy tab into the Lab follows in S4b.
 - **Lab mode.** The key l, the palette's "Lab mode", or Settings → Lab mode toggles it.
   - The map shares the screen: the stage (the map and everything over it) takes the top, and a workbench the bottom 42 % (`ui/LabBench.tsx`).
@@ -6280,3 +6333,144 @@ Merging is not delegated: PRs wait for the owner.
 - the gestures on a real phone and tablet with the children (the owner's);
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
+
+## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
+
+**Research basis:** [task-reversion.md](task-reversion.md):
+- In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
+- With every young worker removed, old *Temnothorax longispinosus* moved inside the nest and cared for brood about as often as the young had (Kohlmeier et al. 2018).
+- In *Solenopsis invicta* micro-colonies, tasks were reassigned within 5 minutes of removing the nurses, depending on the kind of brood (Starkey & Tamborindeguy 2023).
+- Honey bees revert in all-old colonies even without brood (Huang & Robinson 1996, abstract, **unverified**).
+- Workers recognise nestmates' tasks by cuticular hydrocarbons in *Pogonomyrmex* (Greene & Gordon 2003, abstract, **unverified**); recognising a young nurse by contact is **design**.
+
+**The problem (measured, §70).** Larvae still owed their growth food send nothing until they are hungry, and old ants answer the brood's need only by touch at `THETA_OLD`, and nothing brings them to the brood. When a colony's founders age as one cohort, there is a stretch with no young ants at all, and larvae wait beside food. Over `economy.test`'s 16 hour-long games (worlds 1–4 × nudges 0–3), 3 games had more than 8 larvae waiting at once (worst 19); with the foraging dig on (`forageDig: 120`), 15 games (worst 54). The begging fix (`owedBeg`) only moved luck around: the beg is felt only by touch and nobody was beside the larvae (ja-rvli).
+
+**Decisions.**
+- Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
+- The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
+
+**The mechanic (built, off, setting `revert`).**
+- *Cue:* two senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells):
+  - young nestmates met (`youngMet`) below `REVERT_BELOW`;
+  - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
+  A colony with no brood (one at its cap lays none) has no reverting ants. The brood cue was added on the review of #217 (D1, owner, 2026-11-15); the brood floor mark could not serve, as it is laid by ants leaving any brood chamber, brood or not.
+- *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
+- *Ending:* it goes back to foraging when it meets young again, or when the brood is gone (`broodMet` below `BROOD_MET_MIN`).
+- *Only a share of the old* revert, each by a draw fixed to its slot in the colony (a newborn takes a dead ant's), the setting `revert`; 0 = off, main bit for bit.
+
+**Assays and targets.**
+- Assay `larvae` lands first: `economy.test`'s `hour()` as an assay. It records the peak of larvae waiting over 120 s beside enough food in each of 16 games, with workers alive and born, starved workers, food stored and food home as guards.
+- **Target:** no game above 8 (`ja-rvli`'s acceptance), food home not worse by the worst game. Then the same with `forageDig: 120` (`ja-16rp.5`).
+
+**Cost (estimated).** None in Jev: body and steering, no situation field. CPU: one per-cell count of the young, and one leaky count per ant.
+
+**Beads.**
+- ja-7r7x: the epic.
+- ja-7r7x.1: assay `larvae`.
+- ja-7r7x.2: the young-met sense.
+- ja-7r7x.3: reversion, off.
+- ja-7r7x.4: tune and turn it on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Measured (assay `larvae`, seeds 1–16, 2026-11-14).** The most larvae waiting over 120 s beside enough food, per seed. Bound 8.
+
+| `revert` | `owedBeg` | Seeds over 8 | Worst | Workers starved (all seeds) | Food stored (sum) |
+|---|---|---|---|---|---|
+| 0 (main) | 0 | 3 | 38 | 14 | 12,284 |
+| 0.25 | 0 | 4 | 49 | 19 | 12,328 |
+| 0.5 | 0 | 6 | 30 | 1 | 12,337 |
+| 1 | 0 | 6 | 24 | 2 | 12,246 |
+| 0 | 0.15 | 3 | 27 | 0 | 12,319 |
+| 0 | 0.3 | 7 | 30 | 17 | 12,276 |
+| 1 | 0.15 | 9 | 29 | 0 | 12,334 |
+| 1 | 0.3 | 4 | 41 | 10 | 12,276 |
+
+- No setting beats main: every one has 3–9 seeds over the bound, with no trend. Reversion and begging both happen, and the larvae still wait.
+- In a failing seed (10, `revert` 1), 10–15 young ants are alive throughout, so nobody reverts. Larvae wait in three brood chambers with no food in them, while 300+ food lies in the store. Only 1–3 ants are carrying food at a time. The bottleneck is carrying food from the store to the brood chambers, not who is beside the brood.
+
+**Traced (seed 10, `owedBeg` 0.15, minute samples from 2,600 to 3,100 s).**
+- Every waiting larva lies in one brood chamber, and porters do deliver there, at 7–30 food a minute. The larvae there are owed 25–58 food, so they fall behind; few starve (3 larvae over the 16 seeds on main), they wait.
+- Porters start only within two cells of a stocked store. Here all 300+ food lies in a single store of 3 cells at a tunnel's end.
+- Up to 54 ants feel enough need to fetch, and most can read the store's mark, but at any sample none are at the store: they queue on the way.
+- More fetchers (reversion, begging) join the same queue, so neither moves the assay. The limit is getting food out of a small store, not who is by the brood.
+
+**Still open.**
+- How food should get from the stores to the brood faster: bigger or more stores, porters carrying more, or nurses feeding larvae by mouth from their own crops (trophallaxis) rather than only from food lying in the chamber. The last is a new mechanic, with research first.
+- The share of old ants that can revert (owner's call; no measured share).
+- What ends a reversion (not measured in any paper read).
+- Reading the *Pheidole dentata* papers.
+
+## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, off, ja-638i, 2026-11-15)
+
+**Research basis:** [larval-feeding.md](larval-feeding.md):
+- Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
+- In *Camponotus sanctus*, food brought in by foragers spreads mouth to mouth through the colony within an hour (Greenwald, Segre & Feinerman 2015, read in full):
+  - foragers unload about half their crop per nest visit;
+  - some inner workers keep what they receive, others relay it on.
+
+**The problem (traced, §74).** Larvae are fed only from food lying in their chamber, and porters bring it a unit at a time, starting only beside a stocked store. In the traced seed all 300+ food lay in one 3-cell store at a tunnel's end. Fetchers queued on the way, and porters delivered 7–30 food a minute against the 25–58 the larvae were owed.
+
+**Decisions.**
+- Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
+
+**The mechanic (built, off, setting `cropFeed`, 0 = main bit for bit).**
+- *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
+- *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
+- *Unchanged:* porters and their table stay for now.
+- *Design numbers:* the cap (the setting `cropFeed`), `CROP_FILL`, `CROP_PASS`, `CROP_FEED` and `CROP_OWED`.
+
+**Assays and targets.**
+- Assay `larvae` (§74), seeds 1–16, confirmed on 17–32.
+- **Target:** no seed above 8 larvae waiting, no worker starved, food stored not worse by the worst seed. Then with `forageDig: 120` (ja-16rp.5) and the two-colony game.
+
+**Cost (estimated).** None in Jev: body rules, no situation field. CPU: a pass over touching pairs underground each tick, like sharing by mouth today.
+
+**Beads.**
+- ja-638i: the epic.
+- ja-638i.1: crops (fill and pass).
+- ja-638i.2: nurses feed larvae.
+- ja-638i.3: tune and turn on.
+- Then ja-rvli closes, and ja-16rp.5 can turn the foraging dig on.
+
+**Built, off (`cropFeed`), and a first look (2026-11-15).**
+- With crops of 0.5 on three seeds that fail on main, crops barely fill: at most about 4 food is ever in crops, and no crop is ever full.
+- Seed 14 is no better (40 waiting against 38 on main). Seed 5 collapsed: 57 workers left and 32 larvae starved, against 38 waiting on main.
+- Tracing seed 14 corrects §74's reading. The ants feeling enough need to fetch are mostly 11–20+ cells from the store, and they stay there: they are not queueing.
+- The store's floor mark is laid only by ants that have just left a store, and fades with the time since; beyond a few cells from the store there is nothing to follow, and fetchers wander.
+- Crops fill only at the store, so they share that blind spot. The limit is finding the store, not the dose or the queue.
+
+**Measured with task reversion before its brood cue (ddef6b9), on main after §71's brood rule (2026-11-15, assay `larvae`, seeds 1–16).** On this main the baseline collapses on two seeds (ja-097s).
+
+| `revert` | `cropFeed` | Seeds over 8 waiting | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 | 0 (main) | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 0 | 0.5 | 3 | 61 | 0 | 27 | 49 | 12,267 |
+| 1 | 0 | 1 | 23 | 38 | 0 | 87 | 12,218 |
+| 1 | 0.5 | 2 | 20 | 0 | 0 | 149 | 12,218 |
+
+- **Crops** stop workers starving: hungry ants eat from their own crops and pass food to needier ones.
+- **Reversion**, before the brood cue, stopped larvae starving: old ants came to the brood when the young were gone.
+- **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
+
+**With the brood cue by touch, one cell (b6e33c7, review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 matched main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never met any, so they never reverted. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. How an old ant away from the brood should sense it was the owner's D2 call, below.
+
+**With brood smelt within `BROOD_SMELL` (4) cells (owner, D2, 2026-11-15), same seeds.**
+
+| `revert` | `cropFeed` | Seeds over 8 | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 (main) | 0 | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 1 | 0 | 0 | 6 | 17 | 0 | 125 | 12,292 |
+| 1 | 0.5 | 1 | 14 | 0 | 0 | 122 | 12,291 |
+
+- Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
+- Adding crops ends worker starvation too, but one seed goes over the bound (14).
+- Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
+- Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+
+**Still open.**
+- Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).
+- How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
+- The design numbers (owner's call after the sweep).
+- Whether to retire the porters' table once crops carry the brood's food.
+- Reading Cassill & Tschinkel and the 2021 trophallaxis review in full (on blocked hosts).
+

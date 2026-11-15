@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { clock } from "./clock.ts";
 import { nearestSample, type Sample } from "./history.ts";
 
-// One of Lab mode's history charts (PRD §69.6): a line chart of a measure over game time, small multiples sharing the
+// One of Lab mode's history charts (PRD §69.7): a line chart of a measure over game time, small multiples sharing the
 // time axis. The dataviz skill's specs: 2 px lines with round joins, recessive hairline grid, a legend for two or more
 // lines and a name at each line's end where they don't collide, text in the text tokens (a short line key carries the
 // colour), a crosshair that snaps to the nearest sample and reads out every line there. The History tab adds the table.

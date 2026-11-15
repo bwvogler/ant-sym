@@ -4,7 +4,7 @@ import { INFECTED } from "../../colony/index.ts";
 import { History, HISTORY_POINTS, nearestSample, niceMax, type Sample, sampleOf } from "../history.ts";
 import { buildGame } from "../useColony.ts";
 
-// Lab mode's history (PRD §69.6): the game sampled once a sim-second, the whole game kept in a bounded buffer.
+// Lab mode's history (PRD §69.7): the game sampled once a sim-second, the whole game kept in a bounded buffer.
 
 const s = (t: number): Sample => ({ t, infected: [0], living: [10], gap: 1, mutations: 0 });
 

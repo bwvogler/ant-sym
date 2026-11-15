@@ -6,7 +6,7 @@ import { Icon } from "./kit.tsx";
 import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
 import { colonyName } from "./names.ts";
 
-// Lab mode's workbench (PRD §69.6, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
+// Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
 // this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
 // levers, the numbers, the journal; and a step control, to take the game a tick or a second at a time while paused.
 // The key l, the palette or Settings toggle it; it replaced the Details screen.
