@@ -22,7 +22,7 @@ The paper hosts were mostly outside this session's network allowlist. As in `rai
 - **Defence grows closer to home.** In *Pheidole*, a colony's response to invaders is graded, and as the invasion grows the fight moves closer to the nest (`ant-communication.md` §3). High-threshold majors are mobilised only by intense recruitment.
 - **Alarm draws at low doses and repels at high** (`combat.md`).
 
-**For the model:** an ant defends while it is on home ground and its own **threat** is past a threshold. Threat is a leaky count that rises while it smells alarm or has strangers in reach, and fades with a half-life of about 20 s, as the ant's count of returning foragers (`met`) does. The fading state stands for the monoamine level, not a stopwatch. What a defender does is unchanged: alarm draws it to fight, it fights strangers rather than flee, and it goes out at once. Only who defends changes: the ants that sense a threat near home, not every ant in the colony.
+**For the model:** an ant defends while it is on home ground (by sight of its hole where it sees it, else by its own drifting vector: `homeDistPlane`, `ja-k4k.6.2`) and its own **threat** is past a threshold. Threat is a leaky count that rises while it smells alarm or has strangers in reach, and fades with a half-life of about 20 s, as the ant's count of returning foragers (`met`) does. The fading state stands for the monoamine level, not a stopwatch. What a defender does is unchanged: alarm draws it to fight, it fights strangers rather than flee, and it goes out at once. Only who defends changes: the ants that sense a threat near home, not every ant in the colony.
 
 ## Hunger does not make a colony aggressive
 

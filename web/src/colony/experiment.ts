@@ -6,7 +6,7 @@ import { type ColonyParams, type Layer, PLANE } from "./colony.ts";
 import { FAINT, MODES, type Mode, type Stance } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
-import { R } from "./hex.ts";
+import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
@@ -1022,6 +1022,75 @@ export const nestFlow: Assay = {
   }),
 };
 
+/**
+ * Where the young sit (ja-k4k.15; docs/brood-odour.md): every 30 s from 120 s on, for the first colony's ants underground,
+ * the mean hex distance to the nearest brood item lying in the nest (not held), by band (young, middle-aged), and to the
+ * queen (world units, about a cell each). `margin` is the middle-aged's distance to the brood less the young's: positive when the young keep nearer it.
+ */
+export function nurseZoneProbe(): Probe {
+  let nextAt = 120;
+  const toBrood = [0, 0];
+  const toQueen = [0, 0];
+  const counts = [0, 0];
+  return {
+    tick(game) {
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 30;
+      const c = game.player;
+      // One world: the nest is in the curtain (game.map is the plane).
+      const map = game.world?.curtain ?? game.map;
+      const lying = c.brood.items.filter((b) => b.held < 0);
+      const q = c.queen;
+      if (lying.length === 0 || !q?.alive) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || !c.under[i]) continue;
+        const band = c.band(i);
+        if (band > 1) continue;
+        c.antCell(i);
+        const ax = CELL[0];
+        const ay = CELL[1];
+        if (isSky(map, ax, ay)) continue;
+        let near = Infinity;
+        for (const b of lying) near = Math.min(near, hexDistance(ax, ay, b.x, b.y));
+        toBrood[band]! += near;
+        toQueen[band]! += Math.hypot(c.x[i]! - q.x, c.y[i]! - q.y);
+        counts[band]!++;
+      }
+    },
+    summary() {
+      const young = counts[0] ? toBrood[0]! / counts[0] : NaN;
+      const middle = counts[1] ? toBrood[1]! / counts[1] : NaN;
+      return {
+        youngToBrood: young,
+        middleToBrood: middle,
+        margin: middle - young,
+        youngToQueen: counts[0] ? toQueen[0]! / counts[0] : NaN,
+        middleToQueen: counts[1] ? toQueen[1]! / counts[1] : NaN,
+      };
+    },
+  };
+}
+
+/**
+ * Nurse zone (ja-k4k.15.1): the young keep to the brood. Workers are drawn to brood odour and the brood pile holds nurses
+ * (Glancey & Dickens 1988; Sendova-Franks & Franks 1995); in *P. badius* over 90 % of workers below 70 cm are young,
+ * where the brood lies (Tschinkel & Hanley 2017). The side view, one colony of 600, 600 s.
+ */
+export const nurseZone: Assay = {
+  id: "nurseZone",
+  title: "Nurse zone: the young keep nearer the brood than the middle-aged",
+  target: "margin (middle-aged's mean distance to the nearest brood less the young's, cells) > 0; report the distances to the queen",
+  seconds: 600,
+  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rival: false }, probes: [nurseZoneProbe()] }),
+  score: (r) => ({
+    youngToBrood: r.metrics.youngToBrood as number,
+    middleToBrood: r.metrics.middleToBrood as number,
+    margin: r.metrics.margin as number,
+    youngToQueen: r.metrics.youngToQueen as number,
+    pass: (r.metrics.margin as number) > 0 ? 1 : 0,
+  }),
+};
+
 /** Food lying below the ground (not sky) on `map`, and the open cells there (the nest's and its tunnels' ground, net of fills). */
 function underground(map: WorldMap): { food: number; open: number } {
   let food = 0;
@@ -1250,6 +1319,7 @@ export const ASSAYS: Assay[] = [
   game,
   gameTop,
   nestFlow,
+  nurseZone,
   pockets,
   larvae,
   lifecycle,
