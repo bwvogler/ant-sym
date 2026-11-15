@@ -462,6 +462,16 @@ function qualityLayer(): ChunkLayer<Float32Array> {
   return new ChunkLayer((n) => new Float32Array(n), 1);
 }
 
+/**
+ * Before a load: give `map` a quality layer if the saved map had one. Food of a quality other than 1 (the builder's
+ * sugar, crumbs, honeydew) adds the layer to a map that began without it; filled into a map without it, the save's
+ * layer stayed a plain object, and the first taste after the load threw (ja-nzkg.2's save test found it).
+ */
+export function qualityLike(map: WorldMap, saved: unknown): void {
+  if (!map.quality && saved !== null && typeof saved === "object" && (saved as { quality?: unknown }).quality != null)
+    map.quality = qualityLayer();
+}
+
 /** Take one unit of food from the cell under world (x, y), if there is any. */
 export function takeFood(map: WorldMap, x: number, y: number): boolean {
   cellOf(x, y);
