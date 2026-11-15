@@ -91,7 +91,8 @@ export function placeOn(c: Colony, i: number): Where {
 
 /**
  * What the sensor in direction (dx, dy) (a unit vector) reads on every channel, into s[slot] (food), s[slot + 3] (home) and
- * s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN.
+ * s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN. Its reach checks share one
+ * search per ant (inReachShared): a caller outside perceive, which resets it, calls freshReach() first.
  */
 export function sense(c: Colony, i: number, dx: number, dy: number, slot: number): void {
   const d = c.params.sensorDistance;

@@ -194,6 +194,7 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
         const end = Math.min(xHi, ((cx + 1) << CHUNK_BITS) - 1);
         const a = rock.chunk(cx, cy);
         if (a === undefined) {
+          // Defensive: every chunk of today's maps inside their columns exists; a missing one reads as `empty`, as rockAt.
           if (rock.empty === OPEN) for (; x <= end; x++) bits |= 1 << (x - ax + S);
           else x = end + 1;
         } else for (; x <= end; x++) if (a[row | (x & CHUNK_MASK)] === OPEN) bits |= 1 << (x - ax + S);
