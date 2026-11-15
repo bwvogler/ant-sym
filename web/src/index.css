@@ -127,3 +127,30 @@ input[type="checkbox"] {
   outline-offset: 4px;
   border-radius: 6px;
 }
+
+/* The builder's first-use demonstration (ui/BuilderTray.tsx ToolDemo): a finger tapping, or dragging across. */
+@keyframes builder-tap {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(12px) scale(0.85);
+  }
+}
+@keyframes builder-drag {
+  0% {
+    transform: translate(-90px, 0);
+  }
+  50% {
+    transform: translate(90px, 10px);
+  }
+  100% {
+    transform: translate(-90px, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[builder-"] {
+    animation: none !important;
+  }
+}

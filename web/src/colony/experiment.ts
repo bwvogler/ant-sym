@@ -9,6 +9,7 @@ import { Game } from "./game.ts";
 import { R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
+import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
 import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
@@ -35,6 +36,8 @@ import {
 export * from "./harness.ts";
 export * from "./oneAssays.ts";
 export * from "./desertAssays.ts";
+export * from "./builderAssays.ts";
+import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
 import { forage1, game1, route1, search1 } from "./oneAssays.ts";
 
@@ -544,9 +547,9 @@ export const open: Assay = {
 export const RAID_REACH = 10;
 export const RAID_GAIN = 1.5;
 export const RAID_STUCK = 0.1;
-function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number }): Probe {
+export function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number }): Probe {
   const reached = new Set<number>();
-  const was: number[][] = [];
+  const was: ([number, number] | undefined)[] = [];
   let nextAt = 20;
   let first = NaN;
   let stuck = 0;
@@ -564,33 +567,40 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
   return {
     tick(game) {
       const c = game.player;
+      // One world (U6b): distances are the plane's, so only plane ants are measured; an ant in the curtain is home (its own
+      // nest, where the gate recruits) or down the rival's shaft, which it reached on the plane first.
+      const one = game.world !== null;
+      const disc = one ? (c.layers[PLANE] as Layer).nest : c.nest;
       if (!prev || prev.length !== c.n) {
         prev = new Uint8Array(c.n);
         prevRep = new Uint8Array(c.n);
       }
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
+        const plane = onLayer(game, c, i, PLANE);
         if (c.recruited[i] && !prev[i] && !ever.has(i)) {
           ever.add(i);
-          if (Math.hypot(c.x[i] - own.x, c.y[i] - own.y) <= c.nest.r) atHome++;
+          if (!plane || Math.hypot(c.x[i] - own.x, c.y[i] - own.y) <= disc.r) atHome++;
         }
         if (c.reporting[i] && !(prevRep as Uint8Array)[i]) {
           finds++;
-          findDist += Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y);
+          if (plane) findDist += Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y);
         }
         prev[i] = c.recruited[i];
         (prevRep as Uint8Array)[i] = c.reporting[i];
         // Raiders only: on a raid stance an ant not recruited carries on as a forager (behaviour MR 5.2); raidGate 0 sends all.
-        if ((c.recruited[i] || c.params.raidGate <= 0) && Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y) <= RAID_REACH) {
+        if (plane && (c.recruited[i] || c.params.raidGate <= 0) && Math.hypot(c.x[i] - rival.x, c.y[i] - rival.y) <= RAID_REACH) {
           reached.add(i);
           if (Number.isNaN(first)) first = game.time;
         }
       }
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 20;
-      // The raid trail at the nest's rim, toward the rival (where recruits would smell it).
+      // The raid trail at the nest's rim, toward the rival (where recruits would smell it); in one world, where it ends at the
+      // hole, as an ant held at the gate smells it (holeRaid).
       let best = 0;
-      for (let k = -2; k <= 2; k++) best = Math.max(best, c.ph.read("raid", own.x + c.nest.r + 1, own.y + k));
+      if (one) best = holeRaid(c);
+      else for (let k = -2; k <= 2; k++) best = Math.max(best, c.ph.read("raid", own.x + c.nest.r + 1, own.y + k));
       nestRaid += best;
       if (best >= FAINT) nestSmelt++;
       samples++;
@@ -598,9 +608,10 @@ function raidProbe(own: { x: number; y: number }, rival: { x: number; y: number 
         const x = c.x[i];
         const y = c.y[i];
         const prev = was[i];
-        was[i] = [x, y];
-        if (!c.alive[i] || !prev) continue;
-        if (Math.hypot(x - own.x, y - own.y) <= c.nest.r + 2 || Math.hypot(x - rival.x, y - rival.y) <= RAID_REACH) continue;
+        const plane = onLayer(game, c, i, PLANE);
+        was[i] = plane ? [x, y] : undefined;
+        if (!c.alive[i] || !prev || !plane) continue;
+        if (Math.hypot(x - own.x, y - own.y) <= disc.r + 2 || Math.hypot(x - rival.x, y - rival.y) <= RAID_REACH) continue;
         outside++;
         if (Math.hypot(x - prev[0], y - prev[1]) < 3) stuck++;
       }
@@ -651,39 +662,43 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
     probes: [raidProbe(own, rival)],
   };
 }
-export const raidFind: Assay = {
-  id: "raidFind",
-  title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
-  target: `≥ ${RAID_GAIN}× as many raiders reach the rival's nest with the raid trail as without; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
-  seconds: 300,
-  spec: (s) => raidFindSpec(s),
-  score: (r) => {
-    const reached = r.metrics.reached as number;
-    const deaf = runGame(raidFindSpec(r.seed, { raidLay: 0 })).result.metrics.reached as number;
-    const straight = runGame(raidFindSpec(r.seed, { raidGate: 0 })).result.metrics.reached as number; // main: at the rival hole's coordinates
-    const gain = deaf > 0 ? reached / deaf : NaN;
-    const stuck = r.metrics.stuck as number;
-    const m = r.metrics;
-    return {
-      reached,
-      deaf,
-      straight,
-      gain,
-      stuck,
-      firstReach: m.firstReach as number,
-      recruited: m.recruited as number,
-      recruitedAtHome: m.recruitedAtHome as number,
-      recruitsReaching: m.recruitsReaching as number,
-      finds: m.finds as number,
-      findDist: m.findDist as number,
-      recruitsDead: m.recruitsDead as number,
-      deadReached: m.deadReached as number,
-      nestRaid: m.nestRaid as number,
-      nestSmelt: m.nestSmelt as number,
-      pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0,
-    };
-  },
-};
+/** A11 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), its deaf and straight runs too. */
+export function raidFindAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+  return {
+    id: "raidFind",
+    title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
+    target: `≥ ${RAID_GAIN}× as many raiders reach the rival's nest with the raid trail as without; ≤ ${RAID_STUCK * 100} % of outside samples stuck (design marks; docs/raid-recruitment.md, ja-jwy)`,
+    seconds: 300,
+    spec: (s) => remap(raidFindSpec(s)),
+    score: (r) => {
+      const reached = r.metrics.reached as number;
+      const deaf = runGame(remap(raidFindSpec(r.seed, { raidLay: 0 }))).result.metrics.reached as number;
+      const straight = runGame(remap(raidFindSpec(r.seed, { raidGate: 0 }))).result.metrics.reached as number; // main: at the rival hole's coordinates
+      const gain = deaf > 0 ? reached / deaf : NaN;
+      const stuck = r.metrics.stuck as number;
+      const m = r.metrics;
+      return {
+        reached,
+        deaf,
+        straight,
+        gain,
+        stuck,
+        firstReach: m.firstReach as number,
+        recruited: m.recruited as number,
+        recruitedAtHome: m.recruitedAtHome as number,
+        recruitsReaching: m.recruitsReaching as number,
+        finds: m.finds as number,
+        findDist: m.findDist as number,
+        recruitsDead: m.recruitsDead as number,
+        deadReached: m.deadReached as number,
+        nestRaid: m.nestRaid as number,
+        nestSmelt: m.nestSmelt as number,
+        pass: gain >= RAID_GAIN && stuck <= RAID_STUCK ? 1 : 0,
+      };
+    },
+  };
+}
+export const raidFind = raidFindAssay((spec) => spec);
 
 /**
  * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
@@ -714,19 +729,23 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
     probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
-export const raidStop: Assay = {
-  id: "raidStop",
-  title: "A12 a raid no one can find doesn't starve the colony",
-  target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
-  seconds: 900,
-  spec: (seed) => raidStopSpec(seed, "raid"),
-  score: (r) => {
-    const stored = r.metrics["you.stored"];
-    const control = runGame(raidStopSpec(r.seed, "forage")).result.metrics["you.stored"];
-    const share = control > 0 ? stored / control : NaN;
-    return { stored, control, share, outsideLate: r.metrics.outsideLate as number, pass: share >= RAID_STOP_FOOD ? 1 : 0 };
-  },
-};
+/** A12 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), its forage-stance control too. */
+export function raidStopAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+  return {
+    id: "raidStop",
+    title: "A12 a raid no one can find doesn't starve the colony",
+    target: `food stored over 900 s on a raid stance with no rival ≥ ${RAID_STOP_FOOD * 100} % of the same colony's on a forage stance (design mark; docs/raid-recruitment.md)`,
+    seconds: 900,
+    spec: (seed) => remap(raidStopSpec(seed, "raid")),
+    score: (r) => {
+      const stored = r.metrics["you.stored"];
+      const control = runGame(remap(raidStopSpec(r.seed, "forage"))).result.metrics["you.stored"];
+      const share = control > 0 ? stored / control : NaN;
+      return { stored, control, share, outsideLate: r.metrics.outsideLate as number, pass: share >= RAID_STOP_FOOD ? 1 : 0 };
+    },
+  };
+}
+export const raidStop = raidStopAssay((spec) => spec);
 
 /**
  * A9 — strangers meet at food (behaviour MR 4, docs/combat.md). Two colonies on stance forage, nests at either end of
@@ -1095,7 +1114,7 @@ function starvedProbe(): Probe {
 }
 
 /**
- * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §71): slow/economy.test's hour as an assay.
+ * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §74): slow/economy.test's hour as an assay.
  * A colony of 110 on that test's map; its founders age as one cohort, so for a stretch it has no young ants and its
  * larvae are fed only if old ants come to them. `starved` is the most larvae at once waiting over 120 s, unfed, with
  * food enough for them in the nest (nestFlowProbe's measure, sampled every 30 s). Target: no seed above 8, the
@@ -1252,17 +1271,26 @@ const nestFlowOne: Assay = {
   spec: (seed) => ({ ...nestFlow.spec(seed), map: (s) => generateOneWorld(s) }),
 };
 
+/** A run spec on one world's plane (onPlane) that also reports the ants held at the gate at the top of each shaft (gateProbe). */
+const onPlaneGated = (spec: RunSpec): RunSpec => {
+  const s = onPlane(spec);
+  return { ...s, probes: [...(s.probes ?? []), gateProbe()] };
+};
+
 /**
- * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9 and A10 on their arenas
- * made the plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the plane.
- * A5 and A5b (ja-web) count outside on the plane, past the disc round the hole, and report the ants held at the gate
- * at the top of the shaft (gateProbe).
+ * The assays rerun on one world (`experiment.mjs --one`): A1, A2a, A2b, A3, A4, A5, A5b, A6, A9, A10, A11 and A12 on their
+ * arenas made the plane (onPlane), A8 in the curtain, and G1. Same ids as the legacy ones, so `--one bridge` is A1 on the
+ * plane. A5, A5b (ja-web), A11 and A12 (U6b) count outside on the plane, past the disc round the hole, and report the ants
+ * held at the gate at the top of the shaft (gateProbe). A11 and A12 run their controls (no trail, straight at the hole,
+ * a forage stance) on the plane too; their raiders are recruited at the gate (ja-web), so a recruit in the curtain is home.
  */
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
   { ...passAssay(onPlane), title: `${pass.title} (one world)` },
   onPlaneAssay(open),
+  { ...raidFindAssay(onPlaneGated), title: `${raidFind.title} (one world)` },
+  { ...raidStopAssay(onPlaneGated), title: `${raidStop.title} (one world)` },
   onPlaneAssay(contact),
   onPlaneAssay(faintAlarm),
   nestFlowOne,
@@ -1276,10 +1304,8 @@ export const ONE_ASSAYS: Assay[] = [
   desertFirstFind,
   desertTrips,
   desertHeat,
+  ...BUILDER_ASSAYS,
 ];
 
-/** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so). */
-export const ONE_PENDING: Record<string, string> = {
-  raidFind: "U6b: raids by trail on one world (raid scouts start from leave = raid at the gate, ja-web)",
-  raidStop: "U6b: raids by trail on one world (raid scouts start from leave = raid at the gate, ja-web)",
-};
+/** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
+export const ONE_PENDING: Record<string, string> = {};

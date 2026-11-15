@@ -179,6 +179,12 @@ export const HOLD_MAX = 30;
 
 /** A forager's food goes to reception only once it is a chamber of this many cells (see foodTo); until then, to the royal chamber. */
 export const RECEPTION_MIN = 4;
+/**
+ * Cells a brood chamber needs before nurses put brood there (ja-xu6.2), as RECEPTION_MIN for food: one or two cells
+ * wide, just begun, it is a bulge in a tunnel that porters and nurses rarely stand in or beside. On main, 13 of the 14
+ * economy-test seeds that stranded larvae had them in brood chambers of one or two cells (world 1 seed 11: 40).
+ */
+export const BROOD_MIN = 4;
 
 /**
  * Seconds a forager carries its food before it will put it down in any of its colony's food chambers it stands in, not

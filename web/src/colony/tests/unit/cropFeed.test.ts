@@ -6,7 +6,7 @@ import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { digCell, generateSideWorld, mulberry32, OPEN, rockAt } from "../../world.ts";
 import { SMALL_SIDE, broodChamber } from "../builders.ts";
 
-// Larval feeding by mouth (cropFeed, ja-638i, docs/larval-feeding.md, PRD §72): crops filled at the stores, passed mouth
+// Larval feeding by mouth (cropFeed, ja-638i, docs/larval-feeding.md, PRD §75): crops filled at the stores, passed mouth
 // to mouth to a needier nestmate, fed to larvae; the food in crops stays the colony's (inCrops). World 2 of SMALL_SIDE.
 
 /** A colony of `n` ants with crops of `cap`, and a four-cell store holding 20 food off the nest chamber's far wall. */

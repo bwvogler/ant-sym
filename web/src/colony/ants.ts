@@ -316,10 +316,13 @@ export const ANT_FIELDS = {
   // ——— the foraging dig (ja-16rp, PRD §70), last for the same reason ———
   /** seconds left of a foraging dig (forageDig): an old forager home from a trip with nothing digs in the nest for a while */
   digBout: { type: Float32Array, reset: "spawn" },
-  // ——— task reversion (ja-7r7x, PRD §71), last for the same reason ———
+  // ——— the fungus's rouse (ja-rf5.18), last for the same reason ———
+  /** rouse (ja-rf5.18, the fungus's): coming down its shaft, it counts as this share of a finder to the ants waiting at the top */
+  rouse: { type: Float32Array, reset: "asIs" },
+  // ——— task reversion (ja-7r7x, PRD §74), last for the same reason ———
   /** the share of recent time (YOUNG_TAU) a young nestmate was within a cell of it at home; 1 at birth, as if among them */
   youngMet: { type: Float32Array, fill: 1, reset: "spawn" },
-  // ——— larval feeding by mouth (ja-638i, PRD §72), last for the same reason ———
+  // ——— larval feeding by mouth (ja-638i, PRD §75), last for the same reason ———
   /** food in its crop (food units, up to params.cropFeed): filled at the stores, passed mouth to mouth, fed to larvae */
   crop: { type: Float64Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;

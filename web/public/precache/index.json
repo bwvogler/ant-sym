@@ -3,42 +3,42 @@
     {
       "lane": "fungus",
       "aim": "peace",
-      "context": "fungus-v8-side-c7db998c",
+      "context": "fungus-v8-side-153cd1a5",
       "file": "fungus-peace.json",
-      "answers": 130
+      "answers": 193
     },
     {
       "lane": "fungus",
       "aim": "spread",
-      "context": "fungus-v8-side-e1f9d079",
+      "context": "fungus-v8-side-80d1e59a",
       "file": "fungus-spread.json",
-      "answers": 130
+      "answers": 193
     },
     {
       "lane": "fungus",
       "aim": "unite",
-      "context": "fungus-v8-side-ec1a7461",
+      "context": "fungus-v8-side-bb724482",
       "file": "fungus-unite.json",
-      "answers": 130
+      "answers": 193
     },
     {
       "lane": "growth",
       "aim": "peace",
-      "context": "growth-v3-f8e41472",
+      "context": "growth-v4-0e171926",
       "file": "growth-peace.json",
       "answers": 48
     },
     {
       "lane": "growth",
       "aim": "spread",
-      "context": "growth-v3-45ee3c17",
+      "context": "growth-v4-1918cb6b",
       "file": "growth-spread.json",
       "answers": 48
     },
     {
       "lane": "growth",
       "aim": "unite",
-      "context": "growth-v3-18f23733",
+      "context": "growth-v4-12d896ff",
       "file": "growth-unite.json",
       "answers": 48
     },
@@ -113,6 +113,6 @@
     "colony": 7,
     "stance": 4,
     "fungus": 8,
-    "growth": 3
+    "growth": 4
   }
 }

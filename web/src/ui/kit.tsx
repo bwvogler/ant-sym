@@ -93,6 +93,7 @@ const PATHS = {
   settings:
     "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.6 15H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.7 4V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z",
   close: "M6 6l12 12M18 6L6 18",
+  build: "M14 3l7 7M17.5 6.5L9 15M9 15l-4.5 4.5a2.1 2.1 0 0 1-3-3L6 12zM6 12l3 3",
   external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
   lens: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01",
@@ -120,7 +121,7 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Learn drawer, Details). Closing it gives focus back to
+ * preventDefault) or something above it is open (a tooltip, the Codex, Details). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -133,7 +134,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Learn"], [role="dialog"][aria-label="Details"]')) return;
+      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"], [role="dialog"][aria-label="Details"]')) return;
       onClose();
     };
     window.addEventListener("keydown", key);

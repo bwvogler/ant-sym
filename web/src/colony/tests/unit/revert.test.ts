@@ -9,7 +9,7 @@ import { EXPLORE } from "../../vocab.ts";
 import { generateSideWorld, mulberry32 } from "../../world.ts";
 import { SMALL_SIDE, ageOf } from "../builders.ts";
 
-// Task reversion (ja-7r7x, docs/task-reversion.md, PRD §71): an old ant at home that meets no young nestmates nurses as
+// Task reversion (ja-7r7x, docs/task-reversion.md, PRD §74): an old ant at home that meets no young nestmates nurses as
 // the young do, if it is among the share `revert` of the old that can. World 2 of SMALL_SIDE, a fixed "explore" policy.
 
 const colony = (revert: number, n: number) =>

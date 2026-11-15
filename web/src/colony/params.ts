@@ -240,14 +240,14 @@ export interface ColonyParams {
    */
   owedBeg: number;
   /**
-   * ja-7r7x (docs/task-reversion.md, PRD §71): the share of old ants that revert to nursing when they meet no young
+   * ja-7r7x (docs/task-reversion.md, PRD §74): the share of old ants that revert to nursing when they meet no young
    * nestmates at home (each by its own draw: individual thresholds). A reverted ant stays in, keeps to the queen and
    * brood as the young do, works inside at the young's threshold and takes no foraging dig; it goes back to foraging
    * once it meets young again. 0 = off.
    */
   revert: number;
   /**
-   * ja-638i (docs/larval-feeding.md, PRD §72): an ant's crop, in food units. An ant underground that feels some need fills
+   * ja-638i (docs/larval-feeding.md, PRD §75): an ant's crop, in food units. An ant underground that feels some need fills
    * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
    * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off.
    */
