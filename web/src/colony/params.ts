@@ -277,6 +277,12 @@ export interface ColonyParams {
    */
   cropFeed: number;
   /**
+   * ja-ukac.3 (docs/relay-transport.md, PRD §80), an ablation: cells from a stocked store or reception within which an
+   * idle ant can start a carry (nestWork.ts port). 0 = today's PORT_REACH (2 cells). Measures whether starting carries, not
+   * delivering them, limits the larvae's food; not a mechanic.
+   */
+  portReach: number;
+  /**
    * ja-16rp (docs/foraging-tunnels.md, PRD §70): seconds of digging (counted while it explores in the nest) an old forager
    * home from a trip with nothing takes before it climbs back out. At tunnels' dead ends and forks (walkTunnel) it digs
    * without the ROOMY_DIG damping and without nestmates by; starting a face or meeting a tunnel's end head-on (move.ts)
@@ -486,6 +492,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   owedBeg: 0,
   revert: 1,
   cropFeed: 0,
+  portReach: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,

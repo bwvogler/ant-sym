@@ -7036,3 +7036,52 @@ Both colonies at the law, offline, run one assay and seed a process (`runAssay` 
 The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` (10/10); `regulateStop` 9/10; `r1` 6/10; `pass` 3/10; `s1`, `regulate`, `faintAlarm`, `f1`, `d1` 0/10. No `pass` metric (reported only): `open`, `rain`, `lateSugar`, `tweezers`, `crayonRing`, `fillShaft`, `noEntryForkBare`, `nestFlow`, `d3`, `d4`. `d2c` and `f1` are bit-identical (no ant homes on the plane by its vector there; F1's planted find reads the law, but 30 s is too short to differ).
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
+
+## 80. Relay in stages: food reaches the brood by short carries (design, ja-ukac, 2026-11-15)
+
+**Research basis:** [relay-transport.md](relay-transport.md):
+- Harvester seeds are dropped in the top chambers and carried down in stages by a separate group of workers; sand goes up by "transport, deposition, and re-transport" (Tschinkel, Rink & Kwapich 2015, read in full).
+- Leaf-cutter soil pellets were carried over 2 m by up to 12 workers in three groups, the short-distance ones dropping a pellet after a few centimetres (Pielström & Roces 2013, abstract only, **unverified**).
+- Piles of loads may tell a carrier where to put one down: the authors' hypothesis, untested (Tschinkel et al. 2015). No source read covers the store-to-larvae leg.
+
+**The problem (measured, 2026-11-15, `ja-rvli`).** Economy world 3, nudge 1, reversion on, 2,000–2,700 s: 201 carries started and 198 were delivered (median 30 s), so delivery works. Only about 17 a minute start, against the 25–58 a minute the larvae are owed, because a carry starts only when an idle ant is within two cells of a stocked chamber and the store is a tunnel's dead end. Larvae seeds 22 and 16 and this game are `ja-rvli`'s remaining failures (PRD §75).
+
+**Decisions.**
+- Relay in stages (owner, 2026-11-15), chosen over chamber smell as a cue and over fixing crops first.
+- Proposed, needs the owner: D1 the M1 ablation first; D2 floor loads (M2) over hand-over by contact (M3); D3 brood odour (`ja-k4k.15`, built off) as the direction cue, and turning it on.
+
+**The mechanic.** M0 the supply probe (no behaviour change), M1 the pick-up reach as a setting (`portReach`, an ablation), M2 floor loads carried in short legs (`loadLeg`, design). Off is main bit for bit. See the note.
+
+**Play.** Loads moved ant to ant down the tunnels, larvae on time. Risks: loads lost to the economy, a jam, invisibility.
+
+**Assays and targets.** `larvae` seeds 1–32, economy's 16 games, one-world A5 seeds 1–20. Target (`ja-rvli`): no seed above 8 larvae waiting over 120 s, nobody starved, food stored and food brought home not worse by the worst seed.
+
+**Cost (estimated).** None in Jev: body and steering rules, no situation field.
+
+**Beads.**
+- ja-ukac: the epic.
+- ja-ukac.1: research (store-to-larvae leg).
+- ja-ukac.2: the supply probe.
+- ja-ukac.3: the pick-up reach ablation.
+- ja-ukac.4: floor loads.
+- ja-rvli closes when the gate in ja-ukac.4 passes, or when the ablation shows reach alone is enough.
+
+**The pick-up reach ablation (ja-ukac.2, ja-ukac.3; 2026-11-15; `assays.yml` at `913fe30`, `colony.portReach` 0 / 4 / 8, `revert` 1, `cropFeed` 0).** [`larvae` seeds 1–32](https://github.com/bwvogler/ant-sym/actions/runs/43763124965), then [one-world `regulate`, `game1` and `nestFlow`, seeds 1–20](https://github.com/bwvogler/ant-sym/actions/runs/43763128118):
+
+| `portReach` (cells) | `larvae`: seeds over 8 waiting | worst | workers starved (most in a seed) | fewest workers | carries started a minute (median) | ants an idle carrier's reach covers |
+|---|---|---|---|---|---|---|
+| 0 (2, today) | 1 (22) | 10 | 17 | 125 | 31 | 1.05 |
+| 4 | 2 (4, 31) | 15 | 0 | 128 | 50 | 3.06 |
+| 8 | **0** | **8** | **0** | **151** | **62** | 8.5 |
+
+| `portReach` | A5 worst ratio (guard 2.91) | A5 food stored (median) | G1 passing | `nestFlow`: most larvae waiting beside food | `nestFlow` reception's largest pile (median) |
+|---|---|---|---|---|---|
+| 0 | 2.65 | 1,382 | 10/20 | 2 | 435 |
+| 4 | 2.55 | 1,090 | 14/20 | 9 (seed 6) | 210 |
+| 8 | 2.57 | 1,342 | 17/20 | **61 (seed 2)**, 8 (seeds 3, 12) | 10 |
+
+- **Pick-up supply is the limit, confirmed.** Doubling the carries started a minute (31 → 62) clears `larvae` on all 32 seeds, with no worker or larva starved: reach 8 meets `ja-rvli`'s bound there.
+- **Reach alone is not a clean fix.** On the 600-ant `nestFlow` game (900 s) the larvae waiting beside food rise from 2 to 61 on seed 2 at reach 8, and from 2 to 9 on seed 6 at reach 4. Reception drains almost completely (435 → 10) and foragers stop handing food on (`handedOn` median 163 → 0): food leaves reception for the stores faster than the brood chambers get it. A5 is not worse by the worst seed, and the one-world game improves (10/20 → 17/20).
+- **What it says for M2.** A longer reach starts more carries, but they carry to wherever `wanted` names, and the destinations still go through the chamber table. Relay's job is to put the food where the brood is, which the reach cannot do. The ablation is not the mechanic; it is its ceiling.
+
+**Still open.** `LEG` and `PICK_LOAD`; how harvesters feed larvae from the seed chambers; why reach 8 fails `nestFlow` seed 2 (not traced); whether a reach between 4 and 8, or reach with a cap on food drawn to stores, ends `ja-rvli` without it.
