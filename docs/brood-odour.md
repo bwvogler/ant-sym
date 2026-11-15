@@ -116,7 +116,7 @@
 - Whether a fungus lever on brood-odour perception is worth designing (owner).
 - Age-graded thresholds instead of the band-0 cutoff: `ja-k4k.1`.
 - Whether nurses should drop brood where the odour is strongest (piles by positive feedback) and so retire part of the chamber-table choice: `ja-k4k.4`.
-- A fire-ant-like queen volatile as a species option (no range measured).
+- A fire-ant-like queen volatile as a species option (no range measured). Owner, 2026-11-15: no queen attractant otherwise; her contact pheromone stays for caste.
 - The field's reach: two or three cells is **design**; the target is the zoning assay below, not a measured range.
 
 ## Sources

@@ -5678,7 +5678,7 @@ They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the 
 
 **Decisions.**
 - **The cue is brood odour** (owner, 2026-11-14), chosen over the queen's carried scent and a queen volatile.
-- **The queen's carried scent stays as built** (`ja-lo8.9`), for caste, not steering (proposed).
+- **No queen attractant** (owner, 2026-11-15): no ant steers toward the queen by scent; a fire-ant-like species may get an airborne queen attractant later. Her contact pheromone (`ja-lo8.9`) stays as built, for caste and the fungus's queen-signal and queen-scent levers.
 - **First build only band-0 ants, as today's zoning** (proposed). Age-graded thresholds go to `ja-k4k.1`.
 
 **The mechanic.** Brood items lay a short-range `broodOdour` field on their cells: fast evaporation, a little diffusion, about two or three cells of reach (**design**). A young ant in a chamber climbs it at its three antennae through open ground, and searches where it smells none.
