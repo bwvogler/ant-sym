@@ -489,8 +489,8 @@ export function pickPlane(self: Colony, i: number, cx: number, cy: number, enemy
   else {
     // Away from where its vector says home is, farther out by LOOSE_SPREAD on average.
     const odo = self.odoSurf[i];
-    const bx = self.nest.x + odo * self.driftSurf[i];
-    const by = self.nest.y + odo * self.driftSurfY[i];
+    const bx = self.nest.x + odo * self.driftSurf[i] + self.carriedX[i];
+    const by = self.nest.y + odo * self.driftSurfY[i] + self.carriedY[i];
     self.spoilA[i] = Math.atan2(self.y[i] - by, self.x[i] - bx);
     self.spoilTo[i] = fromHomePlane(self, i) + LOOSE_SPREAD * (0.5 + self.rng());
     self.spoilT[i] = 0;

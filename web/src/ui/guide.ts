@@ -470,6 +470,35 @@ export const GUIDE: GuideEntry[] = [
     sources: [{ note: "builder", anchor: "damaged-nests-are-repaired", label: "Damaged nests are repaired" }],
   },
   {
+    id: "builder-tweezers",
+    title: "Tweezers",
+    onScreen:
+      "Pick an ant up with the tweezers (🤏) and drop it somewhere else on the surface. Watch it walk off, search in loops, and find its way home; the bell tells you how long it took.",
+    realAnts:
+      "Scientists move desert ants with tweezers to see how they find home. A moved ant walks the same distance and direction it would have walked home from where it was picked up, as if it hadn't been moved, then searches in loops until it finds the nest.",
+    inGame:
+      "The ant keeps its sense of where home is, moved by as far as you carried it. So it walks to where home would be, searches there, and finds home by its search, the smell of its own mound, or seeing its hole.",
+    sources: [
+      {
+        note: "builder",
+        anchor: "a-displaced-ant-runs-off-its-old-vector-then-searches",
+        label: "A displaced ant runs off its old vector, then searches",
+      },
+    ],
+  },
+  {
+    id: "builder-noentry",
+    trail: "noEntry",
+    title: "No-entry sign",
+    onScreen:
+      "Paint a no-entry sign (🚫) across a trail. Ants following the trail turn away from it and take another way. Ants just wandering about walk straight over it.",
+    realAnts:
+      "Pharaoh's ants mark a dead-end branch of a trail with a 'no entry' smell. When an ant following the trail reaches a fork, 71 out of 100 take the branch without the mark.",
+    inGame:
+      "The sign is 'no entry' smell for every colony. An ant following a trail counts the trail as weaker where the sign is, so at a fork it takes the other branch: about three in four do. It fades over a few minutes.",
+    sources: [{ note: "builder", anchor: "no-entry-turns-trail-followers-away", label: "“No entry” turns trail followers away" }],
+  },
+  {
     id: "builder-rain",
     title: "Rain",
     onScreen: "The rain cloud (🌧️) washes every trail and alarm off the ground under it.",

@@ -328,6 +328,13 @@ export const ANT_FIELDS = {
   // ——— task reversion's brood cue (ja-7r7x, review of #217), last for the same reason ———
   /** the share of recent time (YOUNG_TAU) a brood item lay within a cell of it at home; 0 at birth */
   broodMet: { type: Float32Array, reset: "spawn" },
+  /**
+   * How far the builder's tweezers carried ant i on the plane this trip (docs/builder.md "Slice 2"): its belief of home
+   * moves by as much, so it runs its old vector, as a displaced desert ant does (Wehner & Srinivasan 1981). 0 unless
+   * a child moved it; cleared with the vector up out of its own hole.
+   */
+  carriedX: { type: Float32Array, reset: "spawn" },
+  carriedY: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

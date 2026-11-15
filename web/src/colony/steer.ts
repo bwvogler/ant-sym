@@ -5,7 +5,7 @@ import { backfill, enterStale, staleStep } from "./dig.ts";
 import { avoid, choose, climb, handOnWall, inReach, NO_CELL, SOIL_FILL, tunnel, turnToward } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, SIDE, nx as stepX, ny as stepY } from "./hex.ts";
 import { believe, homeScentNear, routeFail, searchOn } from "./homing.ts";
-import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
+import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_PAINTED, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
 import { touch, touchProbe } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import {
@@ -360,11 +360,14 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       let gl = fl;
       let gf = ff;
       let gr = fr;
-      if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
+      // With the colony's own off (noEntryAvoid 0: it lays none), only the builder's paint can wake the field: read at
+      // NO_ENTRY_PAINTED (docs/builder.md "Slice 2"). With no paint the field never wakes, so nothing here runs.
+      const avoid = p.noEntryAvoid > 0 ? p.noEntryAvoid : NO_ENTRY_PAINTED;
+      if (ph.live("noEntry") && outside) {
         const x = col.x[i];
         const y = col.y[i];
         const d = p.sensorDistance;
-        const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
+        const ne = (b: number) => avoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
         if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
         if (gf < SEEN) gf = Math.max(0, gf - ne(h));
         if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
