@@ -22,6 +22,7 @@ import {
   type Fungus,
   type Hyphae,
   hyphaCell,
+  HYPHA_MASS,
   HYPHA_ROOT,
   type OneWorld,
   STRIP,
@@ -38,6 +39,7 @@ import {
   SOIL,
   type WorldMap,
   worldExtent,
+  type BuildTool,
 } from "../colony/index.ts";
 import {
   aimed,
@@ -62,6 +64,12 @@ import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
+import { antTag, badgeParts, nestBadge } from "./badges.ts";
+import { isPalm } from "./build.ts";
+import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
+import type { FieldProbe } from "./lensStore.ts";
+
+export type { FieldProbe };
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
@@ -114,6 +122,22 @@ interface Props {
   pen?: FieldPen | null;
   /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
   toolsAt?: string;
+  /** the lens is on (PRD §69.3): a mouse over the map reports what is under it, and a click reports it pinned instead of following */
+  lens?: boolean;
+  /** what is under the pointer, with the lens on (null: the pointer left the map) */
+  onProbe?: (p: FieldProbe | null) => void;
+  /** the builder (docs/builder.md, PRD §73): the tool in hand, smell vision, and where a stroke goes; null when it is off */
+  build?: FieldBuild | null;
+}
+
+/** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
+export interface FieldBuild {
+  /** the tool in hand; null: Move (one finger pans and a tap picks an ant, as ever) */
+  tool: BuildTool | null;
+  /** smell vision (owner, PRD §73): every colony's trails and alarm, everywhere, each trail in its colony's tone */
+  smell: boolean;
+  /** a piece of a stroke at world points on `layer` (PLANE, CURTAIN, or 0 on one map); `first`: a new drag begins */
+  onStroke: (layer: number, points: { x: number; y: number }[], first: boolean) => void;
 }
 
 /** What the page may ask of the field's cameras. */
@@ -126,6 +150,10 @@ export interface FieldApi {
   centreOn: (view: number, x: number, y: number, how?: { close?: boolean; span?: number; keepFollow?: boolean }) => void;
   /** view `view`'s camera as last drawn (null before it was shown or centred) */
   camera: (view: number) => Camera | null;
+  /** the whole map, in the view shown (the key 0) */
+  showAll: () => void;
+  /** colony k's nest, in the view shown (the key n cycles them) */
+  goNest: (k: number) => void;
 }
 
 /** The pen on the field (one world's top view). */
@@ -192,6 +220,9 @@ const PICK_PX = 14;
 const LINK_ZOOM = 8;
 /** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
 const NO_CHUNK = -0x80000000;
+/** The builder's sugar (candy pink, as its 🍬) and crumbs (biscuit brown, as its 🍪), drawn apart from the ground's food. */
+const SUGAR_RGB: [number, number, number] = [214, 72, 140];
+const CRUMB_RGB: [number, number, number] = [150, 100, 52];
 
 interface ChunkCanvas {
   canvas: HTMLCanvasElement;
@@ -200,7 +231,7 @@ interface ChunkCanvas {
 }
 
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
-type Gesture = { kind: "pan" | "pinch" | "mini" | "none"; moved: number; button: number; sx: number; sy: number };
+type Gesture = { kind: "pan" | "pinch" | "mini" | "paint" | "none"; moved: number; button: number; sx: number; sy: number };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
 export default function ColonyField({
@@ -220,6 +251,9 @@ export default function ColonyField({
   api,
   pen = null,
   toolsAt = "top-2 left-2",
+  lens = false,
+  onProbe,
+  build = null,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -230,11 +264,12 @@ export default function ColonyField({
   const [goOpen, setGoOpen] = useState(false);
   const goRef = useRef<HTMLDivElement>(null);
   // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
-  // press anywhere outside it.
+  // press anywhere outside it. An Escape something above it took (a pinned lens card) or one a dialog over it will take
+  // (the palette) is not its own: one Escape closes one thing (review of #196, S1).
   useEffect(() => {
     if (!goOpen) return;
     const key = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
       setGoOpen(false);
     };
@@ -271,6 +306,7 @@ export default function ColonyField({
    */
   const carryTo = useRef<number | null>(null);
   const penRef = useRef(pen);
+  const buildRef = useRef(build);
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
   const hover = useRef<[number, number] | null>(null);
   /** The shown view's camera. */
@@ -305,6 +341,17 @@ export default function ColonyField({
   useEffect(() => {
     penRef.current = pen;
   }, [pen]);
+  const lensRef = useRef(!!lens);
+  const probeCb = useRef(onProbe);
+  useEffect(() => {
+    lensRef.current = !!lens;
+    probeCb.current = onProbe;
+  }, [lens, onProbe]);
+  useEffect(() => {
+    buildRef.current = build;
+  }, [build]);
+  /** pointers set aside as palms (builder on): never panned, painted or counted toward a pinch */
+  const palms = useRef(new Set<number>());
 
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture>(NO_GESTURE);
@@ -321,7 +368,9 @@ export default function ColonyField({
     let spores: ChunkLayer<Float32Array> = fungus.spores;
     let strip = false;
     // Each colony's trails on the shown layer; a cell shows them as strongly as a host sensed it lately (PRD §65).
-    let trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array> }[] = [];
+    let trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array>; odour: number }[] = [];
+    // Smell vision (the builder's, PRD §73): every trail and alarm shown everywhere, each food trail in its colony's tone.
+    let smellAll = false;
     let sensedLayer: ChunkLayer<Float32Array> | null = null;
     // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column
     // is the line's s), and the extent the camera fits; set again (rebuild) when the map or its size changes.
@@ -372,11 +421,12 @@ export default function ColonyField({
       trails = [];
       alarms = [];
       sensedLayer = sensed.layer(lv < 0 ? 0 : lv);
+      smellAll = !!buildRef.current?.smell;
       for (const col of colonies) {
         const p = lv < 0 ? col.ph : col.layers[lv]?.ph;
         if (!p) continue;
         alarms.push(p.fields.alarm);
-        trails.push({ food: p.fields.food, home: p.fields.home });
+        trails.push({ food: p.fields.food, home: p.fields.home, odour: col.nestOdour });
       }
     };
     bind();
@@ -387,6 +437,7 @@ export default function ColonyField({
       accent: "",
       warn: "",
       line: "",
+      fg3: "",
       rock: rgb("#c9c2b5"),
       soil: rgb("#e3d5bf"),
       sky: rgb("#e4edf1"),
@@ -409,6 +460,7 @@ export default function ColonyField({
         accent: cssVar("--accent"),
         warn: cssVar("--warn"),
         line: cssVar("--line-strong"),
+        fg3: cssVar("--fg-3"),
         rock: rgb(cssVar("--line-strong")),
         soil: rgb(cssVar("--soil")),
         sky: rgb(cssVar("--sky")),
@@ -467,13 +519,19 @@ export default function ColonyField({
       const sensedC = sensedLayer?.chunk(cx, cy);
       const now = sensed.now;
       // Every colony's food and home trails and alarm here, read only where something was sensed.
-      const trailC: { food: Float32Array | undefined; home: Float32Array | undefined }[] = [];
+      const trailC: { food: Float32Array | undefined; home: Float32Array | undefined; tone: [number, number, number] }[] = [];
       const alarmC: Float32Array[] = [];
-      if (sensedC) {
+      const qc = m.quality?.chunk(cx, cy);
+      if (sensedC || smellAll) {
         for (const t of trails) {
           const food = t.food.chunk(cx, cy);
           const home = t.home.chunk(cx, cy);
-          if (food || home) trailC.push({ food, home });
+          if (food || home)
+            trailC.push({
+              food,
+              home,
+              tone: smellAll ? odourRgb(theme.inkRgb, theme.warnRgb, t.odour) : (theme.trail as [number, number, number]),
+            });
         }
         for (const a of alarms) {
           const ac = a.chunk(cx, cy);
@@ -508,17 +566,20 @@ export default function ColonyField({
           }
           const fv = fc ? fc[i] : 0;
           if (fv > 0) {
-            px[o] = fr;
-            px[o + 1] = fg;
-            px[o + 2] = fb;
+            // The builder's sugar and crumbs (quality above and below the ground's 1) in their own colours (ja-kjj8).
+            const q = qc ? qc[i]! : 1;
+            const [qr, qg, qb] = q > 1.01 ? SUGAR_RGB : q < 0.99 ? CRUMB_RGB : [fr, fg, fb];
+            px[o] = qr;
+            px[o + 1] = qg;
+            px[o + 2] = qb;
             px[o + 3] = 120 + Math.min(135, fv * 12);
             continue;
           }
-          // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike).
-          const w = sensedC ? sightOf(sensedC[i]!, now) : 0;
+          // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike); everywhere in smell vision.
+          const w = smellAll ? 1 : sensedC ? sightOf(sensedC[i]!, now) : 0;
           let al = 0;
-          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / 6));
-          if (al > 0.03) {
+          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / ALARM_FULL));
+          if (al > ALARM_SHOWN) {
             px[o] = theme.alarm[0];
             px[o + 1] = theme.alarm[1];
             px[o + 2] = theme.alarm[2];
@@ -546,18 +607,23 @@ export default function ColonyField({
           // Every colony's trails, as freshly as a host sensed them; where two overlap, the stronger shows.
           let f = 0;
           let h = 0;
+          let ft = theme.trail as [number, number, number];
           if (w > 0)
             for (const t of trailC) {
-              if (show.food && t.food) f = Math.max(f, w * Math.min(1, t.food[i]! / 4));
+              const tf = show.food || smellAll ? (t.food ? w * Math.min(1, t.food[i]! / FOOD_FULL) : 0) : 0;
+              if (tf > f) {
+                f = tf;
+                ft = t.tone;
+              }
               // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / 12));
+              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / HOME_FULL));
             }
-          if (f >= h && f > 0.02) {
-            px[o] = theme.trail[0];
-            px[o + 1] = theme.trail[1];
-            px[o + 2] = theme.trail[2];
+          if (f >= h && f > TRAIL_SHOWN) {
+            px[o] = ft[0];
+            px[o + 1] = ft[1];
+            px[o + 2] = ft[2];
             px[o + 3] = Math.round(f * 150);
-          } else if (h > 0.02) {
+          } else if (h > TRAIL_SHOWN) {
             px[o] = HOME_RGB[0];
             px[o + 1] = HOME_RGB[1];
             px[o + 2] = HOME_RGB[2];
@@ -800,6 +866,19 @@ export default function ColonyField({
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Mass in transit (ja-tgw9, flow on): a soft glow on each cell it fills, brighter and wider the more there is, so the
+      // player sees where the mycelium is feeding and a front cut off from it going dim.
+      for (const [k, load] of h.loads) {
+        if (load < HYPHA_MASS * 0.1) continue;
+        const [lx, ly] = hyphaCell(k);
+        if (!inView(lx, ly)) continue;
+        const [x, y] = toScreen(c, v, centreX(lx, ly), centreY(ly));
+        const full = Math.min(1, load / (HYPHA_MASS * 2));
+        ctx.globalAlpha = (under ? 0.3 : 0.5) * full;
+        ctx.beginPath();
+        ctx.arc(x, y, r * (1 + full), 0, Math.PI * 2);
+        ctx.fill();
+      }
       // Knots (ja-2bw.9): a hard, dark lump on the hypha, a little larger than a tip.
       ctx.fillStyle = theme.ink;
       ctx.globalAlpha = under ? 0.5 : 0.85;
@@ -814,6 +893,32 @@ export default function ColonyField({
       ctx.restore();
     };
 
+    /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
+    const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
+      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
+      const gap = px * 0.45;
+      const widths = parts.map((p) => ctx.measureText(p.text).width);
+      const w = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1) + px;
+      const h = px * 1.6;
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = theme.paper;
+      ctx.strokeStyle = theme.line;
+      ctx.lineWidth = Math.max(1, px / 12);
+      ctx.beginPath();
+      ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "start";
+      let at = x - w / 2 + px / 2;
+      parts.forEach((p, n) => {
+        ctx.fillStyle = p.fill;
+        ctx.fillText(p.text, at, y);
+        at += widths[n]! + gap;
+      });
+      ctx.textBaseline = "alphabetic";
+    };
     /** Text with a paper halo, centred at screen (x, y). */
     const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
       ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -885,7 +990,19 @@ export default function ColonyField({
         let k = -1;
         for (let n = 0; n < holes.length && k < 0; n++) if (holes[n]!.px === h.x && holes[n]!.py === h.y) k = n;
         const [x, y] = toScreen(c, v, wx, wy);
-        label(k >= 0 && colonies[k] ? colonyName(k) : "empty hole", x, y - Math.max(12 * d, 4.5 * c.zoom), px);
+        const above = y - Math.max(12 * d, 4.5 * c.zoom);
+        const col = k >= 0 ? colonies[k] : undefined;
+        if (!col) {
+          label("empty hole", x, above, px);
+          continue;
+        }
+        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
+        pill(
+          badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+          x,
+          above - px * 0.2,
+          px,
+        );
       }
     };
 
@@ -1362,7 +1479,6 @@ export default function ColonyField({
         ctx.stroke();
       }
       if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
-      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       if (labelsOn.current && m.chambers) {
@@ -1399,11 +1515,16 @@ export default function ColonyField({
       if (f && fcol && fHere) {
         const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
         ctx.beginPath();
-        ctx.arc(x, y, Math.max(9 * d, c.zoom * 1.6), 0, Math.PI * 2);
+        const r = Math.max(9 * d, c.zoom * 1.6);
+        ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.strokeStyle = theme.accent;
         ctx.lineWidth = 2 * d;
         ctx.stroke();
+        const tpx = Math.round(11 * d);
+        pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
+      // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
+      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
 
@@ -1504,6 +1625,8 @@ export default function ColonyField({
         s.zoomedIn = zoom > fz * 1.05;
       },
       camera: (v) => cams.current.get(v)?.cam ?? null,
+      showAll: () => showAll(),
+      goNest: (k) => goNest(k),
     };
     return () => {
       api.current = null;
@@ -1581,8 +1704,31 @@ export default function ColonyField({
     return k < 0 ? null : { k, id };
   };
 
+  /** The builder's layer for the shown view: PLANE or CURTAIN in one world, 0 on one map. */
+  const buildLayer = () => (world ? shown.current : 0);
+  /** Send a piece of stroke, device points to world, to the builder. */
+  const paint = (pts: [number, number][], first: boolean) => {
+    const b = buildRef.current;
+    if (!b?.tool) return;
+    const c = camera();
+    const v = viewport();
+    b.onStroke(
+      buildLayer(),
+      pts.map(([px, py]) => {
+        const [wx, wy] = toWorld(c, v, px, py);
+        return { x: wx, y: wy };
+      }),
+      first,
+    );
+  };
+
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
+    // The builder sets a palm aside (a child's resting hand is no finger: docs/builder.md, design).
+    if (buildRef.current && isPalm(e)) {
+      palms.current.add(e.pointerId);
+      return;
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
     e.currentTarget.focus({ preventScroll: true });
     const [x, y] = devicePoint(e);
@@ -1596,12 +1742,28 @@ export default function ColonyField({
     if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
+    } else if (e.button === 0 && buildRef.current?.tool) {
+      // A tool in hand: the touch builds where it lands (a tap places), and a drag carries on painting.
+      gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
+      paint([[x, y]], true);
     } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
+  };
+
+  /** Report canvas point (x, y) to the lens: the page's pixels, the world point and the ant there. */
+  const probeAt = (x: number, y: number, pinned: boolean) => {
+    const cv = canvasRef.current;
+    if (!cv || !probeCb.current) return;
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const [wx, wy] = toWorld(camera(), viewport(), x, y);
+    probeCb.current({ sx: r.left + x / k, sy: r.top + y / k, lv: world ? shown.current : -1, x: wx, y: wy, ant: pick(x, y), pinned });
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
     const [x, y] = devicePoint(e);
     hover.current = [x, y];
+    // The lens follows a mouse over the map (no button down); a finger taps instead (onUp).
+    if (lensRef.current && e.pointerType === "mouse" && pointers.current.size === 0) probeAt(x, y, false);
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
     const g = gesture.current;
@@ -1621,16 +1783,28 @@ export default function ColonyField({
         setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
       }
     } else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
+    else if (g.kind === "paint")
+      paint(
+        [
+          [prev.x, prev.y],
+          [x, y],
+        ],
+        false,
+      );
     pointers.current.set(e.pointerId, { x, y });
   };
 
   const onUp = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (palms.current.delete(e.pointerId)) return;
     const g = gesture.current;
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
-      if (world && pn && shown.current === PLANE) {
+      if (lensRef.current && !(world && pn && shown.current === PLANE)) {
+        // The lens on: a click (a tap) says what is there, and keeps the card up; it follows nothing. The queen's pen keeps its click.
+        probeAt(p.x, p.y, true);
+      } else if (world && pn && shown.current === PLANE) {
         // The queen's pen: a click on the top view is where she flies (the page founds there, or says why not).
         const [wx, wy] = toWorld(camera(), viewport(), p.x, p.y);
         pn.onPick({ x: wx, y: wy });
@@ -1708,14 +1882,17 @@ export default function ColonyField({
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        className="absolute inset-0 block h-full w-full cursor-grab touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset active:cursor-grabbing"
+        className={`absolute inset-0 block h-full w-full touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${build?.tool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
         role="application"
-        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
+        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
-        onPointerLeave={() => (hover.current = null)}
+        onPointerLeave={() => {
+          hover.current = null;
+          if (lensRef.current) probeCb.current?.(null);
+        }}
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
@@ -1756,7 +1933,7 @@ export default function ColonyField({
                 className={labels ? `${item} text-accent` : item}
                 aria-pressed={labels}
                 onClick={() => setLabels((on) => !on)}
-                title="Name each chamber by its role; click a chamber to inspect it in Learn"
+                title="Name each chamber by its role; click a chamber to inspect it in the Codex"
               >
                 {labels ? "✓ " : ""}Chamber labels
               </button>

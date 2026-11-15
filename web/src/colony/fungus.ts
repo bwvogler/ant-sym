@@ -85,8 +85,20 @@ export function askedLevers(menu: ReadonlySet<string>, queen: boolean): string[]
   return LEVERS.filter((v) => menu.has(v.id) && leverFor(v, queen)).map((v) => v.id);
 }
 
-/** The menu the fungus starts with: every lever but the lethal ones. */
-export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id)).map((v) => v.id);
+/**
+ * The menu the fungus starts with: every lever but the lethal ones and those that act only on a species whose finders invite (rouse,
+ * ja-rf5.18): the player puts rouse on the menu in a desert-ant game, so a generic game's requests don't ask a lever that does nothing.
+ */
+export const DEFAULT_MENU: readonly string[] = LEVERS.filter((v) => !LETHAL_LEVERS.has(v.id) && !v.invite).map((v) => v.id);
+
+/**
+ * A menu for a game of a species: the levers that need an invitation (rouse) on where its finders invite (the desert ant: owner, review of
+ * #202 D2) and off where they don't, the rest as given.
+ */
+export function menuFor(menu: readonly string[], invites: boolean): string[] {
+  const rest = menu.filter((id) => !LEVERS.find((v) => v.id === id)?.invite);
+  return invites ? [...rest, ...LEVERS.filter((v) => v.invite).map((v) => v.id)] : rest;
+}
 
 /** A strain: one trait set of the fungus. A landing or paint lays one; later organisms are other trait sets (§5.1). */
 export interface Strain {
@@ -151,8 +163,8 @@ export interface FungusParams {
   /**
    * how many times faster spores fade on ground open to the sun: one world's plane, off the mycelium's own patch (ja-6ip). Full sun kills
    * Metarhizium conidia within about an hour, while in soil they last weeks to months (docs/hyphal-growth.md §6); no
-   * paired test gives a ratio, so this is a design number. Off (1) until it is chosen on the progression with Stalks
-   * in (owner, 2026-11-14; PRD §63.13, ja-19oz): at 4 it slowed seed 11 by 39 %
+   * paired test gives a ratio, so this is a design number. Off (1): ×2–×4 missed P1 on the progression, and ×4 with
+   * Stalks given at landing missed it further (PRD §63.13, ja-19oz; seed 9 took twice as long)
    */
   sun: number;
   /** spores a cell holds at most */
@@ -187,6 +199,12 @@ export interface FungusParams {
    * from where it roots, and its spores go out where they are; off, its patch puts out its spores as before
    */
   hyphae: boolean;
+  /**
+   * with hyphae, mass flows along them (ja-tgw9, docs/mycelial-transport.md, PRD §72): the body's free mass enters at
+   * its patch and at colonised corpses and moves toward the tips, which grow from what has reached them; off, every tip
+   * shares the body's free mass, as before
+   */
+  flow: boolean;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -204,6 +222,8 @@ export const DEFAULT_FUNGUS: FungusParams = {
   groomedAt: 0.05,
   borderRatio: 2,
   hyphae: false,
+  // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §72.1).
+  flow: true,
 };
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
@@ -390,6 +410,8 @@ export class Fungus {
   #corpses: Map<number, number>[];
   /** seconds since each colonised corpse was colonised (stalks, ja-2bw.10), by map and cell */
   #corpseAge: Map<number, number>[];
+  /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, and the curtain cells it feeds */
+  #links: { from: number; to: number[] }[] = [];
   /**
    * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
    * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
@@ -762,7 +784,8 @@ export class Fungus {
     // One world's plane is the sunlit surface (ja-6ip): spores lying out on it fade `sun` times faster, but not on the
     // mycelium's own patch (its base), which fruits in the litter under the surface (docs/hyphal-growth.md §6). On one
     // map (layer −1) and in the curtain the soil shades them all. The length test is defensive: a game of one map steps
-    // through step() (layer −1); only stepLayers on a fungus of one map would pass layer 0.
+    // through step() (layer −1); only stepLayers on a fungus of one map would pass layer 0. The `sun !== 1` term only
+    // skips work: at 1, burn equals keep.
     const sunlit = layer === PLANE && this.#layers.length > 1 && p.sun !== 1;
     const keep = Math.exp(-p.sporeDecay * dt);
     const burn = sunlit ? Math.exp(-p.sporeDecay * p.sun * dt) : keep;
@@ -1133,11 +1156,11 @@ export class Fungus {
         length += h.length;
         tips += h.tips.length;
       }
-    const budget = { free: Math.max(0, e.mass - length * HYPHA_MASS), tips };
+    const budget = { free: Math.max(0, e.mass - length * HYPHA_MASS), tips, flow: p.flow };
     // Every map's tips step together, in turns (hyphae.ts stepRound), on the first map's clock.
-    const maps: { h: Hyphae; g: Ground }[] = [];
+    const maps: { h: Hyphae; g: Ground; sinks?: Map<number, number> }[] = [];
     this.#hyphae.forEach((h, l) => {
-      if (h) maps.push({ h, g: this.#ground(l) });
+      if (h) maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined });
     });
     const clock = maps[0]!.h;
     clock.clock += dt;
@@ -1145,8 +1168,15 @@ export class Fungus {
     while (clock.clock >= every) {
       clock.clock -= every;
       // Stumps of cut hyphae regrow into the dug cells they lost (ja-2bw.15); knots old enough sprout (ja-2bw.9).
+      if (p.flow) this.#placeMass(e);
       for (const { h, g } of maps)
-        budget.tips += h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
+        budget.tips += p.flow
+          ? h.resprout(g, level) +
+            h.sproutKnots(g, knots, { free: Infinity, tips: budget.tips }, level, (m, k) => {
+              e.refund(m / BODY.sporeMass);
+              h.addLoad(k, m);
+            })
+          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
       stepRound(maps, level, budget, this.growthPolicy);
       stepped = true;
     }
@@ -1171,6 +1201,8 @@ export class Fungus {
       for (const { h, g } of maps) {
         const lost = h.cutDug(g);
         if (lost > 0) e.lose(lost * HYPHA_MASS);
+        const load = h.takeLost();
+        if (load > 0) e.lose(load);
       }
     // A plane tip that has come to a hole crosses down it (one world, ja-2bw.14): it leaves the plane, and the hyphae root
     // on the shaft's walls in the curtain (a wall cell whose tip is gone takes a fresh one, ja-2bw.16).
@@ -1180,7 +1212,8 @@ export class Fungus {
         const down = this.crossAt(t.x, t.y);
         if (!down) continue;
         plane.tips = plane.tips.filter((u) => u !== t);
-        this.rootShaft(CURTAIN, down.x, down.y);
+        const to = this.rootShaft(CURTAIN, down.x, down.y);
+        if (p.flow && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to });
       }
     }
     // A tip that has reached a corpse (the midden's) colonises it.
@@ -1314,6 +1347,7 @@ export class Fungus {
     const h = (this.#hyphae[layer] ??= new Hyphae());
     for (const key of L.base) {
       h.addCell(keyX(key), keyY(key));
+      h.sources.add(key);
     }
     cellOf(x, y);
     const cx = CELL[0];
@@ -1371,6 +1405,8 @@ export class Fungus {
     if (!fresh) return;
     if (!h.has(x, y)) h.addCell(x, y);
     for (const d of CORPSE.headings) h.root(x, y, d);
+    // With flow on, the cadaver's substance enters the hyphae at its own cell (ja-tgw9).
+    if (this.params.flow) h.addLoad(k, CORPSE.mass);
   }
 
   /** Whether the colonised corpse at `k` on map `layer` has a stalk at Stalks level `level`: outside (topsoil) and old enough. */
@@ -1403,6 +1439,94 @@ export class Fungus {
   }
 
   /**
+   * With flow on (ja-tgw9): the body's mass not yet in hypha or in transit enters at its patch, shared evenly among the
+   * patch's cells; when the body has less than that (spores and cuts are paid from its mass), the difference is taken
+   * from the patch's loads first and then from every load evenly (owner, 2026-11-14: spores from the patch). Mass
+   * gathered where hyphae cross down a hole goes on to the curtain cells it roots.
+   */
+  #placeMass(e: Evolution): void {
+    const plane = this.#hyphae[0];
+    const down = this.#hyphae[CURTAIN];
+    if (plane && down && this.#links.length > 0) {
+      // The shaft's walls are one mat too: mass that came down the hole gathers on the wall roots a growing tip leads back to.
+      const feeds = down.feedingCells();
+      const walls = [...new Set(this.#links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
+      const outlets = walls.filter((k) => feeds.has(k));
+      let came = 0;
+      for (const { from } of this.#links) {
+        came += plane.loads.get(from) ?? 0;
+        plane.loads.delete(from);
+      }
+      if (outlets.length > 0) {
+        // Only from the wall cells no growing tip leads back to: mass on its way down the wall goes on.
+        for (const k of walls) {
+          if (feeds.has(k)) continue;
+          came += down.loads.get(k) ?? 0;
+          down.loads.delete(k);
+        }
+        for (const k of outlets) down.addLoad(k, came / outlets.length);
+      } else if (walls.length > 0) for (const k of walls) down.addLoad(k, came / walls.length);
+      else for (const { from } of this.#links) plane.addLoad(from, came / this.#links.length);
+    }
+    let held = 0;
+    for (const h of this.#hyphae) if (h) held += h.length * HYPHA_MASS + h.loaded;
+    let gap = e.mass - held;
+    const patch: { h: Hyphae; k: number }[] = [];
+    for (const h of this.#hyphae) if (h) for (const k of h.sources) if (h.parent.has(k)) patch.push({ h, k });
+    // The patch is one mat: the mass on it gathers on the patch cells a growing tip's hypha leads back to, so none sits
+    // on a patch cell with no way out.
+    const feeds = new Map<Hyphae, Set<number>>();
+    this.#hyphae.forEach((h, l) => {
+      if (h) feeds.set(h, h.feedingCells(l === 0 ? this.#links.map(({ from }) => from) : []));
+    });
+    const outlets = patch.filter(({ h, k }) => feeds.get(h)!.has(k));
+    if (outlets.length > 0 && outlets.length < patch.length) {
+      let pooled = 0;
+      for (const { h, k } of patch) {
+        if (feeds.get(h)!.has(k)) continue;
+        pooled += h.loads.get(k) ?? 0;
+        h.loads.delete(k);
+      }
+      for (const { h, k } of outlets) h.addLoad(k, pooled / outlets.length);
+    }
+    const into = outlets.length > 0 ? outlets : patch;
+    if (gap > 0 && into.length > 0) {
+      for (const { h, k } of into) h.addLoad(k, gap / into.length);
+      return;
+    }
+    if (gap >= 0) return;
+    const take = (cells: { h: Hyphae; k: number }[]) => {
+      const total = cells.reduce((n, { h, k }) => n + (h.loads.get(k) ?? 0), 0);
+      if (total <= 0 || gap >= 0) return;
+      const share = Math.min(1, -gap / total);
+      for (const { h, k } of cells) {
+        const v = h.loads.get(k) ?? 0;
+        if (v <= 0) continue;
+        const left = v * (1 - share);
+        if (left > 0) h.loads.set(k, left);
+        else h.loads.delete(k);
+      }
+      gap += total * share;
+    };
+    // The patch first (owner, 2026-11-14: spores from the patch). Not reached in seed 7's first 200 s, where the patch
+    // always holds enough; review of #203, N2.
+    take(patch);
+    const rest: { h: Hyphae; k: number }[] = [];
+    for (const h of this.#hyphae) if (h) for (const k of h.loads.keys()) if (!h.sources.has(k)) rest.push({ h, k });
+    take(rest);
+  }
+
+  /** The plane cells where hyphae crossed down a hole, each weighted by its share of the curtain's tips (flow's sinks). */
+  #sinks(): Map<number, number> {
+    const out = new Map<number, number>();
+    const down = this.#hyphae[CURTAIN];
+    if (!down || this.#links.length === 0) return out;
+    const w = Math.max(1, down.tips.length / this.#links.length);
+    for (const { from } of this.#links) out.set(from, (out.get(from) ?? 0) + w);
+    return out;
+  }
+
+  /**
    * One world: the hyphae also root on the walls of the shaft under a hole (layer `layer`, the curtain; `x`, `y` the
    * hole's entrance there), where `ja-yo3` put the mycelium: walking down the shaft from the entrance, the first soil
    * cell on each side takes a tip heading down. A wall cell that already has a tip on it takes no other; one that holds
@@ -1410,10 +1534,11 @@ export class Fungus {
    * down it (ja-2bw.16). Nothing without hyphae and an evolving fungus. Since ja-2bw.14 it is reached by growth: a
    * plane tip that comes to the hole crosses down it (crossAt), rather than the landing rooting it at once.
    */
-  rootShaft(layer: number, x: number, y: number): void {
-    if (!this.#evolution || !this.params.hyphae) return;
+  rootShaft(layer: number, x: number, y: number): number[] {
+    const rooted: number[] = [];
+    if (!this.#evolution || !this.params.hyphae) return rooted;
     const L = this.#layers[layer];
-    if (!L) return;
+    if (!L) return rooted;
     const g = this.#ground(layer);
     cellOf(x, y);
     const sx = CELL[0];
@@ -1428,6 +1553,7 @@ export class Fungus {
           h.root(sx - 1, yy, SW);
           h.soil.add(cellKey(sx - 1, yy));
         }
+        if (h.has(sx - 1, yy)) rooted.push(cellKey(sx - 1, yy));
         left = true;
       }
       if (!right && g.kind(sx + 1, yy) === "soil") {
@@ -1435,9 +1561,11 @@ export class Fungus {
           h.root(sx + 1, yy, SE);
           h.soil.add(cellKey(sx + 1, yy));
         }
+        if (h.has(sx + 1, yy)) rooted.push(cellKey(sx + 1, yy));
         right = true;
       }
     }
+    return rooted;
   }
 
   /** Cells of the fungus's base (root) on `map` (layer 0). */
@@ -1545,6 +1673,7 @@ export class Fungus {
     c.foreignFood[i] = v.foreignFood * l;
     c.clock[i] = 1 + (v.clock - 1) * l;
     c.calm[i] = v.calm * l;
+    c.rouse[i] = v.rouse * l;
     c.tolerance[i] = c.params.tolerance + v.tolerance * l;
     c.mask[i] = v.mask * l;
     c.layGain[i] = 1 + (v.lay - 1) * l;
@@ -1599,6 +1728,7 @@ export class Fungus {
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
       corpseAges: this.#corpseAge.map((m) => [...m]),
+      links: this.#links.map(({ from, to }) => [from, ...to]),
     };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
     if (this.#layers.length > 1)
@@ -1652,6 +1782,7 @@ export class Fungus {
       m.clear();
       for (const [k, v] of ages[l] ?? []) m.set(k, v);
     });
+    this.#links = ((r.links as number[][] | undefined) ?? []).map(([from, ...to]) => ({ from: from!, to }));
     this.#evolved();
   }
 }

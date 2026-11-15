@@ -167,7 +167,7 @@ test("running: each new situation is asked once; the answers are cached and the 
   const all = sent.flat();
   assert.ok(all.length > 0 && all.length < c.population, `${all.length} situations for ${c.population} ants`);
   assert.equal(new Set(all).size, all.length, "no situation asked twice");
-  assert.equal(j.state.cached, all.length);
+  assert.equal(j.state.lanes.mode.cached, all.length);
   run(c, 1);
   const modes = c.counts();
   assert.equal(modes.follow, c.population, "every ant took Jev's answer on its next tick");
@@ -216,7 +216,7 @@ test("a new doctrine has its own cache; switching back to an old one is free", a
   await tick(40);
   const first = sent.flat().length;
   j.setDoctrine(DOCTRINES[1]!.text);
-  assert.equal(j.state.cached, 0);
+  assert.equal(j.state.lanes.mode.cached, 0);
   run(c, 1);
   await tick(40);
   assert.ok(sent.flat().length > first, "the new doctrine was asked");
@@ -427,7 +427,7 @@ test("the strategist's stance goes through its own cached lane", async () => {
   await tick(40);
   assert.equal(stances.length, 1);
   assert.equal(j.stancePolicy(v), "defend", "then Jev's cached stance");
-  assert.equal(j.state.stancesCached, 1);
+  assert.equal(j.state.lanes.stance.cached, 1);
   await tick(30);
   assert.equal(stances.length, 1, "asked once");
 });
@@ -659,7 +659,7 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
     assert.equal(r.state.aim, undefined, "an ant's request never carries the fungus's aim");
     assert.equal(r.state.hosts, undefined);
   }
-  assert.ok(j.state.fungusCached > 0 && j.state.fungusAsked > 0);
+  assert.ok(j.state.lanes.fungus.cached > 0 && j.state.lanes.fungus.asked > 0);
   // Jev's levels were dormant's: every host runs dormant now.
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
   for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.load[i] > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
@@ -681,17 +681,17 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
     for (let k = 0; k < 6; k++) g.tick(1 / 30);
     await tick(25);
   }
-  const before = j.state.fungusCached;
+  const before = j.state.lanes.fungus.cached;
   assert.ok(before > 0);
   j.setAim("Something else.");
-  assert.equal(j.state.fungusCached, 0, "nothing cached under the new aim yet");
+  assert.equal(j.state.lanes.fungus.cached, 0, "nothing cached under the new aim yet");
   j.setAim("Calm every meeting.");
-  assert.equal(j.state.fungusCached, before, "the old aim's answers are still there");
+  assert.equal(j.state.lanes.fungus.cached, before, "the old aim's answers are still there");
   const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(asked).by, "jev");
   j.setMenu(new Set(["odour", "strangers"]));
   assert.notEqual(j.explainFungus(asked).by, "jev", "other levers on: a new question");
-  assert.equal(j.state.fungusCached, before, "the old menu's answers are kept, for when it comes back");
+  assert.equal(j.state.lanes.fungus.cached, before, "the old menu's answers are kept, for when it comes back");
   assert.equal(g.fungus.menu.has("calm"), false, "and the fungus runs under it");
   await j.stop();
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
@@ -869,8 +869,8 @@ test("stored answers a lane could not have given are dropped on load (ja-ue6)", 
     [stanceKey(raided), "defend"],
   ]);
   j.attach(c);
-  assert.equal(j.state.cached, 1, "the mode cache kept only the real mode");
-  assert.equal(j.state.stancesCached, 1, "the stance cache kept only the real stance");
+  assert.equal(j.state.lanes.mode.cached, 1, "the mode cache kept only the real mode");
+  assert.equal(j.state.lanes.stance.cached, 1, "the stance cache kept only the real stance");
   await j.start();
   assert.equal(j.policy(good), "follow");
   assert.equal(j.policy(bad), localPolicy(bad), "not 'flee': the local rule while it is asked afresh");
@@ -891,7 +891,7 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   ]);
   j.attachFungus(g.fungus);
   j.setAim("Stored aim.");
-  assert.equal(j.state.fungusCached, 1, "kept the full answer, dropped the malformed one");
+  assert.equal(j.state.lanes.fungus.cached, 1, "kept the full answer, dropped the malformed one");
 });
 
 test("a new aim plays the fungus's local rule until Jev answers; the earlier aim's answers play, and are listed, only while Jev can't answer (ja-lo8.15)", () => {
@@ -1058,6 +1058,49 @@ test("busy after a new game: the situations go back into the new game's lanes, n
   for (const s of asked[0]!) assert.ok(later.has(s), `asked again after busy: ${s}`);
 });
 
+test("a lane's asked counts what it sent, less what came back busy; a new run starts every lane's at 0 and keeps what is cached (review of #208, S1)", async () => {
+  const gate = deferred<void>();
+  const sizes: number[] = []; // situations in each mode request, in order sent
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
+    const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants?: Record<string, unknown> } };
+    if (req.state.ants) {
+      sizes.push(Object.keys(req.state.ants).length);
+      if (sizes.length === 1) {
+        await gate.promise;
+        return { ok: false, status: 429, json: async () => ({ error: "busy", run: RUN }) } as Response;
+      }
+    }
+    const r = await answerAll("explore")(req);
+    return { ok: true, status: 200, json: async () => r.body } as Response;
+  }) as typeof fetch;
+  const j = make();
+  const c = colony();
+  j.attach(c);
+  await j.start();
+  run(c, 2);
+  await tick(30); // the first mode request is out, held
+  assert.equal(sizes.length, 1);
+  assert.equal(j.state.lanes.mode.asked, sizes[0], "counted when sent");
+  gate.resolve(); // busy: its situations are taken back off the count
+  await tick(0);
+  assert.equal(j.state.lanes.mode.asked, 0, "a busy request's situations are not counted as asked");
+  await tick(60); // asked again, answered
+  assert.ok(sizes.length >= 2, "asked again after busy");
+  assert.equal(
+    j.state.lanes.mode.asked,
+    sizes.slice(1).reduce((a, b) => a + b, 0),
+    "every request but the busy one",
+  );
+  const cached = j.state.lanes.mode.cached;
+  assert.ok(cached > 0);
+  await j.stop();
+  await j.start();
+  for (const name of ["mode", "stance", "fungus", "growth"] as const)
+    assert.equal(j.state.lanes[name].asked, 0, `${name}: a new run has asked nothing yet`);
+  assert.equal(j.state.lanes.mode.cached, cached, "what is cached outlives the run");
+});
+
 test("a colony with no doctrine of its own follows the first colony's when it changes (ja-6yj)", () => {
   const store = memoryStore();
   store.data.set(policyContext("Later."), [[situationKey(sit()), "follow"]]);
@@ -1086,9 +1129,9 @@ test("the cached count is every colony's, a doctrine two colonies share counted 
   j.setDoctrineFor(0, "Mine.");
   j.setDoctrineFor(1, "Theirs.");
   j.attachColonies([a!, b!]);
-  assert.equal(j.state.cached, 3, "the first colony's 1 and the second's 2");
+  assert.equal(j.state.lanes.mode.cached, 3, "the first colony's 1 and the second's 2");
   j.setDoctrineFor(1, "Mine.");
-  assert.equal(j.state.cached, 1, "one shared doctrine: its answers once");
+  assert.equal(j.state.lanes.mode.cached, 1, "one shared doctrine: its answers once");
 });
 
 test("the stance count is every colony's too, a shared doctrine counted once (PRD §65)", () => {
@@ -1105,9 +1148,9 @@ test("the stance count is every colony's too, a shared doctrine counted once (PR
   j.setDoctrineFor(0, "Mine.");
   j.setDoctrineFor(1, "Theirs.");
   j.attachColonies([a!, b!]);
-  assert.equal(j.state.stancesCached, 3, "the first colony's 1 and the second's 2");
+  assert.equal(j.state.lanes.stance.cached, 3, "the first colony's 1 and the second's 2");
   j.setDoctrineFor(1, "Mine.");
-  assert.equal(j.state.stancesCached, 1, "one shared doctrine: its stances once");
+  assert.equal(j.state.lanes.stance.cached, 1, "one shared doctrine: its stances once");
 });
 
 test("lanes take turns at any request latency: a long mode queue does not keep the fungus waiting (ja-ytc)", async () => {
@@ -1173,7 +1216,7 @@ test("answers are written to the store once for the replies in a second, and at 
   assert.equal(saves.length, 0, "nothing written yet: the delay is a minute");
   j.flushCache();
   assert.equal(saves.length, 1, "one write for the context");
-  assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.cached, "everything the replies brought");
+  assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.lanes.mode.cached, "everything the replies brought");
   j.flushCache();
   assert.equal(saves.length, 1, "nothing more to write");
 });
@@ -1204,7 +1247,7 @@ test("a 200 that is not what the server sends is an error, not a run: start, sto
   await tick(60);
   assert.ok(c.state.failures >= 1, "counted as a failure");
   assert.match(c.state.lastError ?? "", /not a Jev reply/);
-  assert.equal(c.state.cached, 0, "nothing cached");
+  assert.equal(c.state.lanes.mode.cached, 0, "nothing cached");
 });
 
 test("a billed reply whose run summary has drifted is still cached: the answers matter, the summary is read if it can be", async () => {
@@ -1220,7 +1263,7 @@ test("a billed reply whose run summary has drifted is still cached: the answers 
   await j.start();
   run(col, 3);
   await tick(60);
-  assert.ok(sent.length > 0 && j.state.cached > 0, "answers cached");
+  assert.ok(sent.length > 0 && j.state.lanes.mode.cached > 0, "answers cached");
   assert.equal(j.state.failures, 0);
 });
 
@@ -1240,6 +1283,6 @@ test("stop and dispose write the answers still waiting for the debounce", async 
     if (how === "stop") await j.stop();
     else j.dispose();
     assert.equal(saves.length, 1, `${how} wrote them`);
-    assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.cached);
+    assert.equal(store.data.get(policyContext(DOCTRINES[0]!.text))?.length, j.state.lanes.mode.cached);
   }
 });

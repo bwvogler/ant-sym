@@ -28,7 +28,6 @@ import { mill, onMLine, siteAim } from "./plane.ts";
 import type { Mark } from "./pheromone.ts";
 
 const STORE_MARKS: readonly Mark[] = ["store"];
-const ROYAL_MARKS: readonly Mark[] = ["royal"];
 
 /** The floor marks `marks`, summed, at ant i's antenna on bearing b: read through open ground only (inReach), else 0. */
 function marksAt(col: Colony, i: number, b: number, marks: readonly Mark[]): number {
@@ -466,16 +465,11 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const f = marksAt(col, i, h, STORE_MARKS);
       const r = marksAt(col, i, h + a, STORE_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if (col.band(i) === 0 && col.under[i]) {
-      // A young ant in a chamber goes toward the queen by her scent (the royal mark its antennae meet, laid where she lies
-      // and on her chamber's floor), not her position (ja-k4k.2.1); none in reach, it searches. Not the brood mark too: a
-      // road sign every ant lays along the tunnels from a brood chamber, climbing it spread the young out of her chamber,
-      // and chambers.test's floor growth fell and economy.test stranded larvae (review of #192).
-      const l = marksAt(col, i, h - a, ROYAL_MARKS);
-      const f = marksAt(col, i, h, ROYAL_MARKS);
-      const r = marksAt(col, i, h + a, ROYAL_MARKS);
-      h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * 0.3) + noise * p.wander * 0.5 : noise * p.wander;
-    } else if (col.entrance && col.outbound(i) && col.under[i])
+    } else if (col.queen?.alive && col.band(i) === 0 && col.under[i])
+      // A young ant in a chamber: to the queen's position (ja-k4k.2.1). To go by the brood's odour (docs/brood-odour.md,
+      // ja-k4k.15); #192's climbs of the royal and brood floor marks, which every ant lays, led the young off the brood.
+      h = turnToward(h, Math.atan2(col.queen.y - col.y[i], col.queen.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
+    else if (col.entrance && col.outbound(i) && col.under[i])
       // An old forager in a chamber: at the hole's position (ja-k4k.2.2). Aimed where its drifting nest vector puts the
       // hole instead, a few units off, it pressed on the wall beside the chamber's way out (#192: economy.test collapsed).
       h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;

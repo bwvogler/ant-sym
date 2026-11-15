@@ -1,4 +1,4 @@
-import { useEffect, useId, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
 // The page's building blocks (PRD §69, ja-mvo9.1): one section head, one set of buttons and icons, and the drawer that
 // holds a surface beside the map (a bottom sheet on a phone). Components use these rather than hand-rolling the
@@ -93,7 +93,10 @@ const PATHS = {
   settings:
     "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.6 15H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.7 4V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z",
   close: "M6 6l12 12M18 6L6 18",
+  build: "M14 3l7 7M17.5 6.5L9 15M9 15l-4.5 4.5a2.1 2.1 0 0 1-3-3L6 12zM6 12l3 3",
   external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
+  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
+  lens: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01",
 } as const;
 export type IconName = keyof typeof PATHS;
 
@@ -118,7 +121,7 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Learn drawer, Details). Closing it gives focus back to
+ * preventDefault) or something above it is open (a tooltip, the Codex, Details). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -131,7 +134,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Learn"], [role="dialog"][aria-label="Details"]')) return;
+      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"], [role="dialog"][aria-label="Details"]')) return;
       onClose();
     };
     window.addEventListener("keydown", key);
@@ -155,5 +158,84 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-fg-2">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A dialog over the whole page (the command palette, the shortcuts sheet): focus moves into it (its first field, or the
+ * panel) and goes back to what had it when it closes; Tab stays inside; Escape closes it first (in the capture phase, so
+ * a drawer or a follow under it stays), and so does a press on the backdrop.
+ */
+export function Modal({
+  label,
+  onClose,
+  children,
+  className = "",
+}: {
+  label: string;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    (panel.current?.querySelector<HTMLElement>("input, textarea") ?? panel.current)?.focus({ preventScroll: true });
+    return () => {
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      } else if (e.key === "Tab" && panel.current) {
+        const all = [...panel.current.querySelectorAll<HTMLElement>("button, input, textarea, a[href], [tabindex='0']")].filter(
+          (el) => !el.hasAttribute("disabled"),
+        );
+        if (!all.length) return;
+        const first = all[0]!;
+        const last = all[all.length - 1]!;
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", key, true);
+    return () => window.removeEventListener("keydown", key, true);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center bg-black/25 px-4 pt-[10dvh]"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        tabIndex={-1}
+        className={`flex max-h-[75dvh] w-full max-w-xl flex-col overflow-hidden outline-none ${FLOAT} ${className}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** A key, as the shortcuts sheet and the palette show it. */
+export function Kbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="inline-grid min-w-6 place-items-center rounded border border-line-strong bg-raised px-1.5 py-0.5 font-mono text-[11px] leading-none text-fg-2">
+      {children}
+    </kbd>
   );
 }

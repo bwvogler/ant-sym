@@ -22,6 +22,8 @@
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
 //     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
 //     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
+//  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
+//     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -176,6 +178,7 @@ try {
   check((await page.evaluate(() => window.jevAnts.game.landed.colony)) === 1, "and the fungus lands there");
   check((await page.evaluate(() => window.jevAnts.view())) === "above", "a one-world game opens above");
   check((await page.getByRole("button", { name: "above", exact: true }).getAttribute("aria-pressed")) === "true", "the switch shows above");
+  check((await page.getByLabel("sun", { exact: true }).count()) === 0, "a generic game has no sun in the HUD (it has no day)");
   const canvas = page.locator("canvas").first();
   check(/click the line to look below/.test((await canvas.getAttribute("aria-label")) ?? ""), "the field's label is the top view's");
   await sleep(1500); // mid-game
@@ -642,6 +645,49 @@ try {
   );
   check((await card.count()) === 0, "without the dev hook's fly, the pen stays shut while Jev can't read words");
 
+  // ——— 5b. The aim bar (PRD §69.2): on a wide screen the aim is a bar under the map, and only there ———
+  console.log("5b. the aim bar");
+  {
+    const aims = page.getByRole("textbox", { name: "aim", exact: true });
+    const shown = () => aims.evaluateAll((els) => els.filter((e) => e.offsetParent !== null).length);
+    check((await shown()) === 1, `one aim on screen at 1280 px (${await shown()})`);
+    // The fungus drawer open: still only the bar's (the drawer's copy is for narrower screens), and the drawer says
+    // why the aim is locked, the reason the bar keeps in its "locked" tooltip.
+    const fungusTab = page.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true });
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    check((await shown()) === 1, `one aim on screen at 1280 px with The fungus drawer open (${await shown()})`);
+    const locked = await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled));
+    if (locked) check(await page.getByText("The aim is locked:").isVisible(), "the drawer says why the aim is locked");
+    await fungusTab.click();
+    await page.waitForTimeout(150);
+    const bar = await page
+      .getByLabel("fungus aim")
+      .filter({ has: page.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const cv = await page.locator("canvas").first().boundingBox();
+    check(bar !== null && cv !== null && bar.y + bar.height > cv.height - 70, "the aim bar sits along the map's bottom");
+    // With an ant followed, the ant panel stops above the bar, the bar opened to four rows included (owner, review of
+    // #189: D1 b): the bar keeps its full width and the panel scrolls.
+    await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
+    await page.getByRole("region", { name: "followed ant" }).waitFor();
+    // Opened if it can be (a locked aim can't take focus: then the three rows it would add, 13 px at 1.375, are counted).
+    if (!(await aims.evaluateAll((els) => els.some((e) => e.offsetParent !== null && e.disabled)))) await aims.first().focus();
+    const gap = await page.evaluate(() => {
+      const panel = document.querySelector('[aria-label="followed ant"]')?.closest(".overflow-y-auto");
+      const bars = [...document.querySelectorAll('[aria-label="fungus aim"]')].filter((e) => e.offsetParent !== null);
+      if (!panel || bars.length !== 1) return null;
+      const b = bars[0].getBoundingClientRect();
+      return {
+        panelBottom: Math.round(panel.getBoundingClientRect().top + parseFloat(getComputedStyle(panel).maxHeight)) /* at its longest */,
+        barTop: Math.round(b.top - (b.height < 60 ? 3 * 18 : 0)),
+      };
+    });
+    check(gap !== null && gap.panelBottom < gap.barTop, `the ant panel, at its longest, stops above the aim bar (${JSON.stringify(gap)})`);
+    await page.locator("canvas").first().focus();
+    if (await page.evaluate(() => window.jevAnts.followed() !== null)) await page.keyboard.press("Escape");
+  }
+
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
   console.log("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
@@ -690,7 +736,10 @@ try {
   await page.evaluate(() => window.jevAnts.follow(0, 0) || window.jevAnts.follow(0, 1) || window.jevAnts.follow(0, 2));
   await page.getByRole("button", { name: "Go to ▾" }).click();
   await page.locator("canvas").first().focus();
-  check((await page.evaluate(() => window.jevAnts.followed())) !== null, "an ant followed, Go to open");
+  check(
+    (await page.evaluate(() => window.jevAnts.followed())) !== null && (await page.getByRole("group", { name: "go to" }).count()) === 1,
+    "an ant followed, Go to open",
+  );
   await page.keyboard.press("Escape");
   check(
     (await page.getByRole("group", { name: "go to" }).count()) === 0 && (await page.evaluate(() => window.jevAnts.followed())) !== null,
@@ -711,6 +760,19 @@ try {
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
     "the touch page's game, landed",
   );
+  // The aim on a phone: no bar; it is in The fungus drawer.
+  check(
+    !(await tpage.getByRole("textbox", { name: "aim", exact: true }).isVisible()),
+    "on a phone there is no aim bar while the drawers are shut",
+  );
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
+  const inDrawer = await tpage.evaluate(() =>
+    [...document.querySelectorAll('textarea[aria-label="aim"]')].map(
+      (t) => `${t.closest("section")?.getAttribute("aria-label") ?? "-"}:${t.offsetParent !== null}`,
+    ),
+  );
+  check(inDrawer.includes("the fungus:true") && inDrawer.length === 2, `it is in The fungus drawer instead (${inDrawer.join(", ")})`);
+  await tpage.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "The fungus", exact: true }).tap();
   // A phone (PRD §69): the map fills the screen, the rail is a tab bar along the bottom, and a drawer opens as a sheet
   // above it.
   const phone = await tpage.evaluate(() => {
@@ -751,6 +813,19 @@ try {
   const paused = async () => (await tu.getByRole("button", { name: "Play", exact: true }).count()) === 1;
   await until(async () => /You are a fungus/.test((await tcard.textContent()) ?? ""), "the tutorial's first card");
   check(await paused(), "the landing card waits, paused");
+  // From lg the card stops above the aim bar, opened to four lines, as the toasts do (review of #189, S5).
+  {
+    const card = await tcard.boundingBox();
+    const aimBar = await tu
+      .getByLabel("fungus aim")
+      .filter({ has: tu.getByRole("group", { name: "aim presets" }) })
+      .boundingBox();
+    const opened = aimBar && aimBar.y - (aimBar.height < 60 ? 3 * 18 : 0);
+    check(
+      card !== null && opened !== null && card.y + card.height < opened,
+      `the tutorial card stops above the aim bar (${card && Math.round(card.y + card.height)} < ${opened && Math.round(opened)})`,
+    );
+  }
   // What the field shows of scent is what hosts sensed (PRD §65): before any host, nothing, even at the landing.
   check(
     (await tu.evaluate(() => window.jevAnts.sensed("above", window.jevAnts.game.landed.x, window.jevAnts.game.landed.y))) === 0,
@@ -864,18 +939,34 @@ try {
   const det = dp.getByRole("dialog", { name: "Details" });
   await det.getByText("Trails drawn").waitFor({ timeout: 5_000 });
   check(
-    (await det.getByRole("button", { name: "Learn: trails" }).count()) === 0,
+    (await det.getByRole("button", { name: "Codex: trails" }).count()) === 0,
     "Details: no link to the trail entries it lacks (review of #144, S1)",
   );
   await det.getByRole("button", { name: "Close Details" }).click();
-  await dp.getByRole("button", { name: "Learn", exact: true }).click();
-  const learn = dp.getByRole("dialog", { name: "Learn" });
+  await dp.getByRole("button", { name: "Codex", exact: true }).click();
+  const learn = dp.getByRole("dialog", { name: "Codex" });
   await learn.getByRole("heading", { name: "Strangers and battles" }).waitFor({ timeout: 5_000 });
   check(
     (await learn.getByRole("heading", { name: "Food trail", exact: true }).count()) === 0 &&
       (await learn.getByText("lays no trails of some kinds").count()) === 1,
     "the field guide leaves out the trail entries, and says so",
   );
+  check(
+    (await learn.getByRole("heading", { name: "Desert ants", exact: true }).count()) === 1,
+    "and has the desert ant's own entry (ja-rf5.8)",
+  );
+  check(
+    /^sun (high|low|down) · \d+ °C/.test(((await dp.getByLabel("sun", { exact: true }).textContent()) ?? "").trim()),
+    "the HUD shows the sun as the desert ants see it, and the ground's heat",
+  );
+  // On a phone the chip is short (owner, review of #194 D1).
+  await dp.setViewportSize({ width: 390, height: 844 });
+  check(
+    /^(high|low|down) · \d+°$/.test(((await dp.getByLabel("sun, short", { exact: true }).textContent()) ?? "").trim()) &&
+      (await dp.getByLabel("sun, short", { exact: true }).isVisible()),
+    "on a phone the HUD shows the sun short",
+  );
+  await dp.setViewportSize({ width: 1280, height: 900 });
   await dp.reload();
   await dp
     .getByRole("button", { name: "Start the tutorial", exact: true })
@@ -886,6 +977,422 @@ try {
     "a desert game leaves the generic ant's tutorial unplayed",
   );
   await dctx.close();
+
+  // ——— 9. The aim bar's keys with Jev readable (review of #189, N7) ———
+  // The dev server here has no key, so elsewhere the aim is locked and can't take focus. This page is told a key is
+  // set, and every other API call is left unanswered: nothing reaches Jev and nothing is spent, and the page's own start
+  // stays on the wire, which keeps the aim open (a failed start would lock it, policyLock.ts).
+  console.log("9. the aim bar's keys");
+  const kctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  await kctx.route("**/api/health", (r) => r.fulfill({ json: { ok: true, hasKey: true } }));
+  await kctx.route(/\/api\/(?!health)/, () => {}); // never answered
+  const kp = await kctx.newPage();
+  kp.on("pageerror", (e) => errors.push(String(e)));
+  await kp.goto(url);
+  await kp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  const field = kp.getByRole("textbox", { name: "aim", exact: true }).locator("visible=true");
+  await until(() => field.isEnabled(), "the aim unlocked with a key", 10_000, 100);
+  const focused = () => field.evaluate((e) => document.activeElement === e);
+  await field.focus();
+  await field.evaluate((e) => e.setSelectionRange(e.value.length, e.value.length)); // the end of the words, not of a wrapped line
+  const typed = await field.inputValue();
+  await kp.keyboard.type(" Spread");
+  await kp.keyboard.press("Shift+Enter");
+  const kept = (await focused()) && (await field.inputValue()) === `${typed} Spread\n`;
+  check(kept, `Shift+Enter is a new line, the field kept${kept ? "" : ` (${JSON.stringify(await field.inputValue())})`}`);
+  await kp.keyboard.type("now");
+  await kp.keyboard.press("Enter");
+  check(!(await focused()) && (await field.inputValue()) === `${typed} Spread\nnow`, "Enter commits: the field let go, no new line");
+  await field.focus();
+  await kp.keyboard.press("Escape");
+  check(!(await focused()), "Escape gives the keys back to the map");
+  await kctx.close();
+
+  // ——— 10. The palette, the page's keys, the shortcuts sheet and the lens (PRD §69.3) ———
+  console.log("10. the palette, the keys and the lens");
+  const lctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lp = await lctx.newPage();
+  lp.on("pageerror", (e) => errors.push(String(e)));
+  await lp.goto(url);
+  await lp.getByLabel("world seed").fill(String(SEED));
+  await lp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lp.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "a game for the palette");
+  const rail = (name) => lp.getByRole("navigation", { name: "panels" }).getByRole("button", { name, exact: true });
+  const pal = lp.getByRole("dialog", { name: "command palette" });
+  const speedOn = (v) =>
+    lp
+      .getByRole("group", { name: "speed" })
+      .getByRole("button", { name: `${v}×`, exact: true })
+      .getAttribute("aria-pressed");
+  await lp.locator("canvas").first().focus();
+  // ⌘K / Ctrl+K: type part of a name, Enter runs the first.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  check(
+    await lp.getByRole("combobox", { name: "command" }).evaluate((e) => document.activeElement === e),
+    "Ctrl+K opens the palette, its field focused",
+  );
+  await lp.keyboard.type("mutat");
+  check(/^Mutations/.test((await pal.getByRole("option", { selected: true }).textContent()) ?? ""), "typing “mutat” puts Mutations first");
+  await lp.keyboard.press("Enter");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Enter runs it: the Mutations drawer",
+  );
+  // Escape closes the palette first and leaves the drawer under it.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check(
+    (await pal.count()) === 0 && (await rail("Mutations").getAttribute("aria-pressed")) === "true",
+    "Escape closes the palette, not the drawer",
+  );
+  await lp.keyboard.press("Escape"); // and then the drawer
+  // The arrows wrap, and the chosen command stays in sight (review of #196, S3): ↑ from the first is the last.
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("ArrowUp");
+  await lp.waitForTimeout(100);
+  const inSight = await pal.evaluate((d) => {
+    const box = d.querySelector('[role="listbox"]').getBoundingClientRect();
+    const o = d.querySelector('[role="option"][aria-selected="true"]').getBoundingClientRect();
+    return o.top >= box.top - 1 && o.bottom <= box.bottom + 1;
+  });
+  check(inSight, "↑ from the first command chooses the last, and scrolls it into sight");
+  await lp.keyboard.press("Escape");
+  // The keys: speeds, Space, the sheet.
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("1");
+  check((await speedOn(1)) === "true", "the key 1: 1×");
+  const playing = () => lp.getByRole("button", { name: "Pause", exact: true }).count();
+  const was = await playing();
+  await lp.keyboard.press(" ");
+  check((await playing()) !== was, "Space plays or pauses");
+  await lp.keyboard.press(" ");
+  // Space on a focused button presses that button, not play (review of #196, S5).
+  const playedBefore = await playing();
+  await lp.getByRole("group", { name: "speed" }).getByRole("button", { name: "2×", exact: true }).focus();
+  await lp.keyboard.press(" ");
+  check((await speedOn(2)) === "true" && (await playing()) === playedBefore, "Space on the focused 2× button: 2×, and play as it was");
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("3");
+  check((await speedOn(4)) === "true", "the key 3: 4×");
+  await lp.keyboard.press("?");
+  const sheetD = lp.getByRole("dialog", { name: "keyboard shortcuts" });
+  await sheetD.waitFor({ timeout: 3000 });
+  check(/command palette/.test((await sheetD.textContent()) ?? ""), "? opens the shortcuts sheet");
+  await lp.keyboard.press("1");
+  check((await speedOn(4)) === "true", "the game's keys wait while the sheet is open");
+  await lp.keyboard.press("Escape");
+  check((await sheetD.count()) === 0, "Escape closes it");
+  // The lens: i turns it on; over Ink's hole it says so; a click pins it and follows nothing; "more" opens the guide.
+  await lp.keyboard.press("i");
+  const lensBtn = lp.getByRole("button", { name: "Lens: say what is under the pointer (i)" });
+  check((await lensBtn.getAttribute("aria-pressed")) === "true", "i turns the lens on");
+  await lp.evaluate(() => window.jevAnts.goNest(0));
+  await lp.waitForTimeout(200);
+  const hole = await lp.evaluate(() => {
+    const g = window.jevAnts.game;
+    const n = g.colonies[0].layers[0].nest;
+    const c = window.jevAnts.camera("above");
+    const cv = document.querySelector("canvas");
+    const k = cv.getBoundingClientRect().width / cv.width;
+    return { x: ((n.x - c.x) * c.zoom + cv.width / 2) * k, y: ((n.y - c.y) * c.zoom + cv.height / 2) * k };
+  });
+  await lp.mouse.move(hole.x, hole.y);
+  const lensCard = lp.getByRole("region", { name: "lens" });
+  await until(async () => (await lensCard.count()) === 1, "the lens card under the pointer", 3000, 50);
+  const said = (await lensCard.textContent()) ?? "";
+  check(/Ink's hole/.test(said), `over Ink's hole it says so${/Ink's hole/.test(said) ? "" : ` (${said.slice(0, 120)})`}`);
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check((await lp.evaluate(() => window.jevAnts.followed())) === null, "a click with the lens on pins the card and follows nothing");
+  await lp.mouse.move(hole.x + 300, hole.y + 200);
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "pinned, it stays while the pointer wanders");
+  await lensCard.getByRole("button", { name: "More on ink's hole" }).click();
+  await lp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "“more” opens the guide, and the card goes");
+  await lp.keyboard.press("Escape");
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Escape");
+  // Closing a pinned card leaves the pointer's card, if it is over the map: count the pinned one (its × says so).
+  const pinnedCards = () => lensCard.getByRole("button", { name: "Close the lens card" }).count();
+  check((await pinnedCards()) === 0 && (await lensCard.count()) === 1, "Escape closes a pinned card, and the pointer's card is back");
+  // One Escape closes one thing (review of #196, S1): a pinned card over the Go to menu, then the menu; and the palette
+  // over the menu, then the menu.
+  const goBtn = lp.getByRole("button", { name: "Go to ▾" });
+  const goMenu = lp.getByRole("group", { name: "go to" });
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await goBtn.click();
+  await lp.keyboard.press("Escape");
+  check((await pinnedCards()) === 0 && (await goMenu.count()) === 1, "a pinned card and Go to: the first Escape closes the card only");
+  await lp.keyboard.press("Escape");
+  check((await goMenu.count()) === 0, "and the second the menu");
+  await goBtn.click();
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.press("Escape");
+  check((await pal.count()) === 0 && (await goMenu.count()) === 1, "the palette over Go to: the first Escape closes the palette only");
+  await lp.keyboard.press("Escape");
+  // A card pinned on the other view is hidden and doesn't take Escape (review of #196, S2): it waits for its view.
+  await rail("Mutations").click();
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("v");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "pinned above, it hides below");
+  await lp.keyboard.press("Escape");
+  check((await rail("Mutations").getAttribute("aria-pressed")) === "false", "below, Escape closes the drawer, not the hidden card");
+  // Below, the lens still follows the pointer while that card waits above (review of #196, S6).
+  for (const dx of [0, 40, 80]) await lp.mouse.move(640 + dx, 450);
+  await until(async () => (await lensCard.count()) === 1, "a hover card below while a card waits pinned above", 2000, 50);
+  check((await lensCard.getByRole("button", { name: "Close the lens card" }).count()) === 0, "below, the pointer's card (not pinned)");
+  await lp.keyboard.press("v");
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "above again, the pinned card is back");
+  await lp.keyboard.press("Escape");
+  // A command run from the palette closes a pinned card, which would stay over what it opens (review of #196, N4, N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.keyboard.press("Control+k");
+  await pal.waitFor({ timeout: 3000 });
+  await lp.keyboard.type("lab and");
+  await lp.keyboard.press("Enter");
+  await lp.getByRole("dialog", { name: "Details" }).waitFor({ timeout: 3000 });
+  check((await lensCard.count()) === 0, "a palette command (Lab and numbers) closes the pinned card");
+  await lp.getByRole("button", { name: "Close Details" }).click();
+  // The lens off and on again starts afresh: no old pinned card (N8).
+  await lp.mouse.click(hole.x, hole.y);
+  await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
+  await lp.locator("canvas").first().focus();
+  await lp.keyboard.press("i");
+  await lp.keyboard.press("i");
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0, "i twice: the pinned card is gone");
+  await lp.keyboard.press("i");
+  await lp.mouse.move(hole.x + 2, hole.y + 2);
+  await lp.waitForTimeout(100);
+  check((await lensCard.count()) === 0 && (await lensBtn.getAttribute("aria-pressed")) === "false", "i again: the lens off, no card");
+  await lctx.close();
+  // The lens button fits the phone's HUD from 360 px wide (review of #196, S4).
+  const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const np = await nctx.newPage();
+  np.on("pageerror", (e) => errors.push(String(e)));
+  await np.goto(url);
+  await np.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  const lb = await np.getByRole("button", { name: "Lens: say what is under the pointer (i)" }).boundingBox();
+  const hudBar = await np.getByLabel("game bar").boundingBox();
+  check(
+    lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
+    `at 360 px the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
+  );
+  await nctx.close();
+
+  // ——— 11. The builder (docs/builder.md, PRD §73, ja-kjj8.3): on a phone and a tablet ———
+  // A shovel on the tab bar opens a tray of picture tools in its place: a tap places, a drag paints, Move pans, undo takes
+  // a whole drag back, below digs the curtain; the builds go into the game, so a save and a reload keep them.
+  for (const [w, h] of [
+    [390, 844],
+    [768, 1024],
+  ]) {
+    console.log(`11. the builder at ${w} px`);
+    const bctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true, isMobile: true });
+    const bp = await bctx.newPage();
+    bp.on("pageerror", (e) => errors.push(String(e)));
+    await bp.goto(url);
+    await bp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(() => bp.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null), "the builder page's game");
+    await bp.getByRole("button", { name: "Pause", exact: true }).tap();
+    await bp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Builder", exact: true }).tap();
+    const trayBox = await bp.getByRole("navigation", { name: "builder tools" }).boundingBox();
+    check(trayBox !== null && trayBox.y + trayBox.height > h - 4, "the tray sits on the screen's bottom edge");
+    check(!(await bp.getByRole("navigation", { name: "panels" }).isVisible()), "in place of the tab bar");
+    const sizes = await bp.$$eval('[aria-label="builder tools"] button', (bs) =>
+      bs.map((b) => Math.round(b.getBoundingClientRect().width)),
+    );
+    check(Math.min(...sizes) >= 64, `every tray button is at least 64 px (${Math.min(...sizes)})`);
+    check((await bp.evaluate(() => document.documentElement.scrollWidth)) === w, "no sideways scroll");
+    const fieldBox = await bp.locator("canvas").first().boundingBox();
+    const mx = fieldBox.x + fieldBox.width / 2;
+    // The whole map shows at first, centred in the field (it is wider than tall): strokes go about its middle.
+    const my = fieldBox.y + fieldBox.height / 2 - 20;
+    const g = (expr) => bp.evaluate(expr);
+    /** Pick a tray button; a tool is in hand once the field shows its cursor and a frame has passed (a finger takes longer). */
+    const tool = async (name) => {
+      await bp.getByRole("navigation", { name: "builder tools" }).getByRole("button", { name, exact: true }).tap();
+      if (["Undo", "Done building", "Move"].includes(name)) return;
+      await until(
+        () => bp.evaluate(() => document.querySelector("canvas").classList.contains("cursor-crosshair")),
+        `${name} in hand`,
+        3000,
+        20,
+      );
+      await bp.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    };
+    /** A drag with one pointer (Playwright's touchscreen only taps: the mouse makes the same pointer events). */
+    const drag = async (x0, y0, x1, y1) => {
+      await bp.mouse.move(x0, y0);
+      await bp.mouse.down();
+      await bp.mouse.move(x1, y1, { steps: 12 });
+      await bp.mouse.up();
+    };
+    const food0 = await g(() => window.jevAnts.game.layers[0].foodLeft);
+    await tool("Sugar");
+    // Taps along a row: one of them lands on open ground (a tap on rock puts nothing down).
+    for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my);
+    check((await g(() => window.jevAnts.view())) === "above", "taps that build follow no ant and switch no view");
+    check((await g(() => window.jevAnts.game.layers[0].foodLeft)) > food0, "a tap with sugar puts food down");
+    const walls0 = await g(() => window.jevAnts.game.layers[0].filled);
+    await tool("Rock");
+    await drag(mx - 90, my - 50, mx + 90, my - 50);
+    const walls1 = await g(() => window.jevAnts.game.layers[0].filled);
+    check(walls1 > walls0 + 5, `a drag with rock builds a wall (${walls1 - walls0} cells)`);
+    await tool("Trail crayon, Amber");
+    await drag(mx - 90, my + 40, mx + 90, my + 40);
+    const lines = await g(() => window.jevAnts.game.crayons.length);
+    check(lines === 1, `a crayon drag draws one line (${lines})`);
+    await tool("Undo");
+    check((await g(() => window.jevAnts.game.crayons.length)) === 0, "one undo takes the whole crayon drag back");
+    const cam0 = await g(() => window.jevAnts.camera("above"));
+    await tool("Move");
+    await until(
+      () => bp.evaluate(() => !document.querySelector("canvas").classList.contains("cursor-crosshair")),
+      "Move in hand",
+      3000,
+      20,
+    );
+    await bp.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await drag(mx, my, mx - 80, my - 40);
+    const cam1 = await g(() => window.jevAnts.camera("above"));
+    check(cam0 && cam1 && (cam0.x !== cam1.x || cam0.y !== cam1.y), "Move pans the map with one finger");
+    check((await g(() => window.jevAnts.game.layers[0].filled)) === walls1, "and builds nothing");
+    await bp.getByRole("button", { name: "below", exact: true }).tap();
+    const dug0 = await g(() => window.jevAnts.game.layers[1].dug);
+    await tool("Dig");
+    await drag(mx - 60, my + 60, mx + 60, my + 90);
+    check((await g(() => window.jevAnts.game.layers[1].dug)) > dug0, "below, a drag with dig opens the soil");
+    await tool("Done building");
+    check(await bp.getByRole("navigation", { name: "panels" }).isVisible(), "Done building gives the tab bar back");
+    // Save to a slot, reload, Continue: the wall is still there.
+    await bp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).tap();
+    await bp.getByRole("button", { name: "Save here" }).first().tap();
+    await until(async () => (await bp.getByText(/^Slot 1 · empty/).count()) === 0, "the save", 5000, 100);
+    const walls2 = await g(() => window.jevAnts.game.layers[0].filled);
+    await bp.reload();
+    await bp.getByRole("button", { name: "Continue" }).first().click();
+    await until(() => bp.evaluate(() => !!window.jevAnts?.game.world), "the game continued");
+    check((await g(() => window.jevAnts.game.layers[0].filled)) === walls2, "a saved game keeps the builds");
+    await bctx.close();
+  }
+
+  // ——— 12. The Codex (PRD §69.4): guide entries open as the game first shows what each is about ———
+  console.log("12. the Codex");
+  const cctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const cp = await cctx.newPage();
+  cp.on("pageerror", (e) => errors.push(String(e)));
+  await cp.goto(url);
+  await cp.getByLabel("world seed").fill(String(SEED));
+  await cp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => cp.evaluate(() => window.jevAnts?.game.landed !== null), "a game for the Codex");
+  // Paused once the spores land: the game's own first host (~3 s) would race the checks below (review of #206, S4).
+  await cp.getByRole("button", { name: "Pause", exact: true }).click();
+  const learnBtn = cp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true });
+  const guide = cp.getByRole("dialog", { name: "Codex" });
+  const locked = (title) => guide.getByRole("region", { name: `${title}, not yet seen` });
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Jobs by age").count()) === 1, "a new notebook: Jobs by age is not yet seen");
+  check(
+    (await locked("The fungus").count()) === 0 && (await guide.getByRole("heading", { name: "The fungus", exact: true }).count()) === 1,
+    "the fungus's own entry is open from the start",
+  );
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
+  // The first host: Jobs by age opens, with a notice and the rail's badge.
+  await cp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[0];
+    c.load[c.alive.indexOf(1)] = 1;
+  });
+  await until(
+    async () => (await cp.getByText(/^New in the field guide: .*Jobs by age/).count()) === 1,
+    "one notice of what opened",
+    3000,
+    50,
+  );
+  await until(
+    async () => /new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""),
+    "the rail's Codex carries a badge",
+    2000,
+    50,
+  );
+  check(true, "the rail's Codex carries a badge");
+  // A first host opens Jobs by age with the entries for where it stands: one notice names them together (review of #206,
+  // S3). A cue that shows half a second later gets its own notice, so count the names in the one that has Jobs by age.
+  const jobsNotice =
+    (await cp
+      .getByText(/^New in the field guide: .*Jobs by age/)
+      .first()
+      .textContent()) ?? "";
+  check(/ and /.test(jobsNotice), `one notice for everything that opened together (${jobsNotice.slice(0, 90)})`);
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Jobs by age").count()) === 0, "Jobs by age is open now");
+  check(
+    (await guide.getByRole("region", { name: "Jobs by age, not yet seen" }).count()) === 0 &&
+      (await guide.locator("#learn-jobs").getByText("new", { exact: true }).count()) === 1,
+    "and marked new (N6)",
+  );
+  check(!/new in the field guide/.test((await learnBtn.getAttribute("title")) ?? ""), "looked at: the badge goes");
+  // Read it anyway, and show every entry.
+  await locked("Alarm").getByRole("button", { name: "Read it anyway" }).click();
+  check((await locked("Alarm").count()) === 0, "Read it anyway opens one entry");
+  check((await locked("Tiredness and rest").count()) === 1, "and only that one");
+  await guide.getByLabel("Show every entry").check();
+  check((await guide.getByRole("region", { name: /not yet seen$/ }).count()) === 0, "Show every entry opens them all");
+  await guide.getByLabel("Show every entry").uncheck();
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
+  // A link straight to an entry opens it, seen or not.
+  await cp.locator("canvas").first().focus();
+  await cp.keyboard.press("Control+k");
+  await cp.keyboard.type("codex tiredness");
+  await cp.keyboard.press("Enter");
+  await guide.waitFor({ timeout: 3000 });
+  check((await locked("Tiredness and rest").count()) === 0, "the palette's Codex: Tiredness and rest opens it though not yet seen");
+  await guide.getByRole("button", { name: "Close the Codex" }).click();
+  // The notebook outlives the page.
+  await cp.reload();
+  await cp.getByRole("button", { name: "Start", exact: true }).click();
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check(
+    (await locked("Jobs by age").count()) === 0 && (await locked("Tiredness and rest").count()) === 1,
+    "after a reload: Jobs by age still seen, Tiredness and rest not",
+  );
+  // Show every entry outlives the page too (N6).
+  await guide.getByLabel("Show every entry").check();
+  await cp.reload();
+  await cp.getByRole("button", { name: "Start", exact: true }).click();
+  await learnBtn.click();
+  await guide.waitFor({ timeout: 3000 });
+  check(
+    (await guide.getByLabel("Show every entry").isChecked()) && (await locked("Tiredness and rest").count()) === 0,
+    "Show every entry, kept after a reload",
+  );
+  await guide.getByLabel("Show every entry").uncheck();
+  // Starting afresh locks what was seen, and keeps it locked through this game though a host is there now (N3, N6).
+  await cp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[0];
+    c.load[c.alive.indexOf(1)] = 1;
+  });
+  await until(async () => (await locked("Jobs by age").count()) === 0, "a host: Jobs by age open", 3000, 50);
+  await guide.getByRole("button", { name: /^Start the notebook afresh/ }).click();
+  check((await locked("Jobs by age").count()) === 1, "started afresh: Jobs by age is locked again");
+  await cp.waitForTimeout(1200);
+  check((await locked("Jobs by age").count()) === 1, "and stays locked through this game, though a host is there");
+  check((await cp.evaluate(() => localStorage.getItem("jev-ants:codex-seen"))) === "[]", "and the notebook kept is empty too (S5)");
+  await cctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

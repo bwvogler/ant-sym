@@ -47,6 +47,7 @@ import {
   QUEEN_MARK,
   QUEEN_STOCK,
   RECEPTION_MIN,
+  BROOD_MIN,
   STORE_AFTER,
   T_EGG,
   T_LARVA,
@@ -318,7 +319,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
   let royal = -1;
   for (const c of ch.list) {
     if (c.colony !== col.params.nest || c.cells === 0) continue;
-    if (c.role === "brood" && c.brood < least) ((least = c.brood), (to = c.id));
+    if (c.role === "brood" && c.cells >= BROOD_MIN && c.brood < least) ((least = c.brood), (to = c.id));
     if (c.role === "royal") royal = c.id;
   }
   // Eggs by the queen go to a brood chamber (with none yet, brood stays with her); brood lying outside any chamber

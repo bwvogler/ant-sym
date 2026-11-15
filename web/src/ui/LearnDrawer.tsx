@@ -26,12 +26,12 @@ import {
   askedIn,
   type Game,
   upgradeFor,
-  AIMS,
   type LaneWords,
 } from "../colony/index.ts";
 import { LeverChips } from "./DetailsScreen.tsx";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
+import { UNLOCK } from "./codex.ts";
 import { docUrl, guideFor, guideNote, NOTES, type GuideEntry } from "./guide.ts";
 import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
@@ -50,6 +50,7 @@ import {
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { seg } from "./styles.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
+import { forgetSeen, markViewed, setShowAll, useCodex } from "./useCodex.ts";
 
 // The Learn drawer: what the player is looking at, and why. Three tabs: the
 // field guide (each thing on screen, what real ants do, how the game models
@@ -63,8 +64,6 @@ interface Props {
   /** each colony's doctrine (read here: a colony's nature, ja-lo8.2) and the fungus's aim: the same state as the main screen's (useColonyJev) */
   doctrines: DoctrineChoice[];
   aim: DoctrineChoice;
-  setAim: (a: DoctrineChoice) => void;
-  draftAim: (a: DoctrineChoice) => void;
   /** why no policy can change now (policyLock), or null: the aim and the menu are disabled while it is set */
   lock: string | null;
   /** the game (its map, for which levers apply) */
@@ -127,11 +126,11 @@ export default function LearnDrawer(props: Props) {
       ref={panel}
       tabIndex={-1}
       role="dialog"
-      aria-label="Learn"
+      aria-label="Codex"
       className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-ground shadow-2xl outline-none sm:w-[30rem]"
     >
       <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
-        <h2 className="font-semibold text-fg">Learn</h2>
+        <h2 className="font-semibold text-fg">Codex</h2>
         <div className="ml-2 flex overflow-hidden rounded-md border border-line text-sm" role="tablist">
           {TABS.map(([t, name]) => (
             <button
@@ -150,7 +149,7 @@ export default function LearnDrawer(props: Props) {
           type="button"
           className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
           onClick={closeLearn}
-          aria-label="Close Learn"
+          aria-label="Close the Codex"
         >
           Close
         </button>
@@ -169,17 +168,40 @@ export default function LearnDrawer(props: Props) {
 function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
   // A species that lays no trail of a kind doesn't see the entries about it (owner, ja-rf5.11): its colonies' scent says which it lays.
   const ph = game.player.ph;
-  const entries = guideFor((c) => ph.has(c));
+  const entries = guideFor((c) => ph.has(c), game.params.species.id);
   const note = guideNote((c) => ph.has(c), game.params.species.name);
+  // The Codex (PRD §69.4): an entry opens once its cue has shown; the rest wait, named, with what to look for. A link
+  // straight to one (a "?", the lens) opens it anyway, and so does the player's "Read it anyway" or "Show every entry".
+  const codex = useCodex();
+  const [newOnes] = useState(() => new Set(codex.fresh));
+  const [read, setRead] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => markViewed(), [codex.fresh.length]);
+  const starts = (id: string) => (UNLOCK[id]?.cue ?? "start") === "start";
+  const opened = (id: string) => codex.all || codex.seen.has(id) || starts(id) || focus === id || read.has(id);
+  const seenCount = entries.filter((e) => codex.seen.has(e.id) || starts(e.id)).length;
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-fg-3">
         What you see on the field, what real ants do, and how the game models it. Each claim comes from a research note in the repository,
         linked under <em>Sources</em>.{note && <> {note}</>}
       </p>
-      {entries.map((e) => (
-        <Entry key={e.id} e={e} hot={focus === e.id} />
-      ))}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-3" aria-label="codex">
+        <span>
+          Seen <span className="font-mono text-fg-2 tabular-nums">{seenCount}</span> of {entries.length}: an entry opens the first time your
+          hosts show you what it is about.
+        </span>
+        <label className="ml-auto flex items-center gap-1.5 text-fg-2">
+          <input type="checkbox" checked={codex.all} onChange={(e) => setShowAll(e.target.checked)} />
+          Show every entry
+        </label>
+      </div>
+      {entries.map((e, n) =>
+        opened(e.id) ? (
+          <Entry key={e.id} e={e} n={n + 1} hot={focus === e.id} fresh={newOnes.has(e.id)} />
+        ) : (
+          <Locked key={e.id} e={e} n={n + 1} hint={UNLOCK[e.id]?.hint ?? ""} onRead={() => setRead((r) => new Set([...r, e.id]))} />
+        ),
+      )}
       <section className={card} id="learn-notes">
         <h3 className={h3}>The research notes</h3>
         <ul className="mt-2 flex flex-col gap-1.5">
@@ -193,22 +215,59 @@ function GuideTab({ focus, game }: { focus?: string; game: Props["game"] }) {
           ))}
         </ul>
       </section>
+      <button
+        type="button"
+        className="self-start text-xs text-fg-3 underline-offset-2 hover:text-fg-2 hover:underline"
+        onClick={forgetSeen}
+      >
+        Start the notebook afresh (every entry you have seen locks again, from the next game)
+      </button>
     </div>
   );
 }
 
-function Entry({ e, hot }: { e: GuideEntry; hot: boolean }) {
+/** The notebook's catalogue number: No. 07. */
+const no = (n: number) => `No. ${String(n).padStart(2, "0")}`;
+
+/** An entry not yet seen: its name and number, and what to look for. */
+function Locked({ e, n, hint, onRead }: { e: GuideEntry; n: number; hint: string; onRead: () => void }) {
   return (
-    <section id={`learn-${e.id}`} className={`${card} scroll-mt-2 ${hot ? "border-accent/60 ring-1 ring-accent/30" : ""}`}>
-      <div className="flex items-center gap-2">
+    <section
+      id={`learn-${e.id}`}
+      className="scroll-mt-2 rounded-lg border border-dashed border-line-strong p-3"
+      aria-label={`${e.title}, not yet seen`}
+    >
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[11px] text-fg-3">{no(n)}</span>
+        <h3 className="font-serif text-[15px] text-fg-3">{e.title}</h3>
+      </div>
+      <p className="mt-1 text-xs text-fg-3">
+        Not yet seen. It opens with {hint}.{" "}
+        <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onRead}>
+          Read it anyway
+        </button>
+      </p>
+    </section>
+  );
+}
+
+function Entry({ e, n, hot, fresh }: { e: GuideEntry; n: number; hot: boolean; fresh: boolean }) {
+  return (
+    <section
+      id={`learn-${e.id}`}
+      className={`scroll-mt-2 rounded-lg border border-line bg-paper p-3 ${hot ? "border-accent/60 ring-1 ring-accent/30" : ""}`}
+    >
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[11px] text-fg-3">{no(n)}</span>
         {e.swatch && (
-          <span className="flex gap-0.5" aria-hidden>
+          <span className="flex gap-0.5 self-center" aria-hidden>
             {e.swatch.map((c) => (
               <span key={c} className="inline-block h-3 w-3 rounded-sm border border-line" style={{ background: c }} />
             ))}
           </span>
         )}
-        <h3 className="font-medium text-fg">{e.title}</h3>
+        <h3 className="font-serif text-[15px] font-medium text-fg">{e.title}</h3>
+        {fresh && <span className="ml-auto rounded-full bg-spore px-1.5 text-[10px] leading-4 text-paper">new</span>}
       </div>
       <dl className="mt-2 flex flex-col gap-1.5 text-[13px] leading-snug">
         <Row k="On screen">{e.onScreen}</Row>
@@ -291,35 +350,15 @@ function PolicyTab(props: Props & { focus?: string; ping: object }) {
         with the same doctrine share every answer.
       </p>
 
-      <section className="flex flex-col gap-2" aria-label="fungus aim">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="font-medium">
-            <span className="text-spore">Fungus</span> <span className="text-fg-2">aim</span>
-          </h3>
-          <div className="flex overflow-hidden rounded-md border border-line text-sm">
-            {AIMS.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                className={seg(props.aim.id === a.id)}
-                disabled={props.lock !== null}
-                onClick={() => props.setAim({ id: a.id, text: a.text })}
-              >
-                {a.name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <textarea
-          id="learn-aim"
-          className="w-full resize-y rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg outline-none focus:border-accent"
-          rows={3}
-          value={props.aim.text}
-          disabled={props.lock !== null}
-          onChange={(e) => props.draftAim({ id: "custom", text: e.target.value })}
-          onBlur={(e) => props.setAim({ id: props.aim.id, text: e.target.value })}
-          aria-label="fungus aim"
-        />
+      <section className="flex flex-col gap-2" aria-label="the fungus's aim and levers">
+        <h3 className="font-medium">
+          <span className="text-spore">Fungus</span> <span className="text-fg-2">aim</span>
+        </h3>
+        {/* One home for the aim (PRD §69.2): the bar under the map, or The fungus drawer on a narrow screen. */}
+        <blockquote className="rounded-md border border-line bg-paper px-2 py-1.5 text-[13px] leading-snug text-fg-2" aria-label="your aim">
+          {props.aim.text}
+        </blockquote>
+        <p className="text-xs text-fg-3">Change it in the aim bar under the map (on a narrow screen, in The fungus drawer).</p>
         <div className="text-[13px]">
           <span className="text-fg-2">Levers the fungus may pull</span>
           <LeverChips game={props.game} menu={props.menu} locked={props.lock !== null} lock={props.lock} onChange={props.setMenu} />

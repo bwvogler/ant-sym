@@ -4,6 +4,8 @@ import {
   type Mode,
   type Stance,
   DEFAULT_MENU,
+  menuFor,
+  SPECIES,
   DEFAULT_COLONY,
   STRAINS,
   type Fungus,
@@ -408,6 +410,8 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       setControls((c) => ({
         ...c,
         species,
+        // The menu follows the species: rouse on where finders invite, off where they don't (owner, review of #202 D2).
+        menu: menuFor(c.menu, (SPECIES[species]?.params.invitePace ?? 0) > 0),
         seed: Math.max(1, Math.floor(seed) || 1),
         started: true,
         playing: !tutorial,
