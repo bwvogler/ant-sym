@@ -6282,3 +6282,30 @@ Merging is not delegated: PRs wait for the owner.
 - the gestures on a real phone and tablet with the children (the owner's);
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
+
+### 73.3 Slice 2: tweezers, a real-ant no-entry sign, and what happened (design, ja-b3us, 2026-11-15)
+
+**Research basis:** [builder.md](builder.md) "Slice 2".
+- Displaced desert ants run off their whole home vector, then search in loops centred there (Wehner & Srinivasan 1981, **unverified**).
+- "No entry" turns trail followers away at forks: 71 % took the other branch (Robinson et al. 2005).
+
+**Decisions.**
+- Tweezers, no-entry paint and notices of what happened, in one PR (owner, 2026-11-15).
+- No entry is the real-ant stop sign: trail followers turn away, wanderers don't (owner, 2026-11-15, over a made-up fence).
+
+**The mechanic.**
+- **Tweezers:** `Builder.moveAnt` sets an ant down elsewhere on the plane, and shifts its belief of home (`driftSurf`) by the same distance, so it runs its old vector.
+- **No-entry paint:** every colony's `noEntry` along the stroke, topped up as a crayon line is. Followers read it at `NO_ENTRY_PAINTED` (4) while `noEntryAvoid` is 0, and the ants still lay none. **Off:** with no paint the field never wakes, so nothing changes.
+- **`Builder.watch`:** says, once each, when sugar is found and when it is gone, when a crayon line is followed, and when a moved ant gets home or dies.
+
+**Assays and targets.**
+- B7 `noEntryFork`: ≥ 70 % on the unpainted branch in ≥ 8 of 10 seeds.
+- B8 `tweezers`: report the share that reach their would-be home before home, and the share home in 300 s.
+
+**Cost:** none. No lane, field, legend or question changes.
+
+**Beads:**
+- `ja-b3us` (this);
+- `.1` assays;
+- `.2` the tools and `watch`;
+- `.3` the tray, notices and Learn.
