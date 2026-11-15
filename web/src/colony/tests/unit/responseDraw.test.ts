@@ -90,6 +90,38 @@ test("an ant keeps the answer it drew while its situation holds; ants in one sit
   assert.ok(Math.abs(all / total - 0.3) < 0.04, `fight ${(all / total).toFixed(3)} of ${total}`);
 });
 
+test("the draw sharpens with the colony's temperature, and each hook draws apart from the others", () => {
+  const c = colony();
+  const k = responseKey("contact", near);
+  const share = () => {
+    let fights = 0;
+    let total = 0;
+    for (let s = 0; s < 300; s++)
+      for (let i = 0; i < c.gen.length; i++) {
+        if (responseOf("contact", `${k}#${s}`, "fight=0.3,flee=0.7", c.antDraw(i)) === "fight") fights++;
+        total++;
+      }
+    return fights / total;
+  };
+  c.params.sampleTemp = 0.3;
+  // p^(1/T), renormalised: 0.3^(10/3) / (0.3^(10/3) + 0.7^(10/3)) ≈ 0.057
+  const cold = share();
+  assert.ok(cold > 0.035 && cold < 0.08, `fight at T 0.3: ${cold.toFixed(3)}`);
+  c.params.sampleTemp = 1;
+  assert.ok(Math.abs(share() - 0.3) < 0.03);
+  // One ant, one situation: its get and its drop are separate draws (an ant bold in every lane at once would be one draw).
+  let agree = 0;
+  let total = 0;
+  for (let s = 0; s < 100; s++)
+    for (let i = 0; i < c.gen.length; i++) {
+      const key = `${k}#${s}`;
+      if (responseOf("get", key, "true=0.5,false=0.5", c.antDraw(i)) === responseOf("drop", key, "true=0.5,false=0.5", c.antDraw(i)))
+        agree++;
+      total++;
+    }
+  assert.ok(Math.abs(agree / total - 0.5) < 0.05, `get and drop agree ${(agree / total).toFixed(3)}`);
+});
+
 test("an ant draws afresh after `reroll` seconds, each at its own phase; with reroll 0 it never does", () => {
   const c = colony();
   const k = responseKey("contact", near);

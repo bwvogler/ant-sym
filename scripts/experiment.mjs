@@ -148,7 +148,7 @@ async function main() {
   if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
     const cache = loadCache(policy.slice(6));
-    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } =
+    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION, validResponse } =
       await import("../web/src/colony/index.ts");
     const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
     if (JSON.stringify(cache.version) !== JSON.stringify(want))
@@ -160,6 +160,10 @@ async function main() {
       fail(
         `${policy.slice(6)} was asked under other questions or another doctrine than the code's (cache contexts differ). Ask afresh (scripts/colony-live.mjs).`,
       );
+    for (const [hook, table] of Object.entries(cache.responses ?? {}))
+      for (const [k, a] of Object.entries(table))
+        if (typeof a !== "string" || !validResponse(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (hook), a))
+          fail(`${policy.slice(6)}: ${hook} answer ${JSON.stringify(a)} for ${k} is not one its question allows.`);
     const n = (t) => Object.keys(t ?? {}).length;
     console.log(
       `Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(

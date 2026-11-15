@@ -41,6 +41,18 @@ const { localPolicy, localStance, topOf } = await import("../web/src/colony/inde
 const { localResponses, responseOf } = await import("../web/src/colony/index.ts");
 
 const cache = JSON.parse(readFileSync(file, "utf8"));
+// A cache asked under other brain versions keeps its answers in another form (review of #223: version-11 responses were
+// booleans): refuse it here, before reading them, as experiment.mjs would.
+{
+  const { COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/index.ts");
+  const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
+  if (JSON.stringify(cache.version) !== JSON.stringify(want)) {
+    console.error(
+      `${file} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`,
+    );
+    process.exit(1);
+  }
+}
 const outDir = join(root, "experiments", "out", "ablate", `${basename(file, ".json")}-${opt("assay", "game")}-${opt("seconds", "300")}`);
 mkdirSync(outDir, { recursive: true });
 

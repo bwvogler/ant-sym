@@ -81,7 +81,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     !pellet &&
     colony.putAt[i] === NO_KEY &&
     map.food.get(CELL[0], CELL[1]) > 0 &&
-    resp.get(touch(colony, i, toEnemy !== null, mode, item, "food")) &&
+    resp.get(touch(colony, i, toEnemy !== null, mode, item, "food"), colony.antDraw(i)) &&
     takeFoodCell(map, CELL[0], CELL[1])
   ) {
     colony.carrying[i] = 1;
@@ -176,7 +176,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // home from a search (not met in practice; a guard).
     if (p.forageDig > 0 && colony.since[i] > 0 && mode === RETURN && !carrying && !pellet && colony.queen && colony.band(i) === 2)
       colony.digBout[i] = p.forageDig;
-    if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item))) {
+    if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))) {
       colony.carrying[i] = 0;
       colony.stored++;
       colony.larder++;

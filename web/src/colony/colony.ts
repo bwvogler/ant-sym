@@ -538,7 +538,9 @@ export class Colony {
 
   /**
    * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
-   * situation while the ant holds it, until its next `reroll`. One object for every ant, so asking costs nothing per step.
+   * situation while the ant holds it, until its next `reroll`. One object for every ant, so handing it out allocates nothing; a
+   * draw itself hashes two strings (a game whose six hooks all draw ran 10–14 % slower, review of #223: cache the ant's part of
+   * the hash if a response lane is ever asked on the page).
    */
   antDraw(i: number): AntDraw {
     this.#drawAnt = i;
