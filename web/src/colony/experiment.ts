@@ -663,7 +663,7 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
   };
 }
 /** A11 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), its deaf and straight runs too. */
-function raidFindAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+export function raidFindAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   return {
     id: "raidFind",
     title: "A11 raiders find the rival: the raid trail's gain, and stuck ants",
@@ -730,7 +730,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
   };
 }
 /** A12 on the arenas `remap` makes of its own (as they are, or one world's plane: onPlane), its forage-stance control too. */
-function raidStopAssay(remap: (spec: RunSpec) => RunSpec): Assay {
+export function raidStopAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   return {
     id: "raidStop",
     title: "A12 a raid no one can find doesn't starve the colony",

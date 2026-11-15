@@ -21,7 +21,9 @@ import {
   onPlane,
   outingProbe,
   ONE_PENDING,
+  raidFindAssay,
   raidProbe,
+  raidStopAssay,
   R1_ANTS,
   R1_DETOUR,
   R1_FAR,
@@ -419,4 +421,21 @@ test("A11 and A12 run on one world: in ONE_ASSAYS, none pending", () => {
     assert.ok(a && isOneWorld(specMap(a.spec(1))), id);
   }
   assert.deepEqual(ONE_PENDING, {});
+});
+
+test("A11 and A12 remap their control runs too (deaf, straight; forage), so a gain or share compares runs on the same arena", () => {
+  // Review of #210 (S1): taking the remap out of a control run passed every other test here.
+  for (const [make, runs] of [
+    [raidFindAssay, 3],
+    [raidStopAssay, 2],
+  ] as const) {
+    let calls = 0;
+    const assay = make((spec: RunSpec) => {
+      calls++;
+      return { ...spec, seconds: 1 };
+    });
+    const { result } = runGame(assay.spec(1));
+    assay.score(result);
+    assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
+  }
 });
