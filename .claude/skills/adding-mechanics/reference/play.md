@@ -12,7 +12,7 @@ Realism is the floor, not the point. A mechanic earns its place when it makes th
 
 - **The player is the fungus.** Its policy is the game's main handle: an aim in words, a menu of levers, a reach that grows with the mycelium (PRD §50, §50.12). The player never steers an ant.
 - **No colony is the player's** (§21). A colony's doctrine is its nature, a scenario setting. A mechanic that only changes what ants do is not a new lever for the player, unless the fungus can bend the cue it runs on. Ask: *which fungus lever reaches this?*
-- **The main screen keeps some magic** (§50): the table and the numbers sit in Details and Learn. The effect of a mechanic has to be visible on the field itself.
+- **The main screen keeps some magic** (§50): the table and the numbers sit in Lab mode and the Codex. The effect of a mechanic has to be visible on the field itself.
 
 ## Questions to answer
 

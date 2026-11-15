@@ -24,6 +24,7 @@ test("each page key's action", () => {
   assert.deepEqual(pageKey(press("i"), SPEEDS), { kind: "lens" });
   assert.deepEqual(pageKey(press("V"), SPEEDS), { kind: "view" }, "Shift or Caps Lock still switches");
   assert.deepEqual(pageKey(press("f"), SPEEDS), { kind: "host" });
+  assert.deepEqual(pageKey(press("L"), SPEEDS), { kind: "lab" });
   assert.equal(pageKey(press("x"), SPEEDS), null);
 });
 
@@ -54,7 +55,7 @@ test("the sheet lists every page key, and every key it lists away from the map i
     if (k === "Esc") continue; // each surface's own (the menu, the map, a drawer)
     assert.notEqual(pageKey(asKey[k] ?? press(k), SPEEDS), null, `the sheet lists “${k}”`);
   }
-  for (const k of ["?", " ", "1", "2", "3", "4", "i", "v", "f"])
+  for (const k of ["?", " ", "1", "2", "3", "4", "i", "v", "f", "l"])
     assert.ok(anywhere.includes(k === " " ? "Space" : k), `the page answers “${k}”: the sheet lists it`);
   assert.ok(
     SHORTCUTS.filter((g) => g.group !== "Anywhere").every((g) => g.rows.every((r) => r.map)),

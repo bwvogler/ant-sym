@@ -37,10 +37,10 @@ export function policyLock(b: Backend | null, s: JevStatus, starting = false): s
     if (reason === "spend-cap")
       return `Jev's spend cap for this run ($${(s.run?.caps.capUsd ?? 0).toFixed(2)}) is reached: the game plays the answers Jev already gave, and policies can't be changed.`;
     if (reason === "time-cap") return null;
-    if (reason === "user") return "Jev is stopped (Details → Resume Jev): policies can't be changed until it runs.";
-    return `Jev stopped${s.lastError ? `: ${s.lastError}` : ""}. Policies can't be changed until it runs (Details → Resume Jev).`;
+    if (reason === "user") return "Jev is stopped (Lab → Jev → Resume Jev): policies can't be changed until it runs.";
+    return `Jev stopped${s.lastError ? `: ${s.lastError}` : ""}. Policies can't be changed until it runs (Lab → Jev → Resume Jev).`;
   }
-  return s.lastError ? `Jev couldn't start: ${s.lastError}. Details → Resume Jev to try again.` : null;
+  return s.lastError ? `Jev couldn't start: ${s.lastError}. Lab → Jev → Resume Jev to try again.` : null;
 }
 
 /**
@@ -51,7 +51,7 @@ export function shouldStart(b: Backend | null, s: JevStatus, starting: boolean):
   return !starting && s.phase !== "running" && policyLock(b, s, starting) === null;
 }
 
-/** Whether the player can start Jev by hand (Details → Resume): a server and key (unlocked, when hosted), and no run on or starting. */
+/** Whether the player can start Jev by hand (Lab → Jev → Resume): a server and key (unlocked, when hosted), and no run on or starting. */
 export function canResume(b: Backend | null, s: JevStatus, starting: boolean): boolean {
   return !!b?.hasBackend && b.hasKey && !b.needsPass && s.phase !== "running" && !starting;
 }
