@@ -79,7 +79,7 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
   assert.equal(good.code, 0, good.out);
   assert.match(good.out, /^seeds=\[1,2,3,7\]$/m);
   assert.match(good.out, /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert$/m);
-  for (const bad of <Record<string, string>[]>[
+  const bads: Record<string, string>[] = [
     { ASSAYS: "a; rm -rf /" },
     { ASSAYS: "all merge" },
     { SEEDS: "1-50" },
@@ -88,7 +88,8 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     { SET: "*" },
     { SPECIES: "../x" },
     { SECONDS_IN: "1 2" },
-  ]) {
+  ];
+  for (const bad of bads) {
     const r = await plan(bad);
     assert.equal(r.code, 1, `${JSON.stringify(bad)} was accepted: ${r.out}`);
     assert.match(r.out, /::error title=assays input::/);
