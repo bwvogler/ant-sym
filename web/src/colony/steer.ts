@@ -5,7 +5,7 @@ import { backfill, enterStale, staleStep } from "./dig.ts";
 import { avoid, choose, climb, handOnWall, inReach, NO_CELL, SOIL_FILL, tunnel, turnToward } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, SIDE, nx as stepX, ny as stepY } from "./hex.ts";
 import { believe, homeScentNear, routeFail, searchOn } from "./homing.ts";
-import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
+import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_PAINTED, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
 import { touch, touchProbe } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import {
@@ -25,6 +25,23 @@ import { fetches, walkTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
 import { mill, onMLine, siteAim } from "./plane.ts";
+import type { Channel } from "./pheromone.ts";
+
+const STORE_MARKS: readonly Channel[] = ["store"];
+const BROOD_ODOUR: readonly Channel[] = ["broodOdour"];
+
+/** The channels `marks` (floor marks, brood odour), summed, at ant i's antenna on bearing b: read through open ground only (inReach), else 0. */
+function marksAt(col: Colony, i: number, b: number, marks: readonly Channel[]): number {
+  const x = col.x[i];
+  const y = col.y[i];
+  const d = col.params.sensorDistance;
+  const sx = x + Math.cos(b) * d;
+  const sy = y + Math.sin(b) * d;
+  if (!inReach(col.map, x, y, sx, sy)) return 0;
+  let v = 0;
+  for (const m of marks) v += col.ph.read(m, sx, sy);
+  return v;
+}
 
 export function steer(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
@@ -343,11 +360,14 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       let gl = fl;
       let gf = ff;
       let gr = fr;
-      if (p.noEntryAvoid > 0 && ph.live("noEntry") && outside) {
+      // With the colony's own off (noEntryAvoid 0: it lays none), only the builder's paint can wake the field: read at
+      // NO_ENTRY_PAINTED (docs/builder.md "Slice 2"). With no paint the field never wakes, so nothing here runs.
+      const avoid = p.noEntryAvoid > 0 ? p.noEntryAvoid : NO_ENTRY_PAINTED;
+      if (ph.live("noEntry") && outside) {
         const x = col.x[i];
         const y = col.y[i];
         const d = p.sensorDistance;
-        const ne = (b: number) => p.noEntryAvoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
+        const ne = (b: number) => avoid * Math.max(0, ph.read("noEntry", x + Math.cos(b) * d, y + Math.sin(b) * d));
         if (gl < SEEN) gl = Math.max(0, gl - ne(h - a));
         if (gf < SEEN) gf = Math.max(0, gf - ne(h));
         if (gr < SEEN) gr = Math.max(0, gr - ne(h + a));
@@ -445,21 +465,27 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     else if (p.restFetch > 0 && col.queen && col.under[i] && !carrying && !pellet && !col.broodHeld[i] && fetches(col, i)) {
       // Fetching in a chamber (ja-4rfr): toward the stores' marks its antennae meet (as toFood in a tunnel), through
       // open ground; none in reach, it searches the nest (it is not leaving: a hungry old forager headed for the hole).
-      const x = col.x[i];
-      const y = col.y[i];
-      const d = p.sensorDistance;
-      const read = (b: number) => {
-        const sx = x + Math.cos(b) * d;
-        const sy = y + Math.sin(b) * d;
-        return inReach(map, x, y, sx, sy) ? col.ph.read("store", sx, sy) : 0;
-      };
-      const l = read(h - a);
-      const f = read(h);
-      const r = read(h + a);
+      const l = marksAt(col, i, h - a, STORE_MARKS);
+      const f = marksAt(col, i, h, STORE_MARKS);
+      const r = marksAt(col, i, h + a, STORE_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if (col.queen?.alive && (col.band(i) === 0 || col.reverts(i)) && col.under[i])
-      h = turnToward(h, Math.atan2(col.queen.y - col.y[i], col.queen.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
-    else if (col.entrance && col.outbound(i) && col.under[i])
+    } else if ((col.band(i) === 0 || col.reverts(i)) && col.under[i] && (p.broodClimb > 0 || col.queen?.alive)) {
+      if (p.broodClimb > 0) {
+        // A young ant in a chamber keeps to the brood by its odour (ja-k4k.15, docs/brood-odour.md): it climbs it at its
+        // antennae through open ground, and searches where it smells none. Not the queen's position, nor the royal and
+        // brood floor marks every ant lays (#192: they led the young off the brood).
+        const l = marksAt(col, i, h - a, BROOD_ODOUR);
+        const f = marksAt(col, i, h, BROOD_ODOUR);
+        const r = marksAt(col, i, h + a, BROOD_ODOUR);
+        h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * p.broodClimb) + noise * p.wander * 0.5 : noise * p.wander;
+      } else {
+        // Off (broodClimb 0): to the queen's position, the scripted rule this replaces (ja-k4k.2.1).
+        const q = col.queen!;
+        h = turnToward(h, Math.atan2(q.y - col.y[i], q.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
+      }
+    } else if (col.entrance && col.outbound(i) && col.under[i])
+      // An old forager in a chamber: at the hole's position (ja-k4k.2.2). Aimed where its drifting nest vector puts the
+      // hole instead, a few units off, it pressed on the wall beside the chamber's way out (#192: economy.test collapsed).
       h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;
     else if (
       p.foodPlume > 0 &&
@@ -494,7 +520,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   // field (exact as-is: × 1, nothing leaked).
   // Which trail, and how much, are the trail and trailRate responses.
   const tt = touch(col, i, toEnemy !== null, mode, item);
-  const trail = resp.trail(tt);
+  const trail = resp.trail(tt, col.antDraw(i));
   if (trail !== "none") {
     const laid =
       p.deposit *

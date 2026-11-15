@@ -134,7 +134,16 @@ test("the field guide leaves out the entries on trails a species doesn't lay: th
     ids(DESERT_ANT).includes("desert-ant") && !ids(GENERIC_ANT).includes("desert-ant"),
     "the desert ant's own entry, only in its games (ja-rf5.8)",
   );
-  assert.deepEqual(gone, ["food-trail", "home-trail", "food-quality", "double-bridge", "no-entry", "alarm", "builder-crayon"]);
+  assert.deepEqual(gone, [
+    "food-trail",
+    "home-trail",
+    "food-quality",
+    "double-bridge",
+    "no-entry",
+    "alarm",
+    "builder-crayon",
+    "builder-noentry",
+  ]);
   assert.ok(ids(DESERT_ANT).includes("way-home"), "the way home, without a trail, is every species' (owner, review of #144 D1)");
   const note = (species: Species) => {
     const g = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false, species }, mulberry32(1));

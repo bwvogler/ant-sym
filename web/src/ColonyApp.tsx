@@ -15,6 +15,7 @@ import {
   GENERIC_ANT,
   INFECTED,
   Builder,
+  type BuildEvent,
 } from "./colony/index.ts";
 import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
@@ -224,8 +225,17 @@ export default function ColonyApp() {
         ? {
             tool: picked.tool === "move" ? null : picked.tool,
             smell: smell && !little,
+            onTweeze: (k, i, x, y, first) => {
+              // The first touch only lifts it (it stays where it is); each move after carries it on, as one undo.
+              if (first) {
+                builder.begin();
+                play("tweezers");
+                return;
+              }
+              if (builder.moveAnt(k, i, x, y, true)) setBuilt((n) => n + 1);
+            },
             onStroke: (layer, points, first) => {
-              if (picked.tool === "move") return;
+              if (picked.tool === "move" || picked.tool === "tweezers") return;
               if (first) builder.begin();
               const n = builder.apply({ tool: picked.tool, layer, points, colony: picked.colony ?? 0 }, true);
               // A sound for the first touch, and now and then while a drag changes the ground.
@@ -240,6 +250,14 @@ export default function ColonyApp() {
         : null,
     [building, picked, smell, little, builder],
   );
+  // What the ants did with the builds (docs/builder.md "Slice 2"): read once a second, said as notices for the bell.
+  // Builds stay in the game after the builder closes, so this runs whether or not it is open.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      for (const e of builder.watch()) pushToast(buildNotice(e), e.kind === "antLost" ? "info" : "good");
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [builder]);
   // Ctrl/⌘+Z undoes a stroke while building; Escape leaves the builder.
   useEffect(() => {
     if (!building) return;
@@ -1065,6 +1083,23 @@ function Settings({
       </a>
     </div>
   );
+}
+
+/** A builder event (Builder.watch) as a notice, in words a child can follow. */
+function buildNotice(e: BuildEvent): string {
+  const food = (t: "sugar" | "crumb") => (t === "sugar" ? "sugar 🍬" : "crumbs 🍪");
+  switch (e.kind) {
+    case "foodFound":
+      return `An ant found your ${food(e.tool)}!`;
+    case "foodGone":
+      return `Your ${food(e.tool)} ${e.tool === "sugar" ? "is" : "are"} all gone: the ants carried it home.`;
+    case "lineFollowed":
+      return `${e.ants} ${colonyName(e.colony)} ants are following your crayon line! 🖍️`;
+    case "antHome":
+      return `The ${colonyName(e.colony)} ant you moved found its way home in ${Math.round(e.seconds)} s! 🏠`;
+    case "antLost":
+      return `The ${colonyName(e.colony)} ant you moved didn't make it home.`;
+  }
 }
 
 /** The builder's sounds and spoken tool names (PRD §73): on unless turned off, per browser. */

@@ -88,3 +88,31 @@ export function pick(
   }
   return w[w.length - 1]![0];
 }
+
+/**
+ * What a colony hands a response hook to draw with (ja-m7rr). The hooks are asked every step, not once a situation as the mode
+ * is, so a fresh draw each step would flip a fighter between fight and flee step by step, and a carrier with a one-in-ten
+ * "put down" would drop its load within a few steps. Instead `draw(salt)` is uniform in [0, 1) for the ant being stepped and
+ * `salt` (the hook and its situation's key) and the same on every call while it holds: an ant keeps what it drew for as long as
+ * its situation lasts, and draws afresh after `reroll` seconds, as with its mode. `temperature` is the colony's, as for the mode.
+ */
+export interface AntDraw {
+  (salt: string): number;
+  readonly temperature: number;
+}
+
+/** A uniform in [0, 1) from a string (FNV-1a, then murmur3's finaliser so that near strings land far apart). */
+export function unitOf(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** `pick` for a response: drawn with the ant's draw for `salt` (once), or with no draw Jev's choice. */
+export function pickFor(answer: string, draw: AntDraw | undefined, salt: string): string {
+  if (!draw) return topOf(answer);
+  const one = () => draw(salt);
+  return pick(answer, Object.assign(one, { temperature: draw.temperature }));
+}

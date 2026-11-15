@@ -27,7 +27,8 @@
 //  10. the palette, the keys, the shortcuts sheet and the lens (PRD §69.3): Ctrl+K, the speeds and Space, ?, Escape one thing
 //     at a time, the lens over a hole, pinned, on the other view, and the lens button on a 360 px phone.
 //  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
-//     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
+//     rock wall and a crayon line by drags, one undo for a drag, a no-entry sign, an ant carried by the tweezers, Move pans,
+//     dig below, Done; saved, reloaded, the wall kept.
 //  12. the Codex (ja-mvo9.3), paused at the landing: a first host opens Jobs by age with one notice and a badge; the new
 //     mark, Read it anyway, Show every entry, the palette, a reload, starting afresh.
 //  13. specimens (PRD §69.5), paused: pin from the ant panel, follow from the list (the camera to its view), unpin (focus
@@ -1279,6 +1280,61 @@ try {
     check(lines === 1, `a crayon drag draws one line (${lines})`);
     await tool("Undo");
     check((await g(() => window.jevAnts.game.crayons.length)) === 0, "one undo takes the whole crayon drag back");
+    // The no-entry sign (PRD §73.3): every colony's "no entry" wakes under the stroke.
+    await tool("No entry sign");
+    await drag(mx - 90, my + 40, mx + 90, my + 40);
+    check(
+      await g(() => window.jevAnts.game.colonies.every((c) => c.layers[0].ph.live("noEntry"))),
+      "a no-entry drag lays every colony's sign",
+    );
+    await tool("Undo");
+    // The tweezers (PRD §73.3): a drag from an ant on the top view carries it, and its belief of home with it.
+    await tool("Tweezers: pick up an ant");
+    // The game is paused at its start: step it on until an ant is out on the surface, in view.
+    const antInView = () =>
+      bp.evaluate(() => {
+        const cv = document.querySelector("canvas");
+        const cam = window.jevAnts.camera("above");
+        const k = cv.clientWidth / cv.width;
+        // The builder opens on the colony the fungus landed by.
+        const kk = window.jevAnts.game.landed?.colony ?? 0;
+        const c = window.jevAnts.game.colonies[kk];
+        let best = null;
+        for (let i = 0; i < c.n; i++) {
+          if (!c.alive[i] || c.layer[i] !== 0) continue;
+          const sx = ((c.x[i] - cam.x) * cam.zoom + cv.width / 2) * k;
+          const sy = ((c.y[i] - cam.y) * cam.zoom + cv.height / 2) * k;
+          const d = Math.hypot(sx - cv.clientWidth / 2, sy - cv.clientHeight * 0.4);
+          if (!(sx > 40 && sx < cv.clientWidth - 40 && sy > 160 && sy < cv.clientHeight * 0.6) || (best && d >= best.d)) continue;
+          // Dropped 80 px to one side, on open ground (the tweezers refuse rock): that side, if either.
+          const map = window.jevAnts.game.layers[0];
+          const open = (wx, wy) => {
+            const cy = Math.round(wy / (Math.sqrt(3) / 2));
+            const cx = Math.round(wx - (cy & 1) / 2);
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (map.rock.get(cx + dx, cy + dy) !== 0) return false;
+            return true;
+          };
+          const dw = 80 / k / cam.zoom;
+          const side = open(c.x[i] + dw, c.y[i]) && sx + 80 < cv.clientWidth - 10 ? 1 : open(c.x[i] - dw, c.y[i]) && sx - 80 > 10 ? -1 : 0;
+          if (side) best = { k: kk, i, sx, sy, d, x: c.x[i], side };
+        }
+        return best;
+      });
+    let ant = await antInView();
+    for (let k = 0; k < 40 && !ant; k++) {
+      await bp.evaluate(() => window.jevAnts.step(30));
+      ant = await antInView();
+    }
+    check(ant !== null, "an ant on the top view to pick up");
+    await drag(ant.sx, ant.sy, ant.sx + 80 * ant.side, ant.sy);
+    const after = await bp.evaluate(
+      ([k, i]) => [window.jevAnts.game.colonies[k].x[i], window.jevAnts.game.colonies[k].carriedX[i]],
+      [ant.k, ant.i],
+    );
+    check(
+      Math.abs(after[0] - ant.x) > 2 && Math.abs(after[1]) > 2,
+      `the tweezers carry the ant, and its belief of home with it (${after.map((v) => v.toFixed(1))})`,
+    );
     const cam0 = await g(() => window.jevAnts.camera("above"));
     await tool("Move");
     await until(
