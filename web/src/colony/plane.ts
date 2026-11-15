@@ -66,7 +66,10 @@ export function siteAim(c: Colony, i: number): number {
     const { w, h } = c.map.size;
     s = c.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
     // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
-    if (c.params.siteGive > 0 && s > c.params.siteGive * PI_DRIFT * Math.hypot(c.foodX[i], c.foodY[i])) {
+    // With steering weights on (ja-ykmu.3) the memory weight gives a spent spot up as siteGive 1 does: without it, the weight
+    // cost ~14 % of the food against a placebo over seeds 1-20, with it ~4 % (PRD S3).
+    const give = c.params.siteGive > 0 ? c.params.siteGive : c.params.steerLane > 0 ? 1 : 0;
+    if (give > 0 && s > give * PI_DRIFT * Math.hypot(c.foodX[i], c.foodY[i])) {
       c.foodX[i] = c.foodY[i] = NaN;
       c.search[i] = 0;
       c.searchA[i] = 0;
@@ -143,4 +146,16 @@ export function pointDown(c: Colony, i: number, x0: number, y0: number, h: numbe
   }
   c.cellAtX[i] = NaN; // its cell is worked out afresh
   return h;
+}
+
+/**
+ * One world's plane (ja-ykmu.3): whether ant i is within params.findNear of where it believes its last find is (its own
+ * vector and the remembered offset, as siteAim reads them; no true coordinate). False with no find remembered.
+ */
+export function nearFind(c: Colony, i: number): boolean {
+  if (Number.isNaN(c.foodX[i])) return false;
+  const odo = c.odoSurf[i];
+  const tx = c.nest.x + odo * c.driftSurf[i] + c.foodX[i];
+  const ty = c.nest.y + odo * c.driftSurfY[i] + c.foodY[i];
+  return Math.hypot(tx - c.x[i], ty - c.y[i]) < c.params.findNear;
 }

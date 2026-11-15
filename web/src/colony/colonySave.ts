@@ -68,6 +68,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "holeCells",
   "policy",
   "stancePolicy",
+  "steerPolicy",
   "responses",
   "onBury",
   "onDie",

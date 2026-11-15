@@ -89,7 +89,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   ) {
     colony.carrying[i] = 1;
     colony.quality[i] = prey ? 1 : qualityAt(map, CELL[0], CELL[1]);
-    if (p.siteFidelity > 0 && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
+    // Remembered too while ants ask for steering weights (ja-ykmu): the `memory` weight steers by it.
+    if ((p.siteFidelity > 0 || p.steerLane > 0) && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
     colony.homeAfresh(i);
     colony.since[i] = 0;
     colony.fatigue[i] = 0; // found food: the search succeeded

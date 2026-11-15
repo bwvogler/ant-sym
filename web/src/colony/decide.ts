@@ -6,7 +6,20 @@ import type { Item } from "./responses.ts";
 import { touch } from "./sense.ts";
 import { MODE_STRIDE, packSituation } from "./situation.ts";
 import type { AntStep } from "./step.ts";
-import { EXPLORE, FIGHT, FOLLOW, type Mode, MODES, RETURN, type SpeciesSituation, type Stance, STANCES, trailLevel } from "./vocab.ts";
+import {
+  encodeSteering,
+  EXPLORE,
+  FIGHT,
+  FOLLOW,
+  type Mode,
+  MODES,
+  RETURN,
+  type SpeciesSituation,
+  type Stance,
+  STANCES,
+  STEER_NEUTRAL,
+  trailLevel,
+} from "./vocab.ts";
 
 export function decide(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
@@ -123,20 +136,16 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     }
     if (before !== col.asked[i] && !waiting) {
       col.policyDrew = false;
-      mode = MODES.indexOf(
-        col.policy(
-          asks ?? {
-            mode: MODES[mode] as Mode,
-            tired,
-            foodTrail: food,
-            homeTrail: home,
-            alarm,
-            enemy: enemy ? "near" : "none",
-            stance: col.stanceOf(i),
-          },
-          col.policyDraw,
-        ),
-      );
+      const sit = asks ?? {
+        mode: MODES[mode] as Mode,
+        tired,
+        foodTrail: food,
+        homeTrail: home,
+        alarm,
+        enemy: enemy ? "near" : "none",
+        stance: col.stanceOf(i),
+      };
+      mode = MODES.indexOf(col.policy(sit, col.policyDraw));
       col.redraw[i] = col.policyDrew && p.reroll > 0 ? p.reroll : -1;
       if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
       if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
@@ -146,6 +155,18 @@ export function decide(col: Colony, i: number, s: AntStep): void {
       if (mode === FIGHT && !enemy && col.stanceOf(i) === "raid" && col.queen && !col.mayGoOut(i)) mode = EXPLORE;
       if (mode === RETURN && col.mode[i] !== RETURN) col.homeAfresh(i);
       col.mode[i] = mode;
+      // Its steering weights (ja-ykmu; docs/steering.md): asked for the situation with the mode it now has, when that
+      // sends it out exploring or following; any other mode steers by its own routine, so its code goes back to none.
+      // Its weights with no find remembered, or, remembering one, away from it and near it: steer.ts takes whichever its memory says.
+      if (p.steerLane > 0) {
+        const out = mode === EXPLORE || mode === FOLLOW;
+        const now = { ...sit, mode: MODES[mode] as Mode };
+        const remembers = !Number.isNaN(col.foodX[i]);
+        col.steerCode[i] = out
+          ? encodeSteering(col.steerPolicy({ ...now, find: remembers ? "far" : "none" }, col.policyDraw))
+          : STEER_NEUTRAL;
+        col.steerNear[i] = out && remembers ? encodeSteering(col.steerPolicy({ ...now, find: "near" }, col.policyDraw)) : col.steerCode[i];
+      }
       col.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
       col.seen[before] = 1;
       // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the

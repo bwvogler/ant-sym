@@ -18,6 +18,7 @@ import {
   type SpeciesSituation,
   type Stance,
   type StancePolicy,
+  type SteerPolicy,
   type StanceSituation,
   type Trail,
   FIGHT,
@@ -65,9 +66,9 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep, gatesFor } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
-import { localPolicy, localStance } from "./localRules.ts";
+import { localPolicy, localStance, localSteer } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
-export { localPolicy, localStance } from "./localRules.ts";
+export { localPolicy, localStance, localSteer } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -279,6 +280,8 @@ export class Colony {
   /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
   readonly policy: Policy;
   readonly stancePolicy: StancePolicy;
+  /** the weights an ant out exploring or following steers by (ja-ykmu; asked only with params.steerLane): set through `bindPolicy("steer", …)` */
+  readonly steerPolicy: SteerPolicy = localSteer;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
   stance: Stance = "forage";
@@ -713,7 +716,12 @@ export class Colony {
    */
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
-  bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
+  bindPolicy(lane: "steer", fn: SteerPolicy): void;
+  bindPolicy(lane: "mode" | "stance" | "steer", fn: Policy | StancePolicy | SteerPolicy): void {
+    if (lane === "steer") {
+      (this as { steerPolicy: SteerPolicy }).steerPolicy = fn as SteerPolicy;
+      return;
+    }
     const own = this as { policy: Policy; stancePolicy: StancePolicy };
     if (lane === "mode") own.policy = fn as Policy;
     else own.stancePolicy = fn as StancePolicy;

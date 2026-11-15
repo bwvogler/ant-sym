@@ -5,7 +5,7 @@
 //
 // Usage: node scripts/experiment.mjs <assay ...|all> [--one] [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
-//          [--policy cache:<file>] [--log <spec>] [--species <id>]
+//          [--policy cache:<file> | precache:<doctrine>] [--log <spec>] [--species <id>]
 //        node scripts/experiment.mjs merge <file.json ...> [--json out.json]
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
@@ -27,6 +27,13 @@
 // situations). Anything the cache lacks falls back to the local rule, so each
 // result says how much of it was Jev: cache hits per lane. An assay that sets
 // its own policy or stance (A6's raiders) keeps it.
+//
+// --policy precache:<doctrine> (ja-0kys) plays the mode answers the page ships for a preset doctrine
+// (web/public/precache/mode-<doctrine>.json: forage, cautious, warlike) for both colonies, drawn from as the page does
+// (colony/weighted.ts: --set both.sampleTemp=0 is Jev's choice). Situations it lacks play the local rule. A bundle asked
+// under other words than the code's is refused.
+//
+// --set both.<param>=… sets a colony parameter on both colonies at once.
 //
 // --log <spec> keeps a game journal of each run (colony/journal.ts, ja-8tb): what happened, as events. The spec is
 // a level (summary; detail adds births, deaths, infections; verbose adds every mode change and foraging digs), categories (colony, queen, stance, jev, birth, death, mode, infection, dig) and filters
@@ -152,8 +159,19 @@ async function main() {
   const picked = all ? list.map((a) => ({ assay: a, one })) : ids.map(pick).filter(Boolean);
   const chosen = picked.map((p) => p.assay);
   const cs = combos(sets);
-  if (policy) {
-    if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file>`);
+  if (policy?.startsWith("precache:")) {
+    const { policyContext, DOCTRINES } = await import("../web/src/colony/index.ts");
+    const id = policy.slice(9);
+    const d = DOCTRINES.find((x) => x.id === id);
+    if (!d) fail(`--policy ${policy}: no preset doctrine ${id} (have ${DOCTRINES.map((x) => x.id).join(", ")})`);
+    const index = JSON.parse(readFileSync("web/public/precache/index.json", "utf8"));
+    const b = index.bundles.find((x) => x.lane === "mode" && x.doctrine === id && !x.species);
+    if (!b) fail(`--policy ${policy}: no shipped mode bundle for ${id}`);
+    if (b.context !== policyContext(d.text))
+      fail(`--policy ${policy}: ${b.file} was asked under other words than the code's (re-ship it: scripts/precache.mjs)`);
+    console.log(`Playing the shipped mode answers for "${d.name}" (${b.answers} situations) for both colonies.`);
+  } else if (policy) {
+    if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file> or precache:<doctrine>`);
     const cache = loadCache(policy.slice(6));
     const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION, validResponse } =
       await import("../web/src/colony/index.ts");
@@ -355,7 +373,29 @@ async function work() {
     const { SPECIES } = await import("../web/src/colony/index.ts");
     o.game = { ...o.game, species: SPECIES[species] };
   }
-  if (policy) {
+  if (policy?.startsWith("precache:")) {
+    const { localPolicy, pick, situationKey } = await import("../web/src/colony/index.ts");
+    const table = new Map(JSON.parse(readFileSync(`web/public/precache/mode-${policy.slice(9)}.json`, "utf8")));
+    const mode = (s, draw) => {
+      const a = table.get(situationKey(s));
+      count("mode", a !== undefined);
+      return a === undefined ? localPolicy(s) : pick(a, draw);
+    };
+    Object.assign(brains, { policy: mode, rivalPolicy: mode });
+    // The doctrine's steering weights too, where a bundle ships (ja-ykmu.3): they act only with --set both.steerLane=1.
+    const { existsSync } = await import("node:fs");
+    const steerFile = `web/public/precache/steer-${policy.slice(9)}.json`;
+    if (existsSync(steerFile)) {
+      const { steerKey, steeringOf, localSteer } = await import("../web/src/colony/index.ts");
+      const steers = new Map(JSON.parse(readFileSync(steerFile, "utf8")));
+      brains.steer = (s, draw) => {
+        const key = steerKey(s);
+        const a = steers.get(key);
+        count("steer", a !== undefined);
+        return a === undefined ? localSteer(s) : steeringOf(key, a, draw);
+      };
+    }
+  } else if (policy) {
     const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
     const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/index.ts");
     const cache = loadCache(policy.slice(6));
