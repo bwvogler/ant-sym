@@ -39,6 +39,7 @@ test("a founded colony that falls does not end the game; the world's own colonie
   const g = new Game(smallOne(), { antCount: 120, rivalAnts: 120 }, mulberry32(11));
   run(g, 2);
   g.addColony({ ...beyondStart(g), antCount: 30, odour: 0 });
+  assert.equal(g.colonies[0]!.others.length, 2, "the other colonies know its nest");
   const c = g.colonies[2]!;
   for (let i = 0; i < c.n; i++) c.alive[i] = 0;
   if (c.queen) c.queen.alive = false;

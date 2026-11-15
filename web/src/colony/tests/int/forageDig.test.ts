@@ -55,7 +55,7 @@ test("forageDig: alone at a tunnel's dead end in a roomy nest, an ant on a bout 
 });
 
 test("forageDig: in a crowded nest, ants on a bout build and widen no chamber; middle-aged diggers do", () => {
-  // 200 ants crowd the founding nest (crowded()); 30 s.
+  // 200 ants crowd the founding nest (crowded()); 30 s. Measured (S2.3c): the middle-aged add 6-7 chamber cells (seeds 1-4), ants on a bout none.
   const run = (bout: boolean, seed: number) => {
     const w = smallOne(2);
     const c = new Colony(

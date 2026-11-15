@@ -14,7 +14,7 @@ const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 test("a game with no spores runs as before: the fungus stays idle and draws no random numbers", () => {
   const ticks = (paint: boolean): number[] => {
     const g = new Game(smallOne(4), { antCount: 100, rivalAnts: 100 }, mulberry32(77));
-    if (paint) g.paintSpores(-50, -50, 2, 3, 0.3, BLOOM); // off the map: paints nothing, infects nobody
+    if (paint) g.paintSpores(-50, -50, 2, 3, 0.3, BLOOM, CURTAIN); // off the map, on the layer every ant starts on: infects nobody
     for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
     return [g.player.stored, g.rival!.stored, g.player.losses, g.rival!.losses, g.player.x[0]];
   };

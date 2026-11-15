@@ -35,6 +35,8 @@ test("road signs: underground, a strong nest trail underfoot fades the in-nest m
 test("a homing ant whose vector is nearly right never searches: blocked anywhere but at its believed hole, it goes round (review of slice 1)", () => {
   // The first cut searched at any dead end on the ground: the offset grew a step per decision (3, −4.8, 7.7, … 50) and
   // sent ants 50–80 cells off. An ant whose vector is within 3 cells reaches its believed hole in sight of the real one.
+  // (On the plane a returner stalled SEARCH_STALL seconds searches wherever it is, by design, steer.ts: none of these
+  // samples stalls, 157 measured on S2.3c's review, so this reads the belief's search only.)
   const g = new Game(smallOne(5), { antCount: 100 }, mulberry32(5));
   const c = g.player;
   let samples = 0;

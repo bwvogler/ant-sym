@@ -60,7 +60,9 @@ test("a species of the descriptor's pieces alone plays a game: no trails laid, a
   const born = new Game(smallOne(3), { antCount: 30, rival: false, species: LONE }, mulberry32(3)).player;
   for (let i = 0; i < born.n; i++)
     if (born.alive[i]) assert.ok(Number.isFinite(born.lifespan[i]!) && born.lifespan[i]! <= 117, `lifespan ${born.lifespan[i]}`);
-  const g = play(LONE, 150);
+  // 90 s: with youngShare 0 nothing nurses, so none is born, and the colony falls at about 120 s (S2.3c).
+  const g = play(LONE, 90);
+  assert.equal(g.outcome(), "playing", "still playing at 90 s");
   const c = g.player;
   assert.equal(g.params.species, LONE);
   // The Game hands each parameter down (the ones this game does not exercise by behaviour: undertakes, the bands and the raid gates are pinned in undertakes.test.ts and ageStructure.test.ts).
