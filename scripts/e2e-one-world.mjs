@@ -1325,6 +1325,15 @@ try {
       Math.abs(after[0] - ant.x) > 2 && Math.abs(after[1]) > 2,
       `the tweezers carry the ant, and its belief of home with it (${after.map((v) => v.toFixed(1))})`,
     );
+    // Its way home is drawn from where it was set down (ja-cwjp): step the game a frame at a time until the trace has a
+    // few points (the field records one a frame, once the ant has walked on).
+    let trace = null;
+    for (let k = 0; k < 60 && !(trace && trace.points >= 3); k++) {
+      await bp.evaluate(() => window.jevAnts.step(3));
+      await bp.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      trace = await bp.evaluate(([k, i]) => window.jevAnts.traces().find((t) => t.k === k && t.i === i) ?? null, [ant.k, ant.i]);
+    }
+    check(trace !== null && (trace.points >= 3 || trace.end !== null), `the moved ant's way home is drawn (${JSON.stringify(trace)})`);
     const cam0 = await g(() => window.jevAnts.camera("above"));
     await tool("Move");
     await until(

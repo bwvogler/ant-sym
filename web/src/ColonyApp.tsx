@@ -71,6 +71,7 @@ import { openLearn } from "./ui/learn.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
 import { pushToast } from "./ui/toasts.ts";
+import { AntTraces } from "./ui/trace.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
@@ -147,6 +148,8 @@ export default function ColonyApp() {
   // The builder (docs/builder.md, PRD §73, ja-kjj8): a child's tools over the world, on or off at any point in a game. Its
   // builds go into the game itself, so a save keeps them; its undo is this page's, per game.
   const builder = useMemo(() => new Builder(game), [game]);
+  /** each moved ant's way home, drawn on the top view (ja-cwjp) */
+  const traces = useMemo(() => new AntTraces(builder), [builder]);
   const [building, setBuilding] = useState(false);
   const [toolKey, setToolKey] = useState<string>("move");
   const [little, setLittle] = useState(false);
@@ -513,6 +516,8 @@ export default function ColonyApp() {
     (window as unknown as { jevAnts?: unknown }).jevAnts = {
       game,
       notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
+      /** each moved ant's way home as drawn (ja-cwjp): its colony and slot, how many points, and how it ended */
+      traces: () => traces.traces.map((t) => ({ k: t.colony, i: t.i, points: t.xs.length, end: t.end })),
       follow: (k: number, i: number) => {
         const c = game.colonies[k];
         if (!c || !c.alive[i]) return false;
@@ -549,7 +554,7 @@ export default function ColonyApp() {
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, controls.view, setFollowed, sensed]);
+  }, [game, controls.view, setFollowed, sensed, traces]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   // The page (PRD §69, ja-mvo9.1): the map fills the screen; a HUD over its top; a rail of drawers at its left (a tab bar
   // on a phone); the followed ant in an inspector at its right (a sheet on a phone).
@@ -676,6 +681,7 @@ export default function ColonyApp() {
           onProbe={offerProbe}
           toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
           build={build}
+          traces={traces}
         />
         {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
       </div>

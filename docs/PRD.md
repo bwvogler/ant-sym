@@ -6355,6 +6355,7 @@ Merging is not delegated: PRs wait for the owner.
   - "…didn't make it home".
 - **Undone builds are forgotten.**
 - **Learn:** the tweezers and the no-entry sign entries, with their Codex rows.
+- **The way home drawn** (`ui/trace.ts`, ja-cwjp, after #229): on the top view, a moved ant's walk from where it was set down (a ring), its vector's run solid and its search loops dotted (the ant's `search`), until it goes down a hole (a dot) or dies; then it fades over 10 s. Builder on or off; an undone move draws nothing; carried again, it starts over. The page only reads the game.
 
 **Assays,** seeds 1–10, held-out seeds 11–20:
 
