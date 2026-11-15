@@ -98,7 +98,7 @@ export function useColonyJev(
   // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
 
-  // A run starts at the first miss where Jev can run (shouldStart), or by hand (Details → Resume).
+  // A run starts at the first miss where Jev can run (shouldStart), or by hand (Lab → Jev → Resume).
   const [starting, setStarting] = useState(false);
   const start = useCallback(() => {
     setStarting(true);

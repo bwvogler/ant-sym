@@ -12,7 +12,7 @@ The game journal (`web/src/colony/journal.ts`, ja-8tb) is a read-only observer: 
 | You are | Use |
 |---|---|
 | running assays or a whole game offline | `npm run exp -- game --seeds 1 --seconds 240 --log <spec>`: one `.txt` (a line an event, `  182.3s  c0 #523  death  killed`: to `grep`) and one `.jsonl` (the same events with exact `t` and a `data` object: for `jq`) per run in `experiments/out/journal/<assay>-<n>-seed<s>.jsonl` |
-| watching the page | `?log=<spec>` on the URL: events go to the browser console at the debug level (DevTools "Verbose"), and a Journal card in Details shows the newest 200 |
+| watching the page | `?log=<spec>` on the URL: events go to the browser console at the debug level (DevTools "Verbose"), and Lab mode's Journal tab shows the newest 200 |
 | in a test or script | `const j = new Journal(spec); … j.observe(game)` after each tick; `j.events`, `j.subscribe(fn)`; `journalProbe(j)` in `experiment.ts` makes it a probe |
 
 `node scripts/experiment.mjs --help` (any `scripts/*.mjs` takes `--help`) prints its usage.
