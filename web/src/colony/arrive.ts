@@ -171,6 +171,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.bestD[i] = Infinity;
     colony.stallT[i] = 0;
     if (colony.since[i] > 0) colony.hand[i] = rng() < 0.5 ? -1 : 1; // just in: the next trip out keeps whichever hand on the walls
+    // Home from a trip with nothing (ja-16rp): an old forager digs out from the nest for a while before it goes out again.
+    // Only just in (since > 0): an ant resting at home keeps what is left of its bout. No pellet: a spoil carrier isn't
+    // home from a search (not met in practice; a guard).
+    if (p.forageDig > 0 && colony.since[i] > 0 && mode === RETURN && !carrying && !pellet && colony.queen && colony.band(i) === 2)
+      colony.digBout[i] = p.forageDig;
     if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item))) {
       colony.carrying[i] = 0;
       colony.stored++;
@@ -205,6 +210,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     }
   } else colony.since[i] = colony.since[i] + dt;
   if (!atNest) colony.restT[i] = 0;
+  // A foraging dig (ja-16rp) runs down while the ant explores underground, and ends when it has food in its jaws.
+  if (colony.digBout[i] > 0) {
+    if (colony.carrying[i]) colony.digBout[i] = 0;
+    else if (colony.mode[i] === EXPLORE && colony.under[i] === 1) colony.digBout[i] = Math.max(0, colony.digBout[i] - dt);
+  }
   // Fatigue (ja-q47, docs/tiredness.md): what makes a forager tired is an unsuccessful search, and rest is a stay
   // inside. It grows only while the ant is out with empty jaws, exploring, following or fighting (a raid or a defence
   // tires it too: with fights left out, nothing sent a fighter home, raids never ended and combat losses rose 56-72 %,
@@ -293,7 +303,8 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // heads home the vector is fixed.
     // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
     if (colony.mode[i] !== RETURN || outward) colony.odoSurf[i] = colony.odoSurf[i] + Math.hypot(colony.x[i] - x0, colony.y[i] - y0);
-    if (p.routeMemory > 0 && (colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW) && !colony.carrying[i]) routeRecord(colony, i);
+    const out = colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW || (p.routeFight > 0 && colony.mode[i] === FIGHT);
+    if (p.routeMemory > 0 && out && !colony.carrying[i]) routeRecord(colony, i);
     colony.antCell(i);
     const k = colony.holeAt(CELL[0], CELL[1]);
     if (k >= 0 && (k === p.nest ? colony.wantsIn(i, colony.mode[i]) : colony.mode[i] === FIGHT && colony.stanceOf(i) === "raid")) {

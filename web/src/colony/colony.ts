@@ -1,5 +1,6 @@
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
+import type { OutField } from "./homing.ts";
 import { type Channel, type Mark, Pheromones } from "./pheromone.ts";
 import { Brood } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
@@ -212,7 +213,7 @@ export interface Layer {
   readonly entranceCol: number;
   readonly entranceRow: number;
   holes: number[];
-  outDist: Int32Array | null;
+  outDist: OutField | null;
   outCells: number[];
   outVersion: number;
   outAt: number;
@@ -314,7 +315,7 @@ export class Colony {
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   /** the side view: steps to this colony's hole through its tunnels, per cell (see outField), the cells it reached, and the ground's version and time it was built at */
-  outDist: Int32Array | null = null;
+  outDist: OutField | null = null;
   outCells: number[] = [];
   outVersion = -1;
   outAt = -Infinity;
@@ -685,6 +686,7 @@ export class Colony {
     this.clock[i] = 1;
     this.tolerance[i] = this.params.tolerance;
     this.calm[i] = 0;
+    this.rouse[i] = 0;
     this.mask[i] = 0;
     this.layGain[i] = 1;
     this.crossLay[i] = 0;
@@ -873,7 +875,7 @@ export class Colony {
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the side view with a queen). */
   outbound(i: number): boolean {
-    return this.queen !== null && this.band(i) === 2;
+    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i);
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
@@ -883,7 +885,16 @@ export class Colony {
 
   /** Whether ant i digs: in the side view with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
   digs(i: number): boolean {
-    return !this.queen || this.band(i) === 1;
+    return !this.queen || this.band(i) === 1 || this.forageDigs(i);
+  }
+
+  /**
+   * Whether ant i is on a foraging dig (forageDig, ja-16rp, docs/foraging-tunnels.md): an old forager home from a trip
+   * with nothing, digging out from the nest at tunnels' ends while its bout lasts. At walkTunnel's dead ends and forks it
+   * digs alone and whatever the nest's room (move.ts and hug's start still damp it); it builds no chambers.
+   */
+  forageDigs(i: number): boolean {
+    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2;
   }
 
   /** Whether the colony has lost its queen (the side view; the top-down maps have none to lose). */

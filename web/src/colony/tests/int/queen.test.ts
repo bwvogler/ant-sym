@@ -105,6 +105,50 @@ test("nurses take eggs from the queen to a brood chamber", () => {
   assert.ok(moved > 0, `brood in the brood chamber over three games: ${moved}`);
 });
 
+test("nurses take brood only to a brood chamber of BROOD_MIN cells: past a smaller one, else it stays with the queen (ja-xu6.2)", () => {
+  // Off the royal chamber, a tunnel east with a small brood chamber (3 cells) on it, and a big one of exactly BROOD_MIN (4)
+  // farther on: sizes fixed, so a BROOD_MIN of 3 or 5 fails too. A chamber just begun is a bulge in a tunnel nobody stands by: brood put there starved
+  // (economy.test's setup, world 1 n = 11 on main: 40 larvae). With the big one dug, eggs go there and never to the small
+  // one; with only the small one, they stay with the queen.
+  const run = (big: boolean, seed: number) => {
+    const map = generateSideWorld(2, SMALL_SIDE);
+    const ch = map.chambers!;
+    cellOf(map.nest.x, map.nest.y);
+    const [rx, ry] = [CELL[0], CELL[1]];
+    let x = rx;
+    while (rockAt(map, x, ry) === OPEN) x++;
+    const dig = (n: number, rows: number) => {
+      const k = ch.add(0, ry, "brood");
+      for (let j = 0; j < n; j++, x++)
+        for (let r = 0; r < rows; r++) {
+          digCell(map, x, ry - r);
+          ch.claim(k.id, x, ry - r, (a, b) => rockAt(map, a, b) === OPEN);
+        }
+      return k;
+    };
+    for (let j = 0; j < 3; j++) digCell(map, x++, ry);
+    const small = dig(3, 1);
+    for (let j = 0; j < 3; j++) digCell(map, x++, ry);
+    const large = big ? dig(4, 1) : null;
+    assert.ok(small.cells === 3 && (!large || large.cells === 4), "the chambers' sizes, either side of BROOD_MIN (the test's own check)");
+    const c = new Colony(map, { antCount: 40, maxAnts: 80 }, mulberry32(seed), () => "explore");
+    c.feed(20);
+    for (let k = 0; k < 30 * 60; k++) c.tick(1 / 30);
+    const royal = ch.list.find((k) => k.colony === 0 && k.role === "royal")!;
+    return { small: small.brood, large: large?.brood ?? 0, royal: royal.brood };
+  };
+  let large = 0;
+  for (const seed of [3, 4, 5]) {
+    const both = run(true, seed);
+    assert.equal(both.small, 0, `seed ${seed}: nothing in the small brood chamber with a big one dug`);
+    large += both.large;
+    const only = run(false, seed);
+    assert.equal(only.small, 0, `seed ${seed}: nothing in the small brood chamber with none bigger`);
+    assert.ok(only.royal > 0, `seed ${seed}: brood stays with the queen (${only.royal})`);
+  }
+  assert.ok(large > 0, `brood in the big brood chamber over three games: ${large}`);
+});
+
 test("orphaned: the queen dies, no egg is laid after, brood in progress still hatches, and the workers age out", () => {
   const map = bare(2);
   const c = new Colony(map, { antCount: 20, maxAnts: 80 }, mulberry32(4), () => "explore");

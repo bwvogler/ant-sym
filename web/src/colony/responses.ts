@@ -1,4 +1,5 @@
-import type { Mode, Stance } from "./vocab.ts";
+import { defineSchema, type FieldOf } from "./schema.ts";
+import { MODES, STANCES, type Mode, type Stance } from "./vocab.ts";
 
 // An ant's responses to what it touches and carries, pure. Choosing a mode is
 // the ant's one big decision (colony.ts, a `Policy`); these are the small
@@ -85,7 +86,7 @@ export interface Touch {
   crowd: "few" | "many";
 }
 
-export type Returns = "none" | "few" | "many";
+export type Returns = (typeof RETURNS)[number];
 
 /**
  * How soon a rested forager waiting at home goes out (behaviour MR 5): now, soon, or wait (only a scout goes); or raid (docs/stance.md):
@@ -94,7 +95,7 @@ export type Returns = "none" | "few" | "many";
 export const LEAVE = ["now", "soon", "wait", "raid"] as const;
 export type Leave = (typeof LEAVE)[number];
 
-export type Odds = "none" | "outnumbered" | "even" | "outnumbering";
+export type Odds = (typeof ODDS)[number];
 
 /** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
 export const CONTACT = ["fight", "flee", "drop and run"] as const;
@@ -202,11 +203,52 @@ export function responses(over: Partial<Responses> = {}): Responses {
   return { ...localResponses, ...over };
 }
 
+/** The alarm and raid scent an ant smells (Touch.alarm, Touch.raid), the odds round it, the returns it has met and the crowd at home. */
+export const SCENT_LEVELS = ["none", "faint", "strong"] as const;
+export const ODDS = ["none", "outnumbered", "even", "outnumbering"] as const;
+export const RETURNS = ["none", "few", "many"] as const;
+export const CROWD = ["few", "many"] as const;
+
+/**
+ * Touch's fields, declared once (ja-fnd.5.6): each with its values and how it reads in a cache key. The key fields come first, in
+ * key order; porter, digging and enemy read as words, and quality only when it isn't "fair" (so keys from before quality still
+ * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
+ */
+const TOUCH_FIELDS: readonly FieldOf<Touch>[] = [
+  { name: "mode", values: MODES },
+  { name: "carrying", values: ITEMS },
+  { name: "porter", values: [false, true], key: (v) => (v ? "porter" : "-") },
+  { name: "digging", values: [false, true], key: (v) => (v ? "digging" : "-") },
+  { name: "place", values: WHERE },
+  { name: "offered", values: ITEMS },
+  { name: "enemy", values: [false, true], key: (v) => (v ? "enemy" : "clear") },
+  { name: "stance", values: STANCES },
+  { name: "quality", values: QUALITY, key: (v) => (v === "fair" ? null : v) },
+  { name: "alarm", values: SCENT_LEVELS, key: (v) => `alarm:${v}` },
+  { name: "odds", values: ODDS, key: (v) => `odds:${v}` },
+  { name: "returns", values: RETURNS, key: (v) => `returns:${v}` },
+  { name: "raid", values: SCENT_LEVELS, key: (v) => `raid:${v}` },
+  { name: "crowd", values: CROWD, key: (v) => `crowd:${v}` },
+];
+
+/** Every field of a response situation: what the response legend has words for (colonyBrain.RESPONSE_LEGEND). */
+export const TOUCH_SCHEMA = defineSchema<Touch>(TOUCH_FIELDS);
+
+/** A schema over some of Touch's fields, in Touch's order: the key of a lane sent those fields. */
+export function touchSchemaOf(names: readonly (keyof Touch)[]) {
+  for (const n of names) if (!TOUCH_FIELDS.some((f) => f.name === n)) throw new Error(`touchSchemaOf: no field "${String(n)}"`);
+  return defineSchema<Touch>(TOUCH_FIELDS.filter((f) => names.includes(f.name)));
+}
+
+/** The fields every response lane is keyed on (the rest go to some lanes only: colonyBrain.responseKey). */
+export const TOUCH_KEY_FIELDS = ["mode", "carrying", "porter", "digging", "place", "offered", "enemy", "stance", "quality"] as const;
+const TOUCH_KEY = touchSchemaOf(TOUCH_KEY_FIELDS);
+
 /**
  * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
  * quality only when it isn't "fair" (so keys from before quality still match: most combinations never occur). Alarm and
  * odds are the contact lane's alone (colonyBrain.responseKey): the other lanes are never sent them.
  */
 export function touchKey(t: Touch): string {
-  return `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;
+  return TOUCH_KEY.key(t);
 }
