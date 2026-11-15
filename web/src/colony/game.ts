@@ -371,6 +371,7 @@ export class Game {
     const tol = this.params.species.params.tolerance;
     const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
     this.recognition = new Recognition(recognition);
+    // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go: 0 and 1.

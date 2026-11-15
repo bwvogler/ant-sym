@@ -205,7 +205,7 @@ function speciesModeSituations(sp, l, lw) {
   for (const seed of [1, 2, 3]) {
     const g = new Game(
       generateOneWorld(seed),
-      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, species: sp },
+      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
       gameRng(seed, 0),
     );
     for (const c of g.colonies)
