@@ -6,6 +6,7 @@
 // Usage: node scripts/experiment.mjs <assay ...|all> [--one] [--seeds 1-10] [--seconds N]
 //          [--set colony.deposit=2,4,8] [--set game.fight.rate=1,2] [--json out.json] [--jobs N]
 //          [--policy cache:<file>] [--log <spec>] [--species <id>]
+//        node scripts/experiment.mjs merge <file.json ...> [--json out.json]
 //
 // --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
 // with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
@@ -33,6 +34,11 @@
 // writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
 // --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second
 // (300 MB in 600 s of `game`): narrow it with ant=<i>.
+//
+// merge <file.json ...> joins the --json files of runs over different seeds into one report, as if one run had covered
+// them all (a seed in two files is an error). .github/workflows/assays.yml runs one runner per seed and merges them so;
+// a session reads the table in that workflow's report job log (ja-w7ef.12; how to start and read it: the running-assays
+// skill, .claude/skills/running-assays).
 import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
@@ -82,6 +88,7 @@ function combos(sets) {
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args[0] === "merge") return merge(args.slice(1));
   const ids = [];
   let seeds = range("1-10");
   let seconds;
@@ -194,56 +201,123 @@ async function main() {
   );
   process.stderr.write("\n");
 
+  const out = [];
+  for (const id of pending) out.push({ assay: id, pending: ONE_PENDING[id] });
+  for (const { assay, one: inOne } of picked)
+    for (const [ci, { label, o }] of cs.entries()) {
+      const runs = (results.get(`${assay.id}|${ci}`) ?? []).sort((a, b) => a.seed - b.seed);
+      out.push({ assay: assay.id, one: inOne, label, overrides: o, seconds: seconds ?? assay.seconds, runs });
+    }
+  report(out, { ASSAYS, ONE_ASSAYS, policy });
+  console.error(
+    `${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`,
+  );
+  if (json) writeFileSync(json, JSON.stringify(out, null, 1));
+  if (log !== null) console.error(`journals in ${JOURNAL_DIR}/`);
+}
+
+/**
+ * Prints the report: per assay its title and target, then per --set combination the pass count, the failing seeds and
+ * each metric's median and range over the seeds. `out` is what --json writes, so `merge` prints the same from files.
+ */
+function report(out, { ASSAYS, ONE_ASSAYS, policy }) {
   const median = (a) => {
     const s = [...a].sort((x, y) => x - y);
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
   const fmt = (v) => (Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
-  const out = [];
-  for (const id of pending) {
-    const title = ASSAYS.find((x) => x.id === id)?.title ?? id;
-    console.log(`\n## ${title} (one world)\n\nNot run on one world: ${ONE_PENDING[id]}.`);
-    out.push({ assay: id, pending: ONE_PENDING[id] });
-  }
-  for (const assay of chosen) {
-    console.log(`\n## ${assay.title}\n\nTarget: ${assay.target}. Seeds ${seeds[0]}–${seeds.at(-1)}, ${seconds ?? assay.seconds} s.\n`);
-    for (const [ci, { label, o }] of cs.entries()) {
-      const runs = (results.get(`${assay.id}|${ci}`) ?? []).sort((a, b) => a.seed - b.seed);
-      out.push({ assay: assay.id, label, overrides: o, runs });
-      const keys = Object.keys(runs[0].metrics).filter((k) => k !== "pass");
-      const passes = runs.filter((r) => r.metrics.pass === 1).length;
-      const hasPass = runs.some((r) => "pass" in r.metrics);
-      console.log(`**${label}**${hasPass ? ` — pass ${passes}/${runs.length}` : ""}\n`);
-      console.log("| metric | median | min | max |\n|---|---|---|---|");
-      for (const k of keys) {
-        const v = runs.map((r) => r.metrics[k]).filter((x) => x !== undefined && x !== null && !Number.isNaN(x));
-        if (v.length === 0) console.log(`| ${k} | – | – | – |`);
-        else console.log(`| ${k} | ${fmt(median(v))} | ${fmt(Math.min(...v))} | ${fmt(Math.max(...v))} |`);
-      }
-      const ms = runs.map((r) => r.msPerTick);
-      console.log(`| ms/tick | ${fmt(median(ms))} | ${fmt(Math.min(...ms))} | ${fmt(Math.max(...ms))} |\n`);
-      if (policy) {
-        // How much of the result was Jev: cache hits per lane, over every lookup of every seed.
-        const sum = {};
-        for (const r of runs)
-          for (const [lane, { hit, miss }] of Object.entries(r.lookups ?? {})) {
-            const t = (sum[lane] ??= { hit: 0, miss: 0 });
-            t.hit += hit;
-            t.miss += miss;
-          }
-        const parts = Object.entries(sum)
-          .filter(([, v]) => v.hit + v.miss > 0)
-          .map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
-        console.log(`Jev's answers (cache hits; the rest the local rule): ${parts.join(", ") || "no lookups"}\n`);
-      }
+  const find = (e) => (e.one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === e.assay) ?? ONE_ASSAYS.find((x) => x.id === e.assay);
+  let last = null;
+  for (const e of out) {
+    if (e.pending) {
+      const title = ASSAYS.find((x) => x.id === e.assay)?.title ?? e.assay;
+      console.log(`\n## ${title} (one world)\n\nNot run on one world: ${e.pending}.`);
+      continue;
+    }
+    const assay = find(e);
+    const runs = e.runs;
+    if (`${e.assay}|${e.one}` !== last) {
+      console.log(`\n## ${assay.title}\n\nTarget: ${assay.target}. Seeds ${runs[0].seed}–${runs.at(-1).seed}, ${e.seconds} s.\n`);
+      last = `${e.assay}|${e.one}`;
+    }
+    const keys = Object.keys(runs[0].metrics).filter((k) => k !== "pass");
+    const passes = runs.filter((r) => r.metrics.pass === 1).length;
+    const hasPass = runs.some((r) => "pass" in r.metrics);
+    const failing = runs.filter((r) => r.metrics.pass !== 1).map((r) => r.seed);
+    console.log(
+      `**${e.label}**${hasPass ? ` — pass ${passes}/${runs.length}${failing.length ? ` (failing seeds: ${failing.join(", ")})` : ""}` : ""}\n`,
+    );
+    console.log("| metric | median | min | max |\n|---|---|---|---|");
+    for (const k of keys) {
+      const v = runs.map((r) => r.metrics[k]).filter((x) => x !== undefined && x !== null && !Number.isNaN(x));
+      if (v.length === 0) console.log(`| ${k} | – | – | – |`);
+      else console.log(`| ${k} | ${fmt(median(v))} | ${fmt(Math.min(...v))} | ${fmt(Math.max(...v))} |`);
+    }
+    const ms = runs.map((r) => r.msPerTick);
+    console.log(`| ms/tick | ${fmt(median(ms))} | ${fmt(Math.min(...ms))} | ${fmt(Math.max(...ms))} |\n`);
+    if (policy) {
+      // How much of the result was Jev: cache hits per lane, over every lookup of every seed.
+      const sum = {};
+      for (const r of runs)
+        for (const [lane, { hit, miss }] of Object.entries(r.lookups ?? {})) {
+          const t = (sum[lane] ??= { hit: 0, miss: 0 });
+          t.hit += hit;
+          t.miss += miss;
+        }
+      const parts = Object.entries(sum)
+        .filter(([, v]) => v.hit + v.miss > 0)
+        .map(([lane, v]) => `${lane} ${Math.round((100 * v.hit) / (v.hit + v.miss))} % of ${(v.hit + v.miss).toLocaleString()}`);
+      console.log(`Jev's answers (cache hits; the rest the local rule): ${parts.join(", ") || "no lookups"}\n`);
     }
   }
-  console.error(
-    `${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`,
-  );
+}
+
+/**
+ * `merge <file.json …> [--json out.json]`: the files --json wrote from runs over different seeds (assays.yml runs one
+ * runner per seed) joined into one report, as if one run had covered every seed.
+ */
+async function merge(args) {
+  const files = [];
+  let json;
+  for (let k = 0; k < args.length; k++) {
+    if (args[k] === "--json") json = args[++k];
+    else if (args[k].startsWith("--")) fail(`merge: unknown option ${args[k]}`);
+    else files.push(args[k]);
+  }
+  if (files.length === 0) fail("merge <file.json …> [--json out.json]");
+  const out = [];
+  const at = new Map();
+  for (const f of files)
+    for (const e of loadJson(f)) {
+      const key = e.pending ? `pending|${e.assay}` : `${e.assay}|${e.one}|${e.label}`;
+      const have = at.get(key);
+      if (!have) {
+        at.set(key, e);
+        out.push(e);
+      } else if (!e.pending) {
+        if (have.seconds !== e.seconds)
+          fail(`merge: ${e.assay} (${e.label}) ran ${have.seconds} s in one file and ${e.seconds} s in another`);
+        for (const r of e.runs) {
+          if (have.runs.some((x) => x.seed === r.seed)) fail(`merge: ${e.assay} (${e.label}) has seed ${r.seed} in more than one file`);
+          have.runs.push(r);
+        }
+        have.runs.sort((a, b) => a.seed - b.seed);
+      }
+    }
+  const { ASSAYS, ONE_ASSAYS } = await import("../web/src/colony/experiment.ts");
+  // A run asked of a replayed cache (--policy) counts its lookups; without one they are all zero.
+  const replayed = out.some((e) => e.runs?.some((r) => Object.values(r.lookups ?? {}).some((l) => l.hit + l.miss > 0)));
+  report(out, { ASSAYS, ONE_ASSAYS, policy: replayed });
   if (json) writeFileSync(json, JSON.stringify(out, null, 1));
-  if (log !== null) console.error(`journals in ${JOURNAL_DIR}/`);
+}
+
+function loadJson(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    fail(`${file}: ${e.message}`);
+  }
 }
 
 function inWorker(job) {
