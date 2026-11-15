@@ -303,6 +303,11 @@ export interface ColonyParams {
   defendAt: number;
   /** how far from its nest an ant is on home ground: by sight of its hole where it sees it, else by its home vector (world units) */
   homeGround: number;
+  /**
+   * Brood odour each brood item lying in the nest gives off, a second (ja-k4k.15, docs/brood-odour.md): the young climb it
+   * in a chamber (broodClimb). 0: none laid, the channel stays empty (main bit for bit).
+   */
+  broodOdour: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -436,6 +441,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   stanceGate: 1,
   defendAt: 1,
   homeGround: 10,
+  broodOdour: 0,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,

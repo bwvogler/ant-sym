@@ -23,7 +23,7 @@ import type { WorldMap } from "./world.ts";
 // shifted right, a chunk's top-left corner also touches the chunk diagonally
 // up-left, and its bottom-right corner the chunk diagonally down-right.
 
-export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark;
+export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark | "broodOdour";
 /**
  * The nest's road signs (nest slice 3, docs/nest-and-home.md §3.3): each chamber's role, laid on the floor by ants that
  * have been in it, fading the farther they have walked, so each leads back to its kind of chamber (Heyman et al. 2017).
@@ -31,7 +31,8 @@ export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark;
  */
 export type Mark = "royal" | "brood" | "store" | "reception" | "midden";
 export const MARKS: Mark[] = ["royal", "brood", "store", "reception", "midden"];
-export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", "raid", ...MARKS];
+// broodOdour last: an empty channel adds nothing to a fields hash, so with it off the goldens keep (ja-k4k.15.2).
+export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", "raid", ...MARKS, "broodOdour"];
 
 export interface ChannelParams {
   /** share lost per second */
@@ -58,6 +59,9 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   store: { evaporation: 0.01, diffusion: 0 },
   reception: { evaporation: 0.01, diffusion: 0 },
   midden: { evaporation: 0.01, diffusion: 0 },
+  // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Fast to
+  // fade and spreading a little, it reaches two or three cells: strongest on the pile (design; no range is measured).
+  broodOdour: { evaporation: 0.3, diffusion: 0.3 },
 };
 
 /** A record with one entry per channel. */
