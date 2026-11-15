@@ -1,20 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clock, clockTicks } from "./clock.ts";
 import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
 import { Icon } from "./kit.tsx";
 import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
+import { closeLab, type LabTab, type LabTarget, openLab, useLab } from "./labStore.ts";
 import { colonyName } from "./names.ts";
+import PolicyTab, { type PolicyProps } from "./PolicyTab.tsx";
 
 // Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
 // this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
 // levers, the numbers, the journal; and a step control, to take the game a tick or a second at a time while paused.
-// The key l, the palette or Settings toggle it; it replaced the Details screen.
+// The key l, the palette or Settings toggle it; it replaced the Details screen. Its tab lives in the Lab store
+// (labStore.ts), so a "?" on the policy anywhere opens the Policy tab at its section (PRD §69.8).
 
-type Tab = "history" | "world" | "jev" | "levers" | "numbers" | "journal";
-
-const TABS: [Tab, string][] = [
+const TABS: [LabTab, string][] = [
   ["history", "History"],
+  ["policy", "Policy"],
   ["world", "World"],
   ["jev", "Jev"],
   ["levers", "Levers"],
@@ -24,6 +26,8 @@ const TABS: [Tab, string][] = [
 
 /** Colony k's line colour in the charts: a fixed slot per colony (never by rank), the validated --series palette. */
 const seriesColor = (k: number) => `var(--series-${(k % 6) + 1})`;
+/** The Lab as it opens, by l, the palette or Settings. */
+const HISTORY: LabTarget = { tab: "history" };
 const pct = (v: number) => `${Math.round(100 * v)}%`;
 const whole = (v: number) => String(Math.round(v));
 
@@ -32,18 +36,60 @@ export default function LabBench(
     history: History;
     /** step the game n ticks of 1/30 s (useColony.step) */
     step: (n: number) => void;
-    onClose: () => void;
+    /** what the Policy tab reads */
+    policy: PolicyProps;
   },
 ) {
-  const { history, step, onClose, controls, update, journal, game } = props;
-  const [tab, setTab] = useState<Tab>("history");
+  const { history, step, controls, update, journal, game } = props;
+  const target = useLab() ?? HISTORY;
+  const tab = target.tab === "journal" && !journal ? "history" : target.tab;
+  const setTab = (t: LabTab) => openLab({ tab: t });
+  const body = useRef<HTMLDivElement>(null);
+  // The target the Lab opened with: opening takes no focus, so Space still plays and pauses (review of #237, S1).
+  const opened = useRef(target);
+  // A target section (a "?" on the policy) is scrolled to once its tab has rendered, and takes the keyboard's focus, so a
+  // "?" pressed by key lands where it opened (review of #237, S1); a tab of its own starts at the top.
+  useEffect(() => {
+    const el = target.id ? document.getElementById(`lab-${target.id}`) : null;
+    if (el) {
+      el.scrollIntoView({ block: "start" });
+      el.querySelector("summary")?.focus({ preventScroll: true });
+    } else {
+      body.current?.scrollTo({ top: 0 });
+      // A button that swapped the tab under it (the Policy tab's "the Levers tab") leaves focus nowhere: the tab takes
+      // it, so the keyboard stays in the Lab (review of #237, N2).
+      if (target !== opened.current && document.activeElement === document.body)
+        document.querySelector<HTMLElement>('[aria-label="lab tabs"] [aria-selected="true"]')?.focus({ preventScroll: true });
+    }
+  }, [target]);
+  // However the Lab closes (Escape, ×, l, the palette), a focus left nowhere goes to the map, so its keys work at once
+  // (review of #237, N4; as the Drawer gives focus back).
+  useEffect(
+    () => () => {
+      if (document.activeElement === document.body || document.activeElement === null)
+        document.querySelector<HTMLElement>("main canvas")?.focus({ preventScroll: true });
+    },
+    [],
+  );
   // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
   const [, setSteps] = useState(0);
   // A queen in flight waits for the page to found her (the pen), as play does.
   const flying = game.flights.length > 0;
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
   return (
-    <section aria-label="lab" className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground">
+    <section
+      aria-label="lab"
+      // Escape, with focus in the Lab, closes it (the owner, D1 on #237): one Escape, one thing, so not when a chart's
+      // crosshair took it (defaultPrevented) or a tooltip or dialog that takes Escape is open above (not the tutorial's
+      // coach card, which takes none: review of #237, S1). The map takes the focus back (the effect above).
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        if (document.querySelector('[role="tooltip"], [role="dialog"]:not([aria-label="tutorial"])')) return;
+        e.preventDefault();
+        closeLab();
+      }}
+      className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground"
+    >
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5">
         <h2 className="font-semibold text-fg max-sm:order-1">Lab</h2>
         <div className="flex overflow-x-auto rounded-md border border-line text-[13px] max-sm:order-3" role="tablist" aria-label="lab tabs">
@@ -99,16 +145,26 @@ export default function LabBench(
         <button
           type="button"
           className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg max-sm:order-2 max-sm:ml-auto"
-          onClick={onClose}
+          onClick={closeLab}
           aria-label="Close the Lab"
           title="Close the Lab (l)"
         >
           <Icon name="close" className="size-4" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" role="tabpanel" aria-label={TABS.find(([t]) => t === tab)?.[1]}>
+      <div
+        ref={body}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-fg-2"
+        role="tabpanel"
+        aria-label={TABS.find(([t]) => t === tab)?.[1]}
+      >
         {tab === "history" && <HistoryTab history={history} />}
-        {tab !== "history" && (
+        {tab === "policy" && (
+          <div className="max-w-3xl">
+            <PolicyTab {...props.policy} focus={target.id} ping={target} />
+          </div>
+        )}
+        {tab !== "history" && tab !== "policy" && (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
             {tab === "world" && <World {...props} />}
             {tab === "jev" && <JevCard {...props} />}

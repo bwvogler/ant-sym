@@ -31,9 +31,9 @@ export interface Species {
    */
   sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>>;
   /**
-   * Its local rule in words, for the Learn drawer (ja-fnd.5.13): rows read top to bottom, the first that holds decides, then `otherwise`. Kept
+   * Its local rule in words, for Lab mode's Policy tab (ja-fnd.5.13): rows read top to bottom, the first that holds decides, then `otherwise`. Kept
    * honest by a test that walks every situation its schema has and checks the rows give what `policy` gives (ui/policyText.ts ruleTextAgrees).
-   * Absent with a `policy` of its own: the drawer says it plays its own rule and shows no generic rows.
+   * Absent with a `policy` of its own: the tab says it plays its own rule and shows no generic rows.
    */
   ruleText?: ModeRuleText;
 }

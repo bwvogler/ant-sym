@@ -285,6 +285,8 @@ This is design: no paper. It reads the game, never steers it.
 
 ### What slice 2 built (PRD §73.3)
 
+- **The way home, drawn** (ja-cwjp): a moved ant's walk is traced on the top view from where it was set down, the run of its old vector solid and its search loops dotted, so a child sees the experiment happen. It fades once the ant is home or dead.
+
 - **B7:** with the sign on one branch of a crayon fork, a median 75 % of the ants on the fork took the other branch, against 49 % with no sign. Robinson et al. found 71 %.
 - **B8:** of carriers moved 30–60 sideways, 92 % walked to where home would be by their old vector before finding home. All were home within 300 s (median 36.5 s), as Wehner & Srinivasan's displaced ants were. Before the review of #229 dropped their stored route, most walked back by it instead, and got home in 20 s.
 

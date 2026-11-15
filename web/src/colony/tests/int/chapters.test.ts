@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { CHAPTERS, chapterOf, SPREAD_SHARE, type ChapterState } from "../../chapters.ts";
 import { Game } from "../../game.ts";
 import { STRAINS } from "../../fungus.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
+import { generateOneWorld } from "../../oneWorld.ts";
+import { mulberry32 } from "../../world.ts";
 
 const base: ChapterState = { landed: false, colony: "Ink", hosts: 0, share: 0, queenInfected: false, gynes: 0, daughters: 0 };
 
@@ -28,9 +29,8 @@ test("chapters follow the game in order, each ending when what it asks for is tr
   assert.match(spread.goal, /Ink/);
 });
 
-test("landing: spores fall by the hole, no ant is dosed, and ants walking out become the first hosts", () => {
-  const map = generateSideWorld(1);
-  const g = new Game(map, { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
+test("landing (one world): spores fall on the plane by the hole, no ant is dosed, and ants walking out become the first hosts", () => {
+  const g = new Game(generateOneWorld(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   const at = g.land(0, garden);
   assert.ok(g.fungus.sporeCells > 0, "spores on the ground");

@@ -9,7 +9,6 @@ import {
   chunkRock,
   dig,
   OPEN,
-  OPEN_WORLD,
   ROCK,
   SOIL,
   soilAt,
@@ -17,7 +16,6 @@ import {
   escapes,
   flat,
   foodAt,
-  generateWorld,
   heightAt,
   noiseAt,
   reachable,
@@ -28,8 +26,12 @@ import {
   type WorldMap,
 } from "../../world.ts";
 import { MAX_LEVEL, Pheromones, type ChannelParams, type Channel } from "../../pheromone.ts";
+import { generateOneWorld } from "../../oneWorld.ts";
 
 const SMALL = { w: 160, h: 100 };
+
+/** One world's plane (the open-ground generator, `generateWorld(seed, OPEN_WORLD)`), at `size` or its own. */
+const plane = (seed: number, size?: { w: number; h: number }): WorldMap => generateOneWorld(seed, size ? { plane: { size } } : {}).plane;
 
 test("ChunkLayer: unwritten cells read as empty; writes land in their chunk; negative coordinates work; the table grows", () => {
   const l = new ChunkLayer((n) => new Float32Array(n), 0);
@@ -54,9 +56,9 @@ test("ChunkLayer: unwritten cells read as empty; writes land in their chunk; neg
     assert.deepEqual(chunkOf(chunkKey(cx, cy)), [cx, cy]);
 });
 
-test("generateWorld: the same seed is the same world; another seed is another", () => {
-  const a = generateWorld(7, { size: SMALL });
-  const b = generateWorld(7, { size: SMALL });
+test("the plane: the same seed is the same world; another seed is another", () => {
+  const a = plane(7, SMALL);
+  const b = plane(7, SMALL);
   assert.deepEqual(
     flat(a, a.rock, (n) => new Uint8Array(n)),
     flat(b, b.rock, (n) => new Uint8Array(n)),
@@ -66,7 +68,7 @@ test("generateWorld: the same seed is the same world; another seed is another", 
     flat(b, b.food, (n) => new Float32Array(n)),
   );
   assert.deepEqual(a.nests, b.nests);
-  const c = generateWorld(8, { size: SMALL });
+  const c = plane(8, SMALL);
   assert.notDeepEqual(
     flat(c, c.rock, (n) => new Uint8Array(n)),
     flat(a, a.rock, (n) => new Uint8Array(n)),
@@ -76,8 +78,8 @@ test("generateWorld: the same seed is the same world; another seed is another", 
 test("terrain is position-pure: a chunk is the same whatever else was generated, and a bigger map contains the smaller one", () => {
   const cut = rockCut(0.22);
   assert.deepEqual(chunkRock(5, 3, -2, cut), chunkRock(5, 3, -2, cut));
-  const small = generateWorld(5, { ...OPEN_WORLD, size: SMALL });
-  const big = generateWorld(5, { ...OPEN_WORLD, size: { w: 512, h: 320 } });
+  const small = plane(5, SMALL);
+  const big = plane(5, { w: 512, h: 320 });
   // Away from nests and food (which clear rock), the bigger map's ground is the smaller map's ground.
   let same = 0;
   let total = 0;
@@ -90,10 +92,10 @@ test("terrain is position-pure: a chunk is the same whatever else was generated,
   assert.ok(same / total > 0.9, `${((100 * same) / total).toFixed(1)} % of cells are raw terrain in both`);
 });
 
-test("generateWorld, open ground: a nest on main ground, food it can walk to, rock about 22 %", () => {
+test("the plane: a nest on main ground, food it can walk to, rock about 22 %", () => {
   const shares: number[] = [];
   for (let seed = 1; seed <= 20; seed++) {
-    const m = generateWorld(seed, OPEN_WORLD);
+    const m = plane(seed);
     const { w, h } = m.size;
     assert.equal(w, 512);
     assert.ok(!blocked(m, m.nest.x, m.nest.y), `seed ${seed}: nest on rock`);
@@ -131,7 +133,7 @@ test("noiseAt stays in 0..1 and is smooth: neighbours differ little", () => {
 });
 
 test("blocked: rock and the edge of the map", () => {
-  const m = generateWorld(3, { ...OPEN_WORLD, size: SMALL });
+  const m = plane(3, SMALL);
   assert.ok(blocked(m, -0.1, 5));
   assert.ok(blocked(m, 5, m.size.h));
   assert.ok(blocked(m, m.size.w + 3, 5), "cells past the edge, inside the last chunk, are rock too");
@@ -232,7 +234,7 @@ function cellIndex(m: WorldMap, x: number, y: number): number {
 }
 
 test("the sparse step matches the dense one, across chunk borders and a ragged map edge", () => {
-  const m = generateWorld(4, { size: { w: 150, h: 90 } });
+  const m = plane(4, { w: 150, h: 90 });
   const { w, h } = m.size;
   const rock = flat(m, m.rock, (n) => new Uint8Array(n));
   const params = { evaporation: 0.05, diffusion: 0.8 };
@@ -281,7 +283,7 @@ test("faint scent crosses chunk borders as the dense step says (a steady source 
 });
 
 test("asleep costs nothing: untouched chunks never wake, and faded ones go back to sleep", () => {
-  const m = generateWorld(2);
+  const m = plane(2);
   const zero = { evaporation: 0, diffusion: 0 };
   const fast = { evaporation: 3, diffusion: 0.3 };
   const ph = new Pheromones(m, { food: fast, home: zero, alarm: zero } as Record<Channel, ChannelParams>);
@@ -458,46 +460,8 @@ test("chunkRock is exactly the height threshold at each hexagon's centre, cell f
   }
 });
 
-test("underground (the default): mostly soil, some rock, small open chambers; every nest and food patch can be dug to, never sealed behind rock", () => {
-  const shares = { open: 0, rock: 0, soil: 0 };
-  const seeds = 8;
-  for (let seed = 1; seed <= seeds; seed++) {
-    const m = generateWorld(seed);
-    const { w, h } = m.size;
-    let open = 0;
-    let rock = 0;
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const t = rockAt(m, x, y);
-        if (t === OPEN) open++;
-        else if (t === ROCK) rock++;
-      }
-    shares.open += open / (w * h) / seeds;
-    shares.rock += rock / (w * h) / seeds;
-    shares.soil += (w * h - open - rock) / (w * h) / seeds;
-    for (const n of m.nests) {
-      assert.ok(!blocked(m, n.x, n.y), `seed ${seed}: a nest stands in its own open chamber`);
-      assert.ok(escapes(m, n.x, n.y, 48, "diggable"), `seed ${seed}: a nest walled in by rock`);
-    }
-    const reach = reachable(m, m.nest.x, m.nest.y, "diggable");
-    const walk = reachable(m, m.nest.x, m.nest.y, "open");
-    let walkable = 0;
-    for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        if (m.food.get(x, y) > 0) assert.equal(reach[y * w + x], 1, `seed ${seed}: food at (${x}, ${y}) can't be dug to`);
-        walkable += walk[y * w + x]!;
-      }
-    for (const n of m.nests) assert.equal(reach[cellIndex(m, n.x, n.y)], 1, `seed ${seed}: the rival can't be dug to`);
-    assert.ok(walkable < 2000, `seed ${seed}: the nest's chamber leads only ${walkable} cells on foot: the rest must be dug`);
-    assert.equal(m.dug, 0);
-  }
-  assert.ok(shares.rock > 0.08 && shares.rock < 0.17, `rock ${shares.rock.toFixed(3)}`);
-  assert.ok(shares.soil > 0.6 && shares.soil < 0.78, `soil ${shares.soil.toFixed(3)}`);
-  assert.ok(shares.open > 0.14 && shares.open < 0.25, `open ${shares.open.toFixed(3)}`);
-});
-
-test("OPEN_WORLD has no soil at all; soil and rock both block, only soil digs, and the dug cell counts", () => {
-  const o = generateWorld(4, { ...OPEN_WORLD, size: SMALL });
+test("the plane has no soil at all; soil and rock both block, only soil digs, and the dug cell counts", () => {
+  const o = plane(4, SMALL);
   for (let y = 0; y < SMALL.h; y++) for (let x = 0; x < SMALL.w; x++) assert.notEqual(rockAt(o, x, y), SOIL);
   const rock = new Uint8Array(8 * 4);
   rock[1 * 8 + 2] = SOIL;
@@ -554,7 +518,7 @@ test("golden: the generator is deterministic (rock, food and nests of two hex wo
     { seed: 3, size: SMALL, want: [2641910334, 659708478, 3422956274, 4140] },
   ];
   for (const { seed, size, want } of cases) {
-    const m = generateWorld(seed, { ...OPEN_WORLD, size });
+    const m = plane(seed, size);
     const rock = Array.from(flat(m, m.rock, (n) => new Uint8Array(n))).join("");
     const food = Array.from(flat(m, m.food, (n) => new Float32Array(n))).join(",");
     assert.deepEqual([fnv(rock), fnv(food), fnv(JSON.stringify(m.nests)), m.foodTotal], want, `seed ${seed}`);

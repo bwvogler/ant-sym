@@ -6,7 +6,7 @@ import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, keyX, keyY } from "../../hex.ts";
-import { AIR, generateSideWorld, rockAt, OPEN } from "../../world.ts";
+import { AIR, rockAt, OPEN } from "../../world.ts";
 import { DT, ageOf, curtainHole, editPrivate, own, planeHole, run, smallOne } from "../builders.ts";
 
 // One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
@@ -576,17 +576,4 @@ test("one world: an ant that dies on the plane leaves no corpse underground; one
   c.putAnt(1, CURTAIN, at.x, at.y + 4);
   c.kill(1, false);
   assert.equal(c.corpses.length, 1, "the control: underground, the dead lie where they fall");
-});
-
-test("a game on one map: each colony has one layer and every ant is on it", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 30, rivalAnts: 30 }, gameRng(1));
-  assert.equal(g.world, null);
-  assert.equal(g.layers.length, 1);
-  run(g, 2);
-  for (const c of g.colonies) {
-    assert.equal(c.layers.length, 1);
-    assert.equal(c.line, null);
-    assert.deepEqual(c.holeCells, []);
-    assert.ok(c.layer.every((l) => l === 0));
-  }
 });

@@ -1,6 +1,6 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Game, generateWorld, growthContext, growthKey, mulberry32, type GrowthSituation } from "../../colony/index.ts";
+import { Game, generateOneWorld, growthContext, growthKey, mulberry32, type GrowthSituation } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 import type { RunSummary } from "../../../shared/jev.ts";
 
@@ -100,7 +100,8 @@ test("attaching the fungus wires its tips to the growth lane (review of #115, S2
   const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 });
   live.add(j);
   // A real fungus: attachFungus binds its policies through bindPolicy (ja-fnd.5.4.1).
-  const fungus = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 10, rival: false }, mulberry32(3)).fungus;
+  const fungus = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 10, rival: false }, mulberry32(3))
+    .fungus;
   j.attachFungus(fungus);
   assert.equal(fungus.growthPolicy, j.growthPolicy);
 });

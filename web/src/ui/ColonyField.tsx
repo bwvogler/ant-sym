@@ -68,6 +68,7 @@ import { antTag, badgeParts, nestBadge } from "./badges.ts";
 import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
+import { type AntTraces, traceAlpha } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
 
 export type { FieldProbe };
@@ -131,6 +132,8 @@ interface Props {
   onProbe?: (p: FieldProbe | null) => void;
   /** the builder (docs/builder.md, PRD §73): the tool in hand, smell vision, and where a stroke goes; null when it is off */
   build?: FieldBuild | null;
+  /** the ants the tweezers moved: each one's way home, drawn on the top view (ja-cwjp), builder on or off */
+  traces?: AntTraces | null;
 }
 
 /** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
@@ -270,6 +273,7 @@ export default function ColonyField({
   lens = false,
   onProbe,
   build = null,
+  traces = null,
   specimens = NO_SPECIMENS,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
@@ -349,6 +353,10 @@ export default function ColonyField({
   useEffect(() => {
     follow.current = followed;
   }, [followed]);
+  const tracesRef = useRef(traces);
+  useEffect(() => {
+    tracesRef.current = traces;
+  }, [traces]);
   const pinnedRef = useRef(specimens);
   useEffect(() => {
     pinnedRef.current = specimens;
@@ -1530,6 +1538,51 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
+      // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
+      // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
+      const tr = tracesRef.current;
+      if (tr) {
+        const now = performance.now();
+        tr.update(now);
+        if (world && lv === PLANE)
+          for (const t of tr.traces) {
+            const n = t.xs.length;
+            const a = traceAlpha(t, now);
+            if (!n || a <= 0) continue;
+            ctx.globalAlpha = 0.85 * a;
+            ctx.strokeStyle = theme.accent;
+            ctx.fillStyle = theme.accent;
+            ctx.lineWidth = Math.max(1.5 * d, 0.25 * c.zoom);
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+            for (let k = 1; k < n;) {
+              // One run of points in the same phase, as one path.
+              const ph = t.search[k]!;
+              ctx.setLineDash(ph ? [2 * d, 4 * d] : []);
+              ctx.beginPath();
+              const [x0, y0] = toScreen(c, v, t.xs[k - 1]!, t.ys[k - 1]!);
+              ctx.moveTo(x0, y0);
+              for (; k < n && t.search[k] === ph; k++) {
+                const [x, y] = toScreen(c, v, t.xs[k]!, t.ys[k]!);
+                ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            const [sx, sy] = toScreen(c, v, t.xs[0]!, t.ys[0]!);
+            ctx.beginPath();
+            ctx.arc(sx, sy, Math.max(5 * d, 0.8 * c.zoom), 0, Math.PI * 2);
+            ctx.lineWidth = 2 * d;
+            ctx.stroke();
+            if (t.end === "home") {
+              const [ex, ey] = toScreen(c, v, t.xs[n - 1]!, t.ys[n - 1]!);
+              ctx.beginPath();
+              ctx.arc(ex, ey, Math.max(4 * d, 0.6 * c.zoom), 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+      }
       // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring, drawn
       // after these so its tag stays on top (review of #218).
       for (const s of pinnedRef.current) {

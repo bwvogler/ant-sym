@@ -110,7 +110,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
               type="button"
               className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline"
               onClick={() => openLearn(to)}
-              title={`Codex: ${k}`}
+              title={`${to.tab === "policy" ? "Lab" : "Codex"}: ${k}`}
             >
               {k} {v}
             </button>
@@ -230,7 +230,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
   );
 }
 
-/** The situation's fields, each with where the Learn drawer explains it. */
+/** The situation's fields, each with where it is explained: the Codex's guide, or Lab mode's Policy tab ("mode"). */
 function chips(s: Situation, fields?: readonly string[]): [string, string, LearnTarget][] {
   const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
   // Each chip with the situation field it shows; a species' own schema keeps only its fields (review of #132).

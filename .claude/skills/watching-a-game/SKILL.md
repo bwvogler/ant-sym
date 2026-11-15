@@ -5,7 +5,7 @@ description: "Shows what happens in a jev-ants game as events: births, deaths an
 
 # Watching a game
 
-The game journal (`web/src/colony/journal.ts`, ja-8tb) is a read-only observer: after each tick it compares the game with what it saw before and writes one event per change. It draws no random numbers and writes no game state, so a watched game is the game unwatched (`tests/unit/journal.test.ts` holds that). Off unless asked.
+The game journal (`web/src/colony/journal.ts`, ja-8tb) is a read-only observer: after each tick it compares the game with what it saw before and writes one event per change. It draws no random numbers and writes no game state, so a watched game is the game unwatched (`tests/int/journal.test.ts` holds that). Off unless asked.
 
 ## Pick the way in
 
@@ -37,4 +37,4 @@ Comma-separated words, in any order. A word it doesn't know throws and lists the
 
 ## Changing it
 
-A new kind of event is a category in `JOURNAL_CATEGORIES`, written from `Journal.observe` by diffing public state (never by hooking into the colony's code: that is how a watcher changes the game), with a test in `tests/unit/journal.test.ts` that is mutation-checked. Events from outside the colony (the page's Jev lanes) use `journal.note`. Keep the colony free of `console.*`.
+A new kind of event is a category in `JOURNAL_CATEGORIES`, written from `Journal.observe` by diffing public state (never by hooking into the colony's code: that is how a watcher changes the game), with a test in `tests/int/journal.test.ts` that is mutation-checked. Events from outside the colony (the page's Jev lanes) use `journal.note`. Keep the colony free of `console.*`.

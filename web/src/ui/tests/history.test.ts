@@ -1,7 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { INFECTED } from "../../colony/index.ts";
-import { endLabels, History, HISTORY_POINTS, nearestSample, niceMax, perColony, type Sample, sampleOf } from "../history.ts";
+import {
+  chartKey,
+  endLabels,
+  History,
+  linePath,
+  HISTORY_POINTS,
+  nearestSample,
+  niceMax,
+  perColony,
+  type Sample,
+  sampleOf,
+} from "../history.ts";
 import { buildGame } from "../useColony.ts";
 import { clockTicks } from "../clock.ts";
 
@@ -178,4 +189,27 @@ test("the step control's time, to the tick: a float hair under a second is the n
   assert.ok(t !== 15, "the sum drifts off a whole second");
   assert.equal(clockTicks(t), "0:15 +00/30");
   assert.equal(clockTicks(3600 + 29 / 30), "1:00:00 +29/30");
+});
+
+test("a line's path: a null breaks it, and a lone value draws a dot (review of #226, N13)", () => {
+  const px = (i: number) => i * 10;
+  const py = (v: number) => v;
+  assert.equal(linePath([1, 2, null, 4], px, py), "M0.0,1.0h0L10.0,2.0M30.0,4.0h0");
+  assert.equal(linePath([null, 5], px, py), "M10.0,5.0h0", "founded at the latest sample: a dot, not nothing");
+  assert.equal(linePath([null, null], px, py), "");
+});
+
+test("a chart's keys: Escape is the chart's only while a crosshair shows (review of #237, S2)", () => {
+  assert.equal(chartKey("Escape", 4, 9), -1, "a crosshair: Escape puts it away");
+  assert.equal(chartKey("Escape", -1, 9), null, "none: Escape passes on, to an open drawer");
+  assert.equal(chartKey("Escape", 0, 9), -1, "a crosshair at the first sample is one too");
+  assert.equal(chartKey("ArrowRight", -1, 9), 9, "either arrow starts at now");
+  assert.equal(chartKey("ArrowLeft", -1, 9), 9, "the first arrow starts at now");
+  assert.equal(chartKey("ArrowLeft", 0, 9), 0, "and stops at the start");
+  assert.equal(chartKey("ArrowRight", 9, 9), 9, "and at now");
+  assert.equal(chartKey("ArrowRight", 3, 9), 4);
+  assert.equal(chartKey("Home", 5, 9), 0);
+  assert.equal(chartKey("End", 5, 9), 9);
+  assert.equal(chartKey("l", 5, 9), null, "the page's keys pass on");
+  assert.equal(chartKey("ArrowLeft", -1, -1), null, "an empty chart takes nothing");
 });

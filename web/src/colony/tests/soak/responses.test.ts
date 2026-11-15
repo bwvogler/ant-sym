@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
+import { choose, Colony, CURTAIN, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
+import { broodChamber, curtainHole, oneColony, own, smallOne } from "../builders.ts";
 import { Game } from "../../game.ts";
 import {
   packResponseRequest,
@@ -12,7 +13,7 @@ import {
   responsesFromAnswers,
 } from "../../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../../responses.ts";
-import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
+import { dropFood, foodAt, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
 import { touch as senseTouch } from "../../sense.ts";
 
@@ -222,16 +223,16 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
 });
 
 test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
   /** Ticks a run may take at most: brood is first offered anywhere from ~20 s to over 240 s, by map seed (ja-u16k). */
   const CAP = 30 * 300;
   /**
-   * A side-view game with dead to bury: what get was offered, the most ants holding each item at once, and the ticks run.
+   * A game on a small one world with dead to bury: what get was offered, the most ants holding each item at once, and the ticks run.
    * It runs `ticks`, or (null) until every item has been offered and corpse, brood and a loose pellet have each been taken up.
    */
   const run = (refuse: Item | null, ticks: number | null) => {
-    const map = generateSideWorld(2, SMALL);
-    const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
+    const w = smallOne(2);
+    broodChamber(w.curtain); // nurses take brood only to a brood chamber (ja-xu6.2): one beside the royal one
+    const g = new Game(w, { antCount: 200, rival: false }, mulberry32(4));
     const c = g.player;
     const offered = new Set<Item>();
     c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
@@ -242,7 +243,7 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     for (; k < (ticks ?? CAP) && (ticks !== null || !all()); k++) {
       if (k === 30 * 20)
         for (let i = 0, n = 0; i < c.n && n < 20; i++)
-          if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
+          if (c.alive[i] && c.item(i) === "none" && c.layer[i] === CURTAIN && c.y[i]! > curtainHole(own(c)).y + 3) {
             c.kill(i);
             n++;
           }
@@ -311,13 +312,11 @@ test("arrive: putting a load down ends the trip, wherever it was put down", () =
   assert.equal(c.mode[0], 0, "load down: exploring, not returning");
 });
 
-test("arrive in the side view: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+test("arrive in the nest: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
   const at = (age: number, since: number) => {
-    const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+    const { c } = oneColony(1, { maxAnts: 1 }, undefined, 1);
     c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore")); // Jev's answer to returners: keep returning
-    c.x[0] = c.queen!.x;
-    c.y[0] = c.queen!.y;
+    c.putAnt(0, CURTAIN, c.queen!.x, c.queen!.y);
     c.age[0] = age * LIFESPAN;
     c.lifespan[0] = Infinity;
     c.mode[0] = 2;
@@ -348,8 +347,7 @@ test("rest on a top-down map: a tired returner rests in the nest for restTime be
 });
 
 test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither tires nor rests outside; rest comes a little at a time", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
-  const g = new Game(generateSideWorld(2, SMALL), { antCount: 200, rival: false }, mulberry32(4));
+  const g = new Game(smallOne(2), { antCount: 200, rival: false }, mulberry32(4));
   const c = g.player;
   const step = c.params.patience / c.params.restTime / 30; // a tick's rest
   let maxYoung = 0;

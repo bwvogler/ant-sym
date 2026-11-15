@@ -182,6 +182,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
    - This ends the whole-tree re-render, the 250 ms and 500 ms forced ticks in `AntCard` and `NestTab`, and the loop restarting on pause.
    - A game context and a Jev context replace the prop drilling.
 2. **Game rules out of components.** The flight, pen and founding flow, and the Lab's founding (which matches on error text), become session methods with typed results. Dev hooks move to `src/dev/`.
+   Built, part 1 (`ja-fnd.6.2`): a new queen's founding is `ui/flight.ts` (`foundOnWords`, `foundOnMothers`, `lostNotice`: typed `Founded` results with the notice and whether play resumes; `ColonyApp` shows them), and the lab's founding beyond an end is `Game.tryFoundBeyond` (its index or why not; `foundBeyond` throws on top of it), so `LabCards` no longer matches error text. Left: the dev hook to `src/dev/` (after the builder's trace work, which edits it), and the functions become session methods with `ja-fnd.6.1`'s store, agreed with the page redesign (ja-mvo9).
 3. **`ColonyField` in parts:**
    - a plain-TS `FieldRenderer`, with layers: ground, nest, ants, overlay, minimap
    - a camera controller
