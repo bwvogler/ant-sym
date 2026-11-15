@@ -15,6 +15,8 @@ import {
   game1,
   heldProbe,
   lifecycleOne,
+  marchProbe,
+  MARCH_REACH,
   nestFlowProbe,
   occupancyProbe,
   ONE_ASSAYS,
@@ -467,5 +469,48 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
     const { game, result } = runGame(assay.spec(1));
     assay.score(result, game);
     assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
+  }
+});
+
+test("marchProbe (S2.2c): turns a walked ant on the plane toward the other colony's hole, lets go of one that senses a stranger", () => {
+  const g = oneGame();
+  const c = g.player;
+  const foe = g.colonies[1]!;
+  const probe = marchProbe(0, 1);
+  const hole = at(48, 20);
+  for (let i = 3; i < c.n; i++) c.alive[i] = 0;
+  for (let i = 0; i < foe.n; i++) foe.alive[i] = 0;
+  // Ant 0 at the arena's west end, facing away; ant 1 the same, with a stranger beside it; ant 2 in the curtain.
+  put(c, 0, PLANE, 14, 30);
+  put(c, 1, PLANE, 14, 10);
+  put(c, 2, CURTAIN, 14, 30);
+  for (const i of [0, 1, 2]) c.heading[i] = Math.PI;
+  foe.alive[0] = 1;
+  put(foe, 0, PLANE, 15, 10);
+  probe.tick(g, 1);
+  const toward = Math.atan2(hole.y - c.y[0]!, hole.x - c.x[0]!);
+  assert.ok(
+    Math.cos(c.heading[0]! - toward) > 0.7,
+    `walked toward the hole: heading ${c.heading[0]!.toFixed(2)}, the hole at ${toward.toFixed(2)}`,
+  );
+  assert.equal(c.heading[1], Math.fround(Math.PI), "a stranger within reach: let go, its own fight");
+  assert.equal(c.heading[2], Math.fround(Math.PI), "in the curtain: its own rules");
+  put(c, 0, PLANE, hole.x, hole.y);
+  probe.tick(g, 1);
+  assert.equal(probe.summary(g).marched, 1 / c.params.antCount, `one ant within ${MARCH_REACH} steps of the hole`);
+});
+
+test("A6 and A13 on one world (S2.2c): no colony-wide stance (no stance policy, no stanceGate 0), the attackers walked", () => {
+  for (const id of ["pass", "open", "defendHome"]) {
+    const a = ONE_ASSAYS.find((x) => x.id === id);
+    assert.ok(a, `${id} is in ONE_ASSAYS`);
+    const spec = a.spec(1);
+    assert.ok(isOneWorld(specMap(spec)), id);
+    const sides = spec.sides ?? {};
+    assert.equal(sides.stance, undefined, `${id}: no stance policy`);
+    assert.equal(sides.rivalStance, undefined, `${id}: no rival stance policy`);
+    assert.notEqual(sides.colony?.stanceGate, 0, `${id}: the colony's stance is each ant's own`);
+    assert.notEqual(sides.rival?.stanceGate, 0, `${id}: the rival's stance is each ant's own`);
+    assert.ok((spec.probes ?? []).length > 0, `${id}: probes, the march among them`);
   }
 });

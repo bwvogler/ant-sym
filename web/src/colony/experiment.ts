@@ -26,6 +26,7 @@ import {
   gateProbe,
   occupancyProbe,
   onLayer,
+  marchProbe,
   onPlane,
   runGame,
   type Probe,
@@ -523,6 +524,31 @@ function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   };
 }
 export const pass = passAssay((spec) => spec);
+
+/**
+ * A6 on one world with no colony-wide stance (S2.2c, owner's D2 on #184): the arena made the plane, the attackers (colony 0)
+ * in fight mode with their own stance, walked to the defenders' hole by the harness (marchProbe) instead of marching at its
+ * coordinates; the defenders with their own stance. The same for the open control, so the gain compares like with like.
+ */
+export const passWalked: Assay = {
+  ...passAssay((spec) => walked(onPlane(spec), 0, 1)),
+  title: `${pass.title} (one world, attackers walked)`,
+};
+
+/** A battle spec with its colony-wide stances taken off (no stance policy, no stanceGate 0) and side `k` walked at side `to`'s hole. */
+function walked(spec: RunSpec, k: number, to: number): RunSpec {
+  const { stance: _s, rivalStance: _r, colony, rival, ...sides } = spec.sides ?? {};
+  const own = (p?: Partial<ColonyParams>) => {
+    if (!p) return undefined;
+    const { stanceGate: _g, ...rest } = p;
+    return rest;
+  };
+  return {
+    ...spec,
+    sides: { ...sides, ...(own(colony) ? { colony: own(colony) } : {}), ...(own(rival) ? { rival: own(rival) } : {}) },
+    probes: [...(spec.probes ?? []), marchProbe(k, to)],
+  };
+}
 export const open: Assay = {
   id: "open",
   title: "A6 control: the same battle on open ground",
@@ -839,6 +865,45 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     ],
   };
 }
+/**
+ * A13 on one world with no colony-wide stance (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with
+ * its own stance, walked to the colony's hole by the harness (marchProbe). The broadcast arm has no one-world twin (the
+ * colony-wide stance is what S2 deletes); in its place `noDefence` is the same battle with nobody defending (defendAt ∞).
+ * Design mark (owner, 2026-11-15, S2.2c): food at least DEFEND_FOOD of the no-defence colony's, and at least half the war
+ * party killed: defending by its senses should cost the colony no more than not defending, and stop the raiders.
+ */
+export const defendWalked: Assay = {
+  id: "defendHome",
+  title: "A13 defence from senses (one world, the war party walked)",
+  target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  seconds: 300,
+  spec: (seed) => walked(onPlane(defendSpec(seed, false)), 1, 0),
+  score: (r) => {
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) =>
+      runGame(walked(onPlane(defendSpec(r.seed, sealed, colony)), 1, 0)).result.metrics;
+    const stored = r.metrics["you.stored"];
+    const control = run(true)["you.stored"];
+    const none = run(false, { defendAt: Infinity });
+    const killed = r.metrics["rival.losses"];
+    const lost = r.metrics["you.losses"];
+    return {
+      stored,
+      control,
+      foodShare: control > 0 ? stored / control : NaN,
+      noDefence: none["you.stored"] / Math.max(1, control),
+      noDefenceKilled: none["rival.losses"],
+      noDefenceLost: none["you.losses"],
+      killed,
+      lost,
+      exchange: killed / Math.max(1, lost),
+      fightNear: r.metrics.fightNear as number,
+      atPile: r.metrics.atPile as number,
+      marched: r.metrics.marched as number,
+      pass: control > 0 && stored / control >= DEFEND_FOOD * (none["you.stored"] / control) && killed >= 40 ? 1 : 0,
+    };
+  },
+};
+
 export const defendHome: Assay = {
   id: "defendHome",
   title: "A13 defence from senses: the nest is defended, the far pile still worked",
@@ -1294,8 +1359,8 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
-  { ...passAssay(onPlane), title: `${pass.title} (one world)` },
-  onPlaneAssay(open),
+  passWalked,
+  { ...open, title: `${open.title} (one world, attackers walked)`, spec: (s) => walked(onPlane(open.spec(s)), 0, 1) },
   { ...raidFindAssay(onPlaneGated), title: `${raidFind.title} (one world)` },
   { ...raidStopAssay(onPlaneGated), title: `${raidStop.title} (one world)` },
   onPlaneAssay(contact),
@@ -1313,6 +1378,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertHeat,
   ...BUILDER_ASSAYS,
   ...lifecycleOne,
+  defendWalked,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
