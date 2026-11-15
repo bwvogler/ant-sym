@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { alarm, deplete, nurseZoneProbe, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, nurseZoneProbe, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateSideWorld, generateWorld, OPEN_WORLD } from "../../world.ts";
@@ -68,14 +68,15 @@ test("overrides: responses replace the assay's own hook by hook", () => {
   assert.equal(spec.sides?.responses?.carry(t), "take");
 });
 
+// A3 and A4 on one world (their ONE_ASSAYS twins, S2.2e; PRD §76.1: 20/20 each).
 for (const seed of [1, 2]) {
-  test(`A3 depletion passes (seed ${seed}): traffic leaves an emptied patch within 60 s`, () => {
-    const m = runAssay(deplete, seed).metrics;
+  test(`A3 depletion passes on one world (seed ${seed}): traffic leaves an emptied patch within 60 s`, () => {
+    const m = runAssay(oneAssay("deplete"), seed).metrics;
     assert.equal(m.pass, 1, `clearAfter ${m.clearAfter}`);
   });
 
-  test(`A4 alarm passes (seed ${seed}): foragers scatter, then the trail recovers`, () => {
-    const m = runAssay(alarm, seed).metrics;
+  test(`A4 alarm passes on one world (seed ${seed}): foragers scatter, then the trail recovers`, () => {
+    const m = runAssay(oneAssay("alarm"), seed).metrics;
     assert.equal(m.pass, 1, `scatter ${m.scatter}, recoverAfter ${m.recoverAfter}`);
   });
 }

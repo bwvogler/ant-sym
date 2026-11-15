@@ -1,0 +1,123 @@
+{
+ "version": {
+  "colony": 7,
+  "stance": 4,
+  "response": 12
+ },
+ "contexts": {
+  "mode": "colony-v7-5b5501f8",
+  "stance": "stance-v4-1cc01e21",
+  "get": "get-v12-3520f8c5",
+  "carry": "carry-v12-9b6eff11",
+  "drop": "drop-v12-63e7f9f6",
+  "trail": "trail-v12-112a1570",
+  "contact": "contact-v12-d0bf7d5d",
+  "leave": "leave-v12-fb9fe5e7"
+ },
+ "view": "top",
+ "seed": 1,
+ "ants": 600,
+ "seconds": 300,
+ "doctrine": {
+  "id": "warlike",
+  "name": "Warlike",
+  "text": "Destroy the rival colony. Explorers become raiders whenever the colony has ants to spare. Follow alarm scent to every fight. Forage only to grow the colony."
+ },
+ "modes": {},
+ "stances": {},
+ "responses": {
+  "get": {
+   "follow|none|-|-|out|food|clear|forage": "true=0.81,false=0.19",
+   "return|none|-|-|out|food|enemy|forage": "false=0.71,true=0.29",
+   "explore|none|-|-|out|food|clear|forage": "true=0.84,false=0.16",
+   "return|none|-|-|out|food|clear|forage": "true=0.63,false=0.37",
+   "fight|none|-|-|out|food|enemy|forage": "false=0.77,true=0.23"
+  },
+  "carry": {
+   "follow|food|-|-|out|none|clear|forage": "take=0.96,put down=0.04",
+   "return|food|-|-|out|none|clear|forage": "take=0.99,put down=0.01",
+   "return|food|-|-|out|none|enemy|forage": "take=0.94,put down=0.06",
+   "explore|food|-|-|out|none|clear|forage": "take=0.82,put down=0.18",
+   "follow|food|-|-|out|none|enemy|forage": "take=0.84,put down=0.16",
+   "return|food|-|-|out|none|clear|defend": "take=0.88,put down=0.12",
+   "explore|food|-|-|out|none|enemy|forage": "take=0.71,put down=0.29",
+   "return|food|-|-|hole|none|clear|forage": "take=0.99,put down=0.01",
+   "return|food|-|-|hole|none|clear|defend": "take=0.89,put down=0.11"
+  },
+  "drop": {
+   "return|food|-|-|hole|none|clear|forage": "true=0.83,false=0.17",
+   "return|food|-|-|hole|none|clear|defend": "true=0.75,false=0.25"
+  },
+  "trail": {
+   "explore|none|-|-|hole|none|clear|forage": "home=0.83,none=0.17",
+   "explore|none|-|-|out|none|clear|forage": "home=0.87,none=0.13",
+   "follow|none|-|-|out|none|clear|forage": "home=0.87,none=0.13",
+   "return|food|-|-|out|none|clear|forage": "food=0.92,home=0.06,none=0.02",
+   "follow|none|-|-|hole|none|clear|forage": "home=0.69,none=0.3,food=0.01",
+   "return|none|-|-|out|none|enemy|forage": "none=0.52,home=0.48",
+   "return|food|-|-|out|none|enemy|forage": "food=0.84,home=0.09,none=0.07",
+   "return|food|-|-|out|none|clear|defend": "food=0.73,none=0.17,home=0.1",
+   "follow|none|-|-|hole|none|clear|defend": "none=0.53,home=0.47",
+   "follow|none|-|-|out|none|clear|defend": "home=0.63,none=0.37",
+   "return|none|-|-|out|none|clear|forage": "home=0.71,none=0.29",
+   "return|none|-|-|hole|none|clear|forage": "home=0.52,none=0.48",
+   "return|none|-|-|out|none|clear|defend": "none=0.64,home=0.36",
+   "return|none|-|-|hole|none|clear|defend": "none=0.66,home=0.34",
+   "explore|none|-|-|out|none|clear|defend": "home=0.78,none=0.22",
+   "fight|none|-|-|hole|none|clear|raid": "none=0.66,home=0.34",
+   "fight|none|-|-|out|none|clear|raid": "home=0.59,none=0.41",
+   "explore|none|-|-|hole|none|clear|defend": "home=0.73,none=0.27",
+   "return|food|-|-|hole|none|clear|forage": "food=0.89,none=0.09,home=0.02",
+   "fight|none|-|-|out|none|enemy|forage": "none=0.56,home=0.43,food=0.01",
+   "return|food|-|-|hole|none|clear|defend": "food=0.89,none=0.1,home=0.01"
+  },
+  "contact": {
+   "explore|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbering": "fight=0.94,flee=0.06",
+   "return|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbering": "fight=0.75,flee=0.24,drop and run=0.01",
+   "explore|none|-|-|out|none|enemy|forage|alarm:none|odds:even": "fight=0.77,flee=0.22,drop and run=0.01",
+   "return|none|-|-|out|none|enemy|forage|alarm:none|odds:even": "fight=0.69,flee=0.3,drop and run=0.01",
+   "return|food|-|-|out|none|enemy|forage|alarm:none|odds:outnumbering": "fight=0.61,flee=0.37,drop and run=0.02",
+   "follow|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbering": "fight=0.78,flee=0.21,drop and run=0.01",
+   "follow|none|-|-|out|none|enemy|forage|alarm:none|odds:even": "fight=0.83,flee=0.16,drop and run=0.01",
+   "return|food|-|-|out|none|enemy|forage|alarm:none|odds:even": "fight=0.5,flee=0.47,drop and run=0.03",
+   "follow|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbering": "fight=0.88,flee=0.12",
+   "explore|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbering": "fight=0.5,flee=0.49,drop and run=0.01",
+   "return|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbering": "flee=0.7,fight=0.29,drop and run=0.01",
+   "explore|none|-|-|out|none|enemy|forage|alarm:faint|odds:even": "fight=0.75,flee=0.24,drop and run=0.01",
+   "return|none|-|-|out|none|enemy|forage|alarm:faint|odds:even": "fight=0.62,flee=0.36,drop and run=0.02",
+   "explore|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbered": "flee=0.89,fight=0.09,drop and run=0.02",
+   "return|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbered": "flee=0.94,fight=0.04,drop and run=0.02",
+   "return|food|-|-|out|none|enemy|forage|alarm:faint|odds:even": "fight=0.58,flee=0.39,drop and run=0.03",
+   "return|food|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbering": "fight=0.82,flee=0.17,drop and run=0.01",
+   "follow|none|-|-|out|none|enemy|forage|alarm:strong|odds:outnumbering": "fight=0.95,flee=0.04,drop and run=0.01",
+   "return|food|-|-|out|none|enemy|forage|alarm:none|odds:outnumbered": "flee=0.86,drop and run=0.12,fight=0.02",
+   "explore|none|-|-|out|none|enemy|forage|alarm:strong|odds:even": "fight=0.82,flee=0.17,drop and run=0.01",
+   "explore|none|-|-|out|none|enemy|forage|alarm:strong|odds:outnumbering": "fight=0.92,flee=0.07,drop and run=0.01",
+   "fight|none|-|-|out|none|enemy|forage|alarm:none|odds:even": "fight=0.96,flee=0.04",
+   "fight|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbering": "fight=0.99,flee=0.01",
+   "fight|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbered": "flee=0.9,fight=0.08,drop and run=0.02",
+   "return|none|-|-|out|none|enemy|forage|alarm:strong|odds:outnumbering": "fight=0.86,flee=0.13,drop and run=0.01",
+   "fight|none|-|-|out|none|enemy|forage|alarm:faint|odds:even": "fight=0.96,flee=0.03,drop and run=0.01",
+   "fight|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbering": "fight=0.99,flee=0.01",
+   "return|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbered": "flee=0.89,fight=0.1,drop and run=0.01",
+   "explore|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbered": "flee=0.74,fight=0.24,drop and run=0.02",
+   "follow|none|-|-|out|none|enemy|forage|alarm:none|odds:outnumbered": "flee=0.71,fight=0.27,drop and run=0.02",
+   "return|none|-|-|out|none|enemy|forage|alarm:strong|odds:even": "fight=0.85,flee=0.14,drop and run=0.01",
+   "fight|none|-|-|out|none|enemy|forage|alarm:faint|odds:outnumbered": "flee=0.79,fight=0.17,drop and run=0.04",
+   "return|food|-|-|out|none|enemy|forage|alarm:strong|odds:outnumbering": "fight=0.77,flee=0.21,drop and run=0.02",
+   "return|food|-|-|out|none|enemy|forage|alarm:strong|odds:even": "fight=0.63,flee=0.31,drop and run=0.06"
+  },
+  "leave": {
+   "return|none|-|-|hole|none|clear|forage|returns:many|crowd:few": "now=0.94,soon=0.02,wait=0.02,raid=0.02",
+   "return|none|-|-|hole|none|clear|forage|returns:many|crowd:many": "now=0.92,soon=0.03,wait=0.03,raid=0.02",
+   "return|none|-|-|hole|none|clear|forage|returns:few|crowd:many": "now=0.91,soon=0.06,wait=0.02,raid=0.01",
+   "return|none|-|-|hole|none|clear|forage|returns:few|crowd:few": "now=0.77,soon=0.13,wait=0.09,raid=0.01",
+   "return|none|-|-|hole|none|clear|defend|returns:many|crowd:few": "now=0.81,wait=0.1,soon=0.05,raid=0.04",
+   "return|none|-|-|hole|none|clear|forage|returns:none|crowd:few": "wait=0.69,now=0.25,soon=0.05,raid=0.01",
+   "return|none|-|-|hole|none|clear|forage|returns:none|crowd:many": "raid=0.86,wait=0.08,now=0.05,soon=0.01",
+   "return|none|-|-|hole|none|clear|defend|returns:many|crowd:many": "now=0.77,wait=0.14,soon=0.06,raid=0.03",
+   "return|none|-|-|hole|none|clear|defend|returns:none|crowd:many": "raid=0.84,now=0.08,wait=0.07,soon=0.01",
+   "return|none|-|-|hole|none|clear|defend|returns:few|crowd:many": "now=0.46,wait=0.24,soon=0.18,raid=0.12"
+  }
+ }
+}
