@@ -466,7 +466,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const f = read(h);
       const r = read(h + a);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if (col.queen?.alive && col.band(i) === 0 && col.under[i])
+    } else if (col.queen?.alive && (col.band(i) === 0 || col.reverts(i)) && col.under[i])
       h = turnToward(h, Math.atan2(col.queen.y - col.y[i], col.queen.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
     else if (col.entrance && col.outbound(i) && col.under[i])
       h = turnToward(h, Math.atan2(col.entrance.y - col.y[i], col.entrance.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.5;

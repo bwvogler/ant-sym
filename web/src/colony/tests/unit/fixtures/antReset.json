@@ -514,6 +514,15 @@
   "rouse": [
    0
   ],
+  "youngMet": [
+   1
+  ],
+  "crop": [
+   0
+  ],
+  "broodMet": [
+   0
+  ],
   "carriedX": [
    0
   ],
@@ -1036,11 +1045,20 @@
   "rouse": [
    0
   ],
-  "carriedX": [
+  "youngMet": [
    39.25
   ],
-  "carriedY": [
+  "crop": [
    39.5
+  ],
+  "broodMet": [
+   39.75
+  ],
+  "carriedX": [
+   40
+  ],
+  "carriedY": [
+   40.25
   ]
  }
 }

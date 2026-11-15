@@ -28,6 +28,7 @@ export const COLONY_STATE = [
   "outAt",
   "layT",
   "inJaws",
+  "inCrops",
   "belief",
   "entrance",
   "entranceCol",
@@ -79,6 +80,9 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "others",
   "felt",
   "donors",
+  "youngs",
+  "broods",
+  "cropDonors",
   "scentSum",
   "perceived",
 ]);
