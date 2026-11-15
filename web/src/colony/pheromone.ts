@@ -31,7 +31,7 @@ export type Channel = "food" | "home" | "alarm" | "noEntry" | "raid" | Mark | "b
  */
 export type Mark = "royal" | "brood" | "store" | "reception" | "midden";
 export const MARKS: Mark[] = ["royal", "brood", "store", "reception", "midden"];
-// broodOdour last: an empty channel adds nothing to a fields hash, so with it off the goldens keep (ja-k4k.15.2).
+// broodOdour holds nothing while it is off (broodOdour 0 lays nothing), and an empty channel adds nothing to a fields hash: the goldens keep (ja-k4k.15.2).
 export const CHANNELS: Channel[] = ["food", "home", "alarm", "noEntry", "raid", ...MARKS, "broodOdour"];
 
 export interface ChannelParams {

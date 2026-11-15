@@ -10,14 +10,14 @@ import { SMALL_SIDE } from "../builders.ts";
 // cells, strongest on the pile. Off (broodOdour 0) the channel stays empty.
 
 /** A colony of one ant with `items` brood items on one cell of the royal chamber, run `seconds`; the cell and the row's open cells east. */
-function pile(items: number, broodOdour: number, seconds = 30) {
+function pile(items: number, broodOdour: number, seconds = 30, held = false) {
   const map = generateSideWorld(2, SMALL_SIDE);
   const c = new Colony(map, { antCount: 1, maxAnts: 1, broodOdour }, mulberry32(1), () => "explore");
   const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   const y = royal.floorRow - 3;
   const x = royal.x0 + 1;
   c.brood.items.length = 0;
-  for (let k = 0; k < items; k++) c.brood.add(x, y, royal.id);
+  for (let k = 0; k < items; k++) c.brood.add(x, y, royal.id).held = held ? 0 : -1;
   // Held at the egg stage, so the pile stays as laid (nothing hatches, is fed or carried in the half minute).
   for (let k = 0; k < 30 * seconds; k++) {
     for (const b of c.brood.items) b.t = 0;
@@ -32,9 +32,16 @@ test("brood odour: strongest on the brood, falling off with distance, below FAIN
   const one = pile(1, 1);
   assert.ok(one.at(0) > one.at(1) && one.at(1) > one.at(2), `falls off: ${[0, 1, 2].map((d) => one.at(d).toFixed(3)).join(", ")}`);
   assert.ok(one.at(1) >= FAINT, `a single egg is smelt a cell away: ${one.at(1).toFixed(3)}`);
+  // Laid a second, not a tick: after 30 s a single egg's own cell holds about 1.8 (30 × as much a tick would reach the cap, 20).
+  assert.ok(one.at(0) > 1 && one.at(0) < 3, `a single egg's own cell: ${one.at(0).toFixed(3)}`);
   const many = pile(20, 1);
   assert.ok(many.at(2) >= FAINT, `a pile is smelt two cells away: ${many.at(2).toFixed(3)}`);
   assert.ok(many.at(3) < FAINT, `and not three: ${many.at(3).toFixed(3)}`);
+});
+
+test("brood odour comes from brood lying in the nest: an egg in a nurse's jaws lays none", () => {
+  const carried = pile(1, 1, 5, true);
+  assert.equal(carried.at(0), 0);
 });
 
 test("brood odour off (broodOdour 0): nothing is laid, the channel stays empty", () => {

@@ -6257,7 +6257,7 @@ Merging is not delegated: PRs wait for the owner.
 
 **Research basis:** [brood-odour.md](brood-odour.md).
 - **Ant queen pheromones are mostly non-volatile contact signals,** fertility signals that suppress workers' laying (Holman et al. 2010, *Lasius niger*). A queen volatile attracts workers only in the fire ant, with no measured range (Lofgren et al. 1983, **unverified**); the pharaoh ant's is weak (Oliveira et al. 2020).
-- **Workers go toward air from larvae** (Glancey & Dickens 1988, *S. invicta*, **unverified**), and the young answer brood cues more than the old (Kohlmeier et al. 2018).
+- **Workers go toward air from larvae** (Glancey & Dickens 1988, *S. invicta*, **unverified**), and young and old workers respond differently to larval and adult odours, the young by inference toward the larvae's (Kohlmeier et al. 2018).
 - **The brood pile holds nurses.** Care follows how far a worker's zone overlaps the brood (Sendova-Franks & Franks 1995, **unverified**). Climate, not odour, sets where brood should lie.
 
 **The problem (measured).** A young ant in a chamber turns toward the queen's exact x,y (`steer.ts`; gap row "Steering in a chamber: to the queen", `ja-k4k.2.1`). PR #192 replaced it with a climb of floor marks every ant lays. Over 20 seeds of `economy.test`'s setup (world 1 n = 1–7, 9–12; world 2 n = 0, 2–9):
@@ -6297,7 +6297,7 @@ Merging is not delegated: PRs wait for the owner.
 - `ja-k4k.15.5`: turning it on, after `ja-rvli`. It holds the settings, the steps and the guards; `ja-k4k.2.1` closes with it.
 - `ja-k4k.15.4`: the fungus lever question, P4.
 
-**Still open.** The field's reach and rates (design). Whether nurses should drop brood where the odour is strongest (piles by positive feedback; `ja-k4k.4`). A fire-ant-like queen volatile as a species option. #192's branch carries this plan; its code is replaced at `ja-k4k.15.3`.
+**Still open.** The field's reach and rates (design). Whether nurses should drop brood where the odour is strongest (piles by positive feedback; `ja-k4k.4`). A fire-ant-like queen volatile as a species option.
 ### 74.1 The nurse-zone assay, measured on main (ja-k4k.15.1, no behaviour change)
 
 - **`nurseZone`** (`experiment.ts`): the side view, one colony of 600 for 600 s. Every 30 s from 120 s on, it takes the young's and the middle-aged's mean hex distance, underground, to the nearest brood item lying in the nest, and to the queen.

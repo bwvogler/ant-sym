@@ -31,7 +31,7 @@
 - ***S. invicta*, contact:** brood is also recognised by a contact pheromone (Walsh & Tschinkel 1974, *Anim Behav*; title only, so the detail is from memory; not fetched).
 - ***Neivamyrmex opacithorax*:** army-ant workers were attracted to secretions of larvae and pupae (Watkins & Cole 1966, **unverified**, from a citing snippet).
 - ***Ooceraea biroi*:** larvae make a volatile that acts without contact, but it was tested only as a suppressor of worker egg-laying, not as an attractant (Piqueret et al. 2026, **unverified**, press release).
-- **[bee analogy]** The larval volatile E-β-ocimene acts through a screen bees can't touch. The youngest larvae give off the most (L1 4.33 ng/mg against ≤ 0.085 for later stages), and its range in the hive was not measured (Maisonnasse et al. 2010, *PLoS ONE*, full text).
+- **[bee analogy]** The larval volatile E-β-ocimene acts through a screen bees can't touch. Young larvae give off the most (L1 4.33 and L2–3 2.84 ng/mg per 20 min, not significantly different; the other immature stages ≤ 0.085), and its range in the hive was not measured (Maisonnasse et al. 2010, *PLoS ONE*, full text).
 - **Not found:** any measured range for an ant brood volatile. The evidence covers centimetres of a Y-tube with forced air.
 
 **In the game:** a new field, **brood odour**, laid by the brood items themselves (eggs, larvae, pupae) where they lie, not by passing ants.
@@ -56,8 +56,8 @@
 - ***Leptothorax unifasciatus*:**
   - The brood forms one cluster of concentric rings, eggs and micro-larvae at the centre (Franks & Sendova-Franks 1992, abstract, **unverified**).
   - Each worker keeps to a small spatial-fidelity zone, and how much she cares for brood follows how much her zone overlaps the brood; "no clear segregation on the basis of age" (Sendova-Franks & Franks 1995, abstract, **unverified**).
-- ***T. albipennis*:** brood added to a second chamber was carried to the main pile, and callows sat nearer its centre (Robinson et al. 2009, full text).
-- ***Pogonomyrmex badius*:** about 98% of brood lies deepest (larvae at about 110–120 cm), and below 70 cm over 90% of workers are young. CO₂ is not the depth template: "the depth cues… remain unknown" (Tschinkel & Hanley 2017, *PLoS ONE*, full text).
+- ***T. albipennis*:** brood added to a second chamber was carried, at least some of it, to the main pile, and callows sat more centrally in the nest than mature workers (Robinson et al. 2009, full text).
+- ***Pogonomyrmex badius*:** about 98% of brood is kept in the deepest regions (cited from earlier work), larvae at about 110–120 cm; below 70 cm over 90% of workers were unmarked, "probably younger". CO₂ is not the depth template: "the depth cues… remain unknown" (Tschinkel & Hanley 2017, *PLoS ONE*, full text).
 - ***Temnothorax rugatulus*:** nest shape changes where brood and queens lie (Chism et al., bioRxiv 2022.06.30.498314, **preprint**, abstract). A first pass reported that queens sit farther from the brood centroid than workers; the full text wasn't reachable, so that is **unverified**.
 - **Counter-evidence, climate:**
   - *Camponotus mus* nurses move brood along a temperature gradient, to 30.8 °C at midday and 27.5 °C at night (Roces & Núñez 1989, abstract, **unverified**).

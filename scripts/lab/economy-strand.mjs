@@ -3,7 +3,8 @@
 // world × 7919 + n. Each minute from 300 s on it counts larvae unfed over 120 s while the larder could feed them
 // ("stranded"), and reports per seed the worst stranding at once, where those larvae lay (royal chamber, a brood
 // chamber of two cells or fewer, a bigger one, none), the bands at that moment, and the workers alive at 3,600 s
-// (a collapse: under 110). Fed to `xargs -P` it runs seeds side by side.
+// (a collapse: under 110), flagging any worker starved (the test asserts none). Fed to `xargs -P` it runs seeds side by side.
+// It copies economy.test's hour() rather than calling it: keep the two in step if the test changes.
 //
 // Usage: node scripts/lab/economy-strand.mjs <world> <n> [root=this repo] [colony=JSON]
 //   root: another checkout to measure (its web/src/colony is imported), so the same probe measures before and after.
@@ -57,4 +58,5 @@ for (let k = 1; k <= 30 * 3600; k++) {
   for (let i = 0; i < c.n; i++) if (c.alive[i]) bands[c.band(i)]++;
   worst = `t=${k / 30} ${JSON.stringify(kinds)} bands=${bands}`;
 }
-console.log(`w${w}+${nudge} stranded=${stranded} pop=${c.population}${c.population < 110 ? " COLLAPSE" : ""} ${worst}`);
+const starved = c.diedHungry > 0 ? ` STARVED=${c.diedHungry}` : "";
+console.log(`w${w}+${nudge} stranded=${stranded} pop=${c.population}${c.population < 110 ? " COLLAPSE" : ""}${starved} ${worst}`);
