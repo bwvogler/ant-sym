@@ -91,7 +91,8 @@ test("slow.yml's step runs test:slow's files at its per-file limit, sharded by t
   assert.equal(timeout(g1), timeout(script("test:slow")));
   assert.doesNotMatch(g1, /--test-shard/, "G1 is not sharded: it runs alone");
   // It runs exactly when the shards do: the same condition.
-  const cond = (job: string): string => new RegExp(`^  ${job}:\\n(?:    #.*\\n)*    if: >-\\n((?:      .+\\n)+)`, "m").exec(slowYml)?.[1] ?? "";
+  const cond = (job: string): string =>
+    new RegExp(`^  ${job}:\\n(?:    #.*\\n)*    if: >-\\n((?:      .+\\n)+)`, "m").exec(slowYml)?.[1] ?? "";
   assert.ok(cond("slow").length > 0 && cond("g1") === cond("slow"), "the g1 job's if: is the slow job's");
   assert.match(run, /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /);
 });
