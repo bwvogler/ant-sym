@@ -885,12 +885,15 @@ export const defendWalked: Assay = {
     const control = run(true)["you.stored"];
     const none = run(false, { defendAt: Infinity });
     const killed = r.metrics["rival.losses"];
+    const vsNone = control > 0 && none["you.stored"] > 0 ? stored / none["you.stored"] : NaN;
+    const half = (r.metrics["rival.ants"] + killed) / 2;
     const lost = r.metrics["you.losses"];
     return {
       stored,
       control,
       foodShare: control > 0 ? stored / control : NaN,
       noDefence: none["you.stored"] / Math.max(1, control),
+      vsNone,
       noDefenceKilled: none["rival.losses"],
       noDefenceLost: none["you.losses"],
       killed,
@@ -899,7 +902,7 @@ export const defendWalked: Assay = {
       fightNear: r.metrics.fightNear as number,
       atPile: r.metrics.atPile as number,
       marched: r.metrics.marched as number,
-      pass: control > 0 && stored / control >= DEFEND_FOOD * (none["you.stored"] / control) && killed >= 40 ? 1 : 0,
+      pass: vsNone >= DEFEND_FOOD && killed >= half ? 1 : 0,
     };
   },
 };

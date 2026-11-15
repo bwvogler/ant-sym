@@ -6514,7 +6514,7 @@ Both assays' attackers used to be broadcast raiders (`stanceGate: 0`, stance rai
 - **A6 (owner, 2026-11-15):** the walked setup replaces the one-world A6 and its open control (`passWalked`); the mark is unchanged (the defenders' exchange in the pass ≥ 1.5 × the open battle's).
 - **A13 (owner, 2026-11-15):** the broadcast arm has no one-world twin. Its place goes to the same battle with nobody defending (`defendAt` ∞). Mark: food at least `DEFEND_FOOD` (0.9) of the no-defence colony's, and at least half the war party (40 of 80) killed (`defendWalked`, now in `ONE_ASSAYS`).
 
-Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defendHome --one --seeds 1-20`):
+Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defendHome --one --seeds 1-20`); seeds 1–2 give the same numbers on `c6bb4ee`, the main this lands on (review of #230). A13 reports its key metric as `vsNone` (food ÷ no-defence food):
 
 | assay | seeds 1–10 | seeds 11–20 | key metric: median, worst (seed) | seeds 1, 2 | before (§76.1, broadcast) |
 |---|---|---|---|---|---|
@@ -6523,5 +6523,5 @@ Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defen
 
 - **A6 is worse walked:** 4/20 against 12/20 with the broadcast march. A median 24 % of the attackers reach the hole (2–34 %): the rest meet defenders on the way or wander once let go, and the battle seldom forms at the pass. `ja-lp4.6.5` tracks A6 on one world.
 - **A13: defending pays nothing over not defending.** The colony stores 0.92 (0.45–1.49) of the sealed control's food; with nobody defending, 0.89 (0.71–1.50); both kill a median 41 raiders. A median 7 % of the war party reaches the hole. `ja-lp4.6.20`.
-- **Under the marks rule (§76.1)** both fail, so their gate tests guard today's worst seed: A6 gain ≥ 0.60, A13 food ÷ no-defence food ≥ 0.57 and killed ≥ 27.
+- **Under the marks rule (§76.1)** both fail, so the gate tests (`ja-fnd.3.2.5`, not yet built) guard today's worst seed: A6 gain ≥ 0.60 (replacing §76.1's 0.80, which was the broadcast A6's), A13 food ÷ no-defence food ≥ 0.57 and killed ≥ 27.
 - **Cost:** none. No situation, legend or question changed.

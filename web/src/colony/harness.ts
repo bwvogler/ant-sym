@@ -550,9 +550,9 @@ export const MARCH_REACH = 3;
  * of them on the plane that has no stranger of colony `to` within its enemy range (+1 cell) is turned toward the cell two
  * steps on along the way (as R1's walk out); one that has is let go, so the fight is the ants' own. So is one within
  * MARCH_REACH steps of the hole. Ants in the curtain come up by their own rules. Reported: `marched`, the share of
- * colony `k`'s ants that reached the hole (within MARCH_REACH steps) at least once.
+ * colony `k`'s ants that reached the hole (within MARCH_REACH steps) at least once. `walks` is [k, to], for tests.
  */
-export function marchProbe(k: number, to: number): Probe {
+export function marchProbe(k: number, to: number): Probe & { walks: readonly [number, number] } {
   let field: Int32Array | null = null;
   let w = 0;
   let h = 0;
@@ -583,6 +583,7 @@ export function marchProbe(k: number, to: number): Probe {
     return f;
   };
   return {
+    walks: [k, to] as const,
     tick(game) {
       if (!game.world) throw new Error("marchProbe: one world only");
       const f = (field ??= build(game));
