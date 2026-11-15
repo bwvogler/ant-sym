@@ -4,6 +4,7 @@ import {
   UPGRADES,
   type Upgrade,
   LETHAL_LEVERS,
+  canKeep,
   MAX_COLONIES,
   MET,
   type Game,
@@ -52,7 +53,8 @@ import { colonyName, colonyTone } from "./ui/names.ts";
 import { passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
 import Tip from "./ui/Tip.tsx";
-import { NextBody, UpgradeBody } from "./ui/UpgradeTips.tsx";
+import UpgradeTree from "./ui/UpgradeTree.tsx";
+import { useWideTree } from "./ui/upgradeBranches.ts";
 import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
@@ -110,6 +112,7 @@ export default function ColonyApp() {
   const theme = useTheme();
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
+  const wideTree = useWideTree();
   const toggle = useCallback((d: DrawerId) => setDrawer((cur) => (cur === d ? null : d)), []);
   const closeDrawer = useCallback(() => setDrawer(null), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -540,9 +543,7 @@ export default function ColonyApp() {
     onLoad: (r) => (continueFrom(r), setDrawer(null)),
   };
   const ev = stats?.evolution;
-  const affordable = ev
-    ? UPGRADES.some((u) => !idle(u, controls.menu) && (u.costs[ev.levels[u.id] ?? 0] ?? Infinity) <= ev.mutations)
-    : false;
+  const affordable = ev ? UPGRADES.some((u) => !idle(u, controls.menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
   const penCard = flight && gate?.open && oneWorld && circle;
   // The machine can't step the sim at the speed asked: the HUD says how fast it really runs.
   const slow = !!stats && controls.playing && stats.pace > 0 && stats.pace < controls.speed * 0.85;
@@ -822,8 +823,12 @@ export default function ColonyApp() {
           </Drawer>
         )}
         {drawer === "evolve" && (
-          <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer}>
-            {ev ? <Evolve e={ev} evolve={evolve} menu={controls.menu} /> : <p className="text-fg-3">The fungus has not landed yet.</p>}
+          <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer} wide={wideTree}>
+            {ev ? (
+              <Evolve e={ev} evolve={evolve} menu={controls.menu} wide={wideTree} />
+            ) : (
+              <p className="text-fg-3">The fungus has not landed yet.</p>
+            )}
           </Drawer>
         )}
         {drawer === "colonies" && (
@@ -1222,7 +1227,7 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
   return !!u.levers?.every((id) => LETHAL_LEVERS.has(id) && !menu.includes(id));
 }
 
-function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[] }) {
+function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1241,45 +1246,10 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
         </span>
       </div>
       <p className="mt-1 text-[11px] text-fg-3">
-        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks
-        more.
+        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep. Some levels need
+        others first, and every level costs the same price, which rises with each one you keep.
       </p>
-      <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
-        {UPGRADES.map((u) => {
-          const level = e.levels[u.id] ?? 0;
-          const cost = u.costs[level];
-          const next = u.steps[level + 1];
-          return (
-            <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
-              <Tip tip={<UpgradeBody u={u} level={level} />} className="min-w-0 truncate">
-                <span
-                  className={
-                    u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"
-                  }
-                >
-                  {u.name}
-                </span>{" "}
-                <span className="text-fg-3">{u.steps[level]}</span>
-                {idle(u, menu) && <span className="text-fg-3"> (not on the menu)</span>}
-              </Tip>
-              {cost === undefined ? (
-                <span className="shrink-0 text-fg-3">at its most</span>
-              ) : (
-                <Tip tip={<NextBody u={u} level={level} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
-                  <button
-                    type="button"
-                    className="rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
-                    disabled={cost > e.mutations}
-                    onClick={() => evolve(u.id)}
-                  >
-                    {next} · {cost.toLocaleString()}
-                  </button>
-                </Tip>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <UpgradeTree levels={e.levels} mutations={e.mutations} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
     </div>
   );
 }
@@ -1315,7 +1285,7 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
   // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
   const affordable = stats?.evolution
-    ? UPGRADES.some((u) => !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations)
+    ? UPGRADES.some((u) => !idle(u, menu) && canKeep(stats.evolution!.levels, stats.evolution!.mutations, u.id))
     : false;
   const couldAfford = useRef(affordable);
   useEffect(() => {

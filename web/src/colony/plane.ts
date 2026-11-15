@@ -67,7 +67,7 @@ export function siteAim(c: Colony, i: number): number {
     s = c.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
     // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
     // With steering weights on (ja-ykmu.3) the memory weight gives a spent spot up as siteGive 1 does: without it, the weight
-    // cost ~14 % of the food against a placebo over seeds 1-20, with it ~4 % (PRD S3).
+    // cost ~14 % of the food against a placebo over seeds 1-20, with it ~4 % (PRD §82).
     const give = c.params.siteGive > 0 ? c.params.siteGive : c.params.steerLane > 0 ? 1 : 0;
     if (give > 0 && s > give * PI_DRIFT * Math.hypot(c.foodX[i], c.foodY[i])) {
       c.foodX[i] = c.foodY[i] = NaN;

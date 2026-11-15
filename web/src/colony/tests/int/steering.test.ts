@@ -136,7 +136,7 @@ test("near its last find an ant steers by its near weights, elsewhere by its far
   assert.notEqual(run(true), plain, "at its find: its near weights (wide search) change its steering");
 });
 
-test("search −1 is tight (explorers turn more per step), +1 is wide (they turn less): the direction the questions say (PRD S3 round 6)", () => {
+test("search −1 is tight (explorers turn more per step), +1 is wide (they turn less): the direction the questions say (PRD §82 round 6)", () => {
   const turned = (level: -1 | 0 | 1): number => {
     const g = world(1);
     const c = g.player;

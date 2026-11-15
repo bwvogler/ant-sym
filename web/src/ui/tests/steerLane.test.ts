@@ -94,7 +94,7 @@ test("a request asks a score per default weight; a reply reads as levels, and on
   assert.notEqual(steerKey({ ...out, find: "near" }), key, "near its last find is another situation");
   const req = packSteerRequest([{ id: "w0", key, situation: out }], DOCTRINES[0]!.text);
   assert.deepEqual(Object.keys(req.questions), ["w0_search", "w0_memory"]);
-  // Jev's probabilities are kept (a rounded score lost every lean, PRD S3); without them, the rounded score, certain.
+  // Jev's probabilities are kept (a rounded score lost every lean, PRD §82); without them, the rounded score, certain.
   assert.equal(
     readSteer(
       {

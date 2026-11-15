@@ -7037,7 +7037,46 @@ The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
 
-## 80. Measuring lockstep (ja-0kys, 2026-11-14)
+## 80. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
+
+**Basis:** [mutation-tree.md](mutation-tree.md), pure game design. **Owner (2026-11-15):** "What about these mutation upgrades reconsidered as a tech tree? Maybe a flatter cost, but dependencies?"; then the cost as *one price, rising per buy*, a *tree view* in the drawer, and, after a research pass for the edges was stopped by safeguards, "Try building it this way": the tree as design, with no research step (the adding-mechanics gate waived on that word).
+
+**The problem.** The 14 upgrades (26 levels) are a flat menu with no dependencies; each level's hand-set price (2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest, §50.13) does all the pacing, so the choice is mostly the cheapest item.
+
+**Decisions.**
+- One price for every level, rising with each level kept: `PRICE(n) = round(BASE · RATIO^n)`, first guess BASE 3, RATIO 1.38 (all 26 levels about 34,000 mutations, today's total) (owner: the shape; the numbers are tuned).
+- Levels need others first, by the table in the note; seven roots; the lethal levers last and still also on the menu (proposed: the owner edits the edges before code).
+- The drawer draws the tree; the list stays at phone width (owner).
+- No migration: saves stay keyed by upgrade id (owner, 2026-11-10: no backward compatibility).
+
+**Assays and targets.** Unit and soak tests for the price, the locks and the tree's guard (every need real, no cycle, every level reachable), each caught by a mutation. Pacing: about half of everything kept by 20 minutes (§50.13's aim), `progression.mjs --seconds 1200`. P1 (§63.4) on seeds 1–20 with `--hyphae --growth --flow`, against no hyphae on the same commit; BASE and RATIO chosen by the worst seed. The fungus golden is re-recorded (its game buys upgrades); the others stay bit-exact.
+
+**Cost.** None: no question, legend or cache key reads upgrade levels (`evolution.test.ts` pins the fungus key).
+
+**Beads.** `ja-52ui` (this); `ja-52ui.1` model, price and locks; `ja-52ui.2` the tree's edges; `ja-52ui.3` scripts and goldens; `ja-52ui.4` the drawer's tree view; `ja-52ui.5` text; `ja-52ui.6` pacing, P1 and tuning.
+
+**Still open.** Whether a level may need one of two others rather than both; the late levels' price (below).
+
+### 80.1 Built, and the price chosen (2026-11-15)
+
+**Built** (`ja-52ui.1`–`.5`): `Upgrade.needs` replaces the price lists, checked at load (every need a real level, no cycle, every level reachable); `price(kept)`, `unmet`, `canKeep` and `pathTo` in `evolution.ts`; the drawer's tree (`ui/UpgradeTree.tsx`: branches, each upgrade a row of its levels, lines in lanes from a level to what needs it, dashed until met) on a screen 1024 px or wider, the list with "needs …" on a phone; the badge and notice count only levels that can be kept; `progression.mjs` and the goldens keep what a level needs first, and `--price base,ratio` sweeps the price. §50.13's price table is superseded.
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, with and without `--hyphae --growth --flow`, seeds 1–20; `main` at `5a64619` for reference; seconds to a quarter of the hosts):
+
+| | median 1–10 | median 11–20 | worst seed |
+|---|---|---|---|
+| `main`, no hyphae | 246.5 | 294.5 | 587 s (seed 8) |
+| `main`, hyphae | 221.5 | 228 | 406 s (seed 16) |
+| tree at 1, ×1.5, no hyphae | 222.5 | 194 | 525 s (seed 8) |
+| tree at 1, ×1.5, hyphae | 216.5 | 158.5 | 437 s (seed 11) |
+
+- **1, ×1.5 holds P1** (§63.4) on seeds 1–20: the slowest seed with hyphae is +3.3 % (seed 11, 423 → 437 s); every other seed is within 0.4 % or faster. Both games reach a quarter sooner than on `main`. Its first six levels cost 21 in all, as the old list's first levels did.
+- **3, ×1.38** (the first guess) fails: seed 9 +50 %, seed 1 +37 %, seed 2 +33 %, seed 12 +12 %, and both games are slower than `main`. **2, ×1.3** fails on seed 9 (+12 %, seeds 1–10).
+- **Pacing at 20 minutes** (seeds 1–4, hyphae): the 20 levels in the script's order are all kept by 466–679 s. From the 21st level on a level costs 3,300 to 25,000, so the last levels a player picks (often *Crown*, the *Odour weapon*, *Knots* or *Stalks*) are out of reach in a 20-minute game: the order matters, and the tree's end is far.
+- **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
+- **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
+
+## 81. Measuring lockstep (ja-0kys, 2026-11-14)
 
 **What.** `lockstepProbe` (experiment.ts), sampled each second over the ants in the mode their policy chose (carriers left out): `lockAgree`, the share of ants in their situation's commonest mode (1 = every ant in a situation does the same); `lockSwing`, how far the colony's mode mix moves second to second (total variation); `lockBurst`, the Fano factor of mode switches a second (about 1 when ants switch independently); `switchesPerS`. The one-world assay `lockstep` reports them; `--policy precache:<doctrine>` plays the shipped mode answers for both colonies, and `--set both.<param>` sets a parameter on both.
 
@@ -7057,16 +7096,16 @@ The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete
 - **The colony as a whole does not swing.** Its mode mix moves 2–3 % a second whatever the policy, and switching is moderately bunched (Fano 1.6–5.4, wide across seeds) under every policy, the local rule included: bursts come from events (alarm, finds, trails meeting), not from shared answers. What reads as "flipping between a few big states" is more likely the four coarse modes themselves than ants switching together.
 - **Only 21–32 % of mode decisions met a shipped answer** offline (`Jev's answers (cache hits)`); the rest played the local rule, which never draws. The bundles hold the 151 situations one top-down live check met; one world meets more. On the page those misses are asked live, so play there is more Jev's than these runs. A one-world live check (`colony-live`) would ship more situations and make these runs closer to play: an owner's call on spend.
 
-## 81. Steering weights, set by the policy where the biology allows (built, off by default, ja-ykmu, 2026-11-14)
+## 82. Steering weights, set by the policy where the biology allows (built, off by default, ja-ykmu, 2026-11-14)
 
-*Tried first on the long-lived `staging` branch (§80's lockstep measure, then this); brought to `main` on the owner's word (2026-11-15), **off by default**: `steerLane` 0 plays main bit for bit (goldens exact), and the Lab's "Steering weights" switch turns it on. The rounds below are the staging history, numbered as it ran them.*
+*Tried first on the long-lived `staging` branch (§81's lockstep measure, then this); brought to `main` on the owner's word (2026-11-15), **off by default**: `steerLane` 0 plays main bit for bit (goldens exact), and the Lab's "Steering weights" switch turns it on. The rounds below are the staging history, numbered as it ran them.*
 
 **Research basis:** [steering.md](steering.md):
 - A forager's cue weights shift as smooth functions of its state (the vector's weight grows with its length: Wystrach, Mangan & Webb 2015, *Cataglyphis velox*) or switch with the trip's phase (food odour out, vector in); they are not free choices.
 - How faithfully a *Lasius niger* forager follows a trail is near fixed (~75–85 %, Czaczkes et al., **unverified** in part); its own memory overrides the trail after one visit (Grüter et al. 2011, 82–100 %, **unverified**).
 - Search turns tight after a find and wide when lost (*Formica schaufussi*, Fourcassié & Traniello, **unverified**); no forager is shown steering by nearby nestmates.
 
-**The problem (measured).** The policy picks one of four modes; each is a fixed routine with constant weights. PRD §80: ants don't move in lockstep, so what reads as a few big states is likely the coarse action set.
+**The problem (measured).** The policy picks one of four modes; each is a fixed routine with constant weights. PRD §81: ants don't move in lockstep, so what reads as a few big states is likely the coarse action set.
 
 **Decisions.**
 - Shape "both, split" (owner, 2026-11-14): policy-set weights where the biology says a situation sets them (`search`, `memory`; `alarm` already is), design weights (`trail`, `home`, `vector`, `nestmates`) Lab-only on staging.

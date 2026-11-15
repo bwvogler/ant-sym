@@ -366,7 +366,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
-      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Spores left out on the open plane, off its patch, die in the sun twice as fast as in the soil (the game's number: full sun kills Metarhizium spores within an hour). Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
+      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Spores left out on the open plane, off its patch, die in the sun twice as fast as in the soil (the game's number: full sun kills Metarhizium spores within an hour). Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep. They form a tree: some levels need others kept first (the lethal ones last), and every level costs the same price, which rises with each one you keep. Its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
     sources: [
       { note: "fungus-body", anchor: "1-growth-without-a-host", label: "Growth without a host" },
       { note: "fungus-body", anchor: "3-adapting-to-hosts", label: "Adapting to hosts" },
@@ -611,6 +611,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "mycelial-transport",
     title: "Mass flow in a mycelium",
     covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge.",
+  },
+  {
+    note: "mutation-tree",
+    title: "The mutation tree",
+    covers:
+      "The fungus's mutations as a tech tree: levels that need others first, at one price that rises with each level kept. Game design.",
   },
   {
     note: "builder",

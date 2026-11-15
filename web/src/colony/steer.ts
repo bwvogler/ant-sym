@@ -103,7 +103,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const steered =
     sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
   const sl = steered ? steerLevel(sc, 0) : 0;
-  // tight (−1) turns more, wide (+1) less: the questions say "low: tight loops", "high: straight and ranging" (it was the other way round until PRD S3 round 6)
+  // tight (−1) turns more, wide (+1) less: the questions say "low: tight loops", "high: straight and ranging" (it was the other way round until PRD §82 round 6)
   const sm = sl === 0 ? 1 : sl < 0 ? p.searchSpan : 1 / p.searchSpan;
   const detouring = col.detour[i] > 0;
   if (mode !== EXPLORE) col.digT[i] = 0;

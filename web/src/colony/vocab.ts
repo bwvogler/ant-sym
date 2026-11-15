@@ -182,7 +182,7 @@ export function decodeSteering(code: number): Steering {
 /**
  * Where an ant out steers relative to its last find, by its own memory (the way to it, kept one trip): `none`, it remembers no find;
  * `far`, it remembers one elsewhere; `near`, within params.findNear of where it believes the spot is (ja-ykmu.3;
- * docs/steering.md §3, §7). `far` once also meant "none": Jev answered for that and ignored the memory (PRD S3, round 4).
+ * docs/steering.md §3, §7). `far` once also meant "none": Jev answered for that and ignored the memory (PRD §82, round 4).
  */
 export const FINDS = ["none", "far", "near"] as const;
 export type Find = (typeof FINDS)[number];

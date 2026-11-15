@@ -12,7 +12,7 @@ import {
   type SteerWeight,
 } from "./vocab.ts";
 
-// The steer lane, pure (ja-ykmu.3; docs/steering.md, PRD S3): how strongly an ant out exploring or following weighs each
+// The steer lane, pure (ja-ykmu.3; docs/steering.md, PRD §82): how strongly an ant out exploring or following weighs each
 // steering cue, asked per situation under the colony's doctrine. The situation is the mode lane's, with the mode the ant now has
 // (explore or follow). One score question per weight asked, three levels each (low, medium, high; the expected level is read,
 // rounded); the weights the biology lets a situation set are asked by default (STEER_ASKED), the design ones only when the Lab
@@ -46,7 +46,7 @@ export const STEER_LEGEND =
 export const STEER_SCALE = ["low", "medium", "high"] as const;
 
 /**
- * The levels of the two weights the biology lets a situation set, in the question itself (brain v7, PRD S3 round 6). Under the
+ * The levels of the two weights the biology lets a situation set, in the question itself (brain v7, PRD §82 round 6). Under the
  * legend alone, the answers for the real situations did not tell an ant at its last find from one far from it (P(tight) 0.28 near,
  * 0.25 far); with each level saying what it is, 0.91 near and 0.05 far, and an ant that remembers a find leads by it.
  */
@@ -101,7 +101,7 @@ export function packSteerRequest(items: { id: string; key: string; situation: St
 /**
  * An answer as the cache keeps it: for each asked weight, in the key's order, Jev's probabilities of low, usual and high
  * (`0.34/0.59/0.07`), comma-joined. A score's expected level, rounded, lost every lean: Jev answered near a find search 0.70–0.88 and
- * memory 1.06–1.25, all "usual" once rounded (PRD S3). Each ant draws its level from them. With no probabilities, the rounded score, certain.
+ * memory 1.06–1.25, all "usual" once rounded (PRD §82). Each ant draws its level from them. With no probabilities, the rounded score, certain.
  */
 export function readSteer(answers: Record<string, JevAnswer>, id: string, asked: readonly SteerWeight[]): string | null {
   const parts: string[] = [];
