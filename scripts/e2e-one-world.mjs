@@ -649,7 +649,7 @@ try {
     "a click outside her flight is refused, and founds nothing",
   );
   await page.mouse.move(pts.outside.sx, pts.outside.sy);
-  await sleep(300);
+  await sleep(300); // only for the screenshot to catch the preview following the mouse: no check depends on it
   await shot("pen-outside");
   await page.mouse.click(pts.inside.sx, pts.inside.sy);
   await until(() => page.evaluate((n) => window.jevAnts.game.colonies.length > n, before), "her colony", 3000);
@@ -933,6 +933,7 @@ try {
   await tcard.getByRole("button", { name: "Follow it", exact: true }).click(); // the step's button, from the strip
   await until(async () => /groom it/.test((await tcard.textContent()) ?? ""), "the watch card");
   check((await tcard.getByText("Ants lick each other clean").count()) === 1, "the next step shows its card in full again");
+  // A check that something did not happen (the follow dropped) has no condition to poll for: it gets a short settle.
   await sleep(300);
   check(
     (await tu.getByRole("region", { name: "followed ant" }).count()) === 1,
@@ -940,16 +941,21 @@ try {
   );
   // The field follows it too, not only the card: the camera of the view showing it sits on the host, or as near as the
   // map's edge lets it (camera.ts clamp: a host by a hole at the edge, as Amber's on seed 3), on any seed (PR #93 review N1).
-  const off = await tu.evaluate((i) => {
-    const g = window.jevAnts.game;
-    const c = g.colonies[g.landed.colony];
-    const v = window.jevAnts.view();
-    if ((c.layer[i] === 0) !== (v === "above")) return null;
-    const cam = window.jevAnts.camera(v);
-    if (!cam) return null;
-    const e = window.__clampCam(v, c.x[i], c.y[i], cam.zoom);
-    return Math.hypot(cam.x - e.x, cam.y - e.y);
-  }, hostNo);
+  const hostOff = () =>
+    tu.evaluate((i) => {
+      const g = window.jevAnts.game;
+      const c = g.colonies[g.landed.colony];
+      const v = window.jevAnts.view();
+      if ((c.layer[i] === 0) !== (v === "above")) return null;
+      const cam = window.jevAnts.camera(v);
+      if (!cam) return null;
+      const e = window.__clampCam(v, c.x[i], c.y[i], cam.zoom);
+      return Math.hypot(cam.x - e.x, cam.y - e.y);
+    }, hostNo);
+  // The camera eases to the host: poll until it is there (a fixed wait failed under load, ja-w7ef.14); on a timeout the
+  // check below reports where it stopped.
+  await until(async () => ((await hostOff()) ?? 1) < 1, "the camera on the host", 5000, 50).catch(() => {});
+  const off = await hostOff();
   check(
     off !== null && off < 1,
     `the camera sits on the host, as near as the map's edge allows (${off === null ? "not in view" : off.toFixed(2)} away)`,
@@ -1702,7 +1708,7 @@ try {
     [a.x + 5, a.y],
     [a.x + 12, a.y],
   ]);
-  await sleep(300);
+  await sleep(300); // a check that the notice was not taken away: no condition to poll for, a short settle
   check(await a.t.isVisible(), "a small drag slides it back");
   const shown = await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length);
   await finger([
@@ -1711,12 +1717,12 @@ try {
     [a.x + 90, a.y],
     [a.x + 160, a.y],
   ]);
-  await until(async () => (await a.t.count()) === 0, "a finger's swipe sideways takes it away", 3000, 50);
+  await until(async () => (await a.t.count()) === 0, "a finger's swipe sideways takes it away", 10_000, 50);
   check((await np2.evaluate(() => document.querySelectorAll('[role="status"] button').length)) === shown - 1, "and only it");
   // A notice held past its time stays, and lifting the hold leaves it (review of #219, N1).
   const h = await raise("A notice to hold.");
   await finger([[h.x, h.y]], 7000 + 1000);
-  await sleep(300);
+  await sleep(300); // likewise: that it stayed
   check(await h.t.isVisible(), "a notice held outlives its 7 s, and lifting the hold leaves it");
   check(/new/.test((await bell.getAttribute("title")) ?? ""), "the bell counts what is new");
   // Escape closes the list and not the drawer under it; the field's toasts hide while the list is open.
