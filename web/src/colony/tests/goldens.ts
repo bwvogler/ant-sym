@@ -15,7 +15,7 @@ import { mulberry32 } from "../world.ts";
 
 export interface Scenario {
   name: string;
-  /** the full-size world (generateOneWorld's own plane, as the page plays it); otherwise a small plane of 160 × 100 */
+  /** the full-size world: generateOneWorld's own plane, played with Game's defaults (not the page's regrow, autoFound or hyphae); otherwise a small plane of 160 × 100 */
   full?: boolean;
   seed: number;
   ants: number;
