@@ -6479,7 +6479,7 @@ Merging is not delegated: PRs wait for the owner.
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
 
-## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, on at 0.1, ja-638i, 2026-11-15)
+## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, off, ja-638i, 2026-11-15)
 
 **Research basis:** [larval-feeding.md](larval-feeding.md):
 - Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
@@ -6492,7 +6492,7 @@ Merging is not delegated: PRs wait for the owner.
 **Decisions.**
 - Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
 
-**The mechanic (built, setting `cropFeed`, 0 = the old game bit for bit; on at 0.1 since ja-638i.3).**
+**The mechanic (built, setting `cropFeed`, 0 = off, the default; ja-638i.3).**
 - *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
 - *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
 - *Unchanged:* porters and their table stay for now.
@@ -6572,12 +6572,13 @@ Merging is not delegated: PRs wait for the owner.
 
 - Every crop size ends worker starvation, and every one raises the worst seed's waiting larvae; 0.1 keeps the pass count of crops off.
 - By the worst seed, crops off is best for the larvae (10 waiting, none starved); 0.1 trades one seed's 17 starved workers for one seed with 47 larvae waiting and 5 starved.
-- **The owner chose `cropFeed: 0.1`** (2026-11-15): the mechanic is grounded (Greenwald et al. 2015; Cassill & Tschinkel 1995, **unverified**), and no worker starves. It is the default now, with `revert: 1`.
+- The owner first chose `cropFeed: 0.1` (2026-11-15): the mechanic is grounded (Greenwald et al. 2015; Cassill & Tschinkel 1995, **unverified**), and no worker starves.
 - Guards with `revert` 1, `cropFeed` 0 against 0.1 ([run](https://github.com/bwvogler/ant-sym/actions/runs/43718042882)): the two-colony `game`, seeds 1–20, passes 18/20 either way (seeds 3 and 10 fail), and the medians match except the rival's ants (820 against 829); `nestFlow`, seeds 1–20, is identical in every metric. Every golden master is unchanged: their games are short and no ant there fills a crop.
-- The larval spike it brings (seed 19: crops on, larvae wait) stays open in ja-638i.4: how crops fill or are passed so they don't hold back food the brood needs.
+- **One world, the map the page plays** (review of #236, S1; `revert` 1, `cropFeed` 0 against 0.1, seeds 1–20, [run](https://github.com/bwvogler/ant-sym/actions/runs/43721254829)): G1 (10/20 either way) and the one-world nest flow are identical. A5, foraging regulation (360 s), is worse with crops: the share out once food flows falls (median 0.25 → 0.22), food stored falls (median 1,383 → 1,241; seed 1 1,069 → 612), and the before ÷ after ratio worsens on 12 of 20 seeds (seed 1 2.64 → 3.20, past #235's A5 guard of 2.91). Why crops slow foraging there was not traced. Crop loads regulating a colony's intake is reported by Greenwald, Eckmann & Feinerman 2018 (eLife; abstract only, **unverified**).
+- **The owner then chose reversion alone (2026-11-15): `cropFeed` stays 0**, the default. Crops come back with ja-638i.4: the one-world foraging cost and seed 19's larval spike (47 waiting, 5 starved).
 
 **Still open.**
-- Crops' larval spike on seed 19, and seed 22 over the bound with either size.
+- Crops (ja-638i.4): their one-world foraging cost on A5 and their larval spike on seed 19; seed 22 is over the bound with or without them.
 - How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
 - The design numbers (owner's call after the sweep).
 - Whether to retire the porters' table once crops carry the brood's food.

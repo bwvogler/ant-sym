@@ -249,9 +249,10 @@ export interface ColonyParams {
   /**
    * ja-638i (docs/larval-feeding.md, PRD §75): an ant's crop, in food units. An ant underground that feels some need fills
    * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
-   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off; 0.1 by default since
-   * ja-638i.3 (the owner's pick from the crop sweep with `revert` 1, PRD §75). Without reversion 0.1 is worse than off:
-   * larvae seeds 26 and 30 fell to 71 and 65 workers (review of #236).
+   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off, the default: at 0.1
+   * (with `revert` 1) no worker starved on assay larvae, but one-world A5 brought home less food (12 of 20 seeds worse) and
+   * larvae seed 19 left 47 larvae waiting (PRD §75, review of #236; ja-638i.4). Without reversion 0.1 is worse than off:
+   * larvae seeds 26 and 30 fell to 71 and 65 workers.
    */
   cropFeed: number;
   /**
@@ -449,7 +450,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   forageDig: 0,
   owedBeg: 0,
   revert: 1,
-  cropFeed: 0.1,
+  cropFeed: 0,
   routeStep: 3,
   routeSee: 3,
   routeMax: 64,
