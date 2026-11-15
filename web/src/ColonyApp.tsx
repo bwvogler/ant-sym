@@ -169,6 +169,8 @@ export default function ColonyApp() {
   const builder = useMemo(() => new Builder(game), [game]);
   /** each moved ant's way home, drawn on the top view (ja-cwjp) */
   const traces = useMemo(() => new AntTraces(builder), [builder]);
+  /** the builder's aphid clumps as they are now (the game replaces its list as clumps go) */
+  const aphidsNow = useCallback(() => game.aphids, [game]);
   const [building, setBuilding] = useState(false);
   const [toolKey, setToolKey] = useState<string>("move");
   const [little, setLittle] = useState(false);
@@ -179,14 +181,17 @@ export default function ColonyApp() {
   // Colonies founded mid-game join the same array (Game.addColony): its length is what changes.
   const colonyCount = game.colonies.length;
   const trails = game.player.ph.has("food");
+  const pp = game.player.params;
+  const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
   const tray = useMemo(
     () =>
       trayItems(
         little,
         Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
         trails,
+        tends,
       ),
-    [little, colonyCount, trails],
+    [little, colonyCount, trails, tends],
   );
   const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
   const pickTool = useCallback((it: TrayItem) => {
@@ -262,7 +267,8 @@ export default function ColonyApp() {
   // Builds stay in the game after the builder closes, so this runs whether or not it is open.
   useEffect(() => {
     const timer = setInterval(() => {
-      for (const e of builder.watch()) pushToast(buildNotice(e), e.kind === "antLost" ? "info" : "good");
+      for (const e of builder.watch())
+        pushToast(buildNotice(e), e.kind === "antLost" || e.kind === "aphidsEaten" || e.kind === "aphidsGone" ? "info" : "good");
     }, 1000);
     return () => clearInterval(timer);
   }, [builder]);
@@ -690,6 +696,7 @@ export default function ColonyApp() {
             toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
             build={build}
             traces={traces}
+            aphids={aphidsNow}
           />
           {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
         </div>
@@ -1100,6 +1107,12 @@ function buildNotice(e: BuildEvent): string {
       return `The ${colonyName(e.colony)} ant you moved found its way home in ${Math.round(e.seconds)} s! 🏠`;
     case "antLost":
       return `The ${colonyName(e.colony)} ant you moved didn't make it home.`;
+    case "aphidsFound":
+      return `The ${colonyName(e.colony)} ants found your aphids! 🐛`;
+    case "aphidsEaten":
+      return "The ants are eating some of your aphids, as real ants do.";
+    case "aphidsGone":
+      return "Your aphids are all gone: aphid families grow, then fade away.";
   }
 }
 

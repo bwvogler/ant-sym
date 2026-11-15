@@ -9,11 +9,16 @@ test("the full tray: every tool, a crayon per colony named for it, Move first", 
   assert.equal(items[0]?.tool, "move");
   assert.deepEqual(
     items.map((it) => it.key),
-    ["move", "tweezers", "dig", "dirt", "rock", "sugar", "crumb", "crayon-0", "crayon-1", "noEntry", "rain"],
+    ["move", "tweezers", "dig", "dirt", "rock", "sugar", "crumb", "aphids", "crayon-0", "crayon-1", "noEntry", "rain"],
   );
   assert.equal(items.find((it) => it.key === "crayon-1")?.label, "Trail crayon, Amber");
   assert.equal(items.find((it) => it.key === "crayon-1")?.colony, 1);
   for (const it of items) assert.ok(it.picture.length > 0 && it.label.length > 0, it.key);
+});
+
+test("no aphids for a species that takes no honeydew (docs/aphids.md)", () => {
+  assert.ok(trayItems(false, ["Ink"]).some((it) => it.tool === "aphids"));
+  assert.ok(!trayItems(false, ["Ink"], true, false).some((it) => it.tool === "aphids"));
 });
 
 test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => {

@@ -47,6 +47,17 @@ export function updatePlume(s: PlumeState, map: WorldMap, range: number, t: numb
         dist[k] = 0;
         cells.push(k);
       }
+  spread(dist, map, range, cells);
+  return dist;
+}
+
+/**
+ * Spread a plume out from its sources: `cells` holds the source cells' indices (row-major over the map's size), each set
+ * to 0 in `dist` and every other cell −1; each open cell within `range` steps of one gets its steps. Rock, soil and sky stop it.
+ */
+export function spread(dist: Int16Array, map: WorldMap, range: number, cells: number[]): void {
+  const { w, h } = map.size;
+  const { x0 } = map;
   for (let q = 0; q < cells.length; q++) {
     const k = cells[q];
     const d = dist[k] + 1;
@@ -64,7 +75,6 @@ export function updatePlume(s: PlumeState, map: WorldMap, range: number, t: numb
       cells.push(t2);
     }
   }
-  return dist;
 }
 
 /** The odour at cell (cx, cy) of a plume out to `range`: 1 on food, falling to 0 past the range; 0 off the map. */
@@ -73,5 +83,6 @@ export function plumeAt(dist: Int16Array, map: WorldMap, range: number, cx: numb
   const col = cx - map.x0;
   if (col < 0 || cy < 0 || col >= w || cy >= h) return 0;
   const d = dist[cy * w + col];
-  return d < 0 ? 0 : 1 - d / (range + 1);
+  // A plume built out further than this reader's range (the aphids' is built to the farthest any colony smells) reads 0 past it.
+  return d < 0 || d > range ? 0 : 1 - d / (range + 1);
 }

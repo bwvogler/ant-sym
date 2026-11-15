@@ -3,6 +3,7 @@
 // that line. experiment.ts (the assay harness) is not in it: scripts and the slow tests import it by name.
 export * from "./battle.ts";
 export * from "./brood.ts";
+export * from "./aphids.ts";
 export * from "./builder.ts";
 export * from "./chambers.ts";
 export * from "./chapters.ts";
