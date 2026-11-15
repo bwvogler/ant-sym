@@ -434,8 +434,8 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
       calls++;
       return { ...spec, seconds: 1 };
     });
-    const { result } = runGame(assay.spec(1));
-    assay.score(result);
+    const { game, result } = runGame(assay.spec(1));
+    assay.score(result, game);
     assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
   }
 });
