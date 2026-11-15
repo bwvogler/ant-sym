@@ -37,6 +37,9 @@ interface Props {
   onClose: () => void;
   /** the fields the game's species asks about (LaneWords.schema), or the generic ones: the chips show only these (review of #132) */
   fields?: readonly string[];
+  /** whether this ant is one of the specimens (PRD §69.5), and the button that pins or unpins it */
+  pinned?: boolean;
+  onPin?: () => void;
 }
 
 const BY: Record<DecidedBy, string> = {
@@ -46,7 +49,7 @@ const BY: Record<DecidedBy, string> = {
   local: "the local rule",
 };
 
-export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields }: Props) {
+export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields, pinned = false, onPin }: Props) {
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 250);
@@ -77,13 +80,22 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
             : ""}{" "}
           · at ({col.x[i].toFixed(0)}, {col.y[i].toFixed(0)})
         </span>
-        <button
-          type="button"
-          className="ml-auto rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised"
-          onClick={onClose}
-        >
-          Stop following
-        </button>
+        <span className="ml-auto flex gap-1.5">
+          {onPin && (
+            <button
+              type="button"
+              className={`rounded-md border px-2 py-0.5 text-xs hover:bg-raised ${pinned ? "border-accent/60 text-accent" : "border-line text-fg-2"}`}
+              onClick={onPin}
+              aria-pressed={pinned}
+              title="Keep this ant in your specimens, to compare with others (three at most)"
+            >
+              {pinned ? "Pinned" : "Pin as a specimen"}
+            </button>
+          )}
+          <button type="button" className="rounded-md border border-line px-2 py-0.5 text-xs text-fg-2 hover:bg-raised" onClick={onClose}>
+            Stop following
+          </button>
+        </span>
       </div>
       {carrying ? (
         <p className="mt-2 text-xs text-fg-3">

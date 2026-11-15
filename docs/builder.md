@@ -125,7 +125,7 @@ The builder is a set of **player tools that edit the world**. It is not a change
 | Tool | View | What it changes | Through | The ants respond by | Guard |
 |---|---|---|---|---|---|
 | Move (hand) | both | the camera | `ui/camera.ts` | — | — |
-| Dig | below; the mound above | soil → open | `digCell` | digging, backfill and route steering as now | not rock; not the world's edge |
+| Dig | both | soil or rock → open (the map's own rock too: owner, D1) | `digCell` | digging, backfill and route steering as now | not the world's edge or the curtain's sky |
 | Dirt | below; the mound above | open → soil | `fillCell` | as above | skips cells with an ant or brood, and the hole cell |
 | Rock | both | open → rock | a new `placeRock` beside `fillCell` | trail, vector and route memory get round it (B2) | as dirt; never on a hole |
 | Sugar / crumb | both | food, quality 1.5 / 0.5 | `dropFood` | taste and trail laying by quality (A2b, B4) | open ground only |
