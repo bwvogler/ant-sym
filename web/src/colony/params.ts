@@ -250,7 +250,8 @@ export interface ColonyParams {
    * ja-638i (docs/larval-feeding.md, PRD §75): an ant's crop, in food units. An ant underground that feels some need fills
    * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
    * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off; 0.1 by default since
-   * ja-638i.3 (the owner's pick from the crop sweep, PRD §75).
+   * ja-638i.3 (the owner's pick from the crop sweep with `revert` 1, PRD §75). Without reversion 0.1 is worse than off:
+   * larvae seeds 26 and 30 fell to 71 and 65 workers (review of #236).
    */
   cropFeed: number;
   /**

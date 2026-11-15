@@ -6400,7 +6400,7 @@ Merging is not delegated: PRs wait for the owner.
 - Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
 - The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
 
-**The mechanic (built, off, setting `revert`).**
+**The mechanic (built, setting `revert`; on, share 1, since ja-7r7x.4).**
 - *Cue:* two senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells):
   - young nestmates met (`youngMet`) below `REVERT_BELOW`;
   - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
@@ -6464,7 +6464,7 @@ Merging is not delegated: PRs wait for the owner.
 **Decisions.**
 - Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
 
-**The mechanic (built, off, setting `cropFeed`, 0 = main bit for bit).**
+**The mechanic (built, setting `cropFeed`, 0 = the old game bit for bit; on at 0.1 since ja-638i.3).**
 - *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
 - *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
 - *Unchanged:* porters and their table stay for now.
@@ -6516,6 +6516,7 @@ Merging is not delegated: PRs wait for the owner.
 - Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
 - Adding crops ends worker starvation too, but one seed goes over the bound (14).
 - Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
+
 **Confirmed and turned on (ja-7r7x.4, 2026-11-15).** `assays.yml` on GitHub, branch at `4e411b5`, each run crossing `revert` 0/1 with `cropFeed` 0/0.5 ([larvae](https://github.com/bwvogler/ant-sym/actions/runs/43681296621), [game](https://github.com/bwvogler/ant-sym/actions/runs/43681298553), [nestFlow](https://github.com/bwvogler/ant-sym/actions/runs/43681300400)):
 
 | Assay, seeds | main | `cropFeed` 0.5 | **`revert` 1** | `revert` 1 + `cropFeed` 0.5 |
