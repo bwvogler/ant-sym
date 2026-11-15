@@ -3,14 +3,14 @@
 
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { type Policy, type StancePolicy, type SteerPolicy } from "./vocab.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
-import { oneWorldOn, type OneWorld } from "./oneWorld.ts";
+import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, generateSideWorld, OPEN, ROCK, rockAt, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, OPEN, ROCK, rockAt, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -55,7 +55,10 @@ export interface Probe {
 
 export interface RunSpec {
   seed: number;
-  /** the map or one world (game.ts takes either), or how to make it from the seed; default the page's: generateSideWorld(seed) */
+  /**
+   * The one world, or how to make it from the seed; default the page's: generateOneWorld(seed). An arena (a hand-made top-down
+   * field) is only a spec in waiting: `onPlane` (or `oneArena`) makes it a one world's plane, and `runGame` plays one worlds.
+   */
   map?: WorldMap | OneWorld | ((seed: number) => WorldMap | OneWorld);
   game?: Partial<GameParams>;
   sides?: Sides;
@@ -77,17 +80,19 @@ export interface RunResult {
 /** Seconds a forager may hold its food before it counts as lost (the side view's slow/side.test guard, now G1's). */
 export const STUCK_AFTER = 120;
 
-/** The map (or one world) a spec asks for. */
-export function specMap(spec: RunSpec): WorldMap | OneWorld {
-  return typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateSideWorld(spec.seed));
+/** The one world a spec asks for (an arena map is refused: `onPlane` makes it one). */
+export function specMap(spec: RunSpec): OneWorld {
+  const m = typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateOneWorld(spec.seed));
+  if (!isOneWorld(m)) throw new Error("runGame: a game is one world; a spec on an arena goes through onPlane (or oneArena)");
+  return m;
 }
 
 /** Run a game headless and collect the standard numbers plus every probe's. */
 export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
   const world = specMap(spec);
   const game = new Game(world, spec.game, gameRng(spec.seed), spec.sides);
-  // The food the world began with: in one world the plane's piles and the curtain's buried pockets.
-  const foodTotal = isOneWorld(world) ? world.plane.foodTotal + world.curtain.foodTotal : world.foodTotal;
+  // The food the world began with: the plane's piles and the curtain's buried pockets.
+  const foodTotal = world.plane.foodTotal + world.curtain.foodTotal;
   const dt = spec.dt ?? 1 / 30;
   const events = [...(spec.events ?? [])].sort((a, b) => a.at - b.at);
   const probes = [heldProbe(), ...(spec.probes ?? [])];
@@ -406,8 +411,14 @@ export interface Overrides {
   colony?: ColonyOptions;
   rival?: ColonyOptions;
   game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
+  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `rival` where they set the same one */
+  both?: ColonyOptions;
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
+  /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
+  rivalPolicy?: Policy;
+  /** every colony's steer policy (ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
+  steer?: SteerPolicy;
   stance?: StancePolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
@@ -432,15 +443,24 @@ export interface Assay {
 /** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const sides: Sides = { ...spec.sides };
+  if (o.both) {
+    sides.colony = mergeColony(sides.colony, o.both);
+    sides.rival = mergeColony(sides.rival, o.both);
+  }
   if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
+  if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
+  const steer = o.steer;
+  const events = steer
+    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
+    : spec.events;
   if (o.stance && !sides.stance) sides.stance = o.stance;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, sides, game };
+  return { ...spec, sides, game, events };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

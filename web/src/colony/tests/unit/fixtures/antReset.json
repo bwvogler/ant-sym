@@ -531,6 +531,12 @@
   ],
   "reachSurf": [
    0
+  ],
+  "steerCode": [
+   364
+  ],
+  "steerNear": [
+   364
   ]
  },
  "asIs": {
@@ -1065,6 +1071,12 @@
   ],
   "reachSurf": [
    40.5
+  ],
+  "steerCode": [
+   40
+  ],
+  "steerNear": [
+   41
   ]
  }
 }

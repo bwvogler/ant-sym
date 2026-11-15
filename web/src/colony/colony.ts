@@ -18,6 +18,7 @@ import {
   type SpeciesSituation,
   type Stance,
   type StancePolicy,
+  type SteerPolicy,
   type StanceSituation,
   type Trail,
   FIGHT,
@@ -65,9 +66,9 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep, gatesFor } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
-import { localPolicy, localStance } from "./localRules.ts";
+import { localPolicy, localStance, localSteer } from "./localRules.ts";
 import { speciesSituation, stanceView } from "./colonySituation.ts";
-export { localPolicy, localStance } from "./localRules.ts";
+export { localPolicy, localStance, localSteer } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -105,7 +106,6 @@ export {
   T_EGG,
   T_LARVA,
   T_PUPA,
-  WAIT_RIM,
   WAIT_STEPS,
   WALL_LOST,
 } from "./tuning.ts";
@@ -279,6 +279,8 @@ export class Colony {
   /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
   readonly policy: Policy;
   readonly stancePolicy: StancePolicy;
+  /** the weights an ant out exploring or following steers by (ja-ykmu; asked only with params.steerLane): set through `bindPolicy("steer", …)` */
+  readonly steerPolicy: SteerPolicy = localSteer;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
   stance: Stance = "forage";
@@ -427,12 +429,6 @@ export class Colony {
   /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
   intakeRate = 0;
   storedSeen = 0;
-  /**
-   * Foragers home with food, per cell where each put it down, keyed by cellKey (behaviour MR 5): `returning` fills
-   * this tick, `returned` holds last tick's, which the waiting ants round each one meet, once each.
-   */
-  returning = new Map<number, number>();
-  returned = new Map<number, number>();
   /**
    * One world (ja-web): carriers that came down the colony's hole with food this tick, and last tick's, which every ant
    * held at the top of the shaft meets (each carrier walks down past all of them). Not by cell: the returns above are
@@ -713,7 +709,12 @@ export class Colony {
    */
   bindPolicy(lane: "mode", fn: Policy): void;
   bindPolicy(lane: "stance", fn: StancePolicy): void;
-  bindPolicy(lane: "mode" | "stance", fn: Policy | StancePolicy): void {
+  bindPolicy(lane: "steer", fn: SteerPolicy): void;
+  bindPolicy(lane: "mode" | "stance" | "steer", fn: Policy | StancePolicy | SteerPolicy): void {
+    if (lane === "steer") {
+      (this as { steerPolicy: SteerPolicy }).steerPolicy = fn as SteerPolicy;
+      return;
+    }
     const own = this as { policy: Policy; stancePolicy: StancePolicy };
     if (lane === "mode") own.policy = fn as Policy;
     else own.stancePolicy = fn as StancePolicy;
@@ -1422,19 +1423,12 @@ export class Colony {
     const got = this.stored - this.storedSeen;
     this.storedSeen = this.stored;
     this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
-    // The gates (activation, raids by trail, each ant's own stance) are open ground's, where there is no hole into the
-    // layer (gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
+    // The gates (raids by trail and each ant's own stance on open ground, where there is no hole into the layer; the curtain's
+    // hold at the top of the shaft: gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
     const one = this.line !== null;
     const layerGates = multi ? this.layers.map((L) => gatesFor(p, L.entrance === null, one, dt)) : null;
-    let { gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } =
+    let { hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } =
       layerGates?.[this.cur] ?? gatesFor(p, this.entrance === null, one, dt);
-    // Activation (behaviour MR 5): last tick's returns with food are what the waiting foragers round them meet this tick.
-    if (gate || layerGates?.some((g) => g.gate)) {
-      const seen = this.returned;
-      this.returned = this.returning;
-      this.returning = seen;
-      seen.clear();
-    }
     // One world (ja-web): last tick's carriers down the hole are what the ants held at its top meet this tick.
     if (layerGates?.some((g) => g.hold)) {
       this.holeSeen = this.holeIn;
@@ -1456,7 +1450,6 @@ export class Colony {
     s.map = map;
     s.ph = ph;
     s.home = home;
-    s.gate = gate;
     s.hold = hold;
     s.leak = leak;
     s.metLeak = metLeak;
@@ -1472,11 +1465,10 @@ export class Colony {
         this.bind(this.layer[i]);
         ({ map, ph } = this);
         home = this.nest;
-        ({ gate, hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
+        ({ hold, leak, metLeak, rgate, foeLeak, sgate, threatLeak, crowdKeep } = layerGates![this.cur]!);
         s.map = map;
         s.ph = ph;
         s.home = home;
-        s.gate = gate;
         s.hold = hold;
         s.leak = leak;
         s.metLeak = metLeak;
@@ -1510,14 +1502,11 @@ export class Colony {
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
     for (const L of this.layers) L.ph.advance(dt);
-    // Growth: in the side view, the queen and brood (nestLife); elsewhere the larder turns into ants while there is room.
+    // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.queen) {
       nestLife(this, dt);
       middenSmell(this, dt);
-    } else {
-      if (p.mortalWithoutQueen) ageWorkers(this, dt);
-      while (this.larder >= p.foodPerAnt && this.spawn()) this.larder -= p.foodPerAnt;
-    }
+    } else if (p.mortalWithoutQueen) ageWorkers(this, dt);
   }
 
   /** This colony's state for a save (colonySave.ts saveColony). */

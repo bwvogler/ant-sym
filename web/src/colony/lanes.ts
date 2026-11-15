@@ -38,8 +38,28 @@ import {
   validGrowth,
   type GrowthChoice,
 } from "./growthBrain.ts";
+import {
+  askedOf,
+  localSteerAnswer,
+  packSteerRequest,
+  readSteer,
+  STEER_ASKED,
+  steerAsks,
+  steerContext,
+  steerKey,
+  steerSituations,
+  validSteer,
+} from "./steerBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, type Stance, type StanceSituation } from "./vocab.ts";
+import {
+  type LaneWords,
+  STANCE_SCHEMA,
+  type Situation,
+  type SpeciesSituation,
+  type Stance,
+  type StanceSituation,
+  type SteerSituation,
+} from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -47,7 +67,7 @@ import { type LaneWords, STANCE_SCHEMA, type Situation, type SpeciesSituation, t
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
 // colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
-export type LaneName = "mode" | "stance" | "fungus" | "growth";
+export type LaneName = "mode" | "stance" | "fungus" | "growth" | "steer";
 
 export interface LaneKind {
   /** the first character of the ids its situations carry in a request (s0, s1, …) */
@@ -88,6 +108,14 @@ export const LANE_KINDS: Record<LaneName, LaneKind> = {
     countsHits: false,
     reconsiders: false,
     perRequest: GROWTH_BATCH,
+  },
+  // An ant's steering weights (ja-ykmu.3): asked at its mode decisions, so a reply makes the ants reconsider.
+  steer: {
+    idPrefix: "w",
+    contextPrefix: "steer-",
+    countsHits: false,
+    reconsiders: true,
+    perRequest: PER_REQUEST,
   },
 };
 
@@ -257,8 +285,33 @@ const growthLane: Has<LaneSpec<GrowthSituation, GrowthChoice, undefined>, "local
   all: () => Array.from({ length: GROWTH_SCHEMA.size }, (_, c) => GROWTH_SCHEMA.decode(c)),
 };
 
+export const SAMPLE_STEER: SteerSituation = { ...SAMPLE_SITUATION, mode: "explore", find: "far" };
+
+// The steer lane (ja-ykmu.3; docs/steering.md): an ant out exploring or following, asked how strongly it weighs each cue, under
+// its colony's doctrine. The weights asked (STEER_ASKED; the Lab's design ones come with ja-ykmu.4) are in the key.
+const steerLane: Has<LaneSpec<SteerSituation, string, ReadonlySet<string> | undefined>, "local" | "all" | "asks"> = {
+  name: "steer",
+  kind: LANE_KINDS.steer,
+  variants: [""],
+  sample: SAMPLE_STEER,
+  wordsField: "doctrine",
+  presets: DOCTRINES,
+  gather: false,
+  batch: null,
+  // The weights asked are the lane's own (STEER_ASKED): a caller's context is not read. The scripts hand every lane the fungus's lever
+  // menu, whose "trail" and "home" levers once turned this lane's question into one about those weights (ja-ykmu.3).
+  key: (s) => steerKey(s, STEER_ASKED),
+  pack: (items, words) => packSteerRequest(items, words),
+  read: (answers, id, _situation, key) => readSteer(answers, id, askedOf(key)),
+  valid: validSteer,
+  contextOf: (words) => steerContext(words),
+  asks: (s) => steerAsks(s),
+  local: (s) => localSteerAnswer(steerKey(s)),
+  all: () => steerSituations(),
+};
+
 /** Every lane, by name, typed. */
-export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, growth: growthLane } as const;
+export const LANES = { mode: modeLane, stance: stanceLane, fungus: fungusLane, growth: growthLane, steer: steerLane } as const;
 
 /**
  * A lane with its situation type forgotten, for code that loops over the lanes (the scripts' tables, the Learn panel): the one place the
@@ -283,4 +336,4 @@ export interface ErasedLane {
   all?(lane?: LaneWords): unknown[];
 }
 /** Every lane, in the order the page asks them. */
-export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth];
+export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.stance, LANES.fungus, LANES.growth, LANES.steer];

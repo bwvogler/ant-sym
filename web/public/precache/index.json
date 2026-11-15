@@ -131,6 +131,27 @@
       "context": "stance-v4-1cc01e21",
       "file": "stance-warlike.json",
       "answers": 324
+    },
+    {
+      "lane": "steer",
+      "doctrine": "cautious",
+      "context": "steer-v7-2489f87e",
+      "file": "steer-cautious.json",
+      "answers": 203
+    },
+    {
+      "lane": "steer",
+      "doctrine": "forage",
+      "context": "steer-v7-2edb31fb",
+      "file": "steer-forage.json",
+      "answers": 203
+    },
+    {
+      "lane": "steer",
+      "doctrine": "warlike",
+      "context": "steer-v7-694ce533",
+      "file": "steer-warlike.json",
+      "answers": 203
     }
   ],
   "versions": {

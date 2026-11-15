@@ -8,10 +8,10 @@ import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
 import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
-import { generateOneWorld } from "./oneWorld.ts";
+import { generateOneWorld, type OneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
+import { isSky, takeFoodCell, OPEN, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
@@ -42,7 +42,7 @@ export * from "./builderAssays.ts";
 import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
 import { neglectusImmunisation, neglectusTolerance } from "./neglectusAssays.ts";
-import { forage1, game1, route1, search1 } from "./oneAssays.ts";
+import { forage1, game1, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
 
 const always =
   <T extends string>(v: T) =>
@@ -1014,16 +1014,6 @@ export const game: Assay = {
   },
 };
 
-/** The same game on the top-down map (OPEN_WORLD): the bench bed, no queen. */
-export const gameTop: Assay = {
-  id: "gameTop",
-  title: "G' the top-down game (OPEN_WORLD)",
-  target: "report only: food home, held food, outcome",
-  seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateWorld(s, OPEN_WORLD), game: { antCount: 600, rivalAnts: 600 } }),
-  score: (r) => ({ maxHeld: Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0) }),
-};
-
 /**
  * Inside the nest (side view, the first colony), every 30 s: food lying in each kind of chamber, larvae waiting unfed
  * with food enough in the nest, and the first birth. `beyond` is the share of the food lying in the nest that has
@@ -1229,20 +1219,22 @@ export const pockets: Assay = {
 };
 
 /**
- * slow/economy.test's map: the tests' small side map (256 × 160) with one nest and 0.3 of its food, about the full
- * game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
+ * slow/economy.test's world: the tests' small one world (a 160 × 100 plane over its curtain) with 0.3 of both layers' food, about
+ * the full game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
  */
-export function economyMap(seed: number): WorldMap {
-  const map = generateSideWorld(((seed - 1) % 4) + 1, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
-  let total = 0;
-  for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
-      const v = map.food.get(x, y) * 0.3;
-      map.food.set(x, y, v);
-      total += v;
-    }
-  map.foodTotal = map.foodLeft = total;
-  return map;
+export function economyMap(seed: number): OneWorld {
+  const world = generateOneWorld(((seed - 1) % 4) + 1, { plane: { size: { w: 160, h: 100 } } });
+  for (const map of [world.plane, world.curtain]) {
+    let total = 0;
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+        const v = map.food.get(x, y) * 0.3;
+        map.food.set(x, y, v);
+        total += v;
+      }
+    map.foodTotal = map.foodLeft = total;
+  }
+  return world;
 }
 
 /** Workers and larvae starved by the end, and births, of the first colony. */
@@ -1375,32 +1367,6 @@ export const lifecycleScent = lifecycleAssay("scent");
 /** The three on one world (ONE_ASSAYS, same ids): the alates fly from the plane and their daughters dig in the curtain. */
 export const lifecycleOne = (["none", "signal", "scent"] as const).map((arm) => lifecycleAssay(arm, true));
 
-export const ASSAYS: Assay[] = [
-  bridge,
-  twin,
-  richPoor,
-  deplete,
-  alarm,
-  regulate,
-  regulateStop,
-  pass,
-  open,
-  raidFind,
-  raidStop,
-  contact,
-  defendHome,
-  faintAlarm,
-  game,
-  gameTop,
-  nestFlow,
-  nurseZone,
-  pockets,
-  larvae,
-  lifecycle,
-  lifecycleSignal,
-  lifecycleScent,
-];
-
 /** An arena assay rerun on one world's plane (onPlane), its probes counting the plane's ants, its paint on the plane; `probes` added to its own. */
 function onPlaneAssay(a: Assay, probes: () => Probe[] = () => []): Assay {
   return {
@@ -1445,7 +1411,13 @@ export const ONE_ASSAYS: Assay[] = [
   onPlaneAssay(contact),
   onPlaneAssay(faintAlarm),
   nestFlowOne,
+  nurseZone,
+  pockets,
+  larvae,
   game1,
+  lockstep1,
+  searchTight1,
+  memory1,
   search1,
   forage1,
   route1,

@@ -18,14 +18,23 @@ import {
   NO_GAIN,
   SEARCH_STALL,
   TUNNEL_STALL,
-  WAIT_RIM,
   WALL_LOST,
 } from "./tuning.ts";
 import { fetches, walkTunnel } from "./tunnel.ts";
-import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
+import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN, STEER_NEUTRAL, steerLevel } from "./vocab.ts";
 import { isSky, OPEN, rockAt } from "./world.ts";
-import { mill, onMLine, siteAim } from "./plane.ts";
+import { mill, nearFind, onMLine, siteAim } from "./plane.ts";
 import type { Channel } from "./pheromone.ts";
+
+/**
+ * The steering weights' effects (ja-ykmu; docs/steering.md "The mechanic"), by level −1, 0, +1: `search` scales random
+ * turning by params.searchSpan (× at −1, tight: loops close round where it is; ÷ at +1, wide: straight and ranging); `trail` scales a follower's turn up the food trail; `home`, `vector` and `nestmates` add a turn of their own (away at −1,
+ * toward at +1) at these shares of the turn rate. `memory` +1 lets the last find lead over the food trail; −1 leaves it unused.
+ */
+export const TRAIL_MUL = [0, 1, 2] as const;
+export const HOME_W = 0.5;
+export const VECTOR_W = 0.3;
+export const NEST_W = 0.5;
 
 const STORE_MARKS: readonly Channel[] = ["store"];
 const BROOD_ODOUR: readonly Channel[] = ["broodOdour"];
@@ -51,7 +60,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const home = s.home;
   const a = s.a;
   const dt = s.dt;
-  const gate = s.gate;
   const rgate = s.rgate;
   let h = s.h;
   const fl = s.fl;
@@ -75,7 +83,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const prevMode = s.prevMode;
   const item = s.item;
   const resp = s.resp;
-  const waiting = s.waiting;
   const fleeFrom = s.fleeFrom;
   // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
   // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
@@ -87,6 +94,14 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   col.holeX = goal === col.entrance ? nest.x : (col.entrance?.x ?? 0);
   // Steer by mode. An explorer at a soil face keeps its heading while it digs.
   const noise = (rng() - 0.5) * 2 * dt;
+  // Steering weights (ja-ykmu): an empty-jawed ant out exploring or following on one world's plane steers by the weights its
+  // steer policy gave it. None (STEER_NEUTRAL, always so with steerLane 0) leaves every term below as it was, bit for bit.
+  const sc = col.steerNear[i] !== col.steerCode[i] && nearFind(col, i) ? col.steerNear[i] : col.steerCode[i];
+  const steered =
+    sc !== STEER_NEUTRAL && (mode === EXPLORE || mode === FOLLOW) && !carrying && !pellet && col.line !== null && col.cur === PLANE;
+  const sl = steered ? steerLevel(sc, 0) : 0;
+  // tight (−1) turns more, wide (+1) less: the questions say "low: tight loops", "high: straight and ranging" (it was the other way round until PRD §82 round 6)
+  const sm = sl === 0 ? 1 : sl < 0 ? p.searchSpan : 1 / p.searchSpan;
   const detouring = col.detour[i] > 0;
   if (mode !== EXPLORE) col.digT[i] = 0;
   if (mode !== EXPLORE || pellet) col.hugT[i] = 0;
@@ -97,6 +112,8 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     col.chamberCell[i] = NO_KEY; // a face aimed at as an explorer: stale once it does something else (review of slice 2)
   }
   const digging = col.digT[i] > 0;
+  // Its last find leads over the food trail (the `memory` weight at +1), unless food itself is in sight.
+  const memoryLead = steered && steerLevel(sc, 1) === 1 && !Number.isNaN(col.foodX[i]) && Math.max(fl, ff, fr) < SEEN && !digging;
   if (mode !== RETURN) {
     col.wall[i] = 0;
     col.mx[i] = NaN;
@@ -347,6 +364,11 @@ export function steer(col: Colony, i: number, s: AntStep): void {
         if (col.wall[i] !== 0) h = col.towardTarget(i);
       }
     }
+  } else if (memoryLead) {
+    // Memory over the trail (Grüter, Czaczkes & Ratnieks 2011): back to where it found food, as site fidelity steers.
+    // This comes before the explorer's plume branches below (food, aphid) on purpose: with the weight at +1 a remembering ant keeps to its
+    // find over a smelled plume too, unless food is in sight (SEEN). Only with steering on (review of #259, N1).
+    h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
   } else if (mode === FOLLOW && col.staysIn(i)) {
     // An inside worker (zoned by age) doesn't follow a food trail: it leads out, where it may not go. It explores.
     if (walkTunnel(col, i, EXPLORE, p.speed * dt)) h = col.towardTarget(i);
@@ -376,11 +398,14 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       // Top-down maps only. In the side view's chambers food scent leads to stores and brood, and a chance turn there
       // kept porters from the food (the hour-long economy test: no porter trips, larvae starved); on its ground line,
       // where trails don't fork, it still halved the colony's births (PRD §45.3).
+      // The `trail` weight scales the turn up the trail (×1 unweighted, so main's arithmetic is unchanged); `search`, the noise.
+      const tm = steered ? TRAIL_MUL[steerLevel(sc, 2) + 1] : 1;
       h +=
-        (p.followChoice > 0 && col.entrance === null
-          ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng)
-          : climb(gl, gf, gr, p.turnRate * dt)) +
-        noise * p.wander * 0.25;
+        tm *
+          (p.followChoice > 0 && col.entrance === null
+            ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng)
+            : climb(gl, gf, gr, p.turnRate * dt)) +
+        noise * p.wander * 0.25 * sm;
       // The trail ends here, strong, falling away all round, and no food in sight: the patch is spent. Mark it "no entry" (Robinson et al. 2005).
       if (p.noEntryAvoid > 0 && !carrying && outside && Math.max(fl, ff, fr) < SEEN) {
         col.antCell(i);
@@ -503,9 +528,43 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       col.smellsAphids(i, h, a, p.turnRate * dt)
     )
       h += col.plumeTurn + noise * p.wander * 0.25;
-    else if (p.siteFidelity > 0 && col.line !== null && col.cur === PLANE && !Number.isNaN(col.foodX[i]))
-      h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25;
-    else h += noise * p.wander;
+    else if (
+      p.siteFidelity > 0 &&
+      col.line !== null &&
+      col.cur === PLANE &&
+      !Number.isNaN(col.foodX[i]) &&
+      !(steered && steerLevel(sc, 1) === -1)
+    )
+      h = turnToward(h, siteAim(col, i), p.turnRate * dt) + noise * p.wander * 0.25 * sm;
+    else h += noise * p.wander * sm;
+  }
+  if (steered) {
+    // The design weights (the Lab's; docs/steering.md): each adds a turn of its own only when not neutral.
+    const homeW = steerLevel(sc, 3);
+    if (homeW !== 0) h += homeW > 0 ? climb(hl, hf, hr, p.turnRate * dt * HOME_W) : avoid(hl, hf, hr, p.turnRate * dt * HOME_W);
+    const vectorW = steerLevel(sc, 4);
+    if (vectorW !== 0) {
+      // Toward where its own drifting vector says home is (a leash), or away from it.
+      const b = believe(col, i, goal);
+      const toward = Math.atan2(b.y - col.y[i], b.x - col.x[i]);
+      h = turnToward(h, vectorW > 0 ? toward : toward + Math.PI, p.turnRate * dt * VECTOR_W);
+    }
+    const matesW = steerLevel(sc, 5);
+    const mates = col.nestmates;
+    if (matesW !== 0 && mates) {
+      // Nestmates its sensors reach, left, ahead and right (the colony's own occupancy, by contact): gather or spread.
+      const x = col.x[i];
+      const y = col.y[i];
+      const d = p.sensorDistance;
+      const at = (b: number): number => {
+        cellOf(x + Math.cos(b) * d, y + Math.sin(b) * d);
+        return mates.get(CELL[0], CELL[1]);
+      };
+      const ml = at(h - a);
+      const mf = at(h);
+      const mr = at(h + a);
+      h += matesW > 0 ? climb(ml, mf, mr, p.turnRate * dt * NEST_W) : avoid(ml, mf, mr, p.turnRate * dt * NEST_W);
+    }
   }
   // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
   // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
@@ -555,15 +614,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     );
   }
 
-  // Waiting at home (behaviour MR 5) it stays in, milling as far as the nest's rim, where foragers come home: past
-  // WAIT_RIM of the radius it turns back in. Wandering out of the nest, it was asked its mode, and the mode policy
-  // sent it out exploring with nothing coming in; kept to half the radius, it never met a carrier, who puts its food
-  // down on reaching the rim, so only scouts went out.
-  if (waiting && gate) {
-    const dx = home.x - col.x[i];
-    const dy = home.y - col.y[i];
-    if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
-  }
   // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
   // nest's centre at the turn rate, it circled the hole it was over.
   if (col.inbound(i, mode)) {
