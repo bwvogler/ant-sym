@@ -122,7 +122,7 @@ export function Icon({ name, className = "size-5" }: { name: IconName; className
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Codex, Details). Closing it gives focus back to
+ * preventDefault) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({ label, title, onClose, children }: { label: string; title: ReactNode; onClose: () => void; children: ReactNode }) {
@@ -135,7 +135,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"], [role="dialog"][aria-label="Details"]')) return;
+      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"]')) return;
       onClose();
     };
     window.addEventListener("keydown", key);
@@ -144,7 +144,7 @@ export function Drawer({ label, title, onClose, children }: { label: string; tit
   return (
     <section
       aria-label={label}
-      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[62dvh] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none sm:w-[22rem] ${FLOAT}`}
+      className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 flex max-h-[min(62dvh,calc(100%-9rem))] flex-col sm:inset-x-auto sm:top-[4.5rem] sm:bottom-3 sm:left-16 sm:max-h-none sm:w-[22rem] ${FLOAT}`}
     >
       <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
         <h2 className="text-[15px] font-semibold text-fg">{title}</h2>

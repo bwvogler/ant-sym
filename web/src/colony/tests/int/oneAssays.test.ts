@@ -19,7 +19,11 @@ import {
   MARCH_REACH,
   nestFlowProbe,
   occupancyProbe,
+  ASSAYS,
+  defendWalked,
   ONE_ASSAYS,
+  oneAssay,
+  passWalked,
   oneArena,
   onPlane,
   outingProbe,
@@ -520,4 +524,28 @@ test("A6 and A13 on one world (S2.2c): no colony-wide stance (no stance policy, 
       `${id}: the attackers walked at the defenders' hole`,
     );
   }
+});
+
+test("oneAssay: each gate id gives its one-world twin, A6 and A13 walked (review of #235, S1)", () => {
+  for (const id of [
+    "bridge",
+    "twin",
+    "richPoor",
+    "deplete",
+    "alarm",
+    "regulate",
+    "regulateStop",
+    "contact",
+    "faintAlarm",
+    "raidFind",
+    "raidStop",
+  ]) {
+    const a = oneAssay(id);
+    assert.ok(ONE_ASSAYS.includes(a) && !ASSAYS.includes(a), id);
+  }
+  assert.equal(oneAssay("pass"), passWalked);
+  assert.equal(oneAssay("defendHome"), defendWalked);
+  const ids = ONE_ASSAYS.map((a) => a.id);
+  assert.equal(new Set(ids).size, ids.length, "ONE_ASSAYS ids are unique, so oneAssay's find is unambiguous");
+  assert.throws(() => oneAssay("nope"), /no one-world assay nope/);
 });

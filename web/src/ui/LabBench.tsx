@@ -1,0 +1,239 @@
+import { useEffect, useState } from "react";
+import { clock, clockTicks } from "./clock.ts";
+import { History, niceMax, perColony } from "./history.ts";
+import HistoryChart from "./HistoryChart.tsx";
+import { Icon } from "./kit.tsx";
+import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
+import { colonyName } from "./names.ts";
+
+// Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
+// this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
+// levers, the numbers, the journal; and a step control, to take the game a tick or a second at a time while paused.
+// The key l, the palette or Settings toggle it; it replaced the Details screen.
+
+type Tab = "history" | "world" | "jev" | "levers" | "numbers" | "journal";
+
+const TABS: [Tab, string][] = [
+  ["history", "History"],
+  ["world", "World"],
+  ["jev", "Jev"],
+  ["levers", "Levers"],
+  ["numbers", "Numbers"],
+  ["journal", "Journal"],
+];
+
+/** Colony k's line colour in the charts: a fixed slot per colony (never by rank), the validated --series palette. */
+const seriesColor = (k: number) => `var(--series-${(k % 6) + 1})`;
+const pct = (v: number) => `${Math.round(100 * v)}%`;
+const whole = (v: number) => String(Math.round(v));
+
+export default function LabBench(
+  props: LabProps & {
+    history: History;
+    /** step the game n ticks of 1/30 s (useColony.step) */
+    step: (n: number) => void;
+    onClose: () => void;
+  },
+) {
+  const { history, step, onClose, controls, update, journal, game } = props;
+  const [tab, setTab] = useState<Tab>("history");
+  // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
+  const [, setSteps] = useState(0);
+  // A queen in flight waits for the page to found her (the pen), as play does.
+  const flying = game.flights.length > 0;
+  const tabs = TABS.filter(([t]) => t !== "journal" || journal);
+  return (
+    <section aria-label="lab" className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground">
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5">
+        <h2 className="font-semibold text-fg max-sm:order-1">Lab</h2>
+        <div className="flex overflow-x-auto rounded-md border border-line text-[13px] max-sm:order-3" role="tablist" aria-label="lab tabs">
+          {tabs.map(([t, name]) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              className={`px-2.5 py-1 ${tab === t ? "bg-accent text-accent-ink" : "text-fg-2 hover:bg-raised"}`}
+              onClick={() => setTab(t)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto flex items-center gap-1.5 text-xs max-sm:order-4 max-sm:ml-0" role="group" aria-label="step">
+          <button
+            type="button"
+            className="rounded-md border border-line px-2 py-1 text-fg-2 hover:bg-raised"
+            onClick={() => update({ playing: !controls.playing })}
+          >
+            {controls.playing ? "Pause" : "Play"}
+          </button>
+          {(
+            [
+              [1, "Step a tick", "One tick: 1/30 s of game time"],
+              [30, "Step a second", "30 ticks: one second of game time"],
+            ] as const
+          ).map(([n, label, tip]) => (
+            <button
+              key={n}
+              type="button"
+              className="rounded-md border border-line px-2 py-1 text-fg-2 hover:bg-raised disabled:opacity-40"
+              disabled={controls.playing || flying}
+              title={controls.playing ? "Pause first" : flying ? "Found her first" : tip}
+              onClick={() => {
+                step(n);
+                setSteps((k) => k + 1);
+              }}
+            >
+              {label}
+            </button>
+          ))}
+          <span
+            className="font-mono text-fg-3 tabular-nums"
+            aria-label="game time"
+            title="Game time: minutes and seconds, then the tick within the second (of 30)"
+          >
+            {clockTicks(game.time)}
+          </span>
+        </div>
+        <button
+          type="button"
+          className="grid size-8 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg max-sm:order-2 max-sm:ml-auto"
+          onClick={onClose}
+          aria-label="Close the Lab"
+          title="Close the Lab (l)"
+        >
+          <Icon name="close" className="size-4" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" role="tabpanel" aria-label={TABS.find(([t]) => t === tab)?.[1]}>
+        {tab === "history" && <HistoryTab history={history} />}
+        {tab !== "history" && (
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
+            {tab === "world" && <World {...props} />}
+            {tab === "jev" && <JevCard {...props} />}
+            {tab === "levers" && <Levers {...props} />}
+            {tab === "numbers" && (
+              <>
+                <FungusNumbers {...props} />
+                <Debug {...props} />
+              </>
+            )}
+            {tab === "journal" && journal && <JournalCard journal={journal} />}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** The history: four charts sharing game time, and the same numbers as a table. Read once a second. */
+function HistoryTab({ history }: { history: History }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const xs = history.samples;
+  if (xs.length < 2) return <p className="text-xs text-fg-3">The charts start once the game has run a couple of seconds.</p>;
+  const colonies = Math.max(...xs.map((s) => s.living.length));
+  const per = (pick: (s: (typeof xs)[number]) => number[]) =>
+    Array.from({ length: colonies }, (_, k) => ({ name: colonyName(k), color: seriesColor(k), values: perColony(xs, pick, k) }));
+  const living = per((s) => s.living);
+  const infected = per((s) => s.infected);
+  // The table: about a dozen rows, evenly spaced, and the last.
+  const stride = Math.max(1, Math.ceil(xs.length / 12));
+  const rows = xs.filter((_, i) => i % stride === 0 || i === xs.length - 1);
+  return (
+    <div>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-3 lg:grid-cols-2">
+        <HistoryChart
+          title="Infected: share of each colony's living ants"
+          samples={xs}
+          series={infected}
+          yMax={Math.min(
+            1,
+            niceMax(
+              infected.flatMap((s) => s.values),
+              0.1,
+            ),
+          )}
+          format={pct}
+        />
+        <HistoryChart
+          title="Living ants"
+          samples={xs}
+          series={living}
+          yMax={niceMax(
+            living.flatMap((s) => s.values),
+            10,
+          )}
+          format={whole}
+        />
+        <HistoryChart
+          title="The odours apart: 1 at the start, 0 when they smell alike"
+          samples={xs}
+          series={[{ name: "gap", color: seriesColor(0), values: xs.map((s) => s.gap) }]}
+          yMax={niceMax(
+            xs.map((s) => s.gap),
+            1,
+          )}
+          format={(v) => v.toFixed(2)}
+        />
+        <HistoryChart
+          title="Mutations to keep"
+          samples={xs}
+          series={[{ name: "mutations", color: seriesColor(0), values: xs.map((s) => s.mutations) }]}
+          yMax={niceMax(
+            xs.map((s) => s.mutations),
+            10,
+          )}
+          format={whole}
+        />
+      </div>
+      <details className="mt-3 text-xs">
+        <summary className="cursor-pointer text-fg-3 hover:text-fg-2">As a table</summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="font-mono tabular-nums">
+            <thead className="text-fg-3">
+              <tr>
+                <th className="pr-3 text-left font-normal">time</th>
+                {Array.from({ length: colonies }, (_, k) => (
+                  <th key={`i${k}`} className="pr-3 text-right font-normal">
+                    {colonyName(k)} infected
+                  </th>
+                ))}
+                {Array.from({ length: colonies }, (_, k) => (
+                  <th key={`l${k}`} className="pr-3 text-right font-normal">
+                    {colonyName(k)} living
+                  </th>
+                ))}
+                <th className="pr-3 text-right font-normal">gap</th>
+                <th className="text-right font-normal">mutations</th>
+              </tr>
+            </thead>
+            <tbody className="text-fg-2">
+              {rows.map((s) => (
+                <tr key={s.t}>
+                  <td className="pr-3">{clock(s.t)}</td>
+                  {Array.from({ length: colonies }, (_, k) => (
+                    <td key={`i${k}`} className="pr-3 text-right">
+                      {k < s.infected.length ? pct(s.infected[k]!) : "—"}
+                    </td>
+                  ))}
+                  {Array.from({ length: colonies }, (_, k) => (
+                    <td key={`l${k}`} className="pr-3 text-right">
+                      {s.living[k] ?? "—"}
+                    </td>
+                  ))}
+                  <td className="pr-3 text-right">{s.gap.toFixed(2)}</td>
+                  <td className="text-right">{s.mutations}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  );
+}

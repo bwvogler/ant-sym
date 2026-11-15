@@ -5936,6 +5936,34 @@ The owner, playing on a phone, found the green notices at the bottom in the way:
 - **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
+
+### 69.7 S4a: Lab mode, the workbench under the map (ja-mvo9.4, first half)
+Stage 4 goes out in two PRs. This first half builds Lab mode and retires the Details screen. Moving the Codex's Policy tab into the Lab follows in S4b.
+- **Lab mode.** The key l, the palette's "Lab mode", or Settings → Lab mode toggles it.
+  - The map shares the screen: the stage (the map and everything over it) takes the top, and a workbench the bottom 42 % (`ui/LabBench.tsx`).
+  - The game's keys still work, and notices sit above the workbench.
+- **The workbench's tabs:**
+  - History;
+  - World: the seed, the ants, the speeds slider, the trails, restart and a new world;
+  - Jev: spend, run, stop and resume;
+  - Levers: the fungus's menu, hide and cull, the doctrines, the foundings;
+  - Numbers: the fungus's numbers and debug;
+  - Journal: when `?log=` asks for one.
+
+  These are the Details screen's cards, kept in `ui/LabCards.tsx`. The Colonies and Saved games cards keep their drawers.
+- **The step control.** Pause or play, "Step a tick" (1/30 s: the assays' tick, and the longest the frame loop takes) and "Step a second" (30 ticks), from `useColony.step`. The game time shows to the tick. The steps wait while the game plays, and a flight stops them, as it stops play.
+- **History.** The game is sampled once a game-second from its start, whether or not the Lab is open (`ui/history.ts`, pure, tested). The buffer keeps the whole game in at most 600 samples: when it fills, every other sample goes and the interval doubles. Time going back (a restart, a load) starts it afresh. The charts are small multiples sharing game time:
+  - each colony's infected share, its axis rounded up from the data (at least 10 %);
+  - each colony's living ants;
+  - the odours' gap;
+  - the mutations to keep.
+
+  Each chart follows the dataviz skill: 2 px lines, a hairline grid, a legend for two or more lines, a name at each line's end where it clears the others, a crosshair that snaps to the nearest sample and reads out every line, and "As a table" under them.
+- **Colour.** Each colony has a fixed slot of a categorical palette (`--series-1` to `--series-6`), validated with the skill's validator on `--paper` in both themes: adjacent CVD ΔE ≥ 8.4, normal-vision ≥ 19.3. The colony tones the map uses failed as a chart palette: near-black Ink, and greys below the chroma floor. Three light slots sit under 3:1 contrast, so the names and the table carry identity.
+- **Not built:** the plan's stance-mix chart. Stances are per ant, and the colonies' stance line is in the Colonies drawer; it can come later.
+- **Retired:** the Details screen. Its places now say Lab: the policy lock's "Lab → Jev → Resume Jev", Settings' "Lab mode", the palette.
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
@@ -6592,7 +6620,7 @@ Stage 2 of the foundation refactor ([refactor.md](refactor.md#stage-2-one-world-
 | A9 | lost per 100 food | 8.04 (7) | 1.87 | 5.90 |
 | A10 | draw | −0.5 (6) | 1.1 | 0.5 |
 
-A5's seed 1 sits at its worst seed's line (2.64 against 2.65): a guard on seed 1 alone has no slack, which `ja-fnd.3.2.5` should weigh.
+A5's seed 1 sits at its worst seed's line (2.64 against 2.65): a guard on seed 1 alone has no slack, which `ja-fnd.3.2.5` should weigh. (Settled in §76.4: every guard is widened by 10 %.)
 
 ### 76.2 The lifecycle assays on one world (`ja-fnd.3.2.2`)
 
@@ -6629,8 +6657,25 @@ Measured on `fbf6415` with this change, seeds 1–20 (`npm run exp -- pass defen
 
 - **A6 is worse walked:** 4/20 against 12/20 with the broadcast march. A median 24 % of the attackers reach the hole (2–34 %): the rest meet defenders on the way or wander once let go, and the battle seldom forms at the pass. `ja-lp4.6.5` tracks A6 on one world.
 - **A13: defending pays nothing over not defending.** The colony stores 0.92 (0.45–1.49) of the sealed control's food; with nobody defending, 0.89 (0.71–1.50); both kill a median 41 raiders. A median 7 % of the war party reaches the hole. `ja-lp4.6.20`.
-- **Under the marks rule (§76.1)** both fail, so the gate tests (`ja-fnd.3.2.5`, not yet built) guard today's worst seed: A6 gain ≥ 0.60 (replacing §76.1's 0.80, which was the broadcast A6's), A13 food ÷ no-defence food ≥ 0.57 and killed ≥ 27.
+- **Under the marks rule (§76.1)** both fail, so the gate tests (`ja-fnd.3.2.5`, built in §76.4) guard today's worst seed widened by 10 %: A6 gain ≥ 0.54 (replacing §76.1's 0.80, which was the broadcast A6's), A13 food ÷ no-defence food ≥ 0.51 and killed ≥ 24.
 - **Cost:** none. No situation, legend or question changed.
+
+### 76.4 The gate tests on the one-world twins (`ja-fnd.3.2.5`, `ja-fnd.3.2.4`)
+
+The gate tests now run the one-world twins (`oneAssay(id)`, `experiment.ts`), on seeds 1–2 unless said: A3 and A4 in `soak/assays.test.ts`; A1, A2a, A2b, A5, A5b, A9 and A10 in `slow/assays.test.ts`; A11 (seeds 1–10) and A12 in `slow/raidFind.test.ts` and `slow/raidStop.test.ts`; A6 and A13 in a new `slow/defence.test.ts`.
+
+- **Held to their marks** (they pass today): A1, A2a, A2b, A3, A4, A5b, A11 (at least 6 of 10 seeds, none stuck), A12.
+- **Guarded** (they fail today; owner, 2026-11-15): no worse than the worst seed over 1–20 (§76.1, §76.3), widened by 10 % so that a behaviour change elsewhere, which reshuffles a seed's game, doesn't flip the gate. For A5 and A13, seed 1 is itself the worst seed.
+
+| assay | guard | worst seed (1–20) | bead |
+|---|---|---|---|
+| A5 | outside before ÷ after ≤ 2.91 | 2.645 (5) | `ja-lp4.6.8` |
+| A6 | gain ≥ 0.54 | 0.603 (14) | `ja-lp4.6.5`, `ja-lp4.6.5.1` |
+| A9 | lost per 100 food ≤ 8.85 | 8.04 (7) | `ja-lp4.6.4` |
+| A10 | draw ≥ −0.55 | −0.5 (6) | `ja-je8` (was `todo`) |
+| A13 | food ÷ no-defence food ≥ 0.51, killed ≥ 24 | 0.568 (1), 27 (4) | `ja-lp4.6.20` |
+
+Each moves to its real mark when its bead is fixed. The arena versions of these gates are gone; the arena assays themselves stay in `ASSAYS` until step 4 deletes them.
 
 ## 77. Young ants keep to the brood by its odour, not the queen's position (built, off, ja-k4k.15, 2026-11-15)
 

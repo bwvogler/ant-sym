@@ -23,7 +23,7 @@ import { ruleTextAgrees } from "../policyText.ts";
 import { requestFor, tokensPerQuestion } from "../prompt.ts";
 import { situationsOf } from "../useColony.ts";
 
-// ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Details shows
+// ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Lab mode's Jev tab shows
 // "no stance lane", not "0 stances"); a species' rule text is checked against its own rule over every situation of its schema; the request
 // the Learn drawer shows is the species' own.
 
