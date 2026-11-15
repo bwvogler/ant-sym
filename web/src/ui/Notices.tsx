@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FLOAT, IconButton } from "./kit.tsx";
-import { ago, clearNotices, markNoticesRead, noticeLog, setNoticesOpen, subscribeToasts, unreadNotices } from "./toasts.ts";
+import { ago, clearNotices, clearToasts, markNoticesRead, noticeLog, setNoticesOpen, subscribeToasts, unreadNotices } from "./toasts.ts";
 
 // The bell at the top right (owner, 2026-11-15; ja-mvo9.5's notification stack): every notice raised this visit, newest
 // first, so a toast swiped away can be read later. A badge counts those not yet seen; opening the list marks them seen.
@@ -34,6 +34,8 @@ export default function Notices() {
     window.addEventListener("pointerdown", press, true);
     return () => {
       clearInterval(timer);
+      // What the list showed has been read: none of it comes back onto the field for a fresh 7 s (review of #219, N5).
+      clearToasts();
       setNoticesOpen(false);
       window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", press, true);

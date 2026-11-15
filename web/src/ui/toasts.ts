@@ -55,6 +55,13 @@ export function dismissToast(id: number): void {
 
 export const currentToasts = (): readonly Toast[] => toasts;
 
+/** Take every toast off the field (they stay in the log): the list just showed them (review of #219, N5). */
+export function clearToasts(): void {
+  if (!toasts.length) return;
+  toasts = [];
+  emit();
+}
+
 export const noticesOpen = (): boolean => logOpen;
 
 export function setNoticesOpen(open: boolean): void {

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ago,
   clearNotices,
+  clearToasts,
   currentToasts,
   dismissToast,
   HOLD_MS,
@@ -100,4 +101,13 @@ test("the bell's list open hides the field's toasts: a flag the toasts read", ()
   assert.equal(noticesOpen(), true);
   setNoticesOpen(false);
   assert.equal(noticesOpen(), false);
+});
+
+test("closing the list clears the field: its toasts go, the log keeps them (review of #219, N5)", () => {
+  clearNotices();
+  pushToast("seen in the list");
+  assert.ok(currentToasts().length > 0);
+  clearToasts();
+  assert.equal(currentToasts().length, 0);
+  assert.equal(noticeLog()[0]!.text, "seen in the list");
 });

@@ -9,8 +9,9 @@ const TONE = {
 
 /**
  * The notices raised with pushToast, each gone after TOAST_MS, on a tap, or swiped away (owner, 2026-11-15): sideways
- * or down. A finger held on one stops its clock, and lifting a hold leaves it. A swiped notice is still in the log behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar,
- * "top" under the HUD (while the builder's tray fills the bottom).
+ * or down. A finger held on one stops its clock, and lifting a hold leaves it. A swiped notice is still in the log
+ * behind the bell (ui/Notices.tsx). `place`: "bottom" over the tab bar, "top" under the HUD (while the builder's tray
+ * fills the bottom).
  */
 export default function Toasts({ place = "bottom" }: { place?: "bottom" | "top" }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);

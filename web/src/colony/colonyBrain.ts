@@ -237,6 +237,8 @@ export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANC
 /** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
 export const RESPONSE_BRAIN_VERSION = 11;
 
+// Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
+// before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
 export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. ",
   fields: [

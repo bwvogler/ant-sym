@@ -22,9 +22,19 @@
 //  8. the desert ant (ja-rf5): chosen on the start screen, which then offers plain Start (no tutorial: it is the generic ant's); its
 //     game is the desert ant's, plays 20 s of game time at 4× and lays no food or home trail on the plane; a reload still offers
 //     the generic ant's tutorial. Its field guide leaves out the trail entries (ja-rf5.11).
+//  9. the aim bar's keys (PRD §69.2), on a page told a key is set (every other API call left unanswered: nothing spent):
+//     Shift+Enter a new line, Enter commits, Escape lets go.
+//  10. the palette, the keys, the shortcuts sheet and the lens (PRD §69.3): Ctrl+K, the speeds and Space, ?, Escape one thing
+//     at a time, the lens over a hole, pinned, on the other view, and the lens button on a 360 px phone.
 //  11. the builder (ja-kjj8.3), at 390 and 768 px: the tray in the tab bar's place, buttons >= 64 px, sugar by a tap, a
 //     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
-//  13. notices (PRD §69.5), at 390 px by real touch: the bell at the top right; a small drag slides a toast back, a swipe
+//  12. the Codex (ja-mvo9.3), paused at the landing: a first host opens Jobs by age with one notice and a badge; the new
+//     mark, Read it anyway, Show every entry, the palette, a reload, starting afresh.
+//  13. specimens (PRD §69.5), paused: pin from the ant panel, follow from the list (the camera to its view), unpin (focus
+//     to the header), a fourth replaces the oldest and takes its number, a fifth's notice names the kept number it frees, a
+//     specimen that dies leaves with a notice and the rest keep theirs, the list stays with nothing followed and folds to one
+//     line; a new game has none; on a 390 px phone the list folds once nothing is followed.
+//  14. notices (PRD §69.6), at 390 px by real touch: the bell at the top right; a small drag slides a toast back, a swipe
 //     takes it away, a hold outlives its time; the bell counts it, lists it, clears the count, hides the field's toasts;
 //     Escape closes the list and not a drawer under it; a tap outside closes it; while building, toasts sit above the tray.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
@@ -1396,9 +1406,127 @@ try {
   check((await locked("Jobs by age").count()) === 1, "and stays locked through this game, though a host is there");
   check((await cp.evaluate(() => localStorage.getItem("jev-ants:codex-seen"))) === "[]", "and the notebook kept is empty too (S5)");
   await cctx.close();
-  // ——— 13. Notices (PRD §69.5): swipe a toast away; the bell at the top right keeps it ———
+
+  // ——— 13. Specimens (PRD §69.5): pin ants from the ant panel, compare and follow them from the inspector ———
+  console.log("13. specimens");
+  const sctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const sp = await sctx.newPage();
+  sp.on("pageerror", (e) => errors.push(String(e)));
+  await sp.goto(url);
+  await sp.getByLabel("world seed").fill(String(SEED));
+  await sp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => sp.evaluate(() => window.jevAnts?.game.landed !== null), "a game for the specimens");
+  await sp.getByRole("button", { name: "Pause", exact: true }).click(); // no ant dies or is born under the checks
+  const list = sp.getByRole("region", { name: "specimens" });
+  const pinBtn = sp.getByRole("button", { name: /^(Pin as a specimen|Pinned)$/ });
+  const ants = await sp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[0];
+    const out = [];
+    for (let i = 0; i < c.n && out.length < 5; i++) if (c.alive[i]) out.push(i);
+    return out;
+  });
+  const followAnt = (i) => sp.evaluate((i) => window.jevAnts.follow(0, i), i);
+  await followAnt(ants[0]);
+  await pinBtn.click();
+  check(
+    (await list.getByText("No. 1").count()) === 1 && (await pinBtn.getAttribute("aria-pressed")) === "true",
+    "pinned: No. 1, the button says so",
+  );
+  await followAnt(ants[1]);
+  await pinBtn.click();
+  check((await list.getByText("No. 2").count()) === 1, "a second: No. 2");
+  await list.getByRole("button", { name: new RegExp(`^No\\. 1 #${ants[0]} `) }).click();
+  check((await sp.evaluate(() => window.jevAnts.followed()?.i)) === ants[0], "a row follows its specimen");
+  check(
+    (await sp.evaluate(() => window.jevAnts.view())) === "below",
+    "and takes the camera to its view (it is below) (review of #218, S2)",
+  );
+  await list.getByRole("button", { name: "Unpin No. 2" }).click();
+  check((await list.getByText("No. 2").count()) === 0, "unpinned");
+  check(await list.evaluate((el) => document.activeElement === el.querySelector("h2 button")), "focus goes to the list's header, not lost");
+  // Numbers are kept (owner, review of #218, D1): ants[1] takes No. 2 again (the lowest free), ants[2] No. 3; the fourth,
+  // ants[3], replaces the oldest (ants[0]) and takes its No. 1; nothing else is renumbered.
+  for (const i of ants.slice(1, 4)) {
+    await followAnt(i);
+    await pinBtn.click();
+  }
+  await until(
+    async () => (await sp.getByText(new RegExp(`^Three specimens at most: No\\. 1, ant #${ants[0]} of Ink, is unpinned`)).count()) === 1,
+    "the notice of a fourth",
+    2000,
+    50,
+  );
+  const labelOf = (i) => list.getByRole("button", { name: new RegExp(`^No\\. \\d #${i} `) }).evaluate((b) => b.textContent.slice(0, 5));
+  check(
+    (await list.getByRole("listitem").count()) === 3 &&
+      (await labelOf(ants[1])) === "No. 2" &&
+      (await labelOf(ants[2])) === "No. 3" &&
+      (await labelOf(ants[3])) === "No. 1",
+    "a fourth replaces the oldest and takes its number; the others keep theirs",
+  );
+  // A fifth replaces the oldest left, ants[1]: the notice names its kept number, No. 2, not its place in the list (S3).
+  await followAnt(ants[4]);
+  await pinBtn.click();
+  await until(
+    async () => (await sp.getByText(new RegExp(`^Three specimens at most: No\\. 2, ant #${ants[1]} of Ink, is unpinned`)).count()) === 1,
+    "the notice of a fifth names the number it frees",
+    2000,
+    50,
+  );
+  // A specimen that dies leaves, with a notice naming it; the rest keep their numbers; with nothing followed the list stays.
+  await sp.getByRole("button", { name: "Stop following" }).click();
+  await sp.evaluate((i) => (window.jevAnts.game.colonies[0].alive[i] = 0), ants[2]);
+  await until(
+    async () => (await sp.getByText(new RegExp(`^No\\. 3, ant #${ants[2]} of Ink, has died`)).count()) === 1,
+    "the notice of a specimen's death",
+    3000,
+    50,
+  );
+  check(
+    (await list.getByRole("listitem").count()) === 2 &&
+      (await list.getByText("No. 3").count()) === 0 &&
+      (await labelOf(ants[4])) === "No. 2",
+    "it leaves the list, the rest keep their numbers, and the list stays with nothing followed",
+  );
+  // The header folds the list to one line and back (owner, D2).
+  const header = list.getByRole("button", { name: /^Specimens/ });
+  await header.click();
+  check(
+    (await header.getAttribute("aria-expanded")) === "false" &&
+      (await list.getByRole("listitem").count()) === 0 &&
+      /: 2/.test(await header.innerText()),
+    "folded: one line, its count",
+  );
+  await header.click();
+  check((await list.getByRole("listitem").count()) === 2, "and open again");
+  // A new game starts with none (S2).
+  await sp.keyboard.press("Control+k");
+  await sp.keyboard.type("Lab and numbers");
+  await sp.keyboard.press("Enter");
+  await sp.getByRole("button", { name: "Restart", exact: true }).click();
+  await until(async () => (await list.count()) === 0, "a new game starts with no specimens", 3000, 50);
+  check(true, "a new game starts with no specimens");
+  await sctx.close();
+  // On a phone the list folds when the follow ends (D2).
+  const pctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  const pp = await pctx.newPage();
+  pp.on("pageerror", (e) => errors.push(String(e)));
+  await pp.goto(url);
+  await pp.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+  await until(() => pp.evaluate(() => window.jevAnts?.game.landed !== null), "a phone game for the specimens");
+  await pp.getByRole("button", { name: "Pause", exact: true }).tap();
+  await pp.evaluate(() => window.jevAnts.follow(0, window.jevAnts.game.colonies[0].alive.indexOf(1)));
+  await pp.getByRole("button", { name: "Pin as a specimen" }).tap();
+  const plist = pp.getByRole("region", { name: "specimens" });
+  check((await plist.getByRole("listitem").count()) === 1, "on a phone, open while an ant is followed");
+  await pp.getByRole("button", { name: "Stop following" }).tap();
+  await until(async () => (await plist.getByRole("listitem").count()) === 0, "on a phone, folded once nothing is followed", 2000, 50);
+  check((await plist.count()) === 1, "on a phone, folded to one line once nothing is followed");
+  await pctx.close();
+
+  // ——— 14. Notices (PRD §69.6): swipe a toast away; the bell at the top right keeps it ———
   // A real finger (CDP touch events, review of #219 S2): the mouse would not show a browser taking the drag as a pan.
-  console.log("13. notices");
+  console.log("14. notices");
   const nctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const np2 = await nctx2.newPage();
   np2.on("pageerror", (e) => errors.push(String(e)));
@@ -1450,20 +1578,21 @@ try {
   // Escape closes the list and not the drawer under it; the field's toasts hide while the list is open.
   await mutations(np2).tap();
   await bell.tap();
-  const list = np2.getByRole("region", { name: "notices" });
+  const noticeList = np2.getByRole("region", { name: "notices" });
   check((await bell.getAttribute("aria-expanded")) === "true", "the bell says the list is open");
-  check((await list.getByText("A notice to swipe away.").count()) === 1, "the bell's list keeps the swiped notice");
+  check((await noticeList.getByText("A notice to swipe away.").count()) === 1, "the bell's list keeps the swiped notice");
   check(!/new/.test((await bell.getAttribute("title")) ?? ""), "opening the list clears the count");
   check((await np2.locator('[role="status"] button').count()) === 0, "the field's notices hide while the list is open");
   await np2.keyboard.press("Escape");
-  check((await list.count()) === 0, "Escape closes the list");
+  check((await noticeList.count()) === 0, "Escape closes the list");
+  check((await np2.locator('[role="status"] button').count()) === 0, "and what it showed doesn't come back onto the field");
   check(await np2.getByRole("region", { name: "mutations" }).isVisible(), "and leaves the drawer under it open");
   await np2.keyboard.press("Escape");
   // A tap outside the list closes it.
   await bell.tap();
-  check((await list.count()) === 1, "the list opens again");
+  check((await noticeList.count()) === 1, "the list opens again");
   await np2.touchscreen.tap(20, 600);
-  await until(async () => (await list.count()) === 0, "a tap outside closes the list", 3000, 50);
+  await until(async () => (await noticeList.count()) === 0, "a tap outside closes the list", 3000, 50);
   // While building, the notices sit between the HUD and the tray.
   await np2.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Builder", exact: true }).tap();
   const tray = await np2.getByRole("navigation", { name: "builder tools" }).boundingBox();

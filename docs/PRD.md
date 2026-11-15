@@ -5828,14 +5828,30 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
   - one notice naming what opened together;
   - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
   - a "new" mark on those entries;
-  - the count, "Seen 11 of 22".
+  - the count, "Seen 9 of 28" on a new notebook (the generic ant).
 - **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
 - **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
 - **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
 - **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
-### 69.5 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
+### 69.5 S3b: specimens (ja-mvo9.3, second half)
+The second half of stage 3: a few ants kept to watch and compare, the notebook's specimens.
+- **Pinning.** The ant panel's "Pin as a specimen" keeps the followed ant; "Pinned" unpins it.
+  - At most three (`MAX_SPECIMENS`): a fourth replaces the oldest, and a notice names the ant let go.
+  - Each keeps its number (owner, review of #218, D1): the lowest free one of 1 to 3 when pinned. A death or a replacement frees that number; nothing else is renumbered, on the list or the map.
+  - An ant is (colony, slot, generation), as a follow is. A specimen that dies leaves the list with a notice ("No. 2, ant #9 of Amber, has died"), checked once a second.
+  - Specimens belong to their game: a new game starts with none.
+- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Its header folds the list to one line ("Specimens: 3") and back; on a phone it starts folded while nothing is followed, and folds when the follow ends (owner, D2). Each row has two lines:
+  - its label (No. 1), the ant and its colony, and how far the fungus is in it ("host", or the share);
+  - its mode, whether it carries food, above or below, and its fatigue of the colony's patience.
+
+  A row follows its ant, taking the camera to its view. Its × unpins it.
+- **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring, drawn over them.
+- The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
+- **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
+
+### 69.6 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
 
 The owner, playing on a phone, found the green notices at the bottom in the way: "let me swipe them away and check them later in some notifications in the top right."
 
@@ -5853,11 +5869,11 @@ The owner, playing on a phone, found the green notices at the bottom in the way:
 - **Review of #219:**
   - one Escape closes the list and not a dialog opened over it;
   - a press held past 0.5 s is a hold to read, so lifting it leaves the notice (`HOLD_MS`);
-  - the field's notices hide while the list is open (they are in it);
+  - the field's notices hide while the list is open (they are in it), and closing it clears them from the field;
   - the bell is announced as opening a list (`aria-expanded`), not as a toggle.
 - **Checks:**
   - `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, the swipe and hold rule, and `ago`'s boundaries.
-  - `npm run e2e` step 13 runs at 390 px by real touch (CDP touch events):
+  - `npm run e2e` step 14 runs at 390 px by real touch (CDP touch events):
     - a swipe and a slide back;
     - a hold past 7 s;
     - Escape over a drawer, and a tap outside;
