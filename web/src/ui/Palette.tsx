@@ -60,7 +60,7 @@ export default function Palette({ commands, onClose }: { commands: readonly Runn
         <Icon name="search" className="size-4 shrink-0 text-fg-3" />
         <input
           className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-fg outline-none placeholder:text-fg-3"
-          placeholder="Type a command: speed, mutations, follow a host, learn…"
+          placeholder="Type a command: speed, mutations, follow a host, codex…"
           role="combobox"
           aria-label="command"
           aria-expanded="true"

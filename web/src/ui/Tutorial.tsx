@@ -94,7 +94,7 @@ export default function TutorialCard({
             className="text-xs text-accent underline-offset-2 hover:underline"
             onClick={() => openLearn({ tab: "guide", id: card.learn! })}
           >
-            more in Learn
+            more in the Codex
           </button>
         )}
         <button
