@@ -3,119 +3,28 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COLONY_SKIP, COLONY_STATE, CURTAIN, LAYER_STATE, PLANE, type Layer } from "../../colony.ts";
-import { Game, gameRng, type GameSave } from "../../game.ts";
-import { gridsFromLiving, hashGame } from "../saveHash.ts";
+import { Game, gameRng } from "../../game.ts";
 import { STRAINS } from "../../fungus.ts";
 import { CRUST, generateOneWorld } from "../../oneWorld.ts";
 import { encode } from "../../save.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD, type WorldMap } from "../../world.ts";
-import { DT, run } from "../builders.ts";
+import { mulberry32 } from "../../world.ts";
+import { run, smallOne } from "../builders.ts";
 
-// Saving a game (ja-lo8.6): run, save, restore into a game built afresh from the same world and settings, run on. The
-// result must be bit-identical to the unbroken run: every typed array of every colony, every scent and map layer, the
-// fungus's spores, the brood and the chambers. A field the save misses shows up here as a hash that differs.
+// Saving a game (ja-lo8.6): what each part saves, held to the code's own lists, so a new field cannot be lost on load. That a
+// restored game runs on bit-identical to the unbroken one is int/oneWorldSave's (S2.3c: the side and top-down run-on tests went).
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-function build(view: "side" | "top", seed: number): Game {
-  const map: WorldMap = view === "side" ? generateSideWorld(seed) : generateWorld(seed, { ...OPEN_WORLD, size: { w: 160, h: 100 } });
-  return new Game(map, { antCount: 200, rivalAnts: 200, regrow: 600 }, mulberry32(seed * 7919));
+/** A game on a small one world. That a save runs on exactly as the unbroken game, and on a fight death's tick, is int/oneWorldSave's. */
+function build(seed: number): Game {
+  return new Game(smallOne(seed), { antCount: 200, rivalAnts: 200, regrow: 600 }, mulberry32(seed * 7919));
 }
-
-for (const view of ["side", "top"] as const)
-  test(`a save restored into a fresh game runs on exactly as the unbroken game (${view} view, the fungus landed)`, () => {
-    const whole = build(view, 3);
-    whole.land(0, GARDEN, { evolve: true }); // as the page lands: the fungus's body and evolution are saved too (ja-lo8.12)
-    run(whole, 40);
-    const before = hashGame(whole);
-    run(whole, 20);
-    const unbroken = hashGame(whole);
-
-    const first = build(view, 3);
-    first.land(0, GARDEN, { evolve: true });
-    run(first, 40);
-    assert.equal(hashGame(first), before, "the same game, the same state (the test's own check)");
-    const saved = JSON.parse(JSON.stringify(first.save())) as GameSave;
-
-    const again = build(view, 3);
-    again.load(saved);
-    assert.equal(hashGame(again), before, "restored: the state as saved");
-    // Every field the save holds was put back: saving the restored game gives the same save, field for field (a field
-    // a load drops shows here even when it changes nothing for a while).
-    const resaved = JSON.parse(JSON.stringify(again.save())) as GameSave;
-    for (const k of Object.keys(saved) as (keyof GameSave)[]) assert.deepEqual(resaved[k], saved[k], `save field ${k}`);
-    run(again, 20);
-    assert.equal(hashGame(again), unbroken, "run on: as if never saved");
-    assert.ok(again.landed, "it remembers where the fungus landed");
-    // The fungus is still in the game: its patch sporulating, and fungus grown in hosts so far (a weak start may have no
-    // host at this moment: the colony grooms it out of the nest).
-    assert.ok(again.fungus.sporeCells > 0 && (again.fungus.evolution?.growth ?? 0) > 0);
-  });
-
-/**
- * Run g a tick at a time until a tick has a fight death (Unity.deathsPerMinute rises: it only fades otherwise), at most
- * `seconds`; returns whether one did.
- */
-function runToFightDeath(g: Game, seconds: number): boolean {
-  let last = g.unity().deathsPerMinute;
-  for (let k = 0; k < Math.round(seconds / DT); k++) {
-    g.tick(DT);
-    const d = g.unity().deathsPerMinute;
-    if (d > last) return true;
-    last = d;
-  }
-  return false;
-}
-
-/**
- * The game of the fight-tick test: the top-down map's two colonies meet within seconds; in the side view a stranger
- * colony is founded by the first's hole (`found`: a game a save is loaded into re-founds it from the save).
- */
-function fighting(view: "side" | "top", found = true): Game {
-  if (view === "top") return build("top", 3);
-  const g = new Game(generateSideWorld(3), { antCount: 60, rivalAnts: 60, regrow: 600 }, mulberry32(3 * 7919));
-  const e = g.player.nest.entrance!;
-  if (found) g.addColony({ x: e.x + 24, y: e.y, antCount: 40, odour: 1 });
-  return g;
-}
-
-for (const view of ["side", "top"] as const)
-  test(`a save on a tick with a fight death runs on exactly (${view} view): the grids and bands are saved, not built again`, () => {
-    // Game.tick builds the occupancy grids and recognition bands before fights, and the next tick's steps read them, the
-    // ants killed since included. A load that built them again from the living diverged on the first tick (U4b).
-    const whole = fighting(view);
-    assert.ok(runToFightDeath(whole, 30), "a fight death within 30 s (the test's own check)");
-    const saved = JSON.parse(JSON.stringify(whole.save())) as GameSave;
-    const at = hashGame(whole);
-    whole.tick(DT);
-    const next = hashGame(whole);
-    run(whole, 3);
-    const unbroken = hashGame(whole);
-
-    const again = fighting(view, false);
-    again.load(saved);
-    assert.equal(hashGame(again), at, "restored: the state as saved");
-    again.tick(DT);
-    assert.equal(hashGame(again), next, "the first tick after: as unbroken");
-    run(again, 3);
-    assert.equal(hashGame(again), unbroken, "run on: as if never saved");
-
-    // With the grids built again from the living (as a load did before U4b) the same save diverges: this tick really is
-    // one that needs them.
-    const twin = fighting(view, false);
-    twin.load(saved);
-    const rebuilt = fighting(view, false);
-    rebuilt.load({ ...saved, grids: gridsFromLiving(twin) });
-    rebuilt.tick(DT);
-    run(rebuilt, 3);
-    assert.notEqual(hashGame(rebuilt), unbroken, "rebuilt from the living, the run differs");
-  });
 
 test("a save of another version is refused", () => {
-  const g = build("top", 2);
+  const g = build(2);
   const s = g.save();
-  assert.throws(() => build("top", 2).load({ ...s, version: s.version + 1 }), /version/);
+  assert.throws(() => build(2).load({ ...s, version: s.version + 1 }), /version/);
 });
 
 test("what a colony saves: its public properties in `fields`, COLONY_STATE in `private`, and nothing it names as code or rebuilt on load", () => {
@@ -123,7 +32,7 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
   // default (so a new field cannot be lost on load, as tired, holdsBrood and cameFrom were in PR #42's review, S1); COLONY_STATE keeps the older
   // state that is written by name in `private` and restored in place; COLONY_SKIP names what is code, wired again by the Game, or the random stream.
   // That the restore is complete is the run-on tests' job (a loaded game runs on as if never saved): this one holds the lists to each other.
-  const g = build("side", 2);
+  const g = build(2);
   const c0 = g.colonies[0]!;
   const saved = Object.keys(c0.saveState().private as object);
   const fields = Object.keys(c0.saveState().fields as object);
@@ -286,58 +195,7 @@ test("the game's save holds every private field it declares, or the field is bui
     [...inPrivate, ...inGrids, ...derived, ...fromPage].sort(),
     "every declared #field is accounted for",
   );
-  const s = build("top", 2).save();
+  const s = build(2).save();
   assert.deepEqual(Object.keys(s.private).sort(), [...inPrivate].sort());
   assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
-});
-
-test("a single-map save's shape: the game's keys with the grids, colony saves as fields and private, the fungus's keys, one layer of grids", () => {
-  // A single-map game saves none of one world's parts (`world`, a colony's or the fungus's `layers`): held here by name.
-  const game = [
-    "colonies",
-    "crayons",
-    "flights",
-    "founded",
-    "fungus",
-    "grids",
-    "landed",
-    "map",
-    "params",
-    "private",
-    "raids",
-    "recognition",
-    "regrown",
-    "revealed",
-    "species",
-    "strategyChoices",
-    "time",
-    "version",
-  ];
-  const fungus = [
-    "base",
-    "clock",
-    "corpseAges",
-    "corpses",
-    "evolution",
-    "hosts",
-    "hyphae",
-    "links",
-    "menu",
-    "params",
-    "rule",
-    "sporeCells",
-    "sporeStrain",
-    "spores",
-  ];
-  for (const view of ["top", "side"] as const) {
-    const g = build(view, 5);
-    g.land(0, GARDEN, { evolve: true });
-    run(g, 1);
-    const s = g.save();
-    assert.deepEqual(Object.keys(s).sort(), game, `${view}: the game's keys`);
-    for (const c of s.colonies) assert.deepEqual(Object.keys(c).sort(), ["fields", "private"], `${view}: a colony's keys`);
-    assert.deepEqual(Object.keys(s.fungus).sort(), fungus, `${view}: the fungus's keys`);
-    assert.deepEqual(Object.keys(s.grids).sort(), ["bands", "counts"]);
-    assert.equal(s.grids.counts.length, 1, `${view}: one layer`);
-  }
 });

@@ -1,6 +1,6 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { Game, generateWorld, localResponses, mulberry32, type LaneWords, type Mode, type Species } from "../../../colony/index.ts";
+import { Game, generateOneWorld, localResponses, mulberry32, type LaneWords, type Mode, type Species } from "../../../colony/index.ts";
 import { ColonyJev } from "../../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../../shared/jev.ts";
 
@@ -73,7 +73,11 @@ async function play(choice: string) {
   const reqs = proxy(choice);
   const j = new ColonyJev({ intervalMs: 10, gatherMs: 0, saveMs: 0 });
   live.add(j);
-  const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 30, rival: false, species: LONE }, mulberry32(4));
+  const g = new Game(
+    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
+    { antCount: 30, rival: false, species: LONE },
+    mulberry32(4),
+  );
   j.setDoctrine("forage");
   j.attachColonies(g.colonies, LONE);
   await j.start();

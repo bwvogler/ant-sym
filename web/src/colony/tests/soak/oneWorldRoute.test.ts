@@ -7,7 +7,7 @@ import { routeFail, routeRecord } from "../../homing.ts";
 import { Game, gameRng, SAVE_VERSION } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
-import { generateWorld, mulberry32, ROCK } from "../../world.ts";
+import { ROCK } from "../../world.ts";
 
 // Route memory on one world's plane (ja-lp4.16.3, docs/route-memory.md, PRD §59): a forager stores its own places every
 // routeStep cells on its way out; a carrier whose home vector fails (no nearer its belief for SEARCH_STALL; with
@@ -501,28 +501,6 @@ test("route memory: the hole's sight takes over at any moment of a retrace", () 
     tickUntil(g, 5, () => c.layer[0] !== PLANE),
     "in sight of its hole it goes down it, not to its place 50 cells away",
   );
-});
-
-test("route memory: not on a top-down map, which has no vector to fail", () => {
-  const run = (mem: number): number[] => {
-    const world = generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 });
-    const flat = new Colony(world, { antCount: 1, maxAnts: 1, routeMemory: mem, deposit: 0 }, mulberry32(5), () => "explore");
-    flat.age[0] = 0.5 * LIFESPAN;
-    flat.mode[0] = EXPLORE;
-    flat.carrying[0] = 0;
-    flat.routePlaces[0] = 5;
-    flat.routePlaces[1] = 5;
-    flat.routeN[0] = 1;
-    const xs: number[] = [];
-    for (let t = 0; t < 20 * 30; t++) {
-      flat.tick(DT);
-      xs.push(flat.x[0], flat.y[0]);
-    }
-    assert.equal(flat.routeN[0], 1, "it stored nothing on a flat map");
-    assert.equal(flat.routeState[0], 0);
-    return xs;
-  };
-  assert.deepEqual(run(2), run(0));
 });
 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
