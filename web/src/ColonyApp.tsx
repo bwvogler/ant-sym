@@ -4,14 +4,11 @@ import {
   UPGRADES,
   type Upgrade,
   LETHAL_LEVERS,
-  FOUNDING_RESERVE,
   MAX_COLONIES,
   MET,
   type Game,
   AIMS,
   type Flight,
-  CELL,
-  cellOf,
   GENERIC_ANT,
   INFECTED,
   Builder,
@@ -32,7 +29,7 @@ import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.t
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
@@ -80,7 +77,7 @@ import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
 import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
-import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
+import { installDevHook } from "./dev/hook.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
 // clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, the Codex,
@@ -507,55 +504,21 @@ export default function ColonyApp() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [penFor, flight, oneWorld, game, foundOn]);
-  // Dev builds only: the game and the page's views on window, for the Playwright guard (scripts/e2e-one-world.mjs); not
-  // in the Pages build. follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother)
-  // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not. With the game paused,
-  // nextCrossing(maxSeconds, minTicks) rehearses on a copy which curtain ant comes up next, and on which fixed step (rehearse.ts),
-  // and step(n) takes the game itself n of those steps: the guard follows that ant through its hole for certain.
-  // Keyless only: the copy shares the game's policies, so with JEV_API_KEY set a miss in the copy would ask Jev (a run, real
-  // spend, skewed hit counts). npm run e2e starts Vite without the key (PR #65 review N6).
+  // The dev hook (dev/hook.ts): the game and the page's views on window, for the Playwright guard. Dev builds only, not in the Pages build.
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
-    (window as unknown as { jevAnts?: unknown }).jevAnts = {
+    installDevHook({
       game,
-      notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
-      /** each moved ant's way home as drawn (ja-cwjp): its colony and slot, how many points, and how it ended */
-      traces: () => traces.traces.map((t) => ({ k: t.colony, i: t.i, points: t.xs.length, end: t.end })),
-      follow: (k: number, i: number) => {
-        const c = game.colonies[k];
-        if (!c || !c.alive[i]) return false;
-        setFollowed({ k, i, gen: c.gen[i] });
-        return true;
-      },
-      view: () => controls.view,
-      followed: () => followedNow.current,
-      sensed: (v: View, x: number, y: number) => {
-        cellOf(x, y);
-        return sensed.sight(v === "above" ? PLANE : CURTAIN, CELL[0], CELL[1]);
-      },
-      nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(settings), maxSeconds, minTicks),
-      step: (n = 1) => {
-        for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
-      },
-      camera: (v: View) => field.current?.camera(v === "above" ? PLANE : CURTAIN) ?? null,
-      goNest: (k: number) => field.current?.goNest(k),
-      fly: (mother = 0) => {
-        const m = game.colonies[mother];
-        if (!m) return false;
-        setDevPen(true);
-        game.revealed[mother] = true;
-        game.flights.push({
-          mother,
-          x: m.nest.x,
-          y: m.nest.y,
-          load: 1,
-          strain: game.fungus.evolution?.strain ?? 0,
-          at: game.time,
-          food: FOUNDING_RESERVE,
-        });
-        return true;
-      },
-    };
+      settings,
+      notify: (text, tone) => pushToast(text, tone),
+      traces,
+      view: controls.view,
+      followed: followedNow,
+      setFollowed,
+      sensed,
+      field,
+      openPen: () => setDevPen(true),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed, sensed, traces]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
