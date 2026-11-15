@@ -3,13 +3,14 @@
 // the desert ant's desertAssays.ts. Everything is re-exported here, so scripts and tests import experiment.ts by name.
 
 import { type ColonyParams, type Layer, PLANE } from "./colony.ts";
-import { FAINT, MODES, type Mode, type Stance } from "./vocab.ts";
+import { EXPLORE, FAINT, MODES, type Mode, type Stance } from "./vocab.ts";
 import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
-import { CELL, hexDistance, R } from "./hex.ts";
+import { CELL, discOffsets, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
+import { PORT_REACH } from "./tuning.ts";
 import { localResponses, responses } from "./responses.ts";
 import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
 
@@ -1257,6 +1258,65 @@ function starvedProbe(): Probe {
 }
 
 /**
+ * The porters' supply (ja-ukac.2, docs/relay-transport.md, PRD §80): how many carries start a minute and how many are
+ * put down, from 300 s on, and the mean number of idle ants within `PORT_REACH` of a stocked store or reception (an ant
+ * that could start a carry: underground, exploring, empty-jawed), sampled every 30 s. Reads the game, draws nothing.
+ */
+function portSupplyProbe(): Probe {
+  let was = new Uint8Array(0);
+  let pickups = 0;
+  let trips0 = -1;
+  let nextAt = 300;
+  let idle = 0;
+  let samples = 0;
+  return {
+    tick(game) {
+      const c = game.player;
+      if (was.length < c.n) was = Uint8Array.from({ length: c.n + 64 }, (_, i) => (i < was.length ? was[i]! : 0));
+      const timed = game.time >= 300;
+      if (timed && trips0 < 0) trips0 = c.portTrips;
+      for (let i = 0; i < c.n; i++) {
+        const p = c.porter[i]!;
+        if (timed && p && !was[i]) pickups++;
+        was[i] = p;
+      }
+      if (game.time + 1e-9 < nextAt) return;
+      nextAt += 30;
+      const ch = game.map.chambers;
+      if (!ch) return;
+      const stocked = (id: number) => {
+        const k = id >= 0 ? ch.list[id] : undefined;
+        return k !== undefined && k.colony === c.params.nest && (k.role === "reception" || k.role === "store") && k.food >= 1;
+      };
+      let near = 0;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || !c.under[i] || c.carrying[i] || c.porter[i] || c.mode[i] !== EXPLORE) continue;
+        c.antCell(i);
+        const cx = CELL[0];
+        const cy = CELL[1];
+        const o = discOffsets(PORT_REACH)[cy & 1]!;
+        for (let k = 0; k < o.length; k += 2)
+          if (stocked(ch.at(cx + o[k]!, cy + o[k + 1]!))) {
+            near++;
+            break;
+          }
+      }
+      idle += near;
+      samples++;
+    },
+    summary(game) {
+      const c = game.player;
+      const mins = Math.max(1e-9, (game.time - 300) / 60);
+      return {
+        pickupsPerMin: pickups / mins,
+        deliveredPerMin: trips0 < 0 ? 0 : (c.portTrips - trips0) / mins,
+        idleNearStore: samples ? idle / samples : 0,
+      };
+    },
+  };
+}
+
+/**
  * Larvae fed when the young are gone (ja-7r7x.1, docs/task-reversion.md, PRD §74): slow/economy.test's hour as an assay.
  * A colony of 110 on that test's map; its founders age as one cohort, so for a stretch it has no young ants and its
  * larvae are fed only if old ants come to them. `starved` is the most larvae at once waiting over 120 s, unfed, with
@@ -1274,7 +1334,7 @@ export const larvae: Assay = {
     map: economyMap,
     seconds: 3600,
     game: { antCount: 110, rival: false },
-    probes: [nestFlowProbe(), starvedProbe()],
+    probes: [nestFlowProbe(), starvedProbe(), portSupplyProbe()],
   }),
   score: (r) => ({
     waiting: r.metrics.starved as number,
@@ -1283,6 +1343,9 @@ export const larvae: Assay = {
     stored: r.metrics["you.stored"] as number,
     diedHungry: r.metrics.diedHungry as number,
     broodStarved: r.metrics.broodStarved as number,
+    pickupsPerMin: r.metrics.pickupsPerMin as number,
+    deliveredPerMin: r.metrics.deliveredPerMin as number,
+    idleNearStore: r.metrics.idleNearStore as number,
     pass: (r.metrics.starved as number) <= 8 && r.metrics.diedHungry === 0 ? 1 : 0,
   }),
 };

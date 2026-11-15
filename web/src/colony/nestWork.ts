@@ -43,6 +43,7 @@ import {
   PICK_BROOD,
   PICK_CORPSE,
   PORT_RATE,
+  PORT_REACH,
   QUEEN_FIGHT,
   QUEEN_MARK,
   QUEEN_STOCK,
@@ -238,7 +239,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   };
   if (!stocked(here)) {
     here = -1;
-    const o = discOffsets(2)[cy & 1] as Int16Array;
+    const o = discOffsets(PORT_REACH)[cy & 1] as Int16Array;
     for (let k = 2; k < o.length && here < 0; k += 2) {
       const id = ch.at(cx + o[k], cy + o[k + 1]);
       if (stocked(id)) here = id;

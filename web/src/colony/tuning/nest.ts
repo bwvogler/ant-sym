@@ -4,6 +4,9 @@
 /** Chance per second an idle ant in reception or a store, with food there, carries a unit on (see port). */
 export const PORT_RATE = 3;
 
+/** Cells from a stocked store or reception within which an idle ant can start a carry (see port; `portReach` widens it, ja-ukac.3). */
+export const PORT_REACH = 2;
+
 /** A forager's food goes to reception only once it is a chamber of this many cells (see foodTo); until then, to the royal chamber. */
 export const RECEPTION_MIN = 4;
 
