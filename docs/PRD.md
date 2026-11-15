@@ -6372,7 +6372,7 @@ Merging is not delegated: PRs wait for the owner.
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
 
-## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, off, ja-638i, 2026-11-15)
+## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, on at 0.1, ja-638i, 2026-11-15)
 
 **Research basis:** [larval-feeding.md](larval-feeding.md):
 - Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
@@ -6448,13 +6448,27 @@ Merging is not delegated: PRs wait for the owner.
 | `game` 1–20 (two colonies, 600 s): pass | 17/20 (3, 10, 11) | 17/20 | 17/20 | 17/20 |
 | `nestFlow` 1–10 (900 s): most larvae waiting | 3 | 3 | 3 | 3 |
 
-- Over seeds 1–32, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting), and no worker or larva starves on any seed. Crops add nothing on top and make seeds 17–32 worse, so `cropFeed` stays off.
+- Over seeds 1–32, `revert` 1 alone passes 31 of 32 (seed 22 peaks at 10 waiting), and no worker or larva starves on any seed. Crops of 0.5 add nothing on top and make seeds 17–32 worse; the crop size was swept next (below).
 - The two-colony game and the nest flow are unchanged in every metric: their games are short and keep their young, so reversion rarely fires. Every golden master is unchanged with it on, for the same reason.
-- **`revert: 1` is the default now**; `cropFeed: 0`.
-- Still open: N12, brood smelt through solid soil (`BROOD_SMELL` reads a disc)., nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
+- **`revert: 1` is the default now.**
+- Still open: N12, brood smelt through solid soil (`BROOD_SMELL` reads a disc).
+
+**The crop size, with reversion on (ja-638i.3, 2026-11-15).** The owner asked to tune the crop before deciding. `assays.yml`, `larvae` seeds 1–32, `revert` 1 ([run](https://github.com/bwvogler/ant-sym/actions/runs/43716704767)):
+
+| `cropFeed` | Pass (failing seeds) | Worst waiting | Most workers starved in a seed | Most larvae starved in a seed | Fewest workers |
+|---|---|---|---|---|---|
+| 0 | 30/32 (16, 22) | 10 | 17 | 0 | 125 |
+| **0.1** | **30/32 (19, 22)** | **47** | **0** | **5** | **124** |
+| 0.25 | 27/32 (3, 14, 15, 16, 22) | 60 | 0 | 0 | 83 |
+| 0.5 | 29/32 (5, 19, 22) | 49 | 0 | 0 | 110 |
+
+- Every crop size ends worker starvation, and every one raises the worst seed's waiting larvae; 0.1 keeps the pass count of crops off.
+- By the worst seed, crops off is best for the larvae (10 waiting, none starved); 0.1 trades one seed's 17 starved workers for one seed with 47 larvae waiting and 5 starved.
+- **The owner chose `cropFeed: 0.1`** (2026-11-15): the mechanic is grounded (Greenwald et al. 2015; Cassill & Tschinkel 1995, **unverified**), and no worker starves. It is the default now, with `revert: 1`.
+- The larval spike it brings (seed 19: crops on, larvae wait) stays open in ja-638i.3's follow-up: how crops fill or are passed so they don't hold back food the brood needs.
 
 **Still open.**
-- Turning both on: confirm on seeds 17–32, the other assays, slow.yml and the two-colony game (ja-7r7x.4, ja-638i.3).
+- Crops' larval spike on seed 19, and seed 22 over the bound with either size.
 - How an ant that feels the brood's need finds food far from it: the store mark's reach, food carried to the brood by those already holding it (foragers coming home), or stores nearer the brood.
 - The design numbers (owner's call after the sweep).
 - Whether to retire the porters' table once crops carry the brood's food.
