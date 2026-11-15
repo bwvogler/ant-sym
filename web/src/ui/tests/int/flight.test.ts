@@ -43,7 +43,7 @@ test("the pen shut: she founds on her mother's words (or the first colony's), wi
   const g = game();
   const w = words();
   const f = fly(g, 1);
-  fly(g, 0); // another queen still in the air
+  fly(g, 1); // another queen still in the air (from the same mother: below, her words are missing)
   const r = foundOnMothers(g, w, DOCTRINES, f, "No pen: why.");
   assert.equal(r.k, 2);
   assert.deepEqual(w.calls, [[2, DOCTRINES[1]]]);
@@ -74,4 +74,15 @@ test("the lost notice: a full map says so first; with no reason kept, no room to
     lostNotice(full, f).text,
     `A new queen from ${colonyName(0)} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`,
   );
+});
+
+test("the pen shut and the queen lost: no words set, the loss notice (review of #241, S2)", () => {
+  const g = game();
+  const w = words();
+  const f = fly(g, 0);
+  g.flights.length = 0; // no longer pending: game.found gives -1
+  const r = foundOnMothers(g, w, DOCTRINES, f, "No pen.");
+  assert.equal(r.k, -1);
+  assert.deepEqual(w.calls, []);
+  assert.equal(r.notice?.tone, "warn");
 });

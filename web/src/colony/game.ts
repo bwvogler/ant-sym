@@ -648,8 +648,9 @@ export class Game {
       // A save's re-founding (f.nest) grows the line where the founding went (f.spot), as it was then: no search again.
       if (f.nest && !f.spot) throw new Error("addColony: a save's founding needs its spot (one world)");
       if (f.nest || f.spot) {
-        // (a save's re-founding, or a spot settleAt already gave: tryFoundBeyond)
-        cellOf(f.x, f.y); // (as before settleAt: the scratch cell left where it was)
+        // A save's re-founding, or a spot settleAt already gave (tryFoundBeyond). The scratch cell is set as settleAt's own first
+        // step sets it; nothing reads CELL before writing it, so where settleAt's search would have left it doesn't matter.
+        cellOf(f.x, f.y);
         spot = f.spot;
       } else {
         // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
