@@ -1221,7 +1221,7 @@ export const larvae: Assay = {
  * every worker's perception of her scent at "damp" (0.3); "none" forces nothing (the fungus lands and plays the local
  * rule, which pulls neither: dilution alone).
  */
-export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
+export function lifecycleProbe(arm: "none" | "signal" | "scent", one = false): Probe {
   const at: Record<string, number> = { queen: NaN, gyne: NaN, flight: NaN, daughter: NaN, daughterWorker: NaN, daughterOut: NaN };
   const first = (k: string, t: number) => {
     if (Number.isNaN(at[k])) at[k] = t;
@@ -1242,7 +1242,8 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
       if (!d.founding) first("daughterWorker", t);
       if (Number.isNaN(at.daughterOut as number))
         for (let i = 0; i < d.n; i++)
-          if (d.alive[i] && isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R))) {
+          // Out: on the ground above its nest (the side view), or up on the plane (one world).
+          if (d.alive[i] && (one ? d.layer[i] === PLANE : isSky(game.map, Math.floor(d.x[i]), Math.floor(d.y[i] / R)))) {
             first("daughterOut", t);
             break;
           }
@@ -1260,17 +1261,19 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent"): Probe {
   };
 }
 
-function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
+/** The lifecycle assay for one arm: on a solo side-view game, or (`one`) on a solo one world (S2.2b, ja-fnd.3.2.2). */
+function lifecycleAssay(arm: "none" | "signal" | "scent", one = false): Assay {
   const id = arm === "none" ? "lifecycle" : `lifecycle-${arm}`;
   return {
     id,
-    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}`,
+    title: `L new queens${arm === "none" ? " (the fungus lands; no queen lever forced)" : arm === "signal" ? " (the queen's signal damped)" : " (nurses perceive her scent damped)"}${one ? " (one world)" : ""}`,
     target:
       "report only (design, docs/new-queens.md §5): times to the queen, the first gyne, the first flight, and the daughter's first worker and forager; gynes, culls",
     seconds: 1800,
     spec: (seed) => ({
       seed,
       seconds: 1800,
+      ...(one ? { map: (s: number) => generateOneWorld(s) } : {}),
       game: { antCount: 600, rival: false },
       events: [
         {
@@ -1283,7 +1286,7 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
             ),
         },
       ],
-      probes: [lifecycleProbe(arm)],
+      probes: [lifecycleProbe(arm, one)],
     }),
     score: (r) =>
       Object.fromEntries(
@@ -1295,6 +1298,8 @@ function lifecycleAssay(arm: "none" | "signal" | "scent"): Assay {
 export const lifecycle = lifecycleAssay("none");
 export const lifecycleSignal = lifecycleAssay("signal");
 export const lifecycleScent = lifecycleAssay("scent");
+/** The three on one world (ONE_ASSAYS, same ids): the alates fly from the plane and their daughters dig in the curtain. */
+export const lifecycleOne = (["none", "signal", "scent"] as const).map((arm) => lifecycleAssay(arm, true));
 
 export const ASSAYS: Assay[] = [
   bridge,
@@ -1353,6 +1358,8 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * plane. A5, A5b (ja-web), A11 and A12 (U6b) count outside on the plane, past the disc round the hole, and report the ants
  * held at the gate at the top of the shaft (gateProbe). A11 and A12 run their controls (no trail, straight at the hole,
  * a forage stance) on the plane too; their raiders are recruited at the gate (ja-web), so a recruit in the curtain is home.
+ * Also the one-world assays of their own (S1, F1, R1), the desert ant's, the builder's, and the lifecycle assays (L ×3,
+ * lifecycleOne) on a solo one world, 30 minutes each.
  */
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
@@ -1375,6 +1382,7 @@ export const ONE_ASSAYS: Assay[] = [
   desertTrips,
   desertHeat,
   ...BUILDER_ASSAYS,
+  ...lifecycleOne,
 ];
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
