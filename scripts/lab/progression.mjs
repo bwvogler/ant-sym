@@ -12,10 +12,12 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow]
+//          [--grant knots,...] [--sun 4] [--flow] [--species neglectus] [--param groomByLoad=0,...]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
+// --species plays both colonies as that species (colony/species.ts SPECIES; --map one only), --param sets colony parameters over the
+// species' own (a comma list of name=value: the same species with its rule off, for a baseline in the same tree: ja-e668.4.1, P1).
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -46,7 +48,10 @@ if (isMainThread) {
     grant: opt("grant", "").split(",").filter(Boolean),
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
+    species: opt("species", "generic"),
+    param: opt("param", "").split(",").filter(Boolean),
   };
+  if (job.species !== "generic" && job.map !== "one") throw new Error("--species needs --map one");
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
   let next = 0;
@@ -68,7 +73,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.species === "generic" ? "" : `, species ${job.species}${job.param.length ? ` (${job.param.join(", ")})` : ""}`}${job.sun === null ? "" : `, sun ×${job.sun}`}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -86,7 +91,15 @@ if (isMainThread) {
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun, flow } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun, flow, species: speciesId, param } = workerData;
+  // The species by id (importing a species' module registers it), its parameters under any --param overrides.
+  await import("../../web/src/colony/desertAnt.ts");
+  await import("../../web/src/colony/neglectus.ts");
+  const { speciesById } = await import("../../web/src/colony/species.ts");
+  const base = speciesById(speciesId);
+  const overrides = Object.fromEntries(param.map((kv) => kv.split("=")).map(([k, v]) => [k, Number(v)]));
+  const species = { ...base, params: { ...base.params, ...overrides } };
+  if (map !== "one" && speciesId !== "generic") throw new Error("--species needs --map one");
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
@@ -99,6 +112,7 @@ if (isMainThread) {
             regrow: GAME_REGROW,
             autoFound: false,
             fungus: { hyphae, flow, ...(sun === null ? {} : { sun }) },
+            species,
           },
           gameRng(seed, 0),
         )

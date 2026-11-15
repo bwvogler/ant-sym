@@ -35,7 +35,18 @@ export const neglectusPolicy: Policy = (s) => {
 export const NEGLECTUS_ANT: Species = {
   id: "neglectus",
   name: "Invasive garden ant",
-  params: { tolerance: NEGLECTUS_TOLERANCE },
+  // Sensed grooming (ja-e668.4.1): every number design, tuned on N1 (PRD §64.2). The groomer's dose and its priming are what make nestmates
+  // plateau at a trace while the exposed ant keeps its load.
+  params: {
+    tolerance: NEGLECTUS_TOLERANCE,
+    groomByLoad: 1,
+    groomHalf: 0.1,
+    groomVmax: 0.002,
+    groomKm: 0.3,
+    groomDose: 0.5,
+    groomPrime: 40,
+    groomProximity: 0,
+  },
   responses: localResponses,
   lanes: { mode: NEGLECTUS_MODE_WORDS, stance: STANCE_WORDS },
   policy: neglectusPolicy,

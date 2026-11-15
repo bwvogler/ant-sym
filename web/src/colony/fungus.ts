@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import { CURTAIN, PLANE, type Colony, type Layer } from "./colony.ts";
+import { CURTAIN, PLANE, type Colony, type ColonyParams, type Layer } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -226,6 +226,9 @@ export const DEFAULT_FUNGUS: FungusParams = {
   flow: true,
 };
 
+/** The load at which the fungus's `groomed` flag is judged for sensed grooming (design): a host the fungus has well in. */
+const GROOM_REF_LOAD = 0.5;
+
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
 
@@ -369,6 +372,8 @@ interface SporeLayer {
   readonly all: LoadGrid;
   /** each colony's visible load, for grooming's priming */
   readonly visible: LoadGrid[];
+  /** each sensed-grooming colony's own raw load (groomByLoad), so nestmates' load can be told from strangers': built only for those colonies */
+  readonly own: (LoadGrid | undefined)[];
   /** spores taken this step, as x, y, amount: taken after every ant has read its cell */
   readonly taken: number[];
   /** cells at or over SPORE_SHOWN after the last fade (or load): counted in the fade's pass, read by shownSporeCells */
@@ -465,7 +470,7 @@ export class Fungus {
   /** seconds owed since the last step (advance) */
   #clock = 0;
   /** what #gather read around the ant being stepped */
-  readonly #nb = { load: 0, topX: 0, topY: 0, visible: 0, ants: 0, own: 0 };
+  readonly #nb = { load: 0, topX: 0, topY: 0, visible: 0, ants: 0, own: 0, ownLoad: 0 };
 
   /** On one map, or (one world) on each of `map`'s, the first holding `spores` and `sporeStrain`. */
   constructor(map: WorldMap | readonly WorldMap[], params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
@@ -479,6 +484,7 @@ export class Fungus {
       base: [],
       all: new LoadGrid(),
       visible: [],
+      own: [],
       taken: [],
       shown: 0,
     }));
@@ -658,6 +664,9 @@ export class Fungus {
     colonies.forEach((c, k) => {
       const vis = L.visible[k] as LoadGrid;
       vis.reset();
+      // A sensed-grooming colony (groomByLoad) also keeps its own raw load, to tell its nestmates' from strangers'.
+      const own = c.params.groomByLoad > 0 ? (L.own[k] ??= new LoadGrid()) : null;
+      own?.reset();
       for (let i = 0; i < c.n; i++) {
         const l = c.load[i];
         if (!c.alive[i] || l === 0 || (layer >= 0 && c.layer[i] !== layer)) continue;
@@ -666,6 +675,7 @@ export class Fungus {
         const cy = Math.min(h - 1, Math.max(0, CELL[1]));
         const s = c.strain[i];
         all.add(cx, cy, l, s);
+        own?.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
       }
       // The queen too (ja-lo8.7): a host like any, who passes it to the ants that tend her.
@@ -675,6 +685,7 @@ export class Fungus {
         const qx = clampCol(map, CELL[0]);
         const qy = Math.min(h - 1, Math.max(0, CELL[1]));
         all.add(qx, qy, q.load, q.strain);
+        own?.add(qx, qy, q.load, q.strain);
         vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
       }
     });
@@ -687,6 +698,9 @@ export class Fungus {
     const nb = this.#nb;
     colonies.forEach((c, k) => {
       const vis = L.visible[k] as LoadGrid;
+      const cp = c.params;
+      // Sensed grooming (groomByLoad): nestmates groom by the load they feel and pass the fungus on only to a groomer.
+      const own = cp.groomByLoad > 0 ? (L.own[k] ?? null) : null;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
@@ -700,44 +714,77 @@ export class Fungus {
         const r = c.resist[i];
         const s = c.strain[i];
         const st = this.strains[s] as Strain;
-        this.#gather(L, cx, cy, k, grids, vis, near, seen);
+        this.#gather(L, cx, cy, k, grids, vis, near, seen, own);
+        const mates = Math.max(0, nb.own - 1);
+        const shows = this.#shows(c, i, s);
 
         // Contact: the load-weighted share of the ants around (every colony, not counting itself) that carry the fungus.
         // Frequency-dependent, so a crowded nest is not an instant epidemic; its rate is bounded by the strain's.
+        // With sensed grooming, the nestmates' share is passed on only to an ant that grooms (groomGain); strangers' as before.
         let contactGain = 0;
+        let groomGain = 0;
         let contactStrain = s;
         if (near) {
-          const load = nb.load - l;
           const ants = nb.ants - 1;
-          if (load > NOTHING && ants > 0) {
-            contactStrain = all.strainAt(nb.topX, nb.topY);
-            contactGain = (this.strains[contactStrain] as Strain).transmission * Math.min(1, load / ants);
+          if (own === null) {
+            const load = nb.load - l;
+            if (load > NOTHING && ants > 0) {
+              contactStrain = all.strainAt(nb.topX, nb.topY);
+              contactGain = (this.strains[contactStrain] as Strain).transmission * Math.min(1, load / ants);
+            }
+          } else if (ants > 0) {
+            const strangers = nb.load - nb.ownLoad;
+            const mateLoad = nb.ownLoad - l;
+            if (strangers > NOTHING || mateLoad > NOTHING) {
+              contactStrain = all.strainAt(nb.topX, nb.topY);
+              const tr = (this.strains[contactStrain] as Strain).transmission;
+              if (strangers > NOTHING) contactGain = tr * Math.min(1, strangers / ants);
+              if (mateLoad > NOTHING) {
+                // The sickness cue a groomer feels is what its nestmates in reach show, added up like an odour (not averaged: a crowd
+                // must not hide a sick ant); the more of it, the likelier it grooms (Casillas-Pérez et al. 2023: choice by load).
+                const felt = Math.max(0, nb.visible - l * shows);
+                const grooms = felt / (felt + cp.groomHalf);
+                groomGain = (cp.groomDose * grooms + cp.groomProximity) * tr * Math.min(1, mateLoad / ants);
+              }
+            }
           }
         }
+        const contactAll = contactGain + groomGain;
         // Ground: spores on the ant's cell.
         const groundGain = p.pickup * ground;
         if (groundGain > 0) taken.push(cx, cy, groundGain * dt);
 
         // The strain coming in: the host's own, or for a clean ant whichever reaches it most. Only the evolving strain's
         // immune evasion slips past resistance (PR #43 review, N2: a lab strain in an evolving game is as listed).
-        const into = l > 0 ? s : contactGain >= groundGain ? contactStrain : L.sporeStrain.get(cx, cy);
+        const into = l > 0 ? s : contactAll >= groundGain ? contactStrain : L.sporeStrain.get(cx, cy);
         const susceptible = (1 - r * (into === evolving ? this.#evade : 1)) * (1 - l);
-        let gain = (contactGain + groundGain) * susceptible * dt;
-        if (l === 0 && gain < p.minDose * dt) gain = 0;
+        let gain = (contactAll + groundGain) * susceptible * dt;
+        // A groomer's dose is small by design (groomDose of the contact rate), and it adds up (Konrad et al. 2012): the least a clean ant
+        // must take to be infected at all scales with it.
+        if (l === 0 && gain < p.minDose * dt * (own === null ? 1 : Math.min(1, cp.groomDose))) gain = 0;
         const strain = l === 0 && gain > 0 ? into : s;
         // New fungus is what contact passes on (the source keeps its load); spores picked up from the ground are fungus
         // moved, already counted when the mycelium grew them (PR #43 review, S2).
-        if (gain > 0 && strain === evolving) this.#made += (gain * contactGain) / (contactGain + groundGain);
+        if (gain > 0 && strain === evolving) this.#made += (gain * contactAll) / (contactAll + groundGain);
 
-        // Grooming by nestmates around (at most p.groomers of them), and the host's own clearing.
-        const mates = Math.max(0, nb.own - 1);
-        const shows = this.#shows(c, i, s);
-        const loss = l > 0 ? (p.grooming * shows * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
-        // Priming: grooming visible nestmates leaves an ant resistant (its own visible load does not count).
-        if (seen) {
-          const v = nb.visible - l * shows;
-          if (v > NOTHING) c.resist[i] = Math.min(1, r + p.priming * Math.min(1, v / Math.max(1, mates)) * (1 - r) * dt);
+        // Grooming by nestmates around (at most p.groomers of them), and the host's own clearing. With sensed grooming, the nestmates
+        // that groom are the share f / (f + groomHalf) of those in reach (f: what the host shows of its load), each removing
+        // groomVmax × load / (load + groomKm) (Casillas-Pérez et al. 2023: choice by load, removal that saturates).
+        let loss: number;
+        if (own === null) loss = l > 0 ? (p.grooming * shows * Math.min(p.groomers, mates) + st.decay) * l * dt : 0;
+        else {
+          const f = l * shows;
+          const groomers = Math.min(p.groomers, mates) * (f / (f + cp.groomHalf));
+          loss = l > 0 ? (cp.groomVmax * groomers * (l / (l + cp.groomKm)) + st.decay * l) * dt : 0;
         }
+        // Priming: grooming visible nestmates leaves an ant resistant (its own visible load does not count). With sensed grooming it
+        // is the dose a groomer takes that primes it, less as its own load rises (Konrad et al. 2012: a high dose lowered the response).
+        if (own === null) {
+          if (seen) {
+            const v = nb.visible - l * shows;
+            if (v > NOTHING) c.resist[i] = Math.min(1, r + p.priming * Math.min(1, v / Math.max(1, mates)) * (1 - r) * dt);
+          }
+        } else if (groomGain > 0) c.resist[i] = Math.min(1, r + cp.groomPrime * groomGain * susceptible * dt * (1 - l) * (1 - r));
 
         let nl = Math.min(1, Math.max(0, l + gain - loss));
         if (nl < p.clear && nl <= l) nl = 0;
@@ -756,7 +803,7 @@ export class Fungus {
             // Groomed: enough nestmates are around to groom it off, at what its strain shows. Judged at the strain's
             // visibility, not at what the host shows now: a hidden host shows a quarter, and judging it by that would
             // read it as ungroomed the step after it hid, show it again, and hide it again, every step.
-            groomed: p.grooming * ns.visibility * Math.min(p.groomers, mates) >= p.groomedAt,
+            groomed: this.#groomed(cp, ns, mates),
           };
           c.fungal[i] = encodeFungal(sit);
           this.expressLevels(c, i, this.choose(sit, strain), nl);
@@ -1022,9 +1069,10 @@ export class Fungus {
     vis: LoadGrid,
     load: boolean,
     visible: boolean,
+    own: LoadGrid | null = null,
   ): void {
     const nb = this.#nb;
-    nb.load = nb.visible = nb.ants = nb.own = 0;
+    nb.load = nb.visible = nb.ants = nb.own = nb.ownLoad = 0;
     nb.topX = cx;
     nb.topY = cy;
     const lx = cx & EDGE;
@@ -1058,6 +1106,8 @@ export class Fungus {
       }
       const va = visible ? vis.sum.chunk(bx, by) : undefined;
       if (va) for (const d of around) nb.visible += va[o + d];
+      const oa = own ? own.sum.chunk(bx, by) : undefined;
+      if (oa) for (const d of around) nb.ownLoad += oa[o + d];
       return;
     }
     const map = L.map;
@@ -1082,6 +1132,7 @@ export class Fungus {
         }
       }
       if (visible) nb.visible += vis.get(x, y);
+      if (own) nb.ownLoad += own.get(x, y);
     }
   }
 
@@ -1126,6 +1177,19 @@ export class Fungus {
    */
   #shows(c: Colony, i: number, s: number): number {
     return (this.strains[s] as Strain).visibility * c.show[i];
+  }
+
+  /**
+   * Whether a host of strain `ns` is groomed (the fungus's `groomed` situation): its nestmates take load off it at `groomedAt` per second or
+   * more, judged at the strain's visibility and, for sensed grooming, a reference load, never the host's own load now (a hiding host would
+   * flip it every step).
+   */
+  #groomed(cp: ColonyParams, ns: Strain, mates: number): boolean {
+    const p = this.params;
+    if (cp.groomByLoad <= 0) return p.grooming * ns.visibility * Math.min(p.groomers, mates) >= p.groomedAt;
+    const f = ns.visibility * GROOM_REF_LOAD;
+    const rate = cp.groomVmax * Math.min(p.groomers, mates) * (f / (f + cp.groomHalf)) * (GROOM_REF_LOAD / (GROOM_REF_LOAD + cp.groomKm));
+    return rate >= p.groomedAt;
   }
 
   /** The player's settings: the local rule's switches and the menu (fungus-policy.md §5.1, levers 3 and 4). */

@@ -216,6 +216,26 @@ export interface ColonyParams {
    * invitation: the generic ant's encounter count of returns (activation.md), main bit for bit.
    */
   invitePace: number;
+  /**
+   * Sensed grooming (ja-e668.4, docs/lasius-neglectus.md "Sensed grooming"): the fungus's grooming and spread among this colony's nestmates
+   * go by the load they feel on one another (1), or are the generic ant's fixed-rate grooming with spread by proximity (0: main bit for bit).
+   * With it, a nestmate in reach grooms a host with probability f / (f + groomHalf) (f = the host's load × what it shows), the groomers
+   * remove groomVmax × load / (load + groomKm) each (saturating), and the fungus passes between nestmates only to a groomer, at groomDose
+   * times the contact rate, plus groomProximity of the contact rate to anyone beside a host (the valve, 0). Every number is design.
+   */
+  groomByLoad: number;
+  /** the felt load at which half the nestmates in reach groom a host (groomByLoad) */
+  groomHalf: number;
+  /** most load a groomer removes a second as a host's load grows (groomByLoad) */
+  groomVmax: number;
+  /** the host's load at which a groomer removes half of groomVmax (groomByLoad) */
+  groomKm: number;
+  /** a groomer's dose, as a share of the generic contact rate (groomByLoad; Casillas-Pérez 2023's scale is far lower: design) */
+  groomDose: number;
+  /** resistance a groomer gains per unit of dose it takes, less as its own load rises (groomByLoad; Konrad 2012: a high dose lowered the response) */
+  groomPrime: number;
+  /** the valve: the share of the contact rate nestmates pass to anyone beside a host, grooming or not (groomByLoad; 0 = through grooming only) */
+  groomProximity: number;
   /** a waiting ant's pace at rest (cm/s; C. niger idle ants about 1–2 cm/s, the crossing at about 2: Razin 2013) */
   paceRest: number;
   /** seconds for a pace to fall back by e toward paceRest */
@@ -461,6 +481,13 @@ export const DEFAULT_COLONY: ColonyParams = {
   heatNight: 1 / 3,
   heatStart: 0,
   invitePace: 0,
+  groomByLoad: 0,
+  groomHalf: 0.1,
+  groomVmax: 0.01,
+  groomKm: 0.3,
+  groomDose: 0.1,
+  groomPrime: 1,
+  groomProximity: 0,
   paceRest: 1,
   paceTau: 20,
   paceGain: 0.5,

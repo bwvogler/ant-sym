@@ -4,8 +4,9 @@
 // with their mechanics (ja-e668.5, ja-e668.6), and tests/slow/neglectus.test.ts holds them as todos.
 
 import { type Colony, PLANE } from "./colony.ts";
-import { INFECTED, STRAINS } from "./fungus.ts";
+import { STRAINS } from "./fungus.ts";
 import { Game } from "./game.ts";
+import { NEGLECTUS_ANT } from "./neglectus.ts";
 import { binCentre, binOf } from "./recognition.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 
@@ -34,7 +35,14 @@ export interface N1Read {
 }
 
 /**
- * N1's reading over a colony's per-ant arrays: the nestmates (living, not the exposed ant) carrying a load of INFECTED or more, their median
+ * N1: the least load that counts as a nestmate carrying the fungus: a trace, not INFECTED (0.05, what the game calls infected). Konrad's
+ * nestmates carried 1–10 conidia, a detectable trace on a cuticle (about 30 conidia raised their immune response, 3 × 10⁵ were on the exposed
+ * ants): a fifth of INFECTED is a trace in the game's scale (design).
+ */
+export const N1_CARRY = 0.01;
+
+/**
+ * N1's reading over a colony's per-ant arrays: the nestmates (living, in the nest, not the exposed ant) carrying a load of N1_CARRY or more, their median
  * load, the exposed ant's load now and its peak (the dose) against that median, and the nestmates' mean resistance.
  */
 export function n1Read(
@@ -44,16 +52,18 @@ export function n1Read(
   n: number,
   exposed: number,
   peak: number,
+  /** which ants count as nestmates (1) in the colony group: the ones in the nest (default: every living ant) */
+  counts: ArrayLike<number> | null = null,
 ): N1Read {
   let mates = 0;
   let carriers = 0;
   let res = 0;
   const loads: number[] = [];
   for (let i = 0; i < n; i++) {
-    if (!alive[i] || i === exposed) continue;
+    if (!alive[i] || i === exposed || (counts !== null && !counts[i])) continue;
     mates++;
     res += resist[i]!;
-    if (load[i]! >= INFECTED) {
+    if (load[i]! >= N1_CARRY) {
       carriers++;
       loads.push(load[i]!);
     }
@@ -86,7 +96,12 @@ export function n1Score(read: N1Read | null, peak: number): Record<string, numbe
   return { ...r, pass: n1Pass(r.carriers, r.exposedRatio) };
 }
 
-const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
+/**
+ * N1's strain: Garden, the game's own (the fungus a player lands, PRD §63.13). Bloom, the *Metarhizium* analogue, clears itself at 1 % a
+ * second (its `decay`), so an exposed ant left alone falls from 0.8 to 0.24 in N1_READ_AFTER s, below the 8 times the carriers' least load
+ * (N1_CARRY, then INFECTED) that N1 asks: a pass would be out of reach for any grooming rule (ja-e668.4.1).
+ */
+const N1_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** The first living ant of colony c inside its nest (not on one world's plane): the exposed ant, chosen without a random draw. */
 function insideAnt(c: Colony): number {
@@ -95,11 +110,11 @@ function insideAnt(c: Colony): number {
 }
 
 /**
- * N1 — immunisation (Konrad et al. 2012, *L. neglectus* and *Metarhizium*, full text): one worker inside the nest takes a heavy dose of Bloom
- * (the game's *Metarhizium*). Konrad: by days 3–5 about two-thirds of nestmates (64 %) carried a low-level infection, their loads about 8–12
+ * N1 — immunisation (Konrad et al. 2012, *L. neglectus* and *Metarhizium*, full text): one worker inside the nest takes a heavy dose of Garden
+ * (the game's own strain). Konrad: by days 3–5 about two-thirds of nestmates (64 %) carried a low-level infection, their loads about 8–12
  * times lower than the exposed ants' loads on the same days (4.4 against 36 CFU); grooming primes them. Deaths are not modelled (the game's
  * fungus kills no worker by itself: lasius-neglectus.md §3, For the model). Pass, both, N1_READ_AFTER s after the dose: nestmates carrying a
- * load (≥ INFECTED) between 40 % and 85 %, and the exposed ant's load then at least 8 times the carriers' median (`exposedRatio`; the dose
+ * load (≥ N1_CARRY) between 40 % and 85 %, and the exposed ant's load then at least 8 times the carriers' median (`exposedRatio`; the dose
  * itself, `doseRatio`, is reported, review of #228 S2). Today grooming is fixed-rate and contact passes load freely.
  */
 export const neglectusImmunisation: Assay = {
@@ -118,7 +133,11 @@ export const neglectusImmunisation: Assay = {
         if (exposed < 0) return;
         peak = Math.max(peak, c.load[exposed] ?? 0);
         if (read || game.time < N1_EXPOSE_AT + N1_READ_AFTER - 1e-6) return;
-        read = n1Read(c.load, c.alive, c.resist, c.n, exposed, peak);
+        // The nestmates are those in the nest: foragers out on the plane share no dish with the exposed ant (Konrad's ants did), and on a seed
+        // with few ants home the share could not reach a third of the colony (review work on ja-e668.4.1).
+        const inNest = new Uint8Array(c.n);
+        for (let i = 0; i < c.n; i++) inNest[i] = c.layer[i] !== PLANE ? 1 : 0;
+        read = n1Read(c.load, c.alive, c.resist, c.n, exposed, peak, inNest);
       },
       summary() {
         return n1Score(read, peak);
@@ -128,7 +147,7 @@ export const neglectusImmunisation: Assay = {
       seed,
       seconds: N1_EXPOSE_AT + N1_READ_AFTER,
       map: (s) => generateOneWorld(s),
-      game: { antCount: 60, rival: false },
+      game: { antCount: 60, rival: false, species: NEGLECTUS_ANT },
       events: [
         {
           at: N1_EXPOSE_AT,
@@ -138,7 +157,7 @@ export const neglectusImmunisation: Assay = {
             exposed = insideAnt(c);
             if (exposed < 0) return;
             c.load[exposed] = N1_DOSE;
-            c.strain[exposed] = BLOOM;
+            c.strain[exposed] = N1_STRAIN;
             // The fungus steps only while it has a host or spores: a dose set by hand is a host from now.
             g.fungus.hosts = Math.max(1, g.fungus.hosts);
           },
