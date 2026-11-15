@@ -42,6 +42,7 @@ import {
   localModeOtherwise,
 } from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
+import { openLab } from "./labStore.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // Lab mode's Policy tab (PRD §69.8, ja-mvo9.4): the words each colony's ants and the fungus follow, then how each decides
@@ -120,8 +121,15 @@ export default function PolicyTab(props: PolicyProps & { focus?: string; ping: o
         <p className="text-xs text-fg-3">Change it in the aim bar under the map (on a narrow screen, in The fungus drawer).</p>
         <p className="text-xs text-fg-3">
           Jev sets, for each situation the fungus senses in a host, a level for every lever on the menu, under your aim. Where Jev has not
-          answered, the strain does what it was bred for, within the menu and the local rule's two settings (both in the Levers tab).
+          answered, the strain does what it was bred for, within the menu and the local rule's two settings.
         </p>
+        <button
+          type="button"
+          className="self-start rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
+          onClick={() => openLab({ tab: "levers" })}
+        >
+          The menu and the two settings: the Levers tab
+        </button>
       </section>
 
       <div className="flex flex-col gap-2">
@@ -146,7 +154,7 @@ export default function PolicyTab(props: PolicyProps & { focus?: string; ping: o
 
 /**
  * One collapsible explainer. The reader opens and closes it; a "?" or "why?" aimed at it opens it again, each time it is
- * pressed (`ping` is the drawer's target, a new object per press), and leaves the other sections as the reader left them.
+ * pressed (`ping` is the Lab's target, a new object per press), and leaves the other sections as the reader left them.
  */
 function Section({ id, title, focus, ping, children }: { id: string; title: string; focus?: string; ping: object; children: ReactNode }) {
   const hot = focus === id;
@@ -158,7 +166,7 @@ function Section({ id, title, focus, ping, children }: { id: string; title: stri
   }
   return (
     <details
-      id={`learn-${id}`}
+      id={`lab-${id}`}
       open={open}
       onToggle={(e) => setOpen(e.currentTarget.open)}
       className={`scroll-mt-2 rounded-lg border bg-panel ${hot ? "border-accent/60" : "border-line"}`}

@@ -45,11 +45,14 @@ export default function LabBench(
   const tab = target.tab === "journal" && !journal ? "history" : target.tab;
   const setTab = (t: LabTab) => openLab({ tab: t });
   const body = useRef<HTMLDivElement>(null);
-  // A target section (a "?" on the policy) is scrolled to once its tab has rendered; a tab of its own starts at the top.
+  // A target section (a "?" on the policy) is scrolled to once its tab has rendered, and takes the keyboard's focus, so a
+  // "?" pressed by key lands where it opened (review of #237, S1); a tab of its own starts at the top.
   useEffect(() => {
-    const el = target.id ? document.getElementById(`learn-${target.id}`) : null;
-    if (el) el.scrollIntoView({ block: "start" });
-    else body.current?.scrollTo({ top: 0 });
+    const el = target.id ? document.getElementById(`lab-${target.id}`) : null;
+    if (el) {
+      el.scrollIntoView({ block: "start" });
+      el.querySelector("summary")?.focus({ preventScroll: true });
+    } else body.current?.scrollTo({ top: 0 });
   }, [target]);
   // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
   const [, setSteps] = useState(0);
@@ -57,7 +60,19 @@ export default function LabBench(
   const flying = game.flights.length > 0;
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
   return (
-    <section aria-label="lab" className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground">
+    <section
+      aria-label="lab"
+      // Escape, with focus in the Lab, closes it (the owner, D1 on #237): one Escape, one thing, so not when a chart's
+      // crosshair took it (defaultPrevented) or a tooltip or dialog is open above. The map takes the focus back.
+      onKeyDown={(e) => {
+        if (e.key !== "Escape" || e.defaultPrevented) return;
+        if (document.querySelector('[role="tooltip"], [role="dialog"]')) return;
+        e.preventDefault();
+        closeLab();
+        document.querySelector<HTMLElement>("main canvas")?.focus({ preventScroll: true });
+      }}
+      className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground"
+    >
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5">
         <h2 className="font-semibold text-fg max-sm:order-1">Lab</h2>
         <div className="flex overflow-x-auto rounded-md border border-line text-[13px] max-sm:order-3" role="tablist" aria-label="lab tabs">

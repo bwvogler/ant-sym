@@ -1747,9 +1747,19 @@ try {
   await lbp.getByRole("button", { name: "Lab: how the fungus decides" }).first().click();
   check(
     (await bench.getByRole("tab", { name: "Policy" }).getAttribute("aria-selected")) === "true" &&
-      (await bench.locator("details#learn-fungus").evaluate((d) => d.open)),
+      (await bench.locator("details#lab-fungus").evaluate((d) => d.open)),
     "the aim's “?” opens the Lab's Policy tab at the fungus's section",
   );
+  check(
+    await lbp.evaluate(() => document.activeElement?.closest("details")?.id === "lab-fungus"),
+    "and the keyboard's focus lands in that section",
+  );
+  // Escape, with focus in the Lab, closes it and gives the map the focus (owner, D1 on #237); then l opens it again.
+  await lbp.keyboard.press("Escape");
+  await until(() => bench.count().then((n) => n === 0), "Escape in the Lab closes it", 3000, 50);
+  check(await lbp.evaluate(() => document.activeElement?.tagName === "CANVAS"), "Escape in the Lab closes it, and the map has the focus");
+  await lbp.keyboard.press("l");
+  await bench.waitFor({ timeout: 3000 });
   await lbp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Codex", exact: true }).click();
   const codexTabs = lbp.getByRole("dialog", { name: "Codex" }).getByRole("tab");
   check(

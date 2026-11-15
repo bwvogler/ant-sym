@@ -95,6 +95,22 @@ export function linePath(values: readonly (number | null)[], px: (i: number) => 
   return d;
 }
 
+/**
+ * A chart's keys (the crosshair by keyboard): the sample index the crosshair moves to, -1 to put it away, or null where
+ * the key is not the chart's and passes on. ←/→ step from `hover` (or start at the latest), Home and End jump, and Escape
+ * is taken only while there is a crosshair to put away, so with none it reaches an open drawer (review of #226, N12).
+ */
+export function chartKey(key: string, hover: number, last: number): number | null {
+  if (last < 0) return null;
+  const clamp = (i: number) => Math.min(last, Math.max(0, i));
+  if (key === "ArrowLeft") return clamp(hover < 0 ? last : hover - 1);
+  if (key === "ArrowRight") return clamp(hover < 0 ? last : hover + 1);
+  if (key === "Home") return 0;
+  if (key === "End") return last;
+  if (key === "Escape") return hover >= 0 ? -1 : null;
+  return null;
+}
+
 /** A round top for a chart's y axis: 1, 2 or 5 times a power of ten, at least the largest value (and at least `floor`). */
 export function niceMax(values: readonly (number | null)[], floor = 1): number {
   const m = Math.max(floor, ...values.filter((v) => v !== null));

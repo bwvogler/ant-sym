@@ -547,7 +547,7 @@ export class ColonyJev {
   }
 
   /**
-   * The fungus's answers so far, for the Learn drawer's table (ja-lo8.4): each situation answered under the current aim
+   * The fungus's answers so far, for the table in Lab mode's Policy tab (ja-lo8.4): each situation answered under the current aim
    * with the levers asked now, and, while Jev can't answer (canAsk false: they are what plays), where it has none yet, the
    * newest earlier aim's answer, marked stale. Read only.
    */

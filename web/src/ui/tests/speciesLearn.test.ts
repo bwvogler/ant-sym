@@ -25,7 +25,7 @@ import { situationsOf } from "../useColony.ts";
 
 // ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Lab mode's Jev tab shows
 // "no stance lane", not "0 stances"); a species' rule text is checked against its own rule over every situation of its schema; the request
-// the Learn drawer shows is the species' own.
+// Lab mode's Policy tab shows is the species' own.
 
 const SCHEMA = defineSchema<SpeciesSituation>([
   { name: "mode", values: MODES },

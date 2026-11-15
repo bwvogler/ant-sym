@@ -1,6 +1,6 @@
 import { type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
 import { clock } from "./clock.ts";
-import { endLabels, linePath, nearestSample, type Sample } from "./history.ts";
+import { chartKey, endLabels, linePath, nearestSample, type Sample } from "./history.ts";
 
 // One of Lab mode's history charts (PRD §69.7): a line chart of a measure over game time, small multiples sharing the
 // time axis. The dataviz skill's specs: 2 px lines with round joins, recessive hairline grid, a legend for two or more
@@ -62,25 +62,10 @@ export default function HistoryChart({
   const x = (t: number) => M.left + ((t - t0) / (t1 - t0)) * pw;
   const hover = at >= 0 && at <= last ? at : -1;
   const onKey = (e: KeyboardEvent) => {
-    const to =
-      e.key === "ArrowLeft"
-        ? hover < 0
-          ? last
-          : hover - 1
-        : e.key === "ArrowRight"
-          ? hover < 0
-            ? last
-            : hover + 1
-          : e.key === "Home"
-            ? 0
-            : e.key === "End"
-              ? last
-              : e.key === "Escape" && hover >= 0
-                ? -1
-                : null;
+    const to = chartKey(e.key, hover, last);
     if (to === null) return;
     e.preventDefault();
-    setAt(to < 0 ? -1 : Math.min(last, Math.max(0, to)));
+    setAt(to);
   };
   return (
     <figure className="min-w-0" aria-label={title}>

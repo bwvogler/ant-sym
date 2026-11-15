@@ -230,7 +230,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
   );
 }
 
-/** The situation's fields, each with where the Learn drawer explains it. */
+/** The situation's fields, each with where it is explained: the Codex's guide, or Lab mode's Policy tab ("mode"). */
 function chips(s: Situation, fields?: readonly string[]): [string, string, LearnTarget][] {
   const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
   // Each chip with the situation field it shows; a species' own schema keeps only its fields (review of #132).
