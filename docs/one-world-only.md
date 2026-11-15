@@ -175,7 +175,7 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | `raidFind` A11 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210, PRD §51 "U6b built") | **ported** | slow guard `slow/raidFind.test.ts` |
 | `raidStop` A12 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210) | **ported** | slow guard `slow/raidStop.test.ts` |
 | `contact` A9 | yes: §46.4, §54.3 | `onPlaneAssay(contact)` | covered | **plane 3/10** (worst 9.99 lost per 100 food, PRD §58's latest one-world run) |
-| `defendHome` A13 | yes: §54.3 (15/20; food 0.63, broadcast 0.62) | `defendWalked` (war party walked; control: nobody defending) | **ported** (PRD §76.3) | its `broadcast` arm uses `stanceGate: 0`, the colony-wide stance S2 deletes, so the score needs a new control. The war party is a broadcast raider in every arm (`rivalStance: always("raid")`, `rival: { raidGate: 0, stanceGate: 0 }`, `experiment.ts:1256-1257`): it marches at the colony's hole by `steer.ts:425`, which reads the colony `stance` field. Decided (owner, 2026-11-14), review of #184 D2: the assay harness walks the attackers to the hole itself, and colony code keeps no march by coordinates (risk 1) |
+| `defendHome` A13 | yes: §54.3 (15/20; food 0.63, broadcast 0.62) | `defendWalked` (war party walked; control: nobody defending) | **ported** (PRD §76.3) | was a broadcast raid in every arm (`rivalStance: always("raid")`, `stanceGate: 0`, marching by `steer.ts:425`), with a `broadcast` arm that S2 deletes; now the harness walks the war party (`marchProbe`, owner on #184 D2), each ant keeps its own stance, and the control is the same battle with nobody defending: 8/20, vsNone median 1.04, worst 0.57 (PRD §76.3; `ja-lp4.6.20`) |
 | `faintAlarm` A10 | yes: §46.4 | `onPlaneAssay(faintAlarm)` | covered | plane 0/10 (legacy 3/10–5/20; the slow test is `todo` ja-je8) |
 | `game` G | yes: §42.2, §46.4 | `game1` (G1) | covered | G1 slow guard on seeds 4, 5, 9 passes (route memory, §59) |
 | `gameTop` G′ | yes: §42.2, §46.4 (G′ table) | none | **delete** | report-only bench bed on `OPEN_WORLD`, no queen. G1 replaces it as the whole-game measure |
@@ -246,7 +246,7 @@ Per-test totals, counted roughly from the notes: about **97 port**, about **28 c
 About 60 of the ports are in-nest mechanics (curtain): chambers, brood, queen, gynes, food flow, hunger, zoning.
 For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `smallOne()` and re-deriving cells in the curtain, since the curtain runs the side view's nest code.
 
-**Assays** (20 in `ASSAYS`): covered 13 (A1, A2a, A2b, A3, A4, A5, A5b, A6, A6-open, A9, A10, G → G1, A8 → nestFlowOne); ported 6 (A11 and A12 by #210, L ×3 by #211, A13 walked); A6 re-set (attackers walked); delete 1 (G′).
+**Assays** (20 in `ASSAYS`): covered 11 (A1, A2a, A2b, A3, A4, A5, A5b, A9, A10, G → G1, A8 → nestFlowOne); ported 8 (A11 and A12 by #210, L ×3 by #211, A6 and A6-open walked, A13 walked); delete 1 (G′).
 **Slow guards** (12 files, G1's three as one guard): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
 
 **Riskiest: a PRD baseline and no one-world coverage**

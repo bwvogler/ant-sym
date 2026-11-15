@@ -30,8 +30,8 @@ So outside, "home" is a small hole that the ant finds approximately and then hom
 - **Floor chemistry differs by chamber,** so a chamber's role can be read from its smell (*Camponotus fellah*). No light reaches inside, and there is no vector straight to "the nest" through the soil.
 
 ### The queen
-- **Queen pheromone draws workers to her** so they can tend and rescue her. A fire-ant queen exposed outside is surrounded within moments, workers move brood to her, and they lay a trail to her ([Berton et al. 1991](https://dictionnaire-amoureux-des-fourmis.fr/Publications/Berton-et-al-IS1991.pdf)). In the pharaoh ant the queen pheromone is also the retinue signal.
-- **Queenright workers stay with the brood;** queenless workers drift away from it.
+- **Queen pheromone draws workers to her** so they can tend and rescue her. A fire-ant queen exposed outside is surrounded within moments, workers move brood to her, and they lay a trail to her (no fetched source: the citation here was Berton et al. 1991, which studies *Cataglyphis cursor*; see [brood-odour](brood-odour.md#the-queens-pheromone-holds-workers-by-contact-it-is-not-the-nurses-beacon)). In the pharaoh ant the queen pheromone is also the retinue signal, a weakly attractive one (Oliveira et al. 2020).
+- **Queenright workers stay with the brood;** queenless workers drift away from it (no source found, 2026-11-14). What holds nurses is the brood itself, by its odour and the pile ([brood-odour](brood-odour.md)): most ant queen pheromones are contact signals.
 
 The queen's scent is a destination ("where she is"), not the colony's home signal.
 
