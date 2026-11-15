@@ -6265,16 +6265,17 @@ A5's seed 1 sits at its worst seed's line (2.64 against 2.65): a guard on seed 1
 
 `lifecycle`, `lifecycle-signal` and `lifecycle-scent` now also run on a solo one world (`lifecycleOne` in `ONE_ASSAYS`, the same ids; `npm run exp -- --one lifecycle-signal`): `generateOneWorld(seed)`, 600 ants, no rival, Garden landed by the hole at the start, 30 minutes, a queen lever forced in every host as in §50.21. "The daughter's first forager" is now her first ant up on the plane. The side-view versions stay in `ASSAYS` until step 4.
 
-Median (min–max) over seeds 1–10; first gyne over the seeds that rear one. Side view: §50.21.
+Measured on main at `fbf6415`, as §74.1. Median (min–max) over seeds 1–10; first gyne over the seeds that rear one. Side view: §50.21.
 
 | arm | seeds with a gyne | first gyne | gynes | daughters | first daughter's ants at 30 min | side view: first gyne, gynes, daughters |
 |---|---|---|---|---|---|---|
-| None (dilution only) | 0/10 | never | 0 | 0 | – | never, 0, 0 |
-| Signal damped | 5/10 | 249 s (191–295) | 0.5 (0–4) | 0.5 (0–4) | 32 (10–244) | 169 s, 4 (1–9), 4 (1–5) |
-| Scent damped | 8/10 | 145 s (35–191) | 1.5 (0–5) | 1.5 (0–4) | 64.5 (11–151) | 37 s, 7 (4–11), 5 (3–5) |
+| None (dilution only) | 1/10 | 1,715 s (seed 1 only) | 0 (0–1) | 0 | – | never, 0, 0 |
+| Signal damped | 6/10 | 278 s (200–1,711) | 1 (0–5) | 0.5 (0–5) | 23 (4–95) | 169 s, 4 (1–9), 4 (1–5) |
+| Scent damped | 10/10 | 181 s (38–1,711) | 1.5 (1–5) | 1.5 (0–4) | 26 (12–132) | 37 s, 7 (4–11), 5 (3–5) |
 
-- **Confirmed on seeds 11–20** (signal damped): 5/10 seeds rear a gyne, first at 287 s (188–1,443), gynes 0.5 (0–3), daughters 0.5 (0–3), the first daughter's ants at 30 min 33 (1–170). Side view: first gyne 206 s, gynes 3 (1–7), daughters 3 (1–5).
-- **The fungus reaches the queen** at 43 s (33–100) on every arm and seed.
-- **A daughter's first ant is up on the plane** 11–15 s after her first worker ecloses (medians: 458 s and 447 s with the signal damped; 359 s and 344 s with the scent damped).
-- **One world rears far fewer gynes** than the side view did: half the seeds rear none with the signal damped. The levers still bite, so this is the colony's, not the port's (`ja-lp4.6.12`).
-- **The tick** is 6.6–8.1 ms median (one solo colony of ~880 ants). Each run is 30 minutes of game, about 5 minutes of CPU: `npm run exp -- all --one` now runs these three too, which roughly doubles a full one-world sweep.
+- **Confirmed on seeds 11–20** (signal damped): 3/10 seeds rear a gyne, first at 204 s (171–222), gynes 0 (0–2), daughters 0 (0–2), the first daughter's ants at 30 min 40 (25–42). Side view (§50.21, measured then with the free reserve, before #47's fattened alate): first gyne 206 s, gynes 3 (1–7), daughters 3 (1–5).
+- **The fungus reaches the queen** at 43 s (33–101) on every arm and seed.
+- **A daughter's first ant is up on the plane** after her first worker ecloses: medians 513 s against 473 s with the signal damped, 388 s against 373 s with the scent damped.
+- **One world rears far fewer gynes** than the side view did: four seeds in ten rear none with the signal damped (seven in ten on 11–20). The levers still bite, so this is the colony's, not the port's (`ja-lp4.6.12`).
+- **The tick** is 6.0–8.5 ms median (one solo colony of ~880 ants). Each run is 30 minutes of game, about 5 minutes of CPU: `npm run exp -- all --one` now runs these three too, which roughly doubles a full one-world sweep.
+- **First measured on `9620499`** (before #198 and #201): signal 0.5 (0–4) gynes on 5/10 seeds, scent 1.5 (0–5) on 8/10.
