@@ -85,8 +85,13 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
   assert.match(crashed, /⚠ fungus-cost didn't finish/);
   assert.match(crashed, /whether the cost moved is unknown/);
   assert.doesNotMatch(crashed, /Not run|No lane's cost moved|\| lane \|/);
-  const oneSide = notes({ changed: [], body: "", colony: { base: same, head: blank }, fungus: null });
-  assert.match(oneSide, /whether the cost moved is unknown/, "a figure read on one side only is not a change");
+  for (const [base, head] of [
+    [same, blank],
+    [blank, same],
+  ]) {
+    const oneSide = notes({ changed: [], body: "", colony: { base, head }, fungus: null });
+    assert.match(oneSide, /whether the cost moved is unknown/, "a figure read on one side only is not a change");
+  }
 
   const golden = "web/src/colony/tests/golden/oneWorldGolden.json";
   assert.ok(isGolden(golden) && isGolden("web/src/colony/tests/slow/golden.json") && !isGolden("web/src/colony/params.ts"));
@@ -111,7 +116,7 @@ test("pr-notes.yml passes pr-notes.mjs the flags it reads, and runs the cost onl
   // Anywhere in the file, not only on a run: line: every run here is a `run: |` block (review of #234, S1).
   for (const line of yml.split("\n").filter((l) => /github\.(event\.pull_request\.(body|title|head\.ref)|head_ref)/.test(l)))
     assert.match(line, /^\s+[A-Z_]+: \$\{\{ github\.(event\.pull_request\.[\w.]+|head_ref) \}\}$/, `only as an env value: ${line.trim()}`);
-  assert.match(yml, /args\+=\(--cost-ran\)/, "the workflow tells the script the estimates ran");
+  assert.match(yml, /if \[ "\$COST_RAN" = "true" \]; then args\+=\(--cost-ran\); fi/, "the workflow tells the script the estimates ran");
   // A failed estimate is reported in the comment, not as a red step that skips it (review of #234, N8).
   assert.equal((yml.match(/^\s+continue-on-error: true$/gm) ?? []).length, 2, "both cost steps continue on error");
   assert.match(yml, /^\s+set -euo pipefail$/m, "the comment step fails loudly rather than posting a duplicate");
