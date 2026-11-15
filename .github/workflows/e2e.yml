@@ -1,0 +1,77 @@
+# The page's only check in a real browser (ja-w7ef.8): `npm run e2e` (scripts/e2e-one-world.mjs) drives one world in
+# Chromium through the views, linked clicks, the pen, the drawers, the tutorial, the builder and the rest its header lists.
+# Without it, a PR that changes the page ships on unit tests alone.
+#
+# It runs on a pull request that touches what the page is made of: web/src (the UI, and the colony the page plays: the
+# script rehearses game behaviour through the dev hook, so a colony change can break it), web/shared, web/server (the dev
+# server's API plugin, vite.config.ts imports it), web/public, index.html, the build config and dependencies, the script
+# and its helpers, and this file. A change only to tests (any tests/ folder) does not. Its own workflow, not a job in ci.yml:
+# pages.yml calls ci.yml before every deploy, and a browser run of about two minutes stays out of the deploy path.
+#
+# Playwright is not a dependency of the repo (the script uses the machine's copy in sessions), so the runner installs one
+# pinned version beside the checkout and points NODE_PATH at it. 1.63.0 is the version sessions have preinstalled, so CI and
+# an agent's local run drive the same Chromium; released 2026-09-04. ui/tests/e2eWorkflow.test.ts holds this file to the
+# npm script.
+#
+# Screenshots (the script's named shots, and every open page on a failure) and, on a failure, each open context's
+# Playwright trace go up as the `e2e` artifact. A failure is one ::error line naming the step and the last check passed.
+name: E2E
+
+on:
+  pull_request:
+    paths:
+      - "web/src/**"
+      - "web/shared/**"
+      - "web/server/**"
+      - "web/public/**"
+      - "web/index.html"
+      - "web/vite.config.ts"
+      - "web/package.json"
+      - "web/package-lock.json"
+      - "scripts/e2e-one-world.mjs"
+      - "scripts/lib/**"
+      - ".github/workflows/e2e.yml"
+      - "!web/src/**/tests/**"
+      - "!web/server/tests/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_VERSION: 1.63.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: playwright and chromium
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      - name: e2e one world
+        env:
+          E2E_SHOTS: ${{ runner.temp }}/e2e/shots
+          E2E_TRACE: ${{ runner.temp }}/e2e/traces
+        run: npm run e2e
+      - name: screenshots and traces
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e
+          path: ${{ runner.temp }}/e2e/
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true
