@@ -528,6 +528,9 @@
   ],
   "carriedY": [
    0
+  ],
+  "reachSurf": [
+   0
   ]
  },
  "asIs": {
@@ -1059,6 +1062,9 @@
   ],
   "carriedY": [
    40.25
+  ],
+  "reachSurf": [
+   40.5
   ]
  }
 }

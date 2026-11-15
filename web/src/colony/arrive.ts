@@ -314,7 +314,16 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // Path integration on the plane (U3b): it counts its way out, as integrate does on the side view's ground; once it
     // heads home the vector is fixed.
     // Carrying spoil or a corpse out (U3c), it counts too: it is on its way out, and drops by the vector it brought.
-    if (colony.mode[i] !== RETURN || outward) colony.odoSurf[i] = colony.odoSurf[i] + Math.hypot(colony.x[i] - x0, colony.y[i] - y0);
+    if (colony.mode[i] !== RETURN || outward) {
+      colony.odoSurf[i] = colony.odoSurf[i] + Math.hypot(colony.x[i] - x0, colony.y[i] - y0);
+      // piErrorLaw 1 (ja-lp4.19): the error grows with the farthest it has been out, not the path: winding, fighting and
+      // defending near where it has been add nothing (Merkle & Wehner 2010).
+      if (p.piErrorLaw > 0) {
+        // Where its own walking put it: a child's tweezers (carried) move it, not its vector.
+        const far = Math.hypot(colony.x[i] - colony.carriedX[i] - colony.nest.x, colony.y[i] - colony.carriedY[i] - colony.nest.y);
+        if (far > colony.reachSurf[i]) colony.reachSurf[i] = far;
+      }
+    }
     const out = colony.mode[i] === EXPLORE || colony.mode[i] === FOLLOW || (p.routeFight > 0 && colony.mode[i] === FIGHT);
     if (p.routeMemory > 0 && out && !colony.carrying[i]) routeRecord(colony, i);
     colony.antCell(i);

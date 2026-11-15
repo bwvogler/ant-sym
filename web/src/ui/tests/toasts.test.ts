@@ -16,6 +16,7 @@ import {
   SWIPE_PX,
   swipeOutcome,
   TAP_PX,
+  toastPlace,
   unreadNotices,
 } from "../toasts.ts";
 
@@ -110,4 +111,14 @@ test("closing the list clears the field: its toasts go, the log keeps them (revi
   clearToasts();
   assert.equal(currentToasts().length, 0);
   assert.equal(noticeLog()[0]!.text, "seen in the list");
+});
+
+test("where notices sit: the builder's tray and the Lab's workbench keep their places, and a phone's open sheet is not covered (review of #182, N10)", () => {
+  const at = (building: boolean, drawer: boolean, lab: boolean) => toastPlace({ building, drawer, lab });
+  assert.equal(at(false, false, false), "bottom");
+  assert.equal(at(false, false, true), "lab");
+  assert.equal(at(false, true, false), "sheet", "an open drawer: unseen on a phone (they wait in the bell), the bottom's place from sm up");
+  assert.equal(at(false, true, true), "sheet-lab");
+  for (const drawer of [false, true])
+    for (const lab of [false, true]) assert.equal(at(true, drawer, lab), "top", "building: always under the HUD");
 });

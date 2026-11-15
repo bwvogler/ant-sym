@@ -12,6 +12,7 @@ import {
   OUT_FIELD_EVERY,
   PI_DRIFT,
   PI_DRIFT_2D,
+  PI_SPAN_GAIN,
   SEARCH_GROW,
   SEARCH_GROW_2D,
   SEARCH_START,
@@ -261,8 +262,24 @@ function seesHole(c: Colony, x: number, y: number, goal: Nest, d: number): boole
 }
 
 /**
+ * One world's plane: what the trip's drift (driftSurf, driftSurfY) is multiplied by to give the home vector's error. Law 0:
+ * the odometer `odo` (the error grows with the path walked). Law 1 (ja-lp4.19, docs/nest-search.md "How far the vector is
+ * off"): PI_SPAN_GAIN × √(at × reach), `reach` the farthest it has been from its hole this trip, so the miss's median is
+ * PI_MISS_AT × √(at × reach) (Merkle, Knaden & Wehner 2006; Heinze, Narendra & Cheung 2018; Merkle & Wehner 2010).
+ */
+export function piSpanOf(law: number, at: number, odo: number, reach: number): number {
+  return law > 0 ? PI_SPAN_GAIN * Math.sqrt(at * reach) : odo;
+}
+
+/** piSpanOf for ant i of c, by its colony's piErrorLaw and piErrorAt, its odometer and its reach out. */
+export function piSpan(c: Colony, i: number): number {
+  const p = c.params;
+  return piSpanOf(p.piErrorLaw, p.piErrorAt, c.odoSurf[i], c.reachSurf[i]);
+}
+
+/**
  * One world's plane (U3b, docs/one-world.md §4): where ant i believes its hole (`goal`, the plane nest) is. Its vector,
- * started afresh up out of that hole (crossUp), puts it odoSurf × (driftSurf, driftSurfY) off, plus the search's point
+ * started afresh up out of that hole (crossUp), puts it piSpan × (driftSurf, driftSurfY) off (piSpan: odoSurf, or by the distance out), plus the search's point
  * (search's reach at angle searchA), never past the plane's edges. Within HOLE_SIGHT of the hole (seen, and the
  * entrance's smell), or within NEST_SIGHT with a clear line to it, the belief is the hole itself.
  */
@@ -276,7 +293,7 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
     const place = routeBelief(c, i, goal);
     if (place) return place;
   }
-  const odo = c.odoSurf[i];
+  const odo = piSpan(c, i);
   let s = c.search[i];
   let a = c.searchA[i];
   const p = c.params;
@@ -452,7 +469,7 @@ export function searchOn(c: Colony, i: number, stalled = false): void {
     const n = s === 0 ? 0 : stalled && p.searchStall === 0 ? leg - (leg % 3) + 3 : leg + 1;
     if (s === 0) c.searchA[i] = c.heading[i];
     c.searchLeg[i] = n;
-    const sigma = PI_DRIFT_2D * c.odoSurf[i];
+    const sigma = PI_DRIFT_2D * piSpan(c, i);
     const { w, h } = c.map.size;
     c.search[i] = Math.min(Math.max(w, h * R), Math.max(SEARCH_START, sigma * (p.searchLoops + p.searchGrow * Math.floor(n / 3))));
   } else if (c.line !== null && c.cur === PLANE) {
@@ -536,15 +553,22 @@ export function targetHole(c: Colony, x: number, y: number, hy: number): boolean
 
 /**
  * One world's plane (U3c): how far ant i believes it is from home, by its own vector (U3b): from where it believes its
- * hole is, the hole plus odoSurf × (driftSurf, driftSurfY). Not its search's point: that is where it looks, not where
+ * hole is, the hole plus piSpan × (driftSurf, driftSurfY). Not its search's point: that is where it looks, not where
  * it believes home is. With the plane bound.
  */
 export function fromHomePlane(c: Colony, i: number): number {
-  const odo = c.odoSurf[i];
-  const bx = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
-  const by = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
-  return Math.hypot(c.x[i] - bx, c.y[i] - by);
+  const b = vectorHomePlane(c, i);
+  return Math.hypot(c.x[i] - b[0], c.y[i] - b[1]);
 }
+
+/** Where ant i's vector puts its hole on the plane bound: the nest + piSpan × its drift + the tweezers' carry. One answer for every reader (fromHomePlane, the spoil aim), written into a shared pair. */
+export function vectorHomePlane(c: Colony, i: number): readonly [number, number] {
+  const odo = piSpan(c, i);
+  VEC_HOME[0] = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
+  VEC_HOME[1] = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
+  return VEC_HOME;
+}
+const VEC_HOME: [number, number] = [0, 0];
 
 /**
  * How far ant i is from home as it knows it, on the plane bound: by sight where it sees its hole (as believePlane), else

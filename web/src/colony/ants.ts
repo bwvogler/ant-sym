@@ -335,6 +335,9 @@ export const ANT_FIELDS = {
    */
   carriedX: { type: Float32Array, reset: "spawn" },
   carriedY: { type: Float32Array, reset: "spawn" },
+  // ——— path integration's distance out (ja-lp4.19), last for the same reason as the heat's ———
+  /** one world's plane: the farthest (straight) it has been from its own hole since its vector started afresh; with piErrorLaw 1 its vector's error grows with it */
+  reachSurf: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };
