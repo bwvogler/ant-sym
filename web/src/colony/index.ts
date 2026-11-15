@@ -43,6 +43,7 @@ export * from "./save.ts";
 export * from "./schema.ts";
 export * from "./species.ts";
 export * from "./desertAnt.ts";
+export * from "./neglectus.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./weighted.ts";
