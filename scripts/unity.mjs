@@ -1,15 +1,15 @@
 // Offline, no key, no spend: is unity reachable (PRD §53, ja-i0f; docs/one-world.md U6a)? Garden, the strain whose hosts
-// carry its own odour, painted in both colonies at the start, by each royal chamber (in one world on the curtain, where
-// the nests are; in the side view by its chamber). Then the game runs as the page plays it (gameRng, regrowth on, no founding by itself) and
+// carry its own odour, painted in both colonies at the start, by each royal chamber (on the curtain, where the nests are).
+// Then the game runs as the page plays it (gameRng, regrowth on, no founding by itself) and
 // this prints, per seed and size: the peak of Unity.met (the least colony's allied contact, a ~60 s fading share of its
 // living ants; MET = 0.01 is whole), when the outcome first read "unified", the nests' odour gap and the quiet at the end,
 // and where the allied contact happened: sampled each second, ants in allied contact (an ant of another colony whose
 // nest odour its own odour is within tolerance of, in its cell or the six around, on its layer: Game.#meet's rule) on the
 // plane against the curtain.
 //
-// Usage: node scripts/unity.mjs [--one] [--seeds 1-3] [--ants 300,600] [--seconds 600] [--jobs N]
-//   --one: one world (generateOneWorld(seed)); without it the side view (generateSideWorld(seed)), which never unified
-//   (≤ 0.34 % met in 10 min, PRD §53).
+// Usage: node scripts/unity.mjs [--seeds 1-3] [--ants 300,600] [--seconds 600] [--jobs N]
+//   One world (generateOneWorld(seed)) is the only game (S2.3d); --one is accepted and ignored. The side view this once
+//   compared never unified (≤ 0.34 % met in 10 min, PRD §53).
 import { availableParallelism } from "node:os";
 import { isMainThread, parentPort, Worker, workerData } from "node:worker_threads";
 import { helpAndExit } from "./lib/usage.mjs";
@@ -27,14 +27,13 @@ function range(s) {
 
 async function main() {
   const args = process.argv.slice(2);
-  let one = false;
   let seeds = [1, 2, 3];
   let ants = [300, 600];
   let seconds = 600;
   let jobs = availableParallelism();
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
-    if (a === "--one") one = true;
+    if (a === "--one") continue;
     else if (a === "--seeds") seeds = range(args[++k]);
     else if (a === "--ants") ants = args[++k].split(",").map(Number);
     else if (a === "--seconds") seconds = Number(args[++k]);
@@ -44,7 +43,7 @@ async function main() {
       process.exit(1);
     }
   }
-  const queue = ants.flatMap((n) => seeds.map((seed) => ({ one, seed, ants: n, seconds })));
+  const queue = ants.flatMap((n) => seeds.map((seed) => ({ seed, ants: n, seconds })));
   const out = [];
   const t0 = performance.now();
   await Promise.all(
@@ -64,37 +63,32 @@ async function main() {
   process.stderr.write("\n");
   out.sort((a, b) => a.ants - b.ants || a.seed - b.seed);
   const pct = (v) => `${(100 * v).toFixed(2)} %`;
-  console.log(`Unity with Garden in both colonies, ${one ? "one world" : "the side view"}, ${seconds} s (MET = 1 % met is whole)\n`);
+  console.log(`Unity with Garden in both colonies, one world, ${seconds} s (MET = 1 % met is whole)\n`);
   console.log(
-    `| ants | seed | peak met | met at end | unified at | gap at end | quiet at end | ants lost | allied contact${one ? ": plane / curtain" : ""} (ant-s) | wall |`,
+    `| ants | seed | peak met | met at end | unified at | gap at end | quiet at end | ants lost | allied contact: plane / curtain (ant-s) | wall |`,
   );
   console.log("|---|---|---|---|---|---|---|---|---|---|");
   for (const r of out)
     console.log(
-      `| ${r.ants} + ${r.ants} | ${r.seed} | ${pct(r.peakMet)} at ${r.peakAt.toFixed(0)} s | ${pct(r.met)} | ${Number.isNaN(r.unifiedAt) ? "never" : `${r.unifiedAt.toFixed(0)} s`}${r.outcome === "unified" ? "" : ` (ends ${r.outcome})`} | ${r.gap.toFixed(3)} | ${r.quiet.toFixed(0)} s | ${r.deaths} | ${r.plane.toFixed(0)}${one ? ` / ${r.curtain.toFixed(0)}` : ""} | ${r.wall.toFixed(0)} s |`,
+      `| ${r.ants} + ${r.ants} | ${r.seed} | ${pct(r.peakMet)} at ${r.peakAt.toFixed(0)} s | ${pct(r.met)} | ${Number.isNaN(r.unifiedAt) ? "never" : `${r.unifiedAt.toFixed(0)} s`}${r.outcome === "unified" ? "" : ` (ends ${r.outcome})`} | ${r.gap.toFixed(3)} | ${r.quiet.toFixed(0)} s | ${r.deaths} | ${r.plane.toFixed(0)} / ${r.curtain.toFixed(0)} | ${r.wall.toFixed(0)} s |`,
     );
   console.error(`${out.length} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads`);
 }
 
 async function work() {
-  const { one, seed, ants, seconds } = workerData;
+  const { seed, ants, seconds } = workerData;
   const { CURTAIN } = await import("../web/src/colony/index.ts");
   const { STRAINS } = await import("../web/src/colony/index.ts");
   const { GAME_REGROW, Game, gameRng } = await import("../web/src/colony/index.ts");
   const { CELL, cellOf, discOffsets } = await import("../web/src/colony/index.ts");
   const { generateOneWorld } = await import("../web/src/colony/index.ts");
-  const { generateSideWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
-  const game = new Game(
-    one ? generateOneWorld(seed) : generateSideWorld(seed),
-    { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false },
-    gameRng(seed),
-  );
+  const game = new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed));
   const garden = STRAINS.findIndex((s) => s.id === "garden");
-  // By each royal chamber: the colony's nest on its home layer (one world: the curtain).
+  // By each royal chamber: the colony's nest on its home layer, the curtain.
   for (const c of game.colonies) {
-    const nest = one ? c.layers[CURTAIN].nest : c.nest;
-    game.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, garden, one ? CURTAIN : 0);
+    const nest = c.layers[CURTAIN].nest;
+    game.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, garden, CURTAIN);
   }
   const DT = 1 / 30;
   const tol = game.recognition.params.tolerance;

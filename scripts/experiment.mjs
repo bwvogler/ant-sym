@@ -8,10 +8,10 @@
 //          [--policy cache:<file>] [--log <spec>] [--species <id>]
 //        node scripts/experiment.mjs merge <file.json ...> [--json out.json]
 //
-// --one reruns the assays on one world (experiment.ts ONE_ASSAYS, docs/one-world.md U6a): each arena made the plane,
-// with a hole at each nest and the curtain under the line through them (oneArena); A8 in the curtain; G1 (game1), the
-// whole one-world game. The ids are the legacy ones (U6b added A11 and A12); an assay listed in
-// ONE_PENDING, none now, is reported with why it is not rerun. Without --one, `game1` still names G1.
+// Every assay runs on one world (experiment.ts ONE_ASSAYS, docs/one-world.md): each arena made the plane (onPlane), with a hole at
+// each nest and the curtain under the line through them; A8 and the nurse, pocket and larvae assays on the whole world; G1 (game1),
+// the whole one-world game. An assay listed in ONE_PENDING, none now, is reported with why it is not rerun. --one is accepted
+// and does nothing (it chose the one-world list before the old maps went, S2.3d).
 //
 // --species <id> plays every run's colonies as that species (colony/species.ts SPECIES, e.g. desert); --set's colony values
 // still apply over its own. Not with --policy (a replayed cache holds the generic ant's answers).
@@ -95,7 +95,7 @@ async function main() {
   let json;
   let jobs = availableParallelism();
   let policy = null;
-  let one = false;
+  // --one is accepted and ignored: every assay runs on one world now (S2.3d).
   let log = null;
   let species = null;
   const sets = [];
@@ -106,7 +106,7 @@ async function main() {
     else if (a === "--json") json = args[++k];
     else if (a === "--jobs") jobs = Number(args[++k]);
     else if (a === "--policy") policy = args[++k];
-    else if (a === "--one") one = true;
+    else if (a === "--one") continue;
     else if (a === "--species") {
       species = args[++k];
       if (species === undefined) fail("--species <id>");
@@ -119,7 +119,7 @@ async function main() {
     } else if (a.startsWith("--")) fail(`unknown option ${a}`);
     else ids.push(a);
   }
-  const { ASSAYS, ONE_ASSAYS, ONE_PENDING } = await import("../web/src/colony/experiment.ts");
+  const { ONE_ASSAYS, ONE_PENDING } = await import("../web/src/colony/experiment.ts");
   if (species !== null) {
     const { SPECIES } = await import("../web/src/colony/index.ts");
     if (!Object.hasOwn(SPECIES, species)) fail(`--species ${species}: have ${Object.keys(SPECIES).join(", ")}`);
@@ -134,22 +134,18 @@ async function main() {
     }
     mkdirSync(JOURNAL_DIR, { recursive: true });
   }
-  // Each chosen assay with the list it is run from (the worker finds it there): one world's, or the legacy ones (G1 only in one world's).
-  const list = one ? ONE_ASSAYS : ASSAYS;
+  const list = ONE_ASSAYS;
   const pending = [];
   const pick = (id) => {
-    const a = list.find((x) => x.id === id) ?? (one ? null : ONE_ASSAYS.find((x) => x.id === id && !ASSAYS.some((y) => y.id === id)));
-    if (a) return { assay: a, one: one || !ASSAYS.includes(a) };
-    if (one && ONE_PENDING[id]) pending.push(id);
-    else
-      fail(
-        `no assay "${id}"${one ? " on one world" : ""} (have: ${[...list, ...(one ? [] : ONE_ASSAYS.filter((x) => !ASSAYS.some((y) => y.id === x.id)))].map((x) => x.id).join(", ")})`,
-      );
+    const a = list.find((x) => x.id === id);
+    if (a) return { assay: a, one: true };
+    if (ONE_PENDING[id]) pending.push(id);
+    else fail(`no assay "${id}" (have: ${list.map((x) => x.id).join(", ")})`);
     return null;
   };
   const all = ids.length === 0 || ids.includes("all");
-  if (all && one) pending.push(...Object.keys(ONE_PENDING));
-  const picked = all ? list.map((a) => ({ assay: a, one })) : ids.map(pick).filter(Boolean);
+  if (all) pending.push(...Object.keys(ONE_PENDING));
+  const picked = all ? list.map((a) => ({ assay: a, one: true })) : ids.map(pick).filter(Boolean);
   const chosen = picked.map((p) => p.assay);
   const cs = combos(sets);
   if (policy) {
@@ -212,7 +208,7 @@ async function main() {
       const runs = (results.get(`${assay.id}|${ci}`) ?? []).sort((a, b) => a.seed - b.seed);
       out.push({ assay: assay.id, one: inOne, label, overrides: o, seconds: seconds ?? assay.seconds, runs });
     }
-  report(out, { ASSAYS, ONE_ASSAYS, policy });
+  report(out, { ONE_ASSAYS, policy });
   console.error(
     `${done} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads (ms/tick is per run, with the threads sharing the machine)`,
   );
@@ -224,18 +220,18 @@ async function main() {
  * Prints the report: per assay its title and target, then per --set combination the pass count, the failing seeds and
  * each metric's median and range over the seeds. `out` is what --json writes, so `merge` prints the same from files.
  */
-function report(out, { ASSAYS, ONE_ASSAYS, policy }) {
+function report(out, { ONE_ASSAYS, policy }) {
   const median = (a) => {
     const s = [...a].sort((x, y) => x - y);
     const m = s.length >> 1;
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
   const fmt = (v) => (Number.isNaN(v) ? "–" : Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
-  const find = (e) => (e.one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === e.assay) ?? ONE_ASSAYS.find((x) => x.id === e.assay);
+  const find = (e) => ONE_ASSAYS.find((x) => x.id === e.assay);
   let last = null;
   for (const e of out) {
     if (e.pending) {
-      const title = ASSAYS.find((x) => x.id === e.assay)?.title ?? e.assay;
+      const title = ONE_ASSAYS.find((x) => x.id === e.assay)?.title ?? e.assay;
       console.log(`\n## ${title} (one world)\n\nNot run on one world: ${e.pending}.`);
       continue;
     }
@@ -309,10 +305,10 @@ async function merge(args) {
         have.runs.sort((a, b) => a.seed - b.seed);
       }
     }
-  const { ASSAYS, ONE_ASSAYS } = await import("../web/src/colony/experiment.ts");
+  const { ONE_ASSAYS } = await import("../web/src/colony/experiment.ts");
   // A run asked of a replayed cache (--policy) counts its lookups; without one they are all zero.
   const replayed = out.some((e) => e.runs?.some((r) => Object.values(r.lookups ?? {}).some((l) => l.hit + l.miss > 0)));
-  report(out, { ASSAYS, ONE_ASSAYS, policy: replayed });
+  report(out, { ONE_ASSAYS, policy: replayed });
   if (json) writeFileSync(json, JSON.stringify(out, null, 1));
 }
 
@@ -342,8 +338,8 @@ function loadCache(file) {
 }
 
 async function work() {
-  const { id, one, ci, o, seed, seconds, policy, log, species } = workerData;
-  const { ASSAYS, ONE_ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
+  const { id, ci, o, seed, seconds, policy, log, species } = workerData;
+  const { ONE_ASSAYS, runAssay } = await import("../web/src/colony/experiment.ts");
   const lookups = {};
   const count = (lane, hit) => {
     const l = (lookups[lane] ??= { hit: 0, miss: 0 });
@@ -386,7 +382,7 @@ async function work() {
     });
   }
   const run = runAssay(
-    (one ? ONE_ASSAYS : ASSAYS).find((x) => x.id === id),
+    ONE_ASSAYS.find((x) => x.id === id),
     seed,
     { ...o, ...brains },
     seconds,

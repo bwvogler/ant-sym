@@ -11,7 +11,6 @@ import { EXPLORE, FIGHT, FOLLOW, type Mode, MODES, RETURN, type SpeciesSituation
 export function decide(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
   const dt = s.dt;
-  const gate = s.gate;
   const fl = s.fl;
   const ff = s.ff;
   const fr = s.fr;
@@ -46,7 +45,6 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
   let modeStride = MODE_STRIDE; // the mode field's step in that code: the species' own schema's, when it has one
   let waiting = false;
-  let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
   if (carrying || pellet || nursing || reporting) {
     // A carrier takes its load where it belongs (the carry response, in stanceStep, said so): home, not a mode choice; the next
     // question comes once the load is down.
@@ -107,9 +105,8 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
     // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
     // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.
-    waiting = held || (gate && mode === RETURN && !enemy && col.atNestTop(i) && !col.inbound(i, mode));
+    waiting = held;
     if (held) {
-      rolled = true;
       if (col.leaves(i, dt, false)) {
         col.leaveOk[i] = 1;
         col.asked[i] = -1;
@@ -184,7 +181,5 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   s.prevMode = prevMode;
   s.item = item;
   s.resp = resp;
-  s.waiting = waiting;
-  s.rolled = rolled;
   s.fleeFrom = fleeFrom;
 }

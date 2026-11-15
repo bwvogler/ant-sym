@@ -8,7 +8,7 @@ import { cellKey, NO_CELL, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
 import { CELL } from "./hex.ts";
 import { atHome, destMark, fromHomePlane, integrate, routeRecord } from "./homing.ts";
 import { nurse, port, undertake } from "./nestWork.ts";
-import { layMark, nestmatesAround, returnsAround, touch } from "./sense.ts";
+import { layMark, nestmatesAround, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import { fetches } from "./tunnel.ts";
 import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
@@ -24,7 +24,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const ph = s.ph;
   const home = s.home;
   const dt = s.dt;
-  const gate = s.gate;
   const hold = s.hold;
   const leak = s.leak;
   const metLeak = s.metLeak;
@@ -42,7 +41,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const mode = s.mode;
   const item = s.item;
   const resp = s.resp;
-  let rolled = s.rolled;
   // Mechanics: pick up food where there is some (not mid-fight), put it down at the nest; the nest rests a tired ant.
   const ndx = colony.x[i] - home.x;
   const ndy = colony.y[i] - home.y;
@@ -62,7 +60,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.pace[i] = paceAfter(colony.params, colony.pace[i], held ? colony.holeSeen : 0, colony.crowd[i], dt);
   } else if (leak) {
     let m = colony.met[i] * metLeak;
-    if (gate ? atNest && !carrying : held) m += gate ? returnsAround(colony, CELL[0], CELL[1]) : colony.holeSeen;
+    if (held) m += colony.holeSeen;
     colony.met[i] = m;
   }
   // How crowded home is (docs/stance.md), felt by a waiting ant: nestmates in its cell and the six round it, but itself.
@@ -120,7 +118,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     crossUp(colony, i, colony.entranceCol, colony.entranceRow);
     colony.heading[i] = h;
     s.h = h;
-    s.rolled = rolled;
     return true;
   } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL) {
     // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
@@ -192,7 +189,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       colony.carrying[i] = 0;
       colony.stored++;
       colony.larder++;
-      if (gate) colony.returning.set(here, (colony.returning.get(here) ?? 0) + 1);
       h += Math.PI;
     } else if (pellet && !ent && colony.line === null) {
       // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
@@ -213,8 +209,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       // starving brood).
       (!colony.isTired(i) || (p.restFetch > 0 && colony.under[i] === 1 && fetches(colony, i))) &&
       !colony.inbound(i, mode) &&
-      (colony.restT[i] = colony.restT[i] + dt) > REST &&
-      (!gate || ((rolled = true), colony.leaves(i, dt, toEnemy !== null)))
+      (colony.restT[i] = colony.restT[i] + dt) > REST
     ) {
       colony.mode[i] = EXPLORE;
       colony.asked[i] = -1;
@@ -275,8 +270,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     // A hot one (the desert ant's heat, ja-rf5.5) rests to cool first, as a tired one rests (review of #155, N6); always 0 without heat.
     !colony.hot[i] &&
     !colony.inbound(i, RETURN) &&
-    (ent === null ? atNest : colony.under[i] === 1 && colony.band(i) === 2 && atHome(colony, i)) &&
-    (!gate || (!rolled && colony.leaves(i, dt, toEnemy !== null)))
+    (ent === null ? atNest : colony.under[i] === 1 && colony.band(i) === 2 && atHome(colony, i))
   ) {
     // A raid scout starts exploring, not on a food trail (review of #53, N6).
     // `p.follows`: defensive, as at the gated hole (review of #121, N1).
@@ -331,11 +325,9 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     if (k >= 0 && (k === p.nest ? colony.wantsIn(i, colony.mode[i]) : colony.mode[i] === FIGHT && colony.stanceOf(i) === "raid")) {
       crossDown(colony, i, k);
       s.h = h;
-      s.rolled = rolled;
       return true;
     }
   }
   s.h = h;
-  s.rolled = rolled;
   return false;
 }

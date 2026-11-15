@@ -61,20 +61,17 @@ import {
   DEFAULT_MENU,
   STRAINS,
   Game,
-  centreX,
-  centreY,
-  generateSideWorld,
   generateOneWorld,
   gameRng,
   menuFor,
   GAME_REGROW,
-  mulberry32,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
   STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
   DESERT_ANT,
+  GENERIC_ANT,
   NEGLECTUS_ANT,
   isWeighted,
   weightsOf,
@@ -115,26 +112,17 @@ for (let k = 0; k < args.length; k++) {
 const KEY = process.env.JEV_API_KEY;
 if (!opts.dry && !opts.import.length && !KEY) throw new Error("JEV_API_KEY is not set (or use --dry for an estimate, or --import)");
 
-/** The menu the page asks the fungus under: every non-lethal lever (Fungus.askedFor under the default menu, with a nest in the side view). */
+/** The menu the page asks the fungus under: every non-lethal lever (Fungus.askedFor under the default menu: the nest is always there). */
 const MENU = new Set(DEFAULT_MENU);
 
-/** The fungal situations a side-view game meets: Garden on both royal chambers and Lockpick at both holes, 300 s. */
+/**
+ * The fungal situations a game meets: the page's one world (speciesFungalSituations, the generic ant). Garden landed by each
+ * colony's hole in turn, 300 s, on seeds 1–3. (Until S2.3d this recorded the side view, with Garden on both royal chambers
+ * and Lockpick at both holes, on seed 1: the shipped answers are keyed by situation, so they stand; a fresh recording may
+ * meet others, which `--fungus-also` brings in.)
+ */
 function fungalSituations() {
-  const map = generateSideWorld(1);
-  const g = new Game(map, { antCount: 600, rivalAnts: 600 }, mulberry32(7919));
-  const met = new Set();
-  g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
-  const strain = (id) => STRAINS.findIndex((x) => x.id === id);
-  for (let t = 0, painted = false; t < 300; t += 1 / 30) {
-    g.tick(1 / 30);
-    if (painted || g.time < 30) continue;
-    painted = true;
-    for (const c of g.colonies) {
-      const royal = map.chambers.list.find((k) => k.colony === c.params.nest && k.role === "royal");
-      g.paintSpores(centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow), centreY(royal.floorRow), 3, 2, 0.3, strain("garden"));
-      g.paintSpores(c.nest.entrance.x, c.nest.entrance.y, 3, 2, 0.3, strain("lockpick"));
-    }
-  }
+  const met = new Set(speciesFungalSituations(GENERIC_ANT).map((s) => encodeFungal(s)));
   const also = fungusAlso();
   for (let n = 0; n < FUNGAL_SITUATIONS; n++) if (also.has(FUNGAL_SCHEMA.key(decodeFungal(n)))) met.add(n);
   return [...met].sort((a, b) => a - b).map(decodeFungal);

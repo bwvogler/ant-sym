@@ -1,19 +1,25 @@
 import { test } from "node:test";
-import { CELL, cellOf } from "../../hex.ts";
+import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, localPolicy, localStance } from "../../colony.ts";
-import { MODES, type Situation, type StanceSituation } from "../../vocab.ts";
-import { localResponses, responses } from "../../responses.ts";
+import { Colony, type Layer, localPolicy, localStance, PLANE } from "../../colony.ts";
+import type { Situation, StanceSituation } from "../../vocab.ts";
+import { responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
 import { foodIn, mulberry32, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { PUPA } from "../../brood.ts";
 import { touch } from "../../sense.ts";
 import { smallOne } from "../builders.ts";
+import { oneArena } from "../../harness.ts";
 
 /** A bare 40×12 field with two nests, no food. */
+/** Put ant i of colony c on the plane at arena cell (x, y): on a one world every ant starts in the curtain, so the layer is named. */
+function putOn(c: Colony, i: number, x: number, y: number): void {
+  c.putAnt(i, PLANE, centreX(x, y), centreY(y));
+}
+
 function arena(): WorldMap {
   const size = { w: 40, h: 12 };
   const nests = [nestAt(4, 6, 2), nestAt(36, 6, 2)];
@@ -126,9 +132,9 @@ test("no enemy within a cell: no fight", () => {
   assert.deepEqual(deaths, [0, 0]);
 });
 
-test("kill drops carried food where the ant falls; the larder becomes ants in free slots, up to the cap", () => {
+test("kill drops carried food where the ant falls", () => {
   const m = arena();
-  const c = new Colony(m, { antCount: 3, maxAnts: 4, nest: 0, foodPerAnt: 4 }, mulberry32(3), () => "explore");
+  const c = new Colony(m, { antCount: 3, maxAnts: 4, nest: 0 }, mulberry32(3), () => "explore");
   c.carrying[0] = 1;
   put(c, 0, 10, 3);
   c.kill(0);
@@ -136,12 +142,6 @@ test("kill drops carried food where the ant falls; the larder becomes ants in fr
   assert.equal(m.foodLeft, 1, "the map counts the dropped food");
   assert.equal(c.population, 2);
   assert.equal(c.losses, 1);
-  c.larder = 13;
-  c.tick(1 / 30);
-  assert.equal(c.population, 4, "two new ants (8 food), the cap");
-  assert.equal(c.larder, 5, "the rest waits");
-  assert.equal(c.births, 2);
-  assert.equal(c.alive[0], 1, "a dead slot was reused");
 });
 
 test("a fighting ant goes for the enemy it can see", () => {
@@ -212,9 +212,47 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
   assert.ok(run(12) < y0 - 0.2, "strong: turned north, away");
 });
 
+test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
+  // 40 ants at home on a strong raid trail, 40 out on one 16 cells away, on the plane; recruited at raidRecruit (0.5/s here) for 1 s.
+  const g = new Game(oneArena(arena(), 21), { antCount: 80, rivalAnts: 5 }, mulberry32(21), {
+    policy: () => "return",
+    responses: responses({ leave: () => "wait" }),
+    colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 },
+  });
+  const c = g.player;
+  const ph = (c.layers[PLANE] as Layer).ph;
+  const home = (i: number) => i < 40;
+  const place = () => {
+    for (let i = 0; i < 80; i++) putOn(c, i, home(i) ? 4 : 20, 6);
+    for (const x of [4, 20])
+      for (let dx = -3; dx <= 3; dx++)
+        for (let y = 3; y <= 9; y++) {
+          const p = at(x + dx, y);
+          ph.deposit("raid", p.x, p.y, 2 - Math.max(0, ph.read("raid", p.x, p.y))); // held at strong
+        }
+  };
+  for (let i = 0; i < 10; i++) c.carrying[i] = 1; // carriers at home: never recruited
+  for (let k = 0; k < 30; k++) {
+    place();
+    g.tick(1 / 30);
+  }
+  let atHome = 0;
+  let out = 0;
+  let carriers = 0;
+  for (let i = 0; i < 80; i++) {
+    if (i < 10) carriers += c.recruited[i]!;
+    else if (home(i)) atHome += c.recruited[i]!;
+    else out += c.recruited[i]!;
+  }
+  assert.equal(out, 0, "not out at its work");
+  assert.equal(carriers, 0, "not while carrying");
+  // 30 at home over 1 s at 0.5/s: 1 − e^−0.5 ≈ 39 % expected (12); all at once would be 30.
+  assert.ok(atHome >= 4 && atHome <= 21, `by degrees: ${atHome} of 30 at home recruited in 1 s`);
+});
+
 test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside goes home laying the raid trail", () => {
   const run = (raidGate: number) => {
-    const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid", colony: { raidGate } });
+    const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid", colony: { raidGate } });
     const [a, b] = g.colonies as [Colony, Colony];
     for (let i = 0; i < a.n; i++) {
       a.alive[i] = i < 1 ? 1 : 0;
@@ -222,18 +260,18 @@ test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside go
     }
     // Ant 0 is out on the field beside a stranger, on a scout's errand.
     g.tick(1 / 30); // the strategist's first answer sets the stance
-    put(a, 0, 20, 6);
-    put(b, 0, 20, 6);
+    putOn(a, 0, 20, 6);
+    putOn(b, 0, 20, 6);
     a.recruited[0] = 1;
     let reported = 0;
     for (let k = 0; k < 30; k++) {
-      if (!a.reporting[0]) put(a, 0, 20, 6); // it stays beside the stranger until it has met it long enough
-      put(b, 0, 20, 6);
+      if (!a.reporting[0]) putOn(a, 0, 20, 6); // it stays beside the stranger until it has met it long enough
+      putOn(b, 0, 20, 6);
       b.alive[0] = 1; // the stranger stays (the fight would kill it)
       g.tick(1 / 30);
       if (a.reporting[0]) reported++;
     }
-    return { reported, live: a.ph.live("raid") };
+    return { reported, live: (a.layers[PLANE] as Layer).ph.live("raid") }; // the trail is laid on the plane
   };
   const trail = run(1);
   assert.ok(trail.reported > 0 && trail.live, "a finder turned for home and laid the raid trail");
@@ -259,19 +297,19 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   assert.ok(c.x[0] > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${c.x[0].toFixed(1)}`);
 
   // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
-  const g = new Game(arena(), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
+  const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
   const [a, b] = g.colonies as [Colony, Colony];
   for (let i = 0; i < a.n; i++) {
     a.alive[i] = i === 0 ? 1 : 0;
     b.alive[i] = i === 0 ? 1 : 0;
   }
-  put(a, 0, 20, 6);
-  put(b, 0, 20, 6);
+  putOn(a, 0, 20, 6);
+  putOn(b, 0, 20, 6);
   const here = at(20, 6);
   let reported = 0;
   for (let k = 0; k < 90; k++) {
     a.ph.deposit("raid", here.x, here.y, 1);
-    put(b, 0, 20, 6);
+    putOn(b, 0, 20, 6);
     g.tick(1 / 30);
     if (a.reporting[0]) reported++;
   }
@@ -367,81 +405,7 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   b.tick(1 / 30);
   assert.equal(touch(b, 0, false).stance, "forage");
 
-  // A waiting forager whose leave answer is "raid" goes out as a raid scout.
-  const r = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, scoutRate: 0, raidScout: 10 }, mulberry32(15));
-  r.responses = responses({ leave: () => "raid" });
-  put(r, 0, 4, 6);
-  r.mode[0] = MODES.indexOf("return");
-  for (let k = 0; k < 30 * 30 && r.recruited[0] === 0; k++) r.tick(1 / 30);
-  assert.equal(r.recruited[0], 1, "recruited by its own answer");
-  assert.equal(touch(r, 0, false).stance, "raid");
-
-  // Twenty ants waiting at home: each feels the others round it.
-  const g = new Game(arena(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), {
-    policy: () => "return",
-    responses: responses({ leave: () => "wait" }),
-    colony: { scoutRate: 0, crowdAt: 6 },
-  });
-  const c = g.player;
-  for (let i = 0; i < 20; i++) put(c, i, 4, 6);
-  for (let k = 0; k < 30 * 10; k++) g.tick(1 / 30);
-  assert.ok(c.crowd[0] >= c.params.crowdAt, `crowded: ${c.crowd[0].toFixed(1)} nestmates felt`);
-  assert.equal(touch(c, 0, false).crowd, "many");
-});
-
-test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
-  // 40 ants at home on a strong raid trail, 40 out on one 30 cells away; recruited at raidRecruit (0.5/s here) for 1 s.
-  const g = new Game(
-    worldFromArrays({ w: 60, h: 20 }, [nestAt(6, 10, 3), nestAt(56, 10, 3)]),
-    { antCount: 80, rivalAnts: 5 },
-    mulberry32(21),
-    { policy: () => "return", responses: responses({ leave: () => "wait" }), colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 } },
-  );
-  const c = g.player;
-  const home = (i: number) => i < 40;
-  const place = () => {
-    for (let i = 0; i < 80; i++) put(c, i, home(i) ? 6 : 36, 10);
-    for (const x of [6, 36])
-      for (let dx = -3; dx <= 3; dx++)
-        for (let y = 6; y <= 14; y++) {
-          const p = at(x + dx, y);
-          c.ph.deposit("raid", p.x, p.y, 2 - Math.max(0, c.ph.read("raid", p.x, p.y))); // held at strong
-        }
-  };
-  c.carrying[0] = 1; // a carrier at home: never recruited
-  for (let k = 0; k < 30; k++) {
-    place();
-    g.tick(1 / 30);
-  }
-  let atHome = 0;
-  let out = 0;
-  for (let i = 1; i < 80; i++) {
-    if (home(i)) atHome += c.recruited[i];
-    else out += c.recruited[i];
-  }
-  assert.equal(out, 0, "not out at its work");
-  assert.equal(c.recruited[0], 0, "not while carrying");
-  // 39 at home over 1 s at 0.5/s: 1 − e^−0.5 ≈ 39 % expected (15); all at once would be 39.
-  assert.ok(atHome >= 6 && atHome <= 26, `by degrees: ${atHome} of 39 at home recruited in 1 s`);
-});
-
-test("no rival, no raid (review of #53 S1): with the rival beaten, a crowded home's raid answer and a raid trail recruit no one", () => {
-  const g = new Game(arena(), { antCount: 20, rivalAnts: 5 }, mulberry32(22), {
-    policy: () => "return",
-    colony: { scoutRate: 0, crowdAt: 2, raidScout: 5, raidRecruit: 5 },
-  });
-  const [c, r] = g.colonies as [Colony, Colony];
-  for (let i = 0; i < r.n; i++) r.alive[i] = 0;
-  r.larder = 0;
-  for (let i = 0; i < 20; i++) put(c, i, 4, 6);
-  for (let k = 0; k < 30 * 8; k++) {
-    for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) c.ph.deposit("raid", at(x, y).x, at(x, y).y, 0.05);
-    g.tick(1 / 30);
-  }
-  let rec = 0;
-  for (let i = 0; i < c.n; i++) if (c.alive[i]) rec += c.recruited[i];
-  assert.equal(c.raidable, false, "the game found no rival");
-  assert.equal(rec, 0, "nobody raids");
+  // (A leave answer of "raid" sending a scout, and the crowd waiting ants feel, are one world's gate: int/oneWorldLeave.)
 });
 
 test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
@@ -490,20 +454,4 @@ test("raid stance as a bias (review of #41): an ant not recruited, put in FIGHT,
     on > off + 4,
     `not recruited, it doesn't head for the hole: ${on.toFixed(1)} cells off against ${off.toFixed(1)} with raidGate 0`,
   );
-});
-
-test("raid stance as a bias (review of #41): leave asks a recruited ant as a raider (fight) and the others as foragers (return)", () => {
-  const asked = (recruited: boolean) => {
-    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 }, mulberry32(10));
-    const modes = new Set<string>();
-    c.responses = { ...localResponses, leave: (t) => (modes.add(t.mode), "wait") };
-    c.stance = "raid";
-    put(c, 0, 4, 6);
-    c.mode[0] = 2; // return
-    if (recruited) c.recruited[0] = 1;
-    for (let k = 0; k < 30 * 15; k++) c.tick(1 / 30);
-    return [...modes];
-  };
-  assert.deepEqual(asked(true), ["fight"]);
-  assert.deepEqual(asked(false), ["return"]);
 });

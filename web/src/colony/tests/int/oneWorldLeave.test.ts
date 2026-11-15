@@ -361,6 +361,24 @@ test("one world: a crowded gate with no returns sends raid scouts out (crowd is 
   assert.ok(c.raidScouts > 0, `raid scouts: ${c.raidScouts}`);
 });
 
+test("one world: no rival, no raid (review of #53 S1): with the rival beaten, a crowded gate's raid answer and a raid trail recruit no one", () => {
+  const g = game(20);
+  const [c, r] = g.colonies as [Colony, Colony];
+  c.params.crowdAt = 2;
+  c.params.raidScout = 5;
+  c.params.raidRecruit = 5;
+  for (let i = 0; i < r.n; i++) r.alive[i] = 0;
+  r.larder = 0;
+  for (let i = 0; i < 20; i++) toGate(c, i);
+  const p = planeHole(own(c));
+  run(g, 8, () => c.paint("raid", p.x, p.y, 2, 0.5, PLANE));
+  let recruited = 0;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) recruited += c.recruited[i]!;
+  assert.equal(c.raidable, false, "the game found no rival");
+  assert.equal(recruited, 0, "nobody raids");
+  assert.equal(c.raidScouts, 0, "and no raid scout goes");
+});
+
 test("one world: a recruited raider in fight at the gate is held until `leave` says go", () => {
   const g = game();
   const c = g.player;

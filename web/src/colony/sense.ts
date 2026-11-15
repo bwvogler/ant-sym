@@ -2,7 +2,7 @@
 
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
-import { cellKey, inReachShared } from "./grid.ts";
+import { inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
@@ -230,16 +230,6 @@ export function nestmatesAround(c: Colony, cx: number, cy: number): number {
     const y = cy + o[k + 1];
     if (inBounds(map, x, y)) s += f.get(x, y);
   }
-  return s;
-}
-
-/** Last tick's returns with food in cell (cx, cy) and the six round it (behaviour MR 5). */
-export function returnsAround(c: Colony, cx: number, cy: number): number {
-  const g = c.returned;
-  if (g.size === 0) return 0;
-  const o = discOffsets(1)[cy & 1] as Int16Array;
-  let s = 0;
-  for (let k = 0; k < o.length; k += 2) s += g.get(cellKey(cx + o[k], cy + o[k + 1])) ?? 0;
   return s;
 }
 

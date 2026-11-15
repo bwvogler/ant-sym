@@ -19,7 +19,6 @@ import {
   MARCH_REACH,
   nestFlowProbe,
   occupancyProbe,
-  ASSAYS,
   defendWalked,
   ONE_ASSAYS,
   oneAssay,
@@ -468,7 +467,7 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
     let calls = 0;
     const assay = make((spec: RunSpec) => {
       calls++;
-      return { ...spec, seconds: 1 };
+      return onPlane({ ...spec, seconds: 1 });
     });
     const { game, result } = runGame(assay.spec(1));
     assay.score(result, game);
@@ -541,7 +540,7 @@ test("oneAssay: each gate id gives its one-world twin, A6 and A13 walked (review
     "raidStop",
   ]) {
     const a = oneAssay(id);
-    assert.ok(ONE_ASSAYS.includes(a) && !ASSAYS.includes(a), id);
+    assert.ok(ONE_ASSAYS.includes(a), id);
   }
   assert.equal(oneAssay("pass"), passWalked);
   assert.equal(oneAssay("defendHome"), defendWalked);

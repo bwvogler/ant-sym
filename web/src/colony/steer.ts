@@ -18,7 +18,6 @@ import {
   NO_GAIN,
   SEARCH_STALL,
   TUNNEL_STALL,
-  WAIT_RIM,
   WALL_LOST,
 } from "./tuning.ts";
 import { fetches, walkTunnel } from "./tunnel.ts";
@@ -51,7 +50,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const home = s.home;
   const a = s.a;
   const dt = s.dt;
-  const gate = s.gate;
   const rgate = s.rgate;
   let h = s.h;
   const fl = s.fl;
@@ -75,7 +73,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const prevMode = s.prevMode;
   const item = s.item;
   const resp = s.resp;
-  const waiting = s.waiting;
   const fleeFrom = s.fleeFrom;
   // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
   // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
@@ -555,15 +552,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     );
   }
 
-  // Waiting at home (behaviour MR 5) it stays in, milling as far as the nest's rim, where foragers come home: past
-  // WAIT_RIM of the radius it turns back in. Wandering out of the nest, it was asked its mode, and the mode policy
-  // sent it out exploring with nothing coming in; kept to half the radius, it never met a carrier, who puts its food
-  // down on reaching the rim, so only scouts went out.
-  if (waiting && gate) {
-    const dx = home.x - col.x[i];
-    const dy = home.y - col.y[i];
-    if (dx * dx + dy * dy > WAIT_RIM * WAIT_RIM * home.r * home.r) h = Math.atan2(dy, dx);
-  }
   // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
   // nest's centre at the turn rate, it circled the hole it was over.
   if (col.inbound(i, mode)) {
