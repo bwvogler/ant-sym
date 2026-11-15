@@ -177,7 +177,12 @@ export function body(col: Colony, dt: number): void {
   const { felt, donors, energy, scent, scentSum, perceived, youngs } = col;
   // Task reversion (ja-7r7x): where the young are, so each old ant at home senses whether it meets any.
   const revert = col.params.revert > 0 && col.queen !== null;
-  if (revert) youngs.reset();
+  const broods = col.broods;
+  if (revert) {
+    youngs.reset();
+    broods.reset();
+    for (const b of col.brood.items) if (b.held < 0) broods.put(b.x, b.y, 1);
+  }
   // Larval feeding by mouth (ja-638i): crops filled at the stores, passed to the needy, fed to larvae.
   const cap = col.params.cropFeed;
   const crops = cap > 0 && col.queen !== null && !!ch;
@@ -317,8 +322,11 @@ export function body(col: Colony, dt: number): void {
           crop[i] += give;
         }
       }
-      // Meeting young nestmates (ja-7r7x): the share of recent time one was within a cell, read by the old only.
-      if (revert && col.band(i) === 2) col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
+      // Meeting young nestmates, and brood (ja-7r7x): the share of recent time one was within a cell, read by the old only.
+      if (revert && col.band(i) === 2) {
+        col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
+        col.broodMet[i] = col.broodMet[i] + (broods.near(cx, cy) - col.broodMet[i]) * youngStep;
+      }
     }
     scent[i] = sc;
     col.feltLast[i] = now;

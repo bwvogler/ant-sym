@@ -511,12 +511,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   {
     note: "task-reversion",
     title: "Task reversion",
-    covers: "Whether old foragers go back to nursing when the young are gone, and what tells them (not built yet).",
+    covers: "Whether old foragers go back to nursing when the young are gone, and what tells them (built, off for now).",
   },
   {
     note: "larval-feeding",
     title: "Larval feeding",
-    covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (not built yet).",
+    covers: "How food gets from the stores to the larvae: nurses feeding by mouth, food passed ant to ant (built, off for now).",
   },
   {
     note: "activation",

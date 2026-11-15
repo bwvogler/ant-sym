@@ -67,6 +67,12 @@ export const MET_HALF = 20;
 export const YOUNG_TAU = 60;
 /** An old ant at home reverts to nursing while its `youngMet` is below this (design). */
 export const REVERT_BELOW = 0.05;
+/**
+ * ...and only while its `broodMet` (the share of recent time, YOUNG_TAU, a brood item was within a cell of it) is at
+ * least this: foragers revert when "exposed to brood in absence of younger workers" (Symonowicz et al. 2015). A colony
+ * with no brood (one at its cap lays none) has no reverting ants (design threshold; review of #217, D1).
+ */
+export const BROOD_MET_MIN = 0.05;
 
 /**
  * Larval feeding by mouth (ja-638i, docs/larval-feeding.md): food an ant takes into its crop a second from a stocked

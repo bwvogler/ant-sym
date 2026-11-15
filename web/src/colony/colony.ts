@@ -33,6 +33,7 @@ import { blocked, groundTop, isSky, rockAt, type Nest, type WorldMap } from "./w
 import type { Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
+  BROOD_MET_MIN,
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
@@ -457,6 +458,8 @@ export class Colony {
   felt = new FeltGrid();
   /** where the young (age band 0) are underground this tick, for youngMet (task reversion, ja-7r7x); filled only with revert on */
   youngs = new FeltGrid();
+  /** where brood lies this tick, for broodMet (task reversion, ja-7r7x); filled only with revert on */
+  broods = new FeltGrid();
   /** the fullest crop on each cell this tick (cropFeed, ja-638i) */
   cropDonors = new DonorGrid();
   /** the best-fed ant on each cell this tick, for food shared by mouth (hunger.ts); rebuilt every tick, not saved */
@@ -809,12 +812,15 @@ export class Colony {
 
   /**
    * Whether old ant i has reverted to nursing (task reversion, ja-7r7x, docs/task-reversion.md): at home underground, it
-   * has met almost no young nestmates lately (`youngMet` below REVERT_BELOW), and it is among the share `revert` of the
+   * has met almost no young nestmates lately (`youngMet` below REVERT_BELOW) but has met brood (`broodMet` at least
+   * BROOD_MET_MIN), and it is among the share `revert` of the
    * old that revert at all (its own threshold, drawn from its index). It then nurses as the young do.
    */
   reverts(i: number): boolean {
     const share = this.params.revert;
-    if (share <= 0 || this.queen === null || this.under[i] !== 1 || this.youngMet[i] >= REVERT_BELOW || this.band(i) !== 2) return false;
+    if (share <= 0 || this.queen === null || this.under[i] !== 1 || this.youngMet[i] >= REVERT_BELOW || this.broodMet[i] < BROOD_MET_MIN)
+      return false;
+    if (this.band(i) !== 2) return false;
     return ((i + 1) * 0.6180339887498949) % 1 < share;
   }
 

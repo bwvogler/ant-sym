@@ -6221,7 +6221,7 @@ Merging is not delegated: PRs wait for the owner.
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
 
-## 74. Task reversion: old foragers nurse when the young are gone (design, ja-7r7x, 2026-11-14)
+## 74. Task reversion: old foragers nurse when the young are gone (built, off, ja-7r7x, 2026-11-14)
 
 **Research basis:** [task-reversion.md](task-reversion.md):
 - In ants, foragers exposed to brood without younger workers revert to brood care, often within 24 h (Symonowicz et al. 2015, citing Ehrhardt 1931, Dobrzańska 1959, Lenoir 1979 and others).
@@ -6236,11 +6236,14 @@ Merging is not delegated: PRs wait for the owner.
 - Fix it by task reversion, not by tuning thresholds or changing the test's age structure (owner, 2026-11-14).
 - The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
 
-**The mechanic (planned).**
-- *Cue:* an old ant at home whose count of young nestmates met by contact (`youngMet`, leaky, like activation's `met`) is low, near brood (the brood and royal marks).
+**The mechanic (built, off, setting `revert`).**
+- *Cue:* two senses by contact, each the share of the last minute or so (`YOUNG_TAU`) that one was within a cell:
+  - young nestmates met (`youngMet`) below `REVERT_BELOW`;
+  - brood met (`broodMet`) at least `BROOD_MET_MIN`.
+  A colony with no brood (one at its cap lays none) has no reverting ants. The brood cue was added on the review of #217 (D1, owner, 2026-11-15); the brood floor mark could not serve, as it is laid by ants leaving any brood chamber, brood or not.
 - *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
 - *Ending:* it reverts back when it meets young again.
-- *Only a share of the old* revert, each by a threshold drawn at birth (setting `revert`; 0 = off, main bit for bit).
+- *Only a share of the old* revert, each by a draw fixed to its slot in the colony (a newborn takes a dead ant's), the setting `revert`; 0 = off, main bit for bit.
 
 **Assays and targets.**
 - Assay `larvae` lands first: `economy.test`'s `hour()` as an assay. It records the peak of larvae waiting over 120 s beside enough food in each of 16 games, with workers alive and born, starved workers, food stored and food home as guards.
@@ -6284,7 +6287,7 @@ Merging is not delegated: PRs wait for the owner.
 - What ends a reversion (not measured in any paper read).
 - Reading the *Pheidole dentata* papers.
 
-## 75. Larval feeding by mouth: nurses feed larvae from their crops (design, ja-638i, 2026-11-15)
+## 75. Larval feeding by mouth: nurses feed larvae from their crops (built, off, ja-638i, 2026-11-15)
 
 **Research basis:** [larval-feeding.md](larval-feeding.md):
 - Fire-ant workers feed larvae liquid by trophallaxis in small fixed boluses, more often the hungrier the larva; larvae take about 8 h of feeding to be sated (Cassill & Tschinkel 1995, abstract, **unverified**).
@@ -6297,11 +6300,11 @@ Merging is not delegated: PRs wait for the owner.
 **Decisions.**
 - Food should reach the brood by nurses feeding by mouth (owner, 2026-11-15).
 
-**The mechanic (planned, setting `cropFeed`, 0 = main bit for bit).**
+**The mechanic (built, off, setting `cropFeed`, 0 = main bit for bit).**
 - *Crops:* each ant gets a crop of food. It fills within two cells of a stocked store or reception, and passes food by contact to a nestmate with an emptier crop and more felt need.
-- *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it a fixed bolus, more often the more the larva begs.
+- *Feeding larvae:* a nurse with food in its crop, beside a larva that begs or is still owed its growth food, feeds it at a rate (`CROP_FEED` × the larva's strength, a second) that rises with the larva's beg; a hungry ant eats from its own crop first.
 - *Unchanged:* porters and their table stay for now.
-- *Design numbers:* `CROP_MAX`, the share passed and the bolus.
+- *Design numbers:* the cap (the setting `cropFeed`), `CROP_FILL`, `CROP_PASS`, `CROP_FEED` and `CROP_OWED`.
 
 **Assays and targets.**
 - Assay `larvae` (§74), seeds 1–16, confirmed on 17–32.

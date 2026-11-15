@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { LARVA } from "../../brood.ts";
 import { Colony } from "../../colony.ts";
+import { CELL, cellOf } from "../../hex.ts";
 import { NEED_FETCH } from "../../hunger.ts";
 import { worksInside } from "../../nestWork.ts";
 import { fetches } from "../../tunnel.ts";
@@ -24,6 +26,15 @@ function home(c: Colony, i: number, band: 0 | 1 | 2) {
   c.carrying[i] = 0;
 }
 
+/** A larva lying at the nest's centre (where `home` puts the ants): brood the old ant meets. */
+function larvaAtHome(c: Colony) {
+  cellOf(c.nest.x, c.nest.y);
+  const b = c.brood.add(CELL[0], CELL[1], c.map.chambers!.at(CELL[0], CELL[1]));
+  b.stage = LARVA;
+  b.energy = 1;
+  return b;
+}
+
 /** Hold ants in place (the test is the sense, not where they walk) and step `secs` seconds. */
 function hold(c: Colony, secs: number, place: () => void) {
   for (let t = 0; t < 30 * secs; t++) {
@@ -42,9 +53,31 @@ test("youngMet: an old ant at home beside a young one keeps meeting it; alone, t
   assert.equal(c.reverts(0), false);
   const alone = colony(1, 1);
   assert.equal(alone.youngMet[0], 1, "born as if among the young");
+  larvaAtHome(alone);
   hold(alone, 240, () => home(alone, 0, 2));
+  assert.ok(alone.broodMet[0] > 0.9, `beside a larva: ${alone.broodMet[0]}`);
   assert.ok(alone.youngMet[0] < REVERT_BELOW, `alone for 240 s: ${alone.youngMet[0]}`);
-  assert.equal(alone.reverts(0), true, "an old ant meeting no young reverts");
+  assert.equal(alone.reverts(0), true, "an old ant meeting brood and no young reverts");
+});
+
+test("no brood, no reversion: an old ant at home that meets neither young nor brood keeps foraging (review of #217, D1)", () => {
+  const c = colony(1, 1);
+  hold(c, 240, () => home(c, 0, 2));
+  assert.ok(c.youngMet[0] < REVERT_BELOW, "it has met no young");
+  assert.ok(c.broodMet[0] < 0.01, `nor brood: ${c.broodMet[0]}`);
+  assert.equal(c.reverts(0), false, "a colony with no brood (one at its cap lays none) keeps its foragers");
+  assert.equal(c.mayGoOut(0), true);
+});
+
+test("a middle-aged nestmate is not a young one: an old ant beside it, by brood, still reverts", () => {
+  const c = colony(1, 2);
+  larvaAtHome(c);
+  hold(c, 240, () => {
+    home(c, 0, 2);
+    home(c, 1, 1); // middle-aged, on the same cell
+  });
+  assert.ok(c.youngMet[0] < REVERT_BELOW, `the middle-aged don't count: ${c.youngMet[0]}`);
+  assert.equal(c.reverts(0), true);
 });
 
 test("revert 0: the sense is not kept and nobody reverts (main)", () => {
@@ -60,6 +93,7 @@ test("a reverted old ant stays in and works inside at the young's threshold; the
   home(c, 0, 2);
   c.under[0] = 1;
   c.youngMet[0] = 0;
+  c.broodMet[0] = 1;
   assert.equal(c.reverts(0), true);
   assert.equal(c.mayGoOut(0), false, "it stays in like the young");
   assert.equal(c.outbound(0), false, "not a forager on its way out");
@@ -85,6 +119,7 @@ test("only the share `revert` of the old can revert, each by its own draw", () =
       c.age[i] = ageOf(2);
       c.under[i] = 1;
       c.youngMet[i] = 0;
+      c.broodMet[i] = 1;
       if (c.reverts(i)) k++;
     }
     return k;
@@ -97,6 +132,7 @@ test("only the share `revert` of the old can revert, each by its own draw", () =
 
 test("a reverted ant goes back once it meets young again", () => {
   const c = colony(1, 2);
+  larvaAtHome(c);
   hold(c, 240, () => {
     home(c, 0, 2);
     home(c, 1, 0);
