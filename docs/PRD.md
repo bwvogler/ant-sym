@@ -6465,7 +6465,8 @@ Merging is not delegated: PRs wait for the owner.
 - Every crop size ends worker starvation, and every one raises the worst seed's waiting larvae; 0.1 keeps the pass count of crops off.
 - By the worst seed, crops off is best for the larvae (10 waiting, none starved); 0.1 trades one seed's 17 starved workers for one seed with 47 larvae waiting and 5 starved.
 - **The owner chose `cropFeed: 0.1`** (2026-11-15): the mechanic is grounded (Greenwald et al. 2015; Cassill & Tschinkel 1995, **unverified**), and no worker starves. It is the default now, with `revert: 1`.
-- The larval spike it brings (seed 19: crops on, larvae wait) stays open in ja-638i.3's follow-up: how crops fill or are passed so they don't hold back food the brood needs.
+- Guards with `revert` 1, `cropFeed` 0 against 0.1 ([run](https://github.com/bwvogler/ant-sym/actions/runs/43718042882)): the two-colony `game`, seeds 1–20, passes 18/20 either way (seeds 3 and 10 fail), and the medians match except the rival's ants (820 against 829); `nestFlow`, seeds 1–20, is identical in every metric. Every golden master is unchanged: their games are short and no ant there fills a crop.
+- The larval spike it brings (seed 19: crops on, larvae wait) stays open in ja-638i.4: how crops fill or are passed so they don't hold back food the brood needs.
 
 **Still open.**
 - Crops' larval spike on seed 19, and seed 22 over the bound with either size.
