@@ -1,23 +1,22 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { askedLevers, DEFAULT_MENU, Fungus, STRAINS } from "../../fungus.ts";
 import { Game, type GameSave } from "../../game.ts";
 import { CELL, cellOf } from "../../hex.ts";
 import { encodeLevels } from "../../levers.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
-import { SMALL_SIDE } from "../builders.ts";
+import { mulberry32 } from "../../world.ts";
+import { oneColony, smallOne } from "../builders.ts";
 
 // The queen as a host (ja-lo8.7): her attendants infect her by contact; the fungus in her has its own levers (showing,
-// and her signal, which scales her royal mark); reaching her opens her colony's doctrine (Game.revealed).
+// and her signal, which scales her royal mark); reaching her opens her colony's doctrine (Game.revealed). In her royal
+// chamber in one world's curtain (S2.3c: until then the side view's nest).
 
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
-/** A colony of `n` ants, all put beside its queen. */
+/** A colony of `n` ants, all put beside its queen in the curtain. */
 function court(n: number, load: number) {
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const c = new Colony(map, { antCount: n, maxAnts: n }, mulberry32(4), () => "explore");
+  const { map, c } = oneColony(n, { maxAnts: n });
   for (let i = 0; i < n; i++) {
     c.x[i] = c.queen!.x + 0.3;
     c.y[i] = c.queen!.y;
@@ -67,7 +66,7 @@ test("the queen is asked only her own levers, and her signal lever scales the ro
 });
 
 test("reaching a queen opens her colony's doctrine for good, and a save keeps it", () => {
-  const g = new Game(generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 }), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
+  const g = new Game(smallOne(2), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
   g.tick(1 / 30);
   assert.deepEqual(g.revealed, []);
   g.colonies[0]!.queen!.load = 0.3;
@@ -80,7 +79,7 @@ test("reaching a queen opens her colony's doctrine for good, and a save keeps it
   g.tick(1 / 30);
   assert.equal(g.revealed[0], true, "it stays open");
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
-  const again = new Game(generateSideWorld(2, { ...SMALL_SIDE, nestCount: 2 }), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
+  const again = new Game(smallOne(2), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
   again.load(saved);
   assert.equal(again.revealed[0], true);
   assert.equal(again.colonies[0]!.queen!.strain, GARDEN, "and the queen's fungus with it");

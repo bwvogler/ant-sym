@@ -1,20 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Colony } from "../../colony.ts";
+import { localPolicy, PLANE, type Colony } from "../../colony.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { EXPLORE, RETURN } from "../../vocab.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
-import { SMALL_SIDE, ageOf } from "../builders.ts";
+import { oneColony, ageOf } from "../builders.ts";
 
 // forageDig (ja-16rp, docs/foraging-tunnels.md, PRD §70): an old forager home from a trip with nothing digs in the nest
 // for forageDig seconds instead of going straight back out. Assay P1 (pockets) measures what it does over an hour; these
-// pin when a bout starts, what it lets the ant do, and when it ends. World 2 of SMALL_SIDE, as restFetch.test.
+// pin when a bout starts, what it lets the ant do, and when it ends. Seed 2's small one world, in colony 0's nest in the curtain (S2.3c: until then world 2 of the small side map), as restFetch.test.
 
-/** `n` ants on world 2; a fixed "explore" policy unless `local` (the local rule, under which a tired forager turns home). */
+/** `n` ants in the curtain; a fixed "explore" policy unless `local` (the local rule, under which a tired forager turns home). */
 const colony = (forageDig: number, n = 1, local = false) =>
-  local
-    ? new Colony(generateSideWorld(2, SMALL_SIDE), { antCount: n, maxAnts: n, forageDig }, mulberry32(7))
-    : new Colony(generateSideWorld(2, SMALL_SIDE), { antCount: n, maxAnts: n, forageDig }, mulberry32(7), (() => "explore") as never);
+  oneColony(n, { maxAnts: n, forageDig }, local ? localPolicy : () => "explore", 7).c;
 
 /** Ant i of age band `band`, empty-jawed and exploring at the nest's centre. */
 function inNest(c: Colony, i: number, band: 0 | 1 | 2) {
@@ -81,7 +78,10 @@ test("forageDig: a bout starts only for an old forager coming home with nothing,
           assert.equal(c.digBout[i], forageDig, "a bout starts at forageDig seconds");
           assert.equal(c.band(i), 2, "an old ant");
           assert.equal(c.carrying[i], 0, "with nothing in its jaws");
-          assert.equal(c.under[i], 1, "at home");
+          // At home: in its nest, or (one world) at the disc round its hole on the plane, where a returner arrives and goes down.
+          const disc = c.layers[PLANE]!.nest;
+          const atHole = c.layer[i] === PLANE && Math.hypot(c.x[i] - disc.x, c.y[i] - disc.y) <= disc.r;
+          assert.ok(c.under[i] === 1 || atHole, "at home");
         }
         prev[i] = c.digBout[i];
       }
@@ -95,12 +95,7 @@ test("forageDig: a bout starts only for an old forager coming home with nothing,
 test('forageDig: the trigger is an old ant\'s: a middle-aged ant home in "return" with nothing gets no bout', () => {
   const bout = (band: 0 | 1 | 2, since = 50, left = 0) => {
     // A "return" policy keeps it in return at home (the local rule would send a rested ant out first).
-    const c = new Colony(
-      generateSideWorld(2, SMALL_SIDE),
-      { antCount: 1, maxAnts: 1, forageDig: 120 },
-      mulberry32(7),
-      (() => "return") as never,
-    );
+    const { c } = oneColony(1, { maxAnts: 1, forageDig: 120 }, (() => "return") as never, 7);
     c.age[0] = ageOf(band);
     c.x[0] = c.nest.x;
     c.y[0] = c.nest.y;
