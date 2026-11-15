@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ChunkLayer } from "../chunks.ts";
 import { PLANE } from "../colony.ts";
-import { MUTATION } from "../evolution.ts";
+import { MUTATION, pathTo } from "../evolution.ts";
 import { STRAINS } from "../fungus.ts";
 import { Game, GAME_REGROW, gameRng } from "../game.ts";
 import { generateOneWorld } from "../oneWorld.ts";
@@ -32,7 +32,7 @@ export interface Scenario {
 
 /** scripts/lab/progression.mjs's default buy order (the order a player who buys as soon as they can might keep). */
 const UPGRADE_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth".split(
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth".split(
     ",",
   );
 
@@ -142,10 +142,11 @@ function recordOne(s: Scenario): OneSample[] {
     game.land(0, strain, { evolve: true });
     for (const id of L.grant ?? []) {
       const e = game.fungus.evolution!;
-      const cost = e.cost(id);
-      if (cost === null) throw new Error(`${s.name}: can't grant ${id}`);
-      e.growth += cost / MUTATION;
-      if (!game.fungus.upgrade(id)) throw new Error(`${s.name}: grant ${id} not bought`);
+      if (e.cost(id) === null) throw new Error(`${s.name}: can't grant ${id}`);
+      for (const x of pathTo(e.save().levels, id)) {
+        e.growth += e.cost(x)! / MUTATION;
+        if (!game.fungus.upgrade(x)) throw new Error(`${s.name}: grant ${x} not bought`);
+      }
     }
   }
   const out: OneSample[] = [];

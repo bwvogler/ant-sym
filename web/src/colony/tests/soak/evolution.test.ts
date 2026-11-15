@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../../evolution.ts";
+import { BODY, canKeep, Evolution, MUTATION, pathTo, price, unmet, UPGRADES, upgrade } from "../../evolution.ts";
 import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../../fungus.ts";
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
@@ -36,6 +36,11 @@ function run(f: Fungus, colonies: Colony[], seconds: number, dt = 1 / 30): void 
 
 const lever = (id: string) => LEVERS.find((v) => v.id === id)!;
 
+/** Keep the next level of `id` through the fungus, keeping first whatever it needs (the tree, ja-52ui). */
+function keep(f: Fungus, id: string): boolean {
+  return pathTo(f.evolution!.save().levels, id).every((x) => f.upgrade(x));
+}
+
 test("hold: a level is pulled back toward as is until it is within reach; levers without a reach keep their range", () => {
   const food = lever("food"); // five levels, as is at 2
   const rival = lever("rival"); // three levels, as is at 0
@@ -66,8 +71,8 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   const LOCKPICK = STRAINS.findIndex((x) => x.id === "lockpick");
   assert.deepEqual(f.held({ food: 4 }, LOCKPICK), { food: 4 }, "another strain's host (a lab brush) is not held (PR #43 review, N2)");
   const e = f.evolution!;
-  e.replicate(upgrade("senses").costs[0]! / MUTATION);
-  assert.ok(f.upgrade("senses"), "the mutations for the Senses' full range");
+  e.replicate(1e6);
+  assert.ok(keep(f, "senses"), "the mutations for the Senses' full range, and the first steps it needs");
   f.expressLevels(c, 0, { food: 4 }, 1);
   assert.ok(Math.abs(c.gainFood[0] - 2.5) < 1e-9, `the full range: ${c.gainFood[0]}`);
   // A lab helper runs a preset whatever the menu and the reach say.
@@ -91,12 +96,12 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   assert.equal(c.estrange[0], 0, "so the host smells like itself");
   assert.equal(c.regicide[0], 0, "and spares the queen");
   const e = f.evolution!;
-  e.replicate((upgrade("weapon").costs[0]! + upgrade("crown").costs[0]!) / MUTATION);
-  assert.ok(f.upgrade("weapon"), "the mutations for the odour weapon");
+  e.replicate(1e7);
+  assert.ok(keep(f, "weapon"), "the mutations for the odour weapon, and what it needs");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
   assert.ok(c.estrange[0] > 0, "freed: the host smells like nobody's");
   assert.equal(c.regicide[0], 0, "crown still held");
-  assert.ok(f.upgrade("crown"), "the mutations for crown");
+  assert.ok(keep(f, "crown"), "the mutations for crown, and what it needs");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
   assert.ok(c.regicide[0] > 0, "freed: the host kills the queen it tends");
   // A game that doesn't evolve (the lab, the assays) has no reach: the lethal levers run as the menu says.
@@ -119,31 +124,67 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
   assert.ok(c.load[0] > 0.5, "still a host");
   assert.ok(c.fungal[0] >= 0, "the step read its situation and expressed its policy's answer");
   assert.equal(c.estrange[0], 0, "held off through the step");
-  f.evolution!.replicate(upgrade("weapon").costs[0]! / MUTATION);
-  assert.ok(f.upgrade("weapon"));
+  f.evolution!.replicate(1e7);
+  assert.ok(keep(f, "weapon"));
   run(f, [c], 0.2);
   assert.ok(c.estrange[0] > 0, `freed: ${c.estrange[0]}`);
 });
 
-test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {
-  for (const u of UPGRADES)
-    for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
+test("mutations: a fixed share of growth, and every level costs one price, which rises with each level kept (ja-52ui)", () => {
   const e = new Evolution(GARDEN);
   assert.equal(e.mutations, 0);
-  const [a, b, c] = upgrade("infectivity").costs as number[];
-  e.replicate((a! + b!) / MUTATION);
-  assert.ok(Math.abs(e.mutations - (a! + b!)) < 1e-9, "growth × MUTATION");
-  assert.ok(e.buy("infectivity") && e.buy("infectivity"), "levels 1 and 2");
-  assert.equal(e.cost("infectivity"), c);
-  assert.equal(e.buy("infectivity"), false, "level 3: not enough");
-  assert.ok(Math.abs(e.mutations) < 1e-9);
-  assert.equal(e.traits().transmission, upgrade("infectivity").values![2]);
+  assert.equal(e.cost("infectivity"), price(0), "the first level costs the base price");
+  e.replicate((price(0) + price(1)) / MUTATION);
+  assert.ok(Math.abs(e.mutations - (price(0) + price(1))) < 1e-9, "growth × MUTATION");
+  assert.ok(e.buy("infectivity"), "a root: Infectivity fair");
+  assert.equal(e.cost("persistence"), price(1), "one level kept: every next level now costs the second price");
+  assert.equal(e.cost("mycelium"), price(1));
+  assert.ok(price(1) > price(0) && price(10) > price(9), "the price rises");
+  assert.ok(e.buy("persistence"));
+  assert.ok(Math.abs(e.mutations) < 1e-9, "both prices paid");
+  assert.equal(e.buy("mycelium"), false, "too few left");
+  assert.equal(e.traits().transmission, upgrade("infectivity").values![1]);
   e.replicate(1e7);
-  for (const u of UPGRADES) while (e.buy(u.id));
-  for (const u of UPGRADES) assert.equal(e.cost(u.id), null, `${u.id} at its last level`);
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const u of UPGRADES) while (e.buy(u.id)) moved = true;
+  }
+  for (const u of UPGRADES) assert.equal(e.cost(u.id), null, `${u.id} at its last level: every level can be reached`);
   assert.equal(e.buy("infectivity"), false);
   const back = Evolution.load(JSON.parse(JSON.stringify(e.save())));
   assert.deepEqual(back.save(), e.save(), "a save round-trips");
+});
+
+test("the tree: a level that needs another can't be kept before it, and says what it needs (ja-52ui)", () => {
+  const e = new Evolution(GARDEN);
+  e.replicate(1e7);
+  const roots = UPGRADES.filter((u) => e.locked(u.id).length === 0).map((u) => u.id);
+  assert.deepEqual(roots, ["infectivity", "persistence", "mycelium", "fruiting", "stealth", "recognition", "trails"], "seven roots");
+  assert.deepEqual(e.locked("crown"), [
+    { id: "royal", level: 2 },
+    { id: "weapon", level: 1 },
+  ]);
+  assert.equal(e.affordable("crown"), false, "locked: not affordable, however many mutations");
+  assert.equal(e.buy("crown"), false, "and not kept");
+  assert.equal(e.level("crown"), 0);
+  assert.ok(e.buy("infectivity"), "fair: a root");
+  assert.deepEqual(e.locked("infectivity"), [{ id: "persistence", level: 1 }], "strong needs Persistence: clears slowly");
+  assert.equal(e.buy("infectivity"), false);
+  assert.ok(e.buy("persistence") && e.buy("infectivity"), "kept once its need is");
+  assert.deepEqual(e.locked("senses"), [
+    { id: "recognition", level: 1 },
+    { id: "trails", level: 1 },
+  ]);
+  assert.ok(e.buy("recognition"));
+  assert.deepEqual(e.locked("senses"), [{ id: "trails", level: 1 }], "one need met, one still missing");
+  assert.deepEqual(unmet(e.save().levels, "senses"), e.locked("senses"), "the pure form the page uses agrees");
+  assert.equal(canKeep(e.save().levels, e.mutations, "senses"), false);
+  assert.ok(e.buy("trails") && e.buy("senses"));
+  assert.deepEqual(
+    pathTo({}, "crown"),
+    ["recognition", "recognition", "royal", "trails", "trails", "royal", "infectivity", "persistence", "infectivity", "weapon", "crown"],
+    "crown's path: what it needs, then it",
+  );
 });
 
 test("mutations come as fast as the fungus grows: the panel's rate settles at MUTATION × growth a second", () => {
@@ -287,7 +328,7 @@ test("the queen's levels are held too: Stealth decides how far she can hide (PR 
   settle();
   assert.equal(q.show, 1, "Stealth at none: she shows as she is");
   f.evolution!.replicate(1e6);
-  assert.ok(f.upgrade("stealth") && f.upgrade("stealth"));
+  assert.ok(keep(f, "stealth") && keep(f, "stealth"));
   settle();
   assert.equal(q.show, 0.25, "Stealth at its most: hidden");
 });

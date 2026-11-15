@@ -28,7 +28,7 @@ const opt = (name, fallback) => {
 };
 const flag = (name) => args.includes(`--${name}`);
 const DEFAULT_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth";
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
@@ -115,13 +115,15 @@ if (isMainThread) {
     STRAINS.findIndex((s) => s.id === strain),
     { evolve },
   );
-  const { MUTATION } = await import("../../web/src/colony/evolution.ts");
+  const { MUTATION, pathTo } = await import("../../web/src/colony/evolution.ts");
+  // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then.
   for (const id of grant) {
     const e = g.fungus.evolution;
-    const cost = e?.cost(id);
-    if (!e || cost === null || cost === undefined) continue;
-    e.growth += cost / MUTATION;
-    g.fungus.upgrade(id);
+    if (!e || e.cost(id) === null) continue;
+    for (const x of pathTo(e.save().levels, id)) {
+      e.growth += e.cost(x) / MUTATION;
+      g.fungus.upgrade(x);
+    }
   }
   const DT = 1 / 30;
   const r = {

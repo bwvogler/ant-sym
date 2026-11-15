@@ -1,5 +1,5 @@
 import type { Upgrade } from "../colony/index.ts";
-import { nextLevelTip, upgradeTip } from "./upgradeText.ts";
+import { needText, nextLevelTip, upgradeTip } from "./upgradeText.ts";
 
 /** The tooltip body for an upgrade: what it is, why it matters, each level (the current one marked), and the levers a reach upgrade widens. */
 export function UpgradeBody({ u, level }: { u: Upgrade; level: number }) {
@@ -17,7 +17,7 @@ export function UpgradeBody({ u, level }: { u: Upgrade; level: number }) {
           <span key={l.step} className={`block ${k === level ? "font-semibold text-spore" : "text-fg-2"}`}>
             {k === level ? "now: " : k < level ? "had: " : "next: "}
             {l.step}: {l.line}
-            {k > level && u.costs[k - 1] !== undefined ? ` (${u.costs[k - 1]!.toLocaleString()} mutations)` : ""}
+            {k > level && (u.needs[k - 1]?.length ?? 0) > 0 ? ` (needs ${u.needs[k - 1]!.map(needText).join(" and ")})` : ""}
           </span>
         ))}
       </span>
@@ -38,8 +38,8 @@ export function UpgradeBody({ u, level }: { u: Upgrade; level: number }) {
 }
 
 /** The tooltip body for the button that buys the next level. */
-export function NextBody({ u, level }: { u: Upgrade; level: number }) {
-  const n = nextLevelTip(u, level);
+export function NextBody({ u, levels }: { u: Upgrade; levels: Readonly<Record<string, number>> }) {
+  const n = nextLevelTip(u, levels);
   if (!n) return null;
   return (
     <span className="flex flex-col gap-1">
@@ -49,6 +49,7 @@ export function NextBody({ u, level }: { u: Upgrade; level: number }) {
         </span>{" "}
         for {n.cost.toLocaleString()} mutation{n.cost === 1 ? "" : "s"}
       </span>
+      {n.needs.length > 0 && <span className="block text-warn">Needs {n.needs.join(" and ")} first.</span>}
       <span className="block text-fg-2">{n.line}.</span>
       <span className="block text-fg-3">{u.blurb}.</span>
     </span>
