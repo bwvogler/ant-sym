@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { basename, dirname, join } from "node:path";
 
 // The agent files are read in every session, so their size is a cost (docs/agent-guide.md). CLAUDE.md is held to Anthropic's
 // under-200-lines target and to a byte cap, since its lines run long: raise the cap only by cutting something else.
@@ -85,4 +86,52 @@ test("the directory CLAUDE.md files stay small, and the root one names the skill
     assert.ok(text.includes(name), `names the ${name} skill`);
     assert.ok(existsSync(join(ROOT, ".claude/skills", name, "SKILL.md")), `${name} exists`);
   }
+});
+
+// Reviews kept finding agent docs that name a file that had moved or gone (ja-w7ef.6: stale cross-references). Every
+// backticked file path in CLAUDE.md, the agent guide, AGENTS.md, the skills and the reviewer agent must exist: a path
+// with a folder from the repo root or a folder a doc writes paths from, a bare name as some tracked file's name.
+// reference/history.md files tell what was, so they may name what is gone.
+const NOT_IN_GIT: Record<string, string> = {
+  "hooks/policy.ts": "in the sibling repo ../jev-router",
+  "data/jev-budget.json": "the server's ledger, written at run time",
+  "assays.json": "assays.yml's artifact",
+};
+test("the agent docs name files that exist", () => {
+  const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
+  const names = new Set(tracked.map((f) => basename(f)));
+  const skills = readdirSync(join(ROOT, ".claude/skills"));
+  const docs = [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/agent-guide.md",
+    ".claude/agents/pr-reviewer.md",
+    ...skills.flatMap((s) =>
+      readdirSync(join(ROOT, ".claude/skills", s), { recursive: true, encoding: "utf8" })
+        .filter((f) => f.endsWith(".md") && !f.endsWith("history.md"))
+        .map((f) => `.claude/skills/${s}/${f}`),
+    ),
+  ].filter((d) => existsSync(join(ROOT, d)));
+  assert.ok(docs.length >= 10, `${docs.length} docs`);
+  const bases = (doc: string): string[] => [
+    "",
+    "web",
+    "web/src",
+    "web/src/colony",
+    "web/src/colony/tests",
+    ".claude/skills",
+    dirname(doc),
+    ...(doc.startsWith(".claude/skills/") ? [doc.split("/").slice(0, 3).join("/")] : []),
+    // An agent runs a skill (pr-reviewer: reviewing-prs) and writes paths from its folder.
+    ...(doc.startsWith(".claude/agents/") ? skills.map((sk) => `.claude/skills/${sk}`) : []),
+  ];
+  const missing: string[] = [];
+  for (const doc of docs)
+    for (const [, raw] of readFileSync(join(ROOT, doc), "utf8").matchAll(/`([^`\s]+)`/g)) {
+      const p = raw!.replace(/[:#].*$/, "").replace(/[),.]$/, "");
+      if (!/^[\w.@-]+(\/[\w.@-]+)*\.(ts|tsx|mjs|js|md|json|ya?ml|sh)$/.test(p) || p.startsWith("..") || p in NOT_IN_GIT) continue;
+      const found = p.includes("/") ? bases(doc).some((b) => existsSync(join(ROOT, b, p))) : names.has(p);
+      if (!found) missing.push(`${doc}: ${p}`);
+    }
+  assert.deepEqual(missing, [], "named in an agent doc but not in the repo: fix the path, or add it to NOT_IN_GIT with why");
 });
