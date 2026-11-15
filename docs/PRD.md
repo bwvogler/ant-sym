@@ -6237,12 +6237,12 @@ Merging is not delegated: PRs wait for the owner.
 - The share of old ants that can revert is swept on the `larvae` assay; the owner picks from the numbers (owner, 2026-11-14).
 
 **The mechanic (built, off, setting `revert`).**
-- *Cue:* two senses by contact, each the share of the last minute or so (`YOUNG_TAU`) that one was within a cell:
+- *Cue:* two senses, each the share of the last minute or so (`YOUNG_TAU`) that one was in reach (young nestmates by contact, within a cell; brood by smell, within `BROOD_SMELL` cells):
   - young nestmates met (`youngMet`) below `REVERT_BELOW`;
   - brood met (`broodMet`) at least `BROOD_MET_MIN`, smelt within `BROOD_SMELL` cells (4, design; at one cell, by touch, the old ants away from the brood never met it: owner, D2, 2026-11-15).
   A colony with no brood (one at its cap lays none) has no reverting ants. The brood cue was added on the review of #217 (D1, owner, 2026-11-15); the brood floor mark could not serve, as it is laid by ants leaving any brood chamber, brood or not.
 - *Response:* it stays in, follows the brood marks as the young do, works inside at the young's threshold (`NEED_FETCH`), and takes no foraging dig.
-- *Ending:* it reverts back when it meets young again.
+- *Ending:* it goes back to foraging when it meets young again, or when the brood is gone (`broodMet` below `BROOD_MET_MIN`).
 - *Only a share of the old* revert, each by a draw fixed to its slot in the colony (a newborn takes a dead ant's), the setting `revert`; 0 = off, main bit for bit.
 
 **Assays and targets.**
@@ -6339,7 +6339,8 @@ Merging is not delegated: PRs wait for the owner.
 - **Reversion**, before the brood cue, stopped larvae starving: old ants came to the brood when the young were gone.
 - **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
 
-**With the brood cue (review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 now matches main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never meet any, so they never revert. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. The owner's next call: how an old ant away from the brood should sense it.
+**With the brood cue by touch, one cell (b6e33c7, review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 matched main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never met any, so they never reverted. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. How an old ant away from the brood should sense it was the owner's D2 call, below.
+
 **With brood smelt within `BROOD_SMELL` (4) cells (owner, D2, 2026-11-15), same seeds.**
 
 | `revert` | `cropFeed` | Seeds over 8 | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |

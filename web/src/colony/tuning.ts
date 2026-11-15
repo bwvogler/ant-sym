@@ -68,7 +68,7 @@ export const YOUNG_TAU = 60;
 /** An old ant at home reverts to nursing while its `youngMet` is below this (design). */
 export const REVERT_BELOW = 0.05;
 /**
- * ...and only while its `broodMet` (the share of recent time, YOUNG_TAU, a brood item was within a cell of it) is at
+ * ...and only while its `broodMet` (the share of recent time, YOUNG_TAU, a brood item was within BROOD_SMELL cells of it) is at
  * least this: foragers revert when "exposed to brood in absence of younger workers" (Symonowicz et al. 2015). A colony
  * with no brood (one at its cap lays none) has no reverting ants (design threshold; review of #217, D1).
  */
@@ -76,7 +76,8 @@ export const BROOD_MET_MIN = 0.05;
 /**
  * How far (cells) an old ant at home senses brood for broodMet: brood odour a little way, not only touch (owner,
  * 2026-11-15, review of #217, D2: at one cell the old ants away from the brood never met it). Design: Temnothorax
- * workers respond to larval cuticle extracts (Kohlmeier et al. 2018), but no paper read gives a range.
+ * workers respond to larval cuticle extracts (Kohlmeier et al. 2018), but no paper read gives a range. It reads a disc of cells
+ * whatever lies between, so brood behind solid soil counts too (odour through soil; for ja-7r7x.4 to check).
  */
 export const BROOD_SMELL = 4;
 
