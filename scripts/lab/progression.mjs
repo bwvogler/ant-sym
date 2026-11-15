@@ -12,9 +12,10 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
+// --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -46,6 +47,7 @@ if (isMainThread) {
     grant: opt("grant", "").split(",").filter(Boolean),
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
+    price: opt("price", null),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -68,7 +70,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -86,7 +88,11 @@ if (isMainThread) {
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun, flow } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun, flow, price } = workerData;
+  if (price) {
+    const { PRICE } = await import("../../web/src/colony/evolution.ts");
+    [PRICE.base, PRICE.ratio] = price.split(",").map(Number);
+  }
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g =
     map === "one"
