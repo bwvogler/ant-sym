@@ -296,6 +296,8 @@ async function merge(args) {
         at.set(key, e);
         out.push(e);
       } else if (!e.pending) {
+        if (have.seconds !== e.seconds)
+          fail(`merge: ${e.assay} (${e.label}) ran ${have.seconds} s in one file and ${e.seconds} s in another`);
         for (const r of e.runs) {
           if (have.runs.some((x) => x.seed === r.seed)) fail(`merge: ${e.assay} (${e.label}) has seed ${r.seed} in more than one file`);
           have.runs.push(r);

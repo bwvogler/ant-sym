@@ -35,10 +35,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  # Two measurements of one branch at once would only share runners; each run is kept (none cancels another).
-  group: assays-${{ github.run_id }}
-
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -58,8 +54,10 @@ jobs:
           SECONDS_IN: ${{ inputs.seconds }}
           SPECIES: ${{ inputs.species }}
         run: |
+          set -f # no glob expansion of the inputs
           bad() { echo "::error title=assays input::$1"; exit 1; }
           [[ "$ASSAYS" =~ ^[A-Za-z0-9\ ]+$ ]] || bad "assays: ids and spaces only"
+          [[ " $ASSAYS " == *" merge "* ]] && bad "assays: merge is the report job's, not an assay"
           [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
           [[ "$SECONDS_IN" =~ ^[0-9]*$ ]] || bad "seconds: a whole number"
           [[ "$SPECIES" =~ ^[a-z0-9]*$ ]] || bad "species: an id"
@@ -114,7 +112,8 @@ jobs:
 
   report:
     needs: [plan, run]
-    if: ${{ !cancelled() }}
+    # Not after a refused input: plan's ::error is the one to read.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
