@@ -4197,7 +4197,7 @@ The owner asked for the top-down view and the side view to be two views of one g
 - **A6 is a fight at the nest:** every defender dies on 6 of 10 seeds and 413 of 821 defender deaths are in the curtain. Raiders keep going down a rival's shaft (owner, 2026-11-14); what A6 measures on one world stays open (`ja-lp4.6.5`).
 - **G1:** 6 of seeds 1–10 within 2, worst 6 (seed 7). #205's guard asks for 5. Raids: 166 scouts, 42 finds, 13 recruits, recruits on 4 seeds (`ja-lp4.6.9`).
 - **Unity:** peaks 0.02–0.23 % at 300 + 300 and 0.42–0.56 % at 600 + 600 in 600 s; nobody unifies (`ja-lp4.6.6`).
-- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`).
+- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`). **Gate moved (owner, 2026-11-15):** to **13 ms** at 1,200 + 1,200 on the reference machine (second-half mean), from 10 ms. The bit-exact speed-ups of `ja-lp4.6.7` (#214: the sensors share one reach search, Touch.raid worked out lazily; −7.9 %) bring `main` to about 11.9 ms there, so the gate holds with about 1 ms of slack. The ideas that would go further are filed, not scheduled: scentReach only underground (`ja-lp4.6.14`), SENSE_STEPS 5 → 3 (`ja-lp4.6.15`), scent read every other tick (`ja-lp4.6.16`), a cheaper route memory (`ja-lp4.6.17`), reach answers kept across ticks (`ja-lp4.6.18`), the pheromone step (`ja-lp4.6.19`).
 - **Cost:** none: no situation, legend or question changed.
 
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
@@ -4922,7 +4922,21 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Jev's answers.** Asked three times for the first direction ($0.0018 each, $0.0054; owner approved each): v5 and v6 answers ignored the sun (replayed offline, they failed D5 on seeds 1–5); v7 conditioned explore on the sun and passed. **Version 8** (the papers' direction) asked once more ($0.0027; $0.0081 for heat in all): its explore reads "go out, or keep searching, alone for food (only while the sun is high or unseen, and it is not hot)". Under Cautious and Warlike no answer explores at a low or set sun or with a hot body; under Forage one does (an ant whose fight is over, at a low sun). Replayed offline (Forage's answers; with no rival the three doctrines play alike), D5 passes 5/5 on seeds 1–5, with no heat deaths and nobody out at night. These are the shipped `mode-desert-*.json`.
 - **Cost:** about 690 tokens a question for the 128-situation lane (`colony-cost --species desert`), $0.0040 an hour while a doctrine is new; the live re-ask measured about 170 input tokens a question over 384. A cached game spends nothing.
 - **Tests:** `tests/int/desertHeat.test.ts` (the day and the game's start, the body, the sun seen only where the sky is and unseen deeper in, the hot rule, the sun's rule, heat deaths counted, more out at noon than in the low sun, nobody setting out at night, no heat for the generic ant). Mutations, each failing it: heat deaths not counted; the ant blind to the sun; the shaft's top not seeing the sky; the hot rule removed.
-- **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); every ant out at night counted (`ja-rf5.14`); why homing ants stay lost at night (`ja-rf5.15`); the colony in step at noon.
+- **Open:** Amor 2011 and Wehner & Wehner 2011 in full (`ja-rf5.13`); the fix for desert ants lost at night (`ja-rf5.23`; counted and explained in §60.5a); the colony in step at noon.
+
+### 60.5a Lost at night: every desert ant out counted (ja-rf5.14, ja-rf5.15, 2026-11-15)
+
+- **The count.** D5's night count left out ants on their way home (`return`). It now also reports `outNightAll`, every ant out on the plane at night, and its pass needs both ≤ 0.1 × out at noon (owner, 2026-11-15).
+- **Measured** (D5, seeds 1–20, local rule, main after #214): out at night, every ant: median 1.86, most 13.9 (seed 19); over a tenth of noon on 5 seeds (2, 7, 10, 17, 19). Setting out at night: 0 on every seed. **D5 passes 14/20** (seed 3 also fails, on a 30 s high-sun window with no pickup, as on main before this: ja-rf5.24).
+- **Why they stay out** (seeds 2, 10, 17, 19, every homing trip on the plane): 125 of the 133 trips home over 100 s are empty-jawed ants that turned home by day, not hot and under a high sun, because they **tired**: they walked about 300 cells (median) with nothing found before patience (60 s, `planePatience` 1) ran out. Their home vector is then about 30 cells off (median; 5 for the trips under 100 s), and the four-point spiral search takes over 100 s to find the hole, so those that tire in the afternoon are still searching after sunset. Carriers are rarely lost (7 of 133). Not sunset: ants that turn home at sunset are near the hole.
+- **Fixes measured, not taken** (owner: report only for now; ja-rf5.23):
+
+| option | seeds over 10 % at night | worst | D5 pass (old mark) | food stored, median / worst seed | fewest births |
+|---|---|---|---|---|---|
+| as is | 5 | 0.30 | 19 | 883 / 605 | 140 |
+| search loops (`searchLoops` 1.5) | 2 | 0.16 | 19 | 900 / 404 | 100 |
+| tire sooner on the plane (`planePatience` 0.5) | 2 | 0.13 | 20 | 942 / 487 | 115 |
+| `planePatience` 0.35 | 0 | 0.09 | 20 | 894 / 402 | 99 |
 
 ### 60.6 The invitation: a finder's pace, passed on in the shaft (ja-rf5.6, 2026-11-14)
 
@@ -5333,7 +5347,7 @@ Before the page ships hyphae on, the owner asked for seeds 11–20 (`progression
 
 **Why.** Full sunlight kills *Metarhizium* conidia fast: seven Ghanaian isolates lost 28–40 % germination in 30 min under simulated full sun and all of it in 60 min (Acheampong et al. 2025), and after 8 h of UV-B nine of twelve Brazilian isolates were under 5 % (Couceiro et al. 2021). In soil they last weeks to months (Hu & St. Leger 2002). No paired field test of sun against shade was found (`docs/hyphal-growth.md` §6), so the factor below is a **design number, not a measurement**. The owner's reading of the plane (2026-11-12) is the topsoil and litter just under the surface; nothing grows on top in the sun.
 
-**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off)**: see the decision below. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
+**Built.** One world's plane is sunlit: spores lying out on it fade `FungusParams.sun` times faster than `sporeDecay` (0.03/s); at ×4, a half-life of about 6 s instead of 23 s. **Shipped at ×1 (off), ×2 since 2026-11-15**: see the decisions below; at ×2 the half-life is about 12 s. Not on the mycelium's own patch (its base), which fruits in the litter under the surface; and not in the curtain, nor on a game of one map (the side and top-down maps, which `ja-fnd.3.3` retires; the bead's note had the top-down maps sunlit too, but the page plays only one world, so they are left as they were). In practice the sun would take the spores of hosts that die out on the plane, of corpses on the midden (`ja-2bw.7`, §63.2) and the ring a stalk spreads them over (§63.12): the landing's spray covers only the patch, and the hyphae fruit only in dug cells. Built on the owner's delegation (2026-11-14, `ja-6ip`); the factor is the owner's call (below).
 
 **Measured** (`scripts/lab/progression.mjs --map one --evolve --hyphae`, 600 s, aim *unite*; seconds to a quarter of the landing colony; `--sun` is new on the script). First, on `main` at `6883de0`, a flat rule over the whole plane:
 
@@ -5364,7 +5378,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
 
-**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off)** (re-chosen as ×2 below). Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -5377,6 +5391,29 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 | sun ×4 (s) | 543 | 231 | 203 | 18 | 285 | 352 | 245 | 332 | 262 | 361 |
 
 With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
+
+**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on #215's head (`eea04cca`: `main` at `4b114fbc`, after the fungus answers #202 re-shipped, with only `sun` changed), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a no-hyphae run on the same commit. Seconds to a quarter of the hosts:
+
+| seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 203 | 307 | 214 | 133 | 153 | 551 | 303 | 587 | 243 | 250 |
+| sun ×1 | 199 | 279 | 210 | 128 | 146 | 307 | 278 | 373 | **272** | 233 |
+| sun ×2 | 199 | 329 | 210 | 128 | 138 | 290 | 278 | 373 | 206 | 233 |
+| sun ×4 | 199 | 330 | 210 | 129 | 146 | 290 | 278 | 373 | 205 | 233 |
+
+| seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| No hyphae | 440 | 249 | 184 | 18 | 332 | 395 | 225 | 333 | 257 | 408 |
+| sun ×1 | 400 | 226 | 158 | 18 | 264 | 406 | 226 | 217 | 235 | 361 |
+| sun ×2 | 400 | 226 | 158 | 18 | 283 | 406 | 226 | 217 | 230 | 364 |
+| sun ×4 | 400 | 226 | 158 | 18 | 261 | 406 | 226 | 228 | 217 | 361 |
+
+- **×1 misses P1:** seed 9 is 12 % slower than without hyphae (243 → 272 s), and the median of seeds 1–10 is worse (252.5 s against 246.5 s).
+- **×2 holds it on seeds 1–20.** Its slowest seed is seed 2, +7.2 % (307 → 329 s); seed 16 is +2.8 %. Medians: 221.5 s on seeds 1–10 and 228 s on 11–20, against 246.5 and 294.5 s without hyphae. Worst seeds: 373 s against 587 s, and 406 s against 440 s.
+- **×2 and ×4 are within a few seconds** on every seed but 5 and 18 (×2 faster: 138 against 146 s, 217 against 228) and 15 and 19 (×4 faster: 261 against 283 s, 217 against 230); both pass, with the same worst seeds. ×2 is the milder change from the soil's fade.
+- **Before #202** (`main` at `3c79e0fb`, the same command) the ordering was the same: ×1 missed P1 on seed 9 (334 → 418 s, +25 %) and ×2 and ×4 held it, but with seeds 16 and 11 within a point of the 10 % line at ×2 (+9.3 %, +9.2 %). *Stalks* given at landing was measured only there: ×1 (worst +9.3 %) and ×4 (worst +9.3 %) both held P1; ×2 with *Stalks* was not run.
+- **Measured before #214**, which landed on `main` after these runs and moved this game though its goldens pass (seed 3 without hyphae, 300 s: 214 s at `b1ab72d`, 284 s at `fbf6415`; review of #215). Not re-measured; seed 3 at ×2 on #215 merged into `02a78fb` is 267 s, still faster than without hyphae. P1 is re-checked once that change is settled (`ja-q4ca`).
+- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; any other factor fails it. The guide's mutations entry says what the sun does. No sense, action, legend or question changed: no Jev cost change.
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
@@ -5828,11 +5865,58 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
   - one notice naming what opened together;
   - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
   - a "new" mark on those entries;
-  - the count, "Seen 11 of 22".
+  - the count, "Seen 9 of 28" on a new notebook (the generic ant).
 - **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
 - **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
 - **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
 - **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+### 69.5 S3b: specimens (ja-mvo9.3, second half)
+The second half of stage 3: a few ants kept to watch and compare, the notebook's specimens.
+- **Pinning.** The ant panel's "Pin as a specimen" keeps the followed ant; "Pinned" unpins it.
+  - At most three (`MAX_SPECIMENS`): a fourth replaces the oldest, and a notice names the ant let go.
+  - Each keeps its number (owner, review of #218, D1): the lowest free one of 1 to 3 when pinned. A death or a replacement frees that number; nothing else is renumbered, on the list or the map.
+  - An ant is (colony, slot, generation), as a follow is. A specimen that dies leaves the list with a notice ("No. 2, ant #9 of Amber, has died"), checked once a second.
+  - Specimens belong to their game: a new game starts with none.
+- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Its header folds the list to one line ("Specimens: 3") and back; on a phone it starts folded while nothing is followed, and folds when the follow ends (owner, D2). Each row has two lines:
+  - its label (No. 1), the ant and its colony, and how far the fungus is in it ("host", or the share);
+  - its mode, whether it carries food, above or below, and its fatigue of the colony's patience.
+
+  A row follows its ant, taking the camera to its view. Its × unpins it.
+- **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring, drawn over them.
+- The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
+- **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
+
+### 69.6 Notices: swipe a toast away, read it later behind the bell (ja-mvo9.5 in part, 2026-11-15)
+
+The owner, playing on a phone, found the green notices at the bottom in the way: "let me swipe them away and check them later in some notifications in the top right."
+
+- **Swipe away** (`ui/Toasts.tsx`):
+  - a tap, or a swipe of 60 px sideways or down, takes a notice off the field (`swipeOutcome`, pure and tested);
+  - a smaller drag slides it back;
+  - its timer waits while a finger holds it.
+  - Before, on a phone the notices took no touch at all (`max-sm:pointer-events-none`), so they couldn't even be tapped away.
+- **The bell** (`ui/Notices.tsx`): at the top right, beside the goal; on a phone it shares the goal's row.
+  - Every notice raised goes in a log (`toasts.ts` `noticeLog`), newest first, at most 50. The log lasts the visit and is not saved.
+  - A badge counts the ones not yet seen. Opening the list marks them seen.
+  - The list gives each notice's tone, its words and how long ago; Clear empties it.
+  - Escape or a press outside closes it.
+- **While building,** the notices show under the HUD instead of over the builder's tray.
+- **Review of #219:**
+  - one Escape closes the list and not a dialog opened over it;
+  - a press held past 0.5 s is a hold to read, so lifting it leaves the notice (`HOLD_MS`);
+  - the field's notices hide while the list is open (they are in it), and closing it clears them from the field;
+  - the bell is announced as opening a list (`aria-expanded`), not as a toggle.
+- **Checks:**
+  - `ui/tests/toasts.test.ts` covers the log, the cap, unread and read, the swipe and hold rule, and `ago`'s boundaries.
+  - `npm run e2e` step 14 runs at 390 px by real touch (CDP touch events):
+    - a swipe and a slide back;
+    - a hold past 7 s;
+    - Escape over a drawer, and a tap outside;
+    - toasts above the builder's tray.
+  - Without `touch-none`, its swipe check fails.
+- **Still in ja-mvo9.5:** motion, the theme toggle, and a11y.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
@@ -6130,6 +6214,7 @@ Why the larvae wait (economy.test's map, world 1, nudge 1): there the food runs 
 - chapter goals keep counting, and the tutorial doesn't start in builder mode;
 - the little-hands tray is a switch inside the builder;
 - sounds come from WebAudio plus speechSynthesis.
+- Dig opens any rock, the map's own as well as the builder's, on both layers (owner, 2026-11-15; D1 of #204's review): a child can take down a wall without Undo. The note's tool table said "not rock"; the code always did this, and the table now says so.
 
 Merging is not delegated: PRs wait for the owner.
 
