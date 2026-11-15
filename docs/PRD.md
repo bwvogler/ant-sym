@@ -6402,6 +6402,7 @@ Merging is not delegated: PRs wait for the owner.
   - Done gives the tab bar back;
   - saved to a slot, reloaded and continued, the wall is still there.
 - `ui/tests/build.test.ts`: the tray's lists, its sizes and the palm rule.
+- **Two fingers with a tool in hand** (owner, 2026-11-15): pinch and pan already worked with a brush selected, but the first finger to land built at once, so every pinch dropped a brush. A touch or pen now waits (`Gesture.pending`) until it moves past a click's slop or lifts as a tap; a second finger first makes it a pinch and nothing is built. The mouse is unchanged. e2e step 11 checks a pinch and a two-finger pan with sugar in hand (zoom changes, camera moves, no sugar) and a one-finger crayon drag.
 - `tests/int/builder.test.ts`: 18 tests.
 - `tests/soak/save.test.ts`: the save's keys now include `crayons`.
 

@@ -262,6 +262,12 @@ type Gesture = {
   sy: number;
   /** the ant the tweezers hold */
   ant?: Followed;
+  /**
+   * A finger's (or pen's) stroke or lift not begun yet: it starts once the finger has moved past a click's slop, or places on lifting
+   * as a tap. A second finger landing first makes it a pinch instead, and nothing was built (a pinch with a brush in hand used to
+   * drop the brush where the first finger landed).
+   */
+  pending?: boolean;
 };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
@@ -1883,14 +1889,20 @@ export default function ColonyField({
       // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
       const ant = world && shown.current === PLANE ? pick(x, y) : null;
       if (ant) {
-        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant };
-        const [wx, wy] = toWorld(camera(), viewport(), x, y);
-        buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+        // A finger waits to see whether a second joins it (a pinch); a mouse lifts at once.
+        const held = e.pointerType !== "mouse";
+        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant, pending: held };
+        if (!held) {
+          const [wx, wy] = toWorld(camera(), viewport(), x, y);
+          buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+        }
       } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
     } else if (e.button === 0 && buildRef.current?.tool) {
-      // A tool in hand: the touch builds where it lands (a tap places), and a drag carries on painting.
-      gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
-      paint([[x, y]], true);
+      // A tool in hand: a drag paints, and a tap places. A finger waits to see whether a second joins it (two fingers pan and
+      // zoom, as with no tool): it builds once it has moved past the slop, or on lifting as a tap. A mouse builds at once.
+      const held = e.pointerType !== "mouse";
+      gesture.current = { ...NO_GESTURE, ...start, kind: "paint", pending: held };
+      if (!held) paint([[x, y]], true);
     } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
@@ -1928,17 +1940,41 @@ export default function ColonyField({
         setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
       }
     } else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
-    else if (g.kind === "paint")
-      paint(
-        [
-          [prev.x, prev.y],
-          [x, y],
-        ],
-        false,
-      );
-    else if (g.kind === "tweeze" && g.ant) {
-      const [wx, wy] = toWorld(camera(), viewport(), x, y);
-      buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+    else if (g.kind === "paint") {
+      if (g.pending) {
+        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
+        // Still within a click's slop: not yet a stroke (a second finger may be on its way).
+        if (g.moved > slop()) {
+          g.pending = false;
+          paint(
+            [
+              [g.sx, g.sy],
+              [x, y],
+            ],
+            true,
+          );
+        }
+      } else
+        paint(
+          [
+            [prev.x, prev.y],
+            [x, y],
+          ],
+          false,
+        );
+    } else if (g.kind === "tweeze" && g.ant) {
+      if (g.pending) {
+        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
+        if (g.moved > slop()) {
+          g.pending = false;
+          const [sx, sy] = toWorld(camera(), viewport(), g.sx, g.sy);
+          buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, sx, sy, true);
+        }
+      }
+      if (!g.pending) {
+        const [wx, wy] = toWorld(camera(), viewport(), x, y);
+        buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+      }
     }
     pointers.current.set(e.pointerId, { x, y });
   };
@@ -1948,6 +1984,8 @@ export default function ColonyField({
     const g = gesture.current;
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
+    // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
+    if (e.type === "pointerup" && g.kind === "paint" && g.pending) paint([[g.sx, g.sy]], true);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
       if (lensRef.current && !(world && pn && shown.current === PLANE)) {

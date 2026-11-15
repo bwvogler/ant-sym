@@ -1317,6 +1317,70 @@ try {
     for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my);
     check((await g(() => window.jevAnts.view())) === "above", "taps that build follow no ant and switch no view");
     check((await g(() => window.jevAnts.game.layers[0].foodLeft)) > food0, "a tap with sugar puts food down");
+    // Two fingers with a brush in hand still pan and zoom, and build nothing: a finger waits to see whether a second joins it.
+    const bcdp = await bctx.newCDPSession(bp);
+    const touches = (pts, type) => bcdp.send("Input.dispatchTouchEvent", { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
+    const foodHeld = await g(() => window.jevAnts.game.layers[0].foodLeft);
+    const camA = await g(() => window.jevAnts.camera("above"));
+    await touches(
+      [
+        [mx - 20, my],
+        [mx + 20, my],
+      ],
+      "touchStart",
+    );
+    for (let k = 1; k <= 8; k++) {
+      const d = 20 + 6 * k;
+      await touches(
+        [
+          [mx - d, my],
+          [mx + d, my],
+        ],
+        "touchMove",
+      );
+      await sleep(16);
+    }
+    await touches([], "touchEnd");
+    await sleep(150);
+    const camB = await g(() => window.jevAnts.camera("above"));
+    check(
+      camB.zoom > camA.zoom * 1.2,
+      `two fingers spreading zoom the map with sugar in hand (${camA.zoom.toFixed(1)} → ${camB.zoom.toFixed(1)})`,
+    );
+    await touches(
+      [
+        [mx - 20, my],
+        [mx + 20, my],
+      ],
+      "touchStart",
+    );
+    for (let k = 1; k <= 8; k++) {
+      await touches(
+        [
+          [mx - 20 + 8 * k, my + 4 * k],
+          [mx + 20 + 8 * k, my + 4 * k],
+        ],
+        "touchMove",
+      );
+      await sleep(16);
+    }
+    await touches([], "touchEnd");
+    await sleep(150);
+    const camC = await g(() => window.jevAnts.camera("above"));
+    check(Math.hypot(camC.x - camB.x, camC.y - camB.y) > 0.5, "two fingers moving together pan it");
+    check((await g(() => window.jevAnts.game.layers[0].foodLeft)) === foodHeld, "and neither gesture put any sugar down");
+    // One finger still builds: a drag with the crayon draws one line, from where the finger landed.
+    await tool("Trail crayon, Amber");
+    const lines0 = await g(() => window.jevAnts.game.crayons.length);
+    await touches([[mx - 60, my + 60]], "touchStart");
+    for (let k = 1; k <= 8; k++) {
+      await touches([[mx - 60 + 15 * k, my + 60]], "touchMove");
+      await sleep(16);
+    }
+    await touches([], "touchEnd");
+    check((await g(() => window.jevAnts.game.crayons.length)) === lines0 + 1, "one finger dragging with the crayon still draws a line");
+    await tool("Undo");
+    await tool("Sugar");
     // Aphids (PRD §78): a tap puts a clump down on open ground, and its honeydew comes as the game steps on.
     await tool("Aphids");
     for (let k = -3; k <= 3; k++) await bp.touchscreen.tap(mx + 30 * k, my + 20);
