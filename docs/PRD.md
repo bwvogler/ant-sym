@@ -6340,6 +6340,17 @@ Merging is not delegated: PRs wait for the owner.
 - **Together**, no worker or larva starves and no colony falls below 149 workers, where main falls to 33. The waiting bound of 8 still fails on two seeds (worst 20, against 52).
 
 **With the brood cue (review of #217, D1: reversion needs brood met), same seeds.** `revert` 1 with `cropFeed` 0 now matches main seed for seed: 2 seeds over 8, worst 52, 45 workers and 45 larvae starved, fewest 33 workers. With `cropFeed` 0.5: 3 over 8, worst 61, 0 workers and 27 larvae starved, fewest 49. Old ants away from the brood never meet any, so they never revert. Reversion's benefit in the table above came from old ants with no brood near them, which is the case the owner's D1 call rules out. The owner's next call: how an old ant away from the brood should sense it.
+**With brood smelt within `BROOD_SMELL` (4) cells (owner, D2, 2026-11-15), same seeds.**
+
+| `revert` | `cropFeed` | Seeds over 8 | Worst | Workers starved | Larvae starved | Fewest workers at 3,600 s | Food stored (sum) |
+|---|---|---|---|---|---|---|---|
+| 0 (main) | 0 | 2 | 52 | 45 | 45 | 33 | 12,239 |
+| 1 | 0 | 0 | 6 | 17 | 0 | 125 | 12,292 |
+| 1 | 0.5 | 1 | 14 | 0 | 0 | 122 | 12,291 |
+
+- Reversion alone now meets `ja-rvli`'s bound on all 16 seeds: no seed above 8 larvae waiting, and no larva starved. 17 workers still starve.
+- Adding crops ends worker starvation too, but one seed goes over the bound (14).
+- Food stored is unchanged (reverted foragers don't cost the hour's intake on this map).
 - Not yet confirmed on seeds 17–32, nor checked on the other assays, the slow guards or the two-colony game; both settings ship off (owner, 2026-11-15).
 
 **Still open.**
