@@ -267,6 +267,7 @@ export class Builder {
   constructor(game: Game) {
     this.game = game;
     // Clumps already in the game (a loaded save) are watched to their end, said found and eaten already (review of #243, N7).
+    // A clump saved before anyone found it never says "found" after the load: only a notice (N10).
     for (const c of game.aphids) this.#clumps.set(c, { found: true, eaten: c.eaten >= APHIDS_EATEN_SAID });
   }
 

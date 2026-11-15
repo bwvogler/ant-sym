@@ -309,6 +309,7 @@ test("an aphid taken is carried home as food of quality 1, not honeydew's (revie
   // Empty-jawed foragers set down on that cell: within a few ticks one takes, and with chance 1 it takes an aphid.
   const outs = [...Array(c.n).keys()].filter((j) => c.alive[j] && c.layer[j] === PLANE && !c.carrying[j]).slice(0, 5);
   const eaten0 = clump.eaten;
+  const total0 = map.foodTotal;
   for (let t = 0; t < 10 && clump.eaten === eaten0; t++) {
     for (const j of outs) if (!c.carrying[j]) c.putAnt(j, PLANE, centreX(x, y), centreY(y));
     g.tick(1 / 30);
@@ -317,6 +318,8 @@ test("an aphid taken is carried home as food of quality 1, not honeydew's (revie
   const taker = outs.find((j) => c.carrying[j]);
   assert.ok(taker !== undefined);
   assert.equal(c.quality[taker!], 1);
+  // Each aphid taken is counted as food, as honeydew is (review of #243, N4, N9); honeydew made meanwhile counts too.
+  assert.ok(map.foodTotal - total0 >= clump.eaten - eaten0, "aphids taken count in foodTotal");
 });
 
 test("a loaded game's clumps are watched: gone, they say so (review of #243, N7)", () => {
@@ -328,4 +331,22 @@ test("a loaded game's clumps are watched: gone, they say so (review of #243, N7)
   assert.deepEqual(b.watch(), [], "found and eaten are not said again for a loaded clump");
   h.aphids.length = 0;
   assert.deepEqual(b.watch(), [{ kind: "aphidsGone" }]);
+});
+
+test("the odour follows the terrain at once, so a save loads the same one (review of #243, S1, S4)", () => {
+  const g = game();
+  const b = new Builder(g);
+  const s = openSpot(g);
+  b.apply({ tool: "aphids", layer: PLANE, points: [s] });
+  for (let k = 0; k < 30; k++) g.tick(1 / 30);
+  const before = Int16Array.from(g.aphidOdour.dist!);
+  // A rock three cells off the clump, between two ticks of one period.
+  b.apply({ tool: "rock", layer: PLANE, points: [{ x: s.x + 3 * (centreX(1, 0) - centreX(0, 0)), y: s.y }] });
+  g.tick(1 / 30);
+  assert.notDeepEqual(g.aphidOdour.dist, before, "the rock moved the odour");
+  const h = game();
+  h.load(JSON.parse(JSON.stringify(g.save())));
+  g.tick(1 / 30);
+  h.tick(1 / 30);
+  assert.deepEqual(h.aphidOdour.dist, g.aphidOdour.dist);
 });
