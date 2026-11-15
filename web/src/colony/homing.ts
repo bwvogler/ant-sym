@@ -566,11 +566,18 @@ export function targetHole(c: Colony, x: number, y: number, hy: number): boolean
  * it believes home is. With the plane bound.
  */
 export function fromHomePlane(c: Colony, i: number): number {
-  const odo = piSpan(c, i);
-  const bx = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
-  const by = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
-  return Math.hypot(c.x[i] - bx, c.y[i] - by);
+  const b = vectorHomePlane(c, i);
+  return Math.hypot(c.x[i] - b[0], c.y[i] - b[1]);
 }
+
+/** Where ant i's vector puts its hole on the plane bound: the nest + piSpan × its drift + the tweezers' carry. One answer for every reader (fromHomePlane, the spoil aim), written into a shared pair. */
+export function vectorHomePlane(c: Colony, i: number): readonly [number, number] {
+  const odo = piSpan(c, i);
+  VEC_HOME[0] = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
+  VEC_HOME[1] = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
+  return VEC_HOME;
+}
+const VEC_HOME: [number, number] = [0, 0];
 
 /**
  * How far ant i is from home as it knows it, on the plane bound: by sight where it sees its hole (as believePlane), else

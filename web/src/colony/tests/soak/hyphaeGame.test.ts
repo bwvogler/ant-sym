@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { CORPSE, STALK, STRAINS } from "../../fungus.ts";
+import { CORPSE, STALK, STRAINS, type Fungus } from "../../fungus.ts";
+import { pathTo } from "../../evolution.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, hexDistance, nx, ny } from "../../hex.ts";
@@ -38,6 +39,11 @@ function crossDown(g: Game, limit = 90): number {
   while (!g.fungus.hyphaeOn(CURTAIN) && g.time < limit) runFor(g, 1);
   assert.ok(g.fungus.hyphaeOn(CURTAIN), `no tip crossed down the hole in ${limit} s`);
   return g.time;
+}
+
+/** Keep the next level of `id`, keeping first what it needs (the mutation tree, ja-52ui). */
+function keep(f: Fungus, id: string): boolean {
+  return pathTo(f.evolution!.save().levels, id).every((x) => f.upgrade(x));
 }
 
 test("the patch lands on the hole's inner side, and its hyphae reach the curtain by growing down the hole (ja-2bw.14)", () => {
@@ -362,7 +368,7 @@ test("with Knots bought, starved tips harden into knots in the game, paid from t
   const g = game(true);
   const e = g.fungus.evolution!;
   e.growth = 1e7; // mutations enough to buy it at once
-  assert.ok(g.fungus.upgrade("knots"));
+  assert.ok(keep(g.fungus, "knots"));
   const moved: number[] = [];
   const lose = e.lose.bind(e);
   e.lose = (m: number) => {
@@ -393,7 +399,7 @@ test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps 
   const g = game(true);
   const e = g.fungus.evolution!;
   e.growth = 1e7;
-  assert.ok(g.fungus.upgrade("knots"));
+  assert.ok(keep(g.fungus, "knots"));
   const curtain = () => g.fungus.hyphaeOn(CURTAIN);
   const map = g.world!.curtain;
   // A knot with a store; the dug cells round it filled back in (backfill), so it is buried.
@@ -435,7 +441,7 @@ function buried(level: number): Game {
   const g = game(true);
   const e = g.fungus.evolution!;
   e.growth = 1e7;
-  for (let k = 0; k < level; k++) assert.ok(g.fungus.upgrade("stalks"));
+  for (let k = 0; k < level; k++) assert.ok(keep(g.fungus, "stalks"));
   g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
   return g;
 }
@@ -499,8 +505,8 @@ test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
   e.growth = 1e7;
-  assert.ok(g.fungus.upgrade("stalks"));
-  assert.ok(g.fungus.upgrade("stalks"));
+  assert.ok(keep(g.fungus, "stalks"));
+  assert.ok(keep(g.fungus, "stalks"));
   // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
   const [x, y, radius] = [55, 30, STALK.radius[2]];
   const map = g.world!.plane;
@@ -522,9 +528,10 @@ test("a corpse colonised in the nest (a layer that is not topsoil) never grows a
   const g = game(true);
   const e = g.fungus.evolution!;
   e.growth = 1e7;
-  assert.ok(g.fungus.upgrade("stalks"));
-  assert.ok(g.fungus.upgrade("stalks"));
+  // Down the hole first: a tall stalk needs a dense fruiting body (ja-52ui), which leaves less mycelium to grow there.
   crossDown(g);
+  assert.ok(keep(g.fungus, "stalks"));
+  assert.ok(keep(g.fungus, "stalks"));
   const map = g.world!.curtain;
   let at: [number, number] | null = null;
   for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];

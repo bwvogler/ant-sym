@@ -4,7 +4,7 @@
    Jev Ants — ink on warm paper. The field is the paper; ants are
    ink, so more ants read as a darker pen stroke. One jade accent
    for the overseer box, the selected thing and the primary action.
-   Dark mode (prefers-color-scheme) flips to pale ants on charcoal.
+   Dark mode (prefers-color-scheme, or the player's choice in Settings) flips to pale ants on charcoal.
 
    Raw values live on :root and flip with the colour scheme; the
    @theme inline block maps them to Tailwind utilities (bg-panel,
@@ -23,7 +23,7 @@
   --line-strong: #c9c2b5;
   --fg: #1f1d1a;
   --fg-2: #4a463f;
-  --fg-3: #77716a;
+  --fg-3: #6f6a63; /* at least 4.5:1 on ground, paper, panel and raised (axe, S5) */
   --ink: #1f1d1a;
   --ink-settled: #0e0d0b;
   --accent: #1f6f5c;
@@ -37,6 +37,8 @@
   --err-ink: #ffffff; /* text on a filled err button */
   --heat: 31 111 92; /* rgb triplet for the deficit heatmap */
   --spore: #7a4fa0; /* the fungus: spores on the ground, infected ants */
+  --spore-ink: #ffffff; /* text on a spore badge */
+  --aphid: #5a9a2c; /* the builder's aphids on the plane (docs/aphids.md) */
   --soil: #e3d5bf; /* the colony's undug ground */
   --mound: #6e6250; /* dug soil: the mound at a nest, a pellet in an ant's jaws (greyer than the rival's tone) */
   --sky: #e4edf1; /* the side view: above the ground line */
@@ -52,8 +54,11 @@
   --series-6: #008300;
 }
 
+/* The dark theme, twice: under the system's preference unless the player chose light, and when the player chose dark
+   (Settings → Appearance, ui/theme.ts: data-theme on <html>). CSS can't share one rule between a media query and an
+   attribute, so the copies are held equal by ui/tests/theme.test.ts. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ground: #141412;
     --paper: #1a1a17;
     --panel: #1c1c19;
@@ -62,7 +67,7 @@
     --line-strong: #4a4840;
     --fg: #ece8df;
     --fg-2: #bdb7ab;
-    --fg-3: #87817a;
+    --fg-3: #958f88;
     --ink: #ece8df;
     --ink-settled: #fffdf7;
     --accent: #5fb89d;
@@ -76,6 +81,8 @@
     --err-ink: #2a0e0b;
     --heat: 95 184 157;
     --spore: #c39be3;
+    --spore-ink: #141412;
+    --aphid: #8fcf5a;
     --soil: #3b3429;
     --mound: #a39a8a;
     --sky: #1b2226;
@@ -87,6 +94,48 @@
     --series-5: #d55181;
     --series-6: #0ca30c;
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #141412;
+  --paper: #1a1a17;
+  --panel: #1c1c19;
+  --raised: #262622;
+  --line: #33322d;
+  --line-strong: #4a4840;
+  --fg: #ece8df;
+  --fg-2: #bdb7ab;
+  --fg-3: #958f88;
+  --ink: #ece8df;
+  --ink-settled: #fffdf7;
+  --accent: #5fb89d;
+  --accent-hover: #7cc9b1;
+  --accent-ink: #0d1f19;
+  --accent-soft: #1d332c;
+  --warn: #e6a44a;
+  --warn-soft: #3a2b12;
+  --err: #f28b82;
+  --err-soft: #3d1a17;
+  --err-ink: #2a0e0b;
+  --heat: 95 184 157;
+  --spore: #c39be3;
+  --spore-ink: #141412;
+  --aphid: #8fcf5a;
+  --soil: #3b3429;
+  --mound: #a39a8a;
+  --sky: #1b2226;
+  --spoil: #5c4f3c;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #0ca30c;
 }
 
 @theme inline {
@@ -110,6 +159,7 @@
   --color-err-soft: var(--err-soft);
   --color-err-ink: var(--err-ink);
   --color-spore: var(--spore);
+  --color-spore-ink: var(--spore-ink);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -164,8 +214,21 @@ input[type="checkbox"] {
     transform: translate(-90px, 0);
   }
 }
+/* A panel arriving (PRD §69.9): a drawer, the inspector, the Codex, a sheet: a short fade. Opacity only, so nothing is ever
+   off its place while it runs: a tooltip opened, a click made or a measurement taken in those 170 ms finds every panel and
+   the controls in it where they will stay (a first version slid a few pixels, and CI's browser test, on a slow runner,
+   met tooltips and taps against the moving panel). The Lab is not animated: it resizes the map's canvas. */
+@keyframes panel-in {
+  from {
+    opacity: 0;
+  }
+}
+.panel-in {
+  animation: panel-in 170ms ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
-  [class*="animate-[builder-"] {
+  [class*="animate-[builder-"],
+  .panel-in {
     animation: none !important;
   }
 }

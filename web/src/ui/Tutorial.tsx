@@ -9,7 +9,7 @@ import { FAST_SPEED, type Card, type TutorialStep } from "./tutorial.ts";
 const ORDER: Record<TutorialStep, number> = { landing: 1, waiting: 2, host: 3, watch: 4, cleared: 5, died: 5, timeout: 5, aim: 6, done: 6 };
 
 // On a phone the card sits above the tab bar, or under the HUD while a drawer is open (`high`), so it never covers the
-// drawer it points into. From lg it stops above the aim bar, as the toasts do, so it never covers the bar it points at
+// drawer it points into; there its text is for a screen reader only (a title and buttons show), so a tall sheet is not reached (PRD §69.9). From lg it stops above the aim bar, as the toasts do, so it never covers the bar it points at
 // (review of #189, S5).
 const shell =
   "pointer-events-auto absolute inset-x-2 z-20 rounded-xl border border-spore/50 bg-panel/95 shadow-lg backdrop-blur-sm sm:inset-x-auto sm:top-auto sm:right-3 sm:bottom-3 sm:w-[22rem] lg:bottom-32";
@@ -32,7 +32,7 @@ export default function TutorialCard({
   onNext: () => void;
   onFaster: () => void;
   onSkip: () => void;
-  /** a drawer is open: on a phone the card goes under the HUD instead of over the drawer */
+  /** a drawer is open: on a phone the card goes under the HUD instead of over the drawer, and keeps to its title and buttons */
   high?: boolean;
 }) {
   // Hidden for this step only: a different step is a different card, shown in full. (Keyed by the step, so no reset is needed.)
@@ -66,7 +66,7 @@ export default function TutorialCard({
         <h2 className="font-medium text-fg">{card.title}</h2>
         <span className="text-[11px] text-fg-3 tabular-nums">{ORDER[step]} / 6</span>
       </div>
-      <div className="mt-1.5 flex flex-col gap-1.5 text-[13px] leading-snug text-fg-2">
+      <div className={`mt-1.5 flex flex-col gap-1.5 text-[13px] leading-snug text-fg-2 ${high ? "max-sm:sr-only" : ""}`}>
         {card.body.map((p) => (
           <p key={p}>{p}</p>
         ))}

@@ -4,14 +4,12 @@ import {
   UPGRADES,
   type Upgrade,
   LETHAL_LEVERS,
-  FOUNDING_RESERVE,
+  canKeep,
   MAX_COLONIES,
   MET,
   type Game,
   AIMS,
   type Flight,
-  CELL,
-  cellOf,
   GENERIC_ANT,
   INFECTED,
   Builder,
@@ -20,6 +18,7 @@ import {
 import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
 import { play, say, setSoundOn, soundOn } from "./ui/sounds.ts";
+import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
 import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -32,7 +31,7 @@ import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.t
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { seg } from "./ui/styles.ts";
-import { buildGame, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
@@ -54,7 +53,8 @@ import { colonyName, colonyTone } from "./ui/names.ts";
 import { passphrase } from "./ui/backend.ts";
 import PassNote from "./ui/PassNote.tsx";
 import Tip from "./ui/Tip.tsx";
-import { NextBody, UpgradeBody } from "./ui/UpgradeTips.tsx";
+import UpgradeTree from "./ui/UpgradeTree.tsx";
+import { useWideTree } from "./ui/upgradeBranches.ts";
 import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
@@ -74,13 +74,13 @@ import { openLearn } from "./ui/learn.ts";
 import { openLab, toggleLab, useLab } from "./ui/labStore.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
-import { pushToast } from "./ui/toasts.ts";
+import { pushToast, toastPlace } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
 import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
 import type { DoctrineChoice } from "./ui/useColonyJev.ts";
-import { nextCrossing, REHEARSE_DT } from "./ui/rehearse.ts";
+import { installDevHook } from "./dev/hook.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
 // clock, the goal); a rail of drawers at its left (the fungus and its aim, mutations, the colonies, saves, the Codex,
@@ -109,8 +109,10 @@ export default function ColonyApp() {
   // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
   // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
   const lab = useLab() !== null;
+  const theme = useTheme();
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
+  const wideTree = useWideTree();
   const toggle = useCallback((d: DrawerId) => setDrawer((cur) => (cur === d ? null : d)), []);
   const closeDrawer = useCallback(() => setDrawer(null), []);
   // The followed ant belongs to the game it was picked in: a new game has new ants, so nothing is followed.
@@ -167,6 +169,8 @@ export default function ColonyApp() {
   const builder = useMemo(() => new Builder(game), [game]);
   /** each moved ant's way home, drawn on the top view (ja-cwjp) */
   const traces = useMemo(() => new AntTraces(builder), [builder]);
+  /** the builder's aphid clumps as they are now (the game replaces its list as clumps go) */
+  const aphidsNow = useCallback(() => game.aphids, [game]);
   const [building, setBuilding] = useState(false);
   const [toolKey, setToolKey] = useState<string>("move");
   const [little, setLittle] = useState(false);
@@ -177,14 +181,17 @@ export default function ColonyApp() {
   // Colonies founded mid-game join the same array (Game.addColony): its length is what changes.
   const colonyCount = game.colonies.length;
   const trails = game.player.ph.has("food");
+  const pp = game.player.params;
+  const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
   const tray = useMemo(
     () =>
       trayItems(
         little,
         Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
         trails,
+        tends,
       ),
-    [little, colonyCount, trails],
+    [little, colonyCount, trails, tends],
   );
   const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
   const pickTool = useCallback((it: TrayItem) => {
@@ -260,7 +267,8 @@ export default function ColonyApp() {
   // Builds stay in the game after the builder closes, so this runs whether or not it is open.
   useEffect(() => {
     const timer = setInterval(() => {
-      for (const e of builder.watch()) pushToast(buildNotice(e), e.kind === "antLost" ? "info" : "good");
+      for (const e of builder.watch())
+        pushToast(buildNotice(e), e.kind === "antLost" || e.kind === "aphidsEaten" || e.kind === "aphidsGone" ? "info" : "good");
     }, 1000);
     return () => clearInterval(timer);
   }, [builder]);
@@ -501,55 +509,21 @@ export default function ColonyApp() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [penFor, flight, oneWorld, game, foundOn]);
-  // Dev builds only: the game and the page's views on window, for the Playwright guard (scripts/e2e-one-world.mjs); not
-  // in the Pages build. follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother)
-  // sends a new queen from that colony with the fungus in her and opens her pen, Jev or not. With the game paused,
-  // nextCrossing(maxSeconds, minTicks) rehearses on a copy which curtain ant comes up next, and on which fixed step (rehearse.ts),
-  // and step(n) takes the game itself n of those steps: the guard follows that ant through its hole for certain.
-  // Keyless only: the copy shares the game's policies, so with JEV_API_KEY set a miss in the copy would ask Jev (a run, real
-  // spend, skewed hit counts). npm run e2e starts Vite without the key (PR #65 review N6).
+  // The dev hook (dev/hook.ts): the game and the page's views on window, for the Playwright guard. Dev builds only, not in the Pages build.
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
-    (window as unknown as { jevAnts?: unknown }).jevAnts = {
+    installDevHook({
       game,
-      notify: (text: string, tone?: "info" | "warn" | "good") => pushToast(text, tone),
-      /** each moved ant's way home as drawn (ja-cwjp): its colony and slot, how many points, and how it ended */
-      traces: () => traces.traces.map((t) => ({ k: t.colony, i: t.i, points: t.xs.length, end: t.end })),
-      follow: (k: number, i: number) => {
-        const c = game.colonies[k];
-        if (!c || !c.alive[i]) return false;
-        setFollowed({ k, i, gen: c.gen[i] });
-        return true;
-      },
-      view: () => controls.view,
-      followed: () => followedNow.current,
-      sensed: (v: View, x: number, y: number) => {
-        cellOf(x, y);
-        return sensed.sight(v === "above" ? PLANE : CURTAIN, CELL[0], CELL[1]);
-      },
-      nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(settings), maxSeconds, minTicks),
-      step: (n = 1) => {
-        for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
-      },
-      camera: (v: View) => field.current?.camera(v === "above" ? PLANE : CURTAIN) ?? null,
-      goNest: (k: number) => field.current?.goNest(k),
-      fly: (mother = 0) => {
-        const m = game.colonies[mother];
-        if (!m) return false;
-        setDevPen(true);
-        game.revealed[mother] = true;
-        game.flights.push({
-          mother,
-          x: m.nest.x,
-          y: m.nest.y,
-          load: 1,
-          strain: game.fungus.evolution?.strain ?? 0,
-          at: game.time,
-          food: FOUNDING_RESERVE,
-        });
-        return true;
-      },
-    };
+      settings,
+      notify: (text, tone) => pushToast(text, tone),
+      traces,
+      view: controls.view,
+      followed: followedNow,
+      setFollowed,
+      sensed,
+      field,
+      openPen: () => setDevPen(true),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed, sensed, traces]);
   const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
@@ -569,9 +543,7 @@ export default function ColonyApp() {
     onLoad: (r) => (continueFrom(r), setDrawer(null)),
   };
   const ev = stats?.evolution;
-  const affordable = ev
-    ? UPGRADES.some((u) => !idle(u, controls.menu) && (u.costs[ev.levels[u.id] ?? 0] ?? Infinity) <= ev.mutations)
-    : false;
+  const affordable = ev ? UPGRADES.some((u) => !idle(u, controls.menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
   const penCard = flight && gate?.open && oneWorld && circle;
   // The machine can't step the sim at the speed asked: the HUD says how fast it really runs.
   const slow = !!stats && controls.playing && stats.pace > 0 && stats.pace < controls.speed * 0.85;
@@ -645,6 +617,14 @@ export default function ColonyApp() {
         run: toggleLens,
       },
       { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
+      ...THEMES.map((t) => ({
+        id: `theme-${t}`,
+        label: `Appearance: ${THEME_LABEL[t].toLowerCase()}${t === "system" ? " (follow the device)" : ""}`,
+        group: "Help",
+        words: "theme dark light mode night day colour",
+        off: theme === t ? "in use" : undefined,
+        run: () => setTheme(t),
+      })),
       ...guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => ({
         id: `learn-${e.id}`,
         label: `Codex: ${e.title}`,
@@ -680,6 +660,7 @@ export default function ColonyApp() {
             toolsAt="top-[7.25rem] left-1/2 -translate-x-1/2 items-center sm:top-[4.5rem]"
             build={build}
             traces={traces}
+            aphids={aphidsNow}
           />
           {demo && <ToolDemo key={demo.at} tool={demo.tool} />}
         </div>
@@ -842,8 +823,12 @@ export default function ColonyApp() {
           </Drawer>
         )}
         {drawer === "evolve" && (
-          <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer}>
-            {ev ? <Evolve e={ev} evolve={evolve} menu={controls.menu} /> : <p className="text-fg-3">The fungus has not landed yet.</p>}
+          <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer} wide={wideTree}>
+            {ev ? (
+              <Evolve e={ev} evolve={evolve} menu={controls.menu} wide={wideTree} />
+            ) : (
+              <p className="text-fg-3">The fungus has not landed yet.</p>
+            )}
           </Drawer>
         )}
         {drawer === "colonies" && (
@@ -876,7 +861,7 @@ export default function ColonyApp() {
           1024 px it waits while a drawer is open, so the two never overlap. */}
         {!building && (penCard || followed || specimens.length > 0) && (
           <div
-            className={`pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
+            className={`panel-in pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
           >
             {penCard ? (
               <QueenPen
@@ -953,7 +938,7 @@ export default function ColonyApp() {
         />
         {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
         {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}
-        <Toasts place={building ? "top" : lab ? "lab" : "bottom"} />
+        <Toasts place={toastPlace({ building, drawer: drawer !== null, lab })} />
         {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
         {flight && gate?.open && !circle && (
           <QueenPen
@@ -1045,6 +1030,7 @@ function Settings({
         </div>
         <p className="mt-1.5 text-xs text-fg-3">Only where your hosts have smelled them lately.</p>
       </div>
+      <ThemeSetting />
       <SoundSetting />
       <div>
         <SectionHead>Keys</SectionHead>
@@ -1089,7 +1075,31 @@ function buildNotice(e: BuildEvent): string {
       return `The ${colonyName(e.colony)} ant you moved found its way home in ${Math.round(e.seconds)} s! 🏠`;
     case "antLost":
       return `The ${colonyName(e.colony)} ant you moved didn't make it home.`;
+    case "aphidsFound":
+      return `The ${colonyName(e.colony)} ants found your aphids! 🐛`;
+    case "aphidsEaten":
+      return "The ants are eating some of your aphids, as real ants do.";
+    case "aphidsGone":
+      return "Your aphids are all gone: aphid families grow, then fade away.";
   }
+}
+
+/** Light or dark (PRD §69.9): the system's by default, or the player's choice, per browser. */
+function ThemeSetting() {
+  const theme = useTheme();
+  return (
+    <div>
+      <SectionHead>Appearance</SectionHead>
+      <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="appearance">
+        {THEMES.map((t) => (
+          <button key={t} type="button" className={`flex-1 ${seg(theme === t)}`} aria-pressed={theme === t} onClick={() => setTheme(t)}>
+            {THEME_LABEL[t]}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1.5 text-xs text-fg-3">System follows the device&apos;s light or dark setting.</p>
+    </div>
+  );
 }
 
 /** The builder's sounds and spoken tool names (PRD §73): on unless turned off, per browser. */
@@ -1217,7 +1227,7 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
   return !!u.levers?.every((id) => LETHAL_LEVERS.has(id) && !menu.includes(id));
 }
 
-function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[] }) {
+function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1236,45 +1246,10 @@ function Evolve({ e, evolve, menu }: { e: EvolutionStats; evolve: (id: string) =
         </span>
       </div>
       <p className="mt-1 text-[11px] text-fg-3">
-        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep; each level asks
-        more.
+        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep. Some levels need
+        others first, and every level costs the same price, which rises with each one you keep.
       </p>
-      <ul className="mt-2 flex flex-col gap-1" aria-label="upgrades">
-        {UPGRADES.map((u) => {
-          const level = e.levels[u.id] ?? 0;
-          const cost = u.costs[level];
-          const next = u.steps[level + 1];
-          return (
-            <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
-              <Tip tip={<UpgradeBody u={u} level={level} />} className="min-w-0 truncate">
-                <span
-                  className={
-                    u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent"
-                  }
-                >
-                  {u.name}
-                </span>{" "}
-                <span className="text-fg-3">{u.steps[level]}</span>
-                {idle(u, menu) && <span className="text-fg-3"> (not on the menu)</span>}
-              </Tip>
-              {cost === undefined ? (
-                <span className="shrink-0 text-fg-3">at its most</span>
-              ) : (
-                <Tip tip={<NextBody u={u} level={level} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
-                  <button
-                    type="button"
-                    className="rounded-md border border-line px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
-                    disabled={cost > e.mutations}
-                    onClick={() => evolve(u.id)}
-                  >
-                    {next} · {cost.toLocaleString()}
-                  </button>
-                </Tip>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      <UpgradeTree levels={e.levels} mutations={e.mutations} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
     </div>
   );
 }
@@ -1310,7 +1285,7 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
   // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
   const affordable = stats?.evolution
-    ? UPGRADES.some((u) => !idle(u, menu) && (u.costs[stats.evolution!.levels[u.id] ?? 0] ?? Infinity) <= stats.evolution!.mutations)
+    ? UPGRADES.some((u) => !idle(u, menu) && canKeep(stats.evolution!.levels, stats.evolution!.mutations, u.id))
     : false;
   const couldAfford = useRef(affordable);
   useEffect(() => {

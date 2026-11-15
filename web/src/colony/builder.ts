@@ -17,15 +17,19 @@ import type { Game } from "./game.ts";
 import { routeClear } from "./homing.ts";
 import type { Channel, Pheromones } from "./pheromone.ts";
 import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
+import { APHID, type AphidClump } from "./aphids.ts";
 import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
 
-export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "crayon" | "noEntry" | "rain";
-export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "crayon", "noEntry", "rain"];
+export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "aphids" | "crayon" | "noEntry" | "rain";
+export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "aphids", "crayon", "noEntry", "rain"];
 
 /** The tools' sizes and amounts (design marks; docs/builder.md "The mechanic"). Radii in world units. */
 export const BUILD = {
   /** each tool's brush radius */
-  radius: { dig: 1.6, dirt: 1.6, rock: 1.6, sugar: 1.6, crumb: 1.6, crayon: 1.1, noEntry: 1.6, rain: 6 } as Record<BuildTool, number>,
+  radius: { dig: 1.6, dirt: 1.6, rock: 1.6, sugar: 1.6, crumb: 1.6, aphids: 1.6, crayon: 1.1, noEntry: 1.6, rain: 6 } as Record<
+    BuildTool,
+    number
+  >,
   /** food put on each cell a sugar or crumb stroke touches: the world's own piles' (DEFAULT_WORLD.foodPerCell) */
   foodPerCell: 12,
   /** the most food a cell may hold from the builder, so a finger held on one spot doesn't heap a mountain */
@@ -180,6 +184,8 @@ type Change =
   | { kind: "food"; map: WorldMap; x: number; y: number; added: number; quality: number }
   | { kind: "crayon"; line: CrayonLine }
   | { kind: "crayonMore"; line: CrayonLine; cells: number[] }
+  | { kind: "aphids"; clump: AphidClump }
+  | { kind: "aphidsMore"; clump: AphidClump; cells: number[]; start: number }
   | { kind: "rain"; colony: number; layer: number; channel: Channel; x: number; y: number; was: number }
   | { kind: "rainLine"; line: CrayonLine; cells: number[]; at: number }
   | { kind: "ant"; colony: number; i: number; gen: number; dx: number; dy: number };
@@ -190,7 +196,13 @@ export type BuildEvent =
   | { kind: "foodGone"; tool: "sugar" | "crumb" }
   | { kind: "lineFollowed"; colony: number; ants: number }
   | { kind: "antHome"; colony: number; seconds: number }
-  | { kind: "antLost"; colony: number };
+  | { kind: "antLost"; colony: number }
+  | { kind: "aphidsFound"; colony: number }
+  | { kind: "aphidsEaten" }
+  | { kind: "aphidsGone" };
+
+/** Aphids eaten from a clump before `watch` says the ants are eating them. */
+export const APHIDS_EATEN_SAID = 3;
 
 /** Ants on a crayon line at once for `watch` to say it is followed. */
 export const FOLLOWED_AT = 3;
@@ -248,10 +260,15 @@ export class Builder {
   #food: FoodWatch[] = [];
   #followed = new WeakSet<CrayonLine>();
   #moved: MovedAnt[] = [];
+  /** the clumps a child put down, watched until they are gone: found yet, eaten said yet (docs/aphids.md "Play") */
+  #clumps = new Map<AphidClump, { found: boolean; eaten: boolean }>();
   #moves = 0;
 
   constructor(game: Game) {
     this.game = game;
+    // Clumps already in the game (a loaded save) are watched to their end, said found and eaten already (review of #243, N7).
+    // A clump saved before anyone found it never says "found" after the load: only a notice (N10).
+    for (const c of game.aphids) this.#clumps.set(c, { found: true, eaten: c.eaten >= APHIDS_EATEN_SAID });
   }
 
   get canUndo(): boolean {
@@ -275,8 +292,16 @@ export class Builder {
       this.game.crayons.includes(tail.line)
         ? tail.line
         : undefined;
-    const changes = this.#apply(stroke, extend);
+    const clump =
+      stroke.tool === "aphids" &&
+      (tail?.kind === "aphids" || tail?.kind === "aphidsMore") &&
+      tail.clump.layer === stroke.layer &&
+      this.game.aphids.includes(tail.clump)
+        ? tail.clump
+        : undefined;
+    const changes = this.#apply(stroke, extend, clump);
     if (!changes.length) return 0;
+    for (const c of changes) if (c.kind === "aphids") this.#clumps.set(c.clump, { found: false, eaten: false });
     if (stroke.tool === "sugar" || stroke.tool === "crumb") {
       const cells = changes.flatMap((c) =>
         c.kind === "food" ? [{ map: c.map, x: c.x, y: c.y, before: c.map.food.get(c.x, c.y) - c.added, added: c.added }] : [],
@@ -376,6 +401,34 @@ export class Builder {
         out.push({ kind: "lineFollowed", colony: line.colony, ants: n });
       }
     }
+    // Aphids (docs/aphids.md "Play"): found (an ant carrying food on the clump), some eaten, all gone; each said once.
+    for (const [clump, said] of this.#clumps) {
+      if (!game.aphids.includes(clump)) {
+        out.push({ kind: "aphidsGone" });
+        this.#clumps.delete(clump);
+        continue;
+      }
+      if (!said.found) {
+        const on = new Set<number>();
+        for (let k = 0; k < clump.cells.length; k += 2) on.add((clump.cells[k + 1]! + 0x8000) * 0x10000 + (clump.cells[k]! + 0x8000));
+        game.colonies.forEach((c, k) => {
+          for (let i = 0; i < c.n && !said.found; i++) {
+            // An ant carrying food on the clump. One crossing it with sugar would say so too (honeydew is sugar's quality): rare,
+            // and only a notice (review of #243, N6).
+            if (!c.alive[i] || !c.carrying[i] || (game.world && c.layer[i] !== clump.layer)) continue;
+            c.antCell(i);
+            if (on.has((CELL[1] + 0x8000) * 0x10000 + (CELL[0] + 0x8000))) {
+              said.found = true;
+              out.push({ kind: "aphidsFound", colony: k });
+            }
+          }
+        });
+      }
+      if (!said.eaten && clump.eaten >= APHIDS_EATEN_SAID) {
+        said.eaten = true;
+        out.push({ kind: "aphidsEaten" });
+      }
+    }
     this.#moved = this.#moved.filter((m) => {
       const c = game.colonies[m.colony];
       if (!c || !c.alive[m.i] || c.gen[m.i] !== m.gen) {
@@ -396,7 +449,7 @@ export class Builder {
     this.#joinable = false;
   }
 
-  #apply({ tool, layer, points, colony = 0 }: Stroke, extend?: CrayonLine): Change[] {
+  #apply({ tool, layer, points, colony = 0 }: Stroke, extend?: CrayonLine, clump?: AphidClump): Change[] {
     const game = this.game;
     const map = layerMap(game, layer);
     const cells = strokeCells(map, tool, points);
@@ -428,6 +481,33 @@ export class Builder {
         dropFood(map, centreX(x, y), centreY(y), add, quality);
         map.foodTotal += add; // counted, as regrowth's food is (game.ts), so the stats' share stays a share
         out.push({ kind: "food", map, x, y, added: add, quality: q });
+      }
+    } else if (tool === "aphids") {
+      // A clump on open ground (docs/aphids.md): a drag grows the clump it began, cell by cell. Aphids live on the surface:
+      // in one world, the plane only.
+      if (game.layers.length > 1 && layer !== PLANE) return out;
+      const have = new Set<number>();
+      if (clump)
+        for (let k = 0; k < clump.cells.length; k += 2) have.add((clump.cells[k + 1]! + 0x8000) * 0x10000 + (clump.cells[k]! + 0x8000));
+      const open: number[] = [];
+      for (let k = 0; k < cells.length; k += 2) {
+        const x = cells[k] as number;
+        const y = cells[k + 1] as number;
+        const key = (y + 0x8000) * 0x10000 + (x + 0x8000);
+        if (have.has(key) || !buildable(map, x, y) || rockAt(map, x, y) !== OPEN) continue;
+        have.add(key);
+        open.push(x, y);
+      }
+      if (!open.length) return out;
+      const start = (open.length / 2) * APHID.perCell;
+      if (clump) {
+        clump.cells.push(...open);
+        clump.start += start;
+        out.push({ kind: "aphidsMore", clump, cells: open, start });
+      } else {
+        const made: AphidClump = { layer, cells: open, start, eaten: 0, age: 0, owed: 0 };
+        game.aphids.push(made);
+        out.push({ kind: "aphids", clump: made });
       }
     } else if (tool === "crayon" || tool === "noEntry") {
       // A crayon is one colony's food trail; the no-entry paint is every colony's "no entry" (docs/builder.md "Slice 2").
@@ -510,6 +590,7 @@ export class Builder {
     const undoneFood = new Set(changes.flatMap((c) => (c.kind === "food" ? [`${c.x},${c.y}`] : [])));
     if (undoneFood.size) this.#food = this.#food.filter((w) => !w.cells.some((c) => undoneFood.has(`${c.x},${c.y}`)));
     for (const c of changes) if (c.kind === "ant") this.#moved = this.#moved.filter((m) => !(m.colony === c.colony && m.i === c.i));
+    for (const c of changes) if (c.kind === "aphids") this.#clumps.delete(c.clump);
     const game = this.game;
     const guards = new Map<number, Set<number>>();
     const guardOf = (map: WorldMap) => {
@@ -536,6 +617,22 @@ export class Builder {
         c.map.foodLeft -= take;
         c.map.foodTotal -= take;
         if (c.map.quality && v - take <= 0) c.map.quality.set(c.x, c.y, c.quality);
+      } else if (c.kind === "aphids") {
+        // The clump goes; honeydew it already made stays where it lies, as food.
+        const at = game.aphids.indexOf(c.clump);
+        if (at >= 0) game.aphids.splice(at, 1);
+      } else if (c.kind === "aphidsMore") {
+        // A drag's pieces share one undo with the clump it began: this shrinks a clump the same undo then removes (defensive).
+        const drop = new Set<number>();
+        for (let j = 0; j < c.cells.length; j += 2) drop.add((c.cells[j + 1]! + 0x8000) * 0x10000 + (c.cells[j]! + 0x8000));
+        const kept: number[] = [];
+        for (let j = 0; j < c.clump.cells.length; j += 2) {
+          const x = c.clump.cells[j] as number;
+          const y = c.clump.cells[j + 1] as number;
+          if (!drop.has((y + 0x8000) * 0x10000 + (x + 0x8000))) kept.push(x, y);
+        }
+        c.clump.cells = kept;
+        c.clump.start = Math.max(0, c.clump.start - c.start);
       } else if (c.kind === "crayon") {
         const at = game.crayons.indexOf(c.line);
         if (at >= 0) game.crayons.splice(at, 1);

@@ -68,13 +68,15 @@ test("a lethal reach upgrade reads as off or free, a graded one as none, one ste
   assert.match(trails[0]!.line, /held at as is/);
 });
 
-test("the next level's tooltip carries its cost and meaning, and is absent at the top", () => {
+test("the next level's tooltip carries its price, its meaning and what it still needs, and is absent at the top", () => {
   const u = UPGRADES.find((x) => x.id === "infectivity")!;
-  const n = nextLevelTip(u, 0)!;
-  assert.equal(n.cost, 3);
+  const n = nextLevelTip(u, {})!;
+  assert.equal(n.cost, 1);
   assert.equal(n.step, "fair");
   assert.match(n.line, /15 %/);
-  assert.equal(nextLevelTip(u, u.steps.length - 1), null);
+  assert.deepEqual(n.needs, []);
+  assert.deepEqual(nextLevelTip(u, { infectivity: 1 })!.needs, ["Persistence: clears slowly"]);
+  assert.equal(nextLevelTip(u, { infectivity: u.steps.length - 1 }), null);
 });
 
 test("a tooltip goes below its anchor, flips above without room, and stays inside the window", () => {
@@ -91,4 +93,11 @@ test("a tooltip goes below its anchor, flips above without room, and stays insid
   // Room nowhere: it is kept inside the window rather than off it.
   const tall = place({ left: 0, top: 300, right: 10, bottom: 320 }, { width: 100, height: 590 }, view);
   assert.equal(tall.top, EDGE);
+});
+
+test("the drawer's branches hold every upgrade once, Infectivity first (ja-52ui)", async () => {
+  const { BRANCHES } = await import("../upgradeBranches.ts");
+  const ids = BRANCHES.flatMap((b) => b.ids);
+  assert.deepEqual([...ids].sort(), UPGRADES.map((u) => u.id).sort());
+  assert.equal(ids[0], "infectivity", "the e2e check opens the first row's next level: Infectivity fair");
 });

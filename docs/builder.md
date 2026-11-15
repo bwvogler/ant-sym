@@ -104,7 +104,7 @@ The owner decided four things:
 - **Pre-readers follow sound and demonstrations, not symbols.** Children of about 3½ to 5 followed in-app audio and on-screen demonstrations. A button that only changed how it looked did not work as a prompt at any age tested. Abstract symbols, such as a cartoon hand or a progress bar, needed specific design up to age 5. Sources: Hiniker et al. 2015 and 2016. **Unverified**: abstracts only.
 
 **In the game:**
-- **Moving the map with one finger.** A one-finger "move" tool in the tray (a hand) is the main way to move the map. Two-finger pinch and pan still work for an adult. With any tool, tapping places (a stamp, a dish, one cell dug) and dragging paints.
+- **Moving the map with one finger.** A one-finger "move" tool in the tray (a hand) is the main way to move the map. Two-finger pinch and pan work with any tool in hand, and build nothing: a finger (or pen) with a tool waits until it has moved past a click's slop, when the stroke starts from where it landed, or until it lifts as a tap, when it places there. A second finger arriving first makes it a pinch (before this, the first finger had already dropped the brush where it landed). A mouse builds at once. With any tool, tapping places (a stamp, a dish, one cell dug) and dragging paints.
 - **Big tools.** Tray buttons are at least 64 CSS px square (**design**: about 1.5× the 44 px commonly given for adults, since no child figure was found). Their active areas run flush to the screen's bottom edge, with gaps between them.
 - **Forgiving strokes.** A painted stroke is smoothed and has a wide brush, so a wobbly line still makes a trail.
 - **Sound and pictures, not words.** Choosing a tool plays its sound and enlarges its icon. The first time a tool is chosen, a short animated finger shows what it does, with no words. Nothing relies on a glow alone.
@@ -282,6 +282,10 @@ This is design: no paper. It reads the game, never steers it.
 ### Open, slice 2
 
 - How strong the painted sign is (`NO_ENTRY_PAINTED` 4) was to be tuned on B7, but it needed no tuning. B7 passes 9/10 on seeds 1–10 and 10/10 on 11–20 (PRD §73.3).
+
+### Aphids (PRD §78, [aphids.md](aphids.md))
+
+A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note.
 
 ### What slice 2 built (PRD §73.3)
 

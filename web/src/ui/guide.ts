@@ -366,7 +366,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Metarhizium lives for months in soil and around roots without an insect. Passed through groups of grooming ants for ten cycles, it evolved to make more spores and to carry less of the cue groomers detect. In experimental evolution, more replication buys far less than proportionally faster adaptation.",
     inGame:
-      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Spores left out on the open plane, off its patch, die in the sun twice as fast as in the soil (the game's number: full sun kills Metarhizium spores within an hour). Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep, and each level asks more than the last: its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
+      "The fungus lands weak: it passes on slowly, clears from a host on its own, and nestmates groom it out of the nest. Its mycelium by the hole grows and turns some of its mass into spores, so foragers keep walking through them. Spores left out on the open plane, off its patch, die in the sun twice as fast as in the soil (the game's number: full sun kills Metarhizium spores within an hour). Every bit of new fungus can mutate, as its mycelium grows and as it passes from ant to ant, so the faster it grows the faster mutations come (the game's licence: real mutations are random, and selection keeps what works). You choose which to keep. They form a tree: some levels need others kept first (the lethal ones last), and every level costs the same price, which rises with each one you keep. Its body (infectivity, persistence, mycelium, fruiting body, immune evasion) or its reach, how far each group of levers may go, the lethal ones included: a lethal lever you put on the menu stays held off until you keep its upgrade. Jev is asked every lever on its full scale either way, so a new level re-asks nothing.",
     sources: [
       { note: "fungus-body", anchor: "1-growth-without-a-host", label: "Growth without a host" },
       { note: "fungus-body", anchor: "3-adapting-to-hosts", label: "Adapting to hosts" },
@@ -499,6 +499,29 @@ export const GUIDE: GuideEntry[] = [
     sources: [{ note: "builder", anchor: "no-entry-turns-trail-followers-away", label: "“No entry” turns trail followers away" }],
   },
   {
+    id: "builder-aphids",
+    title: "Aphids",
+    onScreen:
+      "Put down a clump of aphids (🐛): little green bugs that drip sweet honeydew. Ants smell them from close by, find them and bring the honeydew home, again and again, so a trail forms. Ants touching the aphids stand and fight if a stranger comes. Now and then an ant carries an aphid home. The clump grows for a few minutes, then fades away.",
+    realAnts:
+      "Black garden ants milk aphids for honeydew, a little like farmers with tiny cows. Scouts walk toward the smell of aphids. Ants looking after aphids bite intruders more often than other ants: 90 out of 100 did in one study. Ants also eat some of their aphids: with ants, a fifth fewer aphids were left after a week.",
+    inGame:
+      "Honeydew is food that keeps coming, so the ants' usual trail brings them back. An ant with empty jaws turns toward the aphids' smell from a few steps away. An ant touching the clump counts it as home ground, so it defends there. One take in twenty is an aphid instead of honeydew. How fast aphids grow and how much they drip are guesses: no one has measured them.",
+    sources: [
+      {
+        note: "aphids",
+        anchor: "ants-find-aphids-by-smell-as-well-as-by-chance-and-l-niger-scouts-climb-toward-aphid-odour",
+        label: "Ants find aphids by smell as well as by chance",
+      },
+      {
+        note: "aphids",
+        anchor: "tending-ants-attack-the-aphids-enemies-more-readily-than-other-ants-and-mostly-locally",
+        label: "Tending ants attack the aphids' enemies more readily",
+      },
+      { note: "aphids", anchor: "ants-also-eat-aphids-mostly-the-ones-that-give-least", label: "Ants also eat aphids" },
+    ],
+  },
+  {
     id: "builder-rain",
     title: "Rain",
     onScreen: "The rain cloud (🌧️) washes every trail and alarm off the ground under it.",
@@ -585,10 +608,22 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge.",
   },
   {
+    note: "mutation-tree",
+    title: "The mutation tree",
+    covers:
+      "The fungus's mutations as a tech tree: levels that need others first, at one price that rises with each level kept. Game design.",
+  },
+  {
     note: "builder",
     title: "Builder mode",
     covers:
       "What real ants do when someone changes their world: drawn trails followed for a while, circles left, walls rerouted (or not), sweet food found late, nests dug out again; and how young children use touch screens.",
+  },
+  {
+    note: "aphids",
+    title: "Ants and aphids",
+    covers:
+      "How ants find aphids (by smell, and by chance), milk them for honeydew, defend them more readily than other ants, eat a few, and leave them when the honeydew stops.",
   },
   {
     note: "queens-and-merging",

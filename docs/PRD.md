@@ -2559,7 +2559,7 @@ The basis is `docs/tiredness.md`:
 - **A raider standstill** (re-review of #36): in `side-bench` seed 6, colony 1, from 500 to 550 s, up to ~300 fighters stand still for 20 s or more on the surface between the nests, then disperse. That is 10,253 ant-seconds stuck on the ground against `main`'s 104. Losses on that seed are below `main`'s. Bead filed.
 - **Porters: mostly a measurement artefact** (re-review of #36). `side-bench`'s porter count read `since`, which `#becomePorter` doesn't reset, so a forager that had rested inside over 120 s counted the moment it took food on. It now uses its own hold clock: on `side-bench 1-6 600 600 2`, 0 porters held over 120 s at the end on both MR 3.1 and `main` (peaks 3 and 1). The "1 → 20" first reported was the old clock.
   - A jam was real on af0a548 (seed 6: 9 at the end); fighting tiring removed it.
-  - `heldProbe`'s `maxPorting` (own clock) is at most 6 on G seeds 1–10 and 0 on 11–20; Cautious's replay reaches 49. ja-3po keeps those, and `slow/side.test` keeps a todo guard.
+  - `heldProbe`'s `maxPorting` (own clock) is at most 6 on G seeds 1–10 and 0 on 11–20; Cautious's replay reaches 49. ja-3po keeps those, and `slow/g1/oneWorldG1.test` keeps a todo guard (in `slow/side.test` until S2.3c).
 - **Legend** (`COLONY_BRAIN_VERSION` 5, `RESPONSE_BRAIN_VERSION` 4; stance unchanged). The legend now says:
   - that tired means a long unsuccessful search, rested only by staying inside;
   - that going home tired is how the colony stops searching where food has run out;
@@ -5516,6 +5516,17 @@ Tier 1 for the species (wide tolerance, its words, the generic schema) and tier 
   - **N3 graded tolerance** (owner, review of #228 D1: classed over **repeated trials**, as Ugelvig's pairs were). Two colonies of 60; the first at odour 0.25 (a recognition band's centre: odour is read in 10 bands), the second 0, 0.1, … 0.7 from it; each distance plays 5 trials, one per world (seeds 1–40: seeds 1–8 the distances on world 1, 9–16 on world 2, …), 240 s each. A trial counts only if the colonies met for 5 ant-seconds or more (on world 3 they barely meet); a distance is **never** aggressive if no such trial had a fight death, **always** if every one did, **mixed** otherwise. Today: 0–0.3 never, 0.4, 0.5 and 0.7 always, 0.6 mixed (one 8-ant-second meeting without a fight): **4 never, 3 always, 1 mixed** (50 / 38 / 12 %) against 14 / 19 / 67 %. The one mixed distance is the floor's doing, not graded behaviour: at a 3 ant-second floor two read mixed, at 8 none (review of #228); a trial that fought counts however short its meeting (S3). Recognition is a step at the tolerance: `ja-e668.10` makes it graded, and should be read at more than one floor (3, 5, 8). The slow N3 test is skipped until then (40 games, 7–12 minutes).
   - **N2** (destructive disinfection) and **N4** (budding) have no assay yet: the game's brood carries no fungus and no colony buds. Each lands with its mechanic (`ja-e668.5`, `ja-e668.6`); `tests/slow/neglectus.test.ts` holds all four as todos, and `tests/soak/neglectusAssays.test.ts` guards that N1 and N3 measure what they say.
 
+- **The species row** (`ja-e668.3`, 2026-11-15; `neglectus.ts`, `NEGLECTUS_ANT`, on the start screen):
+  - **Tolerance: one supercolony** (owner, 2026-11-15: tolerance 1, against the alternatives "wider, rivals still fight" and "as generic"). Within one population nests don't fight at all and nestmates are unrelated (Cremer et al. 2008; Ugelvig et al. 2008, full text). The game's colonies start at odours 0 and 1, so at a tolerance of 1 they never fight and their nests already smell alike. Fights are judged by the game's recognition, so the game now takes its tolerance from the species unless the game names its own (`game.ts`; the generic ant bit-exact). The unity score's recognition guards a tolerance of 1 (it divided by 1 − tolerance).
+  - **Measured** (one world as the page builds it, 600 + 600 ants, 600 s, seeds 1–3): fight deaths 0 / 0 on every seed, against the generic ant's 143, 171 and 72. Not one seed counts as united within 600 s: unity also needs the colonies to meet (met 0.2–0.8 %), so the "free lever" the note feared is smaller than feared: the fungus still has to bring them together.
+  - **Its words:** the generic legend with explore, follow and return, and **no fight** (`NEGLECTUS_MODE_WORDS`, version 2; owner, review of #244 D1: realistic). A game of one species is one population, and nests within a population show no aggression (Cremer et al. 2008; Ugelvig et al. 2008, full text), so an ant has no one to fight; under Warlike, version 1's answers gave fight about 6 % weight and those ants wandered. Fighting returns with other species in a mixed world or rival populations (`ja-e668.11`, on `ja-wfw0`). The stance lane and the responses keep the generic words, whose answers already ship.
+  - **Live check** (owner, 2026-11-15: now, up to $0.01): `precache.mjs --species neglectus --met` (new: asks only the mode situations a page game of the species meets, one world, seeds 1–3, 300 s, since its generic schema has 3,888) asked 81 situations under each preset doctrine: 243 answers, **$0.0022** for version 1 (about 216 real tokens a question) and **about $0.0018** again for version 2 (about 172 real tokens a question): **$0.0040** in all. Shipped as `mode-neglectus-*.json` (version 2). Jev's choice at mean p 0.89 (Forage), 0.89 (Cautious), 0.78 (Warlike). Cached games spend nothing; a situation a game meets beyond the 81 is asked live under its words (about the generic mode lane's rate, PRD §51).
+  - **Tests:** `tests/soak/neglectus.test.ts` (its words' own context; its tolerance reaches recognition while the generic ant's and a game's own stay; the unity score is finite at tolerance 1; no fight deaths in 180 s where the generic ant's colonies fight). Mutations caught: no species tolerance, no tolerance-1 guard, the species over the game's own. `ui/tests/precache.test.ts` accepts a species on the generic schema shipping the situations its game meets (at least 50).
+
+- **Sensed grooming** (`ja-e668.4`, plan 2026-11-15; [lasius-neglectus.md §Sensed grooming](lasius-neglectus.md#sensed-grooming-what-ja-e6684-builds-2026-11-15)). Read for this bead: Casillas-Pérez et al. 2023 and Theis et al. 2015 in full, Konrad et al. 2012 again; Leclerc & Detrain 2016 abstract only. **The sources support a choice by load, not a rate by load:** nestmates pick higher-load ants more often (a small bias, D = 0.053) and removal saturates, but how long a grooming event lasts does not scale with load (42 of 45 tests), and Konrad and Theis found nestmate grooming unchanged by the treatment.
+  - **Owner's decisions (2026-11-15, with the sources stated for and against each):** (1) the grooming rule is a **choice by load with saturating removal**, for this species first, behind a species setting `groomByLoad` (the generic ant bit-exact); (2) the fungus passes between this species' nestmates **through grooming**, with a small proximity pass kept as a **valve, a parameter defaulting to 0** (decided 2026-11-15 after the review corrected the sources: Konrad names "social interactions", not grooming, and no paper separates the routes). A groomer takes a small share `d` of what it removes: **design**, started at 0.1 as an upper bound; Konrad's 8–12× is the outcome N1 gates on, and Casillas-Pérez's scale is about 0.05–0.09 %.
+  - **Plan:** per host, groomers = `min(groomers, mates) × f/(f + F½)` with `f = load × shows`; removal per groomer `Vmax × load/(load + Km)`; the groomer's own dose primes its resistance. All numbers design, tuned on N1. **Gate** (`ja-e668.4.1`): N1 passes on every one of seeds 1–10 (carriers 40–85 %, the exposed ant ≥ 8× the nestmates' median) and on 11–20; a no-dead-end check as P1 is worded (the game's strain reaches a quarter of a neglectus colony against the same species with the rule off, same tree; `progression.mjs` needs a `--species` flag); off = main bit for bit. **Cost:** none (a body rule: no situation field, legend or question; no re-ship). **Not in this bead:** the 30 s pause after being groomed, groomers by odour and the queen's retinue (all `ja-k4k.12`).
+
 ### 64.3 Leafcutter (`ja-vq14`; [leafcutter.md](leafcutter.md))
 
 A caste field (minim, media, major) in its own schema and a size array (`.3`, on `ja-fnd.5.10`), the garden as a chamber role (`.4`, on `ja-fnd.5.5`), one-way waste workers and waste-odour rejection (`.5`), exposed brood to the dump (`.6`), plant learning with food kinds (`.7`, late). Stridulation (`.8`) waits on the owner: its function is contested. Assays L1 division of labour by size, L2 one-way waste work (Brown et al. 2006), L3 brood removal by 36 h (Armitage et al. 2016), L4 the garden fed (`.2`).
@@ -6016,12 +6027,33 @@ The Codex was the field guide, the nest and the policy. The policy is about how 
   - A "?" moves focus to the section it opened, so pressing one by key lands there (review of #237, S1).
   - Escape, with focus in the Lab, closes it and gives the map the focus (the owner, D1 on #237). This replaces the Codex's Escape after a "?".
   - One Escape closes one thing. A chart's crosshair takes it first, and the Lab leaves it alone while a tooltip or a dialog that takes Escape is open (not the tutorial's coach card, which takes none).
-  - Opening the Lab takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
+  - Opening the Lab by `l`, the palette or Settings takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
 - **The Codex** keeps two tabs: the field guide and the nest. Its ids stay `learn-…`, and the Lab's policy sections are `lab-…`, so the two never share one.
 - **Two chart fixes** from #226's re-review (`ja-mvo9.4.1`):
   - Escape on a focused chart is taken only while it puts a crosshair away. Otherwise it passes on, so an open drawer closes (`chartKey`, pure and tested).
   - A lone value (a colony founded at the latest sample) draws a dot (`linePath`'s `h0`).
 - **Unchanged:** the simulation, and every legend and question, so no Jev cost change.
+
+### 69.9 S5: polish (ja-mvo9.5)
+
+The last stage of the page reorganisation: what makes it feel finished. The simulation, every legend and question, and the golden masters are unchanged.
+
+- **Appearance.** Settings has System / Light / Dark.
+  - The choice is kept per browser (`ui/theme.ts`, the key `jevants.theme`) and shown as `data-theme` on `<html>`.
+  - `index.html` applies it before the first paint, so a chosen theme never flashes the other one (a test runs the script over a stubbed storage: light, dark, anything else, no storage).
+  - `index.css` holds the dark variables twice, under the system's preference (unless light is chosen) and under `data-theme="dark"`. `ui/tests/theme.test.ts` holds the copies equal.
+  - The canvas watches the attribute and recolours, as it does for the system's setting.
+  - The palette lists "Appearance: …" for each.
+- **Motion.** A drawer, the inspector, the Codex and a phone's sheet arrive with a 170 ms fade, switched off by `prefers-reduced-motion`. It is opacity only: a first version also slid the panel a few pixels, and CI's browser test (on a slower runner than a dev machine) then met tooltips and taps against a panel that was still moving. The Lab is not animated, because it resizes the map's canvas.
+- **Accessibility, measured.**
+  - axe-core 4.10 was run over the start screen, every drawer, both Codex tabs, the palette, the shortcuts sheet, the builder and every Lab tab, in light, dark and at 390 px (33 states). It found no structural problem, only contrast and keyboard access.
+  - `--fg-3` was 4.38:1 (light) and 4.43:1 (dark) on the ground. It is now 4.88 and 5.76 there, and at least 4.5:1 on paper, panel and the raised surface in both themes (`#6f6a63`, `#958f88`).
+  - The Codex badge's white text on the dark spore purple was 2.3:1. It is now `--spore-ink`, near-black in dark.
+  - A struck-through (inert) lever lost its extra `opacity-50`.
+  - The three sideways-scrolling tables (colonies, history, a nest's chambers) are keyboard-focusable named regions.
+  - `ui/tests/theme.test.ts` computes the text tokens' contrast on every surface, in both themes, so a palette edit that drops under 4.5:1 fails a test.
+- **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices are cut to a pixel (`sr-only`, so a screen reader still announces them) and wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card shows its title and buttons, its text left for a screen reader, so a tall sheet is not reached. From sm up, nothing changes.
+- **Not in this stage:** one colony palette for the map and the charts (`ja-mvo9.9`), and the builder's Codex entries opening on first use of each tool (`ja-mvo9.7`).
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
@@ -6402,6 +6434,7 @@ Merging is not delegated: PRs wait for the owner.
   - Done gives the tab bar back;
   - saved to a slot, reloaded and continued, the wall is still there.
 - `ui/tests/build.test.ts`: the tray's lists, its sizes and the palm rule.
+- **Two fingers with a tool in hand** (owner, 2026-11-15): pinch and pan already worked with a brush selected, but the first finger to land built at once, so every pinch dropped a brush. A touch or pen now waits (`Gesture.pending`) until it moves past a click's slop or lifts as a tap; a second finger first makes it a pinch and nothing is built. The mouse is unchanged. e2e step 11 checks a pinch and a two-finger pan with sugar in hand (zoom changes, camera moves, no sugar) and a one-finger crayon drag.
 - `tests/int/builder.test.ts`: 18 tests.
 - `tests/soak/save.test.ts`: the save's keys now include `crayons`.
 
@@ -6824,19 +6857,114 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 - Both collapses are the all-old deadlock (`ja-rvli`). Once every worker is old, the larvae keep their energy, so they don't beg; no old ant feels any need; nobody keeps to the brood, so no food reaches it.
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
 
-## 78. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
+
+## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
+
+**Research basis:** [aphids.md](aphids.md):
+- *L. niger* scouts head toward aphid odour (Verheggen et al. 2012, full text: 67 % chose aphid alarm scent in a two-way test); recruitment to honeydew is the ordinary food trail (Mailleux et al. 2000, 2003, **unverified**).
+- Tenders bite intruders more readily than other ants (Gaber et al. 2024, full text: 90 % against 76 % of 332), locally, without calling the nest (Detrain et al. 2017, **unverified**). No study measured colonies fighting each other over aphids.
+- Ants eat some aphids, mostly the poorer producers (Oliver, Leather & Cook 2012, full text: 118 against 147 aphids after 7 days; Jossart et al. 2025 saw none in 10 days).
+
+**The problem.** The builder's food is a pile that is used up. The game has nothing that produces food over time, nothing ants defend away from home, and nothing ants farm. The owner asked for aphids (2026-11-15).
+
+**Decisions** (owner, 2026-11-15, each put with its sources for and against):
+- Ants find a clump by searching and by a short smell plume (the range is design).
+- Tenders at the clump defend it on a threat, as on home ground, rival ants included, with no recruitment (the rival part is design).
+- Ants eat a few aphids; larval demand as the cue waits for a sensed cue (`ja-nzkg.7`).
+- A clump grows, then crashes, over a few game minutes (design timing).
+
+**The mechanic.** In [aphids.md "The mechanic"](aphids.md#the-mechanic):
+- the clump is body: a per-cell aphid count on the plane, honeydew refilled as ordinary food up to a cap, a life that grows and crashes;
+- honeydew is food (taste, trail by quality, recruitment): nothing new;
+- the plume is `plume.ts` from aphid cells only (`aphidPlume`), steering only;
+- touching an aphid cell counts as home ground in `stance.ts`'s defend test (`tendDefend`);
+- a small share of takes at a clump is an aphid (`aphidPrey`).
+
+Off: no aphids placed, or each setting 0, is main bit for bit. Nothing reads the clump's position, its count or the colony's larvae. The tool is hidden for a species that takes no honeydew (the desert ant).
+
+**Play.** A clump a child places is found, trailed to, worked for minutes, and fought over; it swells, thins and goes; now and then an ant carries an aphid home. The choice is the child's (where, near which colony). Risks: runaway food (a cap and the crash), a clump never found (B9, the plume), a battlefield between nests (B11).
+
+**Assays and targets** (`ja-nzkg.1`, first, no behaviour change): B9 `aphidsFound` (sooner with the plume), B10 `aphidsRenewable` (more than the same cells of sugar, and a trail), B11 `tendersDefend` (more fights at the clump than away from home), B12 `aphidsEaten` (fewer aphids with ants: report).
+
+**Cost (estimated).** None in Jev: no situation field, no lane. Tick: the odour's rebuild (estimated here at the food plume's 10 ms; measured at 25 µs a build, every tick while a clump lives: §78.2) and a refill pass over aphid cells.
+
+**Beads.** `ja-nzkg` (this); `.1` assays; `.2` the clump and the tool; `.3` the plume; `.4` tenders defend; `.5` aphids eaten; `.6` tray, notices and Learn; `.7` research: a forager's cue for larval hunger.
+
+**Still open.** Honeydew per aphid and the cap (no verified figure); tenders lingering; tending raising the flow; the larval-hunger cue.
+
+### 78.1 The clump and its tool (ja-nzkg.2), assays B9 and B10 (ja-nzkg.1)
+
+**Built.** `colony/aphids.ts`: a clump is a list of plane cells with a start count (`APHID.perCell` 3 a cell), an age and its aphids eaten. Its life curve grows from 1 to `peak` 3× at 150 s and falls to nothing at 360 s. It makes `honey` 0.02 units an aphid a second as food of quality 1.5 (the builder's sugar) on its emptiest open cell, up to `cellCap` 4 a cell. It draws no random numbers. `Game.aphids` steps each tick and saves only when there are clumps, so a game without them saves and plays as before (goldens bit-exact). The builder's `aphids` tool puts a clump on open plane ground; a drag grows the clump it began; undo takes it off, and honeydew already made stays as food. The tray button comes with `ja-nzkg.6`.
+
+**Found on the way.** A map given a quality layer by the builder's food (sugar, crumbs, now honeydew) loaded the layer as a plain object, and the first taste after a reload threw. `qualityLike` (`world.ts`) now gives the map its layer before `Game.load` fills it (`ja-8c5e`).
+
+**Assays,** seeds 1–4, nothing yet steering ants to aphids:
+
+| Id | Result |
+|---|---|
+| B9 `aphidsFound` (60 ants, a clump 75 units off in a corner) | first find a median 9.1 s after it is put down (7.5–15.4). The plume (`ja-nzkg.3`) is measured against this. |
+| B10 `aphidsRenewable` against `aphidsRenewableSugar` (about 37 cells, 300 ants) | food home over 300 s: a median 1,130 (816–1,225) from the clump against 444 (all of it) from the same cells of sugar; ants on the hole–clump line 68 against 4 on a bare line. Passes. At the PR's last code (every step in): 1,110 (1,034–1,128), 68 against 4. |
+
+### 78.2 The aphid plume (ja-nzkg.3)
+
+**Built.** `aphidPlume` (params.ts, 8 cells; the desert ant's 0: it takes no honeydew). The game keeps one plume (`AphidOdour`, aphids.ts), spread with `plume.ts`'s `spread` from every living aphid cell out to the farthest any colony smells, rebuilt every tick while a clump lives (about 25 µs a build); it is shared by the colonies and not saved, since a loaded game builds the same one from the same clumps and map. (Built first each `PLUME_EVERY` period, a save made within one of a terrain change near a clump loaded a different odour: review of #243, S1.) An outside ant with empty jaws climbs it (`Colony.smellsAphids`, the branch after the food plume in `steer.ts`), as the desert ant climbs its food's. Steering only: no situation field, no Jev cost. With no clump, the plume is null and the branch is never taken (goldens bit-exact). `plumeAt` now reads 0 past the reader's range (the desert ant's is built to its own range, so its values are unchanged).
+
+**B9, the plume against a blind search** (`--set colony.aphidPlume=0,8`): first find sooner with it on **10 of seeds 1–10** (median 9.9 → 7.9 s; worst seed 15.4 → 11.9 s) and **7 of 11–20** (8.5 → 7.8 s). Passes. B10 holds with it (median 1,190 food home, 68 ants on the line, seeds 1–4); no tick cost measured beyond the noise (3.0 ms against 3.2). `tests/slow/assays.test.ts` holds seeds 1, 6 and 7.
+
+### 78.3 Tenders defend (ja-nzkg.4)
+
+**Built.** `tendDefend` (params.ts, 1; the desert ant's 0). `Colony.atAphids`: an ant on the plane on an aphid cell or one of the six beside it (the aphid plume's first step: contact). In `stance.ts`'s defend test such an ant counts as on home ground: a threat it senses there (strangers in reach, alarm) past `defendAt` makes it defend, so `contact` answers fight, and alarm turns its mode to fight (`localRules.ts`). It calls no one from the nest. Defending outside the nest already happens on home ground, so no new situation reaches a Jev lane: no cost. With no clump, or `tendDefend` 0, main bit for bit.
+
+**B11 `tendersDefend`** (two colonies of 200, 90 cells apart, a clump halfway; among ants in contact with a rival, the share standing and fighting; `--set colony.tendDefend=0,1 --set rival.tendDefend=0,1`):
+
+| tendDefend (both) | at the clump | away from homes and clump | losses a colony (300 s) |
+|---|---|---|---|
+| 0, seeds 1–4 | 0.00 (0–0.12) | 0.07 | 46 |
+| 1, seeds 1–4 | **0.87** (0.79–0.98) | 0.04 | 91 |
+| 0, seeds 11–20 | 0.00 (0–0.08) | 0.08 | 45 |
+| 1, seeds 11–20 | **0.90** (0.85–0.96) | 0.10 | 80 |
+
+Re-measured at the PR's last code (review of #243, S3). The first figures, taken at step 3, were one draw of a noisy number: step 4's draws in `preyAphid` shift the colonies' random stream, and B11's losses move by tens of ants with it. The fight share at the clump is higher with tending on in 4 of 4 and 10 of 10 seeds. Gaber et al. 2024 found 90 % of caretakers biting. Their "other ants", 76 %, were still on the aphids' plant: the game's away share (a forager meeting a stranger far from anything, which flees) is not that comparison. The cost is the risk the plan named: a clump between nests is fought over. Each colony's losses in 5 minutes rise on every one of the 14 seeds, by about +35 % to +125 % (seed means 46 → 91 and 45 → 80): roughly double. The fights stay at the clump: the away share does not rise. **The owner kept it (2026-11-15, review of #243 D1):** ants guard their aphids hard, and a clump between two nests is a battlefield; softening it (a longer threat before a tender stands) or shipping it off were put with the same sources and declined.
+
+### 78.4 A few aphids eaten (ja-nzkg.5)
+
+**Built.** `aphidPrey` (params.ts, 0.05; the desert ant's 0). When an ant takes food on a living aphid cell (`arrive.ts`, the plane), `Colony.preyAphid` takes one of the aphids instead with that chance: the clump's `eaten` goes up by one, the honeydew stays on the cell, and the ant carries the aphid home as food of quality 1. It draws a number only on an aphid cell, so a game with no clump is main bit for bit. The rate is not yet tied to the colony's hunger: a forager at the clump can't sense its larvae (`ja-nzkg.7`).
+
+**B12 `aphidsEaten`** (a clump worked by 300 ants; at 240 s, the share of its aphids eaten):
+
+| aphidPrey | seeds 1–4 | seeds 11–20 |
+|---|---|---|
+| 0 | 0 | — |
+| 0.02 | 0.11 (0.08–0.15) | — |
+| **0.05** | **0.23** (0.18–0.27) | **0.21** (0.16–0.29) |
+
+Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found with ants and larvae (118 against 147, 20 % fewer, after 7 days). Food home is unchanged within the noise (939 against 914). `tests/slow/assays.test.ts` holds seed 1 between 0.1 and 0.4, and none eaten at 0.
+
+### 78.5 The tray, the map, notices and Learn (ja-nzkg.6)
+
+- **Tray:** 🐛 Aphids in the full tray after the crumbs; hidden for a species that takes no honeydew (`trayItems`' `tends`: aphidPlume, tendDefend or aphidPrey above 0; the desert ant has none). Its sound is three soft rising pips.
+- **Map:** each living clump's cells carry one to four green dots (`--aphid`, light and dark), by its aphids a cell, fading as it crashes; on the top view.
+- **Notices** (`Builder.watch`, once each a clump): "The Amber ants found your aphids!" (an ant carrying food on the clump), "The ants are eating some of your aphids, as real ants do." (3 eaten), "Your aphids are all gone: aphid families grow, then fade away." An undone clump says nothing.
+- **Learn:** the `builder-aphids` entry (what you see, what real ants do, how the game models it, and what is a guess), with its Codex row, open from the start as the other builder tools are.
+- **e2e:** step 11 taps aphids down at 390 and 768 px.
+
+**Cost, the PR's.** No lane, situation field, legend or question changed: no Jev cost. Tick: the plume's rebuild and the honeydew pass show no cost past the noise in B9–B12 (3.0–3.9 ms a tick, as the runs without clumps).
+
+**Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.
+
+## 79. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
 
 **Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
 - *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
 - Between-ant SD about 16 % after 10 m (Pfeffer, Wahl & Wolf 2020, full text).
-- Uncertainty grows like √distance (Heinze, Narendra & Cheung 2018, full text).
+- A path-integration model whose uncertainty grows like √distance, fitted to search data (Heinze, Narendra & Cheung 2018, full text; the √ is the model's premise, not a finding).
 - Search width follows distance out, not the path's tortuosity (Merkle & Wehner 2010, **unverified**).
 
 **The problem (measured, `ja-lp4.14`).** The plane's error was the odometer × one drift a trip (`PI_DRIFT` 0.1): linear in the path, and fighting, defending and winding all added. Defence is gated by the vector (`homeDistPlane` ≤ `homeGround`, Knaden & Wehner 2004; Bollig et al. 2026), so ants far out after long winding paths believed themselves home and defended there. G1 seeds 1–10 on main: 41 defenders died, a median 55 cells from their hole (88 % more than 20 out).
 
 **The law** (`piErrorLaw` 1). The same two drift draws a trip; they are multiplied by `PI_SPAN_GAIN` × √(`piErrorAt` × reach) instead of the odometer, reach (`reachSurf`) being the farthest the ant has walked, straight, from its own hole this trip. The median miss is `PI_MISS_AT` (0.25) × √(`piErrorAt` × reach).
-- **Sourced:** the √ (Heinze 2018; Merkle 2006's 5 → 20 m), the 25 % (Merkle 2006), distance out rather than path (Merkle & Wehner 2010).
-- **Design:** `piErrorAt` 50 cells for 5 m (the map keeps ratios: 2.5–20 m for the game's 25–200-cell trips); the farthest point as "distance out" for a winding path; reach counted in every mode but the walk home, as the odometer is.
+- **Sourced:** the 25 % miss at 5 m and 12 % at 20 m (Merkle 2006, as tabled by Goldschmidt 2017).
+- **Design:** the √ growth, consistent with Merkle's end points (5 → 10 m is near linear, 10 → 20 m near flat) and with Heinze 2018's model, which assumes it rather than measures it; distance out rather than the path, read from an unverified summary of Merkle & Wehner 2010; `piErrorAt` 50 cells for 5 m (the map keeps ratios: 2.5–20 m for the game's 25–200-cell trips); the farthest point as "distance out" for a winding path; reach counted in every mode but the walk home, as the odometer is.
 - **Fighting and defending** add only by taking the ant further out than it has been.
 - **Draws:** unchanged in number and order. Off (0) is main bit for bit: the goldens, and G1 seed 3's per-tick hash over 120 s against `5a646196`.
 - **Not built:** the distance shortfall (Sommer & Wehner 2004), the path-shape bias (Müller & Wehner 1988), the food vector's error, the side view.
@@ -6887,7 +7015,7 @@ Law 1 matches the sources' shape; law 0 is flat in the median with a long tail (
 
 **Beads.** `ja-lp4.19` (this). The owner's choices: the default; `piErrorAt` (50, design; 500 if 1 cell is read literally as a body length, which puts the miss at 79 % at 50 cells out); whether fights should blur the vector more than walking (no source found).
 
-### 78.1 Every one-world assay, law 0 against law 1 (seeds 1–10)
+### 79.1 Every one-world assay, law 0 against law 1 (seeds 1–10)
 
 Both colonies at the law, offline, run one assay and seed a process (`runAssay` with `{ colony, rival }` overrides; `--set colony.` alone would set only the first colony). `lifecycle-signal` and `lifecycle-scent` ran on seeds 1–5 only (each a 1,800 s game; the session's time ran out). G1 is above. Pass counts, failing seeds in brackets:
 
@@ -6908,3 +7036,43 @@ Both colonies at the law, offline, run one assay and seed a process (`runAssay` 
 The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` (10/10); `regulateStop` 9/10; `r1` 6/10; `pass` 3/10; `s1`, `regulate`, `faintAlarm`, `f1`, `d1` 0/10. No `pass` metric (reported only): `open`, `rain`, `lateSugar`, `tweezers`, `crayonRing`, `fillShaft`, `noEntryForkBare`, `nestFlow`, `d3`, `d4`. `d2c` and `f1` are bit-identical (no ant homes on the plane by its vector there; F1's planted find reads the law, but 30 s is too short to differ).
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
+
+## 80. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
+
+**Basis:** [mutation-tree.md](mutation-tree.md), pure game design. **Owner (2026-11-15):** "What about these mutation upgrades reconsidered as a tech tree? Maybe a flatter cost, but dependencies?"; then the cost as *one price, rising per buy*, a *tree view* in the drawer, and, after a research pass for the edges was stopped by safeguards, "Try building it this way": the tree as design, with no research step (the adding-mechanics gate waived on that word).
+
+**The problem.** The 14 upgrades (26 levels) are a flat menu with no dependencies; each level's hand-set price (2–10 for a first level, 300–1,500 for most second ones, 2,000–6,000 for the strongest, §50.13) does all the pacing, so the choice is mostly the cheapest item.
+
+**Decisions.**
+- One price for every level, rising with each level kept: `PRICE(n) = round(BASE · RATIO^n)`, first guess BASE 3, RATIO 1.38 (all 26 levels about 34,000 mutations, today's total) (owner: the shape; the numbers are tuned).
+- Levels need others first, by the table in the note; seven roots; the lethal levers last and still also on the menu (proposed: the owner edits the edges before code).
+- The drawer draws the tree; the list stays at phone width (owner).
+- No migration: saves stay keyed by upgrade id (owner, 2026-11-10: no backward compatibility).
+
+**Assays and targets.** Unit and soak tests for the price, the locks and the tree's guard (every need real, no cycle, every level reachable), each caught by a mutation. Pacing: about half of everything kept by 20 minutes (§50.13's aim), `progression.mjs --seconds 1200`. P1 (§63.4) on seeds 1–20 with `--hyphae --growth --flow`, against no hyphae on the same commit; BASE and RATIO chosen by the worst seed. The fungus golden is re-recorded (its game buys upgrades); the others stay bit-exact.
+
+**Cost.** None: no question, legend or cache key reads upgrade levels (`evolution.test.ts` pins the fungus key).
+
+**Beads.** `ja-52ui` (this); `ja-52ui.1` model, price and locks; `ja-52ui.2` the tree's edges; `ja-52ui.3` scripts and goldens; `ja-52ui.4` the drawer's tree view; `ja-52ui.5` text; `ja-52ui.6` pacing, P1 and tuning.
+
+**Still open.** Whether a level may need one of two others rather than both; the late levels' price (below).
+
+### 80.1 Built, and the price chosen (2026-11-15)
+
+**Built** (`ja-52ui.1`–`.5`): `Upgrade.needs` replaces the price lists, checked at load (every need a real level, no cycle, every level reachable); `price(kept)`, `unmet`, `canKeep` and `pathTo` in `evolution.ts`; the drawer's tree (`ui/UpgradeTree.tsx`: branches, each upgrade a row of its levels, lines in lanes from a level to what needs it, dashed until met) on a screen 1024 px or wider, the list with "needs …" on a phone; the badge and notice count only levels that can be kept; `progression.mjs` and the goldens keep what a level needs first, and `--price base,ratio` sweeps the price. §50.13's price table is superseded.
+
+**Measured** (`scripts/lab/progression.mjs --map one --evolve --seconds 600`, with and without `--hyphae --growth --flow`, seeds 1–20; `main` at `5a64619` for reference; seconds to a quarter of the hosts):
+
+| | median 1–10 | median 11–20 | worst seed |
+|---|---|---|---|
+| `main`, no hyphae | 246.5 | 294.5 | 587 s (seed 8) |
+| `main`, hyphae | 221.5 | 228 | 406 s (seed 16) |
+| tree at 1, ×1.5, no hyphae | 222.5 | 194 | 525 s (seed 8) |
+| tree at 1, ×1.5, hyphae | 216.5 | 158.5 | 437 s (seed 11) |
+
+- **1, ×1.5 holds P1** (§63.4) on seeds 1–20: the slowest seed with hyphae is +3.3 % (seed 11, 423 → 437 s); every other seed is within 0.4 % or faster. Both games reach a quarter sooner than on `main`. Its first six levels cost 21 in all, as the old list's first levels did.
+- **3, ×1.38** (the first guess) fails: seed 9 +50 %, seed 1 +37 %, seed 2 +33 %, seed 12 +12 %, and both games are slower than `main`. **2, ×1.3** fails on seed 9 (+12 %, seeds 1–10).
+- **Pacing at 20 minutes** (seeds 1–4, hyphae): the 20 levels in the script's order are all kept by 466–679 s. From the 21st level on a level costs 3,300 to 25,000, so the last levels a player picks (often *Crown*, the *Odour weapon*, *Knots* or *Stalks*) are out of reach in a 20-minute game: the order matters, and the tree's end is far.
+- **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
+- **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
+

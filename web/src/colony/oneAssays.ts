@@ -22,7 +22,7 @@ export const game1: Assay = {
   id: "game1",
   title: "G1 the one-world game (with A7: foragers holding food)",
   target:
-    "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (slow/side.test's bound); food carried down, births, crossings and porters reported",
+    "≤ 2 foragers holding food over 120 s per colony at any 10-s sample, both layers (the side view's slow/side.test bound, now G1's); food carried down, births, crossings and porters reported",
   seconds: 600,
   spec: (seed) => ({
     seed,

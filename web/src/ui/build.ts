@@ -10,7 +10,19 @@ import type { BuildTool } from "../colony/index.ts";
 export type TrayTool = "move" | "tweezers" | BuildTool;
 
 /** The full tray (the 7-year-old's), in order. The crayon appears once per colony (up to CRAYONS). */
-export const FULL: readonly TrayTool[] = ["move", "tweezers", "dig", "dirt", "rock", "sugar", "crumb", "crayon", "noEntry", "rain"];
+export const FULL: readonly TrayTool[] = [
+  "move",
+  "tweezers",
+  "dig",
+  "dirt",
+  "rock",
+  "sugar",
+  "crumb",
+  "aphids",
+  "crayon",
+  "noEntry",
+  "rain",
+];
 /** The little-hands tray: four tools only, bigger still (owner, PRD §73). */
 export const LITTLE: readonly TrayTool[] = ["move", "sugar", "dig", "rain"];
 /** Crayons shown at most: one per colony, the first few. */
@@ -25,6 +37,7 @@ export const LABEL: Record<TrayTool, string> = {
   rock: "Rock",
   sugar: "Sugar",
   crumb: "Crumbs",
+  aphids: "Aphids",
   crayon: "Trail crayon",
   rain: "Rain",
 };
@@ -38,6 +51,7 @@ export const PICTURE: Record<TrayTool, string> = {
   rock: "🪨",
   sugar: "🍬",
   crumb: "🍪",
+  aphids: "🐛",
   crayon: "🖍️",
   rain: "🌧️",
 };
@@ -52,6 +66,7 @@ export const GESTURE: Record<TrayTool, "tap" | "drag"> = {
   rock: "tap",
   sugar: "tap",
   crumb: "tap",
+  aphids: "tap",
   crayon: "drag",
   rain: "drag",
 };
@@ -74,8 +89,11 @@ export interface TrayItem {
   picture: string;
 }
 
-/** The tray's tools: the little four, or the full set with a crayon per colony (`names`: each colony's name; `trails`: the species lays a food trail). */
-export function trayItems(little: boolean, names: readonly string[], trails = true): TrayItem[] {
+/**
+ * The tray's tools: the little four, or the full set with a crayon per colony (`names`: each colony's name; `trails`: the species
+ * lays a food trail; `tends`: it takes honeydew and tends aphids, docs/aphids.md).
+ */
+export function trayItems(little: boolean, names: readonly string[], trails = true, tends = true): TrayItem[] {
   const out: TrayItem[] = [];
   for (const tool of little ? LITTLE : FULL) {
     if (tool === "crayon") {
@@ -88,6 +106,8 @@ export function trayItems(little: boolean, names: readonly string[], trails = tr
         );
     } else if (tool === "noEntry" && !trails)
       continue; // the sign turns trail followers: no trails, nothing to turn
+    else if (tool === "aphids" && !tends)
+      continue; // a species that takes no honeydew (the desert ant) would ignore them
     else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
   }
   return out;

@@ -40,6 +40,8 @@ import {
   type WorldMap,
   worldExtent,
   type BuildTool,
+  aphidCount,
+  type AphidClump,
 } from "../colony/index.ts";
 import {
   aimed,
@@ -134,6 +136,8 @@ interface Props {
   build?: FieldBuild | null;
   /** the ants the tweezers moved: each one's way home, drawn on the top view (ja-cwjp), builder on or off */
   traces?: AntTraces | null;
+  /** the builder's aphid clumps (docs/aphids.md, ja-nzkg.6), read each frame: the game replaces its list as clumps go */
+  aphids?: (() => readonly AphidClump[]) | null;
 }
 
 /** The builder on the field (ja-kjj8.3, ja-kjj8.4). */
@@ -189,6 +193,14 @@ interface ViewCam {
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
+
+/** Where an aphid cell's dots sit, in world units from its centre: up to four. */
+const APHID_SPOTS: readonly (readonly [number, number])[] = [
+  [-0.22, -0.18],
+  [0.24, -0.12],
+  [-0.12, 0.24],
+  [0.2, 0.22],
+];
 
 /** No specimens: one empty list, so the default prop is the same each render. */
 const NO_SPECIMENS: readonly Specimen[] = [];
@@ -250,6 +262,12 @@ type Gesture = {
   sy: number;
   /** the ant the tweezers hold */
   ant?: Followed;
+  /**
+   * A finger's (or pen's) stroke or lift not begun yet: it starts once the finger has moved past a click's slop, or places on lifting
+   * as a tap. A second finger landing first makes it a pinch instead, and nothing was built (a pinch with a brush in hand used to
+   * drop the brush where the first finger landed).
+   */
+  pending?: boolean;
 };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
@@ -274,6 +292,7 @@ export default function ColonyField({
   onProbe,
   build = null,
   traces = null,
+  aphids = null,
   specimens = NO_SPECIMENS,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
@@ -353,6 +372,10 @@ export default function ColonyField({
   useEffect(() => {
     follow.current = followed;
   }, [followed]);
+  const aphidsRef = useRef(aphids);
+  useEffect(() => {
+    aphidsRef.current = aphids;
+  }, [aphids]);
   const tracesRef = useRef(traces);
   useEffect(() => {
     tracesRef.current = traces;
@@ -479,6 +502,7 @@ export default function ColonyField({
       inkRgb: rgb("#1c1b19"),
       warnRgb: rgb("#8a5300"),
       spore: "#7a4fa0",
+      aphid: "#5a9a2c",
       sporeRgb: rgb("#7a4fa0"),
       chamber: rgb("#a39a8a"),
     };
@@ -502,6 +526,7 @@ export default function ColonyField({
         inkRgb: rgb(cssVar("--ink")),
         warnRgb: rgb(cssVar("--warn")),
         spore: cssVar("--spore"),
+        aphid: cssVar("--aphid"),
         sporeRgb: rgb(cssVar("--spore")),
         chamber: rgb(cssVar("--mound")),
       };
@@ -510,6 +535,9 @@ export default function ColonyField({
     retheme();
     const mq = matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", retheme);
+    // The player's own choice (Settings → Appearance) is data-theme on <html>.
+    const themeWatch = new MutationObserver(retheme);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const fitCanvas = () => {
       const d = Math.min(2, window.devicePixelRatio || 1);
@@ -1538,6 +1566,33 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
+      // The builder's aphids (docs/aphids.md, ja-nzkg.6): one to four green dots a cell, as many as the clump has aphids a
+      // cell, fading as it crashes. On the top view (or the one map).
+      const clumps = aphidsRef.current?.();
+      if (clumps?.length && (world ? lv === PLANE : true)) {
+        ctx.fillStyle = theme.aphid;
+        const r = Math.max(1.2 * d, 0.13 * c.zoom);
+        for (const cl of clumps) {
+          const n = aphidCount(cl);
+          const cells = cl.cells.length / 2;
+          if (n <= 0 || !cells) continue;
+          const per = Math.max(1, Math.min(4, Math.round(n / cells / 2)));
+          ctx.globalAlpha = Math.min(1, 0.35 + n / cells / 4);
+          for (let k = 0; k < cl.cells.length; k += 2) {
+            const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
+            const wy = centreY(cl.cells[k + 1]!);
+            if (!inView(wx, wy)) continue;
+            for (let j = 0; j < per; j++) {
+              const [ox, oy] = APHID_SPOTS[j]!;
+              const [x, y] = toScreen(c, v, wx + ox, wy + oy);
+              ctx.beginPath();
+              ctx.arc(x, y, r, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
       // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
       // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
       const tr = tracesRef.current;
@@ -1663,6 +1718,7 @@ export default function ColonyField({
       off();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
+      themeWatch.disconnect();
       canvas.removeEventListener("wheel", wheel);
     };
     // `count`: a colony founded mid-game is pushed onto the same array (Game.addColony). The view is read each frame
@@ -1837,14 +1893,20 @@ export default function ColonyField({
       // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
       const ant = world && shown.current === PLANE ? pick(x, y) : null;
       if (ant) {
-        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant };
-        const [wx, wy] = toWorld(camera(), viewport(), x, y);
-        buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+        // A finger waits to see whether a second joins it (a pinch); a mouse lifts at once.
+        const held = e.pointerType !== "mouse";
+        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant, pending: held };
+        if (!held) {
+          const [wx, wy] = toWorld(camera(), viewport(), x, y);
+          buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
+        }
       } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
     } else if (e.button === 0 && buildRef.current?.tool) {
-      // A tool in hand: the touch builds where it lands (a tap places), and a drag carries on painting.
-      gesture.current = { ...NO_GESTURE, ...start, kind: "paint" };
-      paint([[x, y]], true);
+      // A tool in hand: a drag paints, and a tap places. A finger waits to see whether a second joins it (two fingers pan and
+      // zoom, as with no tool): it builds once it has moved past the slop, or on lifting as a tap. A mouse builds at once.
+      const held = e.pointerType !== "mouse";
+      gesture.current = { ...NO_GESTURE, ...start, kind: "paint", pending: held };
+      if (!held) paint([[x, y]], true);
     } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
@@ -1882,17 +1944,41 @@ export default function ColonyField({
         setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
       }
     } else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
-    else if (g.kind === "paint")
-      paint(
-        [
-          [prev.x, prev.y],
-          [x, y],
-        ],
-        false,
-      );
-    else if (g.kind === "tweeze" && g.ant) {
-      const [wx, wy] = toWorld(camera(), viewport(), x, y);
-      buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+    else if (g.kind === "paint") {
+      if (g.pending) {
+        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
+        // Still within a click's slop: not yet a stroke (a second finger may be on its way).
+        if (g.moved > slop()) {
+          g.pending = false;
+          paint(
+            [
+              [g.sx, g.sy],
+              [x, y],
+            ],
+            true,
+          );
+        }
+      } else
+        paint(
+          [
+            [prev.x, prev.y],
+            [x, y],
+          ],
+          false,
+        );
+    } else if (g.kind === "tweeze" && g.ant) {
+      if (g.pending) {
+        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
+        if (g.moved > slop()) {
+          g.pending = false;
+          const [sx, sy] = toWorld(camera(), viewport(), g.sx, g.sy);
+          buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, sx, sy, true);
+        }
+      }
+      if (!g.pending) {
+        const [wx, wy] = toWorld(camera(), viewport(), x, y);
+        buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
+      }
     }
     pointers.current.set(e.pointerId, { x, y });
   };
@@ -1902,6 +1988,8 @@ export default function ColonyField({
     const g = gesture.current;
     const p = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
+    // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
+    if (e.type === "pointerup" && g.kind === "paint" && g.pending) paint([[g.sx, g.sy]], true);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
       if (lensRef.current && !(world && pn && shown.current === PLANE)) {

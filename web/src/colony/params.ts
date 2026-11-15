@@ -122,8 +122,8 @@ export interface ColonyParams {
   /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
    * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
-   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
+   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × piSpan: the odometer, or by the
+   * distance out with piErrorLaw 1; Merkle & Wehner 2010: the search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
    * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
    */
   searchLoops: number;
@@ -175,6 +175,27 @@ export interface ColonyParams {
    * to a remembered spot. 0 = no food odour (the generic ant: main bit for bit).
    */
   foodPlume: number;
+  /**
+   * Aphid odour in the air (ja-nzkg.3, docs/aphids.md finding 1): an outside ant with empty jaws climbs the smell of a living
+   * aphid clump (the builder's) within this many cells of it (aphids.ts, plume.ts). L. niger scouts head toward aphid odour in
+   * olfactometers (Verheggen et al. 2012); no field range was measured, so the range is design. 0 = deaf to it (a species
+   * that takes no honeydew). With no clump on the map it reads nothing: main bit for bit.
+   */
+  aphidPlume: number;
+  /**
+   * Tenders defend (ja-nzkg.4, docs/aphids.md finding 5): an ant touching a living aphid clump (on an aphid cell or beside one) counts
+   * as on home ground for the defend stance, so a threat it senses there makes it stand and fight rather than flee, and it calls no one
+   * from the nest. L. niger caretakers bit an intruder more often than other ants (90 % against 76 %; Gaber et al. 2024); against
+   * rival ants it is design (no study measured colonies fighting over aphids). 0 = no tending defence: main bit for bit.
+   */
+  tendDefend: number;
+  /**
+   * Aphids eaten (ja-nzkg.5, docs/aphids.md finding 6): an ant taking honeydew from a living aphid cell takes one of the aphids
+   * instead with this chance, home as food (quality 1). Ants eat some aphids: with larvae, colonies left 118 against 147 after 7
+   * days (Oliver, Leather & Cook 2012); another study saw none in 10 days (Jossart et al. 2025). The rate is design, and is not
+   * tied to the colony's hunger yet (ja-nzkg.7: no sensed cue for it). 0 = never eaten: main bit for bit.
+   */
+  aphidPrey: number;
   /**
    * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
    * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
@@ -305,7 +326,7 @@ export interface ColonyParams {
    */
   routeFight: number;
   /**
-   * One world's plane (ja-lp4.19, docs/nest-search.md "How far the vector is off", PRD §78): how the home vector's error grows.
+   * One world's plane (ja-lp4.19, docs/nest-search.md "How far the vector is off", PRD §79): how the home vector's error grows.
    * 0 = with the path walked (the odometer × the trip's drift: linear, and every step but the walk home adds, fighting
    * too). 1 = with the square root of the distance out (the farthest the ant has been from its hole this trip, straight):
    * a median miss of PI_MISS_AT × √(piErrorAt × that distance) (Merkle, Knaden & Wehner 2006: 25 % at 5 m, 12 % at 20 m;
@@ -450,6 +471,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
+  aphidPlume: 8,
+  tendDefend: 1,
+  aphidPrey: 0.05,
   heatDay: 0,
   heatDawn: 25,
   heatNoon: 52,
