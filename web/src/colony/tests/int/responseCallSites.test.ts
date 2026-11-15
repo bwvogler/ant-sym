@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
 import { RESPONSE_HOOKS, type ResponseHook } from "../../colonyBrain.ts";
 import { Game } from "../../game.ts";
 import { localResponses, responses, type Responses, type Touch } from "../../responses.ts";
@@ -51,4 +52,25 @@ test("the leave response at the gate carries the ant's draw", () => {
   c.responses = r;
   c.leaves(0, 1 / 30, false);
   assert.deepEqual(asks.leave, { drawn: 1, bare: 0 });
+});
+
+// The games above reach most call sites, not all (a corpse hauled, soil picked up on one world's plane, brood: review of #223, S3).
+// So the source too: every call of a response hook in colony/ hands it the ant's draw.
+test("every response hook called in colony/ is handed antDraw", () => {
+  const dir = new URL("../../", import.meta.url);
+  const calls: string[] = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
+    const text = readFileSync(new URL(f, dir), "utf8");
+    for (const m of text.matchAll(/\b(?:resp|responses)\.(get|carry|drop|trail|contact|leave)\(/g)) {
+      // the call's arguments, to its closing parenthesis (a call Prettier wrapped spans lines)
+      let depth = 1;
+      let end = m.index + m[0].length;
+      while (depth > 0 && end < text.length) ((depth += text[end] === "(" ? 1 : text[end] === ")" ? -1 : 0), end++);
+      const call = text.slice(m.index, end);
+      const line = text.slice(0, m.index).split("\n").length;
+      calls.push(`${f}:${line}`);
+      assert.match(call, /antDraw\(/, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
+    }
+  }
+  assert.ok(calls.length >= 11, `found only ${calls.join(", ")}`);
 });

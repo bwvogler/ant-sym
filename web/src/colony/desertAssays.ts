@@ -201,6 +201,7 @@ export const CHAMBER_SIZES = [2, 4, 8, 13] as const;
  * finder raises, damped by the crowd, here the n − 1 still waiting round each; the leave response on it), `trials` times. The game's crowd
  * sense differs (review of #186, S2): it counts every nestmate round the top of the shaft (about 5 on average where about 1.5 wait), so a
  * finder's lift fades about twice as fast in play; and it is wired only where there is a rival (game.ts), so in a game alone it reads 0. An ant that leaves is gone for the trial.
+ * The leave response is asked with no draw: a replayed cache plays Jev's own answer here, where the game draws each ant's (ja-m7rr).
  */
 export function invitationChamber(
   p: ColonyParams,
