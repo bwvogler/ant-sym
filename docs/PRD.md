@@ -4192,6 +4192,14 @@ The owner asked for the top-down view and the side view to be two views of one g
 
 **`ja-web` built (2026-11-10).** Activation at the top of each shaft: every outgoing forager is held at a gate within `WAIT_STEPS` of its own hole and asked `leave` there; carriers have a pass; held ants smell the raid trail at their hole. A5b passes 7/10 on one world, A5 0/10 (the middle-aged go out unheld); G1's food carried down is unchanged and raids return; the tick at 1,200 + 1,200 is over the 10 ms gate (10.7–10.8 ms in the second half), and the slow unity guard (seed 3) no longer unifies (skipped behind `ja-lp4.6.6`). §48.6; `one-world.md` §5, "ja-web as built".
 
+**U6b built (`ja-lp4.6.2`, 2026-11-14): the final one-world baselines.** A11 and A12 run on one world (`ONE_ASSAYS`; nothing pending); no behaviour change, the golden masters bit-exact. Seeds 1–10 on `main` (`74a3d822`); the full table, with U6a's and ja-web's beside it, is `one-world.md` §5, "U6b as built".
+- **Assays:** A1 10/10, A2a 10/10, A2b 9/10, A3 10/10, A4 10/10, A5 0/10, A5b 9/10, A6 5/10, A9 5/10, A10 0/10; **A11 10/10** (gain median 4.14, worst 2.47), **A12 8/10** (median 0.84; seeds 7 and 8 at 0.41 and 0.49, accepted as the baseline by the owner, `ja-lp4.6.10`).
+- **A6 is a fight at the nest:** every defender dies on 6 of 10 seeds and 413 of 821 defender deaths are in the curtain. Raiders keep going down a rival's shaft (owner, 2026-11-14); what A6 measures on one world stays open (`ja-lp4.6.5`).
+- **G1:** 6 of seeds 1–10 within 2, worst 6 (seed 7). #205's guard asks for 5. Raids: 166 scouts, 42 finds, 13 recruits, recruits on 4 seeds (`ja-lp4.6.9`).
+- **Unity:** peaks 0.02–0.23 % at 300 + 300 and 0.42–0.56 % at 600 + 600 in 600 s; nobody unifies (`ja-lp4.6.6`).
+- **Tick, over the gate:** 1,200 + 1,200 second-half mean 16.1 / 17.2 ms on the machine measured (15.4 / 16.0 after merging `5943e5d9`), about 13 ms scaled to the reference machine (ja-web's merge runs 1.26 times slower there), against the owner's 10 ms; `main` is about 20–25 % slower than ja-web on the same machine. The owner shipped U6b over the gate (2026-11-14); the speed work is next (`ja-lp4.6.7`).
+- **Cost:** none: no situation, legend or question changed.
+
 ## 52. Entrances: the crust stays a mechanic, for now (research, ja-nzx, 2026-11-08)
 
 The owner asked whether the side view's undiggable crust could become an ant's own choice, and whether colonies could open new entrances (`ja-nzx`, `ja-4h2`, `ja-lp4.9`). `docs/entrances.md` holds the research:
@@ -4403,7 +4411,7 @@ The longer legends cost a few per cent; the top-down stance lane is gone. The es
 
 ## 55. The page plays one world only (ja-97n, 2026-11-10)
 
-The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines are still open. Only the UI changed:
+The owner (2026-11-10) removed the side-view and top-down games from the page and made one world (§51) its only game, so Details has no Ground choice. This takes the page switch out of U6b (`ja-lp4.6.2`), whose leave and raid assays and final baselines followed (§51, "U6b built", 2026-11-14). Only the UI changed:
 
 - `buildGame` always builds `generateOneWorld(seed)`. `ColonyControls`, the saved settings (`GameSettings`) and `hasNests` no longer carry a ground. Saves made before this change will not load into the same world; there is no migration, because nobody plays yet.
 - The Nest tab, the fungus panel's nest upgrades and the notices no longer check whether the map has nests. The Nest tab's "Switch to the side view" empty state is gone.
@@ -4802,7 +4810,7 @@ A2b's failures are flips: the colony settles on the poor source (rich share 0.06
 - **Tests** (`tests/int/oneWorldRouteJoin.test.ts`), each failing under a mutant: the join at the nearest place (mutant: newest), the newer of equals, the clear line, the narrowing to a searching ant (gate removed, inverted, 2 not always), a game where a carrier near home walks in rather than out, the search restarted and centred on the first place, and only once the retrace is over; `routeFight`'s gate and clause. Not covered: the carrying guard on route recording in `arrive.ts` (the "with food, never" case never reaches it; only the one-world golden holds it, `ja-lp4.6.3.3`).
 - **Not re-run at step 3:** the full one-world assays and the tick bench. At step 4 the join and end together left the assays as they were but A2b (9 → 7 of 10) and A5b (8 → 9), and the tick within noise (16.19 / 15.73 / 15.84 ms on against 15.47 / 15.66 / 15.91 off); routeEnd reads the first stored place on each tick of the search that follows a retrace (one array read).
 
-**Still open.** The bound of 2 on every seed (`ja-lp4.6.3`): with routeEnd on, 14 of seeds 1-20 meet it and seed 7's rival reaches 6. The owner may tighten #183's guard to track this (it passes with 7 of 10 within, against its 4). A narrower `routeFight` (only a fighter that then picks up food far from home) is next.
+**G1 closed (owner, 2026-11-14).** The guard now asks for **at least 5 of seeds 1-10 within 2** (it was 4), none at 10 or more. routeEnd gives 7; on `main` with #201 (brood only in brood chambers) it is 6 (worst you / rival per seed: 0/1 3/1 0/0 3/1 1/1 1/2 3/6 1/1 3/1 2/1), and the owner set the guard one below that, so one seed moving by one carrier doesn't re-open G1. The bound of 2 on every seed is no longer a goal; `ja-lp4.6.3` is closed on this share, and U6b (`ja-lp4.6.2`) is unblocked. The narrower `routeFight` (`ja-lp4.6.3.2`) and a test of the carrying guard on route recording (`ja-lp4.6.3.3`) go to the backlog.
 
 ## 60. A third species: the desert ant (design, ja-rf5, 2026-11-11)
 
@@ -4952,7 +4960,7 @@ Four one-world assays (`experiment.ts`, `ONE_ASSAYS`; `npm run exp -- d1 d2 d3 d
 - **Built** (`levers.ts` `rouse`, emit, none 0 / some 0.5 / strong 1 × the host's load; the ants' `rouse` array, reset with the host's levers; `crossing.ts`: a host going down its own hole with nothing found adds its `rouse` to the passes the waiting ants meet, only where `invitePace` > 0). In the **Trails** upgrade's reach, beside trail, leak and alarm laid. **Off the default menu** (`DEFAULT_MENU` leaves out levers that need an invitation), and **on in a desert game** (`menuFor`, owner 2026-11-14): a generic game's fungus requests don't ask a lever that does nothing. `inertLevers(has, invites)`: inert on a species whose finders don't invite (the generic ant), greyed on the Details screen. Goldens bit-exact.
 - **Measured** (seeds 1–5, one world, 240 s, the fungus landed in the player's colony, rouse strong against none, rich map): the waiting ants meet **+4.6 %** passes and held ants leave about 0.5 s sooner, but **departures fall 0.6 %** (fewer on 4 of 5 seeds). **Why** (ja-rf5.19): 85–90 % of departures are finders cycling straight back out; about one ant waits at the gate and all of them leave anyway (145/145), so a pass only makes one leave sooner; even no gate wait at all gives no more departures (1,799 against 1,837). Variants (rouse at every crossing, or on finders' passes too) moved departures −1.0 % to +0.2 %. Only on a scarce map (1–13 held) does rouse add departures, +0.5 % to +3.8 %. "Strong" expresses only 0.3–0.5 of a finder per host. **The owner chose to merge it as it is and say so (2026-11-14)**; a lever that moves departures must act on a pool that exists (the host itself, or hot foragers cooling inside), a new mechanic, ja-rf5.21 ("strong"'s weak expression: ja-rf5.20).
 - **Re-shipped:** the fungus lane's answers under the new legend (`precache.mjs --lanes fungus`, then `--fungus-also` with main's earlier bundles for the 36 situations a fresh recording didn't meet): 132 situations per preset aim, **$0.0092 + $0.0036**, about 760–784 real tokens a question. The fungus legend gained the lever (1,939 → 2,039 characters), so every fungus request is about **+2 %** longer (4,941 → 5,041 characters in the default request) and the lane's $/h rises by about that.
-- **Desert games and the shipped answers:** a fungus answer is keyed by the levers asked, and the shipped answers were asked under the default menu (no rouse). A desert game asks with rouse on, so its workers' situations miss them (about 1 % of its fungus lookups hit, queen lookups only; review of #202, seeds 1–3): without Jev (the Pages build with no backend) a desert game's fungus plays the local rule for workers; with a run on, it asks about 50 situations an aim (≈ $0.002). Shipping answers under the desert menu is the owner's choice.
+- **Desert games and the shipped answers** (ja-rf5.22, owner's option (c), 2026-11-15): a fungus answer is keyed by the levers asked, and a desert game asks with rouse on, so the answers asked under the default menu missed its workers (about 1 % of its lookups hit, queen lookups only). `precache.mjs --species desert --lanes fungus` records the situations a page desert game meets (seeds 1–3, landing by each colony, 300 s) and asks them under the desert menu, into the same bundles (same context): 61 situations an aim, 183 answers, **$0.0063** (estimated $0.0058), about 826 real tokens a question. Each aim now ships 193 answers. Measured on seeds 1, 4, 5, 6 (4–6 not recorded): a desert game's fungus lookups hit **99.9–100 %**; a generic game's keys are unchanged. `ui/tests/precache.test.ts` holds that every aim ships the desert menu's answers.
 - **Tests:** `tests/soak/rouse.test.ts` (the levels set the share; off the default menu; inert without an invitation; in a game, more passes roused than not; on a species without an invitation, none; a carrier adds exactly one finder's pass; the share scales with load). Mutations, each failing it: the crossing not adding rouse; the invitation guard removed; carriers adding rouse; the load scaling dropped.
 
 ## 61. The first game's tutorial (ja-7x4, 2026-11-12)
@@ -5799,6 +5807,33 @@ The second half of stage 2: ways to find any action and to learn what anything o
 - **The phone's HUD:** the speed and view buttons are tighter below 640 px, so the lens button fits from 360 px wide.
 - **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
+
+
+### 69.4 S3a: the Codex (ja-mvo9.3, first half)
+Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a notebook that fills as the player plays. Specimens (pin ants and compare them) follow in S3b.
+- **Entries open on first sight.** Each guide entry waits, named and numbered, until the game first shows the player what it is about through the fungus's hosts. Then it opens.
+  - **Cues:** the pure `ui/codex.ts` reads a cue from the game twice a second (`cues`); its `UNLOCK` table says which cue opens which entry and what the locked card tells the player to look for.
+    - The fungus, its senses, how the mycelium feeds its tips, the line and the curtain, and a species' own entry are open from the start.
+    - The builder's five tools' entries are open from the start for now; each opening on the tool's first use is ja-mvo9.7 (owner, review of #206, D2).
+    - A first host opens Jobs by age.
+    - A host carrying food opens the food trail, tasting food, forager trips, the way home and route memory.
+    - A host out on the surface opens the home trail, choosing a branch and the "no entry" mark.
+    - A host underground opens chambers, finding the way inside, the queen and brood.
+    - Alarm where a host stands, at the field's own threshold, opens alarm.
+    - A host meeting strangers (its own contact, `foes`: not the policy's fight mode, which a host may never take) opens strangers and battles; a tired host opens tiredness and rest.
+    - The first death opens mound and midden; the first mutation to keep, the fungus's body; the two odours drawing together (`UNITY_SEEN`, read only while two colonies stand: `codexNumbers`), one colony.
+  - A dead host shows nothing: a dead slot keeps its load.
+  - `codex.test` holds every guide entry in `UNLOCK`, so a new entry must say how it opens.
+- **What the player sees:**
+  - one notice naming what opened together;
+  - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
+  - a "new" mark on those entries;
+  - the count, "Seen 11 of 22".
+- **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
+- **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
+- **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
+- **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 

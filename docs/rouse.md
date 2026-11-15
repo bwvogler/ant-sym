@@ -49,7 +49,7 @@ The desert ant has no trails, so the fungus's trail and alarm levers do nothing 
 
 The lever as planned, with two changes (owner, 2026-11-14): it is on the fungus's menu only in a desert game (`menuFor`), so a generic game's requests don't ask a lever that does nothing; and the fungus lane's answers were asked again, including the situations the earlier ship held but a fresh recording didn't meet (132 an aim).
 
-A desert game asks the fungus with rouse on, so the shipped fungus answers (asked without it) don't serve its workers: without Jev they play the local rule (PRD §60.8).
+A desert game asks the fungus with rouse on, so its keys differ from the generic game's: the fungus answers asked under the desert menu ship too (ja-rf5.22, 61 situations an aim, $0.0063; PRD §60.8).
 
 **What it does, honestly: it raises the passes, not the departures.** Seeds 1–5, 240 s, the fungus landed, rouse strong against none, rich map: the waiting ants meet **+4.6 %** passes, ants held at the top leave about 0.5 s sooner, and departures fall **0.6 %** (fewer on 4 of 5 seeds). Why (ja-rf5.19, measured offline):
 - 85–90 % of departures are finders cycling straight back out with their own pass; rouse doesn't touch them.

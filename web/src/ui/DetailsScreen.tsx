@@ -58,7 +58,7 @@ export default function DetailsScreen(props: Props) {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       // The Learn drawer opens over this screen: its Escape is its own.
-      if (document.querySelector('[role="dialog"][aria-label="Learn"]')) return;
+      if (document.querySelector('[role="dialog"][aria-label="Codex"]')) return;
       const a = document.activeElement;
       if (a instanceof HTMLElement && panel.current?.contains(a)) a.blur(); // commits a doctrine being typed (onBlur)
       onClose();
