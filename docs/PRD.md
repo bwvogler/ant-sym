@@ -5828,11 +5828,28 @@ Stage 3 goes out in two PRs. This first half is the Codex: the field guide as a 
   - one notice naming what opened together;
   - a badge on the rail's Codex, its count read out, cleared once the guide has been looked at;
   - a "new" mark on those entries;
-  - the count, "Seen 11 of 22".
+  - the count, "Seen 9 of 28" on a new notebook (the generic ant).
 - **A link straight to an entry opens it, seen or not:** a "?", the lens's "more", the palette. A locked card has "Read it anyway", and "Show every entry" opens them all.
 - **The notebook outlives the game:** what is seen, and the show-all switch, are kept per browser (`localStorage`, every read and write guarded; blocked storage starts empty; each tab adds to what another saved). "Start the notebook afresh" locks everything again, and the watch waits for the next game, else the cues showing now would open their entries again at once.
 - **Look:** the notebook style for the guide only: entries on the paper tone, a serif title, a catalogue number (No. 07), and a locked card dashed.
 - **The drawer is the Codex** (owner, review of #206, D1): the rail's button, its title and every "Codex:" link (the "?" buttons, the lens, the palette, the tutorial). The code keeps its names (`LearnDrawer`, `openLearn`).
+- **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
+
+
+### 69.5 S3b: specimens (ja-mvo9.3, second half)
+The second half of stage 3: a few ants kept to watch and compare, the notebook's specimens.
+- **Pinning.** The ant panel's "Pin as a specimen" keeps the followed ant; "Pinned" unpins it.
+  - At most three (`MAX_SPECIMENS`): a fourth replaces the oldest, and a notice names the ant let go.
+  - An ant is (colony, slot, generation), as a follow is. A specimen that dies leaves the list with a notice ("No. 2, ant #9 of Amber, has died"), checked once a second.
+  - Specimens belong to their game: a new game starts with none.
+- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Each row has two lines:
+  - its label (No. 1), the ant and its colony, and how far the fungus is in it ("host", or the share);
+  - its mode, whether it carries food, above or below, and its fatigue of the colony's patience.
+
+  A row follows its ant, taking the camera to its view. Its × unpins it.
+- **On the map:** each specimen on the view shown has a dashed ring and its label; the followed ant keeps its own ring.
+- The list's rules and each row's words are in the pure `ui/specimens.ts`, tested on a built game.
+- **Look:** the notebook's look, as the Codex: the paper tone and serif labels.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change.
 
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)

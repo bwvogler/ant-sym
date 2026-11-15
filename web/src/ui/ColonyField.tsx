@@ -122,6 +122,8 @@ interface Props {
   pen?: FieldPen | null;
   /** where the "Go to" menu sits over the field (position classes; the page keeps it clear of its own surfaces) */
   toolsAt?: string;
+  /** the specimens (PRD §69.5): each marked on the map with its label */
+  specimens?: readonly Followed[];
   /** the lens is on (PRD §69.3): a mouse over the map reports what is under it, and a click reports it pinned instead of following */
   lens?: boolean;
   /** what is under the pointer, with the lens on (null: the pointer left the map) */
@@ -181,6 +183,9 @@ interface ViewCam {
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
+
+/** No specimens: one empty list, so the default prop is the same each render. */
+const NO_SPECIMENS: readonly Followed[] = [];
 
 /** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
 const ONE_MAP = -1;
@@ -254,6 +259,7 @@ export default function ColonyField({
   lens = false,
   onProbe,
   build = null,
+  specimens = NO_SPECIMENS,
 }: Props) {
   // No colony is the player's (you are the fungus): this one only gives what every colony shares, the map and the holes.
   const anyColony = colonies[0] as Colony;
@@ -332,6 +338,10 @@ export default function ColonyField({
   useEffect(() => {
     follow.current = followed;
   }, [followed]);
+  const pinnedRef = useRef(specimens);
+  useEffect(() => {
+    pinnedRef.current = specimens;
+  }, [specimens]);
   useEffect(() => {
     followCb.current = onFollow;
   }, [onFollow]);
@@ -1522,6 +1532,22 @@ export default function ColonyField({
         ctx.stroke();
         const tpx = Math.round(11 * d);
         pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
+      }
+      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring.
+      for (const [n, s] of pinnedRef.current.entries()) {
+        const sc = followedColony(colonies, s);
+        if (!sc || (lv >= 0 && sc.layer[s.i] !== lv) || (f && f.k === s.k && f.i === s.i && f.gen === s.gen)) continue;
+        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
+        const r = Math.max(7 * d, c.zoom * 1.3);
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.setLineDash([3 * d, 3 * d]);
+        ctx.strokeStyle = theme.ink;
+        ctx.lineWidth = 1.5 * d;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const tpx = Math.round(10 * d);
+        pill([{ text: `No. ${n + 1}`, fill: theme.ink }], x, y - r - tpx, tpx);
       }
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
       if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
