@@ -5364,7 +5364,7 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 **Cost.** No sense, action, legend or question changed: no Jev cost change. Goldens bit-exact; at ×1 a game is bit-exact with `main`.
 
-**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off).** Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
+**Chosen with Stalks in (`ja-19oz`, 2026-11-14): `sun` stays ×1 (off)** (re-chosen as ×2 below). Measured on `main` at `cbfa8a4e` (Stalks #178, knots, route memory), same command. The script's default buy order has no *Stalks*, so a plain sweep never grows one: ×1–×4 on seeds 1–10 (×1: 250 337 293 146 116 365 265 552 217 240; ×2 fails on seeds 2 and 9, ×3 on seed 9; ×4 as in the table above) and ×1 against ×4 on 11–20 reproduced the tables above to the second. With *Stalks* given at landing (`--grant stalks`, as §63.12 measured it):
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -5378,30 +5378,27 @@ The flat rule hits the patch, the game's main early source of spores, so it was 
 
 With stalks the sun costs more, not less: seed 9 is twice as slow, seed 11 +64 %, seed 18 +37 %, seeds 5, 6 and 8 +23–32 %; the worst of seeds 1–10 goes 518 → 585 s (seed 8, whose queen and half the colony are never reached by 600 s), the worst of 11–20 352 → 543 s. Only seeds 2 and 12 are faster. A stalk lays its corpse's spores on the plane, off the patch, which is just what the sun takes. So the rule stays built and off (`tests/golden/fungusGolden.test.ts`, `ja-1ldx`, fails from 30 s on if it is turned on); a factor above 1 would need a compensating source of spores, or the sun to follow a day (`heat.ts` `heatDay`, an idea from the review of #171, not taken up).
 
-**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on `main` at `3c79e0fb` (after #203), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a fresh no-hyphae run on the same commit (the no-hyphae times moved since §63.14: seeds 6, 8 and 20 now never reach a quarter, seed 11 does). Seconds to a quarter of the hosts:
+**Re-chosen with mass flow and the growth lane (`ja-19oz`, 2026-11-15): `sun` is ×2.** The decision above was measured without `--growth` and before mass flow (§72). Re-measured on #215's head (`eea04cca`: `main` at `4b114fbc`, after the fungus answers #202 re-shipped, with only `sun` changed), `progression.mjs --map one --evolve --seconds 600 --hyphae --growth --flow --sun N`, against a no-hyphae run on the same commit. Seconds to a quarter of the hosts:
 
 | seed | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| No hyphae | 217 | 358 | 227 | 156 | 178 | never | 341 | never | 334 | 261 |
-| sun ×1 | 210 | 296 | 225 | 147 | 153 | 338 | 319 | 473 | **418** | 242 |
-| sun ×2 | 210 | 337 | 225 | 147 | 144 | 375 | 319 | 474 | 213 | 242 |
-| sun ×4 | 210 | 370 | 225 | 147 | 161 | 379 | 319 | 473 | 215 | 242 |
-| sun ×1, *Stalks* at landing | 210 | 280 | 225 | 147 | 147 | 380 | 319 | 359 | 363 | 242 |
-| sun ×4, *Stalks* at landing | 210 | 370 | 225 | 147 | 161 | 378 | 319 | 473 | 212 | 242 |
+| No hyphae | 203 | 307 | 214 | 133 | 153 | 551 | 303 | 587 | 243 | 250 |
+| sun ×1 | 199 | 279 | 210 | 128 | 146 | 307 | 278 | 373 | **272** | 233 |
+| sun ×2 | 199 | 329 | 210 | 128 | 138 | 290 | 278 | 373 | 206 | 233 |
+| sun ×4 | 199 | 330 | 210 | 129 | 146 | 290 | 278 | 373 | 205 | 233 |
 
 | seed | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| No hyphae | 435 | 253 | 207 | 18 | 382 | 485 | 234 | 315 | 299 | never |
-| sun ×1 | 458 | 238 | 182 | 18 | 290 | 530 | 230 | 266 | 242 | 402 |
-| sun ×2 | 475 | 238 | 182 | 18 | 318 | 530 | 230 | 265 | 249 | 390 |
-| sun ×4 | 473 | 238 | 182 | 18 | 335 | 530 | 230 | 269 | 233 | 419 |
-| sun ×1, *Stalks* at landing | 459 | 238 | 183 | 18 | 377 | 530 | 230 | 295 | 232 | 388 |
-| sun ×4, *Stalks* at landing | 466 | 238 | 180 | 18 | 335 | 530 | 230 | 269 | 230 | 385 |
+| No hyphae | 440 | 249 | 184 | 18 | 332 | 395 | 225 | 333 | 257 | 408 |
+| sun ×1 | 400 | 226 | 158 | 18 | 264 | 406 | 226 | 217 | 235 | 361 |
+| sun ×2 | 400 | 226 | 158 | 18 | 283 | 406 | 226 | 217 | 230 | 364 |
+| sun ×4 | 400 | 226 | 158 | 18 | 261 | 406 | 226 | 228 | 217 | 361 |
 
-- **×1 misses P1 on this main:** seed 9 is 25 % slower than without hyphae (334 → 418 s). Every other configuration holds it on seeds 1–20. Seed 16 is the closest call in all of them (485 → 530 s, +9.3 %); it, seed 7 and seeds 1, 3, 4, 10, 12–14, 17 do not move with the sun at all.
-- **×2 over ×4:** both pass and have the same median on seeds 1–10 (233.5 s; 297.5 s without hyphae) and the same worst seed (530 s; never without hyphae). ×2 is faster on seeds 2 (337 against 370 s), 15 (318 against 335) and 20 (390 against 419), ×4 only on seeds 6 and 19 by a few seconds.
-- **With *Stalks*** the sun no longer costs more: ×4 with *Stalks* is within 4 s of plain ×4 on every seed but 20, and both pass. No run separates why; the §63.13 runs above had neither flow nor the growth answers.
-- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; at ×1 it fails. Raw runs, 2 × 20 seeds each, took about 25 min a pair. No sense, action, legend or question changed: no Jev cost change.
+- **×1 misses P1:** seed 9 is 12 % slower than without hyphae (243 → 272 s), and the median of seeds 1–10 is worse (252.5 s against 246.5 s).
+- **×2 holds it on seeds 1–20.** Its slowest seed is seed 2, +7.2 % (307 → 329 s); seed 16 is +2.8 %. Medians: 221.5 s on seeds 1–10 and 228 s on 11–20, against 246.5 and 294.5 s without hyphae. Worst seeds: 373 s against 587 s, and 406 s against 440 s.
+- **×2 and ×4 are within a few seconds** on every seed but 5 and 18 (×2 faster: 138 against 146 s, 217 against 228) and 15 and 19 (×4 faster: 261 against 283 s, 217 against 230); both pass, with the same worst seeds. ×2 is the milder change from the soil's fade.
+- **Before #202** (`main` at `3c79e0fb`, the same command) the ordering was the same: ×1 missed P1 on seed 9 (334 → 418 s, +25 %) and ×2 and ×4 held it, but with seeds 16 and 11 within a point of the 10 % line at ×2 (+9.3 %, +9.2 %). *Stalks* given at landing was measured only there: ×1 (worst +9.3 %) and ×4 (worst +9.3 %) both held P1; ×2 with *Stalks* was not run.
+- **Owner (2026-11-15): ×2.** The fungus golden (`fungusGolden.test.ts`) is re-recorded at ×2; any other factor fails it. The guide's mutations entry says what the sun does. No sense, action, legend or question changed: no Jev cost change.
 
 ### 63.14 P1 without tuning (ja-2bw.6, 2026-11-14)
 
