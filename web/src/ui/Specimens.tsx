@@ -24,11 +24,14 @@ export default function Specimens({
 }) {
   const phone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
   const [folded, setFolded] = useState(() => !followed && phone());
-  // On a phone the list folds when the follow ends, so it doesn't sit over the map with nothing followed (D2).
+  // On a phone the list folds when the follow ends, so it doesn't sit over the map with nothing followed (D2): set as the
+  // follow changes, during render, not in an effect.
   const following = followed !== null;
-  useEffect(() => {
+  const [wasFollowing, setWasFollowing] = useState(following);
+  if (following !== wasFollowing) {
+    setWasFollowing(following);
     if (!following && phone()) setFolded(true);
-  }, [following]);
+  }
   const head = useRef<HTMLButtonElement>(null);
   const [, setTick] = useState(0);
   useEffect(() => {

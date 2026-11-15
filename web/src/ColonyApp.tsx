@@ -305,7 +305,11 @@ export default function ColonyApp() {
     (f: Followed) => {
       if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
       // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
-      const r = pin(living(specimens, game.colonies).kept, f);
+      // It is said here: the watch won't see it again.
+      const { kept, gone } = living(specimens, game.colonies);
+      for (const g of gone)
+        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info");
+      const r = pin(kept, f);
       setSpecimens(r.list);
       if (r.dropped)
         pushToast(

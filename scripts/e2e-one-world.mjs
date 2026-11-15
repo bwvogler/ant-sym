@@ -30,8 +30,10 @@
 //     rock wall and a crayon line by drags, one undo for a drag, Move pans, dig below, Done; saved, reloaded, the wall kept.
 //  12. the Codex (ja-mvo9.3), paused at the landing: a first host opens Jobs by age with one notice and a badge; the new
 //     mark, Read it anyway, Show every entry, the palette, a reload, starting afresh.
-//  13. specimens (PRD §69.5), paused: pin from the ant panel, follow from the list, unpin, a fourth replaces the oldest, a
-//     specimen that dies leaves with a notice, and the list stays with nothing followed.
+//  13. specimens (PRD §69.5), paused: pin from the ant panel, follow from the list (the camera to its view), unpin (focus
+//     to the header), a fourth replaces the oldest and takes its number, a fifth's notice names the kept number it frees, a
+//     specimen that dies leaves with a notice and the rest keep theirs, the list stays with nothing followed and folds to one
+//     line; a new game has none; on a 390 px phone the list folds once nothing is followed.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -1417,7 +1419,7 @@ try {
   const ants = await sp.evaluate(() => {
     const c = window.jevAnts.game.colonies[0];
     const out = [];
-    for (let i = 0; i < c.n && out.length < 4; i++) if (c.alive[i]) out.push(i);
+    for (let i = 0; i < c.n && out.length < 5; i++) if (c.alive[i]) out.push(i);
     return out;
   });
   const followAnt = (i) => sp.evaluate((i) => window.jevAnts.follow(0, i), i);
@@ -1441,7 +1443,7 @@ try {
   check(await list.evaluate((el) => document.activeElement === el.querySelector("h2 button")), "focus goes to the list's header, not lost");
   // Numbers are kept (owner, review of #218, D1): ants[1] takes No. 2 again (the lowest free), ants[2] No. 3; the fourth,
   // ants[3], replaces the oldest (ants[0]) and takes its No. 1; nothing else is renumbered.
-  for (const i of ants.slice(1)) {
+  for (const i of ants.slice(1, 4)) {
     await followAnt(i);
     await pinBtn.click();
   }
@@ -1459,6 +1461,15 @@ try {
       (await labelOf(ants[3])) === "No. 1",
     "a fourth replaces the oldest and takes its number; the others keep theirs",
   );
+  // A fifth replaces the oldest left, ants[1]: the notice names its kept number, No. 2, not its place in the list (S3).
+  await followAnt(ants[4]);
+  await pinBtn.click();
+  await until(
+    async () => (await sp.getByText(new RegExp(`^Three specimens at most: No\\. 2, ant #${ants[1]} of Ink, is unpinned`)).count()) === 1,
+    "the notice of a fifth names the number it frees",
+    2000,
+    50,
+  );
   // A specimen that dies leaves, with a notice naming it; the rest keep their numbers; with nothing followed the list stays.
   await sp.getByRole("button", { name: "Stop following" }).click();
   await sp.evaluate((i) => (window.jevAnts.game.colonies[0].alive[i] = 0), ants[2]);
@@ -1471,7 +1482,7 @@ try {
   check(
     (await list.getByRole("listitem").count()) === 2 &&
       (await list.getByText("No. 3").count()) === 0 &&
-      (await labelOf(ants[1])) === "No. 2",
+      (await labelOf(ants[4])) === "No. 2",
     "it leaves the list, the rest keep their numbers, and the list stays with nothing followed",
   );
   // The header folds the list to one line and back (owner, D2).

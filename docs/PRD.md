@@ -5842,7 +5842,7 @@ The second half of stage 3: a few ants kept to watch and compare, the notebook's
   - Each keeps its number (owner, review of #218, D1): the lowest free one of 1 to 3 when pinned. A death or a replacement frees that number; nothing else is renumbered, on the list or the map.
   - An ant is (colony, slot, generation), as a follow is. A specimen that dies leaves the list with a notice ("No. 2, ant #9 of Amber, has died"), checked once a second.
   - Specimens belong to their game: a new game starts with none.
-- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Its header folds the list to one line ("Specimens: 3") and back; on a phone it starts folded while nothing is followed (owner, D2). Each row has two lines:
+- **The inspector** shows them above the followed ant, and on their own when nothing is followed. Its header folds the list to one line ("Specimens: 3") and back; on a phone it starts folded while nothing is followed, and folds when the follow ends (owner, D2). Each row has two lines:
   - its label (No. 1), the ant and its colony, and how far the fungus is in it ("host", or the share);
   - its mode, whether it carries food, above or below, and its fatigue of the colony's patience.
 
