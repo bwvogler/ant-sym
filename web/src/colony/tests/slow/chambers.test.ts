@@ -63,7 +63,7 @@ function crowdedGames() {
     // A filled chamber cell leaves its chamber as it is filled (fillCell releases it), so count the releases (review of #248, S1).
     let released = 0;
     const release = ch.release.bind(ch);
-    ch.release = (x, y) => (released++, release(x, y));
+    ch.release = (x, y) => (ch.at(x, y) >= 0 && released++, release(x, y)); // fillCell releases every cell it fills
     // Every ant middle-aged, a digger: this is about how chambers are dug, not who digs (slice 6 zones digging by age).
     for (let i = 0; i < g.player.n; i++) {
       g.player.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
