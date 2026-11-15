@@ -1,13 +1,13 @@
 # The mutation tree: upgrades that need others first, at one rising price
 
-*Design note for epic `ja-52ui`, PRD §78. Written 2026-11-15. Pure game design: the owner chose (2026-11-15) to build the tree for play, with no research step, so every edge below is **design** and none is a claim about real organisms.*
+*Design note for epic `ja-52ui`, PRD §79. Written 2026-11-15. Pure game design: the owner chose (2026-11-15) to build the tree for play, with no research step, so every edge below is **design** and none is a claim about real organisms.*
 
 Today the fungus has 14 upgrades with 26 levels to buy (`web/src/colony/evolution.ts`, `UPGRADES`). None needs another. Each level has its own hand-set price, from 2–10 for a first level to 2,000–6,000 for the strongest (PRD §50.13), so the price does all the pacing and the choice is mostly "what is cheapest now". This note turns the menu into a tree and replaces the price list with one price.
 
 ## The price
 
 - **One price for every level, rising with each level kept** (owner, 2026-11-15): `PRICE(n) = round(BASE · RATIO^n)`, `n` the number of levels kept so far.
-- Chosen (owner, 2026-11-15, PRD §78.1): BASE 1, RATIO 1.5. The first six levels cost 1, 2, 2, 3, 5 and 8 (21 in all, as the old first levels did); the tenth 38, the twentieth about 2,200, the last about 25,000. It held P1 on seeds 1–20; the first guess, 3 and ×1.38, did not.
+- Chosen (owner, 2026-11-15, PRD §79.1): BASE 1, RATIO 1.5. The first six levels cost 1, 2, 2, 3, 5 and 8 (21 in all, as the old first levels did); the tenth 38, the twentieth about 2,200, the last about 25,000. It held P1 on seeds 1–20; the first guess, 3 and ×1.38, did not.
 - What it changes: a first level of the strongest upgrade no longer costs thousands just for what it is; it costs whatever the next level costs. The tree's depth carries the pacing the price list carried: a strong level is late because what it needs comes first.
 
 **In the game:** the panel shows one "next level" price for everything buyable; keeping any level raises it for all.
@@ -50,7 +50,7 @@ The lethal levers still need the menu as well, as today (`idle`, `ColonyApp.tsx`
 ## Open questions
 
 - The edges: settled by the owner (2026-11-15), as in the table above.
-- BASE and RATIO: 1, ×1.5 (owner, 2026-11-15; PRD §78.1). Whether to cap or soften the price past about 20 levels is `ja-52ui.7`.
+- BASE and RATIO: 1, ×1.5 (owner, 2026-11-15; PRD §79.1). Whether to cap or soften the price past about 20 levels is `ja-52ui.7`.
 - Whether a level may need either of two others (an "or") rather than both. Not in this draft.
 
 ## Sources

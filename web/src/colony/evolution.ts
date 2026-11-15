@@ -13,7 +13,7 @@
 // next level of an upgrade. That choosing is the game's licence (owner, PRD §50.13): real mutations are random and
 // selection keeps what works, and real adaptation speeds up far less than replication does (docs/fungus-body.md §3).
 //
-// **The tree** (ja-52ui, PRD §78, docs/mutation-tree.md; design, owner 2026-11-15): some levels need levels of other
+// **The tree** (ja-52ui, PRD §79, docs/mutation-tree.md; design, owner 2026-11-15): some levels need levels of other
 // upgrades first (`Upgrade.needs`), and every level costs one price, which rises with each level kept (`price`), so the
 // tree's depth carries the pacing. The numbers are design, tuned on `node scripts/lab/progression.mjs`.
 //
@@ -69,7 +69,7 @@ export const MUTATION = 0.25;
 /** Seconds over which the panel's mutation rate is averaged. */
 const RATE_TAU = 20;
 
-/** Every level costs one price, which rises with each level kept: round(base · ratio^kept) (ja-52ui, PRD §78). Owner (2026-11-15): 1, ×1.5, which held P1 on seeds 1–20; 3, ×1.38 and 2, ×1.3 did not. */
+/** Every level costs one price, which rises with each level kept: round(base · ratio^kept) (ja-52ui, PRD §79). Owner (2026-11-15): 1, ×1.5, which held P1 on seeds 1–20; 3, ×1.38 and 2, ×1.3 did not. */
 export const PRICE = { base: 1, ratio: 1.5 };
 
 /** The price of the next level of anything, after `kept` levels have been kept. */

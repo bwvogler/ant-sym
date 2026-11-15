@@ -446,6 +446,8 @@ test("the tree's check refuses a cycle, a level out of reach and a need that nam
   assert.throws(() => checkTree([up("a", [[{ id: "b", level: 1 }]]), up("b", [[{ id: "a", level: 1 }]])]), /can't reach/, "a cycle");
   assert.throws(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 2 }]])]), /no such level/, "a level that isn't there");
   assert.throws(() => checkTree([up("a", [[], [{ id: "c", level: 1 }]])]), /no such level/, "an upgrade that isn't there");
+  assert.throws(() => checkTree([up("a", [[], [{ id: "a", level: 1 }]])]), /no such level/, "a level that needs its own upgrade");
+  assert.throws(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 0 }]])]), /no such level/, "a need for level 0");
   assert.doesNotThrow(() => checkTree(UPGRADES), "the game's own table");
 });
 

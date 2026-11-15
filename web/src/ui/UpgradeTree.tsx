@@ -1,4 +1,4 @@
-// The Mutations drawer's upgrades as a tree (ja-52ui, PRD §78): branches of upgrades, each a row of its levels, and a
+// The Mutations drawer's upgrades as a tree (ja-52ui, PRD §79): branches of upgrades, each a row of its levels, and a
 // line from each level another needs to the level that needs it. At phone width the same rows fall back to the list:
 // the level it is at and the next one's button, or what that level still needs.
 

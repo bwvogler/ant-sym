@@ -499,6 +499,29 @@ export const GUIDE: GuideEntry[] = [
     sources: [{ note: "builder", anchor: "no-entry-turns-trail-followers-away", label: "“No entry” turns trail followers away" }],
   },
   {
+    id: "builder-aphids",
+    title: "Aphids",
+    onScreen:
+      "Put down a clump of aphids (🐛): little green bugs that drip sweet honeydew. Ants smell them from close by, find them and bring the honeydew home, again and again, so a trail forms. Ants touching the aphids stand and fight if a stranger comes. Now and then an ant carries an aphid home. The clump grows for a few minutes, then fades away.",
+    realAnts:
+      "Black garden ants milk aphids for honeydew, a little like farmers with tiny cows. Scouts walk toward the smell of aphids. Ants looking after aphids bite intruders more often than other ants: 90 out of 100 did in one study. Ants also eat some of their aphids: with ants, a fifth fewer aphids were left after a week.",
+    inGame:
+      "Honeydew is food that keeps coming, so the ants' usual trail brings them back. An ant with empty jaws turns toward the aphids' smell from a few steps away. An ant touching the clump counts it as home ground, so it defends there. One take in twenty is an aphid instead of honeydew. How fast aphids grow and how much they drip are guesses: no one has measured them.",
+    sources: [
+      {
+        note: "aphids",
+        anchor: "ants-find-aphids-by-smell-as-well-as-by-chance-and-l-niger-scouts-climb-toward-aphid-odour",
+        label: "Ants find aphids by smell as well as by chance",
+      },
+      {
+        note: "aphids",
+        anchor: "tending-ants-attack-the-aphids-enemies-more-readily-than-other-ants-and-mostly-locally",
+        label: "Tending ants attack the aphids' enemies more readily",
+      },
+      { note: "aphids", anchor: "ants-also-eat-aphids-mostly-the-ones-that-give-least", label: "Ants also eat aphids" },
+    ],
+  },
+  {
     id: "builder-rain",
     title: "Rain",
     onScreen: "The rain cloud (🌧️) washes every trail and alarm off the ground under it.",
@@ -595,6 +618,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     title: "Builder mode",
     covers:
       "What real ants do when someone changes their world: drawn trails followed for a while, circles left, walls rerouted (or not), sweet food found late, nests dug out again; and how young children use touch screens.",
+  },
+  {
+    note: "aphids",
+    title: "Ants and aphids",
+    covers:
+      "How ants find aphids (by smell, and by chance), milk them for honeydew, defend them more readily than other ants, eat a few, and leave them when the honeydew stops.",
   },
   {
     note: "queens-and-merging",
