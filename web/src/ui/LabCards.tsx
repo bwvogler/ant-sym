@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   DOCTRINES,
   LETHAL,
@@ -22,15 +22,14 @@ import { tokensPerQuestion } from "./prompt.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
-// The Details screen (ja-lo8.2): everything the game does not need on its main screen. The colonies' numbers, Jev's
-// spend and caches, the unity and infection figures, the world's settings, and the lab: the fungus's menu and each
-// colony's doctrine (the spore brush and strain picker went in ja-260), for experiments rather than play. Opened from the top bar; Escape closes it.
+// The cards the game does not need on its main screen (ja-lo8.2; once the Details screen, retired by Lab mode, PRD §69.7):
+// the colonies' numbers, Jev's spend and caches, the unity and infection figures, the world's settings, the levers (the
+// fungus's menu, each colony's doctrine, the foundings), saved games, debug and the journal. Each shows in its home: a
+// drawer (BareCards: the drawer has the frame) or a tab of Lab mode's workbench.
 
 type Jev = ReturnType<typeof useColonyJev>;
 
 interface Props {
-  open: boolean;
-  onClose: () => void;
   game: Game;
   controls: ColonyControls;
   update: (patch: Partial<ColonyControls>) => void;
@@ -44,58 +43,10 @@ interface Props {
   saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
   onLoad: (r: SaveRecord) => void;
 }
-export type DetailsProps = Props;
+export type LabProps = Props;
 
 const usd = (v: number) => `$${v.toFixed(4)}`;
 const h2 = "flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-fg-3";
-
-export default function DetailsScreen(props: Props) {
-  const { open, onClose } = props;
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    panel.current?.focus({ preventScroll: true });
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      // The Learn drawer opens over this screen: its Escape is its own.
-      if (document.querySelector('[role="dialog"][aria-label="Codex"]')) return;
-      const a = document.activeElement;
-      if (a instanceof HTMLElement && panel.current?.contains(a)) a.blur(); // commits a doctrine being typed (onBlur)
-      onClose();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [open, onClose]);
-  if (!open) return null;
-  return (
-    <div ref={panel} tabIndex={-1} role="dialog" aria-label="Details" className="fixed inset-0 z-30 flex flex-col bg-ground outline-none">
-      <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
-        <h2 className="font-semibold text-fg">Details</h2>
-        <p className="hidden text-sm text-fg-3 sm:block">the numbers behind the game, and the lab</p>
-        <button
-          type="button"
-          className="ml-auto rounded-md border border-line px-3 py-1.5 text-sm text-fg-2 hover:bg-raised"
-          onClick={onClose}
-          aria-label="Close Details"
-        >
-          Back to the game
-        </button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 lg:grid-cols-2">
-          <Colonies {...props} />
-          <JevCard {...props} />
-          <FungusNumbers {...props} />
-          <World {...props} />
-          <SavedGames {...props} />
-          <Lab {...props} />
-          <Debug {...props} />
-          {props.journal && <JournalCard journal={props.journal} />}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** Inside a drawer (PRD §69) a card drops its own frame and heading: the drawer has them. */
 const Bare = createContext(false);
@@ -161,7 +112,7 @@ export function Colonies({ stats }: Props) {
   );
 }
 
-function JevCard({ jev }: Props) {
+export function JevCard({ jev }: Props) {
   const running = jev.state.phase === "running";
   const run = jev.state.run;
   const choices = jev.state.hits + jev.state.misses;
@@ -235,7 +186,7 @@ function JevCard({ jev }: Props) {
   );
 }
 
-function FungusNumbers({ stats }: Props) {
+export function FungusNumbers({ stats }: Props) {
   return (
     <Card
       label="fungus numbers"
@@ -282,7 +233,7 @@ function FungusNumbers({ stats }: Props) {
   );
 }
 
-function World({ game, controls, update, restart, newWorld }: Props) {
+export function World({ game, controls, update, restart, newWorld }: Props) {
   const { size } = game.map;
   return (
     <Card label="world" title="World">
@@ -371,7 +322,7 @@ function World({ game, controls, update, restart, newWorld }: Props) {
 }
 
 /** For experiments, not play: the fungus's menu, and each colony's doctrine. */
-function Lab({ game, controls, update, stats, jev }: Props) {
+export function Lab({ game, controls, update, stats, jev }: Props) {
   // A re-ask costs the game's species' own questions (ja-fnd.5.12, review of #132 S2): its words and fields, not the generic ant's.
   const perSituation = game.params.species.lanes.mode?.schema
     ? tokensPerQuestion("mode", DOCTRINES[0]!.text, game.params.species.lanes.mode)
@@ -387,7 +338,7 @@ function Lab({ game, controls, update, stats, jev }: Props) {
   const setFoundNote = (text: string | null) => setNote({ token: gameToken, text });
   const locked = jev.lock !== null;
   return (
-    <Card label="lab" title="Lab" wide>
+    <Card label="levers" title="Levers" wide>
       <p className="mt-1 text-xs text-fg-3">
         For experiments rather than play: in the game the fungus lands by a nest and spreads through its hosts, and a colony's doctrine is
         its nature.
@@ -564,7 +515,7 @@ export function SavedGames({ saves, onLoad, controls }: Props) {
   );
 }
 
-function Debug({ stats, fps }: Props) {
+export function Debug({ stats, fps }: Props) {
   return (
     <Card label="debug" title="Debug">
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm text-fg-2">
@@ -579,8 +530,8 @@ function Debug({ stats, fps }: Props) {
   );
 }
 
-/** The newest journal events, newest first; it reads the journal about twice a second while Details is open. */
-function JournalCard({ journal }: { journal: Journal }) {
+/** The newest journal events, newest first; it reads the journal about twice a second while its tab is open. */
+export function JournalCard({ journal }: { journal: Journal }) {
   const [, setWritten] = useState(journal.written);
   useEffect(() => {
     const id = setInterval(() => setWritten(journal.written), 500);

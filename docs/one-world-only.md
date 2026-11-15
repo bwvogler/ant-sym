@@ -170,12 +170,12 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 | `alarm` A4 | yes: §42.2, §46.4 | `onPlaneAssay(alarm)` | covered | plane 10/10 |
 | `regulate` A5 | yes: §42.2, §48.4 | `onPlaneAssay(regulate, gateProbe)` | covered | **plane 0/10** (PRD §58), against legacy 10/10 (§48.4) |
 | `regulateStop` A5b | yes: §48.2, §48.4 | `onPlaneAssay(regulateStop, gateProbe)` | covered | plane 8/10 |
-| `pass` A6 | yes: §42.2, §46.4, §49.3, §54.3 | `passAssay(onPlane)` | covered, needs a new setup | **plane 5/10**: fought in the tunnels (one-world.md §5 says U6b should revisit). Both sides run on `stanceGate: 0` with `stance: always("raid")` (`experiment.ts:935-941`), which the twin keeps (`onPlane` swaps only the map, `:1596-1605`). The attackers also march at the defenders' hole by the colony field (`steer.ts:425`; "every attacker marches at the defenders' hole (raidGate 0)", `:932-941`). With the broadcast gone (owner, 2026-11-14), A6 needs a new setup and baseline, like A13 (risk 1b): the harness walks the attackers to the hole (review of #184 D2), and the defenders get a setup that still forms a battle at the pass. PRD §54.2 gives the reason, `experiment.ts:935-936` the numbers: with their own stance, defenders 40 cells from home turned away from the pass (gain 1.64 against 1.95) |
-| `open` A6 control | report only (part of A6) | `onPlaneAssay(open)` | covered | |
+| `pass` A6 | yes: §42.2, §46.4, §49.3, §54.3 | `passWalked` (attackers walked) | **ported** (PRD §76.3) | was plane 5/10 with both sides broadcast raiders marching at the hole (`stanceGate: 0`, `steer.ts:425`); now the attackers are walked by the harness (`marchProbe`, owner on #184 D2) with each ant's own stance: 4/20, median gain 0.96 (PRD §76.3). The battle seldom forms at the pass (`ja-lp4.6.5`) |
+| `open` A6 control | report only (part of A6) | `walked(onPlane(open.spec))` (attackers walked, as `passWalked`'s control) | **ported** (PRD §76.3) | |
 | `raidFind` A11 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210, PRD §51 "U6b built") | **ported** | slow guard `slow/raidFind.test.ts` |
 | `raidStop` A12 | yes: §49.3, §49.7, §54.3 | `ONE_ASSAYS` (#210) | **ported** | slow guard `slow/raidStop.test.ts` |
 | `contact` A9 | yes: §46.4, §54.3 | `onPlaneAssay(contact)` | covered | **plane 3/10** (worst 9.99 lost per 100 food, PRD §58's latest one-world run) |
-| `defendHome` A13 | yes: §54.3 (15/20; food 0.63, broadcast 0.62) | **none**, in neither `ONE_ASSAYS` nor `ONE_PENDING` | **port**, needs a new setup | its `broadcast` arm uses `stanceGate: 0`, the colony-wide stance S2 deletes, so the score needs a new control. The war party is a broadcast raider in every arm (`rivalStance: always("raid")`, `rival: { raidGate: 0, stanceGate: 0 }`, `experiment.ts:1256-1257`): it marches at the colony's hole by `steer.ts:425`, which reads the colony `stance` field. Decided (owner, 2026-11-14), review of #184 D2: the assay harness walks the attackers to the hole itself, and colony code keeps no march by coordinates (risk 1) |
+| `defendHome` A13 | yes: §54.3 (15/20; food 0.63, broadcast 0.62) | `defendWalked` (war party walked; control: nobody defending) | **ported** (PRD §76.3) | was a broadcast raid in every arm (`rivalStance: always("raid")`, `stanceGate: 0`, marching by `steer.ts:425`), with a `broadcast` arm that S2 deletes; now the harness walks the war party (`marchProbe`, owner on #184 D2), each ant keeps its own stance, and the control is the same battle with nobody defending: 8/20, vsNone median 1.04, worst 0.57 (PRD §76.3; `ja-lp4.6.20`) |
 | `faintAlarm` A10 | yes: §46.4 | `onPlaneAssay(faintAlarm)` | covered | plane 0/10 (legacy 3/10–5/20; the slow test is `todo` ja-je8) |
 | `game` G | yes: §42.2, §46.4 | `game1` (G1) | covered | G1 slow guard on seeds 4, 5, 9 passes (route memory, §59) |
 | `gameTop` G′ | yes: §42.2, §46.4 (G′ table) | none | **delete** | report-only bench bed on `OPEN_WORLD`, no queen. G1 replaces it as the whole-game measure |
@@ -188,15 +188,15 @@ has the one-world twin (`experiment.ts:2646`). S2 step 2 still has to record its
 
 | file | builds | what it guards | verdict | note |
 |---|---|---|---|---|
-| slow/assays.test.ts | arena (A1, A2a, A2b, A5, A5b, A9, A10 todo); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | port (the A-tests) | Point A1/A2a/A2b/A5/A5b/A9 at their `ONE_ASSAYS` twins, re-marked from one-world baselines. **A5 (0/10) and A9 (3/10) would fail today on the plane**; A1 fails seeds 5 and 9. D1–D3 are already one world, and are re-run once the desert ant has its own stance (owner, 2026-11-14) |
+| slow/assays.test.ts | O (A1, A2a, A2b, A5, A5b, A9, A10: `oneAssay`); O (D1, D2 todo, D3) | assay pass marks on seeds 1–2 | **ported** (PRD §76.4) | A1, A2a, A2b, A5b held to their marks; A5, A9, A10 guarded at their worst seed + 10 % (owner) |
 | slow/chambers.test.ts | S | a crowded nest digs chambers; chambers never touch, none too shallow | port (curtain) | `int/transect` "the hole gap keeps founded royal chambers apart…" covers founding chambers only |
 | slow/economy.test.ts | S (one colony, 0.3 food) | an hour: founders replaced, larvae fed, size held; ja-xu6 old feed brood | port | `generateOneWorld` solo (food reaches the curtain from the plane). No one-world hour-long guard exists |
 | slow/golden.test.ts | S | "side view war, seed 6" golden | re-record on one world | S2 step 3 |
 | slow/oneWorld.test.ts | O | unity on one world | keep | **skipped** (ja-lp4.6.6) |
 | slow/oneWorldG1.test.ts (games in oneWorldG1Game.ts) | O | G1 held-food bound, on a share of seeds 1-10 | keep | |
 | slow/oneWorldRoute.test.ts | O | R1 pocket carriers | keep | |
-| slow/raidFind.test.ts | arena | A11, seeds 1–10 | port | `ONE_PENDING` |
-| slow/raidStop.test.ts | arena | A12, seeds 1–2 | port | `ONE_PENDING` |
+| slow/raidFind.test.ts | O (`oneAssay("raidFind")`) | A11, seeds 1–10 | **ported** (PRD §76.4) | |
+| slow/raidStop.test.ts | O (`oneAssay("raidStop")`) | A12, seeds 1–2 | **ported** (PRD §76.4) | |
 | slow/side.test.ts | S | held-food bound, seeds 4 and 6 (#16's guard) | covered | G1 slow guard (`oneWorldG1.test.ts`), same bound of 2. Delete it once G1 stays green |
 
 ### Golden masters
@@ -246,8 +246,8 @@ Per-test totals, counted roughly from the notes: about **97 port**, about **28 c
 About 60 of the ports are in-nest mechanics (curtain): chambers, brood, queen, gynes, food flow, hunger, zoning.
 For those, the work is mostly swapping `generateSideWorld(2, SMALL_SIDE)` for `smallOne()` and re-deriving cells in the curtain, since the curtain runs the side view's nest code.
 
-**Assays** (20 in `ASSAYS`): covered 13 (A1, A2a, A2b, A3, A4, A5, A5b, A6, A6-open, A9, A10, G → G1, A8 → nestFlowOne); ported 5 (A11 and A12 by #210, L ×3 by #211); port 1 (A13); delete 1 (G′).
-**Slow guards** (12 files, G1's three as one guard): port 5 (assays' A-tests, chambers, economy, raidFind, raidStop); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
+**Assays** (20 in `ASSAYS`): covered 11 (A1, A2a, A2b, A3, A4, A5, A5b, A9, A10, G → G1, A8 → nestFlowOne); ported 8 (A11 and A12 by #210, L ×3 by #211, A6 and A6-open walked, A13 walked); delete 1 (G′).
+**Slow guards** (12 files, G1's three as one guard, and `slow/defence.test.ts` new in S2.2e): ported 3 (assays' A-tests, raidFind, raidStop; PRD §76.4); port 2 (chambers, economy); covered 1 (side → G1); re-record 1 (golden); keep 3 (oneWorld, G1 ×3, route).
 
 **Riskiest: a PRD baseline and no one-world coverage**
 1. **A13 `defendHome`** (§54.3): in neither `ONE_ASSAYS` nor `ONE_PENDING`, so it is easy to drop by accident. Its `broadcast` control uses `stanceGate: 0`, which S2 deletes, so the score needs redefining, not only porting. Its war party is a broadcast raider in every arm: it marches at the colony's hole only through the colony `stance` field (`steer.ts:425`), so it needs a new way to attack: the harness walks it there (owner, 2026-11-14, review of #184 D2).
