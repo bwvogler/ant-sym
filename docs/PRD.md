@@ -6253,7 +6253,7 @@ Merging is not delegated: PRs wait for the owner.
 - the tick cost of a sugar flood (`npm run colony-bench`, not run);
 - `npm run colony-cost`: not rerun, since no lane, legend or question changed.
 
-## 73. Young ants keep to the brood by its odour, not the queen's position (design, ja-k4k.15, 2026-11-14)
+## 74. Young ants keep to the brood by its odour, not the queen's position (built, off, ja-k4k.15, 2026-11-15)
 
 **Research basis:** [brood-odour.md](brood-odour.md).
 - **Ant queen pheromones are mostly non-volatile contact signals,** fertility signals that suppress workers' laying (Holman et al. 2010, *Lasius niger*). A queen volatile attracts workers only in the fire ant, with no measured range (Lofgren et al. 1983, **unverified**); the pharaoh ant's is weak (Oliveira et al. 2020).
@@ -6293,11 +6293,12 @@ Merging is not delegated: PRs wait for the owner.
 **Beads.** `ja-k4k.15` (this):
 - `ja-k4k.15.1`: the assay.
 - `ja-k4k.15.2`: the field, off by default.
-- `ja-k4k.15.3`: the climb, which depends on .1 and .2; `ja-k4k.2.1` closes with it.
+- `ja-k4k.15.3`: the climb, built off (merged with #192).
+- `ja-k4k.15.5`: turning it on, after `ja-rvli`. It holds the settings, the steps and the guards; `ja-k4k.2.1` closes with it.
 - `ja-k4k.15.4`: the fungus lever question, P4.
 
 **Still open.** The field's reach and rates (design). Whether nurses should drop brood where the odour is strongest (piles by positive feedback; `ja-k4k.4`). A fire-ant-like queen volatile as a species option. #192's branch carries this plan; its code is replaced at `ja-k4k.15.3`.
-### 73.1 The nurse-zone assay, measured on main (ja-k4k.15.1, no behaviour change)
+### 74.1 The nurse-zone assay, measured on main (ja-k4k.15.1, no behaviour change)
 
 - **`nurseZone`** (`experiment.ts`): the side view, one colony of 600 for 600 s. Every 30 s from 120 s on, it takes the young's and the middle-aged's mean hex distance, underground, to the nearest brood item lying in the nest, and to the queen.
   - `margin` is the middle-aged's distance to the brood less the young's.
@@ -6309,7 +6310,7 @@ Merging is not delegated: PRs wait for the owner.
 - **Reading:** the young sit about as near the queen as the brood, and barely nearer the brood than the middle-aged. Since #201 the brood lies in brood chambers away from the queen, while the young still steer to her position. That is the gap the climb is meant to close. The build's target: the margin above main's at the worst seed, on seeds 1–10 and 11–20.
 - **The economy guard:** `scripts/lab/economy-strand.mjs` runs `economy.test`'s own hour on any seed. It reports the worst stranding, where those larvae lay and the bands at that moment, and flags a collapse. Main's figures on its 20 seeds are in §71: no collapse, worst 10, 2 seeds over 5.
 
-### 73.2 The field and the climb, built off (ja-k4k.15.2, ja-k4k.15.3)
+### 74.2 The field and the climb, built off (ja-k4k.15.2, ja-k4k.15.3)
 
 - **The field** (`broodOdour`, ja-k4k.15.2): each lying brood item lays `broodOdour` a second on its cell. The channel evaporates 0.3 and spreads 0.3, and doesn't cross rock.
   - Off (0) lays nothing; the goldens hold bit for bit.

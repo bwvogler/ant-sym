@@ -1,6 +1,6 @@
 # Brood odour: young workers keep to the brood by its smell, not to the queen
 
-*Research note for `ja-k4k.2.1` (the young's chamber steering) and its epic (PRD §73). Written 2026-11-14, against code at `004e7c6`. Two research passes: primary papers in full text where PubMed Central, PLOS, Frontiers or OUP served them. Springer, Nature, science.org, pnas.org and bioRxiv full texts were refused (login redirects, 403, 429), and several university repositories didn't resolve. Numbers from abstracts, snippets or press coverage are marked **unverified**; honeybee results are marked **[bee analogy]**.*
+*Research note for `ja-k4k.2.1` (the young's chamber steering) and its epic (PRD §74). Written 2026-11-14, against code at `004e7c6`. Two research passes: primary papers in full text where PubMed Central, PLOS, Frontiers or OUP served them. Springer, Nature, science.org, pnas.org and bioRxiv full texts were refused (login redirects, 403, 429), and several university repositories didn't resolve. Numbers from abstracts, snippets or press coverage are marked **unverified**; honeybee results are marked **[bee analogy]**.*
 
 **What the game does today.** A young ant (band 0) in a chamber turns toward the queen's exact x,y (`steer.ts`, the branch after the store fetch): a read no ant can make (`docs/vision.md`, gap row "Steering in a chamber: to the queen"). PR #192 tried two sensed replacements:
 - **The royal and brood floor marks, summed:** `chambers.test` failed.
