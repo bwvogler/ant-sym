@@ -96,7 +96,7 @@ jobs:
           TEST_REPORT_TITLE: int files alone (line 12 s)
           TEST_TIER: int:12000:soak
           TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/int-alone.json
-        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-concurrency=1 --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-concurrency=1 --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout server/tests/int/*.test.ts worker/tests/int/*.test.ts src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts
         working-directory: web
       - name: durations artifact
         if: ${{ !cancelled() }}

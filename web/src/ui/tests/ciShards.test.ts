@@ -97,17 +97,20 @@ test("every sharded test step runs both reporters, so a failure prints its ::err
     assert.ok(runOf(yml, name, file).includes(REPORTERS), `${file} "${name}" runs spec and ci-report`);
     assert.match(b, /TEST_DURATIONS_FILE: /, `${file} "${name}" writes its durations`);
   }
+  assert.match(slowYml, /^\s+name: slow-durations-\$\{\{ matrix\.shard \}\}$/m, "slow.yml uploads each shard's durations");
 });
 
 // The nightly tiers job (ja-w7ef.10) times each unit and int file alone against its tier's line (docs/agent-guide.md,
 // Tests: unit under ~1.5 s, int to 12 s). Its globs and lines are copies; these hold them.
 test("slow.yml's tiers job times test:unit's and test:int's files alone, against the agent guide's lines", () => {
+  assert.match(slowYml, /^  tiers:\n    if: github\.event_name != 'pull_request'$/m, "the tiers job never runs on a PR");
+  assert.match(block(slowYml, "int files alone", "slow.yml"), /^\s+if: \$\{\{ !cancelled\(\) \}\}$/m, "int runs after a red unit step");
+  const guide = readFileSync(join(ROOT, "docs/agent-guide.md"), "utf8");
+  assert.match(guide, /under about 1\.5 s `unit\/`, to 12 s `int\/`, over that `soak\/`/, "the agent guide's lines are 1.5 s and 12 s");
   for (const [name, npm, tier] of [
     ["unit files alone", "test:unit", "unit:1500:int"],
     ["int files alone", "test:int", "int:12000:soak"],
   ] as const) {
-    const guide = readFileSync(join(ROOT, "docs/agent-guide.md"), "utf8");
-    assert.match(guide, /under about 1\.5 s `unit\/`, to 12 s `int\/`, over that `soak\/`/, "the agent guide's lines are 1.5 s and 12 s");
     const run = runOf(slowYml, name, "slow.yml");
     assert.deepEqual(globs(run), globs(script(npm)), name);
     assert.equal(timeout(run), timeout(script(npm)), name);

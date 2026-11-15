@@ -30,7 +30,7 @@ npm run dev                    # http://localhost:38500
 npm test                       # every tier below, ~4 min on 4 cores; node --test, 120 s per file here and in the soak tier, 60 s in unit, int and golden (the limit is a whole file, and files run side by side: split a file before it nears it)
 npm run test:unit              # the quick tier (files under ~1.5 s alone: ui, server, worker, colony/tests/unit), ~9 s
 npm run test:watch             # the unit tier on every save (node --test --watch)
-npm run test:int               # colony/tests/int and ui/tests/int: files of 1.5-12 s
+npm run test:int               # every int/ folder: files of 1.5-12 s
 npm run test:soak              # colony/tests/soak: files over 12 s and the *.soak.test.ts long games (CI shards int, golden and soak 4 ways: `ci.yml`)
 npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
