@@ -7,6 +7,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SEEDS, BOUND, CEILING, WITHIN, judge } from "../web/src/colony/tests/slow/g1/g1Rule.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const dir = process.argv[2];
 if (!dir) {
