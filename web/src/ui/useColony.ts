@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_MENU,
   menuFor,
@@ -183,8 +183,6 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => loop.stop();
   }, [loop]);
   useEffect(() => loop.set(controls.playing, controls.speed), [loop, controls.playing, controls.speed]);
-  const stats = useSyncExternalStore(loop.subscribe, loop.stats, loop.stats);
-  const fps = useSyncExternalStore(loop.subscribe, loop.fps, loop.fps);
 
   // The dev hook (window.jevAnts, the game and the page's views) is dev/hook.ts, installed by ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the hole of the colony its seed chose.
@@ -254,5 +252,5 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step };
+  return { game, loop, controls, update, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step };
 }

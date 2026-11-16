@@ -16,9 +16,11 @@ import Help from "./Help.tsx";
 import { journalLine } from "./journal.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
-import { MAX_SPEED, type ColonyControls, type ColonyStats, type SideStats } from "./useColony.ts";
+import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
+import { useFps, useGameRead, useStats } from "./session.ts";
+import { sameRecord, wholeStats } from "./statSelect.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
@@ -33,8 +35,6 @@ interface Props {
   game: Game;
   controls: ColonyControls;
   update: (patch: Partial<ColonyControls>) => void;
-  stats: ColonyStats | null;
-  fps: number;
   restart: () => void;
   newWorld: () => void;
   jev: Jev;
@@ -73,7 +73,8 @@ function Card({ label, title, children, wide = false }: { label: string; title: 
   );
 }
 
-export function Colonies({ stats }: Props) {
+export function Colonies() {
+  const stats = useStats(wholeStats);
   const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
   return (
     <Card label="colony stats" title="Colonies" wide>
@@ -191,7 +192,8 @@ export function JevCard({ jev }: Props) {
   );
 }
 
-export function FungusNumbers({ stats }: Props) {
+export function FungusNumbers() {
+  const stats = useStats(wholeStats);
   return (
     <Card
       label="fungus numbers"
@@ -327,7 +329,8 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
 }
 
 /** For experiments, not play: the fungus's menu, and each colony's doctrine. */
-export function Lab({ game, controls, update, stats, jev }: Props) {
+export function Lab({ game, controls, update, jev }: Props) {
+  const stats = useStats(wholeStats);
   // A re-ask costs the game's species' own questions (ja-fnd.5.12, review of #132 S2): its words and fields, not the generic ant's.
   const perSituation = game.params.species.lanes.mode?.schema
     ? tokensPerQuestion("mode", DOCTRINES[0]!.text, game.params.species.lanes.mode)
@@ -524,7 +527,9 @@ export function SavedGames({ saves, onLoad, controls }: Props) {
   );
 }
 
-export function Debug({ stats, fps }: Props) {
+export function Debug() {
+  const stats = useStats(wholeStats);
+  const fps = useFps();
   return (
     <Card label="debug" title="Debug">
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm text-fg-2">
@@ -628,17 +633,20 @@ export function LeverChips({
   // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12); an
   // invite lever (rouse) is inert where the species' finders invite no one (ja-rf5.18).
   const inert = new Set(inertLevers(game.player.params.channelSet, game.player.params.invitePace > 0));
+  // What the fungus has kept and whether it has a nest change with play, outside the stats.
+  const reach = useGameRead(() => game.fungus.evolution?.reach() ?? null, sameRecord);
+  const hasNest = useGameRead(() => game.fungus.hasNest);
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
       {(["perceive", "emit", "lethal"] as const).map((kind) => (
         <div key={kind} className="flex flex-wrap items-center gap-1">
           <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
           {/* the nest's levers (floor marks, crown) only where there is a nest */}
-          {LEVERS.filter((v) => v.kind === kind && (game.fungus.hasNest || !NEST_ONLY.has(v.id))).map((v) => {
+          {LEVERS.filter((v) => v.kind === kind && (hasNest || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
             const lethal = LETHAL.has(v.id);
             // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
-            const heldOff = lethal && game.fungus.evolution?.reach()[v.id] === 0;
+            const heldOff = lethal && reach?.[v.id] === 0;
             const nothing = inert.has(v.id);
             return (
               <button

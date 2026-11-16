@@ -67,8 +67,8 @@ const EVERY_MS = 500;
  * Watch the game for the Codex's cues: an entry opens the first time its cue shows, with a notice (the starting ones open
  * quietly). Only the entries the game's species sees (guideFor).
  */
-export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => void, stats: ColonyStats | null): void {
-  // The numbers as last reported, read by the frame (not a dependency: the watch stays subscribed as they change).
+export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => void, stats: () => ColonyStats | null): void {
+  // The numbers as the loop last took them, read by the frame (a getter, not a value: the watch stays subscribed as they change).
   const now = useRef(stats);
   useEffect(() => {
     now.current = stats;
@@ -82,7 +82,7 @@ export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => voi
       const t = performance.now();
       if (t - last < EVERY_MS || state.held) return;
       last = t;
-      const open = newlyOpen(ids, state.seen, cues(game.colonies, codexNumbers(now.current)));
+      const open = newlyOpen(ids, state.seen, cues(game.colonies, codexNumbers(now.current())));
       if (!open.length) return;
       // With what another tab has saved since (N5): each tab adds to the notebook, none overwrites it. Untested: the e2e
       // drives one tab.

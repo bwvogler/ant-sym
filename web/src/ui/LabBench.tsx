@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { Game } from "../colony/index.ts";
 import { clock, clockTicks } from "./clock.ts";
 import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
@@ -7,6 +8,7 @@ import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProp
 import { closeLab, type LabTab, type LabTarget, openLab, useLab } from "./labStore.ts";
 import { colonyName } from "./names.ts";
 import PolicyTab, { type PolicyProps } from "./PolicyTab.tsx";
+import { useGameRead } from "./session.ts";
 
 // Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
 // this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
@@ -75,7 +77,7 @@ export default function LabBench(
   // A step changes nothing React holds: count them, so the time and the buttons read the game after each.
   const [, setSteps] = useState(0);
   // A queen in flight waits for the page to found her (the pen), as play does.
-  const flying = game.flights.length > 0;
+  const flying = useGameRead(() => game.flights.length > 0);
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
   return (
     <section
@@ -140,7 +142,7 @@ export default function LabBench(
             aria-label="game time"
             title="Game time: minutes and seconds, then the tick within the second (of 30)"
           >
-            {clockTicks(game.time)}
+            <GameTime game={game} />
           </span>
         </div>
         <button
@@ -172,8 +174,8 @@ export default function LabBench(
             {tab === "levers" && <Levers {...props} />}
             {tab === "numbers" && (
               <>
-                <FungusNumbers {...props} />
-                <Debug {...props} />
+                <FungusNumbers />
+                <Debug />
               </>
             )}
             {tab === "journal" && journal && <JournalCard journal={journal} />}
@@ -298,4 +300,9 @@ function HistoryTab({ history }: { history: History }) {
       </details>
     </div>
   );
+}
+
+/** The game's time in minutes, seconds and the tick within the second: read from the game itself (the stats' clock is to the tenth), and drawn on each stats tick. */
+function GameTime({ game }: { game: Game }) {
+  return <>{useGameRead(() => clockTicks(game.time))}</>;
 }
