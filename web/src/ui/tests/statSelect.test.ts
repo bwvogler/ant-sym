@@ -8,6 +8,8 @@ import {
   simTime,
   situationsSeenOf,
   slowPace,
+  sameList,
+  sameRecord,
   StatSelection,
   wholeStats,
 } from "../statSelect.ts";
@@ -63,6 +65,11 @@ test("a result that is equal to the last one is the last one: an object a select
   const first = sel.read(select, eq);
   loop.set({ ...loop.stats()!, time: 2 }); // other stats changed, this slice did not
   assert.equal(sel.read(select, eq), first, "the same object");
+  assert.equal(
+    sel.read(select, eq),
+    first,
+    "and again on the same stats: what was handed out is what is kept (getSnapshot must not change)",
+  );
   loop.set({ ...loop.stats()!, counts: { ...loop.stats()!.counts, explore: 99 } });
   const next = sel.read(select, eq);
   assert.notEqual(next, first);
@@ -124,4 +131,35 @@ test("slowPace: only while playing, only when the pace is measured and under 85%
   assert.equal(slowPace(s(3.39), true, 4), 3.39);
   assert.equal(slowPace(s(3), false, 4), null, "paused");
   assert.equal(slowPace(s(0), true, 4), null, "no pace measured yet");
+});
+
+test("a read of game state the stats don't hold (useGameRead): run on each new stats, the same value while it is equal", () => {
+  const loop = fakeLoop(stats({ time: 1 }));
+  const sel = new StatSelection<boolean[]>(loop);
+  const game = { revealed: [false, false] };
+  const read = () => [...game.revealed]; // a new list each call: the list's own equality keeps it
+  const first = sel.read(read, sameList);
+  loop.set({ ...loop.stats()!, time: 2 });
+  assert.equal(sel.read(read, sameList), first, "nothing changed: the same list");
+  game.revealed[1] = true; // a tick sets it; the next stats are taken
+  assert.equal(sel.read(read, sameList), first, "not before the stats are: the game is read on a tick");
+  loop.set({ ...loop.stats()!, time: 3 });
+  const next = sel.read(read, sameList);
+  assert.notEqual(next, first);
+  assert.deepEqual(next, [false, true]);
+});
+
+test("sameList and sameRecord: by items, in order, and by keys and values (NaN is itself)", () => {
+  assert.ok(sameList([1, 2], [1, 2]));
+  assert.ok(!sameList([1, 2], [2, 1]));
+  assert.ok(!sameList([1], [1, 2]));
+  assert.ok(sameList([NaN], [NaN]));
+  assert.ok(sameRecord({ a: 1, b: 2 }, { b: 2, a: 1 }));
+  assert.ok(!sameRecord({ a: 1 }, { a: 2 }));
+  assert.ok(!sameRecord({ a: 1 }, { a: 1, b: 2 }));
+  assert.ok(!sameRecord({ a: 1, b: 2 }, { a: 1 }), "a key the other lacks");
+  assert.ok(!sameRecord({ a: undefined }, { b: undefined }), "the same count of keys, not the same keys");
+  assert.ok(sameRecord(null, null));
+  assert.ok(!sameRecord(null, {}));
+  assert.ok(!sameRecord({}, null));
 });

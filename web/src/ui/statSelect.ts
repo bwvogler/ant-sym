@@ -31,6 +31,17 @@ export class StatSelection<T> {
   }
 }
 
+/** Whether two lists hold the same items in order (Object.is). */
+export const sameList = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
+
+/** Whether two records hold the same keys with the same values (Object.is). */
+export function sameRecord<T>(a: Readonly<Record<string, T>> | null, b: Readonly<Record<string, T>> | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => k in b && Object.is(a[k], b[k]));
+}
+
 // Selectors the page uses more than once, as module-level functions so a component's selector doesn't change between renders.
 
 /** All of the stats (a leaf that shows many of them draws on every tick, which is what it asks for). */

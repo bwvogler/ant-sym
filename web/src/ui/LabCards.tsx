@@ -19,8 +19,8 @@ import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
 import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
-import { useFps, useStats } from "./session.ts";
-import { wholeStats } from "./statSelect.ts";
+import { useFps, useGameRead, useStats } from "./session.ts";
+import { sameRecord, wholeStats } from "./statSelect.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
@@ -633,17 +633,20 @@ export function LeverChips({
   // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12); an
   // invite lever (rouse) is inert where the species' finders invite no one (ja-rf5.18).
   const inert = new Set(inertLevers(game.player.params.channelSet, game.player.params.invitePace > 0));
+  // What the fungus has kept and whether it has a nest change with play, outside the stats.
+  const reach = useGameRead(() => game.fungus.evolution?.reach() ?? null, sameRecord);
+  const hasNest = useGameRead(() => game.fungus.hasNest);
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
       {(["perceive", "emit", "lethal"] as const).map((kind) => (
         <div key={kind} className="flex flex-wrap items-center gap-1">
           <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
           {/* the nest's levers (floor marks, crown) only where there is a nest */}
-          {LEVERS.filter((v) => v.kind === kind && (game.fungus.hasNest || !NEST_ONLY.has(v.id))).map((v) => {
+          {LEVERS.filter((v) => v.kind === kind && (hasNest || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
             const lethal = LETHAL.has(v.id);
             // In the game a lethal lever on the menu does nothing until its upgrade is kept (ja-lo8.16).
-            const heldOff = lethal && game.fungus.evolution?.reach()[v.id] === 0;
+            const heldOff = lethal && reach?.[v.id] === 0;
             const nothing = inert.has(v.id);
             return (
               <button

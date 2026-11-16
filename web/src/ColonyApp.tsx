@@ -1133,8 +1133,7 @@ function SoundSetting() {
   );
 }
 
-/** Where the fungus is, and how far the colonies have come together. */
-/** The sim clock; draws again only when the second changes the text (the stats tick seven times a second). */
+/** The sim clock: a leaf, so it draws on every stats tick (about seven a second) and the page does not. */
 function SimClock({ className }: { className: string }) {
   const t = useStats(simTime);
   return (
@@ -1182,6 +1181,7 @@ function affordableIn(s: ColonyStats | null, menu: readonly string[]): boolean {
   return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
 }
 
+/** Where the fungus is, and how far the colonies have come together. */
 function FungusStatus() {
   const stats = useStats(wholeStats);
   if (!stats) return null;

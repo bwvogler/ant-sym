@@ -43,8 +43,8 @@ import {
 } from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { openLab } from "./labStore.ts";
-import { useStats } from "./session.ts";
-import { situationsSeenOf } from "./statSelect.ts";
+import { useGameRead, useStats } from "./session.ts";
+import { sameList, sameRecord, situationsSeenOf } from "./statSelect.ts";
 import { TOKENS_PER_SITUATION, type DoctrineChoice } from "./useColonyJev.ts";
 
 // Lab mode's Policy tab (PRD §69.8, ja-mvo9.4): the words each colony's ants and the fungus follow, then how each decides
@@ -87,6 +87,8 @@ const h3 = "text-xs font-medium uppercase tracking-wide text-fg-3";
  */
 export default function PolicyTab(props: PolicyProps & { focus?: string; ping: object }) {
   const sides = props.colonies.length;
+  // A doctrine is closed until its colony's queen is reached: a tick sets that, outside the stats.
+  const revealed = useGameRead(() => [...props.game.revealed], sameList);
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[13px] leading-snug">
@@ -99,11 +101,11 @@ export default function PolicyTab(props: PolicyProps & { focus?: string; ping: o
         <section key={k} className="flex flex-col gap-1" aria-label={`${colonyName(k)} doctrine`}>
           <h3 className="font-medium">
             <span className={colonyTone(k)}>{colonyName(k)}</span> <span className="text-fg-2">doctrine</span>{" "}
-            {props.game.revealed[k] && (
+            {revealed[k] && (
               <span className="text-xs font-normal text-fg-3">({DOCTRINES.find((p) => p.id === d.id)?.name ?? "custom"})</span>
             )}
           </h3>
-          {props.game.revealed[k] ? (
+          {revealed[k] ? (
             <p id={`lab-doctrine-${k}`} className="rounded-md border border-line bg-raised px-2 py-1.5 text-[13px] leading-snug text-fg">
               {d.text}
             </p>
@@ -339,6 +341,8 @@ function FungusExplainer(props: PolicyProps) {
   const fungal = followedFungal(props.colonies, props.followed);
   const [table, setTable] = useState(false);
   const menu = new Set(props.menu);
+  // What the fungus has kept changes with play, outside the stats.
+  const reach = useGameRead(() => props.game.fungus.evolution?.reach() ?? null, sameRecord);
   return (
     <>
       <p className="text-[13px]">
@@ -400,7 +404,7 @@ function FungusExplainer(props: PolicyProps) {
                   : v.kind === "emit"
                     ? "what it gives off"
                     : menu.has(v.id)
-                      ? props.game.fungus.evolution?.reach()[v.id] === 0
+                      ? reach?.[v.id] === 0
                         ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}`
                         : "lethal, on"
                       : "lethal, off"}
@@ -477,7 +481,8 @@ function SentExplainer(props: PolicyProps) {
   const fungal = followedFungal(props.colonies, props.followed);
   const k = fol?.k ?? 0;
   // A colony's doctrine is closed until its queen is reached (ja-lo8.7): the request is shown with the words hidden.
-  const doctrine = props.game.revealed[k] ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
+  const open = useGameRead(() => props.game.revealed[k] === true);
+  const doctrine = open ? (props.doctrines[k]?.text ?? "") : "(closed: reach this colony's queen)";
   // The game's species asks in its own words, over its own fields (ja-fnd.5.13): a field of its own an ant was not last asked takes its first value.
   const own = props.game.params.species.lanes.mode;
   const modeSituation = own?.schema ? { ...own.schema.decode(0), ...(fol?.s ?? SAMPLE_SITUATION) } : (fol?.s ?? SAMPLE_SITUATION);

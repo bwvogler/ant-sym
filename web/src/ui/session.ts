@@ -30,6 +30,16 @@ export function useStats<T>(select: (s: ColonyStats | null) => T, eq?: Equal<T>)
   return useLoopStats(useLoop(), select, eq);
 }
 
+/**
+ * State the game keeps outside the stats (a flag a tick sets, the fungus's reach, the clock to the tick): `read` is run again on every
+ * stats tick, and the component draws when its result changed by `eq` (Object.is by default). A component that reads `game.…` while it
+ * draws, and is no longer drawn at the stats rate, needs this to stay fresh. The result must not be a new object each time unless `eq`
+ * compares it.
+ */
+export function useGameRead<T>(read: () => T, eq?: Equal<T>): T {
+  return useStats(() => read(), eq);
+}
+
 /** Frames drawn in the last second. */
 export function useFps(): number {
   const loop = useLoop();
