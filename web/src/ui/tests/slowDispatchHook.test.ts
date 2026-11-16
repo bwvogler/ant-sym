@@ -31,8 +31,12 @@ test("settings.json registers the slow-dispatch hook on the workflow trigger too
 // The hook fails open without jq, so its tests need it; the CI runners have it.
 const hasJq = spawnSync("jq", ["--version"]).status === 0;
 
-test("the hook's own tests pass", { skip: !hasJq && "jq is not installed" }, () => {
-  accessSync(join(ROOT, ".claude/hooks/test.sh"), constants.X_OK);
-  const out = execFileSync("bash", [join(ROOT, ".claude/hooks/test.sh")], { encoding: "utf8" });
-  assert.match(out, /\d+ passed, 0 failed/);
-});
+test(
+  "the hook's own tests pass",
+  { skip: !hasJq && "jq is not installed (the CI runners have it, so this skips only on a machine without it)" },
+  () => {
+    accessSync(join(ROOT, ".claude/hooks/test.sh"), constants.X_OK);
+    const out = execFileSync("bash", [join(ROOT, ".claude/hooks/test.sh")], { encoding: "utf8" });
+    assert.match(out, /\d+ passed, 0 failed/);
+  },
+);
