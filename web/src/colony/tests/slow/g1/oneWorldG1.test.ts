@@ -24,6 +24,8 @@ import { BOUND, CEILING, WITHIN, judge, seedsFrom, type Held } from "./g1Rule.ts
 // The numbers and the judge are g1Rule.ts's, shared with scripts/g1-verdict.mjs. On CI (slow.yml) each seed has a runner:
 // G1_SEEDS (e.g. "4") plays just those seeds and G1_RESULT names the JSON file their figures go to; the `g1 verdict` job merges
 // the files and judges them with the same rule. With G1_SEEDS set this test judges nothing (one seed can't meet WITHIN).
+// That handling of G1_SEEDS and G1_RESULT has no fast test (it takes a game, about 2 minutes); a mistake in it shows as a red
+// `g1 (n)` or `g1 verdict` on a runner, not a green one.
 const SUBSET = process.env.G1_SEEDS?.trim();
 const RESULT = process.env.G1_RESULT;
 

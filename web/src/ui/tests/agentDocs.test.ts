@@ -33,6 +33,10 @@ test("the slow guards' way onto a PR (the slow-guards label) is named in CLAUDE.
   const steward = readFileSync(join(ROOT, ".claude/skills/steward/SKILL.md"), "utf8");
   const description = /^description:\s*"?(.+?)"?\s*$/m.exec(steward)?.[1] ?? "";
   assert.match(description, /slow-guards/, "the steward skill's description names the label");
+  // The steward's body says the rest, and a deleted sentence is not caught by the description alone (reviews of #266, #260).
+  for (const part of [/Don't dispatch slow\.yml/, /before the approval/, /\.claude\/hooks\/slow-dispatch\.sh/]) {
+    assert.match(steward, part, `the steward skill still says ${part}`);
+  }
   const slowYml = readFileSync(join(ROOT, ".github/workflows/slow.yml"), "utf8");
   assert.match(slowYml, /Not for a PR's branch/, "slow.yml's header keeps the dispatch for branches with no PR");
 });

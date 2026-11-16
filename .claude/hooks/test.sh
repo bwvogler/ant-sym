@@ -64,6 +64,11 @@ check "a branch with a / in its name (claude/...) is looked up" deny "$(hook $T 
 check "a branch with a . in its name" deny "$(hook $T "$(run slow.yml fix.v1.2)" 12)"
 check "a branch with an _ in its name" deny "$(hook $T "$(run slow.yml fix_v2)" 12)"
 check "a branch with digits and -" deny "$(hook $T "$(run slow.yml ccr-068a3b40-x9)" 12)"
+check "an uppercase branch is looked up" deny "$(hook $T "$(run slow.yml Fix-X)" 12)"
+runo() { jq -n --arg o "$1" --arg r "$2" '{method: "run_workflow", owner: $o, repo: $r, workflow_id: "slow.yml", ref: "fix-x"}'; }
+check "a repo name with a . in it is looked up" deny "$(hook $T "$(runo bwvogler ant.sym)" 12)"
+check "a repo name with an _ in it" deny "$(hook $T "$(runo bwvogler ant_sym)" 12)"
+check "an owner with a . and an _" deny "$(hook $T "$(runo b.w_vogler ant-sym)" 12)"
 check "slow.yml on a branch with no PR" allow "$(hook $T "$(run slow.yml experiment-1)" "")"
 check "slow.yml on main" allow "$(hook $T "$(run slow.yml main)" 249)"
 check "main asks gh nothing" 0 "$(calls)"

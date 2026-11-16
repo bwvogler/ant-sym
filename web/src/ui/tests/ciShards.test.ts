@@ -132,6 +132,7 @@ test("slow.yml's g1 job is a matrix over G1's seeds, one seed and one result fil
   assert.match(b, /^\s+G1_SEEDS: \$\{\{ matrix\.seed \}\}$/m);
   assert.match(b, /^\s+G1_RESULT: \$\{\{ runner\.temp \}\}\/g1\/g1-seed-\$\{\{ matrix\.seed \}\}\.json$/m);
   assert.match(g1, /^\s+name: g1-seed-\$\{\{ matrix\.seed \}\}$/m, "each seed uploads its result");
+  assert.match(g1, /^\s+path: \$\{\{ runner\.temp \}\}\/g1\/$/m, "from the folder G1_RESULT writes into");
   assert.match(g1, /^\s+persist-credentials: false$/m);
 
   const v = job("g1-verdict");
@@ -140,6 +141,7 @@ test("slow.yml's g1 job is a matrix over G1's seeds, one seed and one result fil
   // After a red seed too (that is its job), but not when the matrix was skipped (no label on a PR).
   assert.match(v, /^    if: \$\{\{ !cancelled\(\) && needs\.g1\.result != 'skipped' \}\}$/m);
   assert.match(v, /^\s+pattern: g1-seed-\*$/m);
+  assert.match(v, /^\s+path: g1$/m, "into the folder the verdict script is given");
   assert.match(v, /^\s+merge-multiple: true$/m);
   const run = block(v, "G1 verdict", "slow.yml");
   assert.match(run, /set -euo pipefail/);
