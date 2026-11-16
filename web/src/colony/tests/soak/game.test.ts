@@ -7,6 +7,7 @@ import { Colony, type Layer, localPolicy, localStance, PLANE } from "../../colon
 import type { Situation, StanceSituation } from "../../vocab.ts";
 import { responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
+import { piSpan } from "../../homing.ts";
 import { foodIn, mulberry32, reachable, worldFromArrays, type WorldMap } from "../../world.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { PUPA } from "../../brood.ts";
@@ -381,8 +382,10 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   // Home ground by sight of its hole, else by its vector (ja-k4k.6.2): `off` cells of error put the hole it would defend that far east.
   const threatened = (cx: number, off = 0) => {
     const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, wander: 0 }, mulberry32(13), () => "return");
+    // Its vector `off` east: a trip 20 out at the farthest (piErrorLaw 1: the span by the distance out), the drift to fit.
     c.odoSurf[0] = off;
-    c.driftSurf[0] = off > 0 ? 1 : 0;
+    c.reachSurf[0] = off > 0 ? 20 : 0;
+    c.driftSurf[0] = off > 0 ? off / piSpan(c, 0) : 0;
     put(c, 0, cx, 6);
     for (let k = 0; k < 60; k++) {
       put(c, 0, cx, 6);

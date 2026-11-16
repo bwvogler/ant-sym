@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
 import { Game } from "../../game.ts";
+import { piSpan } from "../../homing.ts";
 import { CELL } from "../../hex.ts";
 import { mulberry32 } from "../../world.ts";
 import { curtainHole, oneColony, own, smallOne } from "../builders.ts";
@@ -43,12 +44,16 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   let searching = 0;
   for (let t = 0; t < 30 * 45; t++) {
     g.tick(1 / 30);
-    if (t % 30 === 0)
+    // Sampled three times a second: by the distance out (piErrorLaw 1) fewer homing ants are within 3 cells (27 samples
+    // at once a second over 45 s, 89 at three times), and the 50-sample floor stands.
+    if (t % 10 === 0)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.mode[i] !== 2 || c.layer[i] !== PLANE) continue;
         // On the plane only, where its surface vector is what it homes by: underground it homes by its nest vector,
         // and a search there round a wrongly believed chamber is that vector's (a young porter, ja-xu6.1's runs).
-        if (Math.hypot(c.driftSurf[i]! * c.odoSurf[i]!, c.driftSurfY[i]! * c.odoSurf[i]!) >= 3) continue;
+        // Its vector's error is its drift times the span (piErrorLaw 1: by its distance out, not the odometer).
+        const span = piSpan(c, i);
+        if (Math.hypot(c.driftSurf[i]! * span, c.driftSurfY[i]! * span) >= 3) continue;
         samples++;
         if (c.search[i] !== 0) searching++;
       }

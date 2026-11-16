@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   DOCTRINES,
   Game,
-  generateWorld,
+  generateOneWorld,
   mulberry32,
   NEUTRAL_STEERING,
   packSteerRequest,
@@ -86,7 +86,8 @@ const out: SteerSituation = {
   stance: "forage",
   find: "far",
 };
-const colony = () => new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 10, rival: false }, mulberry32(3)).player;
+const colony = () =>
+  new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 10, rival: false }, mulberry32(3)).player;
 
 test("a request asks a score per default weight; a reply reads as levels, and only answers its weights could give are valid", () => {
   const key = steerKey(out);
