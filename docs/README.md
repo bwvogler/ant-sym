@@ -54,6 +54,7 @@ A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/s
 
 - [hosting.md](./hosting.md) (operations, not a research note, so not in the field guide): GitHub Pages for `main`, a preview per PR, and the Cloudflare Worker that hosts Jev for them behind a passphrase and a daily cap. Setup steps.
 - [agent-guide.md](./agent-guide.md) (how agent instructions are written, and the code style an agent follows; its size budget is held by `ui/tests/agentDocs.test.ts`).
+- [beads-sync.md](./beads-sync.md) (operations): how the `ja` beads database syncs through the `beads-dolt` branch, and the hooks and bootstrap behind it.
 - [refactor.md](./refactor.md) (a roadmap, not a research note): the foundation refactor before new species, structures and UI, stages S0–S6 (`ja-fnd`, PRD §57).
 - [one-world-only.md](./one-world-only.md) (a working inventory, not a research note): what each test, assay and slow guard on the old top-down and side maps becomes when stage S2 retires them: port, covered, delete or keep (`ja-fnd.3.1`).
 - [species.md](./species.md) (a design, not a research note): what a species is in this code, the three tiers a species can differ in, the `Species` descriptor at tier 1 and the order of work (`ja-fnd.5.3`, PRD §62).
@@ -65,4 +66,3 @@ A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/s
 - Primary papers are preferred: the journal page, PubMed Central or the publisher's DOI.
 - Links marked *(secondary)* go to news, encyclopaedia, blog or university-news pages. Replace each with the primary paper when the claim is built on.
 - Numbers that could only be read in an abstract or a citing paper are marked **unverified** in the note.
-- [beads-sync.md](./beads-sync.md) (operations): how the `ja` beads database syncs through the `beads-dolt` branch, and the hooks and bootstrap behind it.

@@ -27,7 +27,7 @@ REF="refs/heads/$BRANCH"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 cd "$ROOT" || exit 0
 if ! command -v bd >/dev/null 2>&1; then
-  echo "beads-sync: bd is not installed; skipping (see CLAUDE.md for the install line)"
+  echo "beads-sync: bd is not installed; skipping (see docs/beads-sync.md for the install line)"
   exit 0
 fi
 export BD_NON_INTERACTIVE=1
