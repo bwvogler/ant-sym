@@ -86,6 +86,13 @@ test("the tweezers check picks an ant no other ant sits near, as the page's pick
   assert.match(script, /const crowded = window\.jevAnts\.game\.colonies\.some\(/, "every colony's ants, as pick() looks at every colony");
 });
 
+test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(script, /let off = null;\s*await until\(/, "the value the check reads is declared before the poll");
+  assert.match(script, /off = await hostOff\(\);\s*return off !== null && off < 1;/, "the poll keeps what it read");
+  assert.doesNotMatch(script, /const off = await hostOff\(\)/, "and the check doesn't read the camera again");
+});
+
 test("e2e.yml installs one exact Playwright version", () => {
   assert.match(yml, /^\s+PLAYWRIGHT_VERSION: \d+\.\d+\.\d+$/m, "pin an exact x.y.z: a range would change the browser under the guard");
   assert.match(yml, /playwright@\$PLAYWRIGHT_VERSION/);

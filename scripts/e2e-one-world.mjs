@@ -952,10 +952,19 @@ try {
       const e = window.__clampCam(v, c.x[i], c.y[i], cam.zoom);
       return Math.hypot(cam.x - e.x, cam.y - e.y);
     }, hostNo);
-  // The camera eases to the host: poll until it is there (a fixed wait failed under load, ja-w7ef.14); on a timeout the
-  // check below reports where it stopped.
-  await until(async () => ((await hostOff()) ?? 1) < 1, "the camera on the host", 5000, 50).catch(() => {});
-  const off = await hostOff();
+  // A followed ant's camera is set to the ant in every draw frame, with no easing (ColonyField.tsx), so the fixed 300 ms that
+  // stood here lost a race against the first frames after the step switch on a loaded machine (ja-w7ef.14): poll until the
+  // camera is on the host. The check reads the poll's last value: a second read could land a frame later, host moved on.
+  let off = null;
+  await until(
+    async () => {
+      off = await hostOff();
+      return off !== null && off < 1;
+    },
+    "the camera on the host",
+    5000,
+    50,
+  ).catch(() => {});
   check(
     off !== null && off < 1,
     `the camera sits on the host, as near as the map's edge allows (${off === null ? "not in view" : off.toFixed(2)} away)`,

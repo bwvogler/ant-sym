@@ -34,6 +34,21 @@ export function seedsFrom(spec: string | undefined): number[] {
   return seeds;
 }
 
+/** One seed's result file as parsed: its one entry, with finite numbers, or what is wrong with the file (never a thrown error). */
+export function seedResult(seed: number, parsed: unknown): { held: Held } | { problem: string } {
+  if (!Array.isArray(parsed)) return { problem: "the file is not a list" };
+  if (parsed.length !== 1) return { problem: `${parsed.length} entries where one was expected` };
+  const h: Record<string, unknown> = typeof parsed[0] === "object" && parsed[0] !== null ? parsed[0] : {};
+  if (h.seed !== seed) return { problem: `it holds seed ${JSON.stringify(h.seed ?? null)}` };
+  const figures: number[] = [];
+  for (const k of ["you", "rival", "worst"]) {
+    const v = h[k];
+    if (typeof v !== "number" || !Number.isFinite(v)) return { problem: `${k} is ${JSON.stringify(v ?? null)}, not a number` };
+    figures.push(v);
+  }
+  return { held: { seed, you: figures[0], rival: figures[1], worst: figures[2] } };
+}
+
 /** The rule over seeds 1-10: a result for every seed, at least WITHIN of them within BOUND, none at CEILING or more. */
 export function judge(held: Held[], seeds: number[] = SEEDS): Verdict {
   const sorted = [...held].sort((a, b) => a.seed - b.seed);
