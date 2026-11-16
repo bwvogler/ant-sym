@@ -98,9 +98,9 @@ test("on: wider after a longer trip out, by √ the distance out with law 1, not
 test("on: never under SEARCH_START, and never past the plane's longer side", () => {
   const c = ant({ searchScale: 1 }, 0, 0);
   for (const { s } of points(c, 6)) near(s, SEARCH_START, "no error: SEARCH_START");
-  const big = ant({ searchScale: 1, searchScaleStep: 4 }, 0, 10000, 100, 50);
+  const big = ant({ searchScale: 1, searchScaleStep: 4 }, 0, 10000, 50, 100);
   const p = points(big, 40);
-  const cap = Math.max(100, 50 * R);
+  const cap = Math.max(50, 100 * R);
   assert.ok(
     p.every(({ s }) => s <= cap + 1e-6),
     "capped",

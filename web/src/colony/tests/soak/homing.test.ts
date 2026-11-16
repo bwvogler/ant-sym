@@ -42,10 +42,11 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   const c = g.player;
   let samples = 0;
   let searching = 0;
-  for (let t = 0; t < 30 * 45; t++) {
+  const trips = new Set<string>(); // distinct trips sampled: each trip draws its own drift (review of #264, S2)
+  for (let t = 0; t < 30 * 90; t++) {
     g.tick(1 / 30);
-    // Sampled three times a second: by the distance out (piErrorLaw 1) fewer homing ants are within 3 cells (27 samples
-    // at once a second over 45 s, 89 at three times), and the 50-sample floor stands.
+    // Three times a second over 90 s: by the distance out (piErrorLaw 1) fewer homing ants are within 3 cells than under
+    // the odometer law, so the run is twice the old 45 s, and the floor is on distinct trips, not repeat samples of one.
     if (t % 10 === 0)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.mode[i] !== 2 || c.layer[i] !== PLANE) continue;
@@ -55,9 +56,11 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
         const span = piSpan(c, i);
         if (Math.hypot(c.driftSurf[i]! * span, c.driftSurfY[i]! * span) >= 3) continue;
         samples++;
+        trips.add(`${i}:${c.driftSurf[i]}:${c.driftSurfY[i]}`);
         if (c.search[i] !== 0) searching++;
       }
   }
   assert.ok(samples > 50, `${samples} samples`);
+  assert.ok(trips.size > 40, `${trips.size} distinct trips`); // 53 measured (main, odometer law, 45 s once a second: 46)
   assert.equal(searching, 0, `${searching} of ${samples} were searching`);
 });
