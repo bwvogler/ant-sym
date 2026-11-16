@@ -171,14 +171,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     let tl = 0;
     let tf = 0;
     let tr = 0;
-    if (
-      p.homeTrail > 0 &&
-      carrying &&
-      col.entrance === null &&
-      !detouring &&
-      Math.max(fl, ff, fr) >= FAINT &&
-      Math.max(fl, ff, fr) < SEEN
-    ) {
+    if (p.homeTrail > 0 && carrying && col.onPlane && !detouring && Math.max(fl, ff, fr) >= FAINT && Math.max(fl, ff, fr) < SEEN) {
       const agrees = (b: number) => Math.cos(b - toNest) >= Math.cos(p.homeTrailCone);
       tl = agrees(h - a) ? fl : 0;
       tf = agrees(h) ? ff : 0;
@@ -378,7 +371,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     else {
       // "No entry" ahead (behaviour MR 3): the food scent it marks counts for less. Read only where some was laid, and
       // only outside (a top-down map, or the side view's ground), where food trails lead to food.
-      const outside = col.entrance === null || !col.under[i];
+      const outside = col.onPlane || !col.under[i];
       let gl = fl;
       let gf = ff;
       let gr = fr;
@@ -402,7 +395,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const tm = steered ? TRAIL_MUL[steerLevel(sc, 2) + 1] : 1;
       h +=
         tm *
-          (p.followChoice > 0 && col.entrance === null
+          (p.followChoice > 0 && col.onPlane
             ? choose(gl, gf, gr, p.turnRate * dt, p.followChoice, rng)
             : climb(gl, gf, gr, p.turnRate * dt)) +
         noise * p.wander * 0.25 * sm;
@@ -418,12 +411,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
           const lay = resp.noEntry(touch(col, i, toEnemy !== null, mode, item));
           if (lay > 0) {
             col.antCell(i);
-            ph.depositCell(
-              "noEntry",
-              CELL[0],
-              CELL[1],
-              p.deposit * (col.entrance === null ? p.foodTrailTop : 1) * lay * dt * NO_ENTRY_RATE,
-            );
+            ph.depositCell("noEntry", CELL[0], CELL[1], p.deposit * (col.onPlane ? p.foodTrailPlane : 1) * lay * dt * NO_ENTRY_RATE);
           }
         }
       }
@@ -432,7 +420,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     // A calm ant (the fungus's cue) does not charge.
     // A raider in the side view walks on to the raided nest, cell by cell, past the alarm of fights behind it: steering
     // freely up the alarm left raiders in the pits by the rival's mound, 12–13 columns short of its hole (none got in).
-    const sideRaid = col.stanceOf(i) === "raid" && col.raidTarget !== null && col.entrance !== null;
+    const sideRaid = col.stanceOf(i) === "raid" && col.raidTarget !== null && !col.onPlane;
     if (toEnemy !== null) h = turnToward(h, toEnemy, p.turnRate * dt * 2 * (1 - col.calm[i]));
     else if (Math.max(al, af, ar) >= FAINT && !sideRaid) h += climb(al, af, ar, p.turnRate * dt);
     else if (sideRaid && ((col.detour[i] = 0), walkTunnel(col, i, FIGHT, p.speed * dt))) h = col.towardTarget(i);
@@ -515,7 +503,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     else if (
       p.foodPlume > 0 &&
       !carrying &&
-      (col.entrance === null || (col.line !== null && col.cur === PLANE)) &&
+      (col.onPlane || (col.line !== null && col.cur === PLANE)) &&
       col.smellsFood(i, h, a, p.turnRate * dt)
     )
       h += col.plumeTurn + noise * p.wander * 0.25;
@@ -524,7 +512,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       p.aphidPlume > 0 &&
       !carrying &&
       col.aphidOdour?.dist &&
-      (col.entrance === null || (col.line !== null && col.cur === PLANE)) &&
+      (col.onPlane || (col.line !== null && col.cur === PLANE)) &&
       col.smellsAphids(i, h, a, p.turnRate * dt)
     )
       h += col.plumeTurn + noise * p.wander * 0.25;
@@ -568,17 +556,17 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   }
   // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
   // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
-  if (fleeFrom !== null && (col.entrance === null || !col.under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
+  if (fleeFrom !== null && (col.onPlane || !col.under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);
   // Smelling alarm: the alarmGain response says how hard to shy from it (locally: every mode but fighting, unless digging).
   if (Math.max(al, af, ar) >= FAINT) {
     const gain = resp.alarmGain(touch(col, i, toEnemy !== null, mode, item));
     // On the side view's ground line a carrier can't go round alarm, only turn back: it carries on home through it.
     // Shying, carriers turned back from fights at their own hole and held their food (G seeds 4, 8: raids, 3 held).
-    const noWayRound = carrying && col.entrance !== null && !col.under[i];
+    const noWayRound = carrying && !col.onPlane && !col.under[i];
     if (gain > 0 && !noWayRound) h += avoid(al, af, ar, p.turnRate * p.alarmAvoid * gain * dt);
     // A faint alarm draws it: top-down only. In the side view the drawn explorers crowded the tunnels and the ground
     // line round the nest's fights (G seeds 1–20: 15/20 against 18/20 without the pull).
-    else if (gain < 0 && col.entrance === null) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt);
+    else if (gain < 0 && col.onPlane) h += climb(al, af, ar, p.turnRate * p.alarmDraw * -gain * dt);
   }
 
   // Lay trail: walking out marks the way home, carrying food marks the way to it; a pellet carrier lays none, and
@@ -592,7 +580,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   if (trail !== "none") {
     const laid =
       p.deposit *
-      (trail === "food" && col.entrance === null ? p.foodTrailTop : 1) *
+      (trail === "food" && col.onPlane ? p.foodTrailPlane : 1) *
       resp.trailRate(tt) *
       Math.exp(-col.since[i] / p.depositDecay) *
       dt *

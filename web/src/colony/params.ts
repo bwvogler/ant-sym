@@ -96,13 +96,13 @@ export interface ColonyParams {
   /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
   searchSpan: number;
   /**
-   * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
+   * on the plane, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
-   * is raised instead: foodCapTop.)
+   * is raised instead: foodCapPlane.)
    */
-  foodTrailTop: number;
-  /** on a top-down map, the most food trail a cell holds (behaviour MR 3; the other channels and the side view: MAX_LEVEL 20) */
-  foodCapTop: number;
+  foodTrailPlane: number;
+  /** on the plane, the most food trail a cell holds (behaviour MR 3; the other channels and the curtain: MAX_LEVEL 20) */
+  foodCapPlane: number;
   /**
    * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
    * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
@@ -466,8 +466,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   steerLane: 0,
   findNear: 8,
   searchSpan: 1.33,
-  foodTrailTop: 1,
-  foodCapTop: 80,
+  foodTrailPlane: 1,
+  foodCapPlane: 80,
   homeTrail: 0.8,
   homeTrailCone: Math.PI / 2,
   noEntryAvoid: 0,
