@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { lockstepProbe } from "../../experiment.ts";
-import { mulberry32 } from "../../world.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { mulberry32 } from "../../world.ts";
 import { pick } from "../../weighted.ts";
 import type { Mode, Policy } from "../../vocab.ts";
 
