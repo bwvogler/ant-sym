@@ -23,6 +23,17 @@
         ],
         "matcher": ""
       }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/slow-dispatch.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "mcp__github__actions_run_trigger"
+      }
     ]
   }
 }
