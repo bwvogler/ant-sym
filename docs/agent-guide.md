@@ -92,3 +92,5 @@ What Prettier (`npm run format`) and oxlint (`npm run lint`) enforce is not repe
 
 ### Reporting
 - Say what you measured and with which command; say what you did not run. "Tests pass" is a count and a tier. A mutation that was not caught is a finding, not something to leave out.
+
+The skills' own tests: `.claude/skills/adding-mechanics/scripts/test.sh` and `.claude/skills/reviewing-prs/scripts/test.sh` (moved here from CLAUDE.md, ja-fnd.8).

@@ -65,3 +65,4 @@ A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/s
 - Primary papers are preferred: the journal page, PubMed Central or the publisher's DOI.
 - Links marked *(secondary)* go to news, encyclopaedia, blog or university-news pages. Replace each with the primary paper when the claim is built on.
 - Numbers that could only be read in an abstract or a citing paper are marked **unverified** in the note.
+- [beads-sync.md](./beads-sync.md) (operations): how the `ja` beads database syncs through the `beads-dolt` branch, and the hooks and bootstrap behind it.
