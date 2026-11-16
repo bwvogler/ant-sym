@@ -17,13 +17,17 @@ import { OPEN, rockAt, SOIL } from "../../world.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100), hyphae on, the fungus landed by colony 0's hole and evolving. */
+const OLD_LAW = { piErrorLaw: 0, searchScale: 0 };
+
 function game(hyphae: boolean, flow = false): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
     { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae, flow } },
     gameRng(7),
     // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
-    { colony: { routeMemory: 0 }, rival: { routeMemory: 0 } },
+    // The odometer law and U3b's spiral (piErrorLaw 0, searchScale 0) for the same reason: the default law 1 (PRD §79) moves
+    // the ants too, and on this seed F2's body is then smaller early, so a hypha's mass is 7 % of it at 21 s (bound 6 %).
+    { colony: { routeMemory: 0, ...OLD_LAW }, rival: { routeMemory: 0, ...OLD_LAW } },
   );
   g.land(0, GARDEN, { evolve: true });
   return g;

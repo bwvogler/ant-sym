@@ -21,8 +21,9 @@ const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSav
 /**
  * The game every mutation starts from: seed 7's small plane, Garden landed and spores in the curtain, a stranger colony
  * founded beyond V₀ (the line grows there, so `founded` has a spot and the curtain a negative x0), run 30 s and on to the
- * second tick with a fight death; saved there, and its hash 5 s on. (The second: since U5.1's strip, the first one's dead
- * ant lay where nobody's step read the grids within 5 s, so grids rebuilt from the living ran on to the same hash.)
+ * first tick with a fight death; saved there, and its hash 5 s on. (Which death: one whose dead ant lies where a step reads
+ * the grids within 5 s, or grids rebuilt from the living run on to the same hash. From U5.1's strip to the odometer law's
+ * last day that was the second; with piErrorLaw 1 the game takes another path, and the first is, the second not.)
  */
 function setUp(): { saved: GameSave; unbroken: string } {
   const g = small();
@@ -35,7 +36,7 @@ function setUp(): { saved: GameSave; unbroken: string } {
   g.addColony({ x: centreX(v.x, v.y) - 20, y: centreY(v.y), antCount: 40, odour: 1 });
   assert.equal(g.founded[0]?.spot?.end, "start", "founded beyond V₀");
   run(g, 28);
-  for (let death = 0; death < 2; death++) {
+  for (let death = 0; death < 1; death++) {
     let last = g.unity().deathsPerMinute;
     for (let k = 0; k < 600; k++) {
       g.tick(DT);

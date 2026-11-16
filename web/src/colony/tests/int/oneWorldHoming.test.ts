@@ -56,6 +56,17 @@ function carrier(g: Game, x: number, y: number, odo: number, dx: number, dy: num
   return c;
 }
 
+/**
+ * A food carrier (ant 0 of the player) on the plane at (x, y) whose vector, from a trip that took it `out` cells from its hole at
+ * the farthest, puts its hole at (ox, oy) from the true one: by piErrorLaw 1 its drift is that offset over the span √(out) sets.
+ */
+function vectorCarrier(g: Game, x: number, y: number, out: number, ox: number, oy: number): Colony {
+  const span = piSpanOf(g.player.params.piErrorLaw, g.player.params.piErrorAt, out, out);
+  const c = carrier(g, x, y, out, ox / span, oy / span);
+  c.reachSurf[0] = out;
+  return c;
+}
+
 /** Tick until ant 0 of c goes down (at most `seconds`), calling `each` before every tick; the seconds it took, or NaN. */
 function home(g: Game, c: Colony, seconds: number, each: () => void): number {
   for (let k = 0; k < Math.round(seconds / DT); k++) {
@@ -168,7 +179,8 @@ test("plane, piErrorLaw 1: a tweezers move is not walking out (the reach stays a
 });
 
 test("plane, piErrorLaw 0: the reach is never counted (today's vector, bit for bit)", () => {
-  const g = game();
+  // The old odometer law on purpose: law 1 is the default now (PRD §79).
+  const g = game(7, { piErrorLaw: 0 });
   const c = g.player;
   climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
   for (let k = 0; k < Math.round(3 / DT); k++) g.tick(DT);
@@ -208,14 +220,15 @@ test("plane: a carrier walks to where its vector says the hole is, not to the ho
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 60 out, drifting (0.2, 0.1): it believes the hole 12 east and 6 south of it (13.4 off, out of sight of it).
+  // 30 out at the farthest (span ~116), drifting ~(0.10, 0.05): it believes the hole 12 east and 6 south of it (13.4 off, out of
+  // sight of it).
   const B = { x: H.x + 12, y: H.y + 6 };
   assert.ok(open(g, B.x, B.y), "its belief is on open ground");
   // From south of the belief: the straight way to the hole passes 5 cells from the belief, and never within sight of the hole
   // until it is nearly there.
   const S = { x: B.x + 6, y: B.y + 14 };
   assert.ok(open(g, S.x, S.y));
-  carrier(g, S.x, S.y, 60, 0.2, 0.1);
+  vectorCarrier(g, S.x, S.y, 30, 12, 6);
   let nearB = Infinity; // nearest to its belief before it came within NEST_SIGHT of the hole
   let seen = -1; // the tick it first came within NEST_SIGHT of the hole
   let k = 0;
@@ -237,10 +250,10 @@ test("plane: a carrier whose vector is 12 off finds nothing there, searches in w
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 120 out, drifting (0.1, 0): it believes the hole 12 east, along open row 32.
+  // 32 out at the farthest (span 120), drifting (0.1, 0): it believes the hole 12 east, along open row 32.
   const B = { x: H.x + 12, y: H.y };
   assert.ok(open(g, B.x, B.y));
-  carrier(g, B.x + 20, B.y, 120, 0.1, 0);
+  vectorCarrier(g, B.x + 20, B.y, 32, 12, 0);
   let most = 0;
   const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 3.5, `it searched, and the loops grew (to ${most.toFixed(2)})`);
@@ -252,10 +265,10 @@ test("plane: a carrier whose vector ends in rock gets as near as it can, searche
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 60, drifting (0.2, −0.1): the spot it believes in, 12 east and 6 north of the hole, is in the rock ridge there.
+  // 32 out at the farthest (span 120), drifting (0.1, −0.05): the spot it believes in, 12 east and 6 north of the hole, is in the rock ridge there.
   const B = { x: H.x + 12, y: H.y - 6 };
   assert.ok(!open(g, B.x, B.y), "its belief is in rock");
-  carrier(g, H.x + 30, H.y + 10, 60, 0.2, -0.1);
+  vectorCarrier(g, H.x + 30, H.y + 10, 32, 12, -6);
   let most = 0;
   const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 0, "it searched");
@@ -267,11 +280,11 @@ test("plane: a belief past the plane's edge is held at the edge, and the carrier
   const g = game(1);
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 300 north: it believes the hole 60 north of it, 34 past the plane's top edge.
+  // 150 out at the farthest (span ~260), drifting ~(0, −0.23): it believes the hole 60 north of it, 34 past the plane's top edge.
   const top = 0.75;
   assert.ok(H.y - 60 < 0 && H.y - top > NEST_SIGHT + 10, `hole at y ${H.y.toFixed(1)}`);
   assert.ok(open(g, H.x, top));
-  carrier(g, H.x + 6, top + 2, 300, 0, -0.2);
+  vectorCarrier(g, H.x + 6, top + 2, 150, 0, -60);
   let nearEdge = Infinity;
   const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot(c.x[0] - H.x, c.y[0] - top))));
   assert.ok(nearEdge < 1.5, `it went to the edge, where its belief is held (within ${nearEdge.toFixed(2)})`);
@@ -296,11 +309,11 @@ test("plane: a searching carrier with the home trail under its antennae follows 
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 24 east of the hole along open row 32, facing west, on a home trail that runs from it to the hole; it believes the hole
-  // 40 east (walked 200, drifting (0.2, 0)), behind it, and is searching there (its next point 43 east).
+  // 40 east (90 out at the farthest, span ~201, drifting ~(0.2, 0)), behind it, and is searching there (its next point 43 east).
   const S = { x: H.x + 24, y: H.y };
   for (let x = H.x; x <= S.x + 2; x += 0.5) assert.ok(open(g, x, H.y), `row ${H.y} is open at x ${x}`);
   for (let x = H.x; x <= S.x + 2; x += 0.5) c.paint("home", x, H.y, 1.5, 40, PLANE);
-  carrier(g, S.x, S.y, 200, 0.2, 0);
+  vectorCarrier(g, S.x, S.y, 90, 40, 0);
   const end = searchingRun(g, c, Math.PI, 1.5);
   // At its speed (7) it walks ~10 in 1.5 s: along the trail, it ends well west of where it started, still out of sight of
   // the hole (the snap is not what moved it): 10 west. Steered by its vector it turns round within a second: 6 east.
