@@ -6952,7 +6952,7 @@ Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found wi
 
 **Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.
 
-## 79. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
+## 79. The home vector's error grows like √(distance out), not with the path walked (built, on, ja-lp4.19, 2026-11-16)
 
 **Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
 - *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
@@ -7037,7 +7037,7 @@ The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
 
-### 79.2 The nest search sized to the vector's error (built, off, ja-lp4.20, 2026-11-15)
+### 79.2 The nest search sized to the vector's error (built, on, ja-lp4.20, 2026-11-16)
 
 **Research basis:** [nest-search.md, "Sizing the search to the vector's error"](nest-search.md#sizing-the-search-to-the-vectors-error-ja-lp420). The search is wider after a longer trip, by the distance out and not the path's tortuosity (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), and broader the more uncertain the vector (Vickerstaff & Merkle 2012's Bayesian model). All three abstracts or summaries only (**unverified**); none gives a width multiple.
 
@@ -7116,6 +7116,8 @@ The rest of `--one all` passes on the same seeds in all three arms (`alarm`, `br
 **Reading.** The weakest colony's loss comes with law 1 itself: every law-1 arm is below law 0 on the same two seeds (7 and 19), whatever the search. Sizing the search brings lost carriers home faster in S1, but that is not where G1's weakest colony loses its food. Why law 1 costs it there is not yet measured.
 
 **Beads.** `ja-lp4.20` (this). Open for the owner: (1) whether the weakest colony's food on G1's quiet seeds is the bar for law 1, against the guard, the defenders and the losses it gains (Merkle 2006 and Pfeffer 2020 support the law's size; no source speaks to colony food); (2) if the search is to be sized, loops back through the origin (`searchLoops`: the sources' shape, Wehner & Srinivasan 1981; Müller & Wehner 1994) or this even spiral (design: it wins S1, but an ant that surely sees its hole within sight gains nothing from wider turns, and the sources' wider searches fit uncertain detection, Vickerstaff & Merkle 2012); (3) `piErrorAt` (50, design), which sets σ at short trips and so what law 1 costs short foragers; (4) why law 1 costs the weakest colony food on seeds 7 and 19 (a probe of where its carriers lose time).
+
+**Turned on (owner, 2026-11-16): `piErrorLaw` 1 and `searchScale` 1 together, the defaults.** The owner chose the literature-sized error (Merkle 2006, Pfeffer 2020) with the search sized to it, over the ship rule above: G1's guard 8 / 9 of 10 within 2 (law 0: 6 / 4), defenders die near home (median 24 / 23 cells against 55 / 59), fewer ants lost, S1 better on long trips; accepted costs: the weakest colony's food 18–24 % lower (seeds 7 and 19, cause not traced) and A2b 9 → 6 of 10. Every golden master is re-recorded; tests of the old law or search pin `piErrorLaw` 0 / `searchScale` 0. The tables above are the measurements this rests on.
 
 ## 80. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
 

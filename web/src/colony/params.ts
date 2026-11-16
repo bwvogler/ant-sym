@@ -153,7 +153,8 @@ export interface ColonyParams {
    * √(piErrorAt × distance out)): its first point this many σ out (at least SEARCH_START), each next quarter turn
    * searchScaleStep/4 σ further (an even spiral, not 1.6× a turn). The search is wider after a longer trip, by the distance
    * out (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), broader with more uncertainty (Vickerstaff & Merkle 2012); the
-   * multiples are design. Not round a stored place (routeEnd): that search is the spiral's. 0 = U3b's spiral, bit for bit.
+   * multiples are design. Not round a stored place (routeEnd): that search is the spiral's. 0 = U3b's spiral, bit for bit;
+   * 1 the default (owner, 2026-11-16, with piErrorLaw 1).
    */
   searchScale: number;
   /** One world's plane, with searchScale: σ a full turn of the spiral adds to its reach (design) */
@@ -340,7 +341,8 @@ export interface ColonyParams {
    * too). 1 = with the square root of the distance out (the farthest the ant has been from its hole this trip, straight):
    * a median miss of PI_MISS_AT × √(piErrorAt × that distance) (Merkle, Knaden & Wehner 2006: 25 % at 5 m, 12 % at 20 m;
    * Heinze, Narendra & Cheung 2018: uncertainty grows like √distance; Merkle & Wehner 2010: by distance out, not how winding
-   * the path was). The same drift draws: the law scales them. Steering, the search's σ and every belief of home read it.
+   * the path was; the √ itself is design). The same drift draws: the law scales them. Steering, the search's σ and every
+   * belief of home read it. 1 the default (owner, 2026-11-16, with searchScale 1).
    */
   piErrorLaw: number;
   /** piErrorLaw 1: the distance out (cells) at which the median miss is PI_MISS_AT of it: 50 cells stand for 5 m (design: the map keeps ratios, docs/ant-communication.md) */
