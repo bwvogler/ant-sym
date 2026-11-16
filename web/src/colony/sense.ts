@@ -175,13 +175,13 @@ export function touchProbe(c: Colony, x: number, y: number, angle: number, d: nu
 export function raidSmelt(c: Colony, i: number): "none" | "faint" | "strong" {
   if (c.params.raidGate <= 0) return "strong";
   // One world (ja-web): at the gate at the top of its shaft, the plane's trail where it ends, at its hole.
-  if (c.entrance !== null) return c.atGate(i) ? trailLevel(holeRaid(c)) : "strong";
+  if (!c.onPlane) return c.atGate(i) ? trailLevel(holeRaid(c)) : "strong";
   return trailLevel(raidLevel(c, i));
 }
 
 /** The raid trail's level ant i smells: strongest of its cell and its three sensors (one world's curtain: at its hole, holeRaid). */
 export function raidLevel(c: Colony, i: number): number {
-  if (c.entrance !== null) return c.line !== null ? holeRaid(c) : 0;
+  if (!c.onPlane) return c.line !== null ? holeRaid(c) : 0;
   if (!c.ph.live("raid")) return 0;
   const x = c.x[i];
   const y = c.y[i];

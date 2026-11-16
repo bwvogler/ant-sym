@@ -233,7 +233,7 @@ export function homeGoal(c: Colony, i: number, pellet: boolean): Nest {
  */
 export function believe(c: Colony, i: number, goal: Nest): Nest {
   if (c.line !== null && c.cur === PLANE) return believePlane(c, i, goal);
-  if (!c.entrance) return goal;
+  if (c.onPlane) return goal;
   const x = c.x[i];
   const y = c.y[i];
   const toHole = goal === c.entrance;
