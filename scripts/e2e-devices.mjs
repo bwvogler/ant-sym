@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 // The page on the devices it is played on (owner, 2026-11-16): a Pixel 6 XL (Android, Chrome), Chrome on a desktop, and
 // Safari on an iPad, each opened as that device (scripts/lib/devices.mjs): its viewport, pixel ratio, touch and user agent;
 // the phone and the iPad both ways up. By hand, like `npm run e2e`: `npm run e2e:devices [-- pixel-6-xl desktop-chrome ipad-safari]`
@@ -12,6 +11,7 @@
 // and the Codex open inside the screen; Lab mode opens with its charts inside the screen and the map still showing above;
 // the whole rail is on the screen; a notice shows on the screen, counts repeats (×2), and "Bell only" takes it off the field; a chosen dark theme applies. It lists every failure
 // before it exits 1, and saves a screenshot of each state with E2E_SHOTS=<dir> (otherwise in the temp folder).
+// Usage: npm run e2e:devices [-- pixel-6-xl desktop-chrome ipad-safari]   (E2E_SHOTS=<dir> saves the screenshots there)
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
