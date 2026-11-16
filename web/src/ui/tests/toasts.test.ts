@@ -15,6 +15,8 @@ import {
   setNoticesOpen,
   SWIPE_PX,
   swipeOutcome,
+  parseNoticeLevel,
+  showsAt,
   TAP_PX,
   toastPlace,
   unreadNotices,
@@ -42,14 +44,14 @@ test("every notice raised goes in the log, newest first, unread until the log is
   clearNotices();
   for (const t of [...currentToasts()]) dismissToast(t.id);
   const a = pushToast("first", "info", 1000);
-  pushToast("first", "info", 2000); // still showing: not raised again, not logged again
+  pushToast("first", "info", 2000); // still showing: counted, not stacked and not logged as a second line
   pushToast("second", "good", 3000);
   dismissToast(a);
   assert.deepEqual(
     noticeLog().map((n) => [n.text, n.tone, n.at, n.read]),
     [
       ["second", "good", 3000, false],
-      ["first", "info", 1000, false],
+      ["first", "info", 2000, false], // its one line, at the latest time (and counted: ×2)
     ],
   );
   assert.equal(unreadNotices(), 2);
@@ -121,4 +123,73 @@ test("where notices sit: the builder's tray and the Lab's workbench keep their p
   assert.equal(at(false, true, true), "sheet-lab");
   for (const drawer of [false, true])
     for (const lab of [false, true]) assert.equal(at(true, drawer, lab), "top", "building: always under the HUD");
+});
+
+test("a notice raised again while it shows counts up, takes the latest words, and starts its clock over; the log has one line for it", () => {
+  clearToasts();
+  clearNotices();
+  const id = pushToast("An ant found your sugar!", "good", 1000);
+  const first = currentToasts()[0]!;
+  assert.deepEqual([first.count, first.bump], [1, 0]);
+  assert.equal(pushToast("An ant found your sugar!", "good", 2000), id, "the same text: the same notice");
+  assert.equal(pushToast("An ant found your sugar!", "good", 3000), id);
+  const again = currentToasts()[0]!;
+  assert.deepEqual([currentToasts().length, again.count, again.bump], [1, 3, 2], "one toast, counted, its clock restarted");
+  assert.deepEqual(
+    noticeLog().map((n) => [n.text, n.count, n.at]),
+    [["An ant found your sugar!", 3, 3000]],
+    "one line in the log: counted, at the latest time",
+  );
+  dismissToast(id);
+  assert.notEqual(pushToast("An ant found your sugar!", "good", 4000), id, "once it has gone, the next is a new notice");
+  assert.equal(noticeLog().length, 2, "and the log keeps both");
+});
+
+test("a group counts notices whose words differ, showing the latest; a group and a text don't mix", () => {
+  clearToasts();
+  clearNotices();
+  const a = pushToast("3 ants are following your line", "good", { group: "line", now: 1000 });
+  assert.equal(pushToast("5 ants are following your line", "good", { group: "line", now: 2000 }), a);
+  assert.deepEqual(
+    currentToasts().map((t) => [t.text, t.count]),
+    [["5 ants are following your line", 2]],
+  );
+  const other = pushToast("An ant found your sugar!", "good", { group: "found" });
+  assert.notEqual(other, a, "another group: another notice");
+  const plain = pushToast("5 ants are following your line", "good");
+  assert.notEqual(plain, a, "the same words with no group are not the grouped notice");
+  assert.deepEqual(
+    noticeLog().map((n) => n.count),
+    [1, 1, 2],
+    "the log: newest first, the group's line counted",
+  );
+});
+
+test("a warning is important, anything else is not unless raised so; the levels show the right ones on the field", () => {
+  clearToasts();
+  const info = pushToast("fyi", "info");
+  const warn = pushToast("Jev stopped", "warn");
+  const end = pushToast("The colonies are one.", "good", { important: true });
+  const [i, w, e] = [info, warn, end].map((id) => currentToasts().find((t) => t.id === id)!);
+  assert.deepEqual([i!.important, w!.important, e!.important], [false, true, true]);
+  assert.deepEqual(
+    [i, w, e].map((t) => showsAt("all", t!)),
+    [true, true, true],
+  );
+  assert.deepEqual(
+    [i, w, e].map((t) => showsAt("important", t!)),
+    [false, true, true],
+  );
+  assert.deepEqual(
+    [i, w, e].map((t) => showsAt("bell", t!)),
+    [false, false, false],
+    "bell only: none on the field",
+  );
+  assert.equal(noticeLog().length >= 3, true, "all of them are in the log whatever the level");
+});
+
+test("a stored notice level is all, important or bell", () => {
+  assert.equal(parseNoticeLevel("important"), "important");
+  assert.equal(parseNoticeLevel("bell"), "bell");
+  for (const odd of [null, undefined, "", "all", "none", "Bell"]) assert.equal(parseNoticeLevel(odd), "all", `“${odd}”`);
 });
