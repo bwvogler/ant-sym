@@ -183,6 +183,8 @@ export default function ColonyApp() {
   const trails = game.player.ph.has("food");
   const pp = game.player.params;
   const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
+  // The surface from above has no soil, so Dirt would place rock there: the tray offers it only where it is soil.
+  const soil = game.layers[oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : 0]?.hasSoil ?? true;
   const tray = useMemo(
     () =>
       trayItems(
@@ -190,8 +192,9 @@ export default function ColonyApp() {
         Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
         trails,
         tends,
+        soil,
       ),
-    [little, colonyCount, trails, tends],
+    [little, colonyCount, trails, tends, soil],
   );
   const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
   const pickTool = useCallback((it: TrayItem) => {

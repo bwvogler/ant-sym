@@ -33,6 +33,13 @@ test("no aphids for a species that takes no honeydew (docs/aphids.md)", () => {
   assert.ok(!trayItems(false, ["Ink"], true, false).some((it) => it.tool === "aphids"));
 });
 
+test("no Dirt where the map in view has no soil: it would place rock (the surface from above)", () => {
+  assert.ok(trayItems(false, ["Ink"]).some((it) => it.tool === "dirt"));
+  const above = trayItems(false, ["Ink"], true, true, false);
+  assert.ok(!above.some((it) => it.tool === "dirt"));
+  assert.ok(above.some((it) => it.tool === "rock"));
+});
+
 test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => {
   assert.deepEqual(
     trayItems(true, ["Ink", "Amber"]).map((it) => it.tool),

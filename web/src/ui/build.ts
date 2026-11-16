@@ -105,9 +105,10 @@ export interface TrayItem {
 
 /**
  * The tray's tools: the little four, or the full set with a crayon per colony (`names`: each colony's name; `trails`: the species
- * lays a food trail; `tends`: it takes honeydew and tends aphids, docs/aphids.md).
+ * lays a food trail; `tends`: it takes honeydew and tends aphids, docs/aphids.md; `soil`: the map in view has soil, which the
+ * surface seen from above has not: there Dirt would place rock, so only Rock is offered).
  */
-export function trayItems(little: boolean, names: readonly string[], trails = true, tends = true): TrayItem[] {
+export function trayItems(little: boolean, names: readonly string[], trails = true, tends = true, soil = true): TrayItem[] {
   const out: TrayItem[] = [];
   for (const tool of little ? LITTLE : FULL) {
     if (tool === "crayon") {
@@ -120,6 +121,8 @@ export function trayItems(little: boolean, names: readonly string[], trails = tr
         );
     } else if (tool === "noEntry" && !trails)
       continue; // the sign turns trail followers: no trails, nothing to turn
+    else if (tool === "dirt" && !soil)
+      continue; // dirt on a map with no soil is rock (builder.ts #apply): the Rock button already does that
     else if (tool === "aphids" && !tends)
       continue; // a species that takes no honeydew (the desert ant) would ignore them
     else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
