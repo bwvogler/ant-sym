@@ -28,7 +28,7 @@ import { useSimTick } from "./session.ts";
 // that situation under the doctrine, the local rule while Jev has not
 // answered yet, or the local rule. If the fungus is in it, what the fungus
 // runs there and how it bends the ant's senses: the situation shown is the
-// one the ant perceives. Read from the colony's arrays four times a second;
+// one the ant perceives. Read from the colony's arrays about three times a second (useSimTick);
 // the field keeps the camera on the ant.
 
 interface Props {

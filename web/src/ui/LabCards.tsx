@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import {
   DOCTRINES,
   LETHAL,
@@ -544,13 +544,9 @@ export function Debug() {
   );
 }
 
-/** The newest journal events, newest first; it reads the journal about twice a second while its tab is open. */
+/** The newest journal events, newest first; it reads the journal again when it has written more, on the loop's stats ticks. */
 export function JournalCard({ journal }: { journal: Journal }) {
-  const [, setWritten] = useState(journal.written);
-  useEffect(() => {
-    const id = setInterval(() => setWritten(journal.written), 500);
-    return () => clearInterval(id);
-  }, [journal]);
+  useGameRead(() => journal.written);
   const shown = journal.events.slice(-200).reverse();
   return (
     <Card label="journal" title="Journal" wide>

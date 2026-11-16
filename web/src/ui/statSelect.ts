@@ -45,6 +45,18 @@ export function tickGate(everyMs: number, now: () => number): () => boolean {
   };
 }
 
+/**
+ * Call `fire` on the loop's stats ticks, at most once every `everyMs` of `now`'s clock (a gate of its own for this subscription); the
+ * returned function stops it. The ticks come about every 167 ms at 60 Hz (a frame after more than 150 ms), so what passes is every
+ * `everyMs` rounded up to a whole number of them: a 250 ms gate fires about every 310 ms, a 500 ms one about every 600.
+ */
+export function gatedSubscribe(loop: Pick<GameLoop, "subscribe">, everyMs: number, now: () => number, fire: () => void): () => void {
+  const pass = tickGate(everyMs, now);
+  return loop.subscribe(() => {
+    if (pass()) fire();
+  });
+}
+
 /** Whether two lists hold the same items in order (Object.is). */
 export const sameList = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
 

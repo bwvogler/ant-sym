@@ -45,7 +45,7 @@ export default function LensLayer({
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
   }, [pinned]);
-  // The card says it afresh four times a second while it is up: the ants move under a still pointer.
+  // The card says it afresh about three times a second while it is up: the ants move under a still pointer.
   const shown = at !== null;
   useSimTick(250, shown);
   if (!at) return null;

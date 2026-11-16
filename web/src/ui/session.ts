@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { GameLoop } from "./gameLoop.ts";
-import { type Equal, StatSelection, tickGate } from "./statSelect.ts";
+import { type Equal, gatedSubscribe, StatSelection } from "./statSelect.ts";
 import type { ColonyStats } from "./stats.ts";
 
 // The page's one game loop, for components below ColonyApp (ja-fnd.6.1, docs/refactor.md S5.1): they read the stats and the frame
@@ -41,20 +41,26 @@ export function useGameRead<T>(read: () => T, eq?: Equal<T>): T {
 }
 
 /**
- * Draw again at most every `everyMs` while `on`, for a component that reads the game's arrays as it draws (an ant's card, the nest tab,
- * the lens): the loop's stats ticks set the pace, so it stands still with a hidden tab and no timer of its own runs. Prefer
- * useGameRead where the one thing the component reads can be named.
+ * Draw again about every `everyMs` while `on`, for a component that reads the game's arrays as it draws (an ant's card, the nest tab,
+ * the lens): the loop's stats ticks set the pace (see gatedSubscribe: about 310 ms for 250, 600 for 500, 1,040 for 1,000), so it stands
+ * still with a hidden tab, keeps going while the game is paused (as the loop does) and runs no timer of its own. Prefer useGameRead where
+ * the one thing the component reads can be named.
  */
 export function useSimTick(everyMs: number, on = true): void {
   const loop = useLoop();
   const [, set] = useState(0);
-  useEffect(() => {
-    if (!on) return;
-    const pass = tickGate(everyMs, () => performance.now());
-    return loop.subscribe(() => {
-      if (pass()) set((n) => n + 1);
-    });
-  }, [loop, everyMs, on]);
+  useEffect(
+    () =>
+      on
+        ? gatedSubscribe(
+            loop,
+            everyMs,
+            () => performance.now(),
+            () => set((n) => n + 1),
+          )
+        : undefined,
+    [loop, everyMs, on],
+  );
 }
 
 /** Frames drawn in the last second. */

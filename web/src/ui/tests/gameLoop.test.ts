@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GameLoop, MAX_STEP, type FrameEnv } from "../gameLoop.ts";
+import { GameLoop, MAX_STEP } from "../gameLoop.ts";
+import { fakeEnv } from "./fakeFrames.ts";
 import { buildGame, DEFAULT_COLONY_CONTROLS } from "../useColony.ts";
 import type { Journal } from "../../colony/index.ts";
 import { decisionsOf } from "../stats.ts";
@@ -10,41 +11,6 @@ import type { GameSettings } from "../saves.ts";
 // the clock and reads what the loop did. Before, this was one effect in useColony that tore itself down on every pause and speed change.
 
 const SETTINGS: GameSettings = { species: DEFAULT_COLONY_CONTROLS.species, seed: 1, antCount: 8, rival: true, generation: 0 };
-
-/** A frame source a test drives: `frame(ms)` runs the pending callback at that wall time. */
-function fakeEnv(start = 1000) {
-  let t = start;
-  let cb: ((t: number) => void) | null = null;
-  const calls = { request: 0, cancel: 0 };
-  const env: FrameEnv = {
-    now: () => t,
-    request: (f) => {
-      calls.request++;
-      cb = f;
-      return calls.request;
-    },
-    cancel: () => {
-      calls.cancel++;
-      cb = null;
-    },
-  };
-  return {
-    env,
-    calls,
-    pending: () => cb !== null,
-    /** the next frame, `ms` of wall time later */
-    frame(ms = 50) {
-      assert.ok(cb, "a frame is pending");
-      t += ms;
-      const f = cb;
-      cb = null;
-      f(t);
-    },
-    frames(n: number, ms = 50) {
-      for (let k = 0; k < n; k++) this.frame(ms);
-    },
-  };
-}
 
 function make(over: { playing?: boolean; speed?: number } = {}) {
   const game = buildGame(SETTINGS);
