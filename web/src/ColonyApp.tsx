@@ -16,7 +16,7 @@ import {
   type BuildEvent,
 } from "./colony/index.ts";
 import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
-import { markSeen, seenTools, trayItems, viewHasSoil, type TrayItem, type TrayTool } from "./ui/build.ts";
+import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
 import { play, say, setSoundOn, soundOn } from "./ui/sounds.ts";
 import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
@@ -184,8 +184,8 @@ export default function ColonyApp() {
   const trails = game.player.ph.has("food");
   const pp = game.player.params;
   const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
-  // The surface from above has no soil, so Dirt would place rock there: the tray offers it only where it is soil.
-  const soil = viewHasSoil(game.layers, controls.view);
+  // Some tools work in one view only (Dirt below, aphids above): the tray offers each where it can be placed.
+  const view = controls.view;
   const tray = useMemo(
     () =>
       trayItems(
@@ -193,9 +193,9 @@ export default function ColonyApp() {
         Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
         trails,
         tends,
-        soil,
+        view,
       ),
-    [little, colonyCount, trails, tends, soil],
+    [little, colonyCount, trails, tends, view],
   );
   const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
   const pickTool = useCallback((it: TrayItem) => {
