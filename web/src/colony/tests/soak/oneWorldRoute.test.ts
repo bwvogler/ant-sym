@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Colony, CURTAIN, DEFAULT_COLONY, LIFESPAN, PLANE, type HoleCell } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
 import { route1, runAssay } from "../../experiment.ts";
-import { routeFail, routeRecord } from "../../homing.ts";
+import { piSpan, routeFail, routeRecord } from "../../homing.ts";
 import { Game, gameRng, SAVE_VERSION } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -84,6 +84,12 @@ function carrier(w: World, x: number, y: number, odo = 100): void {
   c.driftSurfY[0] = 0;
   c.fatigue[0] = 0;
   c.bindPolicy("mode", () => "return");
+}
+
+/** Ant 0's vector ends where it stands, 60 east of its hole, from a trip 60 out: its drift that over the span (piErrorLaw 1: by the distance out). */
+function endHere(c: Colony): void {
+  c.reachSurf[0] = 60;
+  c.driftSurf[0] = 60 / piSpan(c, 0);
 }
 
 const tickUntil = (g: Game, seconds: number, done: () => boolean): boolean => {
@@ -311,7 +317,7 @@ test("route memory 2 retraces on reaching its belief with no hole there; 1 searc
       ]),
     );
     carrier(w, hx + 60, hy, 60);
-    c.driftSurf[0] = 1; // its vector's end is where it stands: 60 east of the hole it believes it left, nothing there
+    endHere(c); // its vector's end is where it stands: 60 east of the hole it believes it left, nothing there
     g.tick(DT);
     return { state: c.routeState[0], search: c.search[0] };
   };
@@ -338,7 +344,7 @@ test("route memory 2 retraces the way out to where it began: its first place, ne
     ]),
   ]);
   carrier(w, hx + 60, hy, 60);
-  c.driftSurf[0] = 1; // its belief is the spot it stands on, 60 cells from the hole it left
+  endHere(c); // its belief is the spot it stands on, 60 cells from the hole it left
   assert.ok(
     tickUntil(g, 20, () => c.routeState[0] === 2),
     "it walked its places in order to the first",
@@ -361,7 +367,7 @@ test("route memory: a carrier without food, without places, or already retraced 
         ]),
       );
     carrier(w, hx + 60, hy, 60);
-    c.driftSurf[0] = 1;
+    endHere(c);
     if (how === "food") c.carrying[0] = 0;
     if (how === "done") c.routeState[0] = 2;
     g.tick(DT);
@@ -377,7 +383,7 @@ test("route memory: a carrier without food, without places, or already retraced 
     const w = plane({ routeMemory: mem });
     const { g, c, hx, hy } = w;
     carrier(w, hx + 60, hy, 60);
-    c.driftSurf[0] = 1;
+    endHere(c);
     const xs: number[] = [];
     for (let k = 0; k < 30 * 30; k++) {
       g.tick(DT);
