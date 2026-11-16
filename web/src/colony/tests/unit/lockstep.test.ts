@@ -2,14 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
 import { lockstepProbe } from "../../experiment.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32 } from "../../world.ts";
+import { generateOneWorld } from "../../oneWorld.ts";
 import { pick } from "../../weighted.ts";
 import type { Mode, Policy } from "../../vocab.ts";
 
 // The lockstep probe (ja-0kys): ants that answer a situation alike agree; ants that draw from even odds don't.
 
 const run = (policy: Policy) => {
-  const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 40, rivalAnts: 10 }, mulberry32(3), {
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 40, rivalAnts: 10 }, mulberry32(3), {
     colony: { reroll: 1 },
   });
   g.player.bindPolicy("mode", policy);
