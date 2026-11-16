@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GameLoop, MAX_STEP, type FrameEnv } from "../gameLoop.ts";
-import { buildGame } from "../useColony.ts";
-import { DEFAULT_COLONY_CONTROLS } from "../useColony.ts";
+import { buildGame, DEFAULT_COLONY_CONTROLS } from "../useColony.ts";
 import type { Journal } from "../../colony/index.ts";
+import { decisionsOf } from "../stats.ts";
 import type { GameSettings } from "../saves.ts";
 
 // The frame loop without React or a browser (ja-fnd.6.1): the page's requestAnimationFrame is a hand-driven env, so a test steps
@@ -225,4 +225,160 @@ test("a stop from inside a frame (a listener) ends the loop: no further frame is
   clock.frame();
   assert.equal(clock.pending(), false, "no frame was asked for after the stop");
   assert.equal(clock.calls.request, 1);
+});
+
+/** The ticks a game takes (its dt each), recorded. */
+function recordTicks(game: { tick(dt: number): void }): number[] {
+  const ticks: number[] = [];
+  const tick = game.tick.bind(game);
+  game.tick = (dt: number) => (ticks.push(dt), tick(dt));
+  return ticks;
+}
+
+test("a frame that is not a whole number of MAX_STEPs is cut into equal pieces that add up to dt times the speed (review of #270, S2)", () => {
+  const { game, clock, loop } = make({ speed: 3 });
+  loop.start();
+  const ticks = recordTicks(game);
+  clock.frame(30); // 0.09 s of sim: 3 steps of 0.03
+  assert.equal(ticks.length, 3);
+  assert.ok(Math.abs(ticks.reduce((a, b) => a + b, 0) - 0.09) < 1e-9, `${ticks}`);
+  assert.ok(ticks.every((d) => Math.abs(d - 0.03) < 1e-9));
+});
+
+test("the first frame after start counts the time since start, not the clamp; a frame stamped before it steps nothing (review of #270, S2)", () => {
+  const { game, clock, loop } = make({ speed: 1 });
+  loop.start();
+  const t0 = game.time;
+  clock.frame(16);
+  assert.ok(Math.abs(game.time - (t0 + 0.016)) < 1e-9, `16 ms at 1×: ${game.time - t0}`);
+  const t1 = game.time;
+  clock.frame(-40); // a frame stamped earlier than the last
+  assert.equal(game.time, t1, "the sim never steps backwards");
+});
+
+test("choicesPerSecond is the colonies' decisions over the sim time, per second: 0 until a sim second has passed, then measured; 0 again after a pause", () => {
+  const { game, clock, loop } = make({ speed: 4 });
+  loop.start();
+  clock.frame(50);
+  assert.equal(loop.stats()!.choicesPerSecond, 0, "none before the first sim second");
+  const d0 = decisionsOf(game);
+  const t0 = game.time;
+  clock.frames(30, 50); // 1.5 s wall, 6 s sim
+  const rate = loop.stats()!.choicesPerSecond;
+  assert.ok(rate > 0, `measured: ${rate}`);
+  // the stats are taken every 150 ms: the rate is of the last whole sim second, so it can't exceed all the decisions over all the time
+  assert.ok(rate <= (decisionsOf(game) - d0) / 1 + 1e-9 && game.time - t0 > 5);
+  const per = (decisionsOf(game) - d0) / (game.time - t0);
+  assert.ok(rate > per / 3 && rate < per * 3, `${rate} against the mean ${per}`);
+  loop.set(false, 4);
+  clock.frame(200);
+  assert.equal(loop.stats()!.choicesPerSecond, 0, "a pause starts the rate over, as the sim stands still");
+});
+
+test("the rate is exactly the decisions over the sim time of its last window, a sim second at least: checked against a count kept beside the loop", () => {
+  const { game, clock, loop } = make({ speed: 4 });
+  loop.start();
+  let at = { t: game.time, d: decisionsOf(game) };
+  let expected = 0;
+  let checked = 0;
+  let prev = loop.stats();
+  for (let k = 0; k < 120; k++) {
+    clock.frame(50);
+    if (game.time - at.t >= 1) {
+      expected = (decisionsOf(game) - at.d) / (game.time - at.t);
+      at = { t: game.time, d: decisionsOf(game) };
+    }
+    if (loop.stats() !== prev) {
+      assert.equal(loop.stats()!.choicesPerSecond, expected, `frame ${k}`);
+      prev = loop.stats();
+      checked++;
+    }
+  }
+  assert.ok(checked > 20 && expected > 0, `${checked} stats checked, the last rate ${expected}`);
+});
+
+test("the pace is measured each wall second, not only the first: steady over two windows, then the new speed's after a change (review of #270, S2)", () => {
+  const { clock, loop } = make({ speed: 4 });
+  loop.start();
+  clock.frames(45, 50); // two windows and a bit
+  assert.ok(Math.abs(loop.stats()!.pace - 4) < 0.2, `the second window: ${loop.stats()!.pace}`);
+  loop.set(true, 2);
+  clock.frames(25, 50);
+  assert.ok(Math.abs(loop.stats()!.pace - 2) < 0.2, `after the change: ${loop.stats()!.pace}`);
+});
+
+test("a change of play or speed starts the windows over: stats on the next frame, frame count and pace from now; an unchanged set does nothing", () => {
+  const { clock, loop } = make({ speed: 4 });
+  loop.start();
+  clock.frames(30, 50);
+  const stats = loop.stats();
+  loop.set(true, 4); // the page's echo after a flight pause: nothing changes
+  clock.frame(20);
+  assert.equal(loop.stats(), stats, "an unchanged set neither resets the cadence nor takes stats at once");
+  loop.set(true, 6);
+  clock.frame(20); // 20 ms after the last frame, far under 150 ms: the stats come anyway
+  assert.notEqual(loop.stats(), stats);
+  assert.equal(loop.stats()!.pace, 6);
+});
+
+test("the frame count restarts with start and with a change, and counts every second after the first", () => {
+  const { clock, loop } = make();
+  loop.start();
+  clock.frames(26, 40); // a second and a bit
+  const a = loop.fps();
+  assert.ok(a >= 24 && a <= 26, `${a}`);
+  clock.frames(26, 40);
+  assert.ok(loop.fps() >= 24 && loop.fps() <= 26, `the second second: ${loop.fps()}`);
+  clock.frames(10, 40); // frames of the next second already counted
+  loop.set(true, 5);
+  clock.frames(26, 40);
+  assert.ok(loop.fps() >= 24 && loop.fps() <= 26, `from the change, not from before it: ${loop.fps()}`);
+  loop.stop();
+  loop.start();
+  clock.frames(26, 40);
+  assert.ok(loop.fps() >= 24 && loop.fps() <= 26, `from the restart: ${loop.fps()}`);
+});
+
+test("subscribers hear a frame count change as well as the stats, and before the frame listeners run", () => {
+  const { clock, loop, frame } = make();
+  const order: string[] = [];
+  loop.subscribe(() => order.push("told"));
+  frame.add(() => order.push("listener"));
+  loop.start();
+  clock.frame(1100); // stats and a frame count in the one frame
+  assert.deepEqual(order, ["told", "listener"], "told once, then the listeners");
+  order.length = 0;
+  clock.frame(1100);
+  assert.equal(order[0], "told");
+});
+
+test("a new loop for a new game shows the stats and frame count of the one before until its first frame (they were React state)", () => {
+  const first = make();
+  first.loop.start();
+  first.clock.frames(30, 50);
+  const second = new GameLoop(buildGame({ ...SETTINGS, seed: 2 }), null, {
+    playing: true,
+    speed: 4,
+    onFlight: () => {},
+    env: fakeEnv().env,
+    carry: first.loop,
+  });
+  assert.equal(second.stats(), first.loop.stats());
+  assert.equal(second.fps(), first.loop.fps());
+  assert.ok(second.stats());
+  const none = new GameLoop(buildGame(SETTINGS), null, { playing: true, speed: 4, onFlight: () => {}, env: fakeEnv().env });
+  assert.equal(none.stats(), null, "no loop before: nothing to show");
+  assert.equal(none.fps(), 0);
+});
+
+test("a frame count that changes with no new stats is still told (the stats came 20 ms before)", () => {
+  const { clock, loop } = make();
+  let told = 0;
+  loop.subscribe(() => told++);
+  loop.start();
+  clock.frame(990); // the stats; the frame count's second is not over
+  assert.equal(told, 1);
+  clock.frame(20); // 1010 ms since start: the frame count, and no stats
+  assert.equal(told, 2, "told of the frame count alone");
+  assert.equal(loop.fps(), 2);
 });

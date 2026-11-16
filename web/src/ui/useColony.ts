@@ -162,9 +162,11 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   }, [game, controls.sampleTemp, controls.reroll, controls.steerLane]);
   // The frame loop (gameLoop.ts) goes on across pauses and speed changes: playing and speed are set on it, not a reason to rebuild it.
   const frameListeners = useRef(new Set<() => void>());
+  const lastLoop = useRef<GameLoop | null>(null);
   const loop = useMemo(
     () =>
       new GameLoop(game, journal, {
+        carry: lastLoop.current ?? undefined,
         playing: controls.playing,
         speed: controls.speed,
         // A new queen has flown (ja-lo8.9): the game waits for the page to found her.
@@ -177,6 +179,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   );
   useEffect(() => {
     loop.start();
+    lastLoop.current = loop;
     return () => loop.stop();
   }, [loop]);
   useEffect(() => loop.set(controls.playing, controls.speed), [loop, controls.playing, controls.speed]);

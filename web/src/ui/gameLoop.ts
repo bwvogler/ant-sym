@@ -34,6 +34,8 @@ export interface LoopOptions {
   /** called after every frame (the renderer, the sight map, the history), in order of subscription; the page shares one set across games */
   frame?: Set<() => void>;
   env?: FrameEnv;
+  /** the loop of the game before, when the page builds a new game: its stats and frame count stay on show until this one's first frame (as they did when they were React state) */
+  carry?: GameLoop;
 }
 
 export class GameLoop {
@@ -66,6 +68,10 @@ export class GameLoop {
     this.#frame = o.frame ?? new Set();
     this.#playing = o.playing;
     this.#speed = o.speed;
+    if (o.carry) {
+      this.#stats = o.carry.stats();
+      this.#fps = o.carry.fps();
+    }
   }
 
   /** The latest stats (null until the first is taken). */
@@ -78,12 +84,15 @@ export class GameLoop {
     return () => void this.#subs.delete(fn);
   };
 
-  /** Play or pause, and the speed: the loop goes on. The pace (sim seconds a wall second) starts over, as the speed asked has changed. */
+  /**
+   * Play or pause, and the speed: the loop goes on. The measures over a window (the pace, the choices a second, the frame count) start
+   * over and the stats follow on the next frame, as they did when each change restarted the loop.
+   */
   set(playing: boolean, speed: number): void {
     if (playing === this.#playing && speed === this.#speed) return;
     this.#playing = playing;
     this.#speed = speed;
-    this.#resetPace();
+    this.#restartWindows(this.#env.now());
   }
 
   start(): void {
@@ -91,12 +100,7 @@ export class GameLoop {
     this.#running = true;
     const t = this.#env.now();
     this.#last = t;
-    this.#lastStats = 0;
-    this.#frames = 0;
-    this.#fpsAt = t;
-    this.#rateAt = { t: this.game.time, decisions: decisionsOf(this.game) };
-    this.#rate = 0;
-    this.#resetPace(t);
+    this.#restartWindows(t);
     this.#raf = this.#env.request(this.#loop);
   }
 
@@ -106,7 +110,13 @@ export class GameLoop {
     this.#env.cancel(this.#raf);
   }
 
-  #resetPace(wall = this.#env.now()): void {
+  /** Every measure over a window starts now: the pace begins at the speed asked (0 paused), the rate at 0, the frame count at 0. */
+  #restartWindows(wall: number): void {
+    this.#lastStats = 0;
+    this.#frames = 0;
+    this.#fpsAt = wall;
+    this.#rateAt = { t: this.game.time, decisions: decisionsOf(this.game) };
+    this.#rate = 0;
     this.#paceAt = { wall, sim: this.game.time };
     this.#pace = this.#playing ? this.#speed : 0;
   }
