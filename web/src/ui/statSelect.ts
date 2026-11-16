@@ -31,6 +31,20 @@ export class StatSelection<T> {
   }
 }
 
+/**
+ * A gate that lets a stats tick through at most once every `everyMs` (of `now`'s clock): the first always, then not again until the time
+ * has passed. A component that draws afresh on a schedule (an ant's card, the nest tab) takes its pace from the loop's ticks through one.
+ */
+export function tickGate(everyMs: number, now: () => number): () => boolean {
+  let last = -Infinity;
+  return () => {
+    const t = now();
+    if (t - last < everyMs) return false;
+    last = t;
+    return true;
+  };
+}
+
 /** Whether two lists hold the same items in order (Object.is). */
 export const sameList = <T>(a: readonly T[], b: readonly T[]): boolean => a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
 

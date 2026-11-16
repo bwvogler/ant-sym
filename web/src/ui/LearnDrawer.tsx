@@ -9,6 +9,7 @@ import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
 import { seg } from "./styles.ts";
 import { forgetSeen, markViewed, setShowAll, useCodex } from "./useCodex.ts";
+import { useSimTick } from "./session.ts";
 
 // The Codex drawer: what the player is looking at, and why. Two tabs: the field guide (each thing on screen, what real
 // ants do, how the game models it, with the research notes it comes from) and the nest (its chambers, as only the player
@@ -246,11 +247,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 // ——— nest ———
 
 function NestTab(props: Props & { focus?: string }) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 500);
-    return () => clearInterval(t);
-  }, []);
+  useSimTick(500);
   const views = props.colonies.map((c) => nestView(c));
   return (
     <div className="flex flex-col gap-3">

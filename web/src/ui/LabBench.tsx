@@ -8,7 +8,7 @@ import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProp
 import { closeLab, type LabTab, type LabTarget, openLab, useLab } from "./labStore.ts";
 import { colonyName } from "./names.ts";
 import PolicyTab, { type PolicyProps } from "./PolicyTab.tsx";
-import { useGameRead } from "./session.ts";
+import { useGameRead, useSimTick } from "./session.ts";
 
 // Lab mode's workbench (PRD §69.7, ja-mvo9.4): the map shares the screen with it (the page gives the map the top and
 // this the bottom). Tabs for what the game does not need while it is played: the history charts, the world, Jev, the
@@ -188,11 +188,7 @@ export default function LabBench(
 
 /** The history: four charts sharing game time, and the same numbers as a table. Read once a second. */
 function HistoryTab({ history }: { history: History }) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
+  useSimTick(1000);
   const xs = history.samples;
   if (xs.length < 2) return <p className="text-xs text-fg-3">The charts start once the game has run a couple of seconds.</p>;
   const colonies = Math.max(...xs.map((s) => s.living.length));
