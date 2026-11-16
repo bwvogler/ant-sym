@@ -13,8 +13,7 @@ const NAMES = Object.keys(LANE_KINDS) as LaneName[];
 test("each lane's context prefix is the one its brain puts on its cache contexts, and no prefix hides another", () => {
   assert.equal(laneOfContext(policyContext(DOCTRINES[0]!.text)), "mode");
   assert.equal(laneOfContext(stanceContext(DOCTRINES[0]!.text)), "stance");
-  assert.equal(laneOfContext(fungusContext(AIMS[0]!.text, "side")), "fungus");
-  assert.equal(laneOfContext(fungusContext(AIMS[0]!.text, "top")), "fungus");
+  assert.equal(laneOfContext(fungusContext(AIMS[0]!.text)), "fungus");
   assert.equal(laneOfContext("something-else"), null);
   for (const a of NAMES)
     for (const b of NAMES) if (a !== b) assert.ok(!LANE_KINDS[a].contextPrefix.startsWith(LANE_KINDS[b].contextPrefix), `${a} vs ${b}`);

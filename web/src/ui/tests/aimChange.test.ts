@@ -145,7 +145,7 @@ test("what the new aim has cached is not asked; an aim with everything cached as
   j.setAim("first words");
   const aim = "shipped words";
   const lv = askedLevers(new Set(DEFAULT_MENU), false);
-  assert.equal(j.seed(fungusContext(aim, "top"), [[fungalKey(A, lv), encodeLevels({}, lv)]]), 1, "A's answer under the new aim");
+  assert.equal(j.seed(fungusContext(aim), [[fungalKey(A, lv), encodeLevels({}, lv)]]), 1, "A's answer under the new aim");
   j.seed(
     growthContext(aim),
     LANES.growth.all().map((s) => [LANES.growth.key(s, undefined), "grow"]),
@@ -159,7 +159,7 @@ test("what the new aim has cached is not asked; an aim with everything cached as
   // Everything cached, no run: nothing is wanted.
   const k = make();
   k.setAim("first words");
-  k.seed(fungusContext(aim, "top"), [
+  k.seed(fungusContext(aim), [
     [fungalKey(A, lv), encodeLevels({}, lv)],
     [fungalKey(B, lv), encodeLevels({}, lv)],
   ]);

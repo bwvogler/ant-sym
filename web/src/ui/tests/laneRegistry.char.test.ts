@@ -97,8 +97,8 @@ test("each lane's cache context, under two doctrines or aims, and the fungus's t
     ["stance-v4-657ca221", "stance-v4-a2c72d8e"],
   );
   assert.deepEqual(
-    AIM_TEXTS.flatMap((a) => (["top", "side"] as const).map((v) => fungusContext(a, v))),
-    ["fungus-v8-bb724482", "fungus-v8-side-bb724482", "fungus-v8-abe11431", "fungus-v8-side-abe11431"],
+    AIM_TEXTS.map((a) => fungusContext(a)),
+    ["fungus-v8-side-bb724482", "fungus-v8-side-abe11431"],
   );
 });
 
@@ -168,7 +168,7 @@ test("each local rule over every situation it can be asked in (a hash of all its
 test("a doctrine or aim is trimmed in its context, so stray spaces are not a new cache", () => {
   assert.equal(policyContext(`  ${DOCTRINE_TEXTS[1]}\n`), policyContext(DOCTRINE_TEXTS[1]!));
   assert.equal(stanceContext(`  ${DOCTRINE_TEXTS[1]}\n`), stanceContext(DOCTRINE_TEXTS[1]!));
-  assert.equal(fungusContext(`  ${AIM_TEXTS[1]}\n`, "top"), fungusContext(AIM_TEXTS[1]!, "top"));
+  assert.equal(fungusContext(`  ${AIM_TEXTS[1]}\n`), fungusContext(AIM_TEXTS[1]!));
 });
 
 test("each lane's local answer, and how each lane reads a reply, a bad one and none", () => {

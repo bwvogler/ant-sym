@@ -140,7 +140,7 @@ export interface LaneSpec<Sit, Ans extends string, Ctx, Variant extends string =
   readonly name: LaneName;
   /** the flags and sizes of the lane (LANE_KINDS) */
   readonly kind: LaneKind;
-  /** the forms its cache context takes besides the words: [""] for one, the fungus's "top" and "side" views */
+  /** the forms its cache context takes besides the words: [""] for one (every lane has one now) */
   readonly variants: readonly Variant[];
   /** a situation the Learn panel shows and costs a question by */
   readonly sample: Sit;
@@ -239,13 +239,10 @@ const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "a
 
 // The levers asked (the menu's, a queen's or a worker's, in table order) are in each key, so a question is packed and its answer read and kept
 // against the levers it asked, whatever the menu is by the time it lands: only `key` and `asks` read the menu.
-/** The two forms of the fungus's cache context (fungusContext): the top-down view, and the side view (a nest underground). */
-export type FungusView = "top" | "side";
-
-const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>, FungusView>, "asks"> = {
+const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>>, "asks"> = {
   name: "fungus",
   kind: LANE_KINDS.fungus,
-  variants: ["top", "side"],
+  variants: [""],
   sample: SAMPLE_FUNGAL,
   wordsField: "aim",
   presets: AIMS,
@@ -259,7 +256,7 @@ const fungusLane: Has<LaneSpec<FungalSituation, string, ReadonlySet<string>, Fun
     ),
   read: (answers, id, _situation, key) => readLevels(answers, id, askedIn(key)),
   valid: validLevels,
-  contextOf: (words, variant = "top") => fungusContext(words, variant),
+  contextOf: (words) => fungusContext(words),
   asks: (s, menu) => worthAsking(askedLevers(menu, s.task === "queen")),
 };
 

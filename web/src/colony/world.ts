@@ -17,10 +17,8 @@ import { CELL, cellKey, cellOf, centreX, centreY, discOffsets, E, extent, hexDis
 // map's columns start at 0 but one world's curtain, whose column is the line's
 // s itself, so it starts at the line's first column (often negative).
 //
-// Underground (the default): most ground is diggable soil, with small open
-// chambers and some undiggable rock. Each cell of the `rock` layer is OPEN,
-// ROCK or SOIL; both solids block ants and scent, and ants dig soil open
-// (colony.ts). `OPEN_WORLD` is the old surface map: no soil, more rock.
+// Each cell of the `rock` layer is OPEN, ROCK or SOIL; both solids block ants and scent, and ants dig soil open (colony.ts). The plane
+// (`PLANE_WORLD`) has no soil and more rock; the curtain's ground is oneWorld.ts's.
 
 /** A map's size: columns (w) × rows (h) of hexagons. Its size in world units is `worldExtent`. */
 export interface WorldSize {
@@ -146,20 +144,20 @@ export interface WorldOptions {
   soil: number;
 }
 
-/** Underground: ~12 % rock, ~70 % soil, small open chambers (~18 %); ants dig. Food lies in more, nearer pockets than on the surface, since every way to it is dug. */
-export const DEFAULT_WORLD: WorldOptions = {
+/** The plane (one world's open ground, before any digging): ~22 % rock, no soil. The curtain's ground is oneWorld.ts `CURTAIN_WORLD`. */
+export const PLANE_WORLD: WorldOptions = {
   size: { w: 512, h: 368 },
-  rockiness: 0.12,
-  patchesPerChunk: 2.5,
+  rockiness: 0.22,
+  patchesPerChunk: 1.5,
   foodPerCell: 12,
   nestCount: 2,
   nestGap: 140,
-  foodMinDist: 16,
-  soil: 0.8,
+  foodMinDist: 24,
+  soil: 0,
 };
 
-/** The open surface map (before digging): ~22 % rock, no soil. */
-export const OPEN_WORLD: Partial<WorldOptions> = { rockiness: 0.22, soil: 0, patchesPerChunk: 1.5, foodMinDist: 24 };
+/** How far below the ground line a founded nest's chamber is dug, in rows (foundNest's default). */
+export const FOUND_DEPTH = 14;
 
 /** A random stream whose position can be read and set (a save keeps it: save.ts). */
 export interface Rng {
@@ -695,7 +693,7 @@ function flatIndex(map: WorldMap, x: number, y: number): number {
 }
 
 export function generateWorld(seed: number, opts: Partial<WorldOptions> = {}): WorldMap {
-  const o = { ...DEFAULT_WORLD, ...opts };
+  const o = { ...PLANE_WORLD, ...opts };
   const { size } = o;
   const rng = mulberry32(seed);
   const { rock, food } = blankLayers(size);
@@ -846,7 +844,7 @@ export function nearNests(nests: readonly Nest[]): (x: number, y: number, d: num
  */
 export function buryPockets(
   map: WorldMap,
-  o: WorldOptions,
+  o: Pick<WorldOptions, "patchesPerChunk" | "foodPerCell" | "foodMinDist">,
   r: () => number,
   at: () => readonly [number, number] | null,
   floor: (x: number) => number,
@@ -869,158 +867,6 @@ export function buryPockets(
       break;
     }
   }
-}
-
-/** Side-view options: a cross-section, sky above a ground line `surface` rows down, `relief` rows of rise and fall. */
-export interface SideWorldOptions extends WorldOptions {
-  /** the ground line's mean row (rows of sky above it: room for the mound) */
-  surface: number;
-  /** how far the ground line rises and falls, in rows either way */
-  relief: number;
-  /** food piles on the ground (3–6 cells wide) per 64 columns, on average (patchesPerChunk is buried food, per chunk below ground) */
-  surfacePatches: number;
-  /** food units per cell of a pile on the ground (seeds lie thick; foodPerCell is for pockets below ground) */
-  surfaceFoodPerCell: number;
-  /** how far below the ground line a nest's chamber is dug, in rows */
-  chamberDepth: number;
-}
-
-/**
- * The side view: a cross-section 768 columns wide, ground 64 rows down, mostly soil with stones, two nests
- * 340 columns apart. Wider than the top-down maps: the colonies share one ground line, so each gets its own stretch of it.
- */
-export const SIDE_WORLD: SideWorldOptions = {
-  size: { w: 768, h: 368 },
-  rockiness: 0.1,
-  patchesPerChunk: 0.8,
-  foodPerCell: 12,
-  nestCount: 2,
-  nestGap: 340,
-  foodMinDist: 16,
-  soil: 0.93,
-  surface: 64,
-  relief: 5,
-  surfacePatches: 4,
-  surfaceFoodPerCell: 40,
-  chamberDepth: 14,
-};
-
-/**
- * The side view's ground at world (wx, wy), `depth` rows below the ground line: stones from a few rows down, more of them
- * deeper; cavities only well below the ground line; soil elsewhere. One world's curtain digs its ground by the same rule.
- */
-export function groundCell(seed: number, depth: number, wx: number, wy: number, cut: number, scut: number): Terrain {
-  const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
-  return stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL;
-}
-
-/** The ground line's row at column x: gentle rise and fall (value noise over ~40 columns, rough over ~9). */
-export function groundRow(seed: number, o: { surface: number; relief: number }, x: number): number {
-  const n = 0.75 * noiseAt(seed, 6, x, 0, 40) + 0.25 * noiseAt(seed, 7, x, 0, 9);
-  return Math.round(o.surface + (n - 0.5) * 2 * o.relief);
-}
-
-/**
- * A side-view world from a seed: sky above a ground line, soil below with stones (rock) and a few cavities
- * deeper down, each nest a chamber `chamberDepth` rows down joined to its entrance on the ground line by a
- * slanting shaft, food in piles on the ground and in pockets below it. The rest (tunnels, chambers) the ants dig.
- */
-export function generateSideWorld(seed: number, opts: Partial<SideWorldOptions> = {}): WorldMap {
-  const o = { ...SIDE_WORLD, ...opts };
-  const { size } = o;
-  const rng = mulberry32(seed ^ 0x51de);
-  const { rock, food } = blankLayers(size);
-  const sky = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const cut = rockCut(o.rockiness);
-  const scut = soilCut(o.soil);
-  const ext = extent(size.w, size.h);
-  const loose = new ChunkLayer((n) => new Uint8Array(n), 0);
-  const map: WorldMap = {
-    size,
-    x0: 0,
-    seed,
-    rock,
-    food,
-    nest: { x: ext.w / 2, y: ext.h / 2, r: 3 },
-    nests: [],
-    foodTotal: 0,
-    foodLeft: 0,
-    dug: 0,
-    filled: 0,
-    hasSoil: true,
-    digHeading: headingLayer(),
-    filledAt: timeLayer(),
-    dugAt: timeLayer(),
-    sky,
-    loose,
-    moundCells: 0,
-    chambers: new Chambers(),
-  };
-  const ground = new Int32Array(size.w);
-  for (let x = 0; x < size.w; x++) ground[x] = Math.max(2, Math.min(size.h - 8, groundRow(seed, o, x)));
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++) {
-      const g = ground[x];
-      if (y < g) {
-        sky.set(x, y, 1);
-        rock.set(x, y, AIR);
-        continue;
-      }
-      rock.set(x, y, groundCell(seed, y - g, centreX(x, y), centreY(y), cut, scut));
-    }
-  // The walkway: sky cells touching the ground.
-  for (let y = 0; y < size.h; y++) for (let x = 0; x < size.w; x++) if (sky.get(x, y) === 1 && grounded(map, x, y)) rock.set(x, y, OPEN);
-
-  // Nests: the player's entrance in the left middle, each rival `nestGap` columns on along the ground.
-  const nests: Nest[] = [];
-  let ex = Math.round(size.w * (0.3 + 0.15 * rng()));
-  for (let k = 0; k < o.nestCount; k++) {
-    if (k > 0) ex = Math.min(size.w - 24, ex + o.nestGap);
-    nests.push(digNest(map, ground[ex], ex, o.chamberDepth, rng, k));
-  }
-  map.nest = nests[0] as Nest;
-  map.nests = nests;
-  const nearNest = nearNests(nests);
-
-  // Food on the ground: piles 3–6 cells wide on the walkway, per 64 columns (seeds and bits, as harvester ants forage).
-  for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
-    const r = mulberry32(hash4(seed, 78, cx, 0));
-    const count = Math.floor(o.surfacePatches) + (r() < o.surfacePatches % 1 ? 1 : 0);
-    for (let p = 0; p < count; p++) {
-      for (let tries = 0; tries < 12; tries++) {
-        const x0 = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
-        const wide = 3 + Math.floor(r() * 4);
-        if (x0 + wide >= size.w - 1) continue;
-        const y0 = ground[x0] - 1;
-        if (nearNest(centreX(x0, y0), centreY(y0), o.foodMinDist + wide)) continue;
-        for (let x = x0; x < x0 + wide; x++) {
-          const y = walkwayRow(map, x, ground[x]);
-          if (y >= 0) food.set(x, y, o.surfaceFoodPerCell);
-        }
-        break;
-      }
-    }
-  }
-  // Food below ground: pockets in the soil, chunk by chunk, at least ten rows down.
-  for (let cy = 0; cy < Math.ceil(size.h / CHUNK); cy++)
-    for (let cx = 0; cx < Math.ceil(size.w / CHUNK); cx++) {
-      const r = mulberry32(hash4(seed, 77, cx, cy));
-      const at = () => {
-        const row = (cy << CHUNK_BITS) + Math.floor(r() * CHUNK);
-        const col = (cx << CHUNK_BITS) + Math.floor(r() * CHUNK);
-        return col >= size.w || row >= size.h - 3 || row < ground[col] + 10 ? null : ([col, row] as const);
-      };
-      buryPockets(map, o, r, at, (fx) => ground[fx] + 4, nearNest);
-    }
-  // Only food the player's ants can reach, walking or digging (the walkway and the soil are one ground).
-  keepReachableFood(map, [map.nest], "diggable");
-  return map;
-}
-
-/** The walkway cell of column x (the sky cell just above the ground line `g`), or −1 if it isn't walkable. */
-function walkwayRow(map: WorldMap, x: number, g: number): number {
-  for (let y = g - 1; y >= Math.max(0, g - 3); y--) if (map.sky?.get(x, y) === 1 && map.rock.get(x, y) === OPEN) return y;
-  return -1;
 }
 
 /**
@@ -1079,7 +925,7 @@ function digNest(map: WorldMap, g: number, ex: number, depth: number, rng: () =>
  * A new colony's nest dug mid-game (Game.addColony, ja-lo8.8): a hole in column `ex` (side view), a slanted shaft
  * `depth` rows down, and a founding chamber for colony `colony`, as the world's own nests are dug.
  */
-export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = SIDE_WORLD.chamberDepth): Nest {
+export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = FOUND_DEPTH): Nest {
   if (!inBounds(map, ex, 0)) throw new Error(`foundNest: column ${ex} is off the map (${map.x0}…${map.x0 + map.size.w - 1})`);
   return digNest(map, groundTop(map, ex), ex, depth, rng, colony);
 }

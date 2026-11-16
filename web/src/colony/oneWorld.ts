@@ -23,20 +23,23 @@ import { type Cell, type End, grow, makeTransect, type Transect } from "./transe
 import {
   AIR,
   buryPockets,
+  chamberAt,
   foundNest,
   generateWorld,
-  groundCell,
   hash4,
+  heightAt,
   keepReachableFood,
   mulberry32,
   nearNests,
-  OPEN_WORLD,
+  OPEN,
   reachableFrom,
+  ROCK,
   rockCut,
-  SIDE_WORLD,
+  SOIL,
   soilCut,
   worldFromArrays,
   type Nest,
+  type Terrain,
   type WorldMap,
   type WorldOptions,
 } from "./world.ts";
@@ -62,12 +65,12 @@ export interface OneWorld {
 }
 
 /**
- * A one-world map from a seed: the plane is `generateWorld(seed, OPEN_WORLD)` (with `plane` overriding options, e.g. a
+ * A one-world map from a seed: the plane is `generateWorld(seed, PLANE_WORLD)` (its defaults; `plane` overrides options, e.g. a
  * smaller size for tests); its nests' holes, in order, make the line (Ink at V₀, Amber at V₁); the curtain is dug under
  * it. One or two nests: the game starts with two, and more come by founding beyond an end (U4).
  */
 export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOptions> } = {}): OneWorld {
-  const plane = generateWorld(seed, { ...OPEN_WORLD, ...opts.plane });
+  const plane = generateWorld(seed, opts.plane);
   if (plane.nests.length > 2)
     throw new Error(`generateOneWorld: ${plane.nests.length} nests; the line starts with one or two, and grows by founding`);
   return oneWorldOn(seed, plane);
@@ -92,6 +95,18 @@ export function oneWorldOn(seed: number, plane: WorldMap): OneWorld {
 /** The salt of the curtain's ground noise: the plane's rock uses `seed` itself. */
 const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
 
+/** The curtain's ground: ~10 % rock, ~93 % of the rest diggable soil, buried food pockets (patchesPerChunk is per 64 columns here). */
+export const CURTAIN_WORLD = { rockiness: 0.1, soil: 0.93, patchesPerChunk: 0.8, foodPerCell: 12, foodMinDist: 16 } as const;
+
+/**
+ * The curtain's ground at world (wx, wy), `depth` rows below the ground line: stones from a few rows down, more of them
+ * deeper; cavities only well below the ground line; soil elsewhere.
+ */
+export function groundCell(seed: number, depth: number, wx: number, wy: number, cut: number, scut: number): Terrain {
+  const stone = depth > 3 && heightAt(seed, wx, wy) + 0.06 * Math.min(1, depth / 200) > cut;
+  return stone ? ROCK : depth > 8 && chamberAt(seed, wx, wy) >= scut ? OPEN : SOIL;
+}
+
 /**
  * The curtain under `line` (one-world §2): the side view's ground rules, laid along the line instead of along a straight
  * ground line, with each nest's shaft and royal chamber dug from its hole, and buried food in pockets. The ground strip
@@ -113,8 +128,8 @@ export function generateCurtain(seed: number, line: Transect, colonies: readonly
   const x0 = line.sMin;
   const h = CRUST + CURTAIN_DEPTH;
   const size = { w, h };
-  const cut = rockCut(SIDE_WORLD.rockiness);
-  const scut = soilCut(SIDE_WORLD.soil);
+  const cut = rockCut(CURTAIN_WORLD.rockiness);
+  const scut = soilCut(CURTAIN_WORLD.soil);
   const gs = groundSeed(seed);
   const rock = new Uint8Array(w * h);
   // The sky and the strip: AIR (the strip is drawn from the plane, not stored).
@@ -178,14 +193,14 @@ function buryAlong(
         const s = bs * 64 + Math.floor(r() * 64);
         return row >= h - 3 || row < CRUST + 10 ? null : ([s, row] as const);
       };
-      buryPockets(curtain, SIDE_WORLD, r, at, floor, nearNest);
+      buryPockets(curtain, CURTAIN_WORLD, r, at, floor, nearNest);
     }
 }
 
 /** The curtain's ground at column s, every row: sky (rows 0 … CRUST − 1, the strip included), then the side view's ground. */
 function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
-  const cut = rockCut(SIDE_WORLD.rockiness);
-  const scut = soilCut(SIDE_WORLD.soil);
+  const cut = rockCut(CURTAIN_WORLD.rockiness);
+  const scut = soilCut(CURTAIN_WORLD.soil);
   const gs = groundSeed(seed);
   const sky = curtain.sky!;
   for (let y = 0; y < CRUST; y++) {
@@ -250,7 +265,7 @@ export function growWorld(world: OneWorld, end: End, cell: Cell): number {
  * that joins it (Game.addColony's nearestValid), as a real queen walks after landing to find a site. One reachability
  * pass over the plane from every hole on the line, per founding (~14 ms on the default plane; founding is rare). Every hole
  * is in that region (the generated nests share one, the largest, on seeds 1–300; a founding joins it), so any hole would
- * do as the start; starting from all of them keeps it so if that ever failed. Plane rock never changes (OPEN_WORLD has
+ * do as the start; starting from all of them keeps it so if that ever failed. Plane rock never changes (PLANE_WORLD has
  * no soil to dig), so the region could be cached per world; it isn't, since a pass per founding costs nothing that matters.
  */
 export function mainGround(world: OneWorld): (x: number, y: number) => boolean {

@@ -270,7 +270,7 @@ export class ColonyJev {
     valid: LANES.fungus.valid,
     local: (s) => (this.#fungus ? this.#fungus.local(s) : localFungusRule()(s)),
     asks: (s) => LANES.fungus.asks(s, this.#menuNow()),
-    contextOf: (aim) => LANES.fungus.contextOf(aim, this.#fungus?.hasNest ? "side" : "top"),
+    contextOf: (aim) => LANES.fungus.contextOf(aim),
     words: "",
     batch: LANES.fungus.batch ?? undefined,
     gather: LANES.fungus.gather,
@@ -595,7 +595,6 @@ export class ColonyJev {
     fungus.bindPolicy("growth", this.growthPolicy);
     this.#menuSeq = -1;
     this.#followMenu();
-    this.#recontext(this.#fungal, this.#fungal.words); // the view is part of the fungus's context (fungusContext)
   }
 
   /**
