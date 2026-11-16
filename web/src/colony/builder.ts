@@ -30,7 +30,7 @@ export const BUILD = {
     BuildTool,
     number
   >,
-  /** food put on each cell a sugar or crumb stroke touches: the world's own piles' (DEFAULT_WORLD.foodPerCell) */
+  /** food put on each cell a sugar or crumb stroke touches: the world's own piles' (PLANE_WORLD.foodPerCell) */
   foodPerCell: 12,
   /** the most food a cell may hold from the builder, so a finger held on one spot doesn't heap a mountain */
   foodCap: 60,

@@ -49,7 +49,7 @@ test("the registry lists the four lanes, each with its flags, variants, words an
   for (const l of LANE_LIST) assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], ["top", "side"], [""]],
+    [[""], [""], [""], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
@@ -146,11 +146,8 @@ test("the fungus lane is the fungus brain: only its key and asks read the menu, 
         words,
       ),
     );
-    assert.equal(l.contextOf(words, "top"), fungusContext(words, "top"));
-    assert.equal(l.contextOf(words, "side"), fungusContext(words, "side"));
-    assert.equal(l.contextOf(words), fungusContext(words, "top"), "no variant is the top-down view");
+    assert.equal(l.contextOf(words), fungusContext(words));
   }
-  assert.notEqual(l.contextOf(A[0]!, "top"), l.contextOf(A[0]!, "side"));
   assert.equal((l as { local?: unknown }).local, undefined, "the fungus's local rule is a Game method");
   assert.equal((l as { all?: unknown }).all, undefined, "its situations are the ones a game meets");
 });

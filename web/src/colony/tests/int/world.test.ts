@@ -30,7 +30,7 @@ import { generateOneWorld } from "../../oneWorld.ts";
 
 const SMALL = { w: 160, h: 100 };
 
-/** One world's plane (the open-ground generator, `generateWorld(seed, OPEN_WORLD)`), at `size` or its own. */
+/** One world's plane (the open-ground generator, `generateWorld(seed)`), at `size` or its own. */
 const plane = (seed: number, size?: { w: number; h: number }): WorldMap => generateOneWorld(seed, size ? { plane: { size } } : {}).plane;
 
 test("ChunkLayer: unwritten cells read as empty; writes land in their chunk; negative coordinates work; the table grows", () => {

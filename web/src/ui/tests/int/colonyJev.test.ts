@@ -891,7 +891,7 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   j.attach(g.player);
   const asked = g.fungus.asked;
   const other = { ...GARDEN, groomed: true };
-  store.data.set(fungusContext("Stored aim.", "side"), [
+  store.data.set(fungusContext("Stored aim."), [
     [fungalKey(GARDEN, asked), encodeLevels({}, asked)],
     [fungalKey(other, asked), "9"],
   ]);
@@ -907,7 +907,7 @@ test("a new aim plays the fungus's local rule until Jev answers; the earlier aim
   const g = infectedGame();
   j.attach(g.player);
   const asked = g.fungus.asked;
-  store.data.set(fungusContext("Old aim.", "side"), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
+  store.data.set(fungusContext("Old aim."), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
   j.attachFungus(g.fungus);
   j.setAim("Old aim.");
   assert.equal(j.explainFungus(GARDEN).by, "jev");

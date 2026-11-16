@@ -14,7 +14,7 @@
 
 ## 1. Where we are
 
-One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/world.ts`), plus one curtain under one line, which grows only from its ends (`colony/transect.ts`, `canFound` rule 1). The storage was built to grow: 64 × 64 chunks with signed coordinates (`colony/chunks.ts`, PRD §12, "the hook for the endless map"). Some of generation is already pure, and some is whole-map.
+One world is a bounded plane, 512 × 368 cells (`PLANE_WORLD.size`, `colony/world.ts`), plus one curtain under one line, which grows only from its ends (`colony/transect.ts`, `canFound` rule 1). The storage was built to grow: 64 × 64 chunks with signed coordinates (`colony/chunks.ts`, PRD §12, "the hook for the endless map"). Some of generation is already pure, and some is whole-map.
 
 **Already a pure function of position:**
 - Plane rock: `heightAt`, `chamberAt` and `chunkRock(seed, cx, cy, …)` (`world.ts:269`), which builds one chunk alone. Today it is only called for every chunk at once.

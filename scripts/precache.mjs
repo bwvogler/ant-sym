@@ -151,7 +151,7 @@ const LANES = Object.fromEntries(
       key: (s) => l.key(s, MENU),
       pack: (items, words) => l.pack(items, words),
       read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, MENU)),
-      context: (words) => l.contextOf(words, l.variants.includes("side") ? "side" : undefined),
+      context: (words) => l.contextOf(words),
       id: l.kind.idPrefix,
       batch: l.batch ?? BATCH,
       field: l.wordsField,

@@ -36,7 +36,7 @@ const index = JSON.parse(readFileSync(`${DIR}index.json`, "utf8")) as PrecacheIn
 const CONTEXT: Record<string, (words: string) => string> = {
   mode: policyContext,
   stance: stanceContext,
-  fungus: (aim) => fungusContext(aim, "side"),
+  fungus: (aim) => fungusContext(aim),
   growth: growthContext,
 };
 const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES, growth: GROWTH_CHOICES };

@@ -126,7 +126,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
   const workerAsked = askedLevers(g.fungus.menu, false);
   assert.notDeepEqual(queenAsked, workerAsked);
   // Cached under her own key (her levers): a hit for a queen. Under a worker's levers: not her key, so not a hit.
-  store.data.set(fungusContext(AIM, "side"), [
+  store.data.set(fungusContext(AIM), [
     [fungalKey(QUEEN, queenAsked), encodeLevels(PRESETS[0]!.levels, queenAsked)],
     [fungalKey(WORKER, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)],
   ]);
@@ -136,7 +136,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
   assert.equal(j.explainFungus(QUEEN).by, "jev");
   assert.equal(j.explainFungus(WORKER).by, "jev");
   const wrong = memoryStore();
-  wrong.data.set(fungusContext(AIM, "side"), [[fungalKey(QUEEN, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)]]);
+  wrong.data.set(fungusContext(AIM), [[fungalKey(QUEEN, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)]]);
   const k = make({}, wrong);
   k.attachFungus(g.fungus);
   k.setAim(AIM);
