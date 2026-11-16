@@ -11,6 +11,7 @@ import {
   sameList,
   sameRecord,
   StatSelection,
+  tickGate,
   wholeStats,
 } from "../statSelect.ts";
 import { statsOf } from "../stats.ts";
@@ -162,4 +163,21 @@ test("sameList and sameRecord: by items, in order, and by keys and values (NaN i
   assert.ok(sameRecord(null, null));
   assert.ok(!sameRecord(null, {}));
   assert.ok(!sameRecord({}, null));
+});
+
+test("tickGate lets the first tick through, then one every `everyMs` of its clock and no more", () => {
+  let now = 1000;
+  const pass = tickGate(250, () => now);
+  assert.equal(pass(), true, "the first");
+  now += 150;
+  assert.equal(pass(), false, "150 ms on: too soon");
+  now += 99;
+  assert.equal(pass(), false, "249 ms since the last that passed");
+  now += 1;
+  assert.equal(pass(), true, "250 ms");
+  now += 100;
+  assert.equal(pass(), false, "counted from the one that passed, not from the ones refused");
+  now += 150;
+  assert.equal(pass(), true);
+  assert.equal(tickGate(0, () => 5)(), true, "no spacing: every tick");
 });

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { Colony } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
 import { Icon } from "./kit.tsx";
 import { colonyTone } from "./names.ts";
 import { sameAnt, type Specimen, specimenRow } from "./specimens.ts";
+import { useSimTick } from "./session.ts";
 
-// The specimens in the inspector (PRD §69.5): the pinned ants side by side, read four times a second, each a row to follow
+// The specimens in the inspector (PRD §69.5): the pinned ants side by side, read about three times a second, each a row to follow
 // it by. The notebook's look, as the Codex: specimen labels in a serif, the numbers in mono. Its header folds it to one line
 // (owner, review of #218, D2): on a phone it starts folded while nothing is followed, so it doesn't sit over the map.
 
@@ -33,11 +34,7 @@ export default function Specimens({
     if (!following && phone()) setFolded(true);
   }
   const head = useRef<HTMLButtonElement>(null);
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 250);
-    return () => clearInterval(t);
-  }, []);
+  useSimTick(250);
   return (
     <section className="mb-2 rounded-lg border border-line bg-paper px-3 py-2 text-sm" aria-label="specimens">
       <h2>

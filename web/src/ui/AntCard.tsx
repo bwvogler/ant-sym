@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   type Colony,
   MODES,
@@ -22,13 +21,14 @@ import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
 import { openLearn, type LearnTarget } from "./learn.ts";
 import type { DecidedBy } from "./colonyJev.ts";
+import { useSimTick } from "./session.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
 // that situation under the doctrine, the local rule while Jev has not
 // answered yet, or the local rule. If the fungus is in it, what the fungus
 // runs there and how it bends the ant's senses: the situation shown is the
-// one the ant perceives. Read from the colony's arrays four times a second;
+// one the ant perceives. Read from the colony's arrays about three times a second (useSimTick);
 // the field keeps the camera on the ant.
 
 interface Props {
@@ -54,11 +54,7 @@ const BY: Record<DecidedBy, string> = {
 };
 
 export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields, pinned = false, onPin }: Props) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 250);
-    return () => clearInterval(t);
-  }, []);
+  useSimTick(250);
   const col = followedColony(colonies, followed);
   const i = followed.i;
   if (!col) return null;
