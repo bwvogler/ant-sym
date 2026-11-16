@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { type Colony, CURTAIN, LIFESPAN, PLANE, type HoleCell } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
-import { believePlane, routeFail, routeTo } from "../../homing.ts";
+import { believePlane, piSpan, routeFail, routeTo } from "../../homing.ts";
 import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { SEARCH_START } from "../../tuning.ts";
+import { PI_DRIFT_2D, SEARCH_START } from "../../tuning.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { ROCK } from "../../world.ts";
 
@@ -61,6 +61,13 @@ function onPlane<T>(c: Colony, fn: () => T): T {
   } finally {
     c.bind(CURTAIN);
   }
+}
+
+/** Ant 0's vector ends `ex` cells east of its hole, from a trip 45 out at the farthest (the way out's farthest place): its drift by the span. */
+function endEast(c: Colony, ex: number): void {
+  c.reachSurf[0] = 45;
+  c.driftSurf[0] = ex / piSpan(c, 0);
+  c.driftSurfY[0] = 0;
 }
 
 /** A way out east from the hole and back west 20 cells south of it, to a pickup far west: 12 places. */
@@ -173,10 +180,14 @@ test("routeEnd 1: the retrace over, the search starts afresh round its first pla
   for (const end of [0, 1]) {
     const { c, hx, hy } = plane({ routeEnd: end });
     const pts = wayOut(hx, hy);
-    // Its vector's end lies 40 cells east of the hole; its search had reached 20 cells before the retrace.
-    carrier(c, hx + 20, hy + 30, pts, 100, 0.4, 0);
+    // Its vector's end lies 40 cells east of the hole; its search had reached 20 cells (σ ~10 by its span: its ninth point,
+    // σ × (1 + 0.5 × 8/4), searchScale's) before the retrace.
+    carrier(c, hx + 20, hy + 30, pts, 100);
+    endEast(c, 40);
     c.routeState[0] = 1;
-    c.search[0] = 20;
+    c.searchLeg[0] = 8;
+    c.search[0] = PI_DRIFT_2D * piSpan(c, 0) * (c.params.searchScale + (c.params.searchScaleStep * 8) / 4);
+    const s0 = c.search[0];
     const [b, nx, ny] = onPlane(c, () => {
       routeTo(c, 0, -1);
       const at = believePlane(c, 0, c.nest);
@@ -189,7 +200,7 @@ test("routeEnd 1: the retrace over, the search starts afresh round its first pla
       assert.equal(c.search[0], SEARCH_START, "routeEnd 1: its search starts afresh");
       assert.ok(Math.abs(fromFirst - SEARCH_START) < 1e-4, `routeEnd 1: its search's point is round place 0 (${fromFirst.toFixed(2)})`);
     } else {
-      assert.ok(c.search[0] > 20, "routeEnd 0: its search widens on");
+      assert.ok(c.search[0] > s0, `routeEnd 0: its search widens on (${s0.toFixed(1)} to ${c.search[0].toFixed(1)})`);
       assert.ok(Math.abs(fromEnd - c.search[0]) < 1e-6, `routeEnd 0: round its vector's end (${fromEnd.toFixed(2)})`);
     }
   }
@@ -197,7 +208,8 @@ test("routeEnd 1: the retrace over, the search starts afresh round its first pla
 
 test("routeEnd 1 changes nothing before a retrace is over", () => {
   const { c, hx, hy } = plane({ routeEnd: 1 });
-  carrier(c, hx + 60, hy + 40, wayOut(hx, hy), 100, 0.4, 0);
+  carrier(c, hx + 60, hy + 40, wayOut(hx, hy), 100);
+  endEast(c, 40);
   c.routeState[0] = 0;
   c.search[0] = 10;
   c.searchA[0] = 0;
@@ -205,7 +217,10 @@ test("routeEnd 1 changes nothing before a retrace is over", () => {
     const at = believePlane(c, 0, c.nest);
     return [at.x, at.y, c.nest.x, c.nest.y] as const;
   });
-  assert.ok(Math.abs(bx - (nx + 40 + 10)) < 1e-6 && Math.abs(by - ny) < 1e-6, "searching round its vector's end, as before");
+  // Its vector's end: 40 east, as its drift is stored (a Float32: 40 to within ~3e-6).
+  const ex = piSpan(c, 0) * c.driftSurf[0];
+  assert.ok(Math.abs(ex - 40) < 1e-4);
+  assert.ok(Math.abs(bx - (nx + ex + 10)) < 1e-6 && Math.abs(by - ny) < 1e-6, "searching round its vector's end, as before");
 });
 
 test("routeFight 1: an ant walking out in fight mode stores its places; 0, it does not; with food, never", () => {

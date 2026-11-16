@@ -45,6 +45,9 @@
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
 // the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
 //
+// `--lanes steer` (ja-ykmu.3): the steer lane asks only the explore and follow situations a one-world game meets
+// (steerSituationsMet), not all 1,944.
+//
 // --species <id> (ja-rf5.9): ask every situation of that species' own mode lane (its lane words and schema: the desert ant's 16) under each
 // preset doctrine, and ship them as mode-<species>-<doctrine>.json, marked with the species in index.json. Its lanes are small, so the live
 // check is this run itself (the desert ant: ~16 × 3 questions ≈ $0.001). Known: desert.
@@ -75,6 +78,8 @@ import {
   NEGLECTUS_ANT,
   isWeighted,
   weightsOf,
+  steerKey,
+  NEUTRAL_STEERING,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -129,6 +134,23 @@ function fungalSituations() {
 }
 
 /**
+ * The steer lane's situations a one-world game meets (ja-ykmu.3): explorers and followers on the local rule, 600 + 600 ants,
+ * 300 s, seeds 1-3, steerLane on. Its full space is half the mode lane's (1,944); a game meets far fewer.
+ */
+function steerSituationsMet() {
+  const met = new Map();
+  for (const seed of [1, 2, 3]) {
+    const g = new Game(generateOneWorld(seed), { antCount: 600, rivalAnts: 600 }, gameRng(seed), {
+      colony: { steerLane: 1 },
+      rival: { steerLane: 1 },
+    });
+    for (const c of g.colonies) c.bindPolicy("steer", (s) => (met.set(steerKey(s), { ...s }), NEUTRAL_STEERING));
+    for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
+  }
+  return [...met.values()];
+}
+
+/**
  * --fungus-also: the situation part of every key in the given fungus bundles (a key is `<situation>|<levers asked>`; the situation has bars of its own), so a re-ship after a
  * legend change also asks what an earlier ship held but this recording didn't meet (ja-rf5.18: main's bundles held 130 an aim, a fresh
  * recording 96).
@@ -147,7 +169,7 @@ const LANES = Object.fromEntries(
   LANE_LIST.map((l) => [
     l.name,
     {
-      situations: l.all ?? fungalSituations,
+      situations: l.name === "steer" ? steerSituationsMet : (l.all ?? fungalSituations),
       key: (s) => l.key(s, MENU),
       pack: (items, words) => l.pack(items, words),
       read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, MENU)),

@@ -87,6 +87,15 @@ export interface ColonyParams {
    */
   reroll: number;
   /**
+   * Whether an ant out exploring or following on one world's plane asks the steer policy for its steering weights (
+   * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
+   */
+  steerLane: number;
+  /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
+  findNear: number;
+  /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
+  searchSpan: number;
+  /**
    * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
    * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
    * is raised instead: foodCapTop.)
@@ -138,6 +147,18 @@ export interface ColonyParams {
    * loop's next point (1), or starts the next, wider loop (0: U3b's widening on a stall, as loops).
    */
   searchStall: number;
+  /**
+   * One world's plane (ja-lp4.20, docs/nest-search.md "Sizing the search to the vector's error", PRD §79.2): U3b's spiral
+   * (searchLoops 0) sized by the vector's own error, σ = PI_DRIFT/√2 × piSpan (with piErrorLaw 1, PI_SPAN_GAIN ×
+   * √(piErrorAt × distance out)): its first point this many σ out (at least SEARCH_START), each next quarter turn
+   * searchScaleStep/4 σ further (an even spiral, not 1.6× a turn). The search is wider after a longer trip, by the distance
+   * out (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), broader with more uncertainty (Vickerstaff & Merkle 2012); the
+   * multiples are design. Not round a stored place (routeEnd): that search is the spiral's. 0 = U3b's spiral, bit for bit;
+   * 1 the default (owner, 2026-11-16, with piErrorLaw 1).
+   */
+  searchScale: number;
+  /** One world's plane, with searchScale: σ a full turn of the spiral adds to its reach (design) */
+  searchScaleStep: number;
   /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a searching ant (its vector ran out at no hole) on its own mound
    * smells its colony's hydrocarbons there, strongest at the hole (Sturgis, Greene & Gordon 2011), and walks up them to
@@ -320,7 +341,8 @@ export interface ColonyParams {
    * too). 1 = with the square root of the distance out (the farthest the ant has been from its hole this trip, straight):
    * a median miss of PI_MISS_AT × √(piErrorAt × that distance) (Merkle, Knaden & Wehner 2006: 25 % at 5 m, 12 % at 20 m;
    * Heinze, Narendra & Cheung 2018: uncertainty grows like √distance; Merkle & Wehner 2010: by distance out, not how winding
-   * the path was). The same drift draws: the law scales them. Steering, the search's σ and every belief of home read it.
+   * the path was; the √ itself is design). The same drift draws: the law scales them. Steering, the search's σ and every
+   * belief of home read it. 1 the default (owner, 2026-11-16, with searchScale 1).
    */
   piErrorLaw: number;
   /** piErrorLaw 1: the distance out (cells) at which the median miss is PI_MISS_AT of it: 50 cells stand for 5 m (design: the map keeps ratios, docs/ant-communication.md) */
@@ -441,6 +463,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   followChoice: 1,
   sampleTemp: 1,
   reroll: 10,
+  steerLane: 0,
+  findNear: 8,
+  searchSpan: 1.33,
   foodTrailTop: 1,
   foodCapTop: 80,
   homeTrail: 0.8,
@@ -454,6 +479,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   searchTurn: GOLDEN_ANGLE,
   searchPetal: Math.PI / 3,
   searchStall: 1,
+  searchScale: 1,
+  searchScaleStep: 0.5,
   moundSmell: 1,
   siteFidelity: 0,
   siteGive: 0,
@@ -492,7 +519,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeJoin: 0,
   routeEnd: 1,
   routeFight: 0,
-  piErrorLaw: 0,
+  piErrorLaw: 1,
   piErrorAt: 50,
   raidGate: 1,
   raidLay: 1,

@@ -62,8 +62,10 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   const near = runAssay(neglectusTolerance, 1).metrics;
   const far = runAssay(neglectusTolerance, 6).metrics;
   assert.equal(far.distance, 0.5);
-  // Meetings on seed 1 are 14.9 ant-seconds today (17.8 if ants on different layers counted as meeting): a band catches a miscount.
-  assert.ok(near.meetings > 13 && near.meetings < 16.5, `meetings ${near.meetings}`);
+  // Meetings on seed 1 are 12.5 ant-seconds with piErrorLaw 1 (PRD §79; 14.9 by the odometer law, 17.8 then if ants on
+  // different layers counted as meeting): a band catches a miscount. The band moved with the law, its width the same share
+  // (13–16.5 round 14.9 then, 10.9–13.8 round 12.5 now).
+  assert.ok(near.meetings > 10.9 && near.meetings < 13.8, `meetings ${near.meetings}`);
   assert.equal(near.fought, 0, `alike: ${near.deaths} deaths`);
   assert.ok(far.deaths > 0 && far.fought === 1, `far apart: ${far.deaths} deaths`);
 });

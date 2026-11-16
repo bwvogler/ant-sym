@@ -6055,6 +6055,20 @@ The last stage of the page reorganisation: what makes it feel finished. The simu
 - **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices are cut to a pixel (`sr-only`, so a screen reader still announces them) and wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card shows its title and buttons, its text left for a screen reader, so a tall sheet is not reached. From sm up, nothing changes.
 - **Not in this stage:** one colony palette for the map and the charts (`ja-mvo9.9`), and the builder's Codex entries opening on first use of each tool (`ja-mvo9.7`).
 
+### 69.10 Fewer notices, and the devices (owner, 2026-11-16)
+
+Notices ("An ant found your sugar!", a specimen died, the field guide has new entries) came in a stream, and when a child plays they sit over the map. Two things change, and the page is now checked on the devices it is played on.
+
+- **Repeats count up.** A notice raised again while it still shows is not stacked: it takes the latest words, shows "×3", and its 7 s start over, on the field and in the bell. The key is the text, or a group where the words differ but the event is one (each kind of builder event of a tool or colony: "3 ants are following your line" then "5 ants…"; a specimen dying). `pushToast(text, tone, { group, important })` (`ui/toasts.ts`).
+- **How many float over the map**, the bell's own switch (the panel's top), kept per browser (`jevants.notices`), with a palette command for each:
+  - **All** (the default);
+  - **Important only**: warnings, and the game's end (`important: true`);
+  - **Bell only**: nothing floats. The bell's badge counts them and its list keeps them.
+
+  A notice not shown on the field is still in the page for a screen reader (cut to a pixel, not removed), as on a phone with a sheet open (§69.9).
+- **Device fixtures** (`scripts/lib/devices.mjs`, `npm run e2e:devices`): a Pixel 6 XL (Playwright's "Pixel 6 Pro": the same screen), Chrome on a desktop (1440 × 900) and Safari on an iPad (Playwright's "iPad Pro 11"; WebKit), a phone and the iPad both ways up. Each is opened as the device (viewport, pixel ratio, touch, user agent). Where WebKit is not installed (the cloud machine has Chromium only) the iPad runs on Chromium at its size, touch and user agent, and the report says so: layout and touch at that size, not Safari's own behaviour. `npx playwright install webkit` on a machine that may makes it real. On each it checks that the page does not scroll sideways, the map fills the screen, the rail is where its width says and wholly on the screen, a touch device's rail buttons are at least 40 px, every drawer and the Codex open inside the screen, Lab mode fits with its four charts and the map above, a repeated notice counts, and "Bell only" takes it off the field. It is by hand, like `npm run e2e`.
+- **Found by the fixtures:** on a landscape phone (840 × 360) the rail's seven buttons did not fit and Settings was off the bottom of the screen. The rail now keeps to its stage and scrolls inside it. A bottom bar there, as on a portrait phone, is better and is a bead.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):
@@ -6952,7 +6966,7 @@ Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found wi
 
 **Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.
 
-## 79. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
+## 79. The home vector's error grows like √(distance out), not with the path walked (built, on, ja-lp4.19, 2026-11-16)
 
 **Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
 - *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
@@ -7011,7 +7025,7 @@ Law 1 matches the sources' shape; law 0 is flat in the median with a long tail (
 - **R1:** pass 6/10 both, the same seeds.
 - **`--one all`:** see 78.1.
 
-**Decision: built, off.** By the worst seed law 1 is no worse on G1's guard (better: 8/10 within 2 on both seed sets), A13, A6 and R1, and it matches the sources. It is worse on two things: the weakest colony's food (−13 % on 1–10, −8 % on 11–20) and S1's short trips (92.5 % home at T = 100 and 82.5–87.5 % at 200, against 100 % and 90–95 %). So `piErrorLaw` stays 0 and the owner decides. If it goes on, S1's short-trip searches are the place to look (the search starts at `SEARCH_START` and widens by `SEARCH_GROW_2D` whatever the vector's own σ; `searchLoops` scales by σ but is off).
+**Decision (2026-11-15): built, off; on by default since 2026-11-16 (owner, §79.2's last paragraph).** By the worst seed law 1 is no worse on G1's guard (better: 8/10 within 2 on both seed sets), A13, A6 and R1, and it matches the sources. It is worse on two things: the weakest colony's food (−13 % on 1–10, −8 % on 11–20) and S1's short trips (92.5 % home at T = 100 and 82.5–87.5 % at 200, against 100 % and 90–95 %). So `piErrorLaw` stays 0 and the owner decides. If it goes on, S1's short-trip searches are the place to look (the search starts at `SEARCH_START` and widens by `SEARCH_GROW_2D` whatever the vector's own σ; `searchLoops` scales by σ but is off). §79.2 sized the spiral by σ: S1 recovers, the weakest colony does not.
 
 **Beads.** `ja-lp4.19` (this). The owner's choices: the default; `piErrorAt` (50, design; 500 if 1 cell is read literally as a body length, which puts the miss at 79 % at 50 cells out); whether fights should blur the vector more than walking (no source found).
 
@@ -7036,6 +7050,88 @@ Both colonies at the law, offline, run one assay and seed a process (`runAssay` 
 The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` (10/10); `regulateStop` 9/10; `r1` 6/10; `pass` 3/10; `s1`, `regulate`, `faintAlarm`, `f1`, `d1` 0/10. No `pass` metric (reported only): `open`, `rain`, `lateSugar`, `tweezers`, `crayonRing`, `fillShaft`, `noEntryForkBare`, `nestFlow`, `d3`, `d4`. `d2c` and `f1` are bit-identical (no ant homes on the plane by its vector there; F1's planted find reads the law, but 30 s is too short to differ).
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
+
+### 79.2 The nest search sized to the vector's error (built, on, ja-lp4.20, 2026-11-16)
+
+**Research basis:** [nest-search.md, "Sizing the search to the vector's error"](nest-search.md#sizing-the-search-to-the-vectors-error-ja-lp420). The search is wider after a longer trip, by the distance out and not the path's tortuosity (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), and broader the more uncertain the vector (Vickerstaff & Merkle 2012's Bayesian model). All three abstracts or summaries only (**unverified**); none gives a width multiple.
+
+**The problem (§79).** Law 1 makes short trips' misses 2–4 times larger (35 % at 25 cells out, 18 % at 100), but the search round the vector's end was U3b's spiral from `SEARCH_START` (3 cells), 1.6× wider a turn, whatever the trip. A geometric spiral's turns are 0.6 × its reach apart: past ~20 cells out they are wider than the 12 cells an ant sweeps.
+
+**The rule** (`searchScale`, `searchScaleStep`; off = 0, U3b's spiral bit for bit). On the plane, round where the vector ran out, point n of the quarter-turn spiral reaches max(`SEARCH_START`, σ × (`searchScale` + `searchScaleStep` × n/4)), σ = `PI_DRIFT_2D` × piSpan, the vector's own error per axis (law 1: by √ the distance out; law 0: by the odometer).
+- **Sourced in shape:** the search scales with σ, which grows with the distance out.
+- **Design:** an even spiral (each turn `searchScaleStep` σ further, so the turns keep within sight where the misses are); `searchScale` 1 and `searchScaleStep` 0.5 (chosen on S1, below); `SEARCH_START` as the floor; a search round the first stored place (`routeEnd`) keeps U3b's spiral, since that place was seen, not integrated.
+- **Unchanged:** the stall rule, the cap at the plane's longer side, the side view, `siteAim`. **Cost:** none in Jev; one `sqrt` a search point.
+- **Off is bit-exact:** `npm run test:golden`, and G1 seed 3's per-tick hash over 120 s against `e2b47fd6` (3,600 ticks identical).
+
+**Choosing the multiples** (S1, law 1, seeds 1–4, home in 600 s, worst seed at T = 100 / 200 / 400 / 600; today's search: 92.5 / 92.5 / 67.5 / 70 %):
+
+| `searchScale` \ `searchScaleStep` | 0.25 | 0.5 | 1 |
+|---|---|---|---|
+| 0.25 | 95 / 92.5 / 82.5 / 85 | 95 / 92.5 / 90 / 92.5 | 97.5 / 97.5 / 85 / 82.5 |
+| 0.5 | 97.5 / 92.5 / 85 / 87.5 | 97.5 / 92.5 / 85 / 82.5 | 97.5 / 95 / 77.5 / 72.5 |
+| 1 | 97.5 / 92.5 / 85 / 87.5 | **100 / 95 / 90 / 92.5** | 95 / 97.5 / 80 / 65 |
+
+**S1** (seeds 1–10, then 11–20; home within 600 s, median [worst seed]):
+
+| T (cells out) | law 0 | law 1 | law 1 + scaled | law 0 + scaled | law 1 + scaled 0.25 |
+|---|---|---|---|---|---|
+| 100, seeds 1–10 | 100 [100] | 100 [95] | 100 [100] | 100 [100] | 100 [95] |
+| 100, seeds 11–20 | 100 [100] | 97.5 [90] | 100 [100] | 100 [100] | 100 [87.5] |
+| 200, 1–10 | 100 [95] | 100 [90] | 100 [95] | 100 [100] | 100 [92.5] |
+| 200, 11–20 | 100 [90] | 97.5 [90] | 100 [95] | 100 [95] | 100 [87.5] |
+| 400, 1–10 | 96.3 [72.5] | 91.3 [70] | 97.5 [90] | 98.8 [85] | 98.8 [90] |
+| 400, 11–20 | 95 [85] | 91.3 [85] | 96.3 [87.5] | 97.5 [82.5] | 96.3 [87.5] |
+| 600, 1–10 | 87.5 [77.5] | 90 [75] | 92.5 [85] | 92.5 [85] | 92.5 [90] |
+| 600, 11–20 | 87.5 [70] | 85 [72.5] | 92.5 [72.5] | 90 [70] | 95 [72.5] |
+| median time home at 200, s (1–10 / 11–20) | 3.7 / 4.4 | 28 / 33 | 15 / 14.5 | 5.5 / 4.7 | 16 / 19 |
+| median time home at 600, s | 112 / 112 | 110 / 106 | 45 / 51 | 62 / 48 | 52 / 57 |
+
+The scaled search gives law 1 back S1's worst seed at every trip length, and better than law 0 at 400 and 600 cells out: the even spiral reaches far misses without leaving gaps.
+
+**G1** (both colonies at the arm; `scripts/lab/pi-error.mjs`'s probe with the search set; 600 s):
+
+| seeds 1–10 / 11–20 | law 0 | law 1 | law 1 + scaled | law 0 + scaled | law 1 + scaled 0.25 |
+|---|---|---|---|---|---|
+| most held over 120 s, worst seed | 6 / 4 | 3 / 4 | 5 / 4 | 4 / 6 | 4 / 11 |
+| guard: seeds within 2 | 6/10 / 4/10 | 8/10 / 8/10 | 8/10 / 9/10 | 7/10 / 3/10 | 8/10 / 7/10 |
+| food carried down, median seed | 4,640 / 5,048 | 4,824 / 4,922 | 5,036 / 4,938 | 4,802 / 5,163 | 4,653 / 4,896 |
+| food, worst seed (both) | 3,934 (s7) / 4,180 (s19) | 3,634 (s2) / 4,234 (s18) | 3,571 (s7) / 4,118 (s19) | 3,369 (s10) / 4,413 (s19) | 3,440 (s7) / 4,226 (s15) |
+| food, the weakest colony | 1,754 (s2) / 1,333 (s19) | 1,532 (s7) / 1,220 (s19) | 1,445 (s7) / 1,015 (s19) | 1,498 (s9) / 1,419 (s19) | 1,384 (s7) / 1,261 (s19) |
+| weakest colony, median seed | 2,034 / 2,176 | 2,098 / 2,210 | 2,116 / 2,090 | 2,015 / 2,141 | 2,022 / 2,171 |
+| births, median seed | 740 / 764 | 736 / 716 | 713 / 734 | 737 / 774 | 720 / 728 |
+| births, worst seed | 602 / 611 | 602 / 607 | 601 / 615 | 601 / 620 | 599 / 610 |
+| ants lost, all seeds | 1,653 / 1,933 | 1,558 / 1,449 | 1,497 / 1,473 | 1,796 / 1,755 | 1,450 / 1,344 |
+| ants lost, worst seed | 399 / 349 | 361 / 243 | 332 / 243 | 444 / 332 | 375 / 236 |
+| defenders killed | 41 / 65 | 16 / 4 | 17 / 7 | 41 / 36 | 16 / 11 |
+| their distance from home, median (p90) | 55 (88) / 59 (89) | 25 (37) / 20 (30) | 24 (44) / 23 (47) | 51 (84) / 62 (98) | 22 (41) / 16 (25) |
+
+**Other assays** (one world, seeds 1–10, both colonies):
+
+| assay | law 0 | law 1 | law 1 + scaled | law 0 + scaled |
+|---|---|---|---|---|
+| R1 `r1` | 6/10 | 6/10 | 6/10 | 6/10 (the same failing seeds 1, 2, 6, 9) |
+| A13 `defendHome` | 3/10; stored worst 151, `vsNone` worst 0.57 | 4/10; 159, 0.73 | **2/10**; 171, 0.51 | 4/10; 146, 0.80 |
+| A6 `pass` | 3/10; exchange median 0.86 | 3/10; 0.90 | 4/10; 0.90 | 2/10; 0.92 |
+| A2b `richPoor` | 9/10 | 8/10 | **6/10** (fail 4, 5, 7, 9); rich share median 0.88 | — |
+| A9 `contact` | 5/10; lost per 100 food worst 8.04 | 2/10; 7.23 | 3/10; 8.25 | — |
+| D2 `d2` | 8/10 | 6/10 | 6/10 (law 1's failing seeds) | — |
+| D5 `d5` | 6/10; stored worst 638 | 9/10; 440 | 9/10; 463 | — |
+| A12 `raidStop` | 8/10; stored worst 906 | 10/10; 1,693 | 9/10; 2,340 | — |
+| B2 `wall` | 3/10; stored worst 722 | 1/10; 543 | 2/10; 531 | — |
+| `noEntryFork` | 9/10 | 10/10 | 10/10 | — |
+| `lifecycle`: stored median [worst]; most held, worst seed | 4,910 [2,904]; 12 | 5,560 [3,100]; 4 | 5,960 [3,248]; 7 | — |
+| `lifecycle-signal` (seeds 1–5) | 4,369 [3,752]; 12 | 5,420 [3,622]; 4 | 5,532 [4,150]; 7 | — |
+| `lifecycle-scent` (seeds 1–5) | 4,369 [3,769]; 12 | 4,904 [3,717]; 6 | 5,177 [3,751]; 7 | — |
+
+The rest of `--one all` passes on the same seeds in all three arms (`alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` 10/10; `regulateStop` 9/10; `regulate`, `faintAlarm`, `f1`, `d1`, `n1` 0/10); `d2c`, `f1` and `faintAlarm` are bit-identical between law 1 and law 1 + scaled. Law 0 and law 1 here are `ja-lp4.19`'s runs (§79.1; three re-run at `e2b47fd6` came out bit-identical); `n1` and `n3`, and R1, A13 and A6, ran every arm here. All runs are at `e2b47fd6` + this change; G1 seed 3's per-tick hash over 120 s is the same at `e2b47fd6` and at `main` (`dd033acf`).
+
+**Decision (2026-11-15): built, off; superseded by the owner on 2026-11-16 (below).** The owner's rule: turn on law 1 with the scaled search only if the weakest colony's food and S1's worst seed hold against law 0. S1 holds, and better: the worst seed at 400 and 600 cells out rises from 72.5 / 77.5 % to 90 / 85 % (seeds 1–10), and the median time home at 600 out falls from 112 s to 45–51 s. The weakest colony does not hold: 1,445 against 1,754 (−18 %) on seeds 1–10 and 1,015 against 1,333 (−24 %) on 11–20, below even law 1 with U3b's spiral (1,532 and 1,220). The smaller start (`searchScale` 0.25: 1,384 and 1,261) does no better, and the scaled search under law 0 lowers it on 1–10 (1,498) while raising it on 11–20 (1,419). A2b falls from 9 to 6 of 10 and A13 from 3 to 2. So `searchScale` stayed 0 and `piErrorLaw` 0 that day, and no golden moved. What law 1 + scaled does hold: G1's guard (8 and 9 of 10 seeds within 2, against 6 and 4), defenders dying near home (a median 23–24 cells out, against 55–59), fewer ants lost (1,497 and 1,473 against 1,653 and 1,933), and S1.
+
+**Reading.** The weakest colony's loss comes with law 1 itself: every law-1 arm is below law 0 on the same two seeds (7 and 19), whatever the search. Sizing the search brings lost carriers home faster in S1, but that is not where G1's weakest colony loses its food. Why law 1 costs it there is not yet measured.
+
+**Beads.** `ja-lp4.20` (this). Open for the owner: (1) whether the weakest colony's food on G1's quiet seeds is the bar for law 1, against the guard, the defenders and the losses it gains (Merkle 2006 and Pfeffer 2020 support the law's size; no source speaks to colony food); (2) if the search is to be sized, loops back through the origin (`searchLoops`: the sources' shape, Wehner & Srinivasan 1981; Müller & Wehner 1994) or this even spiral (design: it wins S1, but an ant that surely sees its hole within sight gains nothing from wider turns, and the sources' wider searches fit uncertain detection, Vickerstaff & Merkle 2012); (3) `piErrorAt` (50, design), which sets σ at short trips and so what law 1 costs short foragers; (4) why law 1 costs the weakest colony food on seeds 7 and 19 (a probe of where its carriers lose time).
+
+**Turned on (owner, 2026-11-16): `piErrorLaw` 1 and `searchScale` 1 together, the defaults.** The owner chose the literature-sized error (Merkle 2006, Pfeffer 2020) with the search sized to it, over the ship rule above: G1's guard 8 / 9 of 10 within 2 (law 0: 6 / 4), defenders die near home (median 24 / 23 cells against 55 / 59), fewer ants lost, S1 better on long trips; accepted costs: the weakest colony's food 18–24 % lower (seeds 7 and 19, cause not traced) and A2b 9 → 6 of 10. Every golden master is re-recorded; tests of the old law or search pin `piErrorLaw` 0 / `searchScale` 0. The tables above are the measurements this rests on.
 
 ## 80. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
 
@@ -7076,3 +7172,163 @@ The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete
 - **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
 - **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
 
+## 81. Measuring lockstep (ja-0kys, 2026-11-14)
+
+**What.** `lockstepProbe` (experiment.ts), sampled each second over the ants in the mode their policy chose (carriers left out): `lockAgree`, the share of ants in their situation's commonest mode (1 = every ant in a situation does the same); `lockSwing`, how far the colony's mode mix moves second to second (total variation); `lockBurst`, the Fano factor of mode switches a second (about 1 when ants switch independently); `switchesPerS`. The one-world assay `lockstep` reports them; `--policy precache:<doctrine>` plays the shipped mode answers for both colonies, and `--set both.<param>` sets a parameter on both.
+
+**Measured** (`npm run exp -- lockstep --one --seeds 1-5 --policy precache:<d> --set both.sampleTemp=0,0.5,1`; one world, 300 + 300 ants, 300 s; the first colony, median of seeds 1–5):
+
+| | Food | Lost | lockAgree | lockSwing | lockBurst | Switches/s |
+|---|---|---|---|---|---|---|
+| Local rule | 1,162 | 11 | 1.00 | 0.02 | 5.43 | 32 |
+| Forage, Jev's choice (T 0) | 1,156 | 11 | 1.00 | 0.02 | 1.61 | 35 |
+| Forage, T 0.5 | 826 | 9 | 0.98 | 0.03 | 1.84 | 43 |
+| Forage, T 1 | 702 | 9 | 0.90 | 0.02 | 2.50 | 48 |
+| Warlike, T 0 | 963 | 29 | 1.00 | 0.02 | 2.03 | 31 |
+| Warlike, T 0.5 | 1,027 | 11 | 0.95 | 0.03 | 2.81 | 39 |
+| Warlike, T 1 | 622 | 4 | 0.89 | 0.03 | 2.03 | 55 |
+
+- **Drawing does what it says, within a situation:** agreement falls from 1.00 to 0.89–0.90 at T 1.
+- **The colony as a whole does not swing.** Its mode mix moves 2–3 % a second whatever the policy, and switching is moderately bunched (Fano 1.6–5.4, wide across seeds) under every policy, the local rule included: bursts come from events (alarm, finds, trails meeting), not from shared answers. What reads as "flipping between a few big states" is more likely the four coarse modes themselves than ants switching together.
+- **Only 21–32 % of mode decisions met a shipped answer** offline (`Jev's answers (cache hits)`); the rest played the local rule, which never draws. The bundles hold the 151 situations one top-down live check met; one world meets more. On the page those misses are asked live, so play there is more Jev's than these runs. A one-world live check (`colony-live`) would ship more situations and make these runs closer to play: an owner's call on spend.
+
+## 82. Steering weights, set by the policy where the biology allows (built, off by default, ja-ykmu, 2026-11-14)
+
+*Tried first on the long-lived `staging` branch (§81's lockstep measure, then this); brought to `main` on the owner's word (2026-11-15), **off by default**: `steerLane` 0 plays main bit for bit (goldens exact), and the Lab's "Steering weights" switch turns it on. The rounds below are the staging history, numbered as it ran them.*
+
+**Research basis:** [steering.md](steering.md):
+- A forager's cue weights shift as smooth functions of its state (the vector's weight grows with its length: Wystrach, Mangan & Webb 2015, *Cataglyphis velox*) or switch with the trip's phase (food odour out, vector in); they are not free choices.
+- How faithfully a *Lasius niger* forager follows a trail is near fixed (~75–85 %, Czaczkes et al., **unverified** in part); its own memory overrides the trail after one visit (Grüter et al. 2011, 82–100 %, **unverified**).
+- Search turns tight after a find and wide when lost (*Formica schaufussi*, Fourcassié & Traniello, **unverified**); no forager is shown steering by nearby nestmates.
+
+**The problem (measured).** The policy picks one of four modes; each is a fixed routine with constant weights. PRD §81: ants don't move in lockstep, so what reads as a few big states is likely the coarse action set.
+
+**Decisions.**
+- Shape "both, split" (owner, 2026-11-14): policy-set weights where the biology says a situation sets them (`search`, `memory`; `alarm` already is), design weights (`trail`, `home`, `vector`, `nestmates`) Lab-only on staging.
+- Scope: one world's plane, empty-jawed ants in `explore` or `follow`; homing, tunnels, walls and holes keep their routines (proposed).
+- One lane for the weights, asked only for explore and follow situations; three levels per weight; the expected level, not a draw (proposed: steering.md D2–D4).
+
+**The mechanic.** A `steer` response gives a level per weight per situation; `steer.ts` scales its explore and follow terms by them; neutral levels skip their terms, so `steerLane` 0 is main bit for bit. No new global read (nestmates are read from the colony's occupancy grid at the ant's sensors). Table in steering.md "The mechanic".
+
+**Play.** Ants out on the plane loop tight round finds, range wide, or go back to their own last find off the trail; the follow card shows the weights. A colony's weights are its doctrine's nature; a fungus lever on them is possible later, not in this epic.
+
+**Assays and targets.** First, with no behaviour change: search tightness after a find (ratio > 1) and memory over trail (share to the remembered side); then `lockstep` and G1 (food, losses, held carriers) against main, seeds 1–10, confirmed on 11–20.
+
+**Baselines (ja-ykmu.1; `npm run exp -- t1 m1 --one --seeds 1-10`; median and range).**
+
+| Assay | Setting | Result |
+|---|---|---|
+| T1 search tightness, near ÷ far turning (pass ≥ 1.5, design) | main's steering | 1.00 (0.98–1.04): explorers turn alike near a find and away; 0/10 pass |
+| M1 memory over trail (pass: memory ≥ 0.8) | `siteFidelity` 0 (main) | memory 0.12 (0–0.25), trail 0.37 (0.20–0.61); 0/10 |
+| M1 | `siteFidelity` 1 | memory 0.74 (0.50–0.90), trail 0.07 (0–0.33); 4/10 |
+
+M1 counts only foragers whose spot is at least 60° from the trail: a median 25.5 of 40 (4–40). T1's near sample is small beside its far one (a median 697 units walked near a find, 111,381 away).
+
+**The plumbing (ja-ykmu.2, built).** `vocab.ts` holds the six weights and their packed code (`STEER_NEUTRAL` = every weight 0); the colony's `steerPolicy` (local rule `localSteer`: neutral) is asked in `decide.ts` when `steerLane` is on and the mode is explore or follow, for the situation with that mode; `steer.ts` applies the levels (`SEARCH_MUL` 0.5 / 1 / 2, `TRAIL_MUL` 0 / 1 / 2, `HOME_W` 0.5, `VECTOR_W` 0.3, `NEST_W` 0.5, all design; memory +1 lets `siteAim` lead over the trail). With `steerLane` on, a find is remembered whatever `siteFidelity` says. The follow card names an ant's non-neutral weights. Tests (`tests/int/steering.test.ts`): neutral weights give the same game bit for bit, the steer policy is asked only for explorers and followers, and each weight at −1 and +1 changes steering (mutations of each caught). Goldens bit-exact; `npm test` 1,000/1,000.
+
+**The lane (ja-ykmu.3, built; answers not yet shipped).** `steerBrain.ts`: the mode lane's legend plus a paragraph on the weights, one `score` question per weight asked (low, usual, high; the expected level, rounded), asked only for explore and follow situations, the weights asked in the key (`…|search,memory`), cached as levels (`1,-1`). Registry row `steer` (ids `w0…`, context `steer-v1-…`, reconsiders), a client lane per colony (the generic ant only), `steerAsked` / `steerCached` in the client's state. The Lab's "Steering weights (staging)" switch, on by default on staging, sets `steerLane` for every colony. `precache.mjs --lanes steer` asks the situations a one-world game meets (seeds 1–3, 600 + 600 ants, 300 s): about 74 per doctrine.
+
+**Asked so far (owner-approved spend).**
+- First ask, $0.0015: `precache.mjs` handed every lane the fungus's lever menu as its context, and its `trail` and `home` levers made the steer lane ask about those two weights; none of its keys matched a game's. Fixed (the steer key reads no caller context; a precache test holds the weights asked); the answers removed.
+- `find` added (owner, 2026-11-14): the question says whether the ant is near its last find (by its own memory, within `findNear`, 8 cells), since that is where search turns tight (§7); an ant gets its far weights and, remembering a find, its near ones at each mode decision, and steers by whichever its memory says it is at. Brain version 2.
+- Second ask, $0.0031 (145 situations per doctrine, ~170 tokens a question): **every answer "usual"**, both weights, near and far, all three doctrines. A score is read as its expected level rounded, so a lean short of a whole level is lost, and the bundles keep only the rounded level; the doctrines say nothing about searching or memory. Open: read the score's probabilities (or a nearer threshold) and say in the legend what an ant at a find usually does, then ask again.
+
+- Diagnostic, $0.0001 (10 situations, Forage): Jev leans as the biology does but stays mostly on "usual" (P 0.5–0.8): near a find search 0.70–0.88 (P(tight) 0.20–0.37), memory 1.06–1.25; far, search 1.06–1.20, memory 0.74–0.96. Rounding lost all of it.
+- So answers keep P(low / usual / high) per weight and each ant draws its level (brain v3), as modes do since #169. Third ask, $0.0031 (145 a doctrine, ~170 tokens a question). Mean over the shipped situations, all three doctrines alike: near a find, P(tight) 0.11–0.12, P(wide) 0.11–0.12, memory P(lead) 0.10–0.14, P(ignore) 0.10; far, P(tight) 0.09–0.11, memory P(lead) 0.03, P(ignore) 0.20–0.22. In full requests (~100 situations) search barely tells near from far, unlike the 10-situation diagnostic.
+
+**Measured with the shipped answers** (`npm run exp -- lockstep t1 --one --seeds 1-5` and `m1 --seeds 1-10`, `--policy precache:<d> --set both.steerLane=0,1`; steer answers found for 95–99 % of asks; the first colony, median):
+
+| | Food | Lost | Held > 120 s | lockAgree | T1 ratio | M1 memory |
+|---|---|---|---|---|---|---|
+| Forage, off | 702 | 9 | 0 | 0.90 | 1.00 | 0.06 |
+| Forage, on | 681 | 7 | 0 | 0.90 | 1.01 | 0.04 |
+| Warlike, off | 622 | 4 | 0 | 0.89 | 0.99 | 0.02 |
+| Warlike, on | 679 | 4 | 0 | 0.90 | 0.98 | 0.07 |
+
+- The mechanism works (the weights are asked, cached, drawn and steered by), but the preset doctrines' answers are mostly "usual", so play barely moves and neither target is met (T1 ≥ 1.5, M1 ≥ 0.8).
+- M1's foragers start far from their spot, where Jev reads "memory" as a pull to a spot it is not at and mostly ignores it (P(lead) 0.03 far): the question's wording, not only Jev, is at fault there; the biology's "memory beats the trail" is a choice made setting out, far from the spot.
+- The doctrines say nothing about searching or remembering. What a doctrine that does would get from Jev is not measured yet.
+
+**Round 4 (owner, 2026-11-14: "1 then 2").**
+- Doctrine probe, $0.0001 (the same 10 situations; a doctrine saying "Range wide and straight when exploring away from food, but search tightly around any spot where you found food. Always go back to where you last found food, even if a food trail leads elsewhere."): far, P(wide) 0.48; near, P(tight) 0.60; memory P(lead) 0.61 far, 0.77 near. **When the words ask for it, the lane gives the policy control.**
+- Better questions (brain v4): memory as "set out for that spot and keep to it, even over a food scent that leads elsewhere"; the levels low, medium, high (not "usual"); a legend line on what real foragers do. Re-asked, $0.0031. Answers spread out (P(tight) 0.25–0.29, P(wide) 0.31–0.34) but search still barely tells near from far, and far from a find memory is mostly ignored (P(ignore) 0.56–0.59, P(lead) 0.09).
+- Measured (Forage, `steerLane` 1): food 875 (427–1,173) against 702 off, lost 7, held ≤ 1; lockAgree 0.89; T1 1.02; M1 memory 0.03 (seeds 1–10).
+- Likely cause for memory: `far` lumps "remembers a find elsewhere" with "has found none", and Jev answers for the second. Proposed: three values, `none`, `far`, `near` (×1.5 situations).
+
+**Round 5 (owner: "split").** `find` takes three values: `none` (no find remembered), `far` (one remembered, elsewhere), `near` (brain v5). M1's helper planted the foragers' memory only with `siteFidelity` on, so every earlier steering M1 run had ants with no memory at all (my assay's fault, not Jev's); it now plants it with `steerLane` on too (F1 unchanged). Re-asked, $0.0044 (204 situations a doctrine, ~172 tokens a question).
+
+| Answers (mean over situations, all three doctrines alike) | P(tight) | P(wide) | memory P(ignore) | memory P(lead) |
+|---|---|---|---|---|
+| `none` | 0.26–0.28 | 0.26–0.30 | 0.75–0.78 | 0.03 |
+| `far` | 0.25–0.27 | 0.30–0.32 | 0.31–0.33 | 0.41–0.43 |
+| `near` | 0.26–0.28 | 0.27–0.31 | 0.25–0.26 | 0.33–0.36 |
+
+| Measured (first colony; M1 seeds 1–10, the rest 1–5; median, range) | off | on |
+|---|---|---|
+| Forage food | 702 (499–973) | 523 (397–1,254) |
+| Warlike food | 622 (296–1,323) | 603 (319–1,248) |
+| Lost, Forage / Warlike | 9 / 4 | 9 / 2 |
+| T1, Forage / Warlike | 1.00 / 0.99 | 1.07 / 1.05 |
+| M1 memory (trail), Forage | 0.06 (0.16) | 0.29 (0.04) |
+| M1 memory (trail), Warlike | 0.02 (0.22) | 0.15 (0.04) |
+
+- Memory now behaves as the biology says, in direction: remembering a find, an ant mostly sets out for it and the trail takes few (M1 trail share 0.16–0.22 → 0.04); short of the 0.8 target, as P(lead) ≈ 0.4 says it would be.
+- Search does not depend on `find` in the preset doctrines' answers (P(tight) the same near and far), so T1 barely moves; the doctrine probe shows Jev does set it when the words ask.
+- Food over 5 seeds swings too widely to call (round 4's +25 % for Forage did not hold); held carriers stay at 0–1.
+- Spent on the lane so far: $0.0156.
+
+**Seeds 1–20** (`lockstep --one --seeds 1-20 --policy precache:<d> --set both.steerLane=0,1`; the first colony, paired by seed):
+
+| | Food on ÷ off, median per seed | Worst seed | Seeds on stored more | Lost, median off → on | Held > 120 s |
+|---|---|---|---|---|---|
+| Forage | 0.89 | 0.51 | 6 / 20 | 9.5 → 3 | 0 |
+| Warlike | 0.99 | 0.49 | 7 / 20 | 5 → 4 | 0 |
+
+By the worst seed (CLAUDE.md), steering as shipped costs food: half on the worst seed of each doctrine, while fewer ants die. Next: which weight costs it (one weight acting at a time, Forage, the same seeds).
+
+**Which weight costs the food, against a placebo** (Forage's shipped answers for both colonies, seeds 1–20, one world, 300 s; `scratchpad` script over `runAssay(lockstep1, …)`). The placebo is steering on with every weight neutral but the same draws made: it changes nothing but the random sequence, and still moves a seed's food from 0.76× to 1.77× of steering off (median 1.12×, 12 of 20 seeds higher). So a single seed's worst ratio says little here; each variant is compared with the placebo, seed by seed.
+
+| Against the placebo | Median ratio | Seeds better |
+|---|---|---|
+| Both weights, as first built (search ×0.5 / ×2) | 0.85–0.86 | 3–4 / 20 |
+| Search alone | 0.91 | 6 / 20 |
+| Memory alone | 0.86 | 4 / 20 |
+| Memory alone, spent spot given up (`siteGive` 1, §58) | 0.96 | 8 / 20 |
+| Both, spent spot given up, search ×0.75 / ×1.33 | **0.95** | 8 / 20 |
+
+- **Built:** with `steerLane` on, the memory weight gives a spent spot up as `siteGive` 1 does (`Colony.siteAim`); the search weight scales turning by `searchSpan`, now 1.33 (design). Both act only with steering on: goldens bit-exact.
+- What is left (~5 %) is within the noise the placebo shows. Fewer ants die with steering on (Forage's median 9.5 → 3).
+
+**Cost (estimated from the request, before any spend).** About 1,500 tokens of legend and state a request, ~156 a situation: ~176 tokens a question at ~74 a request (the mode lane: ~229 a situation). Shipping the three doctrines: 3 requests, ≈ 39,000 tokens ≈ $0.0016. In play, a situation is asked once per doctrine; at the mode lane's rate of new situations this is under $0.01 an hour.
+
+**Cost (estimated).** A new lane over explore and follow situations: ~320–380 tokens per question with the three default weights (~500–600 with all seven), roughly $0.01–0.03/h on top of the mode lane; shipping answers for three doctrines ≈ $0.009 (owner approves before spending). Measured with `colony-cost` once the request exists.
+
+**Beads.** `ja-ykmu` (this); `ja-ykmu.1` assays, `ja-ykmu.2` steer response and plumbing, `ja-ykmu.3` the policy lane for search and memory, `ja-ykmu.4` design weights in the Lab, `ja-ykmu.5` play, results and the owner's decision. Found on the way: `ja-w8ys` (a species name in two notes).
+
+**Round 6 (ja-ykmu.6, 2026-11-15): the questions say what each level is, and a sign fixed.** The preset doctrines' answers did not tell an ant at its last find from one far from it (P(tight) 0.28 near, 0.25 far, over the shipped situations). Probes (about $0.002 each, Forage and the other two doctrines alike, search and memory only):
+
+| Wording | Near a find: P(tight) | Far: P(tight) | Notes |
+|---|---|---|---|
+| Legend as it was (v5) | 0.33–0.35 | 0.24–0.28 | matched triples |
+| The biology in the weight's meaning (v6) | 0.45–0.49 | 0.23–0.24 | matched triples only: on the real mix the contrast vanished (0.28 / 0.25) |
+| Each question says where the ant is | 0.06 | 0.17 | backwards: "at the spot" read as "searching a lot" |
+| **The meaning in the question's own levels (v7)** | **0.86–0.91** | **0.04–0.05** | the real shipped situations, full-size requests |
+
+v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "medium: its usual wander", "wide: straight and ranging…"; `memory` is "ignore…", "medium…", "lead: set out for that spot and keep to it, even over a food scent that leads elsewhere". Re-asked for the three doctrines, $0.0066 (~258 tokens a question, was ~172: the lane costs about half as much again per situation). Mean over the shipped situations, the doctrines alike: `none` search P(wide) 0.43–0.45, memory P(ignore) 0.83; `far` P(wide) 0.86–0.89, memory P(lead) 0.34–0.37; `near` P(tight) 0.86, memory P(lead) 0.42–0.44.
+
+**A sign bug (found by the first v7 measurement).** `steer.ts` scaled the heading noise by `searchSpan` at +1 (wide) and divided at −1 (tight): the opposite of the questions. It was invisible while the answers were flat; under v7's answers T1 fell to 0.90 with steering on. Tight now turns more and wide less; `steering.test.ts` holds the order (tight > usual > wide) and fails on the old sign. Steering off is untouched: goldens bit-exact.
+
+**Measured** (`assays.yml` on staging at the time, `lockstep t1 m1 --one`, seeds 1–20, `both.steerLane=0,1`, `--policy precache:<doctrine>`; the first colony, median over seeds; [Forage](https://github.com/bwvogler/ant-sym/actions/runs/43758303707), [Warlike](https://github.com/bwvogler/ant-sym/actions/runs/43758306277)):
+
+| | T1 near ÷ far turning (design target 1.5) | M1 memory / trail (target memory 0.8) | Food on ÷ off, per seed | Losses off → on | Held > 120 s |
+|---|---|---|---|---|---|
+| Forage, off | 1.00 | 0.05 / 0.22 | | 9 | 0 |
+| Forage, on | 1.24 | 0.38 / 0.00 | 0.94 (0.51–1.24), 6/20 higher | 8 | 0 |
+| Warlike, off | 1.00 | 0.00 / 0.20 | | 7.5 | 0 |
+| Warlike, on | 1.17 | 0.20 / 0.09 | 0.93 (0.57–1.61), 8/20 higher | 7 | 0 |
+
+- Search now follows the find (T1 1.00 → 1.24 and 1.17; 0.90 under the inverted sign); it falls short of the 1.5 design mark, which is a design number: the weight multiplies the turning by `searchSpan` 1.33 (up to 1.77 between a tight and a wide ant), and a draw from the answers' odds blurs it. Raising `searchSpan` would widen it at some cost in food (round 5 chose 1.33 against the placebo).
+- Memory leads where the ant remembers a find (M1 memory 0.05 → 0.38, the trail share 0.22 → 0.00 on Forage), short of 0.8 as P(lead) ≈ 0.4 says.
+- Food stays inside the placebo's noise (0.76–1.77×, round 5); fewer ants die; no held carriers.
+- Spent on the lane so far: about $0.027 (rounds 1–5 $0.0156, round 6's probes $0.0045 and re-ask $0.0066).
+- `assays.yml`'s `policy` input takes `precache:<doctrine>`, so these ran on the runners in about 4 minutes.

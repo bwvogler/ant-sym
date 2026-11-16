@@ -86,7 +86,7 @@ The owner decided four things:
 - **Floodplain ants, full text.** Five species built earthen levees 1.5–4 cm high within about 24 h of the first heavy rain. *Ectatomma opaciventre* began repairing breaches within 30 min. Breached colonies recruited more slowly (median 16.8 against 8.0 min) and moved workers from foraging to repair. Source: LeBrun, Moffett & Holway 2011.
 - **Fire ant (*Solenopsis invicta*).** Rain blocks nest exits with soil. Small repairs start during the rain, and large-scale repair finishes within about 12 h. Source: Lu, Hao & Liang 2012. **Unverified**: abstract only.
 
-**In the game:** the dig and dirt brushes change soil to open ground and back, underground and on the mound, with the same `digCell` and `fillCell` the ants use. Dirt never fills a cell that holds an ant or brood: it is placed around them, as the backfill rule's `occupied` check already requires.
+**In the game:** the dig and dirt brushes change soil to open ground and back, underground only (the surface from above has no soil, so the tray hides Dirt there; Rock builds walls on both views), with the same `digCell` and `fillCell` the ants use. Dirt never fills a cell that holds an ant or brood: it is placed around them, as the backfill rule's `occupied` check already requires.
 - This slice adds no repair behaviour. Ants meet filled tunnels and new open space through what they already do: digging at faces, chamber digging and backfill.
 - The colony's response to a cave-in, which the papers above describe as all ages digging until most of the lost area is back, is a later mechanic. Assay B6 reports whether the ants dig back into a filled tunnel today.
 
@@ -126,7 +126,7 @@ The builder is a set of **player tools that edit the world**. It is not a change
 |---|---|---|---|---|---|
 | Move (hand) | both | the camera | `ui/camera.ts` | — | — |
 | Dig | both | soil or rock → open (the map's own rock too: owner, D1) | `digCell` | digging, backfill and route steering as now | not the world's edge or the curtain's sky |
-| Dirt | below; the mound above | open → soil | `fillCell` | as above | skips cells with an ant or brood, and the hole cell |
+| Dirt | below only (the surface has no soil: there it would be rock, so the tray hides it) | open → soil | `fillCell` | as above | skips cells with an ant or brood, and the hole cell |
 | Rock | both | open → rock | a new `placeRock` beside `fillCell` | trail, vector and route memory get round it (B2) | as dirt; never on a hole |
 | Sugar / crumb | both | food, quality 1.5 / 0.5 | `dropFood` | taste and trail laying by quality (A2b, B4) | open ground only |
 | Trail crayon (one per colony) | both | that colony's `food` channel | `Pheromones.deposit` | antenna sensors, the `foodTrail` field (B1, B5) | at a carrier's mark strength, not the cap |
@@ -285,7 +285,7 @@ This is design: no paper. It reads the game, never steers it.
 
 ### Aphids (PRD §78, [aphids.md](aphids.md))
 
-A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note.
+A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note. Aphids live on the surface: the tray offers them from above only (underground they could not be placed; the real root-aphid ants are *L. flavus*, not this ant, aphids.md).
 
 ### What slice 2 built (PRD §73.3)
 

@@ -74,7 +74,7 @@ import { openLearn } from "./ui/learn.ts";
 import { openLab, toggleLab, useLab } from "./ui/labStore.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
-import { pushToast, toastPlace } from "./ui/toasts.ts";
+import { NOTICE_LEVEL_LABEL, NOTICE_LEVELS, pushToast, setNoticeLevel, toastPlace, useNoticeLevel } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
 import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
 import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
@@ -110,6 +110,7 @@ export default function ColonyApp() {
   // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
   const lab = useLab() !== null;
   const theme = useTheme();
+  const noticeLevel = useNoticeLevel();
   // One drawer open at a time, beside the map (PRD §69).
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const wideTree = useWideTree();
@@ -183,6 +184,8 @@ export default function ColonyApp() {
   const trails = game.player.ph.has("food");
   const pp = game.player.params;
   const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
+  // Some tools work in one view only (Dirt below, aphids above): the tray offers each where it can be placed.
+  const view = controls.view;
   const tray = useMemo(
     () =>
       trayItems(
@@ -190,8 +193,9 @@ export default function ColonyApp() {
         Array.from({ length: colonyCount }, (_, k) => colonyName(k)),
         trails,
         tends,
+        view,
       ),
-    [little, colonyCount, trails, tends],
+    [little, colonyCount, trails, tends, view],
   );
   const picked: TrayItem = tray.find((it) => it.key === toolKey) ?? tray[0]!;
   const pickTool = useCallback((it: TrayItem) => {
@@ -268,7 +272,10 @@ export default function ColonyApp() {
   useEffect(() => {
     const timer = setInterval(() => {
       for (const e of builder.watch())
-        pushToast(buildNotice(e), e.kind === "antLost" || e.kind === "aphidsEaten" || e.kind === "aphidsGone" ? "info" : "good");
+        pushToast(buildNotice(e), e.kind === "antLost" || e.kind === "aphidsEaten" || e.kind === "aphidsGone" ? "info" : "good", {
+          // Each kind of event (of a tool, of a colony) counts up rather than stacking: "3 ants are following your line ×2".
+          group: `build:${e.kind}:${"tool" in e ? e.tool : ""}:${"colony" in e ? e.colony : ""}`,
+        });
     }, 1000);
     return () => clearInterval(timer);
   }, [builder]);
@@ -355,7 +362,9 @@ export default function ColonyApp() {
       // It is said here: the watch won't see it again.
       const { kept, gone } = living(specimens, game.colonies);
       for (const g of gone)
-        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info");
+        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info", {
+          group: "specimen-died",
+        });
       const r = pin(kept, f);
       setSpecimens(r.list);
       if (r.dropped)
@@ -374,7 +383,9 @@ export default function ColonyApp() {
       if (!gone.length) return;
       setSpecimens(kept);
       for (const f of gone)
-        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info");
+        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info", {
+          group: "specimen-died",
+        });
     }, 1000);
     return () => clearInterval(t);
   }, [specimens, game, setSpecimens]);
@@ -618,6 +629,14 @@ export default function ColonyApp() {
         run: toggleLens,
       },
       { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
+      ...NOTICE_LEVELS.map((l) => ({
+        id: `notices-${l}`,
+        label: `Notices over the map: ${NOTICE_LEVEL_LABEL[l].toLowerCase()}`,
+        group: "Help",
+        words: "toasts notifications quiet mute kid bell",
+        off: noticeLevel === l ? "in use" : undefined,
+        run: () => setNoticeLevel(l),
+      })),
       ...THEMES.map((t) => ({
         id: `theme-${t}`,
         label: `Appearance: ${THEME_LABEL[t].toLowerCase()}${t === "system" ? " (follow the device)" : ""}`,
@@ -785,7 +804,7 @@ export default function ColonyApp() {
         <nav
           aria-label="panels"
           hidden={building}
-          className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:flex-col sm:gap-1 ${FLOAT}`}
+          className={`pointer-events-auto absolute inset-x-2 bottom-2 z-10 flex justify-around p-1 sm:inset-x-auto sm:top-[4.5rem] sm:bottom-auto sm:left-3 sm:max-h-[calc(100%-5.5rem)] sm:flex-col sm:gap-1 sm:overflow-y-auto sm:overscroll-contain ${FLOAT}`}
         >
           <IconButton icon="build" label="Builder" onClick={toggleBuilding} />
           <IconButton icon="fungus" label="The fungus" active={drawer === "fungus"} onClick={() => toggle("fungus")} />
@@ -1272,7 +1291,8 @@ function useNotices(stats: ColonyStats | null, lock: string | null, phase: strin
   useEffect(() => {
     if (outcome === seenOutcome.current) return;
     seenOutcome.current = outcome;
-    if (outcome !== "playing") pushToast(goalLine(stats), outcome === "unified" ? "good" : "warn");
+    // The game's end shows even when the player has asked for important notices only.
+    if (outcome !== "playing") pushToast(goalLine(stats), outcome === "unified" ? "good" : "warn", { important: true });
   }, [outcome, stats]);
   // A new chapter is worth a notice.
   const chapter = stats?.chapter.chapter;

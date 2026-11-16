@@ -8,6 +8,7 @@ import { generateOneWorld } from "../../oneWorld.ts";
 import { encode } from "../../save.ts";
 import { heapPlane, mulberry32 } from "../../world.ts";
 import { DT } from "../builders.ts";
+import { piSpan } from "../../homing.ts";
 
 // One world's nest search (ja-lp4.11, docs/nest-search.md, PRD §56): a carrier whose vector ran out where no hole was
 // runs loops out from that spot and back, each headed searchTurn on from the last and reaching further, the first
@@ -17,8 +18,13 @@ import { DT } from "../builders.ts";
 const RETURN = MODES.indexOf("return");
 const SIGMA_PER_CELL = PI_DRIFT / Math.SQRT2;
 
-/** The loops as designed (PRD §56), whatever the defaults. */
+/**
+ * The loops as designed (PRD §56), whatever the defaults, and sized as they were designed: by the odometer law (σ from the trip
+ * walked) and, with the loops off, U3b's spiral (piErrorLaw 0, searchScale 0; law 1 and the scaled search are the defaults now, PRD §79).
+ */
 const LOOPS: Partial<Colony["params"]> = {
+  piErrorLaw: 0,
+  searchScale: 0,
   searchLoops: 0.5,
   searchGrow: 0.125,
   searchTurn: Math.PI * (3 - Math.sqrt(5)),
@@ -155,7 +161,7 @@ test("loops: successive loops head the golden angle apart (each loop's way out, 
 });
 
 test("loops off (searchLoops 0): U3b's spiral, each point a quarter turn on and SEARCH_GROW^(1/4) wider", () => {
-  const g = game({ searchLoops: 0 });
+  const g = game({ searchLoops: 0, piErrorLaw: 0, searchScale: 0 }); // U3b's spiral itself, not the scaled search (PRD §79.2)
   const { c } = lost(g, 200);
   const seen: { s: number; a: number }[] = [];
   for (let k = 0; k < Math.round(20 / DT); k++) {
@@ -177,7 +183,8 @@ test("loops off (searchLoops 0): U3b's spiral, each point a quarter turn on and 
 
 // The mound's smell (ja-lp4.11.3): a searching ant on its own mound walks up its colony's smell to its hole.
 
-const SMELL: Partial<Colony["params"]> = { ...LOOPS, moundSmell: 1 };
+// The smell holds under the default error law: these carriers' vectors are by the distance out (piErrorLaw 1).
+const SMELL: Partial<Colony["params"]> = { ...LOOPS, piErrorLaw: 1, moundSmell: 1 };
 
 /** Heap `pellets` round colony k's hole as the game spreads them (2 + reach × √u out), and set its count; that hole. */
 function mound(g: Game, k: number, pellets: number, heap = true): { x: number; y: number } {
@@ -208,7 +215,7 @@ function spot(g: Game, x: number, y: number, r: number, toward: number, bare = f
   throw new Error("no such spot");
 }
 
-/** Ant 0 of colony k (the player's by default) at (x, y), carrying, its vector ending 60 east of its hole (walked 200), facing east; searching there (its first loop's leg out) if `searching`. */
+/** Ant 0 of colony k (the player's by default) at (x, y), carrying, its vector ending 60 east of its hole (70 out at the farthest), facing east; searching there (its first loop's leg out) if `searching`. */
 function smeller(g: Game, x: number, y: number, searching: boolean, k = 0): Colony {
   const c = g.colonies[k]!;
   c.age[0] = 0.5 * LIFESPAN;
@@ -217,7 +224,8 @@ function smeller(g: Game, x: number, y: number, searching: boolean, k = 0): Colo
   c.mode[0] = RETURN;
   c.heading[0] = 0;
   c.odoSurf[0] = 200;
-  c.driftSurf[0] = 0.3;
+  c.reachSurf[0] = 70;
+  c.driftSurf[0] = 60 / piSpan(c, 0);
   c.driftSurfY[0] = 0;
   if (searching) {
     c.search[0] = 7;
@@ -275,7 +283,9 @@ test("smell: a searcher within its mound's reach but on bare ground is not pulle
 });
 
 test("smell: a searcher on the rival's mound is not pulled, to the rival's hole or its own", () => {
-  const g = game(SMELL);
+  // The odometer law on purpose: its loops must stay within the 12 cells between it and the player's hole. By law 1, 115
+  // out, σ is 16 and its later loops pass within HOLE_SIGHT of that hole by their size alone (it goes down no hole either way).
+  const g = game({ ...SMELL, piErrorLaw: 0 });
   // The rival's ant on the player's mound (seed 7's player's hole is mid-plane; the rival's ~115 east, in a corner), its
   // own mound as big: 12 from the player's hole on the side away from its own, on spoil, its loops starting where it stands.
   const V = mound(g, 0, 1000);
@@ -285,9 +295,10 @@ test("smell: a searcher on the rival's mound is not pulled, to the rival's hole 
   const own = { x: centreX(hc.px, hc.py), y: centreY(hc.py) };
   const P = spot(g, V.x, V.y, 12, Math.atan2(V.y - own.y, V.x - own.x));
   smeller(g, P.x, P.y, false, 1);
-  c.odoSurf[0] = 100;
-  c.driftSurf[0] = (P.x - own.x) / 100;
-  c.driftSurfY[0] = (P.y - own.y) / 100;
+  c.odoSurf[0] = 150;
+  c.reachSurf[0] = Math.hypot(P.x - own.x, P.y - own.y);
+  c.driftSurf[0] = (P.x - own.x) / piSpan(c, 0);
+  c.driftSurfY[0] = (P.y - own.y) / piSpan(c, 0);
   const { t, nearest } = watch(g, c, 10, V.x, V.y);
   assert.ok(Number.isNaN(t), "it went down no hole");
   assert.ok(nearest > HOLE_SIGHT, `never nearer the player's hole than ${nearest.toFixed(1)}`);

@@ -113,7 +113,10 @@ test("a crowded nest digs chambers: new ones start off the tunnels, stacked, non
   // be undone), not that the profile arises of itself (review of slice 2).
   const { trends, halves, stacked } = crowdedGames();
   const meanStacked = stacked.reduce((a, b) => a + b, 0) / stacked.length;
-  assert.ok(meanStacked >= 3, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
+  // ≥ 2.5 (owner, 2026-11-16, #264): with piErrorLaw 1 more ants are out searching for their hole and the nest is less
+  // crowded; over games 4-15 the mean fell 4.0 -> 3.5. A three-game mean ≥ 2.5 holds in 97 % of three-game sets under the
+  // law (99 % under the odometer law); 3 held in 89 %. A design mark, no literature target.
+  assert.ok(meanStacked >= 2.5, `stacked chambers, mean over three games ${meanStacked.toFixed(1)} (${stacked.join(", ")})`);
   assert.ok(
     trends >= 2,
     `the spacing rule shows: gap above, shallower half vs deeper half, deeper wider in ${trends} of 3 games (${halves.join("; ")})`,

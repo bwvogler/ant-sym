@@ -157,7 +157,7 @@ export const PLANE_WORLD: WorldOptions = {
 };
 
 /** How far below the ground line a founded nest's chamber is dug, in rows (foundNest's default). */
-export const CHAMBER_DEPTH = 14;
+export const FOUND_DEPTH = 14;
 
 /** A random stream whose position can be read and set (a save keeps it: save.ts). */
 export interface Rng {
@@ -925,7 +925,7 @@ function digNest(map: WorldMap, g: number, ex: number, depth: number, rng: () =>
  * A new colony's nest dug mid-game (Game.addColony, ja-lo8.8): a hole in column `ex` (side view), a slanted shaft
  * `depth` rows down, and a founding chamber for colony `colony`, as the world's own nests are dug.
  */
-export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = CHAMBER_DEPTH): Nest {
+export function foundNest(map: WorldMap, ex: number, colony: number, rng: () => number, depth = FOUND_DEPTH): Nest {
   if (!inBounds(map, ex, 0)) throw new Error(`foundNest: column ${ex} is off the map (${map.x0}…${map.x0 + map.size.w - 1})`);
   return digNest(map, groundTop(map, ex), ex, depth, rng, colony);
 }

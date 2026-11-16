@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { FLOAT } from "./kit.tsx";
-import { colonyTone, GESTURE, TRAY_PX, type TrayItem, type TrayTool } from "./build.ts";
+import { colonyTone, EXTRA_PICTURE, GESTURE, TRAY_PX, trayIconUrl, type TrayItem, type TrayTool } from "./build.ts";
 
 // The builder's tray (docs/builder.md, PRD §73, ja-kjj8.3, ja-kjj8.5): picture-only tools along the bottom of the screen,
 // flush to its edge (Anthony et al.: targets at the edge are hit more often), with gaps between them. The tool in hand
@@ -35,7 +35,7 @@ export default function BuilderTray({
   onExit: () => void;
 }) {
   const px = little ? TRAY_PX.little : TRAY_PX.full;
-  const size: CSSProperties = { width: px, height: px, fontSize: Math.round(px * 0.55) };
+  const size: CSSProperties = { width: px, height: px };
   const base = "relative grid shrink-0 place-items-center rounded-2xl transition-transform select-none disabled:opacity-30";
   const tool = (it: TrayItem) => {
     const on = it.key === picked;
@@ -52,7 +52,7 @@ export default function BuilderTray({
         style={{ ...size, ...(ring ? { boxShadow: `inset 0 -${Math.round(px / 7)}px 0 ${ring}` } : {}) }}
         onClick={() => onPick(it)}
       >
-        <span aria-hidden>{it.picture}</span>
+        <TrayPicture picture={it.picture} />
       </button>
     );
   };
@@ -64,10 +64,10 @@ export default function BuilderTray({
       aria-pressed={opts.pressed}
       disabled={opts.disabled}
       className={`${base} ${opts.pressed ? "bg-accent-soft ring-2 ring-accent" : "bg-raised/40 hover:bg-raised"}`}
-      style={{ ...size, fontSize: Math.round(px * 0.45) }}
+      style={size}
       onClick={onClick}
     >
-      <span aria-hidden>{picture}</span>
+      <TrayPicture picture={picture} />
     </button>
   );
   return (
@@ -77,12 +77,17 @@ export default function BuilderTray({
     >
       {items.map(tool)}
       <span aria-hidden className="mx-1 h-10 w-px bg-line max-sm:hidden" />
-      {extra("Undo", "↩️", onUndo, { disabled: !canUndo })}
-      {!little && extra("Smell vision: see every trail", "👃", onSmell, { pressed: smell })}
-      {extra(little ? "Big tray" : "Little hands", little ? "🧒" : "🧸", onLittle, { pressed: little })}
-      {extra("Done building", "✅", onExit)}
+      {extra("Undo", EXTRA_PICTURE.undo, onUndo, { disabled: !canUndo })}
+      {!little && extra("Smell vision: see every trail", EXTRA_PICTURE.smell, onSmell, { pressed: smell })}
+      {extra(little ? "Big tray" : "Little hands", EXTRA_PICTURE.little, onLittle, { pressed: little })}
+      {extra("Done building", EXTRA_PICTURE.done, onExit)}
     </nav>
   );
+}
+
+/** A tray button's illustration: decorative (the button carries the name); sized to leave room for a crayon's colour bar. */
+function TrayPicture({ picture }: { picture: string }) {
+  return <img src={trayIconUrl(picture)} alt="" aria-hidden draggable={false} className="size-[78%] object-contain" />;
 }
 
 /** The first time a tool is picked: a finger shows its gesture over the map, with no words (Hiniker et al. 2015). */

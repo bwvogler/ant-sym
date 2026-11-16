@@ -65,7 +65,7 @@ export interface OneWorld {
 }
 
 /**
- * A one-world map from a seed: the plane is `generateWorld(seed, PLANE_WORLD)` (its defaults) (with `plane` overriding options, e.g. a
+ * A one-world map from a seed: the plane is `generateWorld(seed, PLANE_WORLD)` (its defaults; `plane` overrides options, e.g. a
  * smaller size for tests); its nests' holes, in order, make the line (Ink at V₀, Amber at V₁); the curtain is dug under
  * it. One or two nests: the game starts with two, and more come by founding beyond an end (U4).
  */

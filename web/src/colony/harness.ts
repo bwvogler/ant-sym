@@ -3,7 +3,7 @@
 
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { type Policy, type StancePolicy, type SteerPolicy } from "./vocab.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
@@ -411,8 +411,14 @@ export interface Overrides {
   colony?: ColonyOptions;
   rival?: ColonyOptions;
   game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
+  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `rival` where they set the same one */
+  both?: ColonyOptions;
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
+  /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
+  rivalPolicy?: Policy;
+  /** every colony's steer policy (ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
+  steer?: SteerPolicy;
   stance?: StancePolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
@@ -437,15 +443,24 @@ export interface Assay {
 /** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const sides: Sides = { ...spec.sides };
+  if (o.both) {
+    sides.colony = mergeColony(sides.colony, o.both);
+    sides.rival = mergeColony(sides.rival, o.both);
+  }
   if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
+  if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
+  const steer = o.steer;
+  const events = steer
+    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
+    : spec.events;
   if (o.stance && !sides.stance) sides.stance = o.stance;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, sides, game };
+  return { ...spec, sides, game, events };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

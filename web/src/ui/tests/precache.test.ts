@@ -22,7 +22,16 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
-import { DESERT_ANT, NEGLECTUS_ANT, decodeSituation, weightedValid, type Species } from "../../colony/index.ts";
+import {
+  DESERT_ANT,
+  NEGLECTUS_ANT,
+  STEER_ASKED,
+  decodeSituation,
+  steerContext,
+  validSteer,
+  weightedValid,
+  type Species,
+} from "../../colony/index.ts";
 
 /** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
 const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT, neglectus: NEGLECTUS_ANT };
@@ -38,9 +47,24 @@ const CONTEXT: Record<string, (words: string) => string> = {
   stance: stanceContext,
   fungus: (aim) => fungusContext(aim),
   growth: growthContext,
+  steer: steerContext,
 };
-const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES, growth: GROWTH_CHOICES };
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48 };
+// The steer lane's answers under its default weights (search, memory: ja-ykmu.3): a level each, −1, 0 or 1.
+const LEVELS = ["-1", "0", "1"];
+const VALID: Record<string, readonly string[]> = {
+  mode: MODES,
+  stance: STANCES,
+  growth: GROWTH_CHOICES,
+  // The steer lane's answers are probabilities (checked by validSteer below): its certain answers stand for the row.
+  steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)).map((x) =>
+    x
+      .split(",")
+      .map((l) => ["1/0/0", "0/1/0", "0/0/1"][Number(l) + 1])
+      .join(","),
+  ),
+};
+// The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), with no find, far from one and near it.
+const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: (SITUATIONS / 2) * 3 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.
@@ -196,6 +220,16 @@ test("a species' own bundles: under its own context, each situation once (every 
         weightedValid(a, (m) => Object.keys(words.criteria).includes(m)),
         `${b.file}: ${a} is not one of its choices`,
       );
+    }
+  }
+});
+
+test("the steer lane's bundles ask the lane's own weights (ja-ykmu.3: not the fungus's lever menu)", () => {
+  for (const b of index.bundles.filter((x) => x.lane === "steer")) {
+    const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
+    for (const [k, a] of pairs) {
+      assert.ok(k.endsWith(`|${STEER_ASKED.join(",")}`), `${b.file}: ${k}`);
+      assert.ok(validSteer(k, a), `${b.file}: ${a}`);
     }
   }
 });

@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
+import { existsSync } from "node:fs";
+import { IMAGE_ICONS, iconUrl } from "../iconUrl.ts";
+import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
 
 // The builder's tray, pure (docs/builder.md, PRD §73, ja-kjj8.3, ja-kjj8.5).
 
@@ -16,9 +18,25 @@ test("the full tray: every tool, a crayon per colony named for it, Move first", 
   for (const it of items) assert.ok(it.picture.length > 0 && it.label.length > 0, it.key);
 });
 
+test("every tray picture and menu icon is a shipped file, under the app's base path", () => {
+  const dir = new URL("../../../public/ui-icons/", import.meta.url);
+  const pictures = [...new Set([...Object.values(PICTURE), ...Object.values(EXTRA_PICTURE)])];
+  for (const name of pictures) assert.ok(existsSync(new URL(`builder/${name}.png`, dir)), name);
+  for (const name of IMAGE_ICONS) assert.ok(existsSync(new URL(`menu/${name}.png`, dir)), name);
+  assert.equal(iconUrl("builder", "dig", "/"), "/ui-icons/builder/dig.png");
+  assert.equal(iconUrl("menu", "saves", "/ant-sym/pr-preview/pr-7"), "/ant-sym/pr-preview/pr-7/ui-icons/menu/saves.png");
+});
+
 test("no aphids for a species that takes no honeydew (docs/aphids.md)", () => {
   assert.ok(trayItems(false, ["Ink"]).some((it) => it.tool === "aphids"));
   assert.ok(!trayItems(false, ["Ink"], true, false).some((it) => it.tool === "aphids"));
+});
+
+test("each view offers only the tools that work there: no Dirt above (no soil: it would place rock), no aphids below", () => {
+  const keys = (view?: "above" | "below") => trayItems(false, ["Ink"], true, true, view).map((it) => it.tool);
+  assert.ok(keys().includes("dirt") && keys().includes("aphids"));
+  assert.ok(!keys("above").includes("dirt") && keys("above").includes("rock") && keys("above").includes("aphids"));
+  assert.ok(!keys("below").includes("aphids") && keys("below").includes("dirt") && keys("below").includes("rock"));
 });
 
 test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => {

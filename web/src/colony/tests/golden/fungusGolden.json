@@ -3,49 +3,49 @@
   {
    "t": 10,
    "food": [
-    "c0a5b619",
-    "45fe7935"
+    "c1925779",
+    "acb50fde"
    ],
    "colonies": [
     {
-     "stored": 11,
+     "stored": 9,
      "births": 0,
      "losses": 0,
-     "decisions": 6931,
+     "decisions": 6898,
      "population": 600,
-     "ants": "171349fc",
+     "ants": "b840e2b2",
      "fields": [
-      "3a43c1c1",
-      "69d6efd1"
+      "39bef50",
+      "b970ce6a"
      ],
-     "crossedUp": 136,
+     "crossedUp": 139,
      "crossedDown": 0
     },
     {
      "stored": 0,
      "births": 0,
      "losses": 0,
-     "decisions": 6838,
+     "decisions": 6713,
      "population": 600,
-     "ants": "120a1f93",
+     "ants": "410c05e2",
      "fields": [
-      "7f568c6f",
-      "1b69eaaa"
+      "81649b2c",
+      "91b00c13"
      ],
-     "crossedUp": 131,
-     "crossedDown": 1
+     "crossedUp": 122,
+     "crossedDown": 0
     }
    ],
    "fungus": {
     "state": {
-     "spores": "61feef56",
+     "spores": "912cd527",
      "sporeStrain": "39b457e0",
      "sporeCells": "b1e884a5",
-     "hosts": "89e14a12",
+     "hosts": "87e146ec",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "4fd5ca4a",
+     "evolution": "860aeacc",
      "base": "8ea4ab75",
      "hyphae": "c85f763a",
      "corpses": "d08749ad",
@@ -54,7 +54,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     38,
+     39,
      0
     ]
    }
@@ -62,49 +62,49 @@
   {
    "t": 20,
    "food": [
-    "4701e6ba",
-    "ff56556e"
+    "86cc8fec",
+    "b1918bff"
    ],
    "colonies": [
     {
-     "stored": 52,
+     "stored": 46,
      "births": 0,
      "losses": 0,
-     "decisions": 17744,
+     "decisions": 17926,
      "population": 600,
-     "ants": "ed499209",
+     "ants": "7460ec15",
      "fields": [
-      "e211fb78",
-      "f6f4fa84"
+      "21d3f894",
+      "f9f4cb7d"
      ],
-     "crossedUp": 285,
-     "crossedDown": 29
+     "crossedUp": 269,
+     "crossedDown": 19
     },
     {
-     "stored": 24,
+     "stored": 8,
      "births": 0,
      "losses": 0,
-     "decisions": 16716,
+     "decisions": 14746,
      "population": 600,
-     "ants": "837badf0",
+     "ants": "76c2732f",
      "fields": [
-      "24dea73e",
-      "65165699"
+      "fdebfe47",
+      "c8419317"
      ],
-     "crossedUp": 340,
-     "crossedDown": 39
+     "crossedUp": 319,
+     "crossedDown": 15
     }
    ],
    "fungus": {
     "state": {
-     "spores": "3d69f83",
+     "spores": "fdd7ef10",
      "sporeStrain": "39b457e0",
      "sporeCells": "b1e884a5",
-     "hosts": "f92c6bad",
+     "hosts": "f72c6887",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "931e5624",
+     "evolution": "a1791279",
      "base": "8ea4ab75",
      "hyphae": "2f67de3e",
      "corpses": "d08749ad",
@@ -113,7 +113,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     98,
+     83,
      0
     ]
    }
@@ -121,58 +121,58 @@
   {
    "t": 30,
    "food": [
-    "1801ea02",
-    "b1e78ef5"
+    "a5a4fbdb",
+    "dd049bd0"
    ],
    "colonies": [
     {
-     "stored": 119,
+     "stored": 148,
      "births": 0,
-     "losses": 2,
-     "decisions": 28162,
-     "population": 598,
-     "ants": "97a52efb",
+     "losses": 3,
+     "decisions": 27123,
+     "population": 597,
+     "ants": "e4607ce0",
      "fields": [
-      "1d56820a",
-      "f0889aa2"
+      "3fabe01f",
+      "79667ce4"
      ],
-     "crossedUp": 348,
-     "crossedDown": 91
+     "crossedUp": 312,
+     "crossedDown": 78
     },
     {
-     "stored": 177,
+     "stored": 56,
      "births": 0,
-     "losses": 1,
-     "decisions": 25648,
-     "population": 599,
-     "ants": "25f7a410",
+     "losses": 0,
+     "decisions": 23153,
+     "population": 600,
+     "ants": "485044b1",
      "fields": [
-      "38411091",
-      "7acabd8d"
+      "890c6b00",
+      "8e1d7ce"
      ],
-     "crossedUp": 406,
-     "crossedDown": 192
+     "crossedUp": 381,
+     "crossedDown": 76
     }
    ],
    "fungus": {
     "state": {
-     "spores": "c74bd122",
-     "sporeStrain": "10396bb5",
-     "sporeCells": "b7a42b16",
-     "hosts": "bce74c58",
+     "spores": "b7349b9a",
+     "sporeStrain": "3b62d33",
+     "sporeCells": "b6698703",
+     "hosts": "f31f9648",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "6c666201",
+     "evolution": "476eaa4a",
      "base": "8ea4ab75",
-     "hyphae": "2bff5c8d",
-     "corpses": "22a79510",
-     "corpseAges": "e11b5ca9",
+     "hyphae": "da4f3600",
+     "corpses": "1467e1bc",
+     "corpseAges": "b45c43d2",
      "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     122,
+     96,
      0
     ]
    }
@@ -180,59 +180,59 @@
   {
    "t": 40,
    "food": [
-    "ce675b90",
-    "e74e5b3e"
+    "d972f0e1",
+    "45efb290"
    ],
    "colonies": [
     {
-     "stored": 217,
+     "stored": 246,
      "births": 0,
-     "losses": 4,
-     "decisions": 35936,
-     "population": 596,
-     "ants": "8c2d1249",
+     "losses": 5,
+     "decisions": 35263,
+     "population": 595,
+     "ants": "5bd8a403",
      "fields": [
-      "9f4c796c",
-      "1f473a0e"
+      "dc7aca15",
+      "33f3a489"
      ],
-     "crossedUp": 404,
-     "crossedDown": 183
+     "crossedUp": 381,
+     "crossedDown": 163
     },
     {
-     "stored": 244,
+     "stored": 131,
      "births": 0,
-     "losses": 6,
-     "decisions": 35046,
-     "population": 594,
-     "ants": "a0266c72",
+     "losses": 2,
+     "decisions": 31514,
+     "population": 598,
+     "ants": "7750b324",
      "fields": [
-      "a2e4455b",
-      "80b82f7a"
+      "59900e79",
+      "d8340da5"
      ],
-     "crossedUp": 479,
-     "crossedDown": 272
+     "crossedUp": 455,
+     "crossedDown": 160
     }
    ],
    "fungus": {
     "state": {
-     "spores": "f8868177",
-     "sporeStrain": "18c92de5",
-     "sporeCells": "13736a2a",
-     "hosts": "28ea34f3",
+     "spores": "56abf23",
+     "sporeStrain": "65888de1",
+     "sporeCells": "9cba375c",
+     "hosts": "f921de51",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "54390de0",
+     "evolution": "8f33c918",
      "base": "8ea4ab75",
-     "hyphae": "b59c6c5c",
-     "corpses": "6bda400f",
-     "corpseAges": "d88b9c84",
+     "hyphae": "38d3754c",
+     "corpses": "a40adcd9",
+     "corpseAges": "fa95424c",
      "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     49,
-     0
+     78,
+     1
     ]
    }
   }
