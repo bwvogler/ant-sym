@@ -169,13 +169,13 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   const packed = cellKey(hx, hy);
   // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
   // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
-  const carryingOut = mode === RETURN && col.pellet[i] === 1 && col.entrance !== null && !Number.isNaN(col.spoilTo[i]);
+  const carryingOut = mode === RETURN && col.pellet[i] === 1 && !col.onPlane && !Number.isNaN(col.spoilTo[i]);
   // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
-  const raiding = mode === FIGHT && col.entrance !== null && col.stanceOf(i) === "raid" && col.raidTarget !== null;
+  const raiding = mode === FIGHT && !col.onPlane && col.stanceOf(i) === "raid" && col.raidTarget !== null;
   const onSky = isSky(map, fresh ? hx : col.gx[i], fresh ? hy : col.gy[i]);
   // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
-  const climbing = mode === RETURN && col.entrance !== null && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
-  const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && col.entrance !== null && onSky);
+  const climbing = mode === RETURN && !col.onPlane && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
+  const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);
   if (fresh && !hugging && !groundHome && col.noTunnel[i] === packed) {
     col.gx[i] = NO_CELL; // looked here already: open ground
     return false;
@@ -349,7 +349,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     )
       next = (dir + 3) % 6;
     // A digger in the side view's nest, crowded: it builds chambers.
-    const builds = mode === EXPLORE && col.entrance !== null && col.mayDig(cx, cy) && col.digs(i) && !col.forageDigs(i) && col.crowded();
+    const builds = mode === EXPLORE && !col.onPlane && col.mayDig(cx, cy) && col.digs(i) && !col.forageDigs(i) && col.crowded();
     const chamberHere = builds ? (map.chambers?.at(cx, cy) ?? -1) : -1;
     // In a chamber still narrow enough to walk like a tunnel (a new one, a cell or two): widen it along its floor.
     const widen = chamberHere >= 0 && col.rng() < WIDEN ? widenWay(col, cx, cy, dir) : -1;

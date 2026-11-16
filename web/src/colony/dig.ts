@@ -525,7 +525,7 @@ export function putDown(self: Colony, i: number): void {
   } else if (self.pellet[i]) {
     if (self.line !== null && self.cur === PLANE)
       dropPlane(self, i, true); // one world's plane: spoil heaped where it stands, a corpse on the midden if out on its ring
-    else if (!self.entrance) {
+    else if (self.onPlane) {
       // Top-down: a pellet is only a count: put down at the nest it is soil out (as the nest branch counts it), elsewhere lost.
       const dx = self.x[i] - self.nest.x;
       const dy = self.y[i] - self.nest.y;

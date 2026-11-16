@@ -55,7 +55,7 @@ export function holdsAt(c: Colony, i: number): boolean {
  * way-out field, outField), where it senses its place as "hole". Leaves the shared CELL as it found it.
  */
 export function atGate(c: Colony, i: number): boolean {
-  if (c.line === null || c.entrance === null) return false;
+  if (c.line === null || c.onPlane) return false;
   // Deeper than WAIT_STEPS rows below the hole, it can't be (most of the nest: no field read).
   if (c.y[i] > centreY(c.entranceRow + WAIT_STEPS) + R) return false;
   const keepX = CELL[0];
