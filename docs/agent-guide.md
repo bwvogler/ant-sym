@@ -42,6 +42,8 @@ A skill (`.claude/skills/<name>/SKILL.md`) is a procedure for one kind of task. 
 5. **Evals before the skill, and kept with it** (`<skill>/evals/evals.json`, as in `adding-mechanics`, `reviewing-prs` and `steward`). Write a few scenarios from what Claude gets wrong without the skill, then the least text that fixes them. Trigger lists: about 8 prompts that should load it and 8 that shouldn't. The useful should-nots are near-misses that share words with it but belong elsewhere ("Review PR #57" for `steward`); an obvious miss tests nothing. Run each trigger prompt about three times, and each scenario with the skill and with it moved aside. If Claude passes a scenario without the skill, the text behind it may no longer be needed (rule 8); the source says this mostly of skills that teach a technique, less of workflow skills like these.
 6. **Write it from friction, review it like code** (rule 8, write by hand, from friction). Give each rule the PR or the mistake it came from, as `reviewing-prs/reference/history.md` does.
 
+The skills' own tests: `.claude/skills/adding-mechanics/scripts/test.sh` and `.claude/skills/reviewing-prs/scripts/test.sh` (moved here from CLAUDE.md, ja-fnd.8).
+
 ### Sources and how far to trust them
 
 - Anthropic, [How Claude remembers your project](https://code.claude.com/docs/en/memory), [Best practices for Claude Code](https://code.claude.com/docs/en/best-practices) and [Extend Claude Code](https://code.claude.com/docs/en/features-overview): the under-200-lines target, where `CLAUDE.md`, rules, skills and hooks each belong, hooks for what must always happen, plain wording over emphasis. Primary and current.

@@ -6055,6 +6055,20 @@ The last stage of the page reorganisation: what makes it feel finished. The simu
 - **Notices and the tutorial card on a phone** (review of #182, N7 and N10). While a drawer is open, its bottom sheet takes the screen: the floating notices are cut to a pixel (`sr-only`, so a screen reader still announces them) and wait in the bell, whose badge counts them (`toastPlace`, tested), and the tutorial's card shows its title and buttons, its text left for a screen reader, so a tall sheet is not reached. From sm up, nothing changes.
 - **Not in this stage:** one colony palette for the map and the charts (`ja-mvo9.9`), and the builder's Codex entries opening on first use of each tool (`ja-mvo9.7`).
 
+### 69.10 Fewer notices, and the devices (owner, 2026-11-16)
+
+Notices ("An ant found your sugar!", a specimen died, the field guide has new entries) came in a stream, and when a child plays they sit over the map. Two things change, and the page is now checked on the devices it is played on.
+
+- **Repeats count up.** A notice raised again while it still shows is not stacked: it takes the latest words, shows "×3", and its 7 s start over, on the field and in the bell. The key is the text, or a group where the words differ but the event is one (each kind of builder event of a tool or colony: "3 ants are following your line" then "5 ants…"; a specimen dying). `pushToast(text, tone, { group, important })` (`ui/toasts.ts`).
+- **How many float over the map**, the bell's own switch (the panel's top), kept per browser (`jevants.notices`), with a palette command for each:
+  - **All** (the default);
+  - **Important only**: warnings, and the game's end (`important: true`);
+  - **Bell only**: nothing floats. The bell's badge counts them and its list keeps them.
+
+  A notice not shown on the field is still in the page for a screen reader (cut to a pixel, not removed), as on a phone with a sheet open (§69.9).
+- **Device fixtures** (`scripts/lib/devices.mjs`, `npm run e2e:devices`): a Pixel 6 XL (Playwright's "Pixel 6 Pro": the same screen), Chrome on a desktop (1440 × 900) and Safari on an iPad (Playwright's "iPad Pro 11"; WebKit), a phone and the iPad both ways up. Each is opened as the device (viewport, pixel ratio, touch, user agent). Where WebKit is not installed (the cloud machine has Chromium only) the iPad runs on Chromium at its size, touch and user agent, and the report says so: layout and touch at that size, not Safari's own behaviour. `npx playwright install webkit` on a machine that may makes it real. On each it checks that the page does not scroll sideways, the map fills the screen, the rail is where its width says and wholly on the screen, a touch device's rail buttons are at least 40 px, every drawer and the Codex open inside the screen, Lab mode fits with its four charts and the map above, a repeated notice counts, and "Bell only" takes it off the field. It is by hand, like `npm run e2e`.
+- **Found by the fixtures:** on a landscape phone (840 × 360) the rail's seven buttons did not fit and Settings was off the bottom of the screen. The rail now keeps to its stage and scrolls inside it. A bottom bar there, as on a portrait phone, is better and is a bead.
+
 ## 70. Foraging tunnels: colonies dig out to the soil's food when foraging fails (built, off, ja-16rp, 2026-11-14)
 
 **Research basis:** [foraging-tunnels.md](foraging-tunnels.md):

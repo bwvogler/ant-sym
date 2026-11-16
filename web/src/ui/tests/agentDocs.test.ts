@@ -9,7 +9,7 @@ import { basename, dirname, join } from "node:path";
 
 const ROOT = join(new URL("../../../../", import.meta.url).pathname);
 const MAX_LINES = 200;
-const MAX_BYTES = 12_000;
+const MAX_BYTES = 9_000;
 
 test("CLAUDE.md stays within its budget and points at the agent guide", () => {
   const text = readFileSync(join(ROOT, "CLAUDE.md"), "utf8");

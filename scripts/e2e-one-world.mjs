@@ -2119,6 +2119,56 @@ try {
     50,
   );
   await hctx.close();
+  // ——— 17. Fewer notices (PRD §69.10): repeats count up; "Important only" and "Bell only" thin the field ———
+  section("17. fewer notices");
+  const fctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const fp = await fctx.newPage();
+  fp.on("pageerror", (e) => errors.push(String(e)));
+  await fp.goto(url);
+  await fp.getByLabel("world seed").fill(String(SEED));
+  await fp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => fp.evaluate(() => !!window.jevAnts?.game.world), "a game for the notices checks", 20_000, 100);
+  const raiseF = (text, tone = "info") => fp.evaluate(([t, o]) => window.jevAnts.notify(t, o), [text, tone]);
+  const floats = async (text) => {
+    const b = await fp.getByRole("button", { name: new RegExp(text.replace(/[.]/g, "\\.")) }).boundingBox();
+    return b !== null && b.width > 4;
+  };
+  await raiseF("An ant found your sugar!", "good");
+  await raiseF("An ant found your sugar!", "good");
+  await raiseF("An ant found your sugar!", "good");
+  const sugar = fp.getByRole("button", { name: /An ant found your sugar!/ });
+  await until(() => sugar.isVisible(), "the notice", 3000, 50);
+  check(
+    (await fp.getByRole("button", { name: /An ant found your sugar!/ }).count()) === 1 &&
+      /3 times/.test((await sugar.getAttribute("aria-label")) ?? ""),
+    "the same notice three times is one toast, counted (×3)",
+  );
+  const bellF = fp.getByRole("button", { name: "Notices", exact: true });
+  await bellF.click();
+  check(((await fp.getByRole("region", { name: "notices" }).textContent()) ?? "").includes("×3"), "and one line in the bell, counted");
+  const levelF = fp.getByRole("group", { name: "notices over the map" });
+  await levelF.getByRole("button", { name: "Important only" }).click();
+  await bellF.click();
+  await raiseF("A passing remark.", "info");
+  await raiseF("Jev stopped, for a test.", "warn");
+  await fp.waitForTimeout(300);
+  check(
+    !(await floats("A passing remark.")) && (await floats("Jev stopped, for a test.")),
+    "Important only: the warning floats over the map, the remark does not",
+  );
+  await bellF.click();
+  await levelF.getByRole("button", { name: "Bell only" }).click();
+  await bellF.click();
+  await raiseF("Another warning, for a test.", "warn");
+  await fp.waitForTimeout(300);
+  check(!(await floats("Another warning, for a test.")), "Bell only: not even a warning floats over the map");
+  check(
+    (await fp.locator('[role="status"] button').filter({ hasText: "Another warning" }).count()) === 1,
+    "but it is still in the page for a screen reader",
+  );
+  await fp.reload();
+  check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
+  await fctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

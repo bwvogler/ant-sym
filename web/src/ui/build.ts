@@ -1,9 +1,10 @@
 // The builder's tray, pure (docs/builder.md "Young children on a touch screen", PRD §73, ja-kjj8.3, ja-kjj8.5): which tools
-// it shows, their pictures, names and gestures, and the rules for a touch. Pictures are emoji: concrete and in colour, so a
-// child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5), with no image files. The names are
-// for the accessible label and the spoken name, never needed to use a tool.
+// it shows, their pictures, names and gestures, and the rules for a touch. Pictures are illustrated icons (web/public/ui-icons):
+// concrete and in colour, so a child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5). The names
+// are for the accessible label and the spoken name, never needed to use a tool.
 
-import type { BuildTool } from "../colony/index.ts";
+import { CURTAIN, PLANE, type BuildTool } from "../colony/index.ts";
+import { iconUrl } from "./iconUrl.ts";
 
 /** A tray tool: Move pans the map with one finger; the rest are the builder's. */
 /** A tray tool: Move pans the map with one finger; the tweezers lift an ant; the rest are strokes. */
@@ -42,19 +43,31 @@ export const LABEL: Record<TrayTool, string> = {
   rain: "Rain",
 };
 
+/** Each tool's icon file in web/public/ui-icons/builder (without `.png`). */
 export const PICTURE: Record<TrayTool, string> = {
-  move: "✋",
-  tweezers: "🤏",
-  noEntry: "🚫",
-  dig: "⛏️",
-  dirt: "🟫",
-  rock: "🪨",
-  sugar: "🍬",
-  crumb: "🍪",
-  aphids: "🐛",
-  crayon: "🖍️",
-  rain: "🌧️",
+  move: "move",
+  tweezers: "tweezers",
+  noEntry: "no-entry",
+  dig: "dig",
+  dirt: "dirt",
+  rock: "rock",
+  sugar: "sugar",
+  crumb: "crumb",
+  aphids: "aphids",
+  crayon: "trail-crayon",
+  rain: "rain",
 };
+
+/** The tray's other buttons' icon files. */
+export const EXTRA_PICTURE = {
+  undo: "undo",
+  smell: "smell-vision",
+  little: "little-hands",
+  done: "done-building",
+} as const;
+
+/** The URL of a tray tool's (or extra button's) icon. */
+export const trayIconUrl = (picture: string): string => iconUrl("builder", picture);
 
 /** The first-use demonstration's gesture: a tap, or a drag. */
 export const GESTURE: Record<TrayTool, "tap" | "drag"> = {
@@ -86,14 +99,16 @@ export interface TrayItem {
   colony?: number;
   key: string;
   label: string;
+  /** the icon file name (see PICTURE) */
   picture: string;
 }
 
 /**
  * The tray's tools: the little four, or the full set with a crayon per colony (`names`: each colony's name; `trails`: the species
- * lays a food trail; `tends`: it takes honeydew and tends aphids, docs/aphids.md).
+ * lays a food trail; `tends`: it takes honeydew and tends aphids, docs/aphids.md; `soil`: the map in view has soil, which the
+ * surface seen from above has not: there Dirt would place rock, so only Rock is offered).
  */
-export function trayItems(little: boolean, names: readonly string[], trails = true, tends = true): TrayItem[] {
+export function trayItems(little: boolean, names: readonly string[], trails = true, tends = true, soil = true): TrayItem[] {
   const out: TrayItem[] = [];
   for (const tool of little ? LITTLE : FULL) {
     if (tool === "crayon") {
@@ -106,11 +121,18 @@ export function trayItems(little: boolean, names: readonly string[], trails = tr
         );
     } else if (tool === "noEntry" && !trails)
       continue; // the sign turns trail followers: no trails, nothing to turn
+    else if (tool === "dirt" && !soil)
+      continue; // dirt on a map with no soil is rock (builder.ts #apply): the Rock button already does that
     else if (tool === "aphids" && !tends)
       continue; // a species that takes no honeydew (the desert ant) would ignore them
     else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
   }
   return out;
+}
+
+/** Whether the map in view has soil: the surface from above has none; underground has. `layers`: the game's [plane, curtain]. */
+export function viewHasSoil(layers: readonly { hasSoil: boolean }[], view: "above" | "below"): boolean {
+  return layers[view === "above" ? PLANE : CURTAIN]?.hasSoil ?? true;
 }
 
 /** Whether a touch is a palm (its contact area too big for a fingertip). A mouse or pen reports 1 × 1 or 0 × 0. */
