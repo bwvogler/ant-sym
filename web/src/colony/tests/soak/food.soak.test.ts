@@ -61,8 +61,9 @@ test("food is conserved when carriers put it down anywhere (behaviour MR 2: on t
         return "put down";
       },
     },
-    150,
-  ); // half the game: the file stays well inside its 60 s beside test:slow (review of #35)
+    210,
+  ); // 210 s of the 300 (review of #35: the file stays inside its limit). With piErrorLaw 1 the player's first porter trip
+  // came at ~165 s here, not ~105 s (food home by 150 s: 380, against 462 by the odometer law), so 150 s saw none.
   assert.ok(where.has("forager out") && where.has("forager tunnel") && where.has("porter chamber"), [...where].join(", "));
   assert.ok(g.player.portTrips > 0, "food still moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);

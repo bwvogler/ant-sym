@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BUILD, Builder, crayonLevel, FOLLOWED_AT, guarded, RAIN_CHANNELS, strokeCells, type BuildTool } from "../../builder.ts";
-import { believePlane, fromHomePlane } from "../../homing.ts";
+import { believePlane, fromHomePlane, piSpan } from "../../homing.ts";
 import { crossUp } from "../../crossing.ts";
 import { NO_ENTRY_PAINTED } from "../../params.ts";
 import { Game } from "../../game.ts";
@@ -431,7 +431,8 @@ test("tweezers: the belief the ant steers by is the hole, its drift and the carr
   // (believePlane keeps a belief inside the plane's edges).
   const map = g.layers[PLANE] as WorldMap;
   c.bind(PLANE);
-  const [ox, oy] = [c.nest.x + c.odoSurf[i]! * c.driftSurf[i]!, c.nest.y + c.odoSurf[i]! * c.driftSurfY[i]!];
+  const span = piSpan(c, i); // its vector's error: drift × span (piErrorLaw 1: by the distance out)
+  const [ox, oy] = [c.nest.x + span * c.driftSurf[i]!, c.nest.y + span * c.driftSurfY[i]!];
   const [lx, hx, hy] = [c.map.x0 + 20, c.map.x0 + c.map.size.w - 20, c.map.size.h * R - 20];
   c.bind(c.home);
   const [fx, fy] = [c.x[i]!, c.y[i]!];
@@ -450,9 +451,9 @@ test("tweezers: the belief the ant steers by is the hole, its drift and the carr
   assert.equal(c.search[i], 0);
   c.bind(PLANE);
   const goal = c.nest;
-  const odo = c.odoSurf[i]!;
-  const bx = goal.x + odo * c.driftSurf[i]! + c.carriedX[i]!;
-  const by = goal.y + odo * c.driftSurfY[i]! + c.carriedY[i]!;
+  const spanNow = piSpan(c, i); // the tweezers' move adds nothing to its reach
+  const bx = goal.x + spanNow * c.driftSurf[i]! + c.carriedX[i]!;
+  const by = goal.y + spanNow * c.driftSurfY[i]! + c.carriedY[i]!;
   const belief = believePlane(c, i, goal);
   assert.ok(Math.abs(belief.x - bx) < 1e-3 && Math.abs(belief.y - by) < 1e-3, `belief ${belief.x},${belief.y} vs ${bx},${by}`);
   assert.ok(Math.hypot(c.carriedX[i]!, c.carriedY[i]!) > 1, "the carry is in it");

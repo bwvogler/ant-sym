@@ -102,15 +102,19 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
   }
 });
 
-// ja-nzkg.3 (PRD §78.2): the generic ant climbs aphid odour. Sooner than with aphidPlume 0 on 10 of seeds 1–10 (median 9.9 → 7.9 s)
-// and 7 of 11–20 (8.5 → 7.8 s); seeds 1, 6 and 7 by a few seconds each.
-test("B9 aphid odour brings the first find of a clump sooner than a blind search", () => {
-  for (const seed of [1, 6, 7]) {
+// ja-nzkg.3 (PRD §78.2): the generic ant climbs aphid odour. Judged by the median gain over seeds 1-10 (owner, 2026-11-16,
+// #264): which seeds tie is chance (a finder walking straight at the clump needs no plume), so a strict "sooner" on three
+// fixed seeds re-rolled with any change to play. Median gain 0.40 s under the odometer law, 0.58 s under piErrorLaw 1
+// (plume sooner on 10 and 7 of 10). A design mark: the assay's target is "sooner", no literature figure.
+test("B9 aphid odour brings the first find of a clump sooner than a blind search (median over seeds 1-10)", () => {
+  const gains: number[] = [];
+  for (let seed = 1; seed <= 10; seed++) {
     const first = (blind: boolean) => runAssay(aphidsFound, seed, blind ? { colony: { aphidPlume: 0 } } : {}).metrics.firstFind;
-    const smelt = first(false);
-    const blind = first(true);
-    assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the aphid plume, ${blind} s blind`);
+    gains.push(first(true) - first(false));
   }
+  const sorted = [...gains].sort((a, b) => a - b);
+  const median = (sorted[4] + sorted[5]) / 2;
+  assert.ok(median > 0, `median gain ${median.toFixed(2)} s (gains ${gains.map((g) => g.toFixed(2)).join(", ")})`);
 });
 
 // ja-nzkg.5 (PRD §78.4): ants eat a few aphids. With aphidPrey 0.05, 23 % of a clump's aphids at 240 s were eaten on seeds 1–4

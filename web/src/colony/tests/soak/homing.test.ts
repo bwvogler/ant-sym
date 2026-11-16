@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
 import { Game } from "../../game.ts";
+import { piSpan } from "../../homing.ts";
 import { CELL } from "../../hex.ts";
 import { mulberry32 } from "../../world.ts";
 import { curtainHole, oneColony, own, smallOne } from "../builders.ts";
@@ -41,18 +42,25 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   const c = g.player;
   let samples = 0;
   let searching = 0;
-  for (let t = 0; t < 30 * 45; t++) {
+  const trips = new Set<string>(); // distinct trips sampled: each trip draws its own drift (review of #264, S2)
+  for (let t = 0; t < 30 * 90; t++) {
     g.tick(1 / 30);
-    if (t % 30 === 0)
+    // Three times a second over 90 s: by the distance out (piErrorLaw 1) fewer homing ants are within 3 cells than under
+    // the odometer law, so the run is twice the old 45 s, and the floor is on distinct trips, not repeat samples of one.
+    if (t % 10 === 0)
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.mode[i] !== 2 || c.layer[i] !== PLANE) continue;
         // On the plane only, where its surface vector is what it homes by: underground it homes by its nest vector,
         // and a search there round a wrongly believed chamber is that vector's (a young porter, ja-xu6.1's runs).
-        if (Math.hypot(c.driftSurf[i]! * c.odoSurf[i]!, c.driftSurfY[i]! * c.odoSurf[i]!) >= 3) continue;
+        // Its vector's error is its drift times the span (piErrorLaw 1: by its distance out, not the odometer).
+        const span = piSpan(c, i);
+        if (Math.hypot(c.driftSurf[i]! * span, c.driftSurfY[i]! * span) >= 3) continue;
         samples++;
+        trips.add(`${i}:${c.driftSurf[i]}:${c.driftSurfY[i]}`);
         if (c.search[i] !== 0) searching++;
       }
   }
   assert.ok(samples > 50, `${samples} samples`);
+  assert.ok(trips.size > 40, `${trips.size} distinct trips`); // 53 measured (main, odometer law, 45 s once a second: 46)
   assert.equal(searching, 0, `${searching} of ${samples} were searching`);
 });

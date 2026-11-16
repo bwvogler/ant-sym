@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE, type Colony, type Corpse } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
+import { piSpan } from "../../homing.ts";
 import { localResponses, type Responses } from "../../responses.ts";
 import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets, hexDistance } from "../../hex.ts";
@@ -97,14 +98,16 @@ test("one world: nobody picks spoil off the mound within ENTRANCE_ZONE of a hole
 });
 
 test("one world: a loose pellet taken home to backfill homes on the plane by the ant's own vector, not to the true hole", () => {
-  // 15 east of its hole, its vector off by 30 east (odoSurf 30 × drift 1): it believes its hole lies 15 farther east.
+  // 15 east of its hole, its vector off by 30 east (20 out at the farthest, span ~95, × drift ~0.32): it believes its hole
+  // lies 15 farther east.
   const g = quiet();
   const c = g.player;
   const hole = planeHole(own(c));
   const i = 0;
   withPellet(c, i, hole.x + 15, hole.y, SOIL_FILL);
   c.odoSurf[i] = 30;
-  c.driftSurf[i] = 1;
+  c.reachSurf[i] = 20;
+  c.driftSurf[i] = 30 / piSpan(c, i);
   c.driftSurfY[i] = 0;
   c.heading[i] = Math.PI / 2;
   const believed = { x: hole.x + 30, y: hole.y };
