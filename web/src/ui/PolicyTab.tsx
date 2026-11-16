@@ -43,7 +43,9 @@ import {
 } from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { openLab } from "./labStore.ts";
-import type { DoctrineChoice } from "./useColonyJev.ts";
+import { useStats } from "./session.ts";
+import { situationsSeenOf } from "./statSelect.ts";
+import { TOKENS_PER_SITUATION, type DoctrineChoice } from "./useColonyJev.ts";
 
 // Lab mode's Policy tab (PRD §69.8, ja-mvo9.4): the words each colony's ants and the fungus follow, then how each decides
 // and what Jev is sent. It was the Codex's Policy tab; a "?" aimed at the policy (openLearn({ tab: "policy" })) opens it
@@ -62,8 +64,18 @@ export interface PolicyProps {
   fungusAnswers: () => { key: string; answer: string; stale: boolean }[];
   /** the fungus's menu (useColony controls): which levers the explainer lists */
   menu: readonly string[];
-  /** what re-asking under a new doctrine costs now, in words */
-  retune: string;
+}
+
+/** What re-asking under a new doctrine costs now, in words: the situations the colonies have met, at the generic ant's tokens each. */
+function Retune() {
+  const seen = useStats(situationsSeenOf);
+  const tokens = (seen ?? 0) * TOKENS_PER_SITUATION;
+  return (
+    <>
+      A new doctrine re-asks the situations a colony meets: about {seen ?? "—"} so far, ≈ {tokens.toLocaleString()} tokens ≈{" "}
+      {`$${(tokens * USD_PER_INPUT_TOKEN).toFixed(4)}`}.
+    </>
+  );
 }
 
 const h3 = "text-xs font-medium uppercase tracking-wide text-fg-3";
@@ -106,8 +118,8 @@ export default function PolicyTab(props: PolicyProps & { focus?: string; ping: o
         </section>
       ))}
       <p className="-mt-2 text-xs text-fg-3">
-        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. {props.retune} Colonies
-        with the same doctrine share every answer.
+        A colony's doctrine is its nature: not yours to rewrite while it lives. The ants' modes are asked under it. <Retune /> Colonies with
+        the same doctrine share every answer.
       </p>
 
       <section className="flex flex-col gap-2" aria-label="the fungus's aim and levers">

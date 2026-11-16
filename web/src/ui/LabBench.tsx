@@ -172,8 +172,8 @@ export default function LabBench(
             {tab === "levers" && <Levers {...props} />}
             {tab === "numbers" && (
               <>
-                <FungusNumbers {...props} />
-                <Debug {...props} />
+                <FungusNumbers />
+                <Debug />
               </>
             )}
             {tab === "journal" && journal && <JournalCard journal={journal} />}

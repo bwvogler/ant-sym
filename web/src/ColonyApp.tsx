@@ -14,13 +14,16 @@ import {
   INFECTED,
   Builder,
   type BuildEvent,
+  type ColonyParams,
 } from "./colony/index.ts";
 import BuilderTray, { ToolDemo } from "./ui/BuilderTray.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./ui/build.ts";
 import { play, say, setSoundOn, soundOn } from "./ui/sounds.ts";
 import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
-import { USD_PER_INPUT_TOKEN } from "../shared/jev.ts";
+import type { GameLoop } from "./ui/gameLoop.ts";
+import { SessionContext, useLoopStats, useStats } from "./ui/session.ts";
+import { chapterNameOf, evolutionOf, flightInAir, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField, { type FieldApi, type FieldBuild, type FieldPen } from "./ui/ColonyField.tsx";
@@ -57,7 +60,7 @@ import UpgradeTree from "./ui/UpgradeTree.tsx";
 import { useWideTree } from "./ui/upgradeBranches.ts";
 import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
-import { TOKENS_PER_FUNGAL_SITUATION, TOKENS_PER_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
+import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
 import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
@@ -89,8 +92,6 @@ import { installDevHook } from "./dev/hook.ts";
 // lives in. Each colony's doctrine is its nature, out of the player's reach (docs/new-queens.md). The lab and the full
 // numbers are Lab mode's (the key l, the palette, Settings): a workbench under the map (PRD §69.7).
 
-const usd = (v: number) => `$${v.toFixed(4)}`;
-
 /** The drawers the rail opens. */
 type DrawerId = "fungus" | "evolve" | "colonies" | "saves" | "settings";
 
@@ -103,7 +104,17 @@ const BLOCKING = ['[aria-modal="true"]', ...["Codex", "Start", "The queen's pen"
 );
 
 export default function ColonyApp() {
-  const { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = useColony();
+  const colony = useColony();
+  // The loop reaches the components below through a context, so each reads its own slice of the stats (ui/session.ts).
+  return (
+    <SessionContext.Provider value={colony.loop}>
+      <Page colony={colony} />
+    </SessionContext.Provider>
+  );
+}
+
+function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
+  const { game, loop, controls, update, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = colony;
   const backend = useBackend();
   const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
   // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
@@ -131,7 +142,6 @@ export default function ColonyApp() {
   useEffect(() => {
     followedNow.current = followed;
   }, [followed]);
-  useNotices(stats, jev.lock, jev.state.phase, controls.menu);
   // The Lab's history (PRD §69.7): the game sampled once a game second from its start, whether or not the Lab is open.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh history for each game: `game` is the key, not an input
   const history = useMemo(() => new History(), [game]);
@@ -145,7 +155,7 @@ export default function ColonyApp() {
     [onFrame, game, history],
   );
   // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Codex says how many are new.
-  useCodexWatch(game, onFrame, stats);
+  useCodexWatch(game, onFrame, loop.stats);
   const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
@@ -428,7 +438,7 @@ export default function ColonyApp() {
     game,
     settings,
     { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull },
-    stats,
+    loop.stats,
     controls.started,
   );
   const continueFrom = useCallback(
@@ -446,7 +456,8 @@ export default function ColonyApp() {
   );
   // A new queen has flown (ja-lo8.9): the game is paused for her. The pen opens if the fungus is in her, her mother's
   // queen was reached and Jev can read new words; else she founds on her mother's doctrine at once, and a notice says why.
-  const flight: Flight | null = stats && stats.flights > 0 ? (game.flights[0] ?? null) : null;
+  const inAir = useLoopStats(loop, flightInAir);
+  const flight: Flight | null = inAir ? (game.flights[0] ?? null) : null;
   // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
   const [devPen, setDevPen] = useState(false);
   const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
@@ -538,15 +549,12 @@ export default function ColonyApp() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed, sensed, traces]);
-  const retune = stats ? stats.situationsSeen * TOKENS_PER_SITUATION : 0;
   // The page (PRD §69, ja-mvo9.1): the map fills the screen; a HUD over its top; a rail of drawers at its left (a tab bar
   // on a phone); the followed ant in an inspector at its right (a sheet on a phone).
   const labProps: LabProps = {
     game,
     controls,
     update,
-    stats,
-    fps,
     restart,
     newWorld,
     jev,
@@ -554,11 +562,10 @@ export default function ColonyApp() {
     saves: games,
     onLoad: (r) => (continueFrom(r), setDrawer(null)),
   };
-  const ev = stats?.evolution;
-  const affordable = ev ? UPGRADES.some((u) => !idle(u, controls.menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
+  // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
+  const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
+  useNotices(loop, affordable, jev.lock, jev.state.phase);
   const penCard = flight && gate?.open && oneWorld && circle;
-  // The machine can't step the sim at the speed asked: the HUD says how fast it really runs.
-  const slow = !!stats && controls.playing && stats.pace > 0 && stats.pace < controls.speed * 0.85;
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
   // The palette's commands (ui/commands.ts ranks them): everything the HUD, the rail, the map's menu and the keys do,
   // and every guide entry. Built only while the palette is open (review of #196, N3); running one closes a pinned lens
@@ -732,9 +739,7 @@ export default function ColonyApp() {
             )}
             <IconButton icon="lens" label="Lens: say what is under the pointer (i)" active={lensOn} onClick={toggleLens} className="ml-1" />
             <IconButton icon="search" label={`Commands (${MOD_K})`} onClick={() => setPalette(true)} className="max-sm:hidden" />
-            <span className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" title="sim time">
-              {clock(stats?.time ?? 0)}
-            </span>
+            <SimClock className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" />
             {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
             {game.player.params.heatDay > 0 && (
               <>
@@ -743,24 +748,17 @@ export default function ColonyApp() {
                   aria-label="sun"
                   title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
                 >
-                  {sunChip(game.player.params, stats?.time ?? 0)}
+                  <Sun params={game.player.params} />
                   {/* Only where the species has its own guide entry (review of #194, N2). */}
                   {ownEntry && <Help to={{ tab: "guide", id: ownEntry }} label={game.params.species.name.toLowerCase()} />}
                 </span>
                 {/* On a phone, short (owner, review of #194 D1). */}
                 <span className="px-1.5 font-mono text-[12px] text-fg-2 tabular-nums sm:hidden" aria-label="sun, short">
-                  {sunChip(game.player.params, stats?.time ?? 0, true)}
+                  <Sun params={game.player.params} short />
                 </span>
               </>
             )}
-            {slow && stats && (
-              <span
-                className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
-                title="This machine can't step the sim that fast: it runs as fast as it can"
-              >
-                running at {stats.pace.toFixed(1)}×
-              </span>
-            )}
+            <SlowBadge playing={controls.playing} speed={controls.speed} wide />
           </div>
           {/* The goal, and the bell at the top right: on a phone they share the second row. */}
           <div className="flex min-w-0 basis-full items-stretch gap-2 sm:flex-1 sm:basis-0">
@@ -768,15 +766,9 @@ export default function ColonyApp() {
               className={`pointer-events-auto flex min-w-0 flex-1 items-center px-3 py-2 text-[13px] text-fg-2 ${FLOAT}`}
               aria-label="goal"
             >
-              <span className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" title="sim time">
-                {clock(stats?.time ?? 0)}
-              </span>
-              {slow && (
-                <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">
-                  {stats!.pace.toFixed(1)}×
-                </span>
-              )}
-              <span className="truncate">{goalLine(stats)}</span>
+              <SimClock className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" />
+              <SlowBadge playing={controls.playing} speed={controls.speed} />
+              <GoalLine />
             </div>
             <Notices />
           </div>
@@ -837,24 +829,20 @@ export default function ColonyApp() {
 
         {drawer === "fungus" && (
           <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
-            <FungusStatus stats={stats} />
+            <FungusStatus />
             <Aim jev={jev} />
             {jev.lock && <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {jev.lock}</p>}
           </Drawer>
         )}
         {drawer === "evolve" && (
           <Drawer label="mutations" title="Body and mutations" onClose={closeDrawer} wide={wideTree}>
-            {ev ? (
-              <Evolve e={ev} evolve={evolve} menu={controls.menu} wide={wideTree} />
-            ) : (
-              <p className="text-fg-3">The fungus has not landed yet.</p>
-            )}
+            <EvolvePanel evolve={evolve} menu={controls.menu} wide={wideTree} />
           </Drawer>
         )}
         {drawer === "colonies" && (
           <Drawer label="colonies" title="Colonies" onClose={closeDrawer}>
             <BareCards>
-              <Colonies {...labProps} />
+              <Colonies />
             </BareCards>
           </Drawer>
         )}
@@ -995,7 +983,6 @@ export default function ColonyApp() {
             game,
             fungusAnswers: jev.fungusAnswers,
             menu: controls.menu,
-            retune: `A new doctrine re-asks the situations a colony meets: about ${stats ? stats.situationsSeen : "—"} so far, ≈ ${retune.toLocaleString()} tokens ≈ ${usd(retune * USD_PER_INPUT_TOKEN)}.`,
           }}
         />
       )}
@@ -1147,7 +1134,56 @@ function SoundSetting() {
 }
 
 /** Where the fungus is, and how far the colonies have come together. */
-function FungusStatus({ stats }: { stats: ColonyStats | null }) {
+/** The sim clock; draws again only when the second changes the text (the stats tick seven times a second). */
+function SimClock({ className }: { className: string }) {
+  const t = useStats(simTime);
+  return (
+    <span className={className} title="sim time">
+      {clock(t)}
+    </span>
+  );
+}
+
+/** The sun as the species' ants see it (the desert ant's day), and the ground's heat now. */
+function Sun({ params, short = false }: { params: ColonyParams; short?: boolean }) {
+  return <>{sunChip(params, useStats(simTime), short)}</>;
+}
+
+/** Says how fast the sim really runs when the machine can't keep up with the speed asked (`wide`: the HUD's, else the goal line's, on a phone). */
+function SlowBadge({ playing, speed, wide = false }: { playing: boolean; speed: number; wide?: boolean }) {
+  const pace = useStats((s) => slowPace(s, playing, speed));
+  if (pace === null) return null;
+  return wide ? (
+    <span
+      className="mr-1 rounded-md bg-warn-soft px-2 py-0.5 text-xs text-warn max-sm:hidden"
+      title="This machine can't step the sim that fast: it runs as fast as it can"
+    >
+      running at {pace.toFixed(1)}×
+    </span>
+  ) : (
+    <span className="mr-2 shrink-0 rounded-md bg-warn-soft px-1.5 py-0.5 text-[11px] text-warn sm:hidden">{pace.toFixed(1)}×</span>
+  );
+}
+
+/** The top bar's line of where the game stands. */
+function GoalLine() {
+  return <span className="truncate">{useStats(goalLine)}</span>;
+}
+
+/** The fungus's body and its mutations, or that it has not landed. */
+function EvolvePanel({ evolve, menu, wide }: { evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
+  const e = useStats(evolutionOf);
+  return e ? <Evolve e={e} evolve={evolve} menu={menu} wide={wide} /> : <p className="text-fg-3">The fungus has not landed yet.</p>;
+}
+
+/** Whether the fungus has a mutation it can keep: only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not). */
+function affordableIn(s: ColonyStats | null, menu: readonly string[]): boolean {
+  const ev = s?.evolution;
+  return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
+}
+
+function FungusStatus() {
+  const stats = useStats(wholeStats);
   if (!stats) return null;
   return (
     <div className="flex flex-col gap-2" aria-label="infection">
@@ -1285,29 +1321,26 @@ function goalLine(stats: ColonyStats | null): string {
 }
 
 /** Notices for what changed: the game's outcome, and Jev's state where it locks the policies. */
-function useNotices(stats: ColonyStats | null, lock: string | null, phase: string, menu: readonly string[]): void {
-  const outcome = stats?.outcome ?? "playing";
+function useNotices(loop: GameLoop, affordable: boolean, lock: string | null, phase: string): void {
+  // The page draws again when the outcome or the chapter changes, not on every tick: the text is read from the stats then.
+  const outcome = useLoopStats(loop, outcomeOf);
   const seenOutcome = useRef(outcome);
   useEffect(() => {
     if (outcome === seenOutcome.current) return;
     seenOutcome.current = outcome;
     // The game's end shows even when the player has asked for important notices only.
-    if (outcome !== "playing") pushToast(goalLine(stats), outcome === "unified" ? "good" : "warn", { important: true });
-  }, [outcome, stats]);
+    if (outcome !== "playing") pushToast(goalLine(loop.stats()), outcome === "unified" ? "good" : "warn", { important: true });
+  }, [outcome, loop]);
   // A new chapter is worth a notice.
-  const chapter = stats?.chapter.chapter;
+  const chapter = useLoopStats(loop, chapterNameOf);
   const seenChapter = useRef(chapter);
   useEffect(() => {
     if (chapter === seenChapter.current) return;
     const first = seenChapter.current === undefined;
     seenChapter.current = chapter;
-    if (!first && stats && chapter !== "land") pushToast(goalLine(stats), "good");
-  }, [chapter, stats]);
+    if (!first && loop.stats() && chapter !== "land") pushToast(goalLine(loop.stats()), "good");
+  }, [chapter, loop]);
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
-  // Only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not).
-  const affordable = stats?.evolution
-    ? UPGRADES.some((u) => !idle(u, menu) && canKeep(stats.evolution!.levels, stats.evolution!.mutations, u.id))
-    : false;
   const couldAfford = useRef(affordable);
   useEffect(() => {
     if (affordable && !couldAfford.current)
@@ -1335,7 +1368,7 @@ export interface Saves {
  * Saved games (ja-lo8.6): the list (newest first), saving to a slot, and the autosave: every AUTOSAVE_MS while a game
  * is under way, and when the tab is hidden (the player may not come back to this tab).
  */
-function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats: ColonyStats | null, started: boolean): Saves {
+function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats: () => ColonyStats | null, started: boolean): Saves {
   const store = useMemo(() => browserSaves(), []);
   const [list, setList] = useState<SaveRecord[]>([]);
   const refresh = useCallback(
@@ -1357,7 +1390,7 @@ function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats
       const n = now.current;
       if (!n.started) return;
       try {
-        await store.put(record(slot, n.settings, n.player, n.game.save(), n.stats?.chapter.goal ?? ""));
+        await store.put(record(slot, n.settings, n.player, n.game.save(), n.stats()?.chapter.goal ?? ""));
         refresh();
       } catch (e) {
         pushToast(`Couldn't save: ${String(e)}`, "warn");
