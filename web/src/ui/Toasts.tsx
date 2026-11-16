@@ -3,11 +3,13 @@ import {
   currentToasts,
   dismissToast,
   noticesOpen,
+  showsAt,
   subscribeToasts,
   swipeOutcome,
   TOAST_MS,
   type Toast,
   type ToastPlace,
+  useNoticeLevel,
 } from "./toasts.ts";
 
 const TONE = {
@@ -36,6 +38,8 @@ export default function Toasts({ place = "bottom" }: { place?: ToastPlace }) {
   const toasts = useSyncExternalStore(subscribeToasts, currentToasts, currentToasts);
   // While the bell's list is open they are in it: none over it.
   const hidden = useSyncExternalStore(subscribeToasts, noticesOpen, noticesOpen);
+  // How many the player wants over the field (the bell's switch): the rest are cut to a pixel, still announced, and counted by the bell.
+  const level = useNoticeLevel();
   if (hidden) return null;
   return (
     <div
@@ -44,13 +48,13 @@ export default function Toasts({ place = "bottom" }: { place?: ToastPlace }) {
       aria-live="polite"
     >
       {toasts.map((t) => (
-        <Item key={t.id} t={t} />
+        <Item key={t.id} t={t} shown={showsAt(level, t)} />
       ))}
     </div>
   );
 }
 
-function Item({ t }: { t: Toast }) {
+function Item({ t, shown }: { t: Toast; shown: boolean }) {
   // Where the finger went (CSS px) while it is down; null when no finger is on it.
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const [leaving, setLeaving] = useState(0);
@@ -60,7 +64,8 @@ function Item({ t }: { t: Toast }) {
     if (drag) return;
     const timer = setTimeout(() => dismissToast(t.id), TOAST_MS);
     return () => clearTimeout(timer);
-  }, [t.id, drag]);
+    // `bump` changes each time the notice is raised again: its clock starts over.
+  }, [t.id, t.bump, drag]);
   // A swiped notice slides off, then goes.
   useEffect(() => {
     if (!leaving) return;
@@ -92,7 +97,13 @@ function Item({ t }: { t: Toast }) {
   return (
     <button
       type="button"
-      className={`pointer-events-auto max-w-xl touch-none rounded-md border px-3 py-2 text-left text-sm shadow-lg select-none ${drag ? "" : "transition-[transform,opacity] duration-150"} ${TONE[t.tone]}`}
+      className={
+        shown
+          ? `pointer-events-auto max-w-xl touch-none rounded-md border px-3 py-2 text-left text-sm shadow-lg select-none ${drag ? "" : "transition-[transform,opacity] duration-150"} ${TONE[t.tone]}`
+          : // Not wanted over the map: one clipped pixel, in the page for a screen reader, with none of the look to widen it.
+            "sr-only"
+      }
+      tabIndex={shown ? 0 : -1}
       style={{ transform: `translate(${dx}px, ${dy}px)`, opacity: fade }}
       onPointerDown={down}
       onPointerMove={move}
@@ -100,9 +111,14 @@ function Item({ t }: { t: Toast }) {
       onPointerCancel={up}
       onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && dismissToast(t.id)}
       title="Tap or swipe away; the bell at the top right keeps it"
-      aria-label={`${t.text} (dismiss)`}
+      aria-label={`${t.text}${t.count > 1 ? `, ${t.count} times` : ""} (dismiss)`}
     >
       {t.text}
+      {t.count > 1 && (
+        <span aria-hidden className="ml-2 rounded-full bg-fg/10 px-1.5 text-xs font-medium tabular-nums">
+          ×{t.count}
+        </span>
+      )}
     </button>
   );
 }
