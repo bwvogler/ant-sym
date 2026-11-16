@@ -285,7 +285,7 @@ This is design: no paper. It reads the game, never steers it.
 
 ### Aphids (PRD §78, [aphids.md](aphids.md))
 
-A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note.
+A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note. Aphids live on the surface: the tray offers them from above only (underground they could not be placed; the real root-aphid ants are *L. flavus*, not this ant, aphids.md).
 
 ### What slice 2 built (PRD §73.3)
 

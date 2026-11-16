@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { IMAGE_ICONS, iconUrl } from "../iconUrl.ts";
-import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems, viewHasSoil } from "../build.ts";
+import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
 
 // The builder's tray, pure (docs/builder.md, PRD §73, ja-kjj8.3, ja-kjj8.5).
 
@@ -32,17 +32,11 @@ test("no aphids for a species that takes no honeydew (docs/aphids.md)", () => {
   assert.ok(!trayItems(false, ["Ink"], true, false).some((it) => it.tool === "aphids"));
 });
 
-test("no Dirt where the map in view has no soil: it would place rock (the surface from above)", () => {
-  assert.ok(trayItems(false, ["Ink"]).some((it) => it.tool === "dirt"));
-  const above = trayItems(false, ["Ink"], true, true, false);
-  assert.ok(!above.some((it) => it.tool === "dirt"));
-  assert.ok(above.some((it) => it.tool === "rock"));
-});
-
-test("the view decides whether there is soil: none from above, some below", () => {
-  const layers = [{ hasSoil: false }, { hasSoil: true }]; // [plane, curtain]
-  assert.equal(viewHasSoil(layers, "above"), false);
-  assert.equal(viewHasSoil(layers, "below"), true);
+test("each view offers only the tools that work there: no Dirt above (no soil: it would place rock), no aphids below", () => {
+  const keys = (view?: "above" | "below") => trayItems(false, ["Ink"], true, true, view).map((it) => it.tool);
+  assert.ok(keys().includes("dirt") && keys().includes("aphids"));
+  assert.ok(!keys("above").includes("dirt") && keys("above").includes("rock") && keys("above").includes("aphids"));
+  assert.ok(!keys("below").includes("aphids") && keys("below").includes("dirt") && keys("below").includes("rock"));
 });
 
 test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => {
