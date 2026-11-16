@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { iconUrl } from "./iconUrl.ts";
+import { IMAGE_ICONS, iconUrl } from "./iconUrl.ts";
 
 // The page's building blocks (PRD §69, ja-mvo9.1): one section head, one set of buttons and icons, and the drawer that
 // holds a surface beside the map (a bottom sheet on a phone). Components use these rather than hand-rolling the
@@ -92,13 +92,13 @@ const PATHS = {
   lens: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01",
 } as const;
 /** Menu icons drawn as illustrations (web/public/ui-icons/menu/<name>.png) rather than stroked paths. */
-const IMAGE_ICONS = ["fungus", "evolve", "colonies", "saves", "learn", "settings", "build"] as const;
 type ImageIconName = (typeof IMAGE_ICONS)[number];
 const isImageIcon = (name: string): name is ImageIconName => (IMAGE_ICONS as readonly string[]).includes(name);
 export type IconName = keyof typeof PATHS | ImageIconName;
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
-  // The illustrations carry their own colour, so they ignore the text colour.
+  // The illustrations carry their own colour, so they ignore the text colour; they default to a larger size (size-8) than
+  // the stroked glyphs (size-5) because they are detailed pictures, not outlines.
   if (isImageIcon(name))
     return <img src={iconUrl("menu", name)} alt="" aria-hidden draggable={false} className={`${className ?? "size-8"} object-contain`} />;
   const filled = name === "play";

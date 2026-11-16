@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { iconUrl } from "../iconUrl.ts";
 import { existsSync } from "node:fs";
-import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
+import { IMAGE_ICONS, iconUrl } from "../iconUrl.ts";
+import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems, viewHasSoil } from "../build.ts";
 
 // The builder's tray, pure (docs/builder.md, PRD §73, ja-kjj8.3, ja-kjj8.5).
 
@@ -22,8 +22,7 @@ test("every tray picture and menu icon is a shipped file, under the app's base p
   const dir = new URL("../../../public/ui-icons/", import.meta.url);
   const pictures = [...new Set([...Object.values(PICTURE), ...Object.values(EXTRA_PICTURE)])];
   for (const name of pictures) assert.ok(existsSync(new URL(`builder/${name}.png`, dir)), name);
-  for (const name of ["fungus", "evolve", "colonies", "saves", "learn", "settings", "build"])
-    assert.ok(existsSync(new URL(`menu/${name}.png`, dir)), name);
+  for (const name of IMAGE_ICONS) assert.ok(existsSync(new URL(`menu/${name}.png`, dir)), name);
   assert.equal(iconUrl("builder", "dig", "/"), "/ui-icons/builder/dig.png");
   assert.equal(iconUrl("menu", "saves", "/ant-sym/pr-preview/pr-7"), "/ant-sym/pr-preview/pr-7/ui-icons/menu/saves.png");
 });
@@ -38,6 +37,12 @@ test("no Dirt where the map in view has no soil: it would place rock (the surfac
   const above = trayItems(false, ["Ink"], true, true, false);
   assert.ok(!above.some((it) => it.tool === "dirt"));
   assert.ok(above.some((it) => it.tool === "rock"));
+});
+
+test("the view decides whether there is soil: none from above, some below", () => {
+  const layers = [{ hasSoil: false }, { hasSoil: true }]; // [plane, curtain]
+  assert.equal(viewHasSoil(layers, "above"), false);
+  assert.equal(viewHasSoil(layers, "below"), true);
 });
 
 test("the little-hands tray: Move, Sugar, Dig and Rain only, and bigger", () => {

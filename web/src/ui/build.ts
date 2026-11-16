@@ -3,7 +3,7 @@
 // concrete and in colour, so a child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5). The names
 // are for the accessible label and the spoken name, never needed to use a tool.
 
-import type { BuildTool } from "../colony/index.ts";
+import { CURTAIN, PLANE, type BuildTool } from "../colony/index.ts";
 import { iconUrl } from "./iconUrl.ts";
 
 /** A tray tool: Move pans the map with one finger; the rest are the builder's. */
@@ -128,6 +128,11 @@ export function trayItems(little: boolean, names: readonly string[], trails = tr
     else out.push({ tool, key: tool, label: LABEL[tool], picture: PICTURE[tool] });
   }
   return out;
+}
+
+/** Whether the map in view has soil: the surface from above has none; underground has. `layers`: the game's [plane, curtain]. */
+export function viewHasSoil(layers: readonly { hasSoil: boolean }[], view: "above" | "below"): boolean {
+  return layers[view === "above" ? PLANE : CURTAIN]?.hasSoil ?? true;
 }
 
 /** Whether a touch is a palm (its contact area too big for a fingertip). A mouse or pen reports 1 × 1 or 0 × 0. */
