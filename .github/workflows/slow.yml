@@ -1,13 +1,13 @@
 # The whole-game guards (web/src/colony/tests/slow): on runners up to about 13 minutes in 4 shards (the side view's side.test.ts,
-# deleted in S2.3c, took 786 s in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) runs its ten seeds in worker
-# threads, one per core, so it has a job of its own: beside another file in a shard it ran out of the 20-minute limit
-# (run 43722461875, ja-w7ef.15). It takes 11-14 minutes alone.
+# deleted in S2.3c, took 786 s in run 43722461875). --test-shard deals out whole files, so A11 and A12 have a file of their own (ja-jkc9). G1 (slow/g1/oneWorldG1.test.ts) has a runner per seed
+# and a verdict job (below): ten seeds on one runner took 16.6 minutes, and beside another file in a shard they ran out of the
+# 20-minute limit (run 43722461875, ja-w7ef.15, ja-w7ef.20). A G1 run takes about one game, 5 minutes.
 # - Nightly on main, and on demand from the Actions tab for a branch with no PR (main, staging): a red run is a measurement to look at.
 #   Not for a PR's branch: that run attaches to no PR and wakes no session; the label below does (ja-w7ef.17).
 # - On a pull request that touches web/src/colony/ or web/shared/ and carries the `slow-guards` label (ja-w7ef.4): the
 #   PR's author adds the label once the review approves, or earlier to see them and takes it off before the next push (the
 #   steward skill), and the run then repeats on every push while
-#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)` and `g1` checks, which wake a watching session like any other
+#   the label stays; the steward removes it after a pass. Its result arrives as the PR's `slow (n)`, `g1 (n)` and `g1 verdict` checks, which wake a watching session like any other
 #   check; a manual dispatch did not (2026-11-14). CLAUDE.md: run them before merging colony changes.
 # The globs and limit are copies of web/package.json's test:slow (the shards' folder and g1's); ui/tests/ciShards.test.ts holds them equal.
 name: Slow guards
@@ -70,37 +70,84 @@ jobs:
           if-no-files-found: ignore
           overwrite: true
 
-  # G1 alone on a runner: its ten games take every core (see the header). Runs when the shards do.
+  # G1 (slow/g1/oneWorldG1.test.ts) with a runner per seed, as assays.yml does: ten games on one runner took 16.6 minutes
+  # against the 20-minute file limit, one game takes about 5 (ja-w7ef.20). The same test file plays the seed (G1_SEEDS) and
+  # writes its figures to G1_RESULT; judging the ten is the `g1 verdict` job's, with the rule the local test uses
+  # (web/src/colony/tests/slow/g1/g1Rule.ts). Runs when the shards do. Checks: `g1 (n)` per seed and `g1 verdict`.
   g1:
+    name: g1 (${{ matrix.seed }})
     if: >-
       github.event_name != 'pull_request' ||
       (contains(github.event.pull_request.labels.*.name, 'slow-guards') &&
        (github.event.action != 'labeled' || github.event.label.name == 'slow-guards'))
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: 22.18
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm --prefix web ci
-      - name: G1, seeds 1-10
+      - name: G1, seed ${{ matrix.seed }}
         env:
-          TEST_REPORT_TITLE: G1, seeds 1-10
-          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/g1.json
+          TEST_REPORT_TITLE: G1, seed ${{ matrix.seed }}
+          TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/g1-${{ matrix.seed }}.json
+          G1_SEEDS: ${{ matrix.seed }}
+          G1_RESULT: ${{ runner.temp }}/g1/g1-seed-${{ matrix.seed }}.json
         run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=1200000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout src/colony/tests/slow/g1/*.test.ts
         working-directory: web
+      - name: result artifact
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: g1-seed-${{ matrix.seed }}
+          path: ${{ runner.temp }}/g1/
+          retention-days: 7
+          if-no-files-found: ignore
+          overwrite: true
       - name: durations artifact
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: slow-durations-g1
+          name: slow-durations-g1-${{ matrix.seed }}
           path: ${{ runner.temp }}/durations/
           retention-days: 30
           if-no-files-found: ignore
           overwrite: true
+
+  # G1's rule over the seeds' results (scripts/g1-verdict.mjs, g1Rule.ts: at least 5 of seeds 1-10 within 2, none at 10). A seed
+  # whose runner failed has no result: the verdict fails and names it. No npm install: the script imports one dependency-free file.
+  g1-verdict:
+    name: g1 verdict
+    needs: g1
+    if: ${{ !cancelled() && needs.g1.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: g1-seed-*
+          path: g1
+          merge-multiple: true
+      - name: G1 verdict
+        run: |
+          set -euo pipefail
+          mkdir -p g1
+          node scripts/g1-verdict.mjs g1 | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Each unit and int file timed alone (--test-concurrency=1), against its tier's line in docs/agent-guide.md (Tests):
   # a ::warning names a file over it and the tier it belongs in (ja-w7ef.10). CI's shards run files side by side, so their

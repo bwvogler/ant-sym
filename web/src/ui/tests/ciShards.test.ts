@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { SEEDS } from "../../colony/tests/slow/g1/g1Rule.ts";
 
 // .github/workflows/ci.yml runs the int, golden and soak files sharded, with their globs copied from web/package.json (node
 // ignores --test-shard after the file list, so the npm scripts can't take it). PR CI and the deploy (pages.yml calls ci.yml)
@@ -81,9 +82,9 @@ test("every *.test.ts under web/ is in a glob of npm test or test:slow", () => {
 // slow.yml runs test:slow sharded, on a schedule and on labelled colony PRs (ja-w7ef.4), with the same kind of copied globs.
 test("slow.yml's step runs test:slow's files at its per-file limit, sharded by the matrix", () => {
   const run = runOf(slowYml, "slow guards", "slow.yml");
-  const g1 = runOf(slowYml, "G1, seeds 1-10", "slow.yml");
+  const g1 = runOf(slowYml, "G1, seed", "slow.yml");
   assert.match(block(slowYml, "slow guards", "slow.yml"), /^\s+working-directory: web$/m);
-  assert.match(block(slowYml, "G1, seeds 1-10", "slow.yml"), /^\s+working-directory: web$/m);
+  assert.match(block(slowYml, "G1, seed", "slow.yml"), /^\s+working-directory: web$/m);
   // The shards run every slow folder but G1's, which has a job of its own (ja-w7ef.15): together, test:slow's globs.
   assert.deepEqual(globs(g1), ["src/colony/tests/slow/g1/*.test.ts"]);
   // The file itself, not only the glob: back in slow/, the shards would run it again (review of #240, N2).
@@ -95,10 +96,10 @@ test("slow.yml's step runs test:slow's files at its per-file limit, sharded by t
   assert.deepEqual([...globs(run), ...globs(g1)], globs(script("test:slow")));
   assert.equal(timeout(run), timeout(script("test:slow")));
   assert.equal(timeout(g1), timeout(script("test:slow")));
-  assert.doesNotMatch(g1, /--test-shard/, "G1 is not sharded: it runs alone");
+  assert.doesNotMatch(g1, /--test-shard/, "G1 is not sharded: a runner per seed, by G1_SEEDS");
   // It runs exactly when the shards do: the same condition.
   const cond = (job: string): string =>
-    new RegExp(`^  ${job}:\\n(?:    #.*\\n)*    if: >-\\n((?:      .+\\n)+)`, "m").exec(slowYml)?.[1] ?? "";
+    new RegExp(`^  ${job}:\\n(?:    (?:#|name:).*\\n)*    if: >-\\n((?:      .+\\n)+)`, "m").exec(slowYml)?.[1] ?? "";
   assert.ok(cond("slow").length > 0 && cond("g1") === cond("slow"), "the g1 job's if: is the slow job's");
   assert.match(run, /--test-shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /);
 });
@@ -108,14 +109,43 @@ test("every sharded test step runs both reporters, so a failure prints its ::err
     [ci, "int and golden", "ci.yml"],
     [ci, "soak", "ci.yml"],
     [slowYml, "slow guards", "slow.yml"],
-    [slowYml, "G1, seeds 1-10", "slow.yml"],
+    [slowYml, "G1, seed", "slow.yml"],
   ] as const) {
     const b = block(yml, name, file);
     assert.ok(runOf(yml, name, file).includes(REPORTERS), `${file} "${name}" runs spec and ci-report`);
     assert.match(b, /TEST_DURATIONS_FILE: /, `${file} "${name}" writes its durations`);
   }
   assert.match(slowYml, /^\s+name: slow-durations-\$\{\{ matrix\.shard \}\}$/m, "slow.yml uploads each shard's durations");
-  assert.match(slowYml, /^\s+name: slow-durations-g1$/m, "and G1's");
+  assert.match(slowYml, /^\s+name: slow-durations-g1-\$\{\{ matrix\.seed \}\}$/m, "and each G1 seed's");
+});
+
+// G1 (ja-w7ef.20): a runner per seed, then one verdict job applying g1Rule.ts's rule to their results.
+test("slow.yml's g1 job is a matrix over G1's seeds, one seed and one result file each; the checks are g1 (n) and g1 verdict", () => {
+  const job = (id: string): string =>
+    new RegExp(`^  ${id}:\\n(?:    .*\\n|\\n(?=    ))+`, "m").exec(slowYml)?.[0] ?? assert.fail(`slow.yml has no ${id} job`);
+  const g1 = job("g1");
+  assert.match(g1, /^    name: g1 \(\$\{\{ matrix\.seed \}\}\)$/m, "the check is `g1 (n)`");
+  const listed = /^        seed: \[([\d, ]+)\]$/m.exec(g1)?.[1]?.split(",").map(Number);
+  assert.deepEqual(listed, SEEDS, "the matrix plays exactly the seeds of the rule");
+  assert.match(g1, /^\s+fail-fast: false$/m, "one red seed doesn't cancel the others: the verdict names them all");
+  const b = block(g1, "G1, seed", "slow.yml");
+  assert.match(b, /^\s+G1_SEEDS: \$\{\{ matrix\.seed \}\}$/m);
+  assert.match(b, /^\s+G1_RESULT: \$\{\{ runner\.temp \}\}\/g1\/g1-seed-\$\{\{ matrix\.seed \}\}\.json$/m);
+  assert.match(g1, /^\s+name: g1-seed-\$\{\{ matrix\.seed \}\}$/m, "each seed uploads its result");
+  assert.match(g1, /^\s+persist-credentials: false$/m);
+
+  const v = job("g1-verdict");
+  assert.match(v, /^    name: g1 verdict$/m, "the check is `g1 verdict`");
+  assert.match(v, /^    needs: g1$/m);
+  // After a red seed too (that is its job), but not when the matrix was skipped (no label on a PR).
+  assert.match(v, /^    if: \$\{\{ !cancelled\(\) && needs\.g1\.result != 'skipped' \}\}$/m);
+  assert.match(v, /^\s+pattern: g1-seed-\*$/m);
+  assert.match(v, /^\s+merge-multiple: true$/m);
+  const run = block(v, "G1 verdict", "slow.yml");
+  assert.match(run, /set -euo pipefail/);
+  assert.match(run, /node scripts\/g1-verdict\.mjs g1 \| tee -a "\$GITHUB_STEP_SUMMARY"/, "the verdict is the shared rule's script");
+  assert.match(v, /^\s+persist-credentials: false$/m);
+  assert.doesNotMatch(v, /\$\{\{ (?:inputs|github\.event)/, "no inputs or PR text in a run: script");
 });
 
 // The nightly tiers job (ja-w7ef.10) times each unit and int file alone against its tier's line (docs/agent-guide.md,
