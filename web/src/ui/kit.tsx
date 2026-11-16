@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { iconUrl } from "./iconUrl.ts";
 
 // The page's building blocks (PRD §69, ja-mvo9.1): one section head, one set of buttons and icons, and the drawer that
 // holds a surface beside the map (a bottom sheet on a phone). Components use these rather than hand-rolling the
@@ -84,29 +85,27 @@ export function IconButton({
 const PATHS = {
   play: "M7 5v14l11-7z",
   pause: "M8 5v14M16 5v14",
-  fungus: "M4 12a8 7 0 0 1 16 0zM10 12v6a2 2 0 0 0 4 0v-6M8 9.5h.01M12 8h.01M16 9.5h.01",
-  evolve: "M7 3c0 6 10 6 10 12s-10 6-10 6M17 3c0 6-10 6-10 12s10 6 10 6M8 7h8M8 17h8",
-  colonies:
-    "M6 9a2 2 0 1 0 0-.01M12 7a2 2 0 1 0 0-.01M18 9a2 2 0 1 0 0-.01M3 19c.5-3 2-5 3-5s2.5 2 3 5M9 19c.5-4 2-7 3-7s2.5 3 3 7M15 19c.5-3 2-5 3-5s2.5 2 3 5",
-  saves: "M6 3h12v18l-6-4-6 4z",
-  learn: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M19 19v2H6",
-  settings:
-    "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.6 15H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.7 4V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1.3z",
   close: "M6 6l12 12M18 6L6 18",
   bell: "M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10.2 20.5a2 2 0 0 0 3.6 0",
-  build: "M14 3l7 7M17.5 6.5L9 15M9 15l-4.5 4.5a2.1 2.1 0 0 1-3-3L6 12zM6 12l3 3",
   external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
   search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
   lens: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01",
 } as const;
-export type IconName = keyof typeof PATHS;
+/** Menu icons drawn as illustrations (web/public/ui-icons/menu/<name>.png) rather than stroked paths. */
+const IMAGE_ICONS = ["fungus", "evolve", "colonies", "saves", "learn", "settings", "build"] as const;
+type ImageIconName = (typeof IMAGE_ICONS)[number];
+const isImageIcon = (name: string): name is ImageIconName => (IMAGE_ICONS as readonly string[]).includes(name);
+export type IconName = keyof typeof PATHS | ImageIconName;
 
-export function Icon({ name, className = "size-5" }: { name: IconName; className?: string }) {
+export function Icon({ name, className }: { name: IconName; className?: string }) {
+  // The illustrations carry their own colour, so they ignore the text colour.
+  if (isImageIcon(name))
+    return <img src={iconUrl("menu", name)} alt="" aria-hidden draggable={false} className={`${className ?? "size-8"} object-contain`} />;
   const filled = name === "play";
   return (
     <svg
       viewBox="0 0 24 24"
-      className={className}
+      className={className ?? "size-5"}
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth={1.8}

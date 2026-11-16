@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
+import { iconUrl } from "../iconUrl.ts";
+import { existsSync } from "node:fs";
+import { EXTRA_PICTURE, PICTURE, FULL, isPalm, LITTLE, PALM_PX, TRAY_PX, trayItems } from "../build.ts";
 
 // The builder's tray, pure (docs/builder.md, PRD §73, ja-kjj8.3, ja-kjj8.5).
 
@@ -14,6 +16,16 @@ test("the full tray: every tool, a crayon per colony named for it, Move first", 
   assert.equal(items.find((it) => it.key === "crayon-1")?.label, "Trail crayon, Amber");
   assert.equal(items.find((it) => it.key === "crayon-1")?.colony, 1);
   for (const it of items) assert.ok(it.picture.length > 0 && it.label.length > 0, it.key);
+});
+
+test("every tray picture and menu icon is a shipped file, under the app's base path", () => {
+  const dir = new URL("../../../public/ui-icons/", import.meta.url);
+  const pictures = [...new Set([...Object.values(PICTURE), ...Object.values(EXTRA_PICTURE)])];
+  for (const name of pictures) assert.ok(existsSync(new URL(`builder/${name}.png`, dir)), name);
+  for (const name of ["fungus", "evolve", "colonies", "saves", "learn", "settings", "build"])
+    assert.ok(existsSync(new URL(`menu/${name}.png`, dir)), name);
+  assert.equal(iconUrl("builder", "dig", "/"), "/ui-icons/builder/dig.png");
+  assert.equal(iconUrl("menu", "saves", "/ant-sym/pr-preview/pr-7"), "/ant-sym/pr-preview/pr-7/ui-icons/menu/saves.png");
 });
 
 test("no aphids for a species that takes no honeydew (docs/aphids.md)", () => {

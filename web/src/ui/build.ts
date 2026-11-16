@@ -1,9 +1,10 @@
 // The builder's tray, pure (docs/builder.md "Young children on a touch screen", PRD §73, ja-kjj8.3, ja-kjj8.5): which tools
-// it shows, their pictures, names and gestures, and the rules for a touch. Pictures are emoji: concrete and in colour, so a
-// child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5), with no image files. The names are
-// for the accessible label and the spoken name, never needed to use a tool.
+// it shows, their pictures, names and gestures, and the rules for a touch. Pictures are illustrated icons (web/public/ui-icons):
+// concrete and in colour, so a child who can't read knows them (Hiniker et al. 2016: abstract symbols fail below 5). The names
+// are for the accessible label and the spoken name, never needed to use a tool.
 
 import type { BuildTool } from "../colony/index.ts";
+import { iconUrl } from "./iconUrl.ts";
 
 /** A tray tool: Move pans the map with one finger; the rest are the builder's. */
 /** A tray tool: Move pans the map with one finger; the tweezers lift an ant; the rest are strokes. */
@@ -42,19 +43,31 @@ export const LABEL: Record<TrayTool, string> = {
   rain: "Rain",
 };
 
+/** Each tool's icon file in web/public/ui-icons/builder (without `.png`). */
 export const PICTURE: Record<TrayTool, string> = {
-  move: "✋",
-  tweezers: "🤏",
-  noEntry: "🚫",
-  dig: "⛏️",
-  dirt: "🟫",
-  rock: "🪨",
-  sugar: "🍬",
-  crumb: "🍪",
-  aphids: "🐛",
-  crayon: "🖍️",
-  rain: "🌧️",
+  move: "move",
+  tweezers: "tweezers",
+  noEntry: "no-entry",
+  dig: "dig",
+  dirt: "dirt",
+  rock: "rock",
+  sugar: "sugar",
+  crumb: "crumb",
+  aphids: "aphids",
+  crayon: "trail-crayon",
+  rain: "rain",
 };
+
+/** The tray's other buttons' icon files. */
+export const EXTRA_PICTURE = {
+  undo: "undo",
+  smell: "smell-vision",
+  little: "little-hands",
+  done: "done-building",
+} as const;
+
+/** The URL of a tray tool's (or extra button's) icon. */
+export const trayIconUrl = (picture: string): string => iconUrl("builder", picture);
 
 /** The first-use demonstration's gesture: a tap, or a drag. */
 export const GESTURE: Record<TrayTool, "tap" | "drag"> = {
@@ -86,6 +99,7 @@ export interface TrayItem {
   colony?: number;
   key: string;
   label: string;
+  /** the icon file name (see PICTURE) */
   picture: string;
 }
 
