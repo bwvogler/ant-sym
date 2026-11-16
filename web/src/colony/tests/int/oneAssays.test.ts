@@ -47,6 +47,7 @@ import {
 } from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
+import { piSpanOf } from "../../homing.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, type OneWorld } from "../../oneWorld.ts";
 import { cellAt } from "../../transect.ts";
@@ -153,16 +154,22 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
       assert.equal(c.carrying[i], 1);
       assert.equal(c.mode[i], MODES.indexOf("return"));
       assert.equal(c.odoSurf[i], T, "its trip");
-      // Its vector's end (where it stands, give or take a tick's walk) is the hole plus T × its drift.
-      const ex = hx + T * c.driftSurf[i];
-      const ey = hy + T * c.driftSurfY[i];
+      // Its vector's end (where it stands, give or take a tick's walk) is the hole plus the span × its drift: a trip T out
+      // (piErrorLaw 1: the span by the distance out, ~21√T).
+      const span = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, T, T);
+      const ex = hx + span * c.driftSurf[i];
+      const ey = hy + span * c.driftSurfY[i];
       assert.ok(Math.hypot(c.x[i] - ex, c.y[i] - ey) < 1, `ant ${i} stands at its vector's end`);
       sq += (ex - hx) ** 2 + (ey - hy) ** 2;
     }
     const rms = Math.sqrt(sq / S1_PER_TRIP);
-    assert.ok(rms > 0.05 * T && rms < 0.16 * T, `trip ${T}: RMS miss ${rms.toFixed(1)}, against PI_DRIFT × T = ${(0.1 * T).toFixed(0)}`);
+    const span = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, T, T);
+    assert.ok(
+      rms > 0.05 * span && rms < 0.16 * span,
+      `trip ${T}: RMS miss ${rms.toFixed(1)}, against PI_DRIFT × span = ${(0.1 * span).toFixed(0)}`,
+    );
   });
-  // Scored over 20 s: most 100-cell carriers (a miss of ~10, sight 6) are home, and each share is a share.
+  // Scored over 20 s: most 100-cell carriers (a miss of ~21 by the distance out, sight 6) are home, and each share is a share.
   const r = runAssay(search1, 2, {}, 20);
   assert.ok(r.metrics["t100.home600"] > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
   for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok(r.metrics[`t${T}.${k}`] >= 0 && r.metrics[`t${T}.${k}`] <= 1);

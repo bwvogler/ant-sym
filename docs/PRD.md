@@ -6966,7 +6966,7 @@ Chosen 0.05: about a fifth fewer aphids, as Oliver, Leather & Cook 2012 found wi
 
 **Still open.** The colony's larval hunger as the cue for eating aphids (`ja-nzkg.7`); tenders lingering at the clump; tending raising the flow.
 
-## 79. The home vector's error grows like √(distance out), not with the path walked (built, off, ja-lp4.19, 2026-11-15)
+## 79. The home vector's error grows like √(distance out), not with the path walked (built, on, ja-lp4.19, 2026-11-16)
 
 **Research basis:** [nest-search.md, "How far the vector is off"](nest-search.md#how-far-the-vector-is-off-the-error-grows-like-the-square-root-of-the-distance-out-ja-lp419), from `ja-lp4.14`'s research.
 - *C. fortis* median miss 25 % after 5 m and 12 % after 20 m (Merkle, Knaden & Wehner 2006, as tabled by Goldschmidt et al. 2017; the citing paper read in full).
@@ -7025,7 +7025,7 @@ Law 1 matches the sources' shape; law 0 is flat in the median with a long tail (
 - **R1:** pass 6/10 both, the same seeds.
 - **`--one all`:** see 78.1.
 
-**Decision: built, off.** By the worst seed law 1 is no worse on G1's guard (better: 8/10 within 2 on both seed sets), A13, A6 and R1, and it matches the sources. It is worse on two things: the weakest colony's food (−13 % on 1–10, −8 % on 11–20) and S1's short trips (92.5 % home at T = 100 and 82.5–87.5 % at 200, against 100 % and 90–95 %). So `piErrorLaw` stays 0 and the owner decides. If it goes on, S1's short-trip searches are the place to look (the search starts at `SEARCH_START` and widens by `SEARCH_GROW_2D` whatever the vector's own σ; `searchLoops` scales by σ but is off).
+**Decision (2026-11-15): built, off; on by default since 2026-11-16 (owner, §79.2's last paragraph).** By the worst seed law 1 is no worse on G1's guard (better: 8/10 within 2 on both seed sets), A13, A6 and R1, and it matches the sources. It is worse on two things: the weakest colony's food (−13 % on 1–10, −8 % on 11–20) and S1's short trips (92.5 % home at T = 100 and 82.5–87.5 % at 200, against 100 % and 90–95 %). So `piErrorLaw` stays 0 and the owner decides. If it goes on, S1's short-trip searches are the place to look (the search starts at `SEARCH_START` and widens by `SEARCH_GROW_2D` whatever the vector's own σ; `searchLoops` scales by σ but is off). §79.2 sized the spiral by σ: S1 recovers, the weakest colony does not.
 
 **Beads.** `ja-lp4.19` (this). The owner's choices: the default; `piErrorAt` (50, design; 500 if 1 cell is read literally as a body length, which puts the miss at 79 % at 50 cells out); whether fights should blur the vector more than walking (no source found).
 
@@ -7050,6 +7050,88 @@ Both colonies at the law, offline, run one assay and seed a process (`runAssay` 
 The same pass count on both, the same failing seeds: `alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` (10/10); `regulateStop` 9/10; `r1` 6/10; `pass` 3/10; `s1`, `regulate`, `faintAlarm`, `f1`, `d1` 0/10. No `pass` metric (reported only): `open`, `rain`, `lateSugar`, `tweezers`, `crayonRing`, `fillShaft`, `noEntryForkBare`, `nestFlow`, `d3`, `d4`. `d2c` and `f1` are bit-identical (no ant homes on the plane by its vector there; F1's planted find reads the law, but 30 s is too short to differ).
 
 **Reading.** Mixed, as in G1: the assays where ants fight or raid far out gain (A12, A13, `lifecycle`'s held carriers), and those that ask a forager to find its way back to a spot or round an obstacle lose (B2's wall, D2, A9's pass count). It does not change the decision: off, for the owner.
+
+### 79.2 The nest search sized to the vector's error (built, on, ja-lp4.20, 2026-11-16)
+
+**Research basis:** [nest-search.md, "Sizing the search to the vector's error"](nest-search.md#sizing-the-search-to-the-vectors-error-ja-lp420). The search is wider after a longer trip, by the distance out and not the path's tortuosity (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), and broader the more uncertain the vector (Vickerstaff & Merkle 2012's Bayesian model). All three abstracts or summaries only (**unverified**); none gives a width multiple.
+
+**The problem (§79).** Law 1 makes short trips' misses 2–4 times larger (35 % at 25 cells out, 18 % at 100), but the search round the vector's end was U3b's spiral from `SEARCH_START` (3 cells), 1.6× wider a turn, whatever the trip. A geometric spiral's turns are 0.6 × its reach apart: past ~20 cells out they are wider than the 12 cells an ant sweeps.
+
+**The rule** (`searchScale`, `searchScaleStep`; off = 0, U3b's spiral bit for bit). On the plane, round where the vector ran out, point n of the quarter-turn spiral reaches max(`SEARCH_START`, σ × (`searchScale` + `searchScaleStep` × n/4)), σ = `PI_DRIFT_2D` × piSpan, the vector's own error per axis (law 1: by √ the distance out; law 0: by the odometer).
+- **Sourced in shape:** the search scales with σ, which grows with the distance out.
+- **Design:** an even spiral (each turn `searchScaleStep` σ further, so the turns keep within sight where the misses are); `searchScale` 1 and `searchScaleStep` 0.5 (chosen on S1, below); `SEARCH_START` as the floor; a search round the first stored place (`routeEnd`) keeps U3b's spiral, since that place was seen, not integrated.
+- **Unchanged:** the stall rule, the cap at the plane's longer side, the side view, `siteAim`. **Cost:** none in Jev; one `sqrt` a search point.
+- **Off is bit-exact:** `npm run test:golden`, and G1 seed 3's per-tick hash over 120 s against `e2b47fd6` (3,600 ticks identical).
+
+**Choosing the multiples** (S1, law 1, seeds 1–4, home in 600 s, worst seed at T = 100 / 200 / 400 / 600; today's search: 92.5 / 92.5 / 67.5 / 70 %):
+
+| `searchScale` \ `searchScaleStep` | 0.25 | 0.5 | 1 |
+|---|---|---|---|
+| 0.25 | 95 / 92.5 / 82.5 / 85 | 95 / 92.5 / 90 / 92.5 | 97.5 / 97.5 / 85 / 82.5 |
+| 0.5 | 97.5 / 92.5 / 85 / 87.5 | 97.5 / 92.5 / 85 / 82.5 | 97.5 / 95 / 77.5 / 72.5 |
+| 1 | 97.5 / 92.5 / 85 / 87.5 | **100 / 95 / 90 / 92.5** | 95 / 97.5 / 80 / 65 |
+
+**S1** (seeds 1–10, then 11–20; home within 600 s, median [worst seed]):
+
+| T (cells out) | law 0 | law 1 | law 1 + scaled | law 0 + scaled | law 1 + scaled 0.25 |
+|---|---|---|---|---|---|
+| 100, seeds 1–10 | 100 [100] | 100 [95] | 100 [100] | 100 [100] | 100 [95] |
+| 100, seeds 11–20 | 100 [100] | 97.5 [90] | 100 [100] | 100 [100] | 100 [87.5] |
+| 200, 1–10 | 100 [95] | 100 [90] | 100 [95] | 100 [100] | 100 [92.5] |
+| 200, 11–20 | 100 [90] | 97.5 [90] | 100 [95] | 100 [95] | 100 [87.5] |
+| 400, 1–10 | 96.3 [72.5] | 91.3 [70] | 97.5 [90] | 98.8 [85] | 98.8 [90] |
+| 400, 11–20 | 95 [85] | 91.3 [85] | 96.3 [87.5] | 97.5 [82.5] | 96.3 [87.5] |
+| 600, 1–10 | 87.5 [77.5] | 90 [75] | 92.5 [85] | 92.5 [85] | 92.5 [90] |
+| 600, 11–20 | 87.5 [70] | 85 [72.5] | 92.5 [72.5] | 90 [70] | 95 [72.5] |
+| median time home at 200, s (1–10 / 11–20) | 3.7 / 4.4 | 28 / 33 | 15 / 14.5 | 5.5 / 4.7 | 16 / 19 |
+| median time home at 600, s | 112 / 112 | 110 / 106 | 45 / 51 | 62 / 48 | 52 / 57 |
+
+The scaled search gives law 1 back S1's worst seed at every trip length, and better than law 0 at 400 and 600 cells out: the even spiral reaches far misses without leaving gaps.
+
+**G1** (both colonies at the arm; `scripts/lab/pi-error.mjs`'s probe with the search set; 600 s):
+
+| seeds 1–10 / 11–20 | law 0 | law 1 | law 1 + scaled | law 0 + scaled | law 1 + scaled 0.25 |
+|---|---|---|---|---|---|
+| most held over 120 s, worst seed | 6 / 4 | 3 / 4 | 5 / 4 | 4 / 6 | 4 / 11 |
+| guard: seeds within 2 | 6/10 / 4/10 | 8/10 / 8/10 | 8/10 / 9/10 | 7/10 / 3/10 | 8/10 / 7/10 |
+| food carried down, median seed | 4,640 / 5,048 | 4,824 / 4,922 | 5,036 / 4,938 | 4,802 / 5,163 | 4,653 / 4,896 |
+| food, worst seed (both) | 3,934 (s7) / 4,180 (s19) | 3,634 (s2) / 4,234 (s18) | 3,571 (s7) / 4,118 (s19) | 3,369 (s10) / 4,413 (s19) | 3,440 (s7) / 4,226 (s15) |
+| food, the weakest colony | 1,754 (s2) / 1,333 (s19) | 1,532 (s7) / 1,220 (s19) | 1,445 (s7) / 1,015 (s19) | 1,498 (s9) / 1,419 (s19) | 1,384 (s7) / 1,261 (s19) |
+| weakest colony, median seed | 2,034 / 2,176 | 2,098 / 2,210 | 2,116 / 2,090 | 2,015 / 2,141 | 2,022 / 2,171 |
+| births, median seed | 740 / 764 | 736 / 716 | 713 / 734 | 737 / 774 | 720 / 728 |
+| births, worst seed | 602 / 611 | 602 / 607 | 601 / 615 | 601 / 620 | 599 / 610 |
+| ants lost, all seeds | 1,653 / 1,933 | 1,558 / 1,449 | 1,497 / 1,473 | 1,796 / 1,755 | 1,450 / 1,344 |
+| ants lost, worst seed | 399 / 349 | 361 / 243 | 332 / 243 | 444 / 332 | 375 / 236 |
+| defenders killed | 41 / 65 | 16 / 4 | 17 / 7 | 41 / 36 | 16 / 11 |
+| their distance from home, median (p90) | 55 (88) / 59 (89) | 25 (37) / 20 (30) | 24 (44) / 23 (47) | 51 (84) / 62 (98) | 22 (41) / 16 (25) |
+
+**Other assays** (one world, seeds 1–10, both colonies):
+
+| assay | law 0 | law 1 | law 1 + scaled | law 0 + scaled |
+|---|---|---|---|---|
+| R1 `r1` | 6/10 | 6/10 | 6/10 | 6/10 (the same failing seeds 1, 2, 6, 9) |
+| A13 `defendHome` | 3/10; stored worst 151, `vsNone` worst 0.57 | 4/10; 159, 0.73 | **2/10**; 171, 0.51 | 4/10; 146, 0.80 |
+| A6 `pass` | 3/10; exchange median 0.86 | 3/10; 0.90 | 4/10; 0.90 | 2/10; 0.92 |
+| A2b `richPoor` | 9/10 | 8/10 | **6/10** (fail 4, 5, 7, 9); rich share median 0.88 | — |
+| A9 `contact` | 5/10; lost per 100 food worst 8.04 | 2/10; 7.23 | 3/10; 8.25 | — |
+| D2 `d2` | 8/10 | 6/10 | 6/10 (law 1's failing seeds) | — |
+| D5 `d5` | 6/10; stored worst 638 | 9/10; 440 | 9/10; 463 | — |
+| A12 `raidStop` | 8/10; stored worst 906 | 10/10; 1,693 | 9/10; 2,340 | — |
+| B2 `wall` | 3/10; stored worst 722 | 1/10; 543 | 2/10; 531 | — |
+| `noEntryFork` | 9/10 | 10/10 | 10/10 | — |
+| `lifecycle`: stored median [worst]; most held, worst seed | 4,910 [2,904]; 12 | 5,560 [3,100]; 4 | 5,960 [3,248]; 7 | — |
+| `lifecycle-signal` (seeds 1–5) | 4,369 [3,752]; 12 | 5,420 [3,622]; 4 | 5,532 [4,150]; 7 | — |
+| `lifecycle-scent` (seeds 1–5) | 4,369 [3,769]; 12 | 4,904 [3,717]; 6 | 5,177 [3,751]; 7 | — |
+
+The rest of `--one all` passes on the same seeds in all three arms (`alarm`, `bridge`, `deplete`, `twin`, `raidFind`, `crayonLine` 10/10; `regulateStop` 9/10; `regulate`, `faintAlarm`, `f1`, `d1`, `n1` 0/10); `d2c`, `f1` and `faintAlarm` are bit-identical between law 1 and law 1 + scaled. Law 0 and law 1 here are `ja-lp4.19`'s runs (§79.1; three re-run at `e2b47fd6` came out bit-identical); `n1` and `n3`, and R1, A13 and A6, ran every arm here. All runs are at `e2b47fd6` + this change; G1 seed 3's per-tick hash over 120 s is the same at `e2b47fd6` and at `main` (`dd033acf`).
+
+**Decision (2026-11-15): built, off; superseded by the owner on 2026-11-16 (below).** The owner's rule: turn on law 1 with the scaled search only if the weakest colony's food and S1's worst seed hold against law 0. S1 holds, and better: the worst seed at 400 and 600 cells out rises from 72.5 / 77.5 % to 90 / 85 % (seeds 1–10), and the median time home at 600 out falls from 112 s to 45–51 s. The weakest colony does not hold: 1,445 against 1,754 (−18 %) on seeds 1–10 and 1,015 against 1,333 (−24 %) on 11–20, below even law 1 with U3b's spiral (1,532 and 1,220). The smaller start (`searchScale` 0.25: 1,384 and 1,261) does no better, and the scaled search under law 0 lowers it on 1–10 (1,498) while raising it on 11–20 (1,419). A2b falls from 9 to 6 of 10 and A13 from 3 to 2. So `searchScale` stayed 0 and `piErrorLaw` 0 that day, and no golden moved. What law 1 + scaled does hold: G1's guard (8 and 9 of 10 seeds within 2, against 6 and 4), defenders dying near home (a median 23–24 cells out, against 55–59), fewer ants lost (1,497 and 1,473 against 1,653 and 1,933), and S1.
+
+**Reading.** The weakest colony's loss comes with law 1 itself: every law-1 arm is below law 0 on the same two seeds (7 and 19), whatever the search. Sizing the search brings lost carriers home faster in S1, but that is not where G1's weakest colony loses its food. Why law 1 costs it there is not yet measured.
+
+**Beads.** `ja-lp4.20` (this). Open for the owner: (1) whether the weakest colony's food on G1's quiet seeds is the bar for law 1, against the guard, the defenders and the losses it gains (Merkle 2006 and Pfeffer 2020 support the law's size; no source speaks to colony food); (2) if the search is to be sized, loops back through the origin (`searchLoops`: the sources' shape, Wehner & Srinivasan 1981; Müller & Wehner 1994) or this even spiral (design: it wins S1, but an ant that surely sees its hole within sight gains nothing from wider turns, and the sources' wider searches fit uncertain detection, Vickerstaff & Merkle 2012); (3) `piErrorAt` (50, design), which sets σ at short trips and so what law 1 costs short foragers; (4) why law 1 costs the weakest colony food on seeds 7 and 19 (a probe of where its carriers lose time).
+
+**Turned on (owner, 2026-11-16): `piErrorLaw` 1 and `searchScale` 1 together, the defaults.** The owner chose the literature-sized error (Merkle 2006, Pfeffer 2020) with the search sized to it, over the ship rule above: G1's guard 8 / 9 of 10 within 2 (law 0: 6 / 4), defenders die near home (median 24 / 23 cells against 55 / 59), fewer ants lost, S1 better on long trips; accepted costs: the weakest colony's food 18–24 % lower (seeds 7 and 19, cause not traced) and A2b 9 → 6 of 10. Every golden master is re-recorded; tests of the old law or search pin `piErrorLaw` 0 / `searchScale` 0. The tables above are the measurements this rests on.
 
 ## 80. Mutations form a tech tree, at one price that rises with each level kept (design, ja-52ui, 2026-11-15)
 
