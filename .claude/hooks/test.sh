@@ -39,6 +39,7 @@ T=mcp__github__actions_run_trigger
 check "slow.yml on a PR branch is refused" deny "$(hook $T "$(run slow.yml ccr-de1a166a-2u2o6p)" 249)"
 hook $T "$(run slow.yml ccr-de1a166a-2u2o6p)" 249 >/dev/null
 reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' "$tmp/out")
+check "the deny names the PreToolUse event" PreToolUse "$(jq -r '.hookSpecificOutput.hookEventName' "$tmp/out")"
 case "$reason" in *'#249'*) check "the reason names the PR" ok ok ;; *) check "the reason names the PR" ok "$reason" ;; esac
 case "$reason" in *slow-guards*issue_write* | *issue_write*slow-guards*) check "the reason says how: the label, through issue_write" ok ok ;; *) check "the reason says how" ok "$reason" ;; esac
 check "it asks the pulls list for open PRs on exactly that head (owner:branch), not a prefix search" "api -X GET repos/bwvogler/ant-sym/pulls -f state=open -f head=bwvogler:ccr-de1a166a-2u2o6p" "$(cat "$FAKE_GH_LOG")"
@@ -50,6 +51,7 @@ wfid() { jq -n --arg w "$1" --arg r "$2" '{method: "run_workflow", owner: "bwvog
 check "a numeric id that is slow.yml, on a PR branch" deny "$(FAKE_GH_WFPATH=.github/workflows/slow.yml hook $T "$(wfid 414678081 ccr-x)" 249)"
 check "the id is resolved through the workflows API" "api repos/bwvogler/ant-sym/actions/workflows/414678081 --jq .path" "$(head -1 "$FAKE_GH_LOG")"
 check "a numeric id that is assays.yml" allow "$(FAKE_GH_WFPATH=.github/workflows/assays.yml hook $T "$(wfid 418894776 ccr-x)" 249)"
+check "a numeric id whose path only contains slow" allow "$(FAKE_GH_WFPATH=.github/workflows/slow-nightly.yml hook $T "$(wfid 500 ccr-x)" 249)"
 check "a numeric id that can't be resolved" allow "$(FAKE_GH_WF_FAIL=1 hook $T "$(wfid 414678081 ccr-x)" 249)"
 check "a numeric id on main asks gh nothing" allow "$(FAKE_GH_WFPATH=.github/workflows/slow.yml hook $T "$(wfid 414678081 main)" 249)"
 check "(and asks it nothing)" 0 "$(calls)"
@@ -58,6 +60,10 @@ check "(and asks it nothing too)" 0 "$(calls)"
 check "an owner with odd characters" allow "$(hook $T "$(jq -n '{method: "run_workflow", owner: "bw/../x", repo: "ant-sym", workflow_id: "slow.yml", ref: "ccr-x"}')" 249)"
 check "a prefix of a PR's branch is not that PR" allow "$(FAKE_GH_PR_REF=ccr-de1a166a-2u2o6p hook $T "$(run slow.yml ccr-de1a166a)" 264)"
 check "branch names are case-sensitive" allow "$(FAKE_GH_PR_REF=CCR-X hook $T "$(run slow.yml ccr-x)" 264)"
+check "a branch with a / in its name (claude/...) is looked up" deny "$(hook $T "$(run slow.yml claude/cool-shannon-x)" 12)"
+check "a branch with a . in its name" deny "$(hook $T "$(run slow.yml fix.v1.2)" 12)"
+check "a branch with an _ in its name" deny "$(hook $T "$(run slow.yml fix_v2)" 12)"
+check "a branch with digits and -" deny "$(hook $T "$(run slow.yml ccr-068a3b40-x9)" 12)"
 check "slow.yml on a branch with no PR" allow "$(hook $T "$(run slow.yml experiment-1)" "")"
 check "slow.yml on main" allow "$(hook $T "$(run slow.yml main)" 249)"
 check "main asks gh nothing" 0 "$(calls)"
