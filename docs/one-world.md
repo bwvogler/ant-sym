@@ -13,7 +13,7 @@ The split was never decided. It appeared in MR 13 (PRD §27) when the owner aske
 | Only the side view has | Only the top-down map has |
 |---|---|
 | the queen, brood, nurses, porters, undertakers (`#nestLife`, `#nurse`, `#port`) | a larder where every 4 food makes an ant (`foodPerAnt`) |
-| chambers, floor marks, road signs | 2D foraging: Deneubourg's trail choice, the food-trail cap (`foodCapTop`), carriers homing by trail and vector |
+| chambers, floor marks, road signs | 2D foraging: Deneubourg's trail choice, the food-trail cap (`foodCapPlane`), carriers homing by trail and vector |
 | a drifting home vector (`#believe`, `#integrate`) | an exact nest position |
 | the mound as real soil, the midden | the faint-alarm pull; the bridge assay A1 |
 | the fungus's nest levers (`muddle`, `crown`) | |

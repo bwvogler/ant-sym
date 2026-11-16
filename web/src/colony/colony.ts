@@ -1330,6 +1330,7 @@ export class Colony {
 
   /** Whether each ant's stance is its own, from what it senses (docs/stance.md: open ground, stanceGate on), not the colony's. */
   get ownStances(): boolean {
+    // (A Layer's own `entrance`, not the bound layer's: `onPlane` reads only the bound one.)
     return this.params.stanceGate > 0 && this.layers.some((L) => L.entrance === null);
   }
 
