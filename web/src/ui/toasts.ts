@@ -86,7 +86,9 @@ export function pushToast(text: string, tone: ToastTone = "info", opts: number |
   if (same) {
     const again: Shown = { ...same, text, count: same.count + 1, bump: same.bump + 1 };
     toasts = toasts.map((t) => (t.id === same.id ? again : t));
-    log = log.map((n) => (n.id === same.id ? { ...n, text, count: again.count, at: now, read: false } : n));
+    // Its one line is counted, at the latest time, unread again, and back at the top (the log is newest first).
+    const old = log.find((n) => n.id === same.id);
+    log = old ? [{ ...old, text, count: again.count, at: now, read: false }, ...log.filter((n) => n.id !== same.id)] : log;
     emit();
     return same.id;
   }

@@ -15,8 +15,11 @@ import {
   setNoticesOpen,
   SWIPE_PX,
   swipeOutcome,
+  noticeLevel,
   parseNoticeLevel,
+  setNoticeLevel,
   showsAt,
+  subscribeToasts,
   TAP_PX,
   toastPlace,
   unreadNotices,
@@ -51,7 +54,7 @@ test("every notice raised goes in the log, newest first, unread until the log is
     noticeLog().map((n) => [n.text, n.tone, n.at, n.read]),
     [
       ["second", "good", 3000, false],
-      ["first", "info", 2000, false], // its one line, at the latest time (and counted: ×2)
+      ["first", "info", 2000, false], // its one line, counted (×2), at the latest time of its raising
     ],
   );
   assert.equal(unreadNotices(), 2);
@@ -192,4 +195,35 @@ test("a stored notice level is all, important or bell", () => {
   assert.equal(parseNoticeLevel("important"), "important");
   assert.equal(parseNoticeLevel("bell"), "bell");
   for (const odd of [null, undefined, "", "all", "none", "Bell"]) assert.equal(parseNoticeLevel(odd), "all", `“${odd}”`);
+});
+
+test("a repeated notice goes back to the top of the bell, unread again (review of #263, N2, N7)", () => {
+  clearToasts();
+  clearNotices();
+  pushToast("older", "info", { now: 1000 });
+  pushToast("newer", "info", { now: 2000 });
+  markNoticesRead();
+  assert.equal(unreadNotices(), 0);
+  pushToast("older", "info", { now: 3000 });
+  assert.deepEqual(
+    noticeLog().map((n) => [n.text, n.count, n.read]),
+    [
+      ["older", 2, false],
+      ["newer", 1, true],
+    ],
+    "newest first: the repeated one is on top, counted, and unread; the other is as it was",
+  );
+  assert.equal(unreadNotices(), 1);
+});
+
+test("choosing a notice level tells its subscribers, and it holds for the page (review of #263, N7)", () => {
+  setNoticeLevel("all");
+  let told = 0;
+  const off = subscribeToasts(() => told++);
+  setNoticeLevel("bell");
+  assert.equal(told, 1, "subscribers are told");
+  assert.equal(noticeLevel(), "bell");
+  setNoticeLevel("all");
+  assert.equal(noticeLevel(), "all");
+  off();
 });

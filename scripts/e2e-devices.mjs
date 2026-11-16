@@ -33,8 +33,12 @@ try {
 }
 
 const wanted = process.argv.slice(2).filter((a) => !a.startsWith("-"));
-for (const w of wanted)
-  if (!FIXTURES[w]) (console.error(`e2e-devices: no device "${w}" (have: ${FIXTURE_NAMES.join(", ")})`), process.exit(2));
+for (const w of wanted) {
+  if (!FIXTURES[w]) {
+    console.error(`e2e-devices: no device "${w}" (have: ${FIXTURE_NAMES.join(", ")})`);
+    process.exit(2);
+  }
+}
 const names = wanted.length ? wanted : FIXTURE_NAMES;
 const SHOTS = process.env.E2E_SHOTS ?? join(tmpdir(), `e2e-devices-${process.pid}`);
 mkdirSync(SHOTS, { recursive: true });
@@ -44,6 +48,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** What each failed: device, orientation, what. */
 const failures = [];
 let checks = 0;
+/** The fixtures that ran emulated (WebKit not launched): said again at the end, where a tailed log ends. */
+const emulatedRuns = [];
 
 async function until(fn, what, ms = 8000) {
   const end = Date.now() + ms;
@@ -64,8 +70,9 @@ try {
     for (const landscape of TURNS(name) ? [false, true] : [false]) {
       const label = `${f.label}${TURNS(name) ? (landscape ? ", landscape" : ", portrait") : ""}`;
       const { browser, context, emulated } = await openFixture(name, playwright, { landscape, sharp: true });
+      if (emulated) emulatedRuns.push(name);
       console.log(
-        `\n${label}${emulated ? "  (emulated: WebKit is not installed, so this is Chromium at the iPad's size, touch and user agent)" : ""}`,
+        `\n${label}${emulated ? "  (emulated: WebKit could not be launched here, so this is Chromium at the iPad's size, touch and user agent)" : ""}`,
       );
       const page = await context.newPage();
       const errors = [];
@@ -205,6 +212,10 @@ try {
 }
 
 console.log(`\n${checks} checks, ${failures.length} failed. Screenshots: ${SHOTS}`);
+if (emulatedRuns.length)
+  console.log(
+    `Emulated, not Safari's own engine (WebKit could not be launched here): ${[...new Set(emulatedRuns)].join(", ")}. Layout and touch only.`,
+  );
 if (failures.length) {
   console.log(failures.map((f) => `  - ${f}`).join("\n"));
   process.exit(1);
