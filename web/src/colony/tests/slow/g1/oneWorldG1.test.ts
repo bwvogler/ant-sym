@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { availableParallelism } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { Worker } from "node:worker_threads";
+import { BOUND, CEILING, WITHIN, judge, seedsFrom, type Held } from "./g1Rule.ts";
 
 // G1 (experiment.ts game1): generateOneWorld(seed), 600 + 600 ants, 600 s, gameRng, the side view's held-food bound (A7):
 // no colony with more than 2 foragers holding food over 120 s at any 10-s sample, counted on both layers. The bound of 2 is
@@ -17,17 +20,12 @@ import { Worker } from "node:worker_threads";
 // (2026-11-14), so one seed moving by one carrier doesn't turn the guard red.
 //
 // Each game takes 3-5 minutes; the ten run in worker threads, as many at a time as the machine has cores.
-const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-const BOUND = 2;
-const WITHIN = 5;
-const CEILING = 10;
-
-interface Held {
-  seed: number;
-  you: number;
-  rival: number;
-  worst: number;
-}
+//
+// The numbers and the judge are g1Rule.ts's, shared with scripts/g1-verdict.mjs. On CI (slow.yml) each seed has a runner:
+// G1_SEEDS (e.g. "4") plays just those seeds and G1_RESULT names the JSON file their figures go to; the `g1 verdict` job merges
+// the files and judges them with the same rule. With G1_SEEDS set this test judges nothing (one seed can't meet WITHIN).
+const SUBSET = process.env.G1_SEEDS?.trim();
+const RESULT = process.env.G1_RESULT;
 
 function game(seed: number): Promise<Held> {
   return new Promise((resolve, reject) => {
@@ -53,14 +51,17 @@ test(
   `G1, one world: hardly a forager holds its food over 120 s (seeds 1-10, 600 + 600 ants, 600 s; at most ${BOUND} on at least ${WITHIN} seeds, none at ${CEILING} or more)`,
   { timeout: 1_200_000 }, // the file limit of test:slow and slow.yml caps it anyway (20 min; on a runner it took 10.6)
   async (t) => {
-    const held = await all(SEEDS, availableParallelism());
-    const within = held.filter((h) => h.worst <= BOUND).length;
-    const table = held.map((h) => `seed ${h.seed}: ${h.you} / ${h.rival}`).join("; ");
+    const seeds = seedsFrom(SUBSET);
+    const held = await all(seeds, availableParallelism());
+    if (RESULT) {
+      mkdirSync(dirname(RESULT), { recursive: true });
+      writeFileSync(RESULT, JSON.stringify(held));
+    }
+    const v = judge(held, seeds);
     // On record when green too: the margin is what the next change to one world's play is checked against.
-    t.diagnostic(`${within} of ${SEEDS.length} within ${BOUND}: ${table}`);
-    assert.ok(within >= WITHIN, `${within} of ${SEEDS.length} seeds within ${BOUND} (need ${WITHIN}): ${table}`);
-    const jam = held.filter((h) => h.worst >= CEILING);
-    assert.equal(jam.length, 0, `seeds at ${CEILING} or more: ${table}`);
+    t.diagnostic(`${v.within} of ${seeds.length} within ${BOUND}: ${v.table}`);
+    if (SUBSET) return; // CI's per-seed runner: the verdict job judges the ten
+    assert.deepEqual(v.failures, [], "G1's rule");
   },
 );
 
