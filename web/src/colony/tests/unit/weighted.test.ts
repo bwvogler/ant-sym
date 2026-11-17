@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
+import { DEFAULT_COLONY } from "../../params.ts";
 import { localPolicy } from "../../colony.ts";
 import { readMode } from "../../colonyBrain.ts";
 import { mulberry32 } from "../../world.ts";
@@ -133,6 +134,12 @@ test("an ant draws again on the clock: the same game asks its policy more often 
   const on = asked(0.5);
   const off = asked(0);
   assert.ok(on > off * 1.2, `${on} asks with the clock, ${off} without`);
+});
+
+test("the defaults: temperature 0.5 (PRD §68.2), a fixed 10 s hold", () => {
+  assert.equal(DEFAULT_COLONY.sampleTemp, 0.5);
+  assert.equal(DEFAULT_COLONY.reroll, 10);
+  assert.equal(DEFAULT_COLONY.rerollLaw, 0);
 });
 
 test("rerollLaw 1: the clocks differ ant to ant and average `reroll`; rerollLaw 0: every clock is `reroll`", () => {
