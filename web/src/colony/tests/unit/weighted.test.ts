@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
+import { DEFAULT_COLONY } from "../../params.ts";
 import { localPolicy } from "../../colony.ts";
 import { readMode } from "../../colonyBrain.ts";
 import { mulberry32 } from "../../world.ts";
@@ -97,7 +98,7 @@ test("pick draws once by probability, and not at all without a draw, from a bare
   assert.ok(share(0.1) > 0.98, `low temperature: ${share(0.1)}`);
 });
 
-const game = (params: { reroll?: number; sampleTemp?: number } = {}) =>
+const game = (params: { reroll?: number; rerollLaw?: number; sampleTemp?: number } = {}) =>
   new Game(smallOne(1), { antCount: 40, rivalAnts: 10 }, mulberry32(3), { colony: params });
 
 /** A policy that answers every situation with the same distribution, drawn from as the page's does. */
@@ -133,6 +134,30 @@ test("an ant draws again on the clock: the same game asks its policy more often 
   const on = asked(0.5);
   const off = asked(0);
   assert.ok(on > off * 1.2, `${on} asks with the clock, ${off} without`);
+});
+
+test("the defaults: temperature 0.5 (PRD §68.2), a fixed 10 s hold", () => {
+  assert.equal(DEFAULT_COLONY.sampleTemp, 0.5);
+  assert.equal(DEFAULT_COLONY.reroll, 10);
+  assert.equal(DEFAULT_COLONY.rerollLaw, 0);
+});
+
+test("rerollLaw 1: the clocks differ ant to ant and average `reroll`; rerollLaw 0: every clock is `reroll`", () => {
+  const clocks = (rerollLaw: number): number[] => {
+    const g = game({ reroll: 8, rerollLaw });
+    const c = g.player;
+    c.bindPolicy("mode", drawing("explore=0.5,follow=0.5"));
+    g.tick(1 / 30);
+    return [...Array(c.params.antCount).keys()].filter((i) => c.redraw[i] > 0).map((i) => c.redraw[i]!);
+  };
+  const fixed = clocks(0);
+  assert.ok(fixed.length > 10);
+  for (const v of fixed) assert.ok(Math.abs(v - 8) < 1e-3, `fixed clock ${v}`);
+  const law = clocks(1);
+  assert.ok(law.length > 10);
+  assert.ok(new Set(law.map((v) => v.toFixed(3))).size > law.length / 2, "the clocks are spread out");
+  const mean = law.reduce((a, b) => a + b, 0) / law.length;
+  assert.ok(mean > 8 * 0.5 && mean < 8 * 1.6, `mean ${mean.toFixed(1)} of ${law.length} clocks, about 8`);
 });
 
 test("a policy that never draws leaves every ant without a clock (the local rule's game is unchanged)", () => {

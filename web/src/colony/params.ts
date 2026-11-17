@@ -87,6 +87,12 @@ export interface ColonyParams {
    */
   reroll: number;
   /**
+   * How long an ant holds a drawn mode before it draws again: 0, exactly `reroll` seconds; 1, a time drawn from an exponential law
+   * with mean `reroll` (a hazard of dt/reroll a tick: some ants change their mind after a second, others hold for a minute, and
+   * they fall out of step by themselves). Needs `reroll` > 0.
+   */
+  rerollLaw: number;
+  /**
    * Whether an ant out exploring or following on one world's plane asks the steer policy for its steering weights (
    * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
    */
@@ -461,8 +467,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
-  sampleTemp: 1,
+  sampleTemp: 0.5,
   reroll: 10,
+  rerollLaw: 0,
   steerLane: 0,
   findNear: 8,
   searchSpan: 1.33,
