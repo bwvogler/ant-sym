@@ -467,7 +467,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
-  sampleTemp: 1,
+  sampleTemp: 0.5,
   reroll: 10,
   rerollLaw: 0,
   steerLane: 0,

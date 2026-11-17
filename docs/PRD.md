@@ -5817,6 +5817,35 @@ The mean probability of the top answer is 0.68–0.95 by lane. Under Warlike, an
 - Under Warlike the losses lean the same way (0.89 and 0.88) but swing by seed. The Warlike cache also lacks some situations the 600 s games reach: the local rule played 21 % of contact lookups in the top arm and 43 % of get lookups in the drawn arm (review of #239). So this row is the weakest of the three. Forage and Cautious stay under 5 % in every lane. Under Forage nothing moves.
 - Unlike the mode draws (§68), drawing the responses costs no food.
 
+### 68.2 The draw's temperature and clock, measured: temperature 0.5 is the default (2026-11-17)
+
+**Why.** §68 drew the mode at temperature 1 and found it cost food (−22 to −38 %, three seeds). The owner asked what drawing every tick would do, whether a lower temperature rescues it, and whether the 10 s timer is the right way to change one's mind.
+
+**Method.** `assays.yml` (free: no Jev), `lockstep --one`, seeds 1–20, `both.sampleTemp` × `both.reroll` [× `both.rerollLaw`], `--policy precache:<doctrine>` (the shipped mode answers; the response and steer lanes play the local rule), the first colony, medians over seeds, [Forage](https://github.com/bwvogler/ant-sym/actions/runs/44014812214) and [Warlike](https://github.com/bwvogler/ant-sym/actions/runs/44014816462) for the exponential arms; the others ran on main `a81158b` with the same seeds. "Old" is temperature 0: Jev's top answer, no draws. Agreement is `lockAgree` (§81): 1.00 is every ant in a situation acting alike.
+
+| Arm (temperature, re-draw) | Food ÷ old, F / W | Lost, F / W | Agreement |
+|---|---|---|---|
+| Old way | 1.00 (940 / 970) | 16 / 22 | 1.00 |
+| Fixed timer 10 s, T 1 (was the default) | 0.81 / 0.67 | 9 / 6 | 0.90–0.91 |
+| **Fixed timer 10 s, T 0.5 (now the default)** | **0.93 / 0.94** | 11 / 8 | 0.96–0.97 |
+| Fixed timer, T 0.3 / 0.2 / 0.1 | 1.03 / 1.07 / 1.00 and 0.96 / 1.12 / 1.02 | 21 / 12 / 18 and 9 / 13 / 14 | 0.99–1.00 |
+| Every tick, T 1 | 0.09 / 0.03 | 0 / 0 | 0.98–0.99 |
+| Every tick, T 0.5 | 0.69 / 0.31 | 1 / 0 | 0.96–0.97 |
+| Every tick, T 0.3 / 0.2 / 0.1 | 1.02 / 1.09 / 1.10 and 0.70 / 0.82 / 0.80 | 5 / 8 / 9 and 0 / 0 / 3 | 0.99–1.00 |
+| Exponential hold, mean 3 / 10 / 30 s, T 0.5 | 0.96 / 1.00 / 0.95 and 0.94 / 0.90 / 1.03 | 10 / 8 / 12 and 4 / 8 / 8 | 0.96–0.97 |
+| Exponential hold, mean 3 / 10 / 30 s, T 1 | 0.80 / 0.86 / 0.89 and 0.66 / 0.75 / 0.71 | 7 / 8 / 6 and 1 / 6 / 4 | 0.88–0.91 |
+
+(The lower-temperature rows give Forage and then Warlike.) No arm held a carrier past 120 s.
+
+- **Drawing every tick fails.** At temperature 1 the colony keeps 3–9 % of its food: an ant that changes mode 30 times a second finishes nothing (a mode change resets its target: a hypothesis, not checked). The collapse is a threshold: fine up to T 0.3, broken by 0.5. Lockstep agreement *rose* (0.98) for the colony that barely foraged: read it with food beside it.
+- **Low temperature is the old way.** At T ≤ 0.3 agreement is 0.99–1.00, the lockstep the draws were meant to remove. Per tick at T ≤ 0.3 on Warlike costs 18–30 % of the food and almost no ants die (0–3 against 22): fights are probably no longer sustained (not checked).
+- **Temperature 0.5 with a hold of seconds is the sweet spot:** 93–94 % of the old food, fewer ants lost than the old way, 7–8 of 20 seeds above it, agreement 0.96–0.97 (today's 0.90 at T 1).
+- **The exponential hold only matches the fixed timer.** At T 0.5 its food ranges 0.90–1.03 across means of 3–30 s with no order, within the seed noise; at T 1 it loses 11–34 %. So the length of the hold matters little between 3 and 30 s, and the temperature does. `rerollLaw` stays an option, off.
+
+**Built.** `sampleTemp` defaults to 0.5 (was 1); the Lab's slider starts there. `rerollLaw` (0 fixed, 1 exponential with mean `reroll`) is new; off, nothing changes. The golden masters don't draw and are exact. Only the mode lane was measured; the response lanes (§68.1) draw at the same temperature but play the local rule on the page.
+
+**Not done.** A time-in-mode cue in the situation (so Jev, not a constant, sets how long an ant holds): it changes the legend and keys and re-ships the answers (~$0.12 for the mode lane), and goes through `adding-mechanics` first.
+
 ## 69. The page: the map fills the screen, depth tucked away (ja-mvo9, 2026-11-14)
 
 The owner asked for the map to fill the screen, with drawers and panels for the controls and menus, and with learning and deep experimentation kept but somewhat buried. From a brainstorm of five directions they picked four to combine:
