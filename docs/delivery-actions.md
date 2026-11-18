@@ -189,3 +189,37 @@ node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 600 --variants roya
 Next work is a researched local loop-recovery design and measurements against this open-exit fixture and the colony controls. A timer that silently chooses another destination, global chamber routing, and uphill-only scoring are not established solutions. The existing long-attempt signal alone does not guarantee progress: the pilot doctrine repeatedly chooses its already-active royal destination. No production behavior, default, response key or token cost changes in this diagnostic slice; no live calls were made.
 
 Validation for this slice: 29 delivery tests passed, with the one explicitly pending escape regression still failing as expected. Typecheck, lint (existing warnings) and changed-file formatting passed. The simulation production files have no diff; build, goldens and the full test suite were not rerun for these harness/test/documentation changes.
+
+## Sampled local turns (ja-g7nz.3.3.2.1), 2026-11-18
+
+### Evidence and scope
+
+Perna et al. (2012) studied *Linepithema humile* exploring an arena. They found turning related to local left/right pheromone differences and showed how directional noise can yield nonlinear collective branch choice. This supports considering variable local turns; it does **not** validate a particular underground delivery rule, turn coefficient, or escape deadline. Source: [full primary article](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1002592), retrieved 2026-11-18. The game's existing food-trail follower already uses squared cue-weighted choice (`grid.choose`; [trails](trails.md)).
+
+**In the game:** tune the existing experimental local delivery scorer, using only its current direction, walkable neighbours and existing role marks. A continuing cell choice weights a positive cue by `(1 + cos(turn))/2`, then samples in proportion to that weighted cue squared. Straight, 60-degree and 120-degree turns therefore have direction factors 1, 0.75 and 0.25 before squaring. These coefficients and the translation to nest delivery are **design**, not measured biology. Sharp bends remain possible. Immediate retracing remains excluded on continuing steps; fresh goals still deterministically consider all six directions, preserving the earlier reverse-cue correction. A retained movement target or no positive cue consumes no route draw; unmarked search retains wall-following. No new memory, sense, action, timer, global chamber read or policy call is added. The role and food remain committed until the existing policy changes or releases them.
+
+The purpose is to remove a deterministic three-cell trap. It is not a general maze solver: a marked cycle with no marked exit can still trap a carrier, and sampling gives no hard escape deadline. The carry policy can still persist indefinitely. The one reusable six-weight buffer is scratch, not saved state; normal RNG state makes saves replayable.
+
+### Tests and pilots
+
+The former pending escape test now passes for 20/20 fixture seeds within 60 centre-to-centre choices, with food and role retained. This is a route-choice bound, not 60 seconds or a colony survival claim. Tests also cover usable sharp bends, a weaker-cue exit having nonzero probability, increased preference after strengthening a cue, unchanged targets, erased-cue search, effort-conditioned release and JSON continuation. The whole delivery suite passes 34/34 with no pending escape test.
+
+A deterministic turn penalty was first tested and rejected: seed-1 direct royal storage improved354→397, but five-second redirection fell99→84 and still held up to28 loads over120 s. Twenty-second storage was141 with9 long-held loads. The exact rejected patch and raw run are retained as `rejected-turn-weight.patch` and `seed1-turn-weight-rejected.json`.
+
+Final sampled-turn pilots use the same two generated worlds, 60 starting ants and 600 seconds as before:
+
+| Doctrine | Seed 1 stored, before → sampled | Seed 2 stored, before → sampled | Max loads held >120 s, before → sampled (seeds 1 / 2) |
+|---|---:|---:|---|
+| Default | 444 → 444 | 698 → 698 | 1 / 0 → 1 / 0 |
+| Lane enabled, retain only | 444 → 444 | 698 → 698 | 1 / 0 → 1 / 0 |
+| Direct royal | 354 → 420 | 684 → 680 | 0 / 0 → 0 / 1 |
+| Brood → royal at 5 s | 99 → 166 | 245 → 372 | 28 / 15 → 3 / 0 |
+| Brood → royal at 20 s | 125 → 135 | 331 → 311 | 20 / 0 → 5 / 0 |
+
+The change removes the reduced deterministic trap and improves the five-second treatment in both pilots, but is not a universal improvement. Direct royal loses four deliveries and gains one long-held load in seed2; twenty-second redirection loses20 deliveries there. Remaining held loads and throughput below baseline keep ja-g7nz.3.3.2 and calibration open. The two seeds guided exploration; they are **not** independent validation. Neither effort threshold nor a new default doctrine is selected. The production default remains `deliveryLane: 0`.
+
+Raw final results: `seed1-sampled-turns.json`, `seed2-sampled-turns.json`. Each records the base commit, exact `sampled-turns.patch` for the route change, and routing/harness hashes. To reproduce at this implementation, use the pilot command with `--variants baseline,retain,royal,royal5,royal20`. Different trajectories consume different random draws; comparisons are paired initial seeds, not equal subsequent randomness.
+
+For play, explicit deliveries can deviate from a local cue cycle while retaining their role, and distorted marks still influence movement. There is no new player control or response-cache dimension. Incremental Jev token cost is zero; no live calls were made. Broader colony calibration, remaining trapped loads and absent-role doctrines still need work before default promotion.
+
+Final validation: all34 delivery tests and all four simulation goldens pass unchanged; typecheck, lint (existing warnings), changed-file formatting and production build pass. The full all-tier suite and multi-minute slow guards were not rerun. Final populations for direct/5-second/20-second treatments are90/90/89 in seed1 and90/90/90 in seed2; queens survive, with no adult hunger deaths or brood starvation recorded. These short pilots still do not establish long-term survival.

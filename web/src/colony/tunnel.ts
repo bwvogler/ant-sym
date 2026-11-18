@@ -44,6 +44,9 @@ import { AIR, OPEN, SOIL, isSky, markFork, rockAt, takeFork, tunnelHeading, type
 import { believe, climbOut, destMark, holeMetric, searchOn, targetHole, towardHole } from "./homing.ts";
 import { around } from "./sense.ts";
 
+// Scratch for one synchronous local route decision; never persisted per ant.
+const deliveryWeights = new Float64Array(6);
+
 /**
  * The chance a raider about to step onto a cell of the raided colony's midden (mark v there) turns back. A lone scout
  * mostly does; a raid in force presses on (review of #26: one saturated cell turned back 98 % of raiders, so none ever
@@ -276,6 +279,8 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     const hy = col.goalY - centreY(cy);
     let best = -1;
     let bestV = byVector ? -Infinity : 0;
+    let total = 0;
+    if (delivering && !fresh) deliveryWeights.fill(0);
     // A chosen role can lie behind after redirection. The ordinary homing
     // rule avoids retracing. Reconsider the reverse cue on a fresh step (a new
     // goal or invalidated target), not after every cell: that can bounce forever.
@@ -287,9 +292,29 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       const v = byVector
         ? Math.cos(DIR_ANGLE[d]) * hx + Math.sin(DIR_ANGLE[d]) * hy
         : (signs ? signs.get(tx, ty) * signGain : 0) + (delivering ? 0 : field.get(tx, ty));
-      if (v > bestV) {
-        bestV = v;
+      // A continuing route samples local cues rather than locking into a
+      // deterministic three-cell maximum. Turn weighting favours continuing
+      // forward but still permits sharp bends (design; docs/delivery-actions.md).
+      const score = delivering && !fresh ? (v * (1 + Math.cos((turn * Math.PI) / 3))) / 2 : v;
+      if (delivering && !fresh) {
+        deliveryWeights[d] = score > 0 ? score * score : 0;
+        total += deliveryWeights[d];
+      }
+      if (score > bestV) {
+        bestV = score;
         best = d;
+      }
+    }
+    // One draw at a new continuing cell choice; never on a retained target,
+    // a fresh goal, an unmarked search or the default route.
+    if (delivering && !fresh && total > 0) {
+      let draw = col.rng() * total;
+      for (let d = 0; d < 6; d++) {
+        draw -= deliveryWeights[d];
+        if (deliveryWeights[d] > 0 && draw < 0) {
+          best = d;
+          break;
+        }
       }
     }
     if (delivering) col.deliveryState[i] = best < 0 ? DELIVERY_SEARCH : DELIVERY_TRAVEL;
