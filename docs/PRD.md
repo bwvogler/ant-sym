@@ -7379,3 +7379,82 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Checked.** Unit tests for the helpers (`ui/tests/hyphaeLook.test.ts`: same place, same bend, bounded; the spline passes through every point; runs cover every edge once and cut at cord changes; twigs fixed by the key). Before and after screenshots at the same moment of the same game.
 
+
+## 84. Opt-in food pickup policy experiment (local review, ja-8jup, 2026-11-18)
+
+**Scope and basis.** Owner requested the first narrow action-level experiment using §42's existing response architecture. This connects an existing action and existing sensed `Touch` fields to the page client; it introduces no new biological claim, sense, fungal lever or response semantics. §82's steering lane is independent. The implementation is uncommitted pending review.
+
+**Route.** Open the page with `?pickupPolicy=1` (or `&pickupPolicy=1` after other query parameters), or construct `new ColonyJev({ pickupPolicy: true }, store)`. Missing or other values leave it off. Reload without the parameter to disable. This is an experimental page-session option, not a saved game setting.
+
+Only empty-jawed ants offered **food** consult the `get` lane. Soil, corpses and brood, and every other response, retain their existing behavior. A cached answer uses the existing `responseOf` weighted draw. A miss, invalid answer or failed request leaves the species' original `get` in charge (`localResponses` for the generic ant), including its draw. No old-doctrine answer substitutes for a missing pickup answer. The existing context hash, legend, question, response version and cache keys are unchanged. No precache refresh is necessary.
+
+The client materializes the shared `Touch`, including its lazy `place` getter, before queuing. Queues and in-flight requests deduplicate by context and situation; colonies sharing a doctrine share answers. Requests use the existing scheduler, budget and cache store. Pickup batches gather using the client's existing `gatherMs`; warm caches incur no additional requests. A new doctrine clears its queue and uses its own cache.
+
+**Fungus and play.** All fungal sensory gains and their existing application sites remain intact. The fungus still acts through those senses; this experiment does not give it direct pickup commands or use its aim as the colony doctrine. The visible difference is that a policy can leave encountered food on the ground, or allow a fighter to pick it up. There is no progression or social-immunity bypass. Blanket refusal could starve a colony; the setting stays off by default.
+
+**Focused experiment.** `web/src/ui/tests/pickupPolicy.test.ts` runs paired, hand-placed food encounters across seeds 1–20, each with three arms: local response, cached accept, cached reject. Each ant starts on the food cell and advances one simulation tick. Local and accept each pick up 20/20; reject picks up 0/20. Food is conserved in every arm. This is a deterministic control-path ablation, not evidence of improved foraging or a biological fit. It uses synthetic cached decisions and spends nothing on Jev. Long-game effects and live doctrine quality remain unmeasured.
+
+**Regression coverage.** Actual food pickup and fighting-ant pickup; default-off response identity and no pickup requests; cache hits, invalid seeds, doctrine isolation, weighted draws and species fallback; repeated attachment; mutable Touch and lazy place snapshots; repeated encounters asking once and then spending nothing; fungal sensory gains retained. Existing golden recordings were not updated.
+
+**Cost estimate.** Using `estimateTokens` on `packResponseRequest` with the first preset doctrine and the sample food Touch, at the repo's $0.042/M input-token rate:
+
+| Situations in batch | Estimated input tokens | Tokens/situation | Estimated USD/batch |
+|---|---:|---:|---:|
+| 1 | 2,053 | 2,053 | 0.000086226 |
+| 10 | 3,370 | 337 | 0.000141540 |
+| 100 | 16,669 | 166.69 | 0.000700098 |
+
+No new situation dimension is added. Off: zero additional questions. On: one question per previously unanswered encountered food Touch per doctrine, absent retries; warm cache: zero. An hourly figure needs an observed count and batch distribution of new situations, so none is claimed. Actual billing uses the existing ledger, not this size estimate. No live Jev calls were made.
+
+**Verification commands (repo root).**
+
+```sh
+npm --prefix web ci
+npm run test:unit
+node --test web/src/ui/tests/pickupPolicy.test.ts web/src/colony/tests/unit/laneBinding.test.ts web/src/ui/tests/precache.test.ts web/src/colony/tests/int/responseDraw.test.ts web/src/colony/tests/int/responseCallSites.test.ts
+npm run test:golden
+npm run typecheck
+npm run lint
+git diff --check
+```
+
+Beads `ja-8jup` records the implementation; `ja-xs4i` records follow-up validation on main `196deaf3` in an isolated worktree. The owner subsequently authorized pushing the reviewed changes and continuing the plan on 2026-11-18.
+
+**Initial validation results (superseded by the latest-main follow-up below).** 579 unit tests, 39 focused tests (overlap with unit tests), and 4 golden tests passed. Typecheck and changed-file formatting passed. Lint passed with seven pre-existing no-unused-expressions warnings in unchanged files. `git diff --check` passed. Browser end-to-end, soak, slow guards and paid live-policy checks were not run.
+
+### Paired one-world validation (ja-xs4i)
+
+The follow-up harness is `scripts/lab/pickup-policy.mjs`. It constructs the same 160 × 100 one-world map and random stream for each arm, with 120 ants per colony and two colonies. Only pickup differs; mode, stance and steering are restored to the game's original policies after attaching the client. Both colonies share one doctrine. Synthetic deterministic answers are preseeded for every eligible Touch combination, so there are no live requests. This deliberately isolates the get cache route; it does not evaluate Jev's interpretation of a doctrine.
+
+The arms are off, cached-local (the exact local get decision), and cached-refuse (refuse every food offer). Each paired seed asserts that off and cached-local produce exactly the same SHA-256 of the complete saved simulation. The refusal arm must accept no food offers. Counters include eligible food encounters, accepted offers, unique response keys, food home and combat losses per colony. Repeated offers are not distinct pickups. The harness reports a cold-cache cost envelope for the observed keys: batches of 100 versus one request per key, without retries. These are counterfactual estimates using the experiment doctrine; actual requests are asserted zero in all arms, and the disabled feature would always add zero spend.
+
+Reproduce the 120-second games (seeds 1–10, then held-out 11–20; no tuning between groups):
+
+```sh
+node scripts/lab/pickup-policy.mjs 1-20 120 > pickup-policy-results.jsonl
+```
+
+The targeted client tests also cover two colonies sharing one pending get question and cache entry, and rejection of an invalid live noul answer without losing the local fallback.
+
+**Follow-up results.** Seeds 1–20 passed exact off-versus-cached-local saved-state equality. Food home summed across colonies: median 326.5 on seeds 1–10, 438 on seeds 11–20, unchanged by the cache route; cached refusal delivered zero on all seeds. Only 2–4 distinct keys occurred locally and 4–6 under refusal, despite 5,083–49,441 offers under refusal. The cold-cache cost envelope over enabled runs was $0.00008988–$0.000502656 for the observed keys; actual requests zero. [Experiment report and commands](../experiments/pickup-policy/README.md); [per-seed data](../experiments/pickup-policy/results.jsonl). Final validation on main `196deaf3`: 588 unit, 22 focused and 4 golden tests pass; typecheck, formatting, lint (seven existing warnings) and diff checks pass. `ja-nhin` tracks measuring repeated-offer dwell before extending behavior.
+
+**Refusal dwell follow-up (`ja-nhin`).** An observational probe over the same 20 seeds found 6,299 refusal episodes: 6,084 (96.6%) crossed multiple hexes, 6,199 ended with no food under the ant, 23 ended at death/slot reuse and 77 remained active at the boundary. Per-seed completed-episode p50: 0.667–1.100 s; p95: 1.633–36.000 s. The longest observed episode lasted 57.467 s, traversing 31 cells and 402.03 world units within a 6.71-unit radius from its first offer. No same-food-hex offer streak exceeded 0.733 s. This points to repeated local movement, not immobility. All 40 run hashes and prior counters are unchanged; four observer tests pass. [Definitions, limitations, results and reproduction](../experiments/pickup-policy/DWELL.md). No movement behavior was changed: a separate disengagement decision should be researched and planned before implementation.
+
+
+## 85. Departure is separate from food refusal (design, ja-ygs9, 2026-11-18)
+
+**Research basis:** [food-disengagement.md](food-disengagement.md). Lasius niger acceptance depends on experience; food rejection need not mean immediate departure (Wendt et al. 2019). Ants can pass poorer food for a known better alternative (Wendt & Czaczkes 2017; detailed methods unverified here). Trail strength did not determine acceptance in the tested comparison (Oberhauser et al. 2020).
+
+**Measured problem.** §84 refusal episodes mostly involve movement: 96.6% crossed hexes, yet one lasted 57.467 s. Refusal alone does not express a choice to move on. The observer cannot equate food disappearance with geometric departure.
+
+**Decision (owner approved continuing the plan, 2026-11-18).** A separate, opt-in response after food refusal: continue (local fallback) or bounded heading-preserving pass-by. No overload of get or nest leave. Existing collision/combat priority and fungal sensory controls remain intact. No new sensed dimension or world-wide read. Per-ant execution state and cache version are separate from get.
+
+**Play.** The policy can leave food untouched while exploring nearby, or explicitly move on. Passing by trades a resource opportunity for travel; it does not promise better survival. No new unlock or UI panel in the first assay.
+
+**Assays and targets.** First measure actual departure in fixed non-depleting open, broad, corridor and obstructed patches, with no behavior change (`ja-ygs9.1`). Then compare refusal/continue/pass-by using seeds 1–10 for development and 11–20 untouched, worst seed reported. Proposed engineering gates and 0.5/1/2-second candidates are in the note; these are not biological targets. Disabled and cached continue must preserve saved states and RNG exactly. No golden updates expected.
+
+**Cost.** One separate response family, no new Touch fields; zero additional requests off or with a warm cache. New-lane token count and post-intervention key coverage remain unmeasured; packer estimates and observed batching/retries precede any paid test. This planning work spent zero on Jev.
+
+**Beads.** `ja-ygs9` research/design epic; `ja-ygs9.1` assays blocks `ja-ygs9.2` action implementation. Owner review completed on 2026-11-18; assays precede implementation. No behavior code has been added for this section.
+
+**Still open.** Actuator integration, save/reload contract, measured departure benefit and tick overhead. Learned expectations are deferred; commit this plan before departure assays.
