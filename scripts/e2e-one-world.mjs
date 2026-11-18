@@ -765,6 +765,7 @@ try {
   section("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
   const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first(); // Infectivity: fair, a root of the tree
+  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first(); // on a phone's list: the upgrade's name
   // The upgrades live in the Mutations drawer (PRD §69): the rail opens it, and the button shows it pressed.
   const mutations = (p) => p.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Mutations", exact: true });
   await mutations(page).click();
