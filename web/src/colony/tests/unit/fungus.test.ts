@@ -392,7 +392,6 @@ test("a landing roots a tip in each of the six ways, whichever way it aims; grow
   };
   const all = [0, 1, 2, 3, 4, 5];
   assert.deepEqual(headings(null).sort(), all, "no aim: all six");
-  const east = headings({ x: 30, y: at(20, 6).y });
-  assert.deepEqual([...east].sort(), all, "aimed at a hole to the east: all six, the aimed one first");
-  assert.equal(east[0], 0);
+  // Aimed due west (heading 3, not the first in the list): the aimed tip comes first, then the rest round from it.
+  assert.deepEqual(headings({ x: 10, y: at(20, 6).y }), [3, 4, 5, 0, 1, 2], "aimed west: all six, the aimed one first, then round");
 });
