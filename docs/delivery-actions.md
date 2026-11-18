@@ -67,3 +67,20 @@ ja-g7nz.3.2 tracks bounded search/replanning, interrupted meals, congestion and 
 ### Validation record
 
 Typecheck, lint (existing warnings only), formatting and production build passed. The broad run started before the final search-state fix: 1,353 passed, two failed, four TODOs. One failure caught the delivery search-state assignment in the wrong tunnel branch; moving it to the delivery cue choice fixed it, and the final 33-test focused run passed, including the 80 fork trials. The remaining broad-run failure is the previously reproduced Node 24 CI-report timeout-fixture mismatch tracked in ja-dkgo; it is unrelated to delivery. All four ant/fungus simulation goldens passed unchanged. The full suite was not repeated after the focused fix.
+
+## Recovery assays, 2026-11-18 (ja-g7nz.3.2.1)
+
+`tests/int/deliveryRecovery.test.ts` characterizes the existing action before introducing another sense or choice. Six tests passed:
+
+| Intervention | Result | Limit of the claim |
+|---|---|---|
+| Fill the chosen next cell with rock | The movement step is reconsidered locally; the role and food remain | Does not prove eventual escape from every maze |
+| Remove the brood role, then change the carry policy to store after one second | 20/20 RNG seeds deposit in the store within the following five seconds | The harness schedules the replacement; the ant cannot yet sense failed-search duration |
+| Hungry carrier feeds beside stocked store | Energy rises, jaws retain the load, brood delivery resumes; stock + eaten + carried food conserved | Feeding is instantaneous in `body`, not a timed interruptible meal |
+| Save during failed delivery, reload, apply identical replacement | Subsequent game saves match exactly | Policies must be reattached to both games |
+| Inspect the search explanation 100 times | Next 50 RNG draws and saved state match an uninspected control | Observability guard, not a behavioral intervention |
+| Send 1, 8 or 24 carriers through the same one-cell passage | All loads arrive in three ticks in each case; none duplicated and all carriers alive | This fixture produces no congestion penalty; it cannot validate queuing or yielding |
+
+These are synthetic contract assays, not biological timing calibration or colony-scale survival evidence. No production behavior, question wording, cache key, or default setting changes in this slice; incremental Jev cost is zero. The same-seed trace comparison holds random draws equal only while inspection is the sole intervention; diverging trajectories must not be described as having identical subsequent draws merely because their seeds match.
+
+The broader ja-g7nz.3.2 remains open. Its children separate the remaining decisions: ja-g7nz.3.2.2 researches locally sensed failed-search evidence and bounded policy commitment; ja-g7nz.3.2.3 researches timed feeding and passage congestion. A hidden timer that chooses another chamber would bypass the policy, so it is not added as an unmeasured fallback. The player still gets the existing delivery explanation; there is no new control or implied colony-scale readiness.
