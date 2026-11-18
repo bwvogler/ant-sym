@@ -276,7 +276,10 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     const hy = col.goalY - centreY(cy);
     let best = -1;
     let bestV = byVector ? -Infinity : 0;
-    for (const turn of [0, 1, -1, 2, -2]) {
+    // A chosen role can lie behind after redirection. The ordinary homing
+    // rule avoids retracing. Reconsider the reverse cue on a fresh step (a new
+    // goal or invalidated target), not after every cell: that can bounce forever.
+    for (const turn of delivering && fresh ? [0, 1, -1, 2, -2, 3] : [0, 1, -1, 2, -2]) {
       const d = (dir + turn + 6) % 6;
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);

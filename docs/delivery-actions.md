@@ -134,3 +134,36 @@ game.player.responses = responses({
 This deliberately uses one fallback role. Choosing the same fallback again does not reset effort. A policy that alternates different roles can still thrash, and a persistent policy can still strand a load; neither is repaired by an omniscient default. Threshold calibration, colony-scale survival/throughput and timed meals/traffic remain open.
 
 The complete unit tier passed 575/575. The response regression file passed 29 tests and found one old carry-key assertion; the assertion was updated to include effort while still excluding contact-only alarm/odds, and the two targeted contact tests then passed. Formatting passed. The full all-tier suite was not repeated for this slice; its known Node 24 CI-report fixture issue remains tracked separately as ja-dkgo.
+
+## Colony pilot and reverse-cue fix (ja-g7nz.3.3), 2026-11-18
+
+The tiny fork tests did not predict colony performance. A reproducible offline harness now lives in `scripts/lab/delivery-calibration.mjs`; raw runs are in `experiments/delivery-calibration/`. Two generated worlds (seeds 1 and 2), 60 initial ants, a 160×100 plane, one colony, no rival, 600 simulated seconds, no forced food/positions/cues and no live calls were used. These are diagnostic pilots, not the required training seeds 1–10 and held-out seeds 11–20. The larger sweep is deferred because the pilots already fail the retained-load guard; the available GitHub connector also does not expose workflow dispatch.
+
+Both initial nests had only a royal chamber for the player. The earlier synthetic doctrine (brood, then store) therefore chose roles absent from these nests, and deposited zero food in the initial 120-second pilots. The harness does not reveal the chamber table to the policy. A fixed royal doctrine, and brood followed by royal on the effort signal, distinguish absent destinations from the ability to reach a destination that exists.
+
+Two negative controls use the shipped default and explicit-lane-enabled `take` with no selected role. Their recorded metrics match in both seeds: 444/698 food stored, 90 living workers, 30 births, no hunger deaths, and maximum 1/0 loads held over 120 seconds. Same-seed treatment runs start from the same RNG state; diverging trajectories do not retain identical subsequent draws.
+
+### Local turn correction
+
+The directed route scorer excluded the neighbour directly behind even when a changed goal invalidated its movement step. A regression failed with the store behind at cue strength 100 and a forward cue of 1: it chose forward. Explicit delivery now considers the reverse cue on a **fresh** movement step (new goal or invalidated target). Continuing cell-to-cell paths retain the no-immediate-retrace rule. No destination address, new sense, policy call or RNG draw is added. Default routing stays unchanged.
+
+Allowing reversal at every cell was tested and rejected: direct royal deliveries fell from 354/684 to 0/50, with 58/56 long-held loads. The final narrow correction preserves the direct-royal outcomes exactly. It improves one bad redirection case but does not solve general recovery, and several other treatment metrics worsen; it is a correction to local goal reconsideration, not a promoted navigation strategy.
+
+| Doctrine | Seed 1 stored, before → final | Seed 2 stored, before → final | Final max loads held >120 s, seeds 1/2 |
+|---|---:|---:|---:|
+| Default | 444 → 444 | 698 → 698 | 1 / 0 |
+| Always royal | 354 → 354 | 684 → 684 | 0 / 0 |
+| Brood → royal after 5 s | 0 → 99 | 272 → 245 | 28 / 15 |
+| Brood → royal after 20 s | 150 → 125 | 366 → 331 | 20 / 0 |
+
+Final five-second treatment populations were 82/90 (22/30 births); twenty-second populations were 89/90 (29/30 births). Queens survived and no adult hunger deaths or brood starvation were recorded in these runs. Survival alone would have missed the food-flow and retained-load failures. Neither 5 nor 20 seconds earns default promotion. Direct royal delivery also fell short of baseline throughput, especially seed 1 (354 vs 444).
+
+The harness records goal starts, replacements, completions, effort exposure, carried food, long-held loads, food stores, births and sampled unresolved carriers. Local measurements take under a minute for each five-variant seed run; wall times are instrumentation, not a performance benchmark. `harness-source.txt` preserves the exact pre-formatting harness matching the SHA recorded in each raw JSON. The JSON's `commit` is the initial simulation baseline; `routingVariant` distinguishes original, rejected always-reverse and the final fresh-reverse patch.
+
+Reproduce the final treatment pilot from the repo root:
+
+```sh
+node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 600 --ants 60 --variants baseline,retain,royal,royal5,royal20 --out pilot.json
+```
+
+Repeat with seed 2. The broader calibration remains open under ja-g7nz.3.3; ja-g7nz.3.3.2 tracks long-held loads after redirection before proceeding to a 20-seed promotion sweep. The reverse-cue bug is ja-g7nz.3.3.1. All 28 delivery tests and four unchanged simulation goldens passed after the narrow correction.

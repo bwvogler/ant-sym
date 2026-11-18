@@ -254,3 +254,29 @@ test("an explicit destination on the surface still homes to its familiar entranc
   assert.equal(s.goal, c.nest);
   assert.equal(c.carrying[0], 1);
 });
+
+test("an explicit delivery can turn back toward a stronger destination mark", () => {
+  const { c, y } = setup();
+  put(c, 0, 23, y);
+  c.heading[0] = 0; // east; the store is immediately west
+  chooseDelivery(c, 0, "to store");
+  c.ph.fields.store.set(22, y, 100);
+  c.ph.fields.store.set(24, y, 1);
+  walkTunnel(c, 0, RETURN, 0.01);
+  assert.equal(c.gx[0], 22, "the strongest locally sensed destination mark may be behind");
+  assert.equal(c.gy[0], y);
+  assert.equal(c.carrying[0], 1);
+});
+
+test("a continuing delivery step does not repeatedly reverse at each cell", () => {
+  const { c, y } = setup();
+  chooseDelivery(c, 0, "to store");
+  put(c, 0, 23, y);
+  c.gx[0] = 23;
+  c.gy[0] = y;
+  c.gdir[0] = 0;
+  c.ph.fields.store.set(22, y, 100);
+  c.ph.fields.store.set(24, y, 1);
+  walkTunnel(c, 0, RETURN, 0.01);
+  assert.equal(c.gx[0], 24, "a continuing path retains its no-immediate-retrace rule");
+});
