@@ -1,0 +1,185 @@
+[
+  {
+    "name": "narrow-passage",
+    "selectedCell": [
+      0,
+      0
+    ],
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "openCells": [
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "rockCells": [],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "illustrativeDepth": 1.2,
+    "recessDepth": 1.08,
+    "workerDepth": 0.48,
+    "description": "Exactly the selected hex and six neighbours. Deliberate topology fixture, not captured gameplay; no front-to-back tunnel connections are implied."
+  },
+  {
+    "name": "chamber-floor",
+    "selectedCell": [
+      0,
+      0
+    ],
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "openCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "rockCells": [],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "illustrativeDepth": 1.2,
+    "recessDepth": 1.08,
+    "workerDepth": 0.48,
+    "description": "Exactly the selected hex and six neighbours. Deliberate topology fixture, not captured gameplay; no front-to-back tunnel connections are implied."
+  },
+  {
+    "name": "digging-face",
+    "selectedCell": [
+      0,
+      0
+    ],
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "openCells": [
+      [
+        -1,
+        0
+      ],
+      [
+        0,
+        0
+      ]
+    ],
+    "rockCells": [
+      [
+        0,
+        -1
+      ]
+    ],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "illustrativeDepth": 1.2,
+    "recessDepth": 1.08,
+    "workerDepth": 0.48,
+    "description": "Exactly the selected hex and six neighbours. Deliberate topology fixture, not captured gameplay; no front-to-back tunnel connections are implied."
+  }
+]

@@ -1,0 +1,41 @@
+# Soil, surface growth, and live cell inspection
+
+The live viewer uses the selected hex plus six neighbours in both inspections. `inspectionPatch.ts` samples the actual seven game cells; `drawInspectionPatch.ts` builds a continuous voxel patch, caches its terrain, and updates occupants on the game's frame subscription. The sidebar counts only the selected cell. Neighbours preserve their recorded positions and give context. Map edges stay empty outside the world. The older single-cell renderer remains available for historical art previews.
+
+Surface inspection follows the oblique direction in `art/surface-studies/`. Below uses a dedicated vertical cutaway with a rear surface recessed 1.08 units inside a 1.20-unit section, plus a separately rendered sprite atlas; see `art/inspection-live/`. Terrain and openings follow live cell state. The surface strip is a projected boundary, including real entrances, rather than an excavated tunnel. These are layered sprites with foreground wall occlusion, not full 3D geometry. Below occupants contact an illustrative rear cut plane so continuous map positions and headings can be preserved; the composed floor-standing poses in the studies are not reconstructed automatically.
+
+The pinned lens card's **Inspect cell** button opens a non-modal inspection panel with an oblique voxel view. The aerial map keeps its ordinary hex sizes and its existing selection behavior. Escape closes the inspection first; the pinned lens remains available beneath it. The panel uses the game's frame subscription and detaches it on close, without an independent timer. Text updates use the lens's existing simulation-tick cadence.
+
+`source/inspection.blend` contains editable soil/rock tiles, the worker, and the food/aphid geometry. `source/worker-base.blend` preserves the v2 worker source required to regenerate these views. Food and aphid models come from `art/resources/source/resources.blend`.
+
+The native unit is still hex width = 1: worker body 0.885, aphid body 0.300, food body 0.240. The orthographic view uses a 1.5-unit frame. `projection.json` contains the camera anchor and map-x/map-y/vertical basis vectors exported directly by Blender. Relative positions use that basis for every sprite, including food in a worker's jaws. Workers have twelve heading frames and one static leg pose in this inspection atlas; the aerial map's distance-driven walk is unchanged.
+
+## Live contents and illustration
+
+`ui/cellInspection.ts` reads the selected hex through the same probe and sensed-trail thresholds as the lens. It includes every living worker in that layer and cell, with generation, heading, continuous relative position, cargo quality, and infection state. The renderer sorts their feet back-to-front; it never caps, redistributes, shrinks, or packs occupants. Dense cells therefore overlap. This is a layered sprite view; it does not resolve intersecting 3D bodies.
+
+Food and aphids retain the map's compressed abundance conventions. Aphids are aggregate clumps, so the panel labels their per-cell value as density. Mycelium segments use actual parent/child/fusion neighbours; a lone root does not gain fictional branches. Knots and stalks are shown only where recorded, and spores use the lens's visibility threshold. Trails retain host-sensed visibility and the active food/home toggles.
+
+Open ground, undug soil, and rock use distinct stepped materials with deterministic surface grain. Soil grit, spoil clods, spore-speck arrangement, and stalk shape are illustrative treatments of cell fields. Spoil clods indicate presence; they do not reconstruct the exact height field as 3D relief. The numeric spoil height in the panel is authoritative. No grass, leaf canopy, decorative plant state, or terrain change was added to the simulation. Queens, brood, and corpse bodies use the additional atlas and sources described in `art/lifecycle/README.md`. Alates and chamber stores are not yet depicted.
+
+## Regeneration
+
+From the repository root, with Blender 4.3 and Python/Pillow:
+
+```sh
+blender -b art/inspection/source/worker-base.blend --python art/inspection/source/build_inspection.py -- "$PWD/art/inspection/build" "$PWD/art/resources/source/resources.blend"
+python art/inspection/source/pack_inspection.py art/inspection/build
+cp -f art/inspection/build/assets/inspection-atlas.png web/src/assets/inspection/inspection-atlas.png
+cp -f art/inspection/build/assets/projection.json web/src/assets/inspection/projection.json
+cp -f art/inspection/build/source/inspection.blend art/inspection/source/inspection.blend
+```
+
+The atlas has 22 frames of 256 × 256, with a one-pixel transparent border per frame, in a 5-column 1290 × 1290 image. Re-rendering after camera changes requires updating the projection JSON alongside the PNG. The panel retains its text details if the image cannot load or its dimensions are invalid.
+
+Validation covers live cell membership without a capacity limit, read-only extraction, layer filtering, sensed trail gating, aggregate aphids, real mycelium connections, camera projection, and unabridged crowded-cell drawing. Native Canvas previews exercise the same drawing function as the application, including an eight-worker cell from the seed-1 capture. They are not browser screenshots or a browser frame-rate benchmark. The existing `npm run e2e` guard now includes panel focus, image loading, available game shortcuts, Escape preserving the pinned lens, focus restoration, and an unchanged map camera. These browser checks have been added but not run here. Desktop, iPad, and phone CSS viewport layouts have been checked in Chromium, including both mobile orientations and surface/below modes. This is not a physical touch-device or Safari verification. Browser frame-rate benchmarking remains outstanding.
+
+## Responsive panel
+
+Inspection uses a right panel from 640 CSS pixels wide and a bottom sheet below that width, with bounded internal scrolling and a sticky 44-pixel close target. Narrow-screen artwork has a bounded height so details remain accessible. The map stays interactive; clicking another cell updates the open inspector. Escape first closes inspection and restores the pinned lens card. View changes preserve each view's pinned-card behavior. The selected outline is projected onto the underground back plane and is occluded by solid cut faces.
+
+`web/device-review.html` is a development review page with desktop (1440 × 900), iPad (834 × 1194 / 1194 × 834), and phone (412 × 816 / 840 × 360) viewports. It resizes the same live game without restarting. Its scaled iframe checks CSS layout only; it does not emulate touch, DPR, or Safari. The device E2E suite includes both surface and below inspection for every configured device/orientation, but that full suite has not been run in this environment.

@@ -1198,6 +1198,56 @@ try {
   check((await lp.evaluate(() => window.jevAnts.followed())) === null, "a click with the lens on pins the card and follows nothing");
   await lp.mouse.move(hole.x + 300, hole.y + 200);
   check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "pinned, it stays while the pointer wanders");
+  // The non-modal inspector keeps the map available and never changes its hex size.
+  const inspectButton = lensCard.getByRole("button", { name: "Inspect cell", exact: true });
+  const inspection = lp.getByRole("complementary", { name: /^Cell / });
+  const beforeInspectionCamera = await lp.evaluate(() => window.jevAnts.camera("above"));
+  await inspectButton.click();
+  await inspection.waitFor({ timeout: 3000 });
+  check(
+    await inspection.evaluate((d) => !d.hasAttribute("aria-modal") && d.contains(document.activeElement)),
+    "inspection focuses a non-modal side panel",
+  );
+  const inspectionCanvas = inspection.locator("canvas");
+  await until(
+    () =>
+      inspectionCanvas.evaluate((cv) => {
+        if (cv.dataset.assetsReady !== "true") return false;
+        const data = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
+        return false;
+      }),
+    "the inspection atlas paints the cell",
+    5000,
+    50,
+  );
+  check((await inspection.getByRole("status").count()) === 0, "the inspection atlas loads without fallback");
+  const scentOverlay = inspection.getByRole("checkbox", { name: "Scents", exact: true });
+  await scentOverlay.uncheck();
+  check(!(await scentOverlay.isChecked()), "inspection scents can be hidden");
+  await scentOverlay.check();
+  const locationOverlay = inspection.getByRole("checkbox", { name: "Location markers", exact: true });
+  await locationOverlay.uncheck();
+  check(!(await locationOverlay.isChecked()), "inspection location markers can be hidden independently");
+  await locationOverlay.check();
+  await lp.keyboard.press("2");
+  check((await speedOn(2)) === "true", "game speed shortcuts remain available while inspection is open");
+  await lp.keyboard.press("3");
+  await lp.keyboard.press("Escape");
+  await inspection.waitFor({ state: "detached", timeout: 2000 });
+  check(
+    (await lensCard.getByRole("button", { name: "Close the lens card" }).count()) === 1,
+    "Escape closes inspection and keeps the pinned lens",
+  );
+  check(await inspectButton.evaluate((button) => document.activeElement === button), "inspection returns focus to its opening button");
+  const afterInspectionCamera = await lp.evaluate(() => window.jevAnts.camera("above"));
+  check(
+    JSON.stringify(afterInspectionCamera) === JSON.stringify(beforeInspectionCamera),
+    "opening inspection leaves the map camera and hex size unchanged",
+  );
+  await inspectButton.click();
+  await inspection.getByRole("button", { name: "Close inspection", exact: true }).click();
+  await inspection.waitFor({ state: "detached", timeout: 2000 });
   await lensCard.getByRole("button", { name: "More on ink's hole" }).click();
   await lp.getByRole("dialog", { name: "Codex" }).waitFor({ timeout: 3000 });
   check((await lensCard.count()) === 0, "“more” opens the guide, and the card goes");
@@ -1243,6 +1293,20 @@ try {
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });
   check(/Ink's hole/.test((await lensCard.textContent()) ?? ""), "above again, the pinned card is back");
   await lp.keyboard.press("Escape");
+  await lp.keyboard.press("v");
+  await lp.mouse.click(720, 450);
+  await lensCard.getByRole("button", { name: "Inspect cell", exact: true }).click();
+  await inspection.waitFor({ timeout: 3000 });
+  check(
+    (await inspection.locator("canvas").getAttribute("aria-label"))?.startsWith("Seven-cell below inspection"),
+    "below opens the dedicated seven-cell cutaway",
+  );
+  await until(() => inspection.locator("canvas").evaluate((cv) => cv.dataset.assetsReady === "true"), "the below atlas loads", 5000, 50);
+  check((await inspection.getByRole("status").count()) === 0, "the below atlas loads without fallback");
+  await lp.keyboard.press("Escape");
+  await inspection.waitFor({ state: "detached", timeout: 2000 });
+  await lp.keyboard.press("Escape");
+  await lp.keyboard.press("v");
   // A command run from the palette closes a pinned card, which would stay over what it opens (review of #196, N4, N8).
   await lp.mouse.click(hole.x, hole.y);
   await lensCard.getByRole("button", { name: "Close the lens card" }).waitFor({ timeout: 2000 });

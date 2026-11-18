@@ -1,0 +1,125 @@
+[
+  {
+    "name": "foraging",
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "selectedCell": [
+      0,
+      0
+    ],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "continuousGround": true,
+    "context": "Deliberate composition fixture, not captured gameplay. Centre selection only; neighbouring contents give context."
+  },
+  {
+    "name": "aphids",
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "selectedCell": [
+      0,
+      0
+    ],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "continuousGround": true,
+    "context": "Deliberate composition fixture, not captured gameplay. Centre selection only; neighbouring contents give context."
+  },
+  {
+    "name": "fungal-growth",
+    "visibleCells": [
+      [
+        -1,
+        -1
+      ],
+      [
+        -1,
+        0
+      ],
+      [
+        -1,
+        1
+      ],
+      [
+        0,
+        -1
+      ],
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    "selectedCell": [
+      0,
+      0
+    ],
+    "hexWidth": 1,
+    "workerBodyLength": 0.885,
+    "continuousGround": true,
+    "context": "Deliberate composition fixture, not captured gameplay. Centre selection only; neighbouring contents give context."
+  }
+]

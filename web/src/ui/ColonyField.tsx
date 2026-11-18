@@ -72,13 +72,18 @@ import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./le
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import { type AntTraces, traceAlpha } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
+import { WorkerGait, WorkerSprites, drawWorkerSprite, workerLod } from "./workerSprites.ts";
+import { NestSprites, drawNestSprite, type NestSprite } from "./nestSprites.ts";
+import { drawMapTerrainGrain } from "./mapTerrain.ts";
+import { carriedBroodOn } from "./mapCargo.ts";
+import { APHID_SPOTS, FOOD_SPOTS, ResourceSprites, aphidDensity, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
 
 export type { FieldProbe };
 
 // The colony's ground through a camera. One canvas at device resolution,
 // redrawn every frame: only the chunks in view are painted, each into its
 // own 64×64 canvas and scaled up without smoothing, so cells stay crisp;
-// only the ants in view are drawn, as ink ticks with a jade crumb on the
+// only the ants in view are drawn, as aerial worker sprites at hex zoom and ink ticks farther out, with a jade crumb on the
 // carriers. Drag to pan, wheel or pinch to zoom, arrows/WASD and +/− on the
 // keyboard; click an ant to follow it. Zoomed in, a minimap in the corner
 // shows the whole map and where the view is (click it to jump). Colours
@@ -193,14 +198,6 @@ interface ViewCam {
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
-
-/** Where an aphid cell's dots sit, in world units from its centre: up to four. */
-const APHID_SPOTS: readonly (readonly [number, number])[] = [
-  [-0.22, -0.18],
-  [0.24, -0.12],
-  [-0.12, 0.24],
-  [0.2, 0.22],
-];
 
 /** No specimens: one empty list, so the default prop is the same each render. */
 const NO_SPECIMENS: readonly Specimen[] = [];
@@ -412,6 +409,11 @@ export default function ColonyField({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
+    const workerSprites = new WorkerSprites();
+    const nestSprites = new NestSprites();
+    const resourceSprites = new ResourceSprites();
+    const workerGait = new WorkerGait();
+    const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
     let lv = -1;
@@ -507,6 +509,8 @@ export default function ColonyField({
       chamber: rgb("#a39a8a"),
     };
     const retheme = () => {
+      workerSprites.clearTints();
+      nestSprites.clearTints();
       theme = {
         paper: cssVar("--paper"),
         ink: cssVar("--ink"),
@@ -568,8 +572,8 @@ export default function ColonyField({
       return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
     };
 
-    /** Paint chunk (cx, cy)'s cells into its canvas: rock and soil, then the trails, then food over everything. */
-    const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array) => {
+    /** Paint chunk colours: rock/soil, trails, and legacy food washes unless aerial sprites will show the food. */
+    const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array, foodAsSprites: boolean) => {
       const fc = m.food.chunk(cx, cy);
       const lc = m.loose?.chunk(cx, cy);
       // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
@@ -622,7 +626,7 @@ export default function ColonyField({
             continue;
           }
           const fv = fc ? fc[i] : 0;
-          if (fv > 0) {
+          if (fv > 0 && !foodAsSprites) {
             // The builder's sugar and crumbs (quality above and below the ground's 1) in their own colours (ja-kjj8).
             const q = qc ? qc[i]! : 1;
             const [qr, qg, qb] = q > 1.01 ? SUGAR_RGB : q < 0.99 ? CRUMB_RGB : [fr, fg, fb];
@@ -1254,12 +1258,20 @@ export default function ColonyField({
       const rx0 = Math.max(gx0, Math.floor(vis.x0) - 1);
       const rx1 = Math.min(gx0 + gw - 1, Math.ceil(vis.x1) + 1);
       const hexes = c.zoom >= HEX_ZOOM * d;
+      const resourceLod = workerLod(c.zoom, d);
+      // Read-only browser diagnostics: actual CSS scale and the available worker representation.
+      const cssHex = (c.zoom / d).toFixed(2),
+        workerStyle = hexes && workerSprites.ready(resourceLod) ? "voxel" : "ink";
+      if (canvas.dataset.hexCssPx !== cssHex) canvas.dataset.hexCssPx = cssHex;
+      if (canvas.dataset.workerStyle !== workerStyle) canvas.dataset.workerStyle = workerStyle;
+      // Both maps face the ants' walking plane: aerial above, straight onto the back wall below.
+      const resourceImage = hexes ? resourceSprites.get(resourceLod) : null;
       for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
         for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
           const rc = m.rock.chunk(cx, cy);
           if (!rc) continue;
           const cc = chunkCanvas(cx, cy);
-          paintChunk(cx, cy, cc, rc);
+          paintChunk(cx, cy, cc, rc, !!resourceImage);
           if (hexes) continue;
           // Zoomed out: bricks. Each row of the chunk is a strip one cell high (R), odd rows shifted
           // half a cell right: the same six neighbours as hexagons, and a few draws per chunk.
@@ -1275,6 +1287,41 @@ export default function ColonyField({
           }
         }
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
+      if (hexes)
+        drawMapTerrainGrain(
+          ctx,
+          c.zoom,
+          v.w / 2 - c.x * c.zoom,
+          v.h / 2 - c.y * c.zoom,
+          [rx0, rx1, ry0, ry1],
+          (x, y) => rockAt(m, x, y),
+          (x, y) => {
+            const data = chunks.get(`${x >> 6},${y >> 6}`)?.img.data;
+            return !!data && data[(((y & 63) << 6) | (x & 63)) * 4 + 3] === 0;
+          },
+          theme.ink,
+          theme.paper,
+        );
+      const nestImage = hexes ? nestSprites.get(resourceLod) : null;
+      const nestStyle = nestImage ? "voxel" : "symbols";
+      if (canvas.dataset.nestStyle !== nestStyle) canvas.dataset.nestStyle = nestStyle;
+      // Food amount becomes density, not the size of a morsel. Keep terrain and sensed trails underneath it.
+      if (resourceImage) {
+        for (let y = ry0; y <= ry1; y++)
+          for (let x = rx0; x <= rx1; x++) {
+            const amount = m.food.get(x, y);
+            if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
+            const density = foodDensity(amount),
+              kind = foodKind(m.quality?.get(x, y) ?? 1);
+            ctx.globalAlpha = density.alpha;
+            for (let j = 0; j < density.marks; j++) {
+              const [ox, oy] = FOOD_SPOTS[j]!;
+              const [sx, sy] = toScreen(c, v, centreX(x, y) + ox, centreY(y) + oy);
+              drawResourceSprite(ctx, resourceImage, resourceLod, kind, 0, sx, sy, c.zoom);
+            }
+          }
+        ctx.globalAlpha = 1;
+      }
       // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
       const hp = colonies[0]?.params;
       if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
@@ -1375,8 +1422,11 @@ export default function ColonyField({
           const wy = centreY(b.y);
           if (!inView(wx, wy)) continue;
           const [x, y] = toScreen(c, v, wx, wy);
-          ctx.fillStyle = BROOD_RGB[b.stage] as string;
-          ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+          if (nestImage) drawNestSprite(ctx, nestImage, resourceLod, `brood-${b.stage}` as NestSprite, x, y, c.zoom);
+          else {
+            ctx.fillStyle = BROOD_RGB[b.stage] as string;
+            ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+          }
         }
         // Nest slice 5: food lying in this colony's chambers, as seeds along each floor (up to 40 drawn a chamber).
         if (home && m.chambers) {
@@ -1392,7 +1442,8 @@ export default function ColonyField({
               const wy = centreY(fy);
               if (!inView(wx, wy)) continue;
               const [x, y] = toScreen(c, v, wx, wy);
-              ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
+              if (resourceImage) drawResourceSprite(ctx, resourceImage, resourceLod, "plain", 0, x, y, c.zoom);
+              else ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
             }
           }
         }
@@ -1407,6 +1458,10 @@ export default function ColonyField({
           const wy = centreY(k.y);
           if (!inView(wx, wy)) continue;
           const [x, y] = toScreen(c, v, wx, wy);
+          if (nestImage) {
+            drawNestSprite(ctx, nestImage, resourceLod, "corpse", x, y, c.zoom);
+            continue;
+          }
           ctx.moveTo(x - bd, y - bd);
           ctx.lineTo(x + bd, y + bd);
           ctx.moveTo(x + bd, y - bd);
@@ -1430,23 +1485,28 @@ export default function ColonyField({
         ctx.stroke();
         if (home && col.queen && inView(col.queen.x, col.queen.y)) {
           const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
-          const qr = Math.max(3, len * 0.9);
-          ctx.beginPath();
-          ctx.ellipse(x, y, qr * 1.4, qr * 0.8, 0, 0, Math.PI * 2);
-          const qc = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-          ctx.lineWidth = Math.max(1, d);
-          if (col.queen.alive) {
-            ctx.fillStyle = qc;
-            ctx.fill();
+          const queenImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour)) : null;
+          if (queenImage) {
+            drawNestSprite(ctx, queenImage, resourceLod, col.queen.alive ? "queen" : "queen-dead", x, y, c.zoom);
           } else {
-            ctx.strokeStyle = qc;
-            ctx.globalAlpha = 0.6;
-            ctx.stroke();
+            const qr = Math.max(3, len * 0.9);
             ctx.beginPath();
-            ctx.moveTo(x - qr * 1.4, y - qr);
-            ctx.lineTo(x + qr * 1.4, y + qr);
-            ctx.stroke();
-            ctx.globalAlpha = 1;
+            ctx.ellipse(x, y, qr * 1.4, qr * 0.8, 0, 0, Math.PI * 2);
+            const qc = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+            ctx.lineWidth = Math.max(1, d);
+            if (col.queen.alive) {
+              ctx.fillStyle = qc;
+              ctx.fill();
+            } else {
+              ctx.strokeStyle = qc;
+              ctx.globalAlpha = 0.6;
+              ctx.stroke();
+              ctx.beginPath();
+              ctx.moveTo(x - qr * 1.4, y - qr);
+              ctx.lineTo(x + qr * 1.4, y + qr);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            }
           }
         }
         // Alates (ja-lo8.9): new queens, smaller than the queen, with wings, as they wait and walk out to fly.
@@ -1454,17 +1514,23 @@ export default function ColonyField({
           if (!home || !inView(al.x, al.y)) continue;
           const [x, y] = toScreen(c, v, al.x, al.y);
           const ar = Math.max(2.5, len * 0.7);
-          ctx.beginPath();
-          ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
-          ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
-          ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
-          ctx.globalAlpha = 0.5;
-          ctx.fillStyle = theme.paper;
-          ctx.fill();
-          ctx.globalAlpha = 1;
+          const alateImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour)) : null;
+          if (alateImage) {
+            drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
+            drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
+          } else {
+            ctx.beginPath();
+            ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
+            ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
+            ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = theme.paper;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
           if (al.load > 0) {
             ctx.beginPath();
             ctx.arc(x, y, Math.max(1.5, ar * 0.45), 0, Math.PI * 2);
@@ -1475,19 +1541,30 @@ export default function ColonyField({
         ctx.lineCap = "round";
         ctx.lineWidth = Math.max(1, len * 0.3);
         ctx.globalAlpha = 0.85;
+        workerGait.update(col);
+        // A front-facing curtain worker is the same silhouette as the aerial worker against its walking plane.
+        // The surface strip is a separate diagrammatic projection, not another underground population.
+        const lod = workerLod(c.zoom, d);
         // One stroke per odour band (most frames: one band per colony).
         let bands = 0;
         for (let i = 0; i < col.n; i++) if (col.alive[i] && (lv < 0 || col.layer[i] === lv)) bands |= 1 << binOf(col.odour[i]);
         for (let b = 0; b < BINS; b++) {
           if (!(bands & (1 << b))) continue;
+          const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
+          const sprite = hexes ? workerSprites.get(lod, colour) : null;
           ctx.beginPath();
           for (let i = 0; i < col.n; i++) {
             if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
             const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-            const hc = Math.cos(col.heading[i]) * half;
-            const hs = Math.sin(col.heading[i]) * half;
-            ctx.moveTo(x - hc, y - hs);
-            ctx.lineTo(x + hc, y + hs);
+            if (sprite) {
+              const pose = lod === "walk" && !motion.matches ? workerGait.pose(col, i) : 0;
+              drawWorkerSprite(ctx, sprite, lod, col.heading[i], pose, x, y, c.zoom);
+            } else {
+              const hc = Math.cos(col.heading[i]) * half;
+              const hs = Math.sin(col.heading[i]) * half;
+              ctx.moveTo(x - hc, y - hs);
+              ctx.lineTo(x + hc, y + hs);
+            }
           }
           ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
           ctx.stroke();
@@ -1513,7 +1590,20 @@ export default function ColonyField({
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.carrying[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
           const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-          ctx.fillRect(x + Math.cos(col.heading[i]) * half - crumb / 2, y + Math.sin(col.heading[i]) * half - crumb / 2, crumb, crumb);
+          if (resourceImage) {
+            const reach = 0.46 * c.zoom;
+            drawResourceSprite(
+              ctx,
+              resourceImage,
+              resourceLod,
+              foodKind(col.quality[i]),
+              0,
+              x + Math.cos(col.heading[i]) * reach,
+              y + Math.sin(col.heading[i]) * reach,
+              c.zoom,
+            );
+          } else
+            ctx.fillRect(x + Math.cos(col.heading[i]) * half - crumb / 2, y + Math.sin(col.heading[i]) * half - crumb / 2, crumb, crumb);
         }
         ctx.fillStyle = theme.mound;
         ctx.strokeStyle = theme.mound;
@@ -1522,18 +1612,36 @@ export default function ColonyField({
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || !col.pellet[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
           const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-          const px = x + Math.cos(col.heading[i]) * half;
-          const py = y + Math.sin(col.heading[i]) * half;
+          const reach = hexes ? c.zoom * 0.46 : half;
+          const px = x + Math.cos(col.heading[i]) * reach;
+          const py = y + Math.sin(col.heading[i]) * reach;
           if (col.carriesCorpse(i)) {
+            if (nestImage) {
+              drawNestSprite(ctx, nestImage, resourceLod, "corpse", px, py, c.zoom);
+              continue;
+            }
             // A corpse in the jaws: the dead's grey cross, half size (slice 7 review: it was drawn as a soil crumb).
             const h = crumb * 0.75;
             ctx.moveTo(px - h, py - h);
             ctx.lineTo(px + h, py + h);
             ctx.moveTo(px + h, py - h);
             ctx.lineTo(px - h, py + h);
-          } else ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
+          } else if (resourceImage) drawResourceSprite(ctx, resourceImage, resourceLod, "crumb", 0, px, py, c.zoom);
+          else ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
         }
         ctx.stroke();
+        for (const { i, stage } of carriedBroodOn(col, lv)) {
+          if (!inView(col.x[i], col.y[i])) continue;
+          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
+          const reach = hexes ? c.zoom * 0.46 : half;
+          const px = x + Math.cos(col.heading[i]) * reach,
+            py = y + Math.sin(col.heading[i]) * reach;
+          if (nestImage) drawNestSprite(ctx, nestImage, resourceLod, `brood-${stage}` as NestSprite, px, py, c.zoom);
+          else {
+            ctx.fillStyle = BROOD_RGB[stage] as string;
+            ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
+          }
+        }
       }
       if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
 
@@ -1566,8 +1674,8 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
-      // The builder's aphids (docs/aphids.md, ja-nzkg.6): one to four green dots a cell, as many as the clump has aphids a
-      // cell, fading as it crashes. On the top view (or the one map).
+      // Aphid marks show aggregate clump density, not individually simulated insects. Fixed-size glyphs at hex zoom;
+      // the original green dots farther out / while loading, fading by the same clump-life convention.
       const clumps = aphidsRef.current?.();
       if (clumps?.length && (world ? lv === PLANE : true)) {
         ctx.fillStyle = theme.aphid;
@@ -1576,18 +1684,22 @@ export default function ColonyField({
           const n = aphidCount(cl);
           const cells = cl.cells.length / 2;
           if (n <= 0 || !cells) continue;
-          const per = Math.max(1, Math.min(4, Math.round(n / cells / 2)));
-          ctx.globalAlpha = Math.min(1, 0.35 + n / cells / 4);
+          const density = aphidDensity(n, cells);
+          ctx.globalAlpha = density.alpha;
           for (let k = 0; k < cl.cells.length; k += 2) {
             const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
             const wy = centreY(cl.cells[k + 1]!);
             if (!inView(wx, wy)) continue;
-            for (let j = 0; j < per; j++) {
+            for (let j = 0; j < density.marks; j++) {
               const [ox, oy] = APHID_SPOTS[j]!;
               const [x, y] = toScreen(c, v, wx + ox, wy + oy);
-              ctx.beginPath();
-              ctx.arc(x, y, r, 0, Math.PI * 2);
-              ctx.fill();
+              if (resourceImage)
+                drawResourceSprite(ctx, resourceImage, resourceLod, "aphid", cl.cells[k]! + cl.cells[k + 1]! + j, x, y, c.zoom);
+              else {
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+              }
             }
           }
         }
@@ -1696,6 +1808,9 @@ export default function ColonyField({
         ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
       }
     };
+    workerSprites.load(draw);
+    nestSprites.load(draw);
+    resourceSprites.load(draw);
     const off = onFrame(draw);
     draw();
 
@@ -1716,6 +1831,9 @@ export default function ColonyField({
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
       off();
+      workerSprites.dispose();
+      nestSprites.dispose();
+      resourceSprites.dispose();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
       themeWatch.disconnect();

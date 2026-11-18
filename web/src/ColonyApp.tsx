@@ -943,6 +943,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           layer={shownLayer}
           trails={{ food: controls.showFoodTrail, home: controls.showHomeTrail }}
           onFollow={setFollowed}
+          aphids={aphidsNow}
+          onFrame={onFrame}
         />
         {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
         {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}

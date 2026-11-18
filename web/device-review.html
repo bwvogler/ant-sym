@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ant Sym · device layout review</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e8e5df; color: #29251f; font: 14px system-ui, sans-serif; }
+    header { padding: 12px 16px; background: #fff; border-bottom: 1px solid #ccc; }
+    label { display: inline-flex; align-items: center; gap: 12px; font-weight: 600; }
+    select { min-height: 44px; font: inherit; }
+    p { margin: 6px 0; color: #635d54; }
+    #stage { margin: 16px auto; position: relative; }
+    iframe { position: absolute; border: 0; transform-origin: top left; background: white; box-shadow: 0 3px 16px #0003; }
+  </style>
+</head>
+<body>
+  <header>
+    <label>Layout viewport
+      <select id="device">
+        <option value="1440,900">Desktop · 1440 × 900</option>
+        <option value="834,1194">iPad · portrait · 834 × 1194</option>
+        <option value="1194,834">iPad · landscape · 1194 × 834</option>
+        <option value="412,816">Phone · portrait · 412 × 816</option>
+        <option value="840,360">Phone · landscape · 840 × 360</option>
+      </select>
+    </label>
+    <p>Same live game, resized without restarting. Review the surface and below panels, select another map cell, scroll details, and close.</p>
+    <p>Chromium layout check at these CSS viewport sizes. This does not emulate touch, device pixel ratio, or Safari.</p>
+  </header>
+  <main id="stage"><iframe id="review-frame" title="Ant Sym device preview" src="/"></iframe></main>
+  <script>
+    const device = document.getElementById('device'), stage = document.getElementById('stage'), frame = document.getElementById('review-frame');
+    function layout() {
+      const [width, height] = device.value.split(',').map(Number);
+      const scale = Math.min(1, (innerWidth - 32) / width, (innerHeight - document.querySelector('header').offsetHeight - 32) / height);
+      frame.style.width = width + 'px'; frame.style.height = height + 'px';
+      frame.style.transform = `scale(${scale})`;
+      stage.style.width = width * scale + 'px'; stage.style.height = height * scale + 'px';
+    }
+    device.addEventListener('change', layout); window.addEventListener('resize', layout); layout();
+  </script>
+</body>
+</html>

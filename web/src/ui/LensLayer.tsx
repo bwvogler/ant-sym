@@ -1,10 +1,12 @@
-import { useEffect } from "react";
-import type { Colony, Fungus, WorldMap } from "../colony/index.ts";
+import { useEffect, useState } from "react";
+import type { AphidClump, Colony, Fungus, WorldMap } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import LensCard from "./LensCard.tsx";
 import { lensAnt, lensLines, probe } from "./lens.ts";
 import { shownOn, unpin, useLens } from "./lensStore.ts";
+import CellInspection from "./CellInspection.tsx";
+import { inspectPatch } from "./inspectionPatch.ts";
 import { useSimTick } from "./session.ts";
 
 // The lens's card over the page (PRD §69.3): it reads the store the map reports to, so only this re-renders as the pointer
@@ -20,6 +22,8 @@ export default function LensLayer({
   layer,
   trails,
   onFollow,
+  aphids,
+  onFrame,
 }: {
   on: boolean;
   colonies: readonly Colony[];
@@ -30,21 +34,25 @@ export default function LensLayer({
   layer: number;
   trails: { food: boolean; home: boolean };
   onFollow: (f: Followed) => void;
+  aphids: () => readonly AphidClump[];
+  onFrame: (draw: () => void) => () => void;
 }) {
   const lens = useLens();
   const at = on ? shownOn(lens, layer) : null;
   const pinned = at?.pinned ?? false;
+  const [inspecting, setInspecting] = useState(false);
   // A pinned card: Escape closes it first (before a follow or a drawer), unless a dialog is over it.
   useEffect(() => {
     if (!pinned) return;
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
-      unpin();
+      if (inspecting) setInspecting(false);
+      else unpin();
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [pinned]);
+  }, [pinned, inspecting]);
   // The card says it afresh about three times a second while it is up: the ants move under a still pointer.
   const shown = at !== null;
   useSimTick(250, shown);
@@ -54,14 +62,23 @@ export default function LensLayer({
     probe({ colonies, fungus, world }, sensed, at.lv, at.x, at.y, trails),
     ant ? lensAnt(colonies, ant.k, ant.i) : null,
   );
+  const readInspection = () => inspectPatch({ colonies, fungus, world }, sensed, at.lv, at.x, at.y, trails, aphids());
   return (
-    <LensCard
-      lines={lines}
-      x={at.sx}
-      y={at.sy}
-      pinned={at.pinned}
-      onClose={unpin}
-      onFollow={ant ? () => (onFollow(ant), unpin()) : undefined}
-    />
+    <>
+      <div hidden={pinned && inspecting}>
+        <LensCard
+          lines={lines}
+          x={at.sx}
+          y={at.sy}
+          pinned={at.pinned}
+          onClose={unpin}
+          onFollow={ant ? () => (onFollow(ant), unpin()) : undefined}
+          onInspect={() => setInspecting(true)}
+        />
+      </div>
+      {pinned && inspecting && (
+        <CellInspection state={readInspection()} read={readInspection} onFrame={onFrame} onClose={() => setInspecting(false)} />
+      )}
+    </>
   );
 }
