@@ -1,5 +1,20 @@
 import * as T from "three";
 const srgb = (v: number) => Math.round(255 * Math.max(0, Math.min(1, v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055)));
+const same = (a: ArrayLike<number> | null, b: ArrayLike<number> | null) => {
+  if (a === null || b === null) return a === b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+const meshKey = (o: T.Mesh) =>
+  [
+    o.uuid,
+    o.geometry.uuid,
+    o.matrixWorld.elements.join(","),
+    (Array.isArray(o.material) ? o.material[0] : o.material).uuid,
+    ...["position", "color", "normal"].map((name) => (o.geometry.getAttribute(name) as T.BufferAttribute | undefined)?.version ?? -1),
+    o.geometry.index?.version ?? -1,
+  ].join("/");
 /** Same real mesh geometry and depth test as the GPU path, with cached static mesh layers. */
 export class InspectionSoftware {
   private ctx: CanvasRenderingContext2D;
@@ -9,6 +24,8 @@ export class InspectionSoftware {
   private background: Uint32Array;
   private backgroundDepth: Float32Array;
   private key = "";
+  private frameKey = "";
+  private instances = new WeakMap<T.InstancedMesh, { matrices: Float32Array; colours: Float32Array | null }>();
   private cache = new WeakMap<T.Mesh, { key: string; pixels: Uint32Array; depth: Float32Array }>();
   constructor(privateCanvas: HTMLCanvasElement) {
     const ctx = privateCanvas.getContext("2d");
@@ -37,6 +54,21 @@ export class InspectionSoftware {
       if (o instanceof T.InstancedMesh) actors.push(o);
       else if (o instanceof T.Mesh) staticMeshes.push(o);
     });
+    const cameraKey = view.elements.join(","),
+      key = cameraKey + staticMeshes.map(meshKey).join("/"),
+      frameKey = key + actors.map((o) => meshKey(o) + "/" + o.count).join("/");
+    let unchanged = true;
+    for (const actor of actors) {
+      const matrices = actor.instanceMatrix.array.subarray(0, actor.count * 16),
+        colours = actor.instanceColor?.array.subarray(0, actor.count * 3) ?? null,
+        previous = this.instances.get(actor);
+      if (!previous || !same(previous.matrices, matrices) || !same(previous.colours, colours)) {
+        unchanged = false;
+        this.instances.set(actor, { matrices: new Float32Array(matrices), colours: colours ? new Float32Array(colours) : null });
+      }
+    }
+    // The game clock keeps calling while paused; reuse the actual canvas without re-rasterizing its actors.
+    if (unchanged && frameKey === this.frameKey) return;
     const raster = (object: T.Mesh, pixels: Uint32Array, depth: Float32Array) => {
       const g = object.geometry,
         pos = g.getAttribute("position"),
@@ -99,13 +131,11 @@ export class InspectionSoftware {
         }
       }
     };
-    const cameraKey = view.elements.join(","),
-      key = cameraKey + staticMeshes.map((o) => o.uuid + o.geometry.uuid + o.matrixWorld.elements.join(",")).join("/");
     if (key !== this.key) {
       this.background.fill(0);
       this.backgroundDepth.fill(Infinity);
       for (const mesh of staticMeshes) {
-        const mk = cameraKey + mesh.geometry.uuid + mesh.matrixWorld.elements.join(",");
+        const mk = cameraKey + meshKey(mesh);
         let cached = this.cache.get(mesh);
         if (!cached || cached.key !== mk) {
           cached = { key: mk, pixels: new Uint32Array(this.pixels.length), depth: new Float32Array(this.depth.length).fill(Infinity) };
@@ -124,8 +154,11 @@ export class InspectionSoftware {
     this.depth.set(this.backgroundDepth);
     for (const a of actors) raster(a, this.pixels, this.depth);
     this.ctx.putImageData(this.image, 0, 0);
+    this.frameKey = frameKey;
   }
   dispose(): void {
     this.cache = new WeakMap();
+    this.instances = new WeakMap();
+    this.key = this.frameKey = "";
   }
 }

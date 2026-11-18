@@ -4,6 +4,8 @@ The inspector uses actual mesh geometry from the approved lifecycle and resource
 
 `InspectionScene.ts` batches actors in growing instance pools, caches terrain and content meshes, and shares the game render clock. Its models and Three.js load lazily. WebGL is preferred; `inspectionSoftware.ts` renders the same geometry using a depth buffer and cached static mesh layers when GPU rendering is unavailable. A failed model download keeps the fixed sprite fallback and exact cell details available. The cloud browser exercises software 3D; physical touch, Safari and hardware GPU rendering still need verification.
 
+The software renderer reuses unchanged frames, comparing active instance transforms and colours rather than buffer upload counters. Motion, instance counts, visibility, camera changes and geometry updates invalidate the frame. Tests exercise 64 independent instances through movement, removal and restoration; this is a renderer stress case, not normal cell occupancy. A local CPU comparison with the production worker mesh at 4, 16 and 64 instances preserved identical moving-frame pixels while eliminating repeated idle rasterization; it does not establish hardware GPU or mobile frame rates.
+
 ## Cadavers and decay
 
 The existing `colony.corpses` records continue to drive undertakers and loose-corpse removal. `colony.remains` is passive, saved visual history for surface deaths and recent midden deposits: it does not enter undertaking, scent, nutrition, fungus budgets or burial totals. Each record retains the original death timestamp; carrying or burial does not restart its age. History is pruned after `CORPSE_ROT` (900 simulation seconds), including colonies without queens. Older saves default to empty history.
