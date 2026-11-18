@@ -165,7 +165,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
-      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
+      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, drop its load and run, or ignore it. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. By default, nearby strangers create combat pressure even when they retreat. The experimental directed-combat rules count only ants choosing to attack: mutual peace is safe, but ignoring an attacker gives no protection. Both use the odds in the cells around.",
     scripted: {
       bead: "ja-k4k.6",
       reads:
@@ -306,7 +306,7 @@ export const GUIDE: GuideEntry[] = [
     title: "The fungus",
     swatch: ["var(--spore)"],
     onScreen:
-      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Purple lines are its hyphae, a dot at each growing tip: faint above, just under the surface round where it landed; below, along the shaft's and tunnels' walls. They slide along stones, split against them, and turn from each other; once you keep the borer, they push into undug soil. You are the fungus.",
+      "Purple: spores on the ground and a dot on infected ants (brighter for a heavy load). Purple lines are its hyphae, a dot at each growing tip: faint above, just under the surface round where it landed; below, along the shaft's and tunnels' walls. They slide along stones, split against them, and turn from each other; once you keep the borer, they push into undug soil. They are drawn as wandering curves, and the fine twigs off them, seen close up, are only for looks: the fungus's cells are the main lines. You are the fungus.",
     realAnts:
       "Real parasites change what an ant perceives, gives off and can do, not its plans. Rickia makes its hosts carry more of one alkane, and they are attacked less by strangers. Ophiocordyceps hosts lose their daily rhythm and communicate less. Grooming off Metarhizium passes low doses that immunise nestmates.",
     inGame:
@@ -541,6 +541,11 @@ export const GUIDE: GuideEntry[] = [
 
 /** The research notes, for the guide's footer (docs/README.md's table). */
 export const NOTES: { note: string; title: string; covers: string }[] = [
+  {
+    note: "contact-actions",
+    title: "Contact actions",
+    covers: "Experimental directed attacks, ignoring strangers, and asymmetric recognition.",
+  },
   { note: "vision", title: "Vision", covers: "The goal, what an ant may sense, and which behaviours are still scripted." },
   {
     note: "ant-communication",

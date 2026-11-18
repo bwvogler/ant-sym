@@ -236,9 +236,9 @@ export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANC
 
 /**
  * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
- * responses no longer apply. 12: kept with Jev's probabilities (readResponse, ja-m7rr), where 11 kept a boolean or a bare choice.
+ * responses no longer apply. 13: contact can ignore a stranger; 12 kept Jev's probabilities.
  */
-export const RESPONSE_BRAIN_VERSION = 12;
+export const RESPONSE_BRAIN_VERSION = 13;
 
 // Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
 // before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
@@ -328,11 +328,12 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
       return {
         [`${id}_contact`]: {
           type: "choice",
-          instructions: `Going by the doctrine, ${ant} has strangers of another colony within reach (odds says how many nestmates are round it against them): what should it do?`,
+          instructions: `Going by the doctrine, ${ant} has strangers within reach (odds says how many nestmates are round it against them): what should it do?`,
           criteria: {
             fight: "fight: attack the strangers where they are",
             flee: "flee: turn away from them and go home, keeping whatever it carries",
             "drop and run": "drop and run: put down what it carries here and flee home",
+            ignore: "ignore: continue its work without attacking, fleeing or releasing its load",
           },
         },
       };

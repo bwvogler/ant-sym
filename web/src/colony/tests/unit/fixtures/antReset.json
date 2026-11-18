@@ -537,6 +537,9 @@
   ],
   "steerNear": [
    364
+  ],
+  "attackLayer": [
+   -1
   ]
  },
  "asIs": {
@@ -1076,6 +1079,9 @@
    40
   ],
   "steerNear": [
+   41
+  ],
+  "attackLayer": [
    41
   ]
  }

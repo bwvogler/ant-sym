@@ -1,9 +1,9 @@
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import { type Colony, type Layer } from "./colony.ts";
 import { ENEMY } from "./vocab.ts";
-import { CELL, discOffsets } from "./hex.ts";
-import type { Recognition } from "./recognition.ts";
-import { clampCol, inBounds, type Bounds } from "./world.ts";
+import { CELL, centreX, centreY, discOffsets } from "./hex.ts";
+import { BINS, binCentre, binOf, STRANGER_EPS, SumGrid, type Recognition } from "./recognition.ts";
+import { blocked, clampCol, inBounds, type Bounds } from "./world.ts";
 import { touch } from "./sense.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
@@ -19,10 +19,14 @@ import { touch } from "./sense.ts";
 // alike stop fighting. A calming cue counts against both sides: a calm
 // neighbour is (1 − calm) of an enemy, and a calm ant takes (1 − calm) of the
 // hazard. Allies are still the ant's own colony around it.
+// With p.intent enabled, only explicit attackers contribute pressure and their own
+// perceived tolerance decides whom they attack; a peaceful victim has no immunity.
 
 export interface FightParams {
   /** deaths per second for an ant facing as many enemies as allies */
   rate: number;
+  /** Experimental directed aggression; absent/false preserves legacy fights. */
+  intent?: boolean;
   /** alarm laid per second by an ant in a fight */
   alarm: number;
 }
@@ -126,6 +130,53 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
   return s;
 }
 
+// Reused across ticks and layers; only touched cells are cleared. Recognition uses
+// ten target bands, never a list of ant pairs. Without recognition, target colonies.
+const pressureCache = new WeakMap<Colony, SumGrid[]>();
+function attackPressure(colonies: Colony[], recognition: boolean, layer: number): SumGrid[] {
+  if (!colonies.length) return [];
+  const count = recognition ? BINS : colonies.length;
+  let grids = pressureCache.get(colonies[0]);
+  if (!grids || grids.length !== count) {
+    grids = Array.from({ length: count }, () => new SumGrid());
+    pressureCache.set(colonies[0], grids);
+  }
+  for (const g of grids) g.reset();
+  colonies.forEach((c, own) => {
+    const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i] || c.attackLayer[i] < 0 || c.attackLayer[i] !== c.layer[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
+      const weight = recognition ? 1 - c.calm[i] : 1;
+      if (weight <= 0 || blocked(map, c.x[i], c.y[i])) continue;
+      c.antCell(i);
+      const cx = CELL[0],
+        cy = CELL[1];
+      const offsets = discOffsets(1)[cy & 1] as Int16Array;
+      for (let k = 0; k < offsets.length; k += 2) {
+        const x = cx + offsets[k],
+          y = cy + offsets[k + 1];
+        if (!inBounds(map, x, y)) continue;
+        const tx = centreX(x, y),
+          ty = centreY(y);
+        // Sample the local path, including its endpoint: no hits into soil/rock.
+        let clear = true;
+        for (let step = 1; step <= 4; step++) {
+          if (blocked(map, c.x[i] + ((tx - c.x[i]) * step) / 4, c.y[i] + ((ty - c.y[i]) * step) / 4)) {
+            clear = false;
+            break;
+          }
+        }
+        if (!clear) continue;
+        for (let b = 0; b < count; b++) {
+          const stranger = recognition ? Math.abs(binCentre(b) - c.odour[i]) > c.tolerance[i] + STRANGER_EPS : b !== own;
+          if (stranger) grids[b].add(x, y, weight);
+        }
+      }
+    }
+  });
+  return grids;
+}
+
 /**
  * Resolve one dt of fighting between colonies; `grids[k]` is colony k's occupancy. With `rec` (built this
  * tick), enemies are strangers by odour; without it, every ant of another colony. With `layer` (one world, ja-lp4.3),
@@ -141,6 +192,7 @@ export function resolveFights(
   rec: Recognition | null = null,
   layer = -1,
 ): number[] {
+  const pressure = p.intent ? attackPressure(colonies, rec !== null, layer) : null;
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const on = layer < 0 ? null : (c.layers[layer] as Layer);
@@ -152,7 +204,22 @@ export function resolveFights(
       const cx = clampCol(map, CELL[0]);
       const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
       let enemies = 0;
-      if (rec) {
+      if (pressure) {
+        if (blocked(map, c.x[i], c.y[i])) continue;
+        const band = binOf(c.odour[i]);
+        enemies = pressure[rec ? band : k].get(cx, cy);
+        // A very narrow tolerance can classify even its own coarse odour band as
+        // strange. Other ants in that band may attack, but never this ant itself.
+        if (
+          rec &&
+          c.attackLayer[i] >= 0 &&
+          c.attackLayer[i] === c.layer[i] &&
+          Math.abs(binCentre(band) - c.odour[i]) > c.tolerance[i] + STRANGER_EPS
+        )
+          enemies = Math.max(0, enemies - (1 - c.calm[i]));
+        enemies *= rec ? 1 - c.calm[i] : 1;
+        if (enemies < 1e-6) continue;
+      } else if (rec) {
         rec.look(c.odour[i], rec.params.tolerance);
         enemies = rec.around(cx, cy, map) * (1 - c.calm[i]);
         if (enemies < 1e-6) continue;

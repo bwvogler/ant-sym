@@ -105,3 +105,24 @@ test("the shared step record clears encounter intent before processing the next 
   assert.equal(first.s.contactAction, null);
   assert.equal(second.c.mode[0], EXPLORE);
 });
+
+test("ignore ends attack steering, keeps loads, and old attack intent clears without contact", () => {
+  const { c, s } = encounter("fight");
+  decide(c, 0, s);
+  assert.equal(c.attackLayer[0], c.layer[0]);
+  c.responses = responses({ contact: () => "ignore" });
+  decide(c, 0, s);
+  assert.equal(c.attackLayer[0], -1);
+  assert.equal(s.mode, EXPLORE);
+  assert.equal(s.fleeFrom, null);
+  c.responses = responses({ contact: () => "fight" });
+  decide(c, 0, s);
+  s.toEnemy = null;
+  decide(c, 0, s);
+  assert.equal(c.attackLayer[0], -1);
+  const loaded = encounter("ignore", true);
+  decide(loaded.c, 0, loaded.s);
+  assert.equal(loaded.c.carrying[0], 1);
+  assert.equal(loaded.c.mode[0], RETURN);
+  assert.equal(loaded.c.attackLayer[0], -1);
+});

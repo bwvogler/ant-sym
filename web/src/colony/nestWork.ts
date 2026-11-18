@@ -59,7 +59,7 @@ import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
 import { around, touch } from "./sense.ts";
 import { ageWorkers, dropBrood } from "./body.ts";
-import { clearPellet, markMidden, markMiddenPlane } from "./pellets.ts";
+import { clearPellet, markMiddenPlane } from "./pellets.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -405,8 +405,7 @@ export function middenSmell(col: Colony, dt: number): void {
     if (left <= 0) break;
     const n = Math.min(left, count);
     left -= n;
-    if (col.line !== null) markMiddenPlane(col, keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
-    else markMidden(col, keyX(key), MIDDEN_MARK * dt * 0.1 * n);
+    markMiddenPlane(col, keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
   }
 }
 

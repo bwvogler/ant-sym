@@ -15,7 +15,7 @@ import { FIGHT, RETURN } from "../../vocab.ts";
 import { mulberry32, worldFromArrays } from "../../world.ts";
 import { nestAt, put } from "../hexmaps.ts";
 
-function meeting(choices: [Contact, Contact], tolerances: [number, number], sameOdour = false, seed = 1) {
+function meeting(choices: [Contact, Contact], tolerances: [number, number], sameOdour = false, seed = 1, intent = false) {
   const map = worldFromArrays({ w: 40, h: 12 }, [nestAt(4, 6, 2), nestAt(36, 6, 2)]);
   const colonies = choices.map((answer, nest) => {
     const c = new Colony(map, { antCount: 12, maxAnts: 12, nest, odour: sameOdour ? 0 : nest }, mulberry32(20 + nest), () => "explore");
@@ -44,7 +44,7 @@ function meeting(choices: [Contact, Contact], tolerances: [number, number], same
   }
   // Hold positions fixed to isolate the encounter decision from escape speed.
   const grids = colonies.map((c) => occupancy(c, new CountGrid()));
-  const deaths = resolveFights(colonies, grids, 0.2, mulberry32(seed), undefined, rec);
+  const deaths = resolveFights(colonies, grids, 0.2, mulberry32(seed), { rate: 1.5, alarm: 8, intent }, rec);
   return { sensed, modes, deaths, alarm: colonies.map((c) => c.ph.total("alarm")) };
 }
 
@@ -82,4 +82,30 @@ test("baseline: matching emitted odours prevents combat; the same seed replays e
   assert.deepEqual(familiar.deaths, [0, 0]);
   assert.deepEqual(familiar.alarm, [0, 0]);
   assert.deepEqual(meeting(["fight", "flee"], [1, 0.35]), meeting(["fight", "flee"], [1, 0.35]));
+});
+
+test("directed encounters: peace is safe together but does not grant immunity", (t) => {
+  let losses = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    for (const choice of ["flee", "ignore"] as const) {
+      const peaceful = meeting([choice, choice], [0.35, 0.35], false, seed, true);
+      assert.deepEqual(peaceful.deaths, [0, 0]);
+      assert.deepEqual(peaceful.alarm, [0, 0]);
+      const attacked = meeting([choice, "fight"], [0.35, 0.35], false, seed, true);
+      assert.equal(attacked.deaths[1], 0);
+      assert.equal(attacked.alarm[1], 0);
+      assert.ok(attacked.alarm[0] > 0);
+      losses += attacked.deaths[0];
+    }
+    const tolerant = meeting(["fight", "fight"], [1, 1], false, seed, true);
+    assert.deepEqual(tolerant.deaths, [0, 0]);
+    const unilateral = meeting(["fight", "fight"], [1, 0.35], false, seed, true);
+    assert.equal(unilateral.deaths[1], 0);
+    assert.ok(unilateral.alarm[0] > 0);
+    const attack = meeting(["fight", "fight"], [0.35, 0.35], false, seed, true);
+    assert.deepEqual(attack.deaths, meeting(["fight", "fight"], [0.35, 0.35], false, seed).deaths);
+    assert.deepEqual(meeting(["fight", "fight"], [0.35, 0.35], true, seed, true).deaths, [0, 0]);
+  }
+  assert.ok(losses > 0);
+  t.diagnostic(`20 seeds: peaceful victims lost ${losses} ants; their attackers lost none`);
 });

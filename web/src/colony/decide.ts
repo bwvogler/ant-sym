@@ -175,6 +175,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     }
   }
   let fleeFrom: number | null = null;
+  col.attackLayer[i] = -1;
   s.contactAction = null; // the step record is shared: never leak the preceding ant's encounter
   // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
@@ -185,6 +186,9 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     s.contactAction = action;
     if (action.movement === "attack") {
       mode = FIGHT;
+      col.attackLayer[i] = col.layer[i];
+    } else if (action.movement === "ignore") {
+      if (mode === FIGHT) mode = EXPLORE;
     } else if (action.movement === "withdraw") {
       if (action.release) putDown(col, i);
       if (mode !== RETURN) col.homeAfresh(i);

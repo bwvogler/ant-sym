@@ -124,3 +124,7 @@ One scripted behaviour per change:
 3. Measure the behaviour before and after.
 4. Note the new token cost for the lane in the PR, as CLAUDE.md requires. A new situation field multiplies the question space, so look for a steering-only route first ([ant-communication §1](ant-communication.md#1-how-many-channels): steering is free, the situation is paid).
 5. Close the row's bead and strike the row here.
+
+### Contact action gap
+
+[Contact actions](contact-actions.md): proximity currently causes damage even when both ants withdraw. The opt-in directed combat experiment closes this gap using the existing stranger cue and contact response; no new sense. Default promotion awaits colony-scale measurements.

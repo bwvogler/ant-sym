@@ -7201,6 +7201,8 @@ The rest of `--one all` passes on the same seeds in all three arms (`alarm`, `br
 - **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
 - **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
 
+**Revised after #251 (owner, 2026-11-16; `ja-52ui.8`).** The first drawer (a row of chips for each upgrade, lines in lanes beside them) "doesn't look like a tech tree I'm used to", and a price on every level repeats the one price. Now: tiers left to right (`ui/upgradeBranches.ts` `tierOf`: 7 levels in the first column, then 11, 6, 1 and 1; one row for each upgrade, grouped by branch), boxed levels joined by curves; the next price is in the drawer's header by the mutations in hand ("next 11"), and not on the levels or the phone list's buttons (a level's tooltip still says what it costs). No rule or number changed: goldens bit-exact, Jev cost unchanged.
+
 ## 81. Measuring lockstep (ja-0kys, 2026-11-14)
 
 **What.** `lockstepProbe` (experiment.ts), sampled each second over the ants in the mode their policy chose (carriers left out): `lockAgree`, the share of ants in their situation's commonest mode (1 = every ant in a situation does the same); `lockSwing`, how far the colony's mode mix moves second to second (total variation); `lockBurst`, the Fano factor of mode switches a second (about 1 when ants switch independently); `switchesPerS`. The one-world assay `lockstep` reports them; `--policy precache:<doctrine>` plays the shipped mode answers for both colonies, and `--set both.<param>` sets a parameter on both.
@@ -7361,3 +7363,19 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 - Food stays inside the placebo's noise (0.76–1.77×, round 5); fewer ants die; no held carriers.
 - Spent on the lane so far: about $0.027 (rounds 1–5 $0.0156, round 6's probes $0.0045 and re-ask $0.0066).
 - `assays.yml`'s `policy` input takes `precache:<doctrine>`, so these ran on the runners in about 4 minutes.
+
+## 83. The hyphae are drawn as wandering curves, with fuzz twigs (built, ja-p72j, 2026-11-18)
+
+**Owner (2026-11-16):** "could you think of a few creative ways to render the mycelium hyphae so they don't look so unnatural? Maybe more squiggly? Ideally not so angular and straight. The more chaotic the nicer. Ideally it would branch a lot more like real life, but c'est la vie." Of five ideas offered the owner chose **smooth + meander** and **fuzz twigs**; width taper with flow streaming and a gooey filter layer were not chosen.
+
+**Why they looked unnatural.** Each hypha cell was joined to its parent by a straight line between hex centres: a segment one cell long, in one of six directions (`docs/hyphal-growth.md` §2: the sim branches once in `BRANCH_RUN` = 7 cells, so runs are long and straight).
+
+**Built** (drawing only; `ui/hyphaeLook.ts`, `ColonyField.tsx` `drawHyphae`):
+- **Wander.** Every drawn point is bent by one smooth warp of the world: three octaves of seeded value noise (frequencies 0.42, 1.1 and 2.7 a cell, amplitudes 0.42, 0.25 and 0.11 cells). It depends on a point's place alone, so a cell never moves as the mycelium grows, and cells that share an edge or a branch point bend alike and stay joined. Tips, mass-in-transit glows and knots are bent the same way, so they sit on the curves.
+- **Curves.** Each run of cells between branch points (and wherever the cord status changes) is one Catmull-Rom spline through its bent centres; fusion loops are gently bowed curves.
+- **Fuzz.** From each thin hypha cell, by a hash of its key, up to one twig off each side (chance 0.3 each side, length 0.6–1.9 cells, 40 % forked), drawn thinner and fainter; they fade in between 5 and 12 px a cell and are not drawn zoomed out.
+- **Cost.** The runs, with their bent positions and the box of cells each spans, are found again when the tree's size changes, but no sooner than 60 ms after the last time (it changes every tick while it grows), and at the latest every 150 ms (2.9 ms for 6,000 cells); a frame then draws only the runs in view: 0.7 ms for 6,000 cells in view with twigs (node, path calls stubbed). No sim, golden or Jev cost change.
+- **Not changed.** The cells, their parents and branching: the twigs are cosmetic, so the sim's branching density (and P1) are as they were. Making it branch more for real would cost cells and mass and re-tune P1; not taken up.
+
+**Checked.** Unit tests for the helpers (`ui/tests/hyphaeLook.test.ts`: same place, same bend, bounded; the spline passes through every point; runs cover every edge once and cut at cord changes; twigs fixed by the key). Before and after screenshots at the same moment of the same game.
+

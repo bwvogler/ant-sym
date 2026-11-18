@@ -54,6 +54,8 @@ test("responseOf: get and drop read as booleans; validResponse holds an answer t
   assert.equal(responseOf("drop", "k", "false=0.5,true=0.5"), false);
   assert.equal(responseOf("contact", "k", "drop and run=0.6,flee=0.4"), "drop and run");
   assert.ok(validResponse("contact", "drop and run=0.6,flee=0.4"));
+  assert.equal(responseOf("contact", "k", "ignore=1"), "ignore");
+  assert.ok(validResponse("contact", "ignore=0.6,fight=0.4"));
   assert.ok(validResponse("get", "true=1"));
   assert.ok(!validResponse("get", "yes=1"));
   assert.ok(!validResponse("carry", "take=0.5,return=0.5"), "a mode is no carry answer");

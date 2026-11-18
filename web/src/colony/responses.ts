@@ -99,7 +99,7 @@ export type Leave = (typeof LEAVE)[number];
 export type Odds = (typeof ODDS)[number];
 
 /** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
-export const CONTACT = ["fight", "flee", "drop and run"] as const;
+export const CONTACT = ["fight", "flee", "drop and run", "ignore"] as const;
 export type Contact = (typeof CONTACT)[number];
 
 export type TrailKind = "food" | "home" | "none";
