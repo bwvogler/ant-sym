@@ -175,6 +175,7 @@ test("mycelium uses parent, child and fusion connections; a lone root invents no
     sporesOn: (l: number) => g.fungus.sporesOn(l),
     hyphaeOn: () => h,
     stalksOn: () => [key],
+    corpsesOn: () => new Map(),
   } as unknown as Fungus;
   const world = { colonies: g.colonies, world: g.world, fungus: f };
   assert.deepEqual(inspectCell(world, s, PLANE, x, y, trails).threads, []);

@@ -36,6 +36,7 @@ import type { Transect } from "./transect.ts";
 import { SITUATIONS, decodeSituation } from "./situation.ts";
 import {
   BROOD_MET_MIN,
+  CORPSE_ROT,
   CHAMBER_GAP,
   CHAMBER_GAP_GROWTH,
   CHAMBER_MIN_DEPTH,
@@ -375,6 +376,8 @@ export class Colony {
   // The midden (nest slice 7): corpses lie where workers die until an undertaker carries them out to the midden.
   /** the colony's dead not yet on the midden: where each lies (a cell), who carries it (−1 none), when it died, its fungus */
   readonly corpses: Corpse[] = [];
+  /** Surface deaths and recent midden deposits retained for visual decay only; never offered to undertakers or counted twice. Saved with public state. */
+  readonly remains: Corpse[] = [];
   /** the midden: corpses buried per cell (cellKey), a count rather than a list growing all game (review of #26) */
   readonly midden = new Map<number, number>();
   /** called with each corpse as it is put on the midden (the game: a sporulating strain's spores there), and the layer it lies on (absent: layer 0) */
@@ -1508,6 +1511,7 @@ export class Colony {
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
     for (const L of this.layers) L.ph.advance(dt);
+    for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.queen) {
       nestLife(this, dt);

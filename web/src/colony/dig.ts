@@ -340,6 +340,7 @@ export function dropOut(self: Colony, i: number, col: number): void {
       k.x = col;
       k.y = row;
       if (onMidden) {
+        self.remains.push({ ...k });
         self.corpses.splice(n, 1);
         const key = cellKey(col, row);
         self.midden.set(key, (self.midden.get(key) ?? 0) + 1);
@@ -419,6 +420,7 @@ export function dropPlane(self: Colony, i: number, atWill = false): void {
       k.y = cy;
       k.layer = PLANE;
       if (!midden) continue; // it lies here
+      self.remains.push({ ...k });
       self.corpses.splice(n, 1);
       const key = cellKey(cx, cy);
       self.midden.set(key, (self.midden.get(key) ?? 0) + 1);

@@ -1,5 +1,6 @@
+import bands from "../assets/inspection-3d/abdomen-bands.json" with { type: "json" };
 import layout from "../assets/nest/manifest.json" with { type: "json" };
-import { tintWorkerPixels, type WorkerLod } from "./workerSprites.ts";
+import { neutralSpriteRim, tintWorkerPixels, type WorkerLod } from "./workerSprites.ts";
 
 export type NestSprite = "queen" | "queen-dead" | "corpse" | "brood-0" | "brood-1" | "brood-2" | "alate-body" | "alate-wings";
 export function drawNestSprite(
@@ -41,10 +42,10 @@ export class NestSprites {
       im.src = URLS[lod];
     }
   }
-  get(lod: WorkerLod, colour?: readonly number[]): CanvasImageSource | null {
+  get(lod: WorkerLod, colour?: readonly number[], darkGround = false): CanvasImageSource | null {
     const im = this.images.get(lod);
     if (!im || !colour) return im ?? null;
-    const key = `${lod}:${colour.join(",")}`;
+    const key = `${lod}:${colour.join(",")}:${darkGround}`;
     const cached = this.tints.get(key);
     if (cached) return cached;
     const a = layout[lod],
@@ -55,11 +56,12 @@ export class NestSprites {
     if (!ctx) return null;
     try {
       ctx.drawImage(im, 0, 0);
-      // Bodies adopt colony colour; the separate wings, brood and dead bodies keep their materials.
+      // Abdomen bands adopt colony colour; the separate wings, brood and dead bodies keep their materials.
       for (const kind of ["queen", "alate-body"]) {
         const x = layout.names.indexOf(kind) * a.stride + 1;
         const data = ctx.getImageData(x, 1, a.frame, a.frame);
-        tintWorkerPixels(data.data, colour);
+        if (darkGround) neutralSpriteRim(data.data, a.frame, a.frame);
+        tintWorkerPixels(data.data, colour, (lod === "tiny" ? bands.nestTiny : bands.nestWalk)[kind as "queen" | "alate-body"]);
         ctx.putImageData(data, x, 1);
       }
       this.tints.set(key, cv);

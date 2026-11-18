@@ -1,8 +1,14 @@
+import { chamberFoodSpots } from "./chamberFood.ts";
+import { decayStage, visibleCadavers, type DecayStage, type InspectedCadaver } from "./cadaverVisual.ts";
+import type { FungalStructures } from "./fungalStructures.ts";
 import {
   CELL,
+  CORPSE_ROT,
   HYPHA_ROOT,
   INFECTED,
   PLANE,
+  OPEN,
+  rockAt,
   aphidCount,
   cellKey,
   cellOf,
@@ -26,8 +32,10 @@ export interface InspectedAnt {
   carrying: boolean;
   quality: number;
   infected: boolean;
+  odour?: number;
   cargo?: "none" | "food" | "soil" | "corpse" | "brood";
   broodStage?: number;
+  corpseStage?: DecayStage;
 }
 export interface InspectedQueen {
   k: number;
@@ -35,8 +43,9 @@ export interface InspectedQueen {
   y: number;
   alive: boolean;
   infected: boolean;
+  odour?: number;
 }
-export interface CellInspectionState {
+export interface CellInspectionState extends FungalStructures {
   cell: [number, number];
   place: LensProbe;
   quality: number;
@@ -46,10 +55,14 @@ export interface CellInspectionState {
   /** Local thread directions to real connected neighbours, in map-world offsets. */
   threads: [number, number][];
   knot: boolean;
+  cord?: boolean;
   stalk: boolean;
   queens: InspectedQueen[];
   /** Loose brood has cell coordinates only; floor icons are grouped by stage. Held brood is attached to its carrier. */
   brood: [number, number, number];
+  cadavers?: InspectedCadaver[];
+  recentRemains?: number;
+  storedFoodMarks?: number;
   fallen: number;
   buried: number;
 }
@@ -82,6 +95,9 @@ export function inspectCell(
     stalk: false,
     queens: [],
     brood: [0, 0, 0],
+    cadavers: [],
+    recentRemains: 0,
+    storedFoodMarks: 0,
     fallen: 0,
     buried: 0,
   };
@@ -101,15 +117,29 @@ export function inspectCell(
         carrying: !!c.carrying[i],
         quality: c.quality[i],
         infected: c.load[i] >= INFECTED,
+        odour: c.odour[i],
         cargo: c.item(i),
       });
     }
     const carriers = new Map(out.ants.filter((a) => a.k === k).map((a) => [a.i, a]));
     const home = layer < 0 || layer === c.home;
+    if (home && map.chambers)
+      for (const ch of map.chambers.list) {
+        if (ch.colony !== c.params.nest) continue;
+        for (const [xx, yy] of chamberFoodSpots(ch, (xx, yy) => map.chambers!.at(xx, yy) === ch.id && rockAt(map, xx, yy) === OPEN))
+          if (xx === gx && yy === gy) out.storedFoodMarks!++;
+      }
     if (home && c.queen) {
       cellOf(c.queen.x, c.queen.y);
       if (CELL[0] === gx && CELL[1] === gy)
-        out.queens.push({ k, x: c.queen.x - cx, y: c.queen.y - cy, alive: c.queen.alive, infected: c.queen.load >= INFECTED });
+        out.queens.push({
+          k,
+          x: c.queen.x - cx,
+          y: c.queen.y - cy,
+          alive: c.queen.alive,
+          infected: c.queen.load >= INFECTED,
+          odour: c.nestOdour,
+        });
     }
     for (const b of c.brood.items) {
       if (b.held >= 0) {
@@ -117,6 +147,16 @@ export function inspectCell(
         if (a?.cargo === "brood") a.broodStage = b.stage;
       } else if (home && b.x === gx && b.y === gy) out.brood[b.stage]++;
     }
+    for (const dead of visibleCadavers(c, layer))
+      if (dead.x === gx && dead.y === gy) out.cadavers!.push({ stage: decayStage(c.time, dead.died), fungal: false });
+    for (const dead of c.remains)
+      if (c.time - dead.died <= CORPSE_ROT && (layer < 0 || (dead.layer ?? c.home) === layer) && dead.x === gx && dead.y === gy)
+        out.recentRemains!++;
+    for (const dead of c.corpses)
+      if (dead.held >= 0) {
+        const a = carriers.get(dead.held);
+        if (a) a.corpseStage = decayStage(c.time, dead.died);
+      }
     for (const dead of c.corpses)
       if (dead.held < 0 && (layer < 0 || (dead.layer ?? c.home) === layer) && dead.x === gx && dead.y === gy) out.fallen++;
     if (layer < 0 || layer === PLANE) out.buried += c.midden.get(cellKey(gx, gy)) ?? 0;
@@ -149,7 +189,19 @@ export function inspectCell(
       out.threads.push([centreX(xx, yy) - cx, centreY(yy) - cy]);
     }
     out.knot = h.knots.has(key);
+    out.knotSprouted = h.knots.get(key)?.sprouted ?? false;
+    out.cord = h.cords.has(key);
+    out.fruit = h.fruits.includes(key);
+    out.tips = h.tips
+      .filter((t) => t.x === gx && t.y === gy)
+      .map((t) => [centreX(nx(gx, gy, t.heading), ny(gy, t.heading)) - cx, centreY(ny(gy, t.heading)) - cy]);
   }
   out.stalk = g.fungus.stalksOn(lv).includes(key);
+  const left = g.fungus.corpsesOn(lv).get(key);
+  out.colonised = left !== undefined;
+  out.sporulating = (left ?? 0) > 0;
+  out.stalkLevel = out.stalk ? Math.max(1, g.fungus.evolution?.level("stalks") ?? 1) : 0;
+  // Legacy saves and aggregate fungal sites still record a colonised cadaver resource, even without a loose-body record.
+  if (out.stalk && !out.cadavers!.length) out.cadavers!.push({ stage: 1, fungal: true });
   return out;
 }

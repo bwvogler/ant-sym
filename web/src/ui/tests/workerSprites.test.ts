@@ -97,7 +97,7 @@ test("odour tint preserves alpha and shading, including a light dark-theme ant",
     [240, 235, 220],
   ]) {
     const p = new Uint8ClampedArray([35, 31, 28, 255, 137, 107, 77, 127, 7, 8, 9, 0]);
-    tintWorkerPixels(p, colour);
+    tintWorkerPixels(p, colour, [0, p.length / 4]);
     assert.equal(p[3], 255);
     assert.equal(p[7], 127);
     assert.ok(p[4] > p[0]);

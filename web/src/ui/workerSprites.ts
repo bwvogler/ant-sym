@@ -1,3 +1,4 @@
+import bands from "../assets/inspection-3d/abdomen-bands.json" with { type: "json" };
 import type { Colony } from "../colony/index.ts";
 
 /** Atlas frame padding is transparent; worldSize keeps the body at the same ant:hex scale. */
@@ -89,13 +90,27 @@ export class WorkerGait {
 }
 
 /** Keep alpha and voxel shading while using the game's existing odour colours in either theme. */
-export function tintWorkerPixels(pixels: Uint8ClampedArray, colour: readonly number[]): void {
-  for (let i = 0; i < pixels.length; i += 4) {
-    if (!pixels[i + 3]) continue;
-    const light = (pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722 - 28) / 100;
-    const shade = 0.65 + Math.max(0, Math.min(1, light)) * 0.5;
-    for (let k = 0; k < 3; k++) pixels[i + k] = Math.round(Math.min(255, colour[k] * shade));
-  }
+export function tintWorkerPixels(pixels: Uint8ClampedArray, colour: readonly number[], runs: readonly number[] = []): void {
+  for (let run = 0; run < runs.length; run += 2)
+    for (let pixel = runs[run]; pixel < runs[run] + runs[run + 1]; pixel++) {
+      const i = pixel * 4;
+      if (!pixels[i + 3]) continue;
+      const light = (pixels[i] * 0.2126 + pixels[i + 1] * 0.7152 + pixels[i + 2] * 0.0722 - 28) / 100;
+      const shade = 0.65 + Math.max(0, Math.min(1, light)) * 0.5;
+      for (let k = 0; k < 3; k++) pixels[i + k] = Math.round(Math.min(255, colour[k] * shade));
+    }
+}
+
+/** Lift existing silhouette pixels on dark ground. Alpha and footprint stay exact; no outer halo or colony hue is added. */
+export function neutralSpriteRim(pixels: Uint8ClampedArray, width: number, height: number): void {
+  const alpha = (x: number, y: number) => (x < 0 || y < 0 || x >= width || y >= height ? 0 : pixels[(y * width + x) * 4 + 3]);
+  const neutral = [166, 161, 143];
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      if (alpha(x, y) < 96 || [alpha(x - 1, y), alpha(x + 1, y), alpha(x, y - 1), alpha(x, y + 1)].every((a) => a >= 96)) continue;
+      const at = (y * width + x) * 4;
+      for (let k = 0; k < 3; k++) pixels[at + k] = Math.max(pixels[at + k], Math.round(pixels[at + k] * 0.3 + neutral[k] * 0.7));
+    }
 }
 
 const URLS = {
@@ -135,10 +150,10 @@ export class WorkerSprites {
     return this.images.has(lod);
   }
 
-  get(lod: WorkerLod, colour: readonly number[]): HTMLCanvasElement | null {
+  get(lod: WorkerLod, colour: readonly number[], darkGround = false): HTMLCanvasElement | null {
     const image = this.images.get(lod);
     if (!image) return null;
-    const key = `${lod}:${colour.join(",")}`;
+    const key = `${lod}:${colour.join(",")}:${darkGround}`;
     let canvas = this.tints.get(key);
     if (canvas) return canvas;
     canvas = document.createElement("canvas");
@@ -150,7 +165,8 @@ export class WorkerSprites {
     try {
       ctx.drawImage(image, 0, 0);
       const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      tintWorkerPixels(data.data, colour);
+      if (darkGround) neutralSpriteRim(data.data, canvas.width, canvas.height);
+      tintWorkerPixels(data.data, colour, lod === "tiny" ? bands.workerTiny : bands.workerWalk);
       ctx.putImageData(data, 0, 0);
       this.tints.set(key, canvas);
       return canvas;

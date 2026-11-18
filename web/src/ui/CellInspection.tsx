@@ -1,3 +1,5 @@
+import { dragOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
+import type { InspectionScene } from "./InspectionScene.ts";
 import { useEffect, useRef, useState } from "react";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 import { INSPECTION_ATLAS_URL, LIFECYCLE_ATLAS_URL, LIFECYCLE_ATLAS_SIZE } from "./drawCellInspection.ts";
@@ -22,6 +24,9 @@ export default function CellInspection({
     reader.current = read;
   }, [read]);
   const [failed, setFailed] = useState(false);
+  const [rendererKind, setRendererKind] = useState<"webgl" | "software" | "fixed" | "loading">("loading");
+  const sceneRef = useRef<InspectionScene | null>(null);
+  const drag = useRef<{ id: number; x: number; y: number; orbit: InspectionOrbit } | null>(null);
   const [overlays, setOverlays] = useState(DEFAULT_INSPECTION_OVERLAYS);
   const overlayOptions = useRef(overlays),
     redraw = useRef<(() => void) | null>(null);
@@ -42,71 +47,71 @@ export default function CellInspection({
       });
     };
   }, []);
-  // Share the game's render clock; no timer or independent animation loop. Re-read live positions each frame.
+  // One game clock for both renderer paths; no independent timers or animation loops.
   useEffect(() => {
-    const ctx = canvas.current?.getContext("2d");
-    if (!ctx) return;
-    const image = new Image();
-    const lifecycle = new Image();
-    const below = new Image();
+    const cv = canvas.current;
+    if (!cv) return;
     const mode = state.mode,
-      renderer = new InspectionPatchRenderer();
-    let lifecycleReady = false,
-      ready = false,
-      belowReady = false,
-      disposed = false;
+      images: { surface?: CanvasImageSource; lifecycle?: CanvasImageSource; below?: CanvasImageSource } = {};
+    const pending: HTMLImageElement[] = [];
+    let disposed = false,
+      scene: InspectionScene | null = null,
+      ctx: CanvasRenderingContext2D | null = null;
+    const fallback = new InspectionPatchRenderer();
     const draw = () => {
-      if (!disposed)
-        renderer.draw(
-          ctx,
-          reader.current(),
-          { surface: ready ? image : undefined, lifecycle: lifecycleReady ? lifecycle : undefined, below: belowReady ? below : undefined },
-          384,
-          320,
-          overlayOptions.current,
-        );
+      if (disposed) return;
+      if (scene) scene.draw(reader.current(), overlayOptions.current);
+      else if (ctx) fallback.draw(ctx, reader.current(), images, 384, 320, overlayOptions.current);
     };
     redraw.current = draw;
-    const load = (im: HTMLImageElement, url: string, size: readonly number[], accept: () => void) => {
-      im.onload = () => {
-        if (disposed) return;
-        if (im.naturalWidth !== size[0] || im.naturalHeight !== size[1]) {
-          setFailed(true);
+    setLoadedMode(null);
+    setRendererKind("loading");
+    void import("./InspectionScene.ts")
+      .then((m) => m.InspectionScene.create(cv, mode))
+      .then((next) => {
+        if (disposed) {
+          next.dispose();
           return;
         }
-        accept();
-        if (mode === "below" ? belowReady : ready && lifecycleReady) {
-          setLoadedMode(mode);
-          setFailed(false);
+        scene = next;
+        sceneRef.current = next;
+        setRendererKind(next.accelerated ? "webgl" : "software");
+        setLoadedMode(mode);
+        setFailed(false);
+        draw();
+      })
+      .catch(() => {
+        if (disposed) return;
+        ctx = cv.getContext("2d");
+        setRendererKind("fixed");
+        setFailed(true);
+        const load = (key: keyof typeof images, url: string, size: readonly number[]) => {
+          const im = new Image();
+          pending.push(im);
+          im.onload = () => {
+            if (disposed) return;
+            if (im.naturalWidth !== size[0] || im.naturalHeight !== size[1]) return;
+            images[key] = im;
+            if (mode === "below" ? !!images.below : !!images.surface && !!images.lifecycle) setLoadedMode(mode);
+            draw();
+          };
+          im.src = url;
+        };
+        if (mode === "below") load("below", BELOW_ATLAS_URL, BELOW_ATLAS_SIZE);
+        else {
+          load("surface", INSPECTION_ATLAS_URL, [1290, 1290]);
+          load("lifecycle", LIFECYCLE_ATLAS_URL, LIFECYCLE_ATLAS_SIZE);
         }
         draw();
-      };
-      im.onerror = () => {
-        if (!disposed) setFailed(true);
-      };
-      im.src = url;
-    };
-    if (mode === "below")
-      load(below, BELOW_ATLAS_URL, BELOW_ATLAS_SIZE, () => {
-        belowReady = true;
       });
-    else {
-      load(image, INSPECTION_ATLAS_URL, [1290, 1290], () => {
-        ready = true;
-      });
-      load(lifecycle, LIFECYCLE_ATLAS_URL, LIFECYCLE_ATLAS_SIZE, () => {
-        lifecycleReady = true;
-      });
-    }
     const off = onFrame(draw);
-    draw();
     return () => {
       disposed = true;
-      redraw.current = null;
       off();
-      image.onload = image.onerror = null;
-      lifecycle.onload = lifecycle.onerror = null;
-      below.onload = below.onerror = null;
+      redraw.current = null;
+      sceneRef.current = null;
+      scene?.dispose();
+      for (const im of pending) im.onload = im.onerror = null;
     };
   }, [onFrame, state.mode]);
   const selected = state.selected,
@@ -151,14 +156,87 @@ export default function CellInspection({
               Location markers
             </label>
           </fieldset>
+          <div className="mb-2 flex gap-2 text-xs">
+            <button
+              type="button"
+              className="min-h-11 rounded-md border border-line px-3"
+              disabled={rendererKind === "fixed" || rendererKind === "loading"}
+              onClick={() => {
+                sceneRef.current?.reset();
+                redraw.current?.();
+              }}
+            >
+              Map view
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-md border border-line px-3"
+              disabled={rendererKind === "fixed" || rendererKind === "loading"}
+              onClick={() => {
+                sceneRef.current?.angle();
+                redraw.current?.();
+              }}
+            >
+              Angled view
+            </button>
+          </div>
           <canvas
             ref={canvas}
+            tabIndex={0}
+            style={{ touchAction: "none", cursor: rendererKind === "fixed" ? "default" : "grab" }}
+            onPointerDown={(e) => {
+              const scene = sceneRef.current;
+              if (!scene) return;
+              e.preventDefault();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, orbit: { ...scene.orbit } };
+            }}
+            onPointerMove={(e) => {
+              const d = drag.current,
+                scene = sceneRef.current;
+              if (!d || !scene || d.id !== e.pointerId) return;
+              scene.orbit = dragOrbit(d.orbit, e.clientX - d.x, e.clientY - d.y);
+              redraw.current?.();
+            }}
+            onPointerUp={() => {
+              drag.current = null;
+            }}
+            onPointerCancel={() => {
+              drag.current = null;
+            }}
+            onLostPointerCapture={() => {
+              drag.current = null;
+            }}
+            onKeyDown={(e) => {
+              const scene = sceneRef.current;
+              if (!scene) return;
+              const movement: Record<string, [number, number]> = {
+                ArrowLeft: [-16, 0],
+                ArrowRight: [16, 0],
+                ArrowUp: [0, -12],
+                ArrowDown: [0, 12],
+              };
+              if (e.key === "Home") {
+                e.preventDefault();
+                scene.reset();
+                redraw.current?.();
+              } else if (movement[e.key]) {
+                e.preventDefault();
+                scene.orbit = dragOrbit(scene.orbit, ...movement[e.key]);
+                redraw.current?.();
+              }
+            }}
+            data-view-kind={rendererKind === "fixed" ? "fixed" : "voxel-3d"}
+            data-renderer={rendererKind}
             width="384"
             height="320"
             aria-label={`Seven-cell ${state.mode} inspection; ${selected.ants.length} workers in the selected cell`}
             data-assets-ready={loadedMode === state.mode ? "true" : "false"}
             className="mx-auto block h-auto max-h-[27dvh] w-full object-contain [image-rendering:pixelated] sm:max-h-none"
           />
+          <p className="mt-1 text-xs text-fg-3">
+            {rendererKind === "fixed" ? "Fixed view · 3D models unavailable" : "Drag to rotate · arrow keys rotate · Home resets"}
+          </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-fg-2" aria-label="Inspection overlay legend">
             {overlays.scents &&
               Object.values(SCENT_STYLES).map((s) => (
@@ -173,7 +251,7 @@ export default function CellInspection({
           </div>
           {failed && (
             <p role="status" className="text-sm text-fg-2">
-              The inspection image could not load. Cell details are still available.
+              The 3D models could not load. The fixed inspection and cell details remain available.
             </p>
           )}
         </div>
@@ -208,8 +286,16 @@ export default function CellInspection({
             <dd>{selected.fallen}</dd>
             <dt className="text-fg-3">Buried in midden</dt>
             <dd>{selected.buried}</dd>
-            <dt className="text-fg-3">Food</dt>
+            <dt className="text-fg-3">Loose food</dt>
             <dd>{p.food.toFixed(2)}</dd>
+            {p.chamber && (
+              <>
+                <dt className="text-fg-3">Stored food (whole chamber)</dt>
+                <dd>{p.chamber.food.toFixed(2)}</dd>
+              </>
+            )}
+            <dt className="text-fg-3">Recent surface / midden remains</dt>
+            <dd>{selected.recentRemains ?? 0}</dd>
             <dt className="text-fg-3">Aphid density</dt>
             <dd>{selected.aphidDensity.toFixed(1)} / cell</dd>
             <dt className="text-fg-3">Spoil height</dt>
@@ -218,15 +304,20 @@ export default function CellInspection({
             <dd>
               {p.hypha ? "Present" : "None"}
               {selected.knot ? " · knot" : ""}
+              {selected.knotSprouted ? " (sprouted)" : ""}
+              {selected.cord ? " · cord" : ""}
+              {selected.fruit ? " · spore tufts" : ""}
+              {selected.colonised ? " · colonised remains" : ""}
               {selected.stalk ? " · stalk" : ""}
             </dd>
             <dt className="text-fg-3">Spores</dt>
             <dd>{p.spores ? "Visible" : "None visible"}</dd>
           </dl>
           <p className="mt-4 text-xs leading-relaxed text-fg-3">
-            The six neighbours give context; these counts apply only to the outlined centre cell. Food and aphid marks show abundance. Floor
-            brood and fallen-ant icons are grouped; counts are exact. Soil grit and spoil relief are illustrative. Trail washes use the
-            map’s sensed visibility. Scents are local strengths, not movement directions. Overlay switches affect this inspection only.
+            The six neighbours give context; these counts apply only to the outlined centre cell. Food and aphid marks show abundance.
+            Cadavers decay in steps over 15 simulation minutes. Buried counts are historical, not exposed bodies. Store marks illustrate the
+            chamber stock. Floor brood icons are grouped; counts are exact. Soil grit and spoil relief are illustrative. Trail washes use
+            the map’s sensed visibility. Scents are local strengths, not movement directions. Overlay switches affect this inspection only.
           </p>
         </div>
       </div>

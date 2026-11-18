@@ -1,3 +1,8 @@
+import { CadaverSprites } from "./cadaverSprites.ts";
+import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
+import { FungalMapSprites } from "./fungalStructures.ts";
+import { hyphaShape, HYPHA_COLOURS } from "./hyphaVisual.ts";
+import { chamberFoodSpots } from "./chamberFood.ts";
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
 import { MapLeafSprites, SurfaceLeaves } from "./surfaceFood.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
@@ -6,8 +11,6 @@ import {
   type ChunkLayer,
   type Colony,
   CURTAIN,
-  keyX,
-  keyY,
   moundRadius,
   PLANE,
   groundHeat,
@@ -26,6 +29,9 @@ import {
   hyphaCell,
   HYPHA_MASS,
   HYPHA_ROOT,
+  nx as neighbourX,
+  ny as neighbourY,
+  cellKey,
   type OneWorld,
   STRIP,
   BINS,
@@ -411,6 +417,8 @@ export default function ColonyField({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
+    const cadaverSprites = new CadaverSprites();
+    const fungalSprites = new FungalMapSprites();
     const workerSprites = new WorkerSprites();
     const nestSprites = new NestSprites();
     const resourceSprites = new ResourceSprites();
@@ -898,38 +906,56 @@ export default function ColonyField({
       ry1: number,
     ) => {
       const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
-      const path = new Path2D();
-      // Cords (a web, ja-2bw.8): the segments into a cord cell, drawn thicker.
-      const cords = new Path2D();
+      const path = new Path2D(),
+        cords = new Path2D(),
+        hairs = new Path2D();
       const segment = (a: number, b: number, into: Path2D = path) => {
-        const [ax, ay] = hyphaCell(a);
-        const [bx, by] = hyphaCell(b);
+        const [ax, ay] = hyphaCell(a),
+          [bx, by] = hyphaCell(b);
         if (!inView(ax, ay) && !inView(bx, by)) return;
-        const [sx, sy] = toScreen(c, v, centreX(ax, ay), centreY(ay));
-        const [tx, ty] = toScreen(c, v, centreX(bx, by), centreY(by));
-        into.moveTo(sx, sy);
-        into.lineTo(tx, ty);
+        const shape = hyphaShape([centreX(ax, ay), centreY(ay)], [centreX(bx, by), centreY(by)]);
+        shape.points.forEach(([x, y], i) => {
+          const p = toScreen(c, v, x, y);
+          if (i === 0) into.moveTo(...p);
+          else into.lineTo(...p);
+        });
+        if (c.zoom / d >= 12)
+          for (const [a, b] of shape.hairs) {
+            hairs.moveTo(...toScreen(c, v, ...a));
+            hairs.lineTo(...toScreen(c, v, ...b));
+          }
       };
       for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k, h.cords.has(k) ? cords : path);
-      for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i]!, h.fusions[i + 1]!);
+      for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i], h.fusions[i + 1]);
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
-      ctx.strokeStyle = theme.spore;
-      ctx.globalAlpha = under ? 0.45 : 0.9;
-      ctx.lineWidth = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
+      const fine = Math.max(1.3 * d, Math.min(4 * d, c.zoom * 0.17)),
+        thick = Math.max(2.8 * d, Math.min(9 * d, c.zoom * 0.35));
+      ctx.globalAlpha = 0.72;
+      ctx.strokeStyle = HYPHA_COLOURS.edge;
+      ctx.lineWidth = fine + 1.2 * d;
       ctx.stroke(path);
-      ctx.lineWidth = Math.max(2.5 * d, Math.min(8 * d, c.zoom * 0.32));
+      ctx.lineWidth = thick + 1.3 * d;
       ctx.stroke(cords);
-      ctx.fillStyle = theme.spore;
-      ctx.globalAlpha = under ? 0.6 : 1;
+      ctx.globalAlpha = under ? 0.92 : 1;
+      ctx.strokeStyle = HYPHA_COLOURS.body;
+      ctx.lineWidth = fine;
+      ctx.stroke(path);
+      ctx.lineWidth = thick;
+      ctx.stroke(cords);
+      ctx.strokeStyle = HYPHA_COLOURS.core;
+      ctx.lineWidth = Math.max(0.8 * d, c.zoom * 0.045);
+      ctx.stroke(hairs);
+      ctx.fillStyle = HYPHA_COLOURS.body;
+      ctx.globalAlpha = 1;
       const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
       for (const t of h.tips) {
         if (!inView(t.x, t.y)) continue;
-        const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y));
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fill();
+        const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y)),
+          dx = centreX(neighbourX(t.x, t.y, t.heading), neighbourY(t.y, t.heading)) - centreX(t.x, t.y),
+          dy = centreY(neighbourY(t.y, t.heading)) - centreY(t.y);
+        fungalSprites.draw(ctx, { tips: [[dx, dy]] }, 0, x, y, c.zoom);
       }
       // Mass in transit (ja-tgw9, flow on): a soft glow on each cell it fills, brighter and wider the more there is, so the
       // player sees where the mycelium is feeding and a front cut off from it going dim.
@@ -944,16 +970,20 @@ export default function ColonyField({
         ctx.arc(x, y, r * (1 + full), 0, Math.PI * 2);
         ctx.fill();
       }
-      // Knots (ja-2bw.9): a hard, dark lump on the hypha, a little larger than a tip.
-      ctx.fillStyle = theme.ink;
-      ctx.globalAlpha = under ? 0.5 : 0.85;
-      for (const k of h.knots.keys()) {
+      ctx.globalAlpha = 1;
+      const fruits = new Set(h.fruits);
+      for (const k of new Set([...h.knots.keys(), ...fruits])) {
         const [kx, ky] = hyphaCell(k);
         if (!inView(kx, ky)) continue;
         const [x, y] = toScreen(c, v, centreX(kx, ky), centreY(ky));
-        ctx.beginPath();
-        ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
-        ctx.fill();
+        fungalSprites.draw(
+          ctx,
+          { knot: h.knots.has(k), knotSprouted: h.knots.get(k)?.sprouted ?? false, fruit: fruits.has(k) },
+          k,
+          x,
+          y,
+          c.zoom,
+        );
       }
       ctx.restore();
     };
@@ -1263,6 +1293,7 @@ export default function ColonyField({
       const rx1 = Math.min(gx0 + gw - 1, Math.ceil(vis.x1) + 1);
       const hexes = c.zoom >= HEX_ZOOM * d;
       const resourceLod = workerLod(c.zoom, d);
+      const darkSprites = theme.paperRgb[0] * 0.2126 + theme.paperRgb[1] * 0.7152 + theme.paperRgb[2] * 0.0722 < 100;
       // Read-only browser diagnostics: actual CSS scale and the available worker representation.
       const cssHex = (c.zoom / d).toFixed(2),
         workerStyle = hexes && workerSprites.ready(resourceLod) ? "voxel" : "ink";
@@ -1350,28 +1381,23 @@ export default function ColonyField({
       }
       const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
       if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
-      // Stalks (ja-2bw.10): a short upright stroke on each colonised corpse that has grown one.
-      const stalks = fungus.stalksOn(lv < 0 ? 0 : lv);
-      if (stalks.length) {
-        ctx.save();
-        ctx.strokeStyle = theme.ink;
-        ctx.lineCap = "round";
-        ctx.globalAlpha = 0.8;
-        ctx.lineWidth = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
-        const tall = Math.max(6 * d, Math.min(24 * d, c.zoom * 1.2));
-        for (const k of stalks) {
-          const [sx, sy] = hyphaCell(k);
-          if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
-          const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.lineTo(x, y - tall);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(x, y - tall, tall * 0.18, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        ctx.restore();
+      const corpseCells = new Set(colonies.flatMap((col) => visibleCadavers(col, lv).map((k) => cellKey(k.x, k.y))));
+      const stalks = new Set(fungus.stalksOn(lv < 0 ? 0 : lv)),
+        stalkLevel = fungus.evolution?.level("stalks") ?? 0;
+      for (const [k, left] of fungus.corpsesOn(lv < 0 ? 0 : lv)) {
+        const [sx, sy] = hyphaCell(k);
+        if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
+        const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+        fungalSprites.draw(
+          ctx,
+          { colonised: true, sporulating: left > 0, stalkLevel: stalks.has(k) ? stalkLevel : 0 },
+          k,
+          x,
+          y,
+          c.zoom,
+          "ground",
+        );
+        if (stalks.has(k) && !corpseCells.has(k)) cadaverSprites.draw(ctx, workerLod(c.zoom, d), 1, x, y, c.zoom);
       }
 
       // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
@@ -1444,11 +1470,7 @@ export default function ColonyField({
           ctx.fillStyle = theme.accent;
           for (const ch of m.chambers.list) {
             if (ch.colony !== col.params.nest || ch.food < 1 || ch.cells === 0) continue;
-            const span = ch.x1 - ch.x0 + 1;
-            const shown = Math.min(40, Math.floor(ch.food));
-            for (let k = 0; k < shown; k++) {
-              const fx = ch.x0 + (k % span);
-              const fy = ch.floorRow - (Math.floor(k / span) % 2);
+            for (const [fx, fy] of chamberFoodSpots(ch, (x, y) => m.chambers!.at(x, y) === ch.id && rockAt(m, x, y) === OPEN)) {
               const wx = centreX(fx, fy);
               const wy = centreY(fy);
               if (!inView(wx, wy)) continue;
@@ -1462,13 +1484,14 @@ export default function ColonyField({
         ctx.strokeStyle = theme.mound;
         ctx.lineWidth = Math.max(1, d * 0.8);
         ctx.beginPath();
-        for (const k of col.corpses) {
+        for (const k of visibleCadavers(col, lv)) {
           // One world: a corpse lies on its layer (carried up to the plane's midden, or dropped there; home when unset).
           if (k.held >= 0 || (lv >= 0 && (k.layer ?? col.home) !== lv)) continue;
           const wx = centreX(k.x, k.y);
           const wy = centreY(k.y);
           if (!inView(wx, wy)) continue;
           const [x, y] = toScreen(c, v, wx, wy);
+          if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, k.died), x, y, c.zoom)) continue;
           if (nestImage) {
             drawNestSprite(ctx, nestImage, resourceLod, "corpse", x, y, c.zoom);
             continue;
@@ -1478,25 +1501,11 @@ export default function ColonyField({
           ctx.moveTo(x + bd, y - bd);
           ctx.lineTo(x - bd, y + bd);
         }
-        // The midden keeps a count per cell: one cross a cell, larger the more lie there. In one world it is the plane's.
-        for (const [key, n] of col.midden) {
-          if (lv === CURTAIN) break;
-          const mx = keyX(key);
-          const my = keyY(key);
-          const wx = centreX(mx, my);
-          const wy = centreY(my);
-          if (!inView(wx, wy)) continue;
-          const [x, y] = toScreen(c, v, wx, wy);
-          const s = bd * Math.min(3, 1 + Math.log2(n) / 3);
-          ctx.moveTo(x - s, y - s);
-          ctx.lineTo(x + s, y + s);
-          ctx.moveTo(x + s, y - s);
-          ctx.lineTo(x - s, y + s);
-        }
+        // Historical burial counts remain in the inspector, rather than permanent exposed-body crosses.
         ctx.stroke();
         if (home && col.queen && inView(col.queen.x, col.queen.y)) {
           const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
-          const queenImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour)) : null;
+          const queenImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
           if (queenImage) {
             drawNestSprite(ctx, queenImage, resourceLod, col.queen.alive ? "queen" : "queen-dead", x, y, c.zoom);
           } else {
@@ -1525,7 +1534,7 @@ export default function ColonyField({
           if (!home || !inView(al.x, al.y)) continue;
           const [x, y] = toScreen(c, v, al.x, al.y);
           const ar = Math.max(2.5, len * 0.7);
-          const alateImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour)) : null;
+          const alateImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
           if (alateImage) {
             drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
             drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
@@ -1562,7 +1571,7 @@ export default function ColonyField({
         for (let b = 0; b < BINS; b++) {
           if (!(bands & (1 << b))) continue;
           const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
-          const sprite = hexes ? workerSprites.get(lod, colour) : null;
+          const sprite = hexes ? workerSprites.get(lod, colour, darkSprites) : null;
           ctx.beginPath();
           for (let i = 0; i < col.n; i++) {
             if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
@@ -1577,8 +1586,24 @@ export default function ColonyField({
               ctx.lineTo(x + hc, y + hs);
             }
           }
-          ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
+          ctx.strokeStyle = theme.ink;
           ctx.stroke();
+          if (!sprite) {
+            ctx.beginPath();
+            for (let i = 0; i < col.n; i++) {
+              if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+              const [x, y] = toScreen(c, v, col.x[i], col.y[i]),
+                co = Math.cos(col.heading[i]),
+                si = Math.sin(col.heading[i]),
+                ax = x - co * half * 0.45,
+                ay = y - si * half * 0.45,
+                w = Math.max(d, half * 0.35);
+              ctx.moveTo(ax - si * w, ay + co * w);
+              ctx.lineTo(ax + si * w, ay - co * w);
+            }
+            ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
+            ctx.stroke();
+          }
         }
         ctx.globalAlpha = 1;
         // Infected ants: a spore-coloured dot on the body, fainter for a light load.
@@ -1627,6 +1652,8 @@ export default function ColonyField({
           const px = x + Math.cos(col.heading[i]) * reach;
           const py = y + Math.sin(col.heading[i]) * reach;
           if (col.carriesCorpse(i)) {
+            const dead = col.corpses.find((k) => k.held === i);
+            if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, dead?.died ?? col.time), px, py, c.zoom)) continue;
             if (nestImage) {
               drawNestSprite(ctx, nestImage, resourceLod, "corpse", px, py, c.zoom);
               continue;
@@ -1655,6 +1682,14 @@ export default function ColonyField({
         }
       }
       if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
+
+      // Tall structures occlude bodies in the aerial view, just as they do in 3D inspection.
+      for (const k of stalks) {
+        const [sx, sy] = hyphaCell(k);
+        if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
+        const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+        fungalSprites.draw(ctx, { stalkLevel }, k, x, y, c.zoom, "raised");
+      }
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       if (labelsOn.current && m.chambers) {
@@ -1821,6 +1856,7 @@ export default function ColonyField({
         ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
       }
     };
+    cadaverSprites.load(draw);
     workerSprites.load(draw);
     nestSprites.load(draw);
     resourceSprites.load(draw);
@@ -1844,6 +1880,7 @@ export default function ColonyField({
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
       off();
+      cadaverSprites.dispose();
       workerSprites.dispose();
       nestSprites.dispose();
       resourceSprites.dispose();

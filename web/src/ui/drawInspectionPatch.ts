@@ -90,7 +90,7 @@ const SIDES: [Point3, Point3[]][] = [
 ];
 
 /** Actual seven-cell terrain only. Added cut thickness is visual; no simulation geometry is written. */
-export function buildPatchTerrain(patch: InspectionPatch): Face[] {
+export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Face[] {
   const isBelow = patch.mode === "below",
     step = isBelow ? 0.06 : 0.05,
     limit = isBelow ? 26 : 31;
@@ -136,7 +136,7 @@ export function buildPatchTerrain(patch: InspectionPatch): Face[] {
   } of voxels.values())
     for (const [normal, corners] of SIDES) {
       if (
-        normal[0] * eye[0] + normal[1] * eye[1] + normal[2] * eye[2] <= 0 ||
+        (!allSides && normal[0] * eye[0] + normal[1] * eye[1] + normal[2] * eye[2] <= 0) ||
         voxels.has([x + normal[0], y + normal[1], z + normal[2]].join(","))
       )
         continue;
@@ -167,7 +167,7 @@ export function patchPoint(mode: InspectionPatch["mode"], width: number, height:
 const surfaceSoil = ["#DB9B59", "#E3A363", "#D29454", "#E8AB6B", "#D89B5B"];
 const belowSoil = ["#AF855E", "#B58B63", "#A77D56", "#BA916B", "#A9825C"];
 const rocks = ["#858D88", "#929A95", "#7D8681", "#9AA19B", "#818985"];
-function faceColour(face: Face, mode: InspectionPatch["mode"]): string {
+export function faceColour(face: Face, mode: InspectionPatch["mode"]): string {
   const hex =
     face.kind === "back"
       ? "#503B2D"
