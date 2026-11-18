@@ -17,9 +17,7 @@ import {
   type Situation,
   type SpeciesSituation,
   type Stance,
-  type StancePolicy,
   type SteerPolicy,
-  type StanceSituation,
   type Trail,
   FIGHT,
   RETURN,
@@ -44,7 +42,6 @@ import {
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
   HOLE_SIGHT,
-  INTAKE_WINDOW,
   MIDDEN_AT,
   RECEPTION_MIN,
   REVERT_BELOW,
@@ -66,9 +63,9 @@ import { moveDig } from "./move.ts";
 import { arrive } from "./arrive.ts";
 import { AntStep, gatesFor } from "./step.ts";
 import { atGate, crossed } from "./crossing.ts";
-import { localPolicy, localStance, localSteer } from "./localRules.ts";
-import { speciesSituation, stanceView } from "./colonySituation.ts";
-export { localPolicy, localStance, localSteer } from "./localRules.ts";
+import { localPolicy, localSteer } from "./localRules.ts";
+import { speciesSituation } from "./colonySituation.ts";
+export { localPolicy, localSteer } from "./localRules.ts";
 export { SITUATIONS, decodeSituation, encodeSituation, packSituation } from "./situation.ts";
 export {
   BY_VECTOR,
@@ -84,9 +81,6 @@ export {
   FOLLOW_GIVE_UP,
   GLANCE,
   HOLE_SIGHT,
-  INTAKE_NONE,
-  INTAKE_PLENTY,
-  INTAKE_WINDOW,
   LEAVE_NOW,
   LEAVE_SOON,
   MET_HALF,
@@ -276,14 +270,12 @@ export class Colony {
   /** one world: every nest's hole on both layers (HoleCell), indexed by colony as the maps' nests are; empty elsewhere */
   holeCells: HoleCell[] = [];
   params: ColonyParams;
-  /** what an ant of this colony does in a situation, and what the colony's strategist chooses: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
+  /** what an ant of this colony does in a situation: read here, set through `bindPolicy` (the lane's answers: the local rule, Jev's cached answers, a test's) */
   readonly policy: Policy;
-  readonly stancePolicy: StancePolicy;
   /** the weights an ant out exploring or following steers by (ja-ykmu; asked only with params.steerLane): set through `bindPolicy("steer", …)` */
   readonly steerPolicy: SteerPolicy = localSteer;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
-  stance: Stance = "forage";
   /**
    * whether a rival lives, as the game last found (review of #53, S1): where each ant's stance is its own, nobody raids without one. An
    * interim rule until the world grows a new neighbour when none is left (ja-5hm). The game sets it every strategy tick.
@@ -426,9 +418,6 @@ export class Colony {
   goalY = 0;
   /** the curtain: where the ant being stepped believes the hole is, across the ground (see believe, towardHole) */
   holeX = 0;
-  /** food stored per second, a running average over INTAKE_WINDOW (behaviour MR 5): what the strategist knows of food */
-  intakeRate = 0;
-  storedSeen = 0;
   /**
    * One world (ja-web): carriers that came down the colony's hole with food this tick, and last tick's, which every ant
    * held at the top of the shaft meets (each carrier walks down past all of them). Not by cell: the returns above are
@@ -488,9 +477,8 @@ export class Colony {
   /** pellets put back into unused space on the way home (backfill), and pellets lost with ants that died carrying them */
   soilFilled = 0;
   soilLost = 0;
-  /** ants lost, and a count of recent losses fading over ~30 s */
+  /** ants lost */
   losses = 0;
-  recentLosses = 0;
   births = 0;
   /** mode choices made by the policy */
   decisions = 0;
@@ -562,7 +550,6 @@ export class Colony {
     params: Partial<ColonyParams> = {},
     rng: () => number = Math.random,
     policy: Policy = localPolicy,
-    stancePolicy: StancePolicy = localStance,
     world: { plane: WorldMap; line: Transect } | null = null,
   ) {
     this.map = map;
@@ -578,7 +565,6 @@ export class Colony {
       this.entranceRow = CELL[1];
     }
     this.policy = policy;
-    this.stancePolicy = stancePolicy;
     this.rng = rng;
     // On the plane, the food trail holds up to foodCapPlane (behaviour MR 3): under main's cap a busy trail sat at it near the
     // nest, and a follower couldn't tell a strong trail from a weak (unless the colony's params set a cap of their own).
@@ -705,19 +691,16 @@ export class Colony {
 
   /**
    * Bind a lane's policy to this colony (the one place a policy is set after the constructor: the page's Jev client, the assays and the tests go through it,
-   * not a field). "mode": an ant's choice in its situation; "stance": the colony's strategist.
+   * not a field). "mode": an ant's choice in its situation; "steer": its steering weights.
    */
   bindPolicy(lane: "mode", fn: Policy): void;
-  bindPolicy(lane: "stance", fn: StancePolicy): void;
   bindPolicy(lane: "steer", fn: SteerPolicy): void;
-  bindPolicy(lane: "mode" | "stance" | "steer", fn: Policy | StancePolicy | SteerPolicy): void {
+  bindPolicy(lane: "mode" | "steer", fn: Policy | SteerPolicy): void {
     if (lane === "steer") {
       (this as { steerPolicy: SteerPolicy }).steerPolicy = fn as SteerPolicy;
       return;
     }
-    const own = this as { policy: Policy; stancePolicy: StancePolicy };
-    if (lane === "mode") own.policy = fn as Policy;
-    else own.stancePolicy = fn as StancePolicy;
+    (this as { policy: Policy }).policy = fn as Policy;
   }
 
   /** Ant i as a healthy ant: it perceives the world as it is, gives off no calming cue, and smells of its nest alone (from the next odour step). */
@@ -1320,18 +1303,12 @@ export class Colony {
     // "raid" (docs/stance.md): it goes out as a raid scout. Recruited, its stance is raid, and its mode policy is asked afresh as one (it
     // starts exploring: see the callers). Where it can't be recruited (the curtain, raidGate
     // 0, or no living rival: N3, S1) "raid" is a wait: it goes at raidScout, a scout like any other.
-    if (answer === "raid" && this.params.stanceGate > 0 && this.params.raidGate > 0 && own && this.raidable) {
+    if (answer === "raid" && this.params.raidGate > 0 && own && this.raidable) {
       this.recruited[i] = 1;
       this.gone[i] = 0;
       this.raidScouts++;
     }
     return true;
-  }
-
-  /** Whether each ant's stance is its own, from what it senses (docs/stance.md: open ground, stanceGate on), not the colony's. */
-  get ownStances(): boolean {
-    // (A Layer's own `entrance`, not the bound layer's: `onPlane` reads only the bound one.)
-    return this.params.stanceGate > 0 && this.layers.some((L) => L.entrance === null);
   }
 
   /** How many living ants act on each stance now (the HUD, where each ant's stance is its own). */
@@ -1342,15 +1319,12 @@ export class Colony {
   }
 
   /**
-   * The stance ant i acts on (behaviour MR 5.2): the colony's, except that a raid stance is a bias and not an order. An ant that has
-   * smelt no raid trail and has not gone out as a scout carries on as a forager, so a raid stance never idles the colony.
+   * The stance ant i acts on (docs/stance.md): its own, from what it senses. Defend while it senses a threat on home ground, raid once
+   * recruited, else forage; a raid stance is a bias and not an order. In one world on both layers (the owner's choice, ja-lp4.3): a
+   * raider keeps its stance down a rival's shaft. Nobody chooses a stance for the colony.
    */
   stanceOf(i: number): Stance {
-    // On the plane, each ant's own (docs/stance.md): defend while it senses a threat on home ground, raid once recruited, else
-    // forage. In one world on both layers (the owner's choice, ja-lp4.3): a raider keeps its stance down a rival's shaft.
-    if (this.params.stanceGate > 0 && (this.onPlane || this.line !== null))
-      return this.defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
-    return this.stance === "raid" && this.recruited[i] === 0 && this.params.raidGate > 0 && this.onPlane ? "forage" : this.stance;
+    return this.defending[i] ? "defend" : this.recruited[i] ? "raid" : "forage";
   }
 
   /** Whether ant i is within its nest's radius on the plane. */
@@ -1424,11 +1398,6 @@ export class Colony {
     const ca = Math.cos(a);
     const sa = Math.sin(a);
     this.time += dt;
-    this.recentLosses *= Math.exp(-dt / 30);
-    // Intake (behaviour MR 5): food stored per second, averaged over INTAKE_WINDOW.
-    const got = this.stored - this.storedSeen;
-    this.storedSeen = this.stored;
-    this.intakeRate += (got / dt - this.intakeRate) * (1 - Math.exp(-dt / INTAKE_WINDOW));
     // The gates (raids by trail and each ant's own stance on open ground, where there is no hole into the layer; the curtain's
     // hold at the top of the shaft: gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
     const one = this.line !== null;
@@ -1530,10 +1499,5 @@ export class Colony {
     own: { schema: Schema<SpeciesSituation>; sense?: (c: Colony, i: number) => Readonly<Record<string, unknown>> } | null,
   ): void {
     speciesSituation(this, own);
-  }
-
-  /** The strategist's view of this colony (colonySituation.ts stanceView). `enemyNearNest` comes from the game, which sees both colonies. */
-  stanceSituation(enemyNearNest: boolean): StanceSituation {
-    return stanceView(this, enemyNearNest);
   }
 }

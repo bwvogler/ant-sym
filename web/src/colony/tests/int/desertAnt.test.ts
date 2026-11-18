@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PLANE } from "../../colony.ts";
+import { PLANE, type Colony } from "../../colony.ts";
 import { MODE_WORDS, policyContext } from "../../colonyBrain.ts";
 import { DESERT_ANT, DESERT_MODE_WORDS, DESERT_SCHEMA } from "../../desertAnt.ts";
 import { localResponses, type Touch } from "../../responses.ts";
@@ -9,16 +9,16 @@ import { Game, gameRng } from "../../game.ts";
 import { LANES } from "../../lanes.ts";
 import { inertLevers } from "../../levers.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { own, planeHole, smallOne } from "../builders.ts";
 import type { Policy, SpeciesSituation } from "../../vocab.ts";
 
 // ja-rf5.3: the desert ant on the descriptor (docs/desert-ant.md, PRD §60.2). A species made only of the descriptor's pieces: its own lane words
 // and situation (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, no corpse removal, its own local rule.
 
-test("its lane is its own: its context, its 128 situations, no follow, no stance lane", () => {
+test("its lane is its own: its context, its 128 situations, no follow", () => {
   assert.notEqual(policyContext("forage", DESERT_MODE_WORDS), policyContext("forage", MODE_WORDS));
   assert.equal(DESERT_SCHEMA.size, 128);
   assert.equal(LANES.mode.valid("k", "follow", DESERT_MODE_WORDS), false);
-  assert.equal(DESERT_ANT.lanes.stance, undefined);
   assert.deepEqual(
     inertLevers(DESERT_ANT.params.channelSet ?? null, true).sort(),
     ["alarm", "alarmLaid", "food", "leak", "rival"],
@@ -53,13 +53,21 @@ test("D1: a desert ant lays no trail (the assay, with the species)", () => {
   for (const seed of [1, 2]) assert.equal(runAssay(desertNoTrail, seed, { game: { species: DESERT_ANT } }).metrics.pass, 1, `seed ${seed}`);
 });
 
-test("no stance lane: the colony forages, and no colony-wide count picks a stance (review of #138, S1)", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rivalAnts: 60, species: DESERT_ANT }, gameRng(1));
-  for (let k = 0; k < 30 * 60; k++) {
-    g.tick(1 / 30);
-    for (const c of g.colonies) assert.equal(c.stance, "forage");
-  }
-  assert.equal(g.strategyChoices, 0, "the strategist chose nothing");
+test("each desert ant's stance is its own, like any ant's: a threat felt on home ground makes it defend, far from home it does not (owner, #184 D1)", () => {
+  const g = new Game(smallOne(7), { antCount: 6, rivalAnts: 6, species: DESERT_ANT, regrow: 0 }, gameRng(1));
+  const [a, b] = g.colonies as [Colony, Colony];
+  for (const c of [a, b]) for (let i = 0; i < c.n; i++) c.alive[i] = i === 0 ? 1 : 0;
+  // Ant 0 of the first colony has felt a threat (as oneWorldGame's and aphids' tests give it); it stands at its own hole, then at the other colony's.
+  const stand = (hole: { x: number; y: number }): string => {
+    for (let k = 0; k < 10; k++) {
+      a.putAnt(0, PLANE, hole.x, hole.y);
+      a.threat[0] = 5 * a.params.defendAt;
+      g.tick(1 / 30);
+    }
+    return a.stanceOf(0);
+  };
+  assert.equal(stand(planeHole(own(a))), "defend", "on home ground it defends");
+  assert.equal(stand(planeHole(own(b))), "forage", "far from home the same threat does not make it stand");
   assert.equal(g.player.params.maxAnts, 200, "about 200 workers (C. fortis)");
 });
 

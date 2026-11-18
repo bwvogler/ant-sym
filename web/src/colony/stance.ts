@@ -48,7 +48,7 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
   // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
   // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
   // with no trail under it: no trail was laid for it, or the trail has faded.
-  if (rgate && (sgate || col.stance === "raid")) {
+  if (rgate && sgate) {
     const homeNow = col.atNestTop(i);
     if (!homeNow) col.gone[i] = 1;
     if (col.recruited[i] === 0) {
@@ -98,7 +98,6 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
     held &&
     col.recruited[i] === 0 &&
     p.raidGate > 0 &&
-    p.stanceGate > 0 &&
     col.raidable &&
     raidSmelt(col, i) !== "none" &&
     rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(col, i) / STRONG) * dt)

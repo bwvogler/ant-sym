@@ -96,7 +96,7 @@ export function oneColony(
   seed = 2,
 ): { map: WorldMap; c: Colony } {
   const w = smallOne(2);
-  const c = new Colony(w.curtain, { antCount: n, maxAnts: n + 4, ...params }, mulberry32(seed), policy, undefined, {
+  const c = new Colony(w.curtain, { antCount: n, maxAnts: n + 4, ...params }, mulberry32(seed), policy, {
     plane: w.plane,
     line: w.line,
   });

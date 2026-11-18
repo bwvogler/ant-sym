@@ -97,7 +97,6 @@ export const DESERT_ANT: Species = {
     channelSet: MARKS,
     homeTrail: 0,
     raidGate: 0,
-    stanceGate: 0,
     undertakes: false,
     // Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): C. fortis turns in to food odour up to about 6 m (5.9 m the longest;
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,

@@ -18,7 +18,7 @@ import { oneColony, smallOne } from "../builders.ts";
 /** A one-world colony of one ant, bound to its curtain, the ant underground at its queen. */
 function atQueen(): Colony {
   const w = smallOne(2);
-  const c = new Colony(w.curtain, { antCount: 1, maxAnts: 1 }, mulberry32(1), undefined, undefined, { plane: w.plane, line: w.line });
+  const c = new Colony(w.curtain, { antCount: 1, maxAnts: 1 }, mulberry32(1), undefined, { plane: w.plane, line: w.line });
   c.under[0] = 1;
   c.x[0] = c.queen!.x;
   c.y[0] = c.queen!.y;

@@ -116,7 +116,7 @@ Leads not yet followed: Knaden & Wehner 2003 (*J Insect Behav* 16:717) and 2004 
 
 ## What ja-rf5.3 built from this (PRD §60.2)
 
-The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situation lane (mode, tired, enemy), no follow and no stance lane, no trail or alarm channel, its own local rule with rule text, no corpse removal, about 200 workers. On one world it lays no trail (D1 passes), asks only its own fields, and finds and stores food on its own (less than the generic ant, without recruitment), so it needs no food sense to live; the plume (`ja-rf5.4`) is for finding food sooner. Its Jev lane costs about $0.004 an hour while a doctrine is new; its shipped answers wait on a live check at the owner's say.
+The species on the descriptor (`colony/desertAnt.ts`): its own words and 16-situation lane (mode, tired, enemy), no follow, no trail or alarm channel (its stance is each ant's own, like any ant's: owner, #184 D1), its own local rule with rule text, no corpse removal, about 200 workers. On one world it lays no trail (D1 passes), asks only its own fields, and finds and stores food on its own (less than the generic ant, without recruitment), so it needs no food sense to live; the plume (`ja-rf5.4`) is for finding food sooner. Its Jev lane costs about $0.004 an hour while a doctrine is new; its shipped answers wait on a live check at the owner's say.
 
 ## What ja-rf5.4 built (PRD §60.4)
 

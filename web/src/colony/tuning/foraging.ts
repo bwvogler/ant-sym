@@ -5,15 +5,6 @@
 /** Seconds an ant rests at home in "return" before it is asked afresh as an explorer (ja-qnx). */
 export const REST = 10;
 
-/** seconds over which the colony averages its intake (behaviour MR 5) */
-export const INTAKE_WINDOW = 60;
-
-/** food stored per ant per second below which the strategist reads "no intake" (behaviour MR 5; tuned, PRD §48) */
-export const INTAKE_NONE = 0.0005;
-
-/** and above which "plenty" */
-export const INTAKE_PLENTY = 0.01;
-
 /** half-life (s) of an ant's count of contacts with nestmates bringing food (behaviour MR 5: a rise is felt within seconds, gone in a minute or so) */
 export const MET_HALF = 20;
 

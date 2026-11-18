@@ -1,7 +1,7 @@
-import { centreX, centreY, R } from "./hex.ts";
+import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, localStance, PLANE, type ColonyParams, type Layer } from "./colony.ts";
-import { type Policy, SITUATION_SCHEMA, type StancePolicy } from "./vocab.ts";
+import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
 import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
@@ -42,10 +42,8 @@ export interface GameParams {
   /** a rival colony at the map's second nest */
   rival: boolean;
   rivalAnts: number;
-  /** seconds between strategist choices */
-  strategyEvery: number;
-  /** cells around a nest where an enemy counts as "near the nest" */
-  nestWatch: number;
+  /** seconds between looks for a living rival (whether the colonies may raid, and whom) */
+  rivalEvery: number;
   fight: FightParams;
   fungus: Partial<FungusParams>;
   recognition: Partial<RecognitionParams>;
@@ -68,8 +66,7 @@ export const DEFAULT_GAME: GameParams = {
   antCount: 800,
   rival: true,
   rivalAnts: 800,
-  strategyEvery: 5,
-  nestWatch: 12,
+  rivalEvery: 5,
   fight: DEFAULT_FIGHT,
   fungus: {},
   recognition: {},
@@ -147,7 +144,6 @@ export interface GameSave {
   /** the id of the species the game was played with (Species.id): a game built for another is refused (Game.load) */
   species: string;
   time: number;
-  strategyChoices: number;
   landed: unknown;
   regrown: number;
   /** per colony: its queen has been reached (Game.revealed) */
@@ -183,7 +179,7 @@ export interface GameSave {
     lastFightDeath: number;
     metBy?: number[];
     haveMet?: boolean;
-    nextStrategy: number;
+    nextRivalCheck: number;
     regrowClock: number;
     rng: number | null;
     regrowRng: number | null;
@@ -200,14 +196,12 @@ export const GAME_REGROW = 1800;
  */
 export type Outcome = "playing" | "unified" | "fallen";
 
-/** How each side plays: the first colony's policy, strategist and params, and the same for the second (default: the local rule). */
+/** How each side plays: the first colony's policy and params, and the same for the second (default: the local rule). */
 export interface Sides {
   policy?: Policy;
-  stance?: StancePolicy;
   colony?: Partial<ColonyParams>;
   rival?: Partial<ColonyParams>;
   rivalPolicy?: Policy;
-  rivalStance?: StancePolicy;
   /** the first colony's responses (responses.ts; default the local ones), and the second's */
   responses?: Responses;
   rivalResponses?: Responses;
@@ -312,7 +306,6 @@ export class Game {
   params: GameParams;
   time = 0;
   /** stance choices made by strategists */
-  strategyChoices = 0;
   /** each layer's occupancy, per colony: [layer][colony] */
   #grids: CountGrid[][];
   /** fight deaths, fading over ~60 s, and when the last one was */
@@ -326,7 +319,7 @@ export class Game {
    * the colonies are one; without the latch the outcome would flap and toast each time it came back.
    */
   #haveMet = false;
-  #nextStrategy = 0;
+  #nextRivalCheck = 0;
   #rng: () => number;
   /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
   #piles: { cells: Float64Array; full: Float32Array } | null = null;
@@ -376,7 +369,6 @@ export class Game {
       { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.#speciesParams(), ...player.colony },
       rng,
       player.policy ?? this.params.species.policy ?? localPolicy,
-      player.stance ?? localStance,
       layered,
     );
     mine.responses = player.responses ?? this.params.species.responses;
@@ -389,7 +381,6 @@ export class Game {
           { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.#speciesParams(), ...player.rival, nest: 1 },
           rng,
           player.rivalPolicy ?? this.params.species.policy ?? localPolicy,
-          player.rivalStance ?? localStance,
           layered,
         ),
       );
@@ -640,7 +631,6 @@ export class Game {
       },
       this.#rng,
       this.params.species.policy ?? localPolicy,
-      localStance,
       { plane: world.plane, line: world.line },
     );
     c.responses = this.params.species.responses;
@@ -788,35 +778,6 @@ export class Game {
       this.colonies.forEach((c, k) => occupancy(c, grids[k] as CountGrid, l));
       if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(this.colonies, l);
     });
-  }
-
-  /**
-   * Strangers (to the nest's odour, at the healthy tolerance) within `nestWatch` (world units) of colony k's nest, and of
-   * its entrance in the side view; in one world, on each layer round that layer's nest (the plane's disc, the curtain's
-   * chamber and entrance), each layer's recognition counting the ants on it.
-   */
-  enemiesNearNest(k: number): number {
-    const c = this.colonies[k] as Colony;
-    let s = 0;
-    this.layers.forEach((m, l) => {
-      const rec = this.#recs[l] as Recognition;
-      const nest = (c.layers[l] as Layer).nest;
-      rec.look(c.nestOdour, rec.params.tolerance);
-      const { w, h } = m.size;
-      const { x0 } = m;
-      const r = this.params.nestWatch;
-      for (let y = Math.max(0, Math.floor((nest.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((nest.y + r) / R)); y++)
-        for (let x = Math.max(x0, Math.floor(nest.x - r - 1)); x <= Math.min(x0 + w - 1, Math.ceil(nest.x + r)); x++)
-          if (Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) <= r) s += rec.get(x, y);
-      // The side view: the entrance too (it is above the chamber, out of that watch), unless the two overlap.
-      const en = nest.entrance;
-      if (en && Math.hypot(en.x - nest.x, en.y - nest.y) > r)
-        for (let y = Math.max(0, Math.floor((en.y - r) / R - 1)); y <= Math.min(h - 1, Math.ceil((en.y + r) / R)); y++)
-          for (let x = Math.max(x0, Math.floor(en.x - r - 1)); x <= Math.min(x0 + w - 1, Math.ceil(en.x + r)); x++)
-            if (Math.hypot(centreX(x, y) - en.x, centreY(y) - en.y) <= r && Math.hypot(centreX(x, y) - nest.x, centreY(y) - nest.y) > r)
-              s += rec.get(x, y);
-    });
-    return s;
   }
 
   /** How far the fungus has come toward one colony. With no rival there is nothing to unify. */
@@ -988,8 +949,8 @@ export class Game {
       const recs = this.colonies.length > 1 ? this.#recs : null;
       this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
     }
-    if (this.time >= this.#nextStrategy) {
-      this.#nextStrategy = this.time + this.params.strategyEvery;
+    if (this.time >= this.#nextRivalCheck) {
+      this.#nextRivalCheck = this.time + this.params.rivalEvery;
       this.colonies.forEach((c, k) => {
         // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
         // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
@@ -997,24 +958,12 @@ export class Game {
         // raiders swarmed the other nest with nobody there to fight).
         const tol = this.recognition.params.tolerance;
         if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
-          c.stance = "forage";
           c.raidable = false;
           return;
         }
         c.raidable = true;
         // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
         this.#aimRaids(k);
-        // On open ground each ant's stance is its own, from what it senses (docs/stance.md): nobody chooses one for the colony.
-        if (c.ownStances) return;
-        // A species with no stance lane (the desert ant) has no stance to choose: it forages, and no colony-wide count (intake, larder,
-        // head count, enemies by the nest: nothing an ant senses) picks one for it (review of #138, S1).
-        if (!this.params.species.lanes.stance) {
-          c.stance = "forage";
-          return;
-        }
-        // A stance is part of every ant's situation: a change re-asks the ants by itself.
-        c.stance = c.stancePolicy(c.stanceSituation(this.enemiesNearNest(k) > 0));
-        this.strategyChoices++;
       });
     }
   }
@@ -1137,7 +1086,6 @@ export class Game {
       version: SAVE_VERSION,
       species: this.params.species.id,
       time: this.time,
-      strategyChoices: this.strategyChoices,
       landed: encode(this.landed),
       regrown: this.regrown,
       revealed: [...this.revealed],
@@ -1163,7 +1111,7 @@ export class Game {
         lastFightDeath: this.#lastFightDeath,
         metBy: [...this.#metBy],
         haveMet: this.#haveMet,
-        nextStrategy: this.#nextStrategy,
+        nextRivalCheck: this.#nextRivalCheck,
         regrowClock: this.#regrowClock,
         rng: (this.#rng as Partial<Rng>).state ?? null,
         regrowRng: this.#regrowRng?.state ?? null,
@@ -1198,7 +1146,6 @@ export class Game {
     if (saved.colonies.length !== this.colonies.length)
       throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
-    this.strategyChoices = saved.strategyChoices;
     this.landed = decode(saved.landed) as Game["landed"];
     this.regrown = saved.regrown;
     this.revealed = [...(saved.revealed ?? [])];
@@ -1223,7 +1170,7 @@ export class Game {
     // Saves before ja-i0f carry no contact: the colonies must meet again (MET over the fading minute) before they can be one.
     this.#metBy = [...(p.metBy ?? [])];
     this.#haveMet = p.haveMet ?? false;
-    this.#nextStrategy = p.nextStrategy;
+    this.#nextRivalCheck = p.nextRivalCheck;
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import { defineSchema, legendOf } from "../../schema.ts";
-import { COLONY_LEGEND, STRATEGY_LEGEND, situationKey, situationState, stanceKey } from "../../colonyBrain.ts";
+import { COLONY_LEGEND, situationKey, situationState } from "../../colonyBrain.ts";
 import {
   AROUSALS,
   CARRYING,
@@ -17,7 +17,7 @@ import {
 } from "../../fungalPolicy.ts";
 import { FUNGUS_LEGEND, fungalKey } from "../../fungusBrain.ts";
 import { decodeSituation, encodeSituation, packSituation, SITUATIONS } from "../../colony.ts";
-import { HOMES, MODES, SITUATION_SCHEMA, STANCE_SCHEMA, STANCES, TRAILS, type Situation, type StanceSituation } from "../../vocab.ts";
+import { HOMES, MODES, SITUATION_SCHEMA, STANCES, TRAILS, type Situation } from "../../vocab.ts";
 
 // The situation's code, key and state as they were written by hand before they came from the schema (docs/refactor.md S4.1):
 // the schema must reproduce every one of them, so no cached Jev answer is bought again.
@@ -39,9 +39,6 @@ function legacyDecode(code: number): Situation {
 }
 const legacyKey = (s: Situation) =>
   `${s.mode}|${s.tired ? "tired" : "fresh"}|${s.foodTrail}|${s.homeTrail}|${s.alarm}|${s.enemy}|${s.stance}`;
-const legacyStanceKey = (s: StanceSituation) =>
-  `${s.stance}|${s.ants}|${s.losses}|${s.enemyNearNest ? "enemy" : "clear"}|intake:${s.intake}|${s.larder}`;
-
 test("the mode lane's schema reproduces the hand-written decode, key and state of every one of its 3,888 situations", () => {
   assert.equal(SITUATIONS, 3888);
   for (let code = 0; code < SITUATIONS; code++) {
@@ -69,29 +66,6 @@ test("the hot path's packSituation gives the code encode gives, for every situat
     );
     assert.equal(packed, code);
   }
-});
-
-test("the strategist's schema has 324 views and reproduces the hand-written key of each", () => {
-  assert.equal(STANCE_SCHEMA.size, 324);
-  // The values the views take are the schema's fields: a value added to one would be a view no loop below reaches.
-  const values = (name: string) => STANCE_SCHEMA.fields.find((f) => f.name === name)?.values;
-  assert.deepEqual(values("ants"), ["few", "some", "many"]);
-  assert.deepEqual(values("losses"), ["none", "some", "heavy"]);
-  assert.deepEqual(values("intake"), ["none", "some", "plenty"]);
-  assert.deepEqual(values("larder"), ["low", "full"]);
-  assert.deepEqual(values("enemyNearNest"), [false, true]);
-  let n = 0;
-  for (const stance of STANCES)
-    for (const ants of ["few", "some", "many"] as const)
-      for (const losses of ["none", "some", "heavy"] as const)
-        for (const enemyNearNest of [false, true])
-          for (const intake of ["none", "some", "plenty"] as const)
-            for (const larder of ["low", "full"] as const) {
-              const s = { stance, ants, losses, enemyNearNest, intake, larder };
-              assert.equal(stanceKey(s), legacyStanceKey(s));
-              n++;
-            }
-  assert.equal(n, 324);
 });
 
 test("a schema numbers its situations 0 .. size − 1 with the first field most significant, and decode inverts encode", () => {
@@ -161,8 +135,6 @@ const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 test("the legends built from the schemas' field passages are byte for byte the ones written whole", () => {
   assert.equal(COLONY_LEGEND.length, 2062);
   assert.equal(sha(COLONY_LEGEND), "887b107af8d7635325fe0a9e079687e1d3e5168147e1de2269642eb0771e9037");
-  assert.equal(STRATEGY_LEGEND.length, 706);
-  assert.equal(sha(STRATEGY_LEGEND), "7c647d29c54104aa9aa3d7ae19c660f32a913c6e31684010521f8ce3a0194668");
   // The rouse lever (ja-rf5.18) joined the legend: the fungus lane was re-shipped with it.
   assert.equal(FUNGUS_LEGEND.length, 2039);
   assert.equal(sha(FUNGUS_LEGEND), "ab5ab8539c077ba68838569ba088de3a7ff99412c5f2a1edc6c1524ea55050f1");
@@ -171,7 +143,6 @@ test("the legends built from the schemas' field passages are byte for byte the o
 test("each legend names every field of its schema", () => {
   for (const [legend, schema] of [
     [COLONY_LEGEND, SITUATION_SCHEMA],
-    [STRATEGY_LEGEND, STANCE_SCHEMA],
     [FUNGUS_LEGEND, FUNGAL_SCHEMA],
   ] as const)
     for (const f of schema.fields) assert.ok(legend.includes(String(f.name)), `the legend never names "${String(f.name)}"`);

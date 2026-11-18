@@ -46,13 +46,13 @@ test("pr-notes: the cost table, its change, and whether a re-recorded golden is 
   assert.match(quiet, /None changed\./);
 
   const flat = notes({ changed: [], body: "", colony: { base: same, head: same }, fungus: null });
-  assert.match(flat, /\| modes and stances, \$\/h \| \$0\.19000 \| \$0\.19000 \| unchanged \|/);
+  assert.match(flat, /\| modes, \$\/h \| \$0\.19000 \| \$0\.19000 \| unchanged \|/);
   assert.match(flat, /No lane's cost moved\./);
 
   const dearer = { ...same, usdPerHour: 0.209, tokPerQuestion: 748 };
   const moved = notes({ changed: [], body: "", colony: { base: same, head: dearer }, fungus: null });
-  assert.match(moved, /\| modes and stances, \$\/h \| \$0\.19000 \| \$0\.20900 \| \+\$0\.01900 \(\+10\.0 %\) \|/);
-  assert.match(moved, /\| modes and stances, tokens a question \| 680 \| 748 \| \+68 \(\+10\.0 %\) \|/);
+  assert.match(moved, /\| modes, \$\/h \| \$0\.19000 \| \$0\.20900 \| \+\$0\.01900 \(\+10\.0 %\) \|/);
+  assert.match(moved, /\| modes, tokens a question \| 680 \| 748 \| \+68 \(\+10\.0 %\) \|/);
   assert.match(moved, /The cost moved: CLAUDE\.md asks the PR to note the new figure/);
   const fungusMoved = notes({
     changed: [],

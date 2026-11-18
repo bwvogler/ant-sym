@@ -278,7 +278,6 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   assert.equal(clean.params.maxAnts, first.params.maxAnts);
   assert.ok(clean.queen?.alive && first.queen?.alive);
   assert.equal(clean.policy, first.policy);
-  assert.equal(clean.stancePolicy, first.stancePolicy);
   assert.equal(clean.responses, first.responses);
   for (const wire of ["friends", "enemies", "nestmates", "onBury", "raidMarks"] as const)
     assert.equal(Boolean(clean[wire]), Boolean(first[wire]), wire);

@@ -7,14 +7,14 @@ import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneNa
 // is a full request's size over the situations it carries, as useColonyJev's
 // estimates have always been.
 
-export { SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../colony/index.ts";
+export { SAMPLE_FUNGAL, SAMPLE_SITUATION } from "../colony/index.ts";
 const MENU_ON = new Set(DEFAULT_MENU);
 
 export { PER_REQUEST } from "../colony/index.ts";
 
 /** A sample for lane N: the situation type its row takes (the lane registry's). */
 type SampleOf<N extends LaneName> = { lane: N; situation: (typeof LANES)[N]["sample"] };
-export type Sample = SampleOf<"mode"> | SampleOf<"stance"> | (SampleOf<"fungus"> & { menu?: ReadonlySet<string> });
+export type Sample = SampleOf<"mode"> | (SampleOf<"fungus"> & { menu?: ReadonlySet<string> });
 
 /**
  * The request lane `lane` would send for these situations under these words (doctrine or aim): the lane's own key and pack, with the ids its

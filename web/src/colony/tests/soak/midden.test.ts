@@ -55,7 +55,6 @@ const raidOfEveryAge = () => {
   const [a, b] = g.colonies as [Colony, Colony];
   // Ages as a new colony has them (0 to half a lifespan, Colony's constructor): about a third young, every band present.
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
-  b.bindPolicy("stance", () => "raid");
   const h = b.holeCells[b.params.nest] as HoleCell;
   let young = 0;
   let atHole = 0;
@@ -64,9 +63,9 @@ const raidOfEveryAge = () => {
   let longest = 0;
   for (let k = 0; k < 30 * 60; k++) {
     g.tick(1 / 30);
-    b.stance = "raid";
     for (let i = 0; i < b.n; i++) {
       if (!b.alive[i]) continue;
+      b.recruited[i] = 1; // each ant a raider by its own stance (the rival raids in force)
       if (b.band(i) !== 0) {
         if (k % 30 === 0 && onRivalSide(b, i, a)) raiders++;
         continue;
@@ -114,12 +113,11 @@ test(
     const [a, b] = g.colonies as [Colony, Colony];
     middleAged(b);
     for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
-    b.bindPolicy("stance", () => "raid");
     const under = curtainHole(a.holeCells[a.params.nest] as HoleCell);
     let inRival = 0;
     for (let k = 0; k < 30 * 60; k++) {
       g.tick(1 / 30);
-      b.stance = "raid";
+      for (let i = 0; i < b.n; i++) if (b.alive[i]) b.recruited[i] = 1; // each ant a raider by its own stance
       if (k % 30) continue;
       let n = 0;
       for (let i = 0; i < b.n; i++) if (b.alive[i] && b.layer[i] === CURTAIN && Math.abs(b.x[i]! - under.x) < 30) n++;

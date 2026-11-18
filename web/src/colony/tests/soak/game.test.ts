@@ -3,8 +3,8 @@ import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony, type Layer, localPolicy, localStance, PLANE } from "../../colony.ts";
-import type { Situation, StanceSituation } from "../../vocab.ts";
+import { Colony, type Layer, localPolicy, PLANE } from "../../colony.ts";
+import type { Situation } from "../../vocab.ts";
 import { responses } from "../../responses.ts";
 import { Game } from "../../game.ts";
 import { piSpan } from "../../homing.ts";
@@ -45,16 +45,6 @@ const sit = (s: Partial<Situation>): Situation => ({
   stance: "forage",
   ...s,
 });
-const view = (s: Partial<StanceSituation>): StanceSituation => ({
-  stance: "forage",
-  ants: "some",
-  losses: "none",
-  enemyNearNest: false,
-  intake: "some",
-  larder: "low",
-  ...s,
-});
-
 test("the plane: two nests, a walk apart, joined on foot, with food away from both", () => {
   for (let seed = 1; seed <= 15; seed++) {
     const m = generateOneWorld(seed).plane;
@@ -80,15 +70,6 @@ test("localPolicy: enemies near are the contact response's (MR 4); raids take ex
   assert.equal(localPolicy(sit({ stance: "defend", alarm: "faint" })), "fight");
   assert.equal(localPolicy(sit({ stance: "forage", alarm: "strong", mode: "explore" })), "explore", "foragers leave alarm to steering");
   assert.equal(localPolicy(sit({ mode: "fight" })), "return");
-});
-
-test("localStance: defend a nest under attack, raid when food is scarce or the colony is full and fed, else forage", () => {
-  assert.equal(localStance(view({ enemyNearNest: true, losses: "some" })), "defend");
-  assert.equal(localStance(view({ enemyNearNest: true })), "forage", "an enemy passing by is not an attack");
-  assert.equal(localStance(view({ intake: "none" })), "raid");
-  assert.equal(localStance(view({ intake: "none", ants: "few" })), "forage", "too few to raid");
-  assert.equal(localStance(view({ larder: "full", ants: "many" })), "raid");
-  assert.equal(localStance(view({})), "forage");
 });
 
 test("fights: equal numbers trade; the bigger crowd loses fewer; fighters lay alarm in their own field", () => {
@@ -253,7 +234,7 @@ test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at ho
 
 test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside goes home laying the raid trail", () => {
   const run = (raidGate: number) => {
-    const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid", colony: { raidGate } });
+    const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { colony: { raidGate } });
     const [a, b] = g.colonies as [Colony, Colony];
     for (let i = 0; i < a.n; i++) {
       a.alive[i] = i < 1 ? 1 : 0;
@@ -284,8 +265,8 @@ test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside go
 test("raids by trail (review of #41): a raider with no enemy near climbs the raid trail; a finder is not made on the trail", () => {
   // One raider out on an open field, a raid gradient rising to the east, and nothing else: it walks up the gradient.
   const m = arena();
-  const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0, stanceGate: 0 }, mulberry32(4)); // a raid stance told to every ant: the climb alone
-  c.stance = "raid";
+  const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(4));
+  c.recruited[0] = 1; // a raider by its own stance: the climb alone
   for (let y = 1; y <= 10; y++)
     for (let x = 8; x <= 38; x++) {
       const p = at(x, y);
@@ -298,18 +279,19 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   assert.ok(c.x[0] > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${c.x[0].toFixed(1)}`);
 
   // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
-  const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { stance: () => "raid" });
+  const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5));
   const [a, b] = g.colonies as [Colony, Colony];
   for (let i = 0; i < a.n; i++) {
     a.alive[i] = i === 0 ? 1 : 0;
     b.alive[i] = i === 0 ? 1 : 0;
   }
+  a.recruited[0] = 1; // a raider by its own stance
   putOn(a, 0, 20, 6);
   putOn(b, 0, 20, 6);
   const here = at(20, 6);
   let reported = 0;
   for (let k = 0; k < 90; k++) {
-    a.ph.deposit("raid", here.x, here.y, 1);
+    (a.layers[PLANE] as Layer).ph.deposit("raid", here.x, here.y, 1); // the trail is the plane's
     putOn(b, 0, 20, 6);
     g.tick(1 / 30);
     if (a.reporting[0]) reported++;
@@ -325,10 +307,10 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
     for (let seed = 1; seed <= 5; seed++) {
       const c = new Colony(
         worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]),
-        { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward, stanceGate: 0 },
+        { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, raidOnward },
         mulberry32(seed),
       );
-      c.stance = "raid";
+      c.recruited[0] = 1; // a raider by its own stance
       put(c, 0, 12, 10);
       c.heading[0] = 0; // facing east, up the trail
       for (let k = 0; k < 30 * 30; k++) {
@@ -353,10 +335,10 @@ test("raids by trail (ja-sf1): a raider that finds nothing stronger ahead on the
   // recruited (else it would never climb a trail again).
   const c = new Colony(
     worldFromArrays({ w: 60, h: 20 }, [nestAt(4, 10, 2), nestAt(56, 10, 2)]),
-    { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0, stanceGate: 0 },
+    { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 },
     mulberry32(1),
   );
-  c.stance = "raid";
+  c.recruited[0] = 1;
   const pastEnd = () => c.pastEnd[0];
   const lay = () => {
     for (let y = 1; y <= 18; y++)
@@ -401,60 +383,28 @@ test("each ant's own stance (docs/stance.md): alarm near home makes it defend, t
   assert.equal(threatened(11, 30), "defend", "7 cells off, it sees its hole down a clear line (NEST_SIGHT)");
   assert.equal(threatened(13, 0), "defend", "out of sight, inside home ground by its vector");
   assert.equal(threatened(13, 30), "forage", "out of sight, its vector says home is 30 cells off");
-  // The colony's own stance is not read: a defend broadcast makes no one defend (review of #53, N2).
-  const b = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(14));
-  b.stance = "defend";
-  put(b, 0, 20, 6);
-  b.tick(1 / 30);
-  assert.equal(touch(b, 0, false).stance, "forage");
-
   // (A leave answer of "raid" sending a scout, and the crowd waiting ants feel, are one world's gate: int/oneWorldLeave.)
 });
 
-test("raid stance as a bias (behaviour MR 5.2): an ant with no trail carries on as a forager, a trail or a scout's errand makes it a raider, and it is a forager again once home", () => {
-  const colony = (raidScout: number) => {
-    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout, stanceGate: 0 }, mulberry32(8)); // the colony's stance, as on the side view
-    c.stance = "raid";
+test("raid stance is a bias (behaviour MR 5.2): an ant with no trail forages, a trail at home recruits it", () => {
+  const colony = () => {
+    const c = new Colony(arena(), { antCount: 1, maxAnts: 1, nest: 0, raidScout: 0 }, mulberry32(8));
     put(c, 0, 4, 6);
     return c;
   };
-  // No trail, no errand: it acts on forage, however long the colony raids.
-  const c = colony(0);
-  for (let k = 0; k < 30 * 20; k++) c.tick(1 / 30);
-  assert.equal(touch(c, 0, false).stance, "forage", "a raid stance idles no one");
-  // A scout's trail under it recruits it.
-  const t = colony(0);
-  for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) t.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
-  t.tick(1 / 30);
+  // No trail: it acts on forage.
+  const c = colony();
+  for (let k = 0; k < 30 * 20; k++) {
+    put(c, 0, 4, 6);
+    c.tick(1 / 30);
+  }
+  assert.equal(touch(c, 0, false).stance, "forage", "no trail, no raid");
+  // A scout's trail under it recruits it. (A scout going out on `leave` "raid" is one world's gate: int/oneWorldLeave.)
+  const t = colony();
+  for (let k = 0; k < 30 * 20 && t.recruited[0] === 0; k++) {
+    put(t, 0, 4, 6); // it stays at home
+    for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) t.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
+    t.tick(1 / 30);
+  }
   assert.equal(touch(t, 0, false).stance, "raid", "a trail recruits it");
-  // A scout (raidScout huge: it goes at once) is out as a raider, and a forager again when it comes home without a trail.
-  const sc = colony(1000);
-  sc.tick(1 / 30);
-  assert.equal(touch(sc, 0, false).stance, "raid", "a scout acts on the raid");
-  assert.equal(sc.recruited[0], 1);
-  put(sc, 0, 20, 6); // away
-  sc.tick(1 / 30);
-  put(sc, 0, 4, 6); // and home again
-  sc.params.raidScout = 0;
-  sc.tick(1 / 30);
-  assert.equal(touch(sc, 0, false).stance, "forage", "home with no trail: its raid is over");
-});
-
-test("raid stance as a bias (review of #41): an ant not recruited, put in FIGHT, does not walk to the rival hole's coordinates", () => {
-  const run = (raidGate: number) => {
-    const m = arena();
-    const c = new Colony(m, { antCount: 1, maxAnts: 1, nest: 0, raidGate, raidScout: 0 }, mulberry32(9), () => "fight");
-    c.stance = "raid";
-    c.raidTarget = nestAt(36, 6, 2);
-    put(c, 0, 12, 6);
-    c.heading[0] = Math.PI / 2; // facing across the field, not at the rival
-    for (let k = 0; k < 60; k++) c.tick(1 / 30);
-    return Math.hypot(c.x[0] - c.raidTarget.x, c.y[0] - c.raidTarget.y);
-  };
-  const off = run(0); // the old rule: straight at the coordinates
-  const on = run(1);
-  assert.ok(
-    on > off + 4,
-    `not recruited, it doesn't head for the hole: ${on.toFixed(1)} cells off against ${off.toFixed(1)} with raidGate 0`,
-  );
 });

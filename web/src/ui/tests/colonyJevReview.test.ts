@@ -7,7 +7,7 @@ import type { JevRequest, RunSummary } from "../../../shared/jev.ts";
 /** A bare colony of n on the curtain of seed 1's small one world (S2.3c: on the open top-down map until then). */
 function oneWorldColony(n: number, seed: number): Colony {
   const w = generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } });
-  return new Colony(w.curtain, { antCount: n }, mulberry32(seed), undefined, undefined, { plane: w.plane, line: w.line });
+  return new Colony(w.curtain, { antCount: n }, mulberry32(seed), undefined, { plane: w.plane, line: w.line });
 }
 
 // PR #7 review: the fungus lane's menu, and a 409 with questions still in flight.

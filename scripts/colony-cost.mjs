@@ -17,7 +17,7 @@
 // are estimated too, as if each were asked like the modes; they are not asked
 // by the page yet, so they are reported apart and not in the session's total.
 //
-// --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule, and its stance lane only if it has one; the
+// --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule; the
 // generic ant without it. Known here: generic, desert (docs/desert-ant.md).
 //
 // Usage: node scripts/colony-cost.mjs [--species <id>] [minutes=10] [ants=600] [seed=1]
@@ -118,11 +118,9 @@ const fromRow = (row, lw, local = row.local) =>
     row.kind.idPrefix,
     row.batch ?? 100,
   );
-// The species' own words and local rule (the generic ant's are the rows' defaults); no stance lane where it has none.
+// The species' own words and local rule (the generic ant's are the rows' defaults).
 const modes = fromRow(LANES.mode, species.lanes.mode, species.policy ?? LANES.mode.local);
-const stances = species.lanes.stance ? fromRow(LANES.stance, species.lanes.stance) : null;
 const modeContext = (d) => LANES.mode.contextOf(d, undefined, species.lanes.mode);
-const stanceContext = (d) => LANES.stance.contextOf(d, undefined, species.lanes.stance);
 const hooks = Object.fromEntries(
   RESPONSE_HOOKS.map((h) => [
     h,
@@ -137,13 +135,11 @@ const hooks = Object.fromEntries(
 );
 const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, gameRng(seed), {
   policy: modes.policy,
-  ...(stances ? { stance: stances.policy } : {}),
   responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
 });
 const colony = game.player;
 const flush = () => {
   modes.flush();
-  stances?.flush();
   for (const h of RESPONSE_HOOKS) hooks[h].flush();
 };
 
@@ -166,14 +162,12 @@ let t = 0;
 for (const d of plan) {
   doctrine = d.text;
   modes.clear();
-  stances?.clear();
   for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = {
     tokens,
     requests,
     modes: modes.seen(modeContext(doctrine)),
-    stances: stances ? stances.seen(stanceContext(doctrine)) : 0,
   };
   const end = t + slice;
   for (; t < end; t += DT) {
@@ -189,7 +183,6 @@ for (const d of plan) {
   phases.push({
     name: d.name,
     newSituations: modes.seen(modeContext(doctrine)) - before.modes,
-    newStances: stances ? stances.seen(stanceContext(doctrine)) - before.stances : 0,
     tokens: tokens - before.tokens,
     requests: requests - before.requests,
   });
@@ -198,17 +191,15 @@ for (const d of plan) {
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
 console.log(
-  `game cost, offline (one world${species === GENERIC_ANT ? "" : `, ${species.name}`}${stances ? "" : ", no stance lane"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
+  `game cost, offline (one world${species === GENERIC_ANT ? "" : `, ${species.name}`}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
 );
 console.log(
   `you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`,
 );
-console.log(
-  `${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`,
-);
+console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations\n`);
 for (const p of phases)
   console.log(
-    `  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`,
+    `  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`,
   );
 console.log(
   `\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`,
