@@ -1378,6 +1378,11 @@ try {
           const sy = ((c.y[i] - cam.y) * cam.zoom + cv.height / 2) * k;
           const d = Math.hypot(sx - cv.clientWidth / 2, sy - cv.clientHeight * 0.4);
           if (!(sx > 40 && sx < cv.clientWidth - 40 && sy > 160 && sy < cv.clientHeight * 0.6) || (best && d >= best.d)) continue;
+          // Only an ant the press reaches: a notice floats over the map as a button that takes the press, and it does so just
+          // when this check runs (an ant has found the sugar a few game seconds in): the drag then lands on the toast and the ant
+          // stays put (ja-w7ef.24: 4 of 40 fresh pages, each with a toast at the press point; every other page had the canvas).
+          // The two-finger check presses 50 px below it too, with the second finger: that point needs the canvas as well.
+          if (document.elementFromPoint(sx, sy) !== cv || document.elementFromPoint(sx, sy + 50) !== cv) continue;
           // The tweezers lift the nearest live ant of any colony within PICK_PX (14 CSS px, ColonyField's pick): with another
           // ant within twice that, the drag can lift that one and leave this one where it was (run 43721564508; review of
           // #233, S3). Only an ant alone there.
