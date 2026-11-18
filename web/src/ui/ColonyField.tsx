@@ -71,6 +71,7 @@ import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import { type AntTraces, traceAlpha } from "./trace.ts";
+import { type Chain, chainsOf, hash, smoothThrough, twigsOf, wander } from "./hyphaeLook.ts";
 import type { FieldProbe } from "./lensStore.ts";
 
 export type { FieldProbe };
@@ -270,6 +271,49 @@ type Gesture = {
   pending?: boolean;
 };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
+
+/** A run of hyphae with what drawing it needs that does not change with the camera: its cells' bent world positions, and the box of cells it spans. */
+interface DrawnChain extends Chain {
+  /** the bent world positions of its cells: x0, y0, x1, y1, … (ui/hyphaeLook.ts wander) */
+  world: number[];
+  /** the box of grid cells it spans */
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/**
+ * The runs of a hyphal tree (ui/hyphaeLook.ts chainsOf) with their bent positions, kept between frames: found again when its size
+ * changes, or every 150 ms (a cut or a sprout that leaves the size alone shows a moment late). A cell never moves, so only the
+ * tree's shape needs finding again, not the camera's view of it.
+ */
+const chainCache = new WeakMap<Hyphae, { size: number; cords: number; at: number; chains: DrawnChain[] }>();
+function chainsFor(h: Hyphae): DrawnChain[] {
+  const now = performance.now();
+  const hit = chainCache.get(h);
+  if (hit && hit.size === h.parent.size && hit.cords === h.cords.size && now - hit.at < 150) return hit.chains;
+  const spot = [0, 0];
+  const chains = chainsOf(h.parent, h.cords, HYPHA_ROOT).map((ch): DrawnChain => {
+    const world: number[] = [];
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const k of ch.cells) {
+      const [kx, ky] = hyphaCell(k);
+      wander(centreX(kx, ky), centreY(ky), spot);
+      world.push(spot[0]!, spot[1]!);
+      x0 = Math.min(x0, kx);
+      x1 = Math.max(x1, kx);
+      y0 = Math.min(y0, ky);
+      y1 = Math.max(y1, ky);
+    }
+    return { ...ch, world, x0, x1, y0, y1 };
+  });
+  chainCache.set(h, { size: h.parent.size, cords: h.cords.size, at: now, chains });
+  return chains;
+}
 
 export default function ColonyField({
   colonies,
@@ -874,9 +918,11 @@ export default function ColonyField({
     };
 
     /**
-     * The mycelium's hyphae (ja-2bw.3, docs/hyphal-growth.md): each cell joined to the one it grew from by a line through
-     * the hexagons' centres, the loops fusion closed, and a dot at each tip. On the plane (`under`) faint, as threads just
-     * under the surface; in the curtain plainer. Only the cells in view (rows ry0…ry1, columns rx0…rx1, a cell's margin).
+     * The mycelium's hyphae (ja-2bw.3, docs/hyphal-growth.md): each run of cells between branch points as one wandering curve
+     * through the cells' centres (bent by a smooth seeded warp, so no hex-to-hex straights: ui/hyphaeLook.ts), the loops
+     * fusion closed, short fuzz twigs off the thin hyphae when zoomed in, and a dot at each tip. On the plane (`under`) faint,
+     * as threads just under the surface; in the curtain plainer. Only the cells in view (rows ry0…ry1, columns rx0…rx1, a
+     * cell's margin).
      */
     const drawHyphae = (
       h: Hyphae,
@@ -890,26 +936,65 @@ export default function ColonyField({
       ry1: number,
     ) => {
       const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
+      const spot = [0, 0];
+      /** the screen position of cell (x, y)'s centre, bent by the warp */
+      const at = (x: number, y: number): [number, number] => {
+        wander(centreX(x, y), centreY(y), spot);
+        return toScreen(c, v, spot[0]!, spot[1]!);
+      };
       const path = new Path2D();
-      // Cords (a web, ja-2bw.8): the segments into a cord cell, drawn thicker.
+      // Cords (a web, ja-2bw.8): the runs of cord cells, drawn thicker.
       const cords = new Path2D();
-      const segment = (a: number, b: number, into: Path2D = path) => {
+      // Fuzz twigs: only once a cell is big enough on screen to see them, fading in.
+      const fuzz = new Path2D();
+      const cell = c.zoom;
+      const twigAlpha = Math.max(0, Math.min(1, (cell - 5) / 7));
+      const pts: number[] = [];
+      for (const ch of chainsFor(h)) {
+        if (ch.x1 < rx0 - 1 || ch.x0 > rx1 + 1 || ch.y1 < ry0 - 1 || ch.y0 > ry1 + 1) continue;
+        pts.length = 0;
+        for (let i = 0; i < ch.world.length; i += 2)
+          pts.push((ch.world[i]! - c.x) * c.zoom + v.w / 2, (ch.world[i + 1]! - c.y) * c.zoom + v.h / 2);
+        smoothThrough(ch.cord ? cords : path, pts);
+        if (!ch.cord && twigAlpha > 0)
+          for (let i = 1; i < ch.cells.length; i++) {
+            const before = (i - 1) * 2;
+            const after = Math.min(ch.cells.length - 1, i + 1) * 2;
+            twigsOf(
+              fuzz,
+              ch.cells[i]!,
+              pts[i * 2]!,
+              pts[i * 2 + 1]!,
+              Math.atan2(pts[after + 1]! - pts[before + 1]!, pts[after]! - pts[before]!),
+              cell,
+            );
+          }
+      }
+      // The loops fusion closed: a gently bowed curve from one cell to the other.
+      for (let i = 0; i + 1 < h.fusions.length; i += 2) {
+        const a = h.fusions[i]!;
+        const b = h.fusions[i + 1]!;
         const [ax, ay] = hyphaCell(a);
         const [bx, by] = hyphaCell(b);
-        if (!inView(ax, ay) && !inView(bx, by)) return;
-        const [sx, sy] = toScreen(c, v, centreX(ax, ay), centreY(ay));
-        const [tx, ty] = toScreen(c, v, centreX(bx, by), centreY(by));
-        into.moveTo(sx, sy);
-        into.lineTo(tx, ty);
-      };
-      for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k, h.cords.has(k) ? cords : path);
-      for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i]!, h.fusions[i + 1]!);
+        if (!inView(ax, ay) && !inView(bx, by)) continue;
+        const [sx, sy] = at(ax, ay);
+        const [tx, ty] = at(bx, by);
+        const bow = (hash(a, b, 3) - 0.5) * 0.7;
+        path.moveTo(sx, sy);
+        path.quadraticCurveTo((sx + tx) / 2 - (ty - sy) * bow, (sy + ty) / 2 + (tx - sx) * bow, tx, ty);
+      }
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.strokeStyle = theme.spore;
+      const thin = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
+      if (twigAlpha > 0) {
+        ctx.globalAlpha = (under ? 0.3 : 0.6) * twigAlpha;
+        ctx.lineWidth = Math.max(0.6 * d, thin * 0.55);
+        ctx.stroke(fuzz);
+      }
       ctx.globalAlpha = under ? 0.45 : 0.9;
-      ctx.lineWidth = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
+      ctx.lineWidth = thin;
       ctx.stroke(path);
       ctx.lineWidth = Math.max(2.5 * d, Math.min(8 * d, c.zoom * 0.32));
       ctx.stroke(cords);
@@ -918,7 +1003,7 @@ export default function ColonyField({
       const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
       for (const t of h.tips) {
         if (!inView(t.x, t.y)) continue;
-        const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y));
+        const [x, y] = at(t.x, t.y);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fill();
@@ -929,7 +1014,7 @@ export default function ColonyField({
         if (load < HYPHA_MASS * 0.1) continue;
         const [lx, ly] = hyphaCell(k);
         if (!inView(lx, ly)) continue;
-        const [x, y] = toScreen(c, v, centreX(lx, ly), centreY(ly));
+        const [x, y] = at(lx, ly);
         const full = Math.min(1, load / (HYPHA_MASS * 2));
         ctx.globalAlpha = (under ? 0.3 : 0.5) * full;
         ctx.beginPath();
@@ -942,7 +1027,7 @@ export default function ColonyField({
       for (const k of h.knots.keys()) {
         const [kx, ky] = hyphaCell(k);
         if (!inView(kx, ky)) continue;
-        const [x, y] = toScreen(c, v, centreX(kx, ky), centreY(ky));
+        const [x, y] = at(kx, ky);
         ctx.beginPath();
         ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
         ctx.fill();
