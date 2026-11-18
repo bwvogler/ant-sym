@@ -1,5 +1,6 @@
 // Decide (docs/refactor.md S3.4): the third stage of an ant's step in tick. Where homing heads (the goal: its chamber, the hole, a brood or food chamber), the mode it takes (a load sends it home; else the mode policy is asked when its situation changed, or it waits held at the gate), and strangers in reach, where the contact response decides over the policy. Moved out of Colony.tick verbatim but for `this` becoming `col`; what it decided goes to the next stages through the step record.
 import type { Colony } from "./colony.ts";
+import { contactAction } from "./contactAction.ts";
 import { chamberGoal, putDown } from "./dig.ts";
 import { homeField, homeGoal } from "./homing.ts";
 import type { Item } from "./responses.ts";
@@ -174,20 +175,23 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     }
   }
   let fleeFrom: number | null = null;
+  s.contactAction = null; // the step record is shared: never leak the preceding ant's encounter
   // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
     const answer = resp.contact(touch(col, i, true, mode, item), col.antDraw(i));
-    if (answer === "fight" && !reporting) {
-      if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
-    } else {
-      if (answer === "drop and run" && (carrying || pellet || nursing)) putDown(col, i);
+    const action = contactAction(answer, carrying || pellet || nursing, reporting);
+    s.contactAction = action;
+    if (action.movement === "attack") {
+      mode = FIGHT;
+    } else if (action.movement === "withdraw") {
+      if (action.release) putDown(col, i);
       if (mode !== RETURN) col.homeAfresh(i);
       mode = RETURN;
       // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
       // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
-      if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
+      if (action.target === "stranger") fleeFrom = toEnemy;
     }
     col.mode[i] = mode;
     // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,
