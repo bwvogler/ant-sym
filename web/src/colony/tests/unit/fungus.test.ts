@@ -381,3 +381,18 @@ test("advance: steps only once its interval has built up, and covers the time ow
   for (let k = 0; k < 30; k++) b.f.step([b.c], b.grids, 0.1);
   for (let i = 0; i < 3; i++) assert.ok(Math.abs(a.c.load[i] - b.c.load[i]) < 1e-5, `ant ${i}: ${a.c.load[i]} vs ${b.c.load[i]}`);
 });
+
+test("a landing roots a tip in each of the six ways, whichever way it aims; growth decides which push (owner, 2026-11-18)", () => {
+  const headings = (toward: { x: number; y: number } | null): number[] => {
+    const f = new Fungus([arena(), arena()], { hyphae: true });
+    f.evolve(BLOOM);
+    const p = at(20, 6);
+    f.root(p.x, p.y, 2, 0, toward);
+    return f.hyphaeOn(0)!.tips.map((t) => t.heading);
+  };
+  const all = [0, 1, 2, 3, 4, 5];
+  assert.deepEqual(headings(null).sort(), all, "no aim: all six");
+  const east = headings({ x: 30, y: at(20, 6).y });
+  assert.deepEqual([...east].sort(), all, "aimed at a hole to the east: all six, the aimed one first");
+  assert.equal(east[0], 0);
+});
