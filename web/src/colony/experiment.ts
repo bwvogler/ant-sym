@@ -1443,3 +1443,5 @@ export function oneAssay(id: string): Assay {
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
 export const ONE_PENDING: Record<string, string> = {};
+
+export * from "./departureAssays.ts";

@@ -541,6 +541,11 @@ export const GUIDE: GuideEntry[] = [
 
 /** The research notes, for the guide's footer (docs/README.md's table). */
 export const NOTES: { note: string; title: string; covers: string }[] = [
+  {
+    note: "food-disengagement",
+    title: "Food refusal and departure",
+    covers: "Research and proposed separate pass-by action; fixed-patch departure assays. Not built.",
+  },
   { note: "vision", title: "Vision", covers: "The goal, what an ant may sense, and which behaviours are still scripted." },
   {
     note: "ant-communication",

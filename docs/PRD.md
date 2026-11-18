@@ -7458,3 +7458,13 @@ The targeted client tests also cover two colonies sharing one pending get questi
 **Beads.** `ja-ygs9` research/design epic; `ja-ygs9.1` assays blocks `ja-ygs9.2` action implementation. Owner review completed on 2026-11-18; assays precede implementation. No behavior code has been added for this section.
 
 **Still open.** Actuator integration, save/reload contract, measured departure benefit and tick overhead. Learned expectations are deferred; commit this plan before departure assays.
+
+### D1 departure baseline (ja-ygs9.1)
+
+The fixed-footprint single-ant assay is exported by `experiment.ts`; run `node scripts/lab/food-departure.mjs 1-20 30`. Open, corridor, broad and blocked geometries each have 20 seeds and a matched observer-off control. All 80 pairs preserve colony state, next RNG draw and food-offer count; food never depletes and no rock/out-of-bounds samples occur. No Jev requests.
+
+Open and corridor runs all exit within 30 seconds. Eight broad-patch seeds never exit (2, 3, 6, 7, 10, 11, 12, 15); blocked runs all remain censored. Mean first-exit time capped at 30 seconds, development/validation: open 0.387/0.377 s, corridor 0.753/0.893 s, broad 15.747/10.027 s, blocked 30/30 s. Completed-episode p95 alone hides non-exiters; future actuator comparisons must also report capped first-exit times and no-exit counts. These are engineering baselines, not literature targets. [Methods, limitations and raw results](../experiments/food-departure/README.md).
+
+No departure behavior is built. Cached-continue parity, actuator duration selection and new-lane cost remain gates for `ja-ygs9.2`. The research note is also listed in the Learn guide's required notes index.
+
+D1 validation: 591 unit tests and four bit-exact golden tests pass; typecheck, lint (seven existing warnings), changed-code formatting and diff checks pass. No paid live-policy requests, browser run or slow-guard run.
