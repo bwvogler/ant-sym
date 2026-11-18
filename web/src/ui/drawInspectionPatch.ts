@@ -11,6 +11,7 @@ import {
   inspectionMarkers,
   type InspectionOverlays,
 } from "./inspectionOverlays.ts";
+import { drawLeafTiles, SurfaceLeaves } from "./surfaceFood.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 
 export const BELOW_ATLAS_URL = new URL("../assets/inspection/below-atlas.png", import.meta.url).href;
@@ -20,6 +21,8 @@ export interface PatchImages {
   lifecycle?: CanvasImageSource;
   below?: CanvasImageSource;
 }
+/** Worker crown is about 0.4 world units above its walking plane. */
+export const SURFACE_ROCK_HEIGHT = 1;
 type Point3 = [number, number, number];
 interface Face {
   points: Point3[];
@@ -106,7 +109,7 @@ export function buildPatchTerrain(patch: InspectionPatch): Face[] {
       const ground = slot.state.place.ground;
       if (!isBelow) {
         if (ground === "air") continue;
-        for (let h = -4; h < 0; h++) {
+        for (let h = -4; h < (ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0); h++) {
           const p: Point3 = [ix, iz, h];
           voxels.set(p.join(","), { p, kind: ground === "rock" ? "rock" : "soil" });
         }
@@ -194,6 +197,8 @@ export class InspectionPatchRenderer {
   private key = "";
   private terrain: { back: HTMLCanvasElement; front: HTMLCanvasElement } | null = null;
   private createCanvas: () => HTMLCanvasElement;
+  private raised: Face[] = [];
+  private leaves = new SurfaceLeaves();
   constructor(createCanvas: () => HTMLCanvasElement = () => document.createElement("canvas")) {
     this.createCanvas = createCanvas;
   }
@@ -214,7 +219,12 @@ export class InspectionPatchRenderer {
     }
     const backCtx = back.getContext("2d")!,
       frontCtx = front.getContext("2d")!;
+    this.raised = [];
     for (const face of buildPatchTerrain(patch)) {
+      if (patch.mode === "surface" && face.points.some((p) => p[2] > 0)) {
+        this.raised.push(face);
+        continue;
+      }
       const ctx = face.front ? frontCtx : backCtx;
       ctx.fillStyle = faceColour(face, patch.mode);
       ctx.beginPath();
@@ -245,6 +255,26 @@ export class InspectionPatchRenderer {
     const mode = patch.mode,
       ppu = (Math.min(w / 384, h / 320) * 384) / (mode === "below" ? 4 : 4.15),
       point = (x: number, y: number, z = 0) => patchPoint(mode, w, h, x, y, z);
+    const layers: { depth: number; draw: () => void }[] = [];
+    const drawAt = (x: number, y: number, z: number, draw: () => void) => {
+      if (mode === "surface") layers.push({ depth: x * 1.1 + y * 3.3 + z * 2.43, draw });
+      else draw();
+    };
+    for (const face of this.raised)
+      layers.push({
+        depth: face.depth,
+        draw: () => {
+          ctx.fillStyle = faceColour(face, mode);
+          ctx.beginPath();
+          face.points.forEach(([x, y, z], i) => {
+            const p = point(x, -y, z).map(Math.round) as [number, number];
+            if (i === 0) ctx.moveTo(...p);
+            else ctx.lineTo(...p);
+          });
+          ctx.closePath();
+          ctx.fill();
+        },
+      });
     const sprite = (name: string, x: number, y: number, z = 0) => {
       const desc = mode === "below" ? below : surface.names.includes(name) ? surface : lifecycle;
       const image = mode === "below" ? images.below : surface.names.includes(name) ? images.surface : images.lifecycle;
@@ -252,18 +282,30 @@ export class InspectionPatchRenderer {
       if (!image || i < 0) return;
       const p = point(x, y, z),
         factor = ppu / (desc.frame / desc.worldFrame);
-      ctx.drawImage(
-        image,
-        (i % desc.cols) * desc.stride + 1,
-        Math.floor(i / desc.cols) * desc.stride + 1,
-        desc.frame,
-        desc.frame,
-        p[0] - desc.anchor[0] * factor,
-        p[1] - desc.anchor[1] * factor,
-        desc.frame * factor,
-        desc.frame * factor,
-      );
+      const alpha = ctx.globalAlpha;
+      drawAt(x, y, z + 0.15, () => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(
+          image,
+          (i % desc.cols) * desc.stride + 1,
+          Math.floor(i / desc.cols) * desc.stride + 1,
+          desc.frame,
+          desc.frame,
+          p[0] - desc.anchor[0] * factor,
+          p[1] - desc.anchor[1] * factor,
+          desc.frame * factor,
+          desc.frame * factor,
+        );
+        ctx.restore();
+      });
     };
+    const lookup = new Map([
+      ...(patch.surfaceFood ?? []),
+      ...patch.cells
+        .filter((c) => c.valid && c.state.place.ground === "open" && foodKind(c.state.quality) === "plain")
+        .map((c): [number, number] => [cellKey(...c.state.cell), c.state.place.food]),
+    ]);
     const scale = ppu / 96;
     for (const cell of patch.cells) {
       if (!cell.valid || cell.surfaceStrip || cell.state.place.ground === "air") continue;
@@ -367,9 +409,15 @@ export class InspectionPatchRenderer {
         ctx.fillRect(b[0] - 3 * scale, b[1] - 3 * scale, 6 * scale, 5 * scale);
       }
       const food = foodDensity(p.food);
-      ctx.globalAlpha = food.alpha;
-      for (let i = 0; i < food.marks; i++) sprite("food-" + foodKind(s.quality), x + FOOD_SPOTS[i][0], y + FOOD_SPOTS[i][1]);
-      ctx.globalAlpha = 1;
+      if (mode === "surface" && p.ground === "open" && foodKind(s.quality) === "plain") {
+        const tiles = this.leaves.get(...s.cell, (a, b) => lookup.get(cellKey(a, b)) ?? 0);
+        const [gx, gy] = patch.selected.cell;
+        drawLeafTiles(ctx, tiles, (a, b, z) => point(a - centreX(gx, gy), b - centreY(gy), z));
+      } else {
+        ctx.globalAlpha = food.alpha;
+        for (let i = 0; i < food.marks; i++) sprite("food-" + foodKind(s.quality), x + FOOD_SPOTS[i][0], y + FOOD_SPOTS[i][1]);
+        ctx.globalAlpha = 1;
+      }
       if (mode === "surface") {
         const aphids = aphidDensity(s.aphidDensity, 1);
         ctx.globalAlpha = aphids.alpha;
@@ -391,19 +439,21 @@ export class InspectionPatchRenderer {
         const q = entity.body;
         sprite(q.alive ? "queen" : "queen-dead", x, y);
         const p = point(x, y, q.alive ? 0.3 : 0.12);
-        if (!q.alive) {
-          ctx.strokeStyle = "#B34840";
-          ctx.lineWidth = 2 * scale;
-          ctx.beginPath();
-          ctx.moveTo(p[0] - 5 * scale, p[1] - 5 * scale);
-          ctx.lineTo(p[0] + 5 * scale, p[1] + 5 * scale);
-          ctx.moveTo(p[0] + 5 * scale, p[1] - 5 * scale);
-          ctx.lineTo(p[0] - 5 * scale, p[1] + 5 * scale);
-          ctx.stroke();
-        } else if (q.infected) {
-          ctx.fillStyle = "#B18DD1";
-          ctx.fillRect(p[0] - 2 * scale, p[1] - 2 * scale, 4 * scale, 4 * scale);
-        }
+        drawAt(x, y, 0.31, () => {
+          if (!q.alive) {
+            ctx.strokeStyle = "#B34840";
+            ctx.lineWidth = 2 * scale;
+            ctx.beginPath();
+            ctx.moveTo(p[0] - 5 * scale, p[1] - 5 * scale);
+            ctx.lineTo(p[0] + 5 * scale, p[1] + 5 * scale);
+            ctx.moveTo(p[0] + 5 * scale, p[1] - 5 * scale);
+            ctx.lineTo(p[0] - 5 * scale, p[1] + 5 * scale);
+            ctx.stroke();
+          } else if (q.infected) {
+            ctx.fillStyle = "#B18DD1";
+            ctx.fillRect(p[0] - 2 * scale, p[1] - 2 * scale, 4 * scale, 4 * scale);
+          }
+        });
         continue;
       }
       const a = entity.body;
@@ -415,12 +465,15 @@ export class InspectionPatchRenderer {
       else if (a.cargo === "brood" && a.broodStage !== undefined) sprite("brood-" + a.broodStage, hx, hy, 0.16);
       else if (a.cargo === "corpse") sprite("corpse", hx, hy, 0.16);
       else if (a.cargo === "soil") sprite("food-crumb", hx, hy, 0.16);
-      if (a.infected) {
-        const p = point(x, y, 0.27);
-        ctx.fillStyle = "#B18DD1";
-        ctx.fillRect(p[0] - 2 * scale, p[1] - 2 * scale, 4 * scale, 4 * scale);
-      }
+      drawAt(x, y, 0.3, () => {
+        if (a.infected) {
+          const p = point(x, y, 0.27);
+          ctx.fillStyle = "#B18DD1";
+          ctx.fillRect(p[0] - 2 * scale, p[1] - 2 * scale, 4 * scale, 4 * scale);
+        }
+      });
     }
+    layers.sort((a, b) => a.depth - b.depth).forEach((layer) => layer.draw());
     if (overlays.markers) {
       ctx.save();
       ctx.lineWidth = 1.5 * scale;
@@ -456,7 +509,13 @@ export class InspectionPatchRenderer {
       ctx.beginPath();
       for (let d = 0; d < 6; d++) {
         const a = Math.PI / 6 + (d * Math.PI) / 3;
-        ctx.lineTo(...point(Math.cos(a) / Math.sqrt(3), Math.sin(a) / Math.sqrt(3), mode === "below" ? 0.025 : 0.012));
+        ctx.lineTo(
+          ...point(
+            Math.cos(a) / Math.sqrt(3),
+            Math.sin(a) / Math.sqrt(3),
+            mode === "below" ? 0.025 : selected.state.place.ground === "rock" ? SURFACE_ROCK_HEIGHT + 0.012 : 0.012,
+          ),
+        );
       }
       ctx.closePath();
       ctx.stroke();

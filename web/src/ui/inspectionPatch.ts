@@ -1,4 +1,19 @@
-import { CELL, CURTAIN, OPEN, SOIL, STRIP, cellAt, centreX, centreY, inBounds, nx, ny, rockAt, type AphidClump } from "../colony/index.ts";
+import {
+  CELL,
+  CURTAIN,
+  OPEN,
+  SOIL,
+  STRIP,
+  cellAt,
+  cellKey,
+  centreX,
+  centreY,
+  inBounds,
+  nx,
+  ny,
+  rockAt,
+  type AphidClump,
+} from "../colony/index.ts";
 import { inspectCell, type CellInspectionState } from "./cellInspection.ts";
 import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
@@ -19,6 +34,8 @@ export interface InspectionPatch {
   mode: "surface" | "below";
   /** Centre first, then the six game neighbours; invalid edge slots remain present but empty. */
   cells: InspectionPatchCell[];
+  /** One extra ring for leaf joins beyond the seven-cell crop. */
+  surfaceFood?: Map<number, number>;
 }
 
 export function inspectPatch(
@@ -57,5 +74,16 @@ export function inspectPatch(
     }
     return out;
   });
-  return { selected, mode, cells };
+  const surfaceFood = new Map<number, number>();
+  if (mode === "surface")
+    for (const c of cells) {
+      const [x, y] = c.state.cell;
+      for (let d = -1; d < 6; d++) {
+        const a = d < 0 ? x : nx(x, y, d),
+          b = d < 0 ? y : ny(y, d);
+        if (inBounds(map, a, b) && rockAt(map, a, b) === OPEN && Math.abs((map.quality?.get(a, b) ?? 1) - 1) <= 0.01)
+          surfaceFood.set(cellKey(a, b), map.food.get(a, b));
+      }
+    }
+  return { selected, mode, cells, surfaceFood };
 }

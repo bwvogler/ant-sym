@@ -183,3 +183,53 @@ test("inspection patches preserve ant arrays, brood, and terrain while sampling"
   cellOf(c.x[0], c.y[0]);
   assert.equal(CELL.length, 2);
 });
+
+test("surface rocks rise above ants and adjoining cells have no internal wall", () => {
+  const p = patch();
+  for (const c of p.cells) {
+    c.valid = true;
+    c.state.place.ground = "open";
+  }
+  p.cells[0].state.place.ground = p.cells[1].state.place.ground = "rock";
+  const faces = buildPatchTerrain(p).filter((f) => f.kind === "rock");
+  assert.equal(Math.max(...faces.flatMap((f) => f.points.map((p) => p[2]))), 1);
+  assert.ok(faces.some((f) => f.normal[2] === 1 && f.points.every((p) => p[2] === 1)));
+  assert.ok(
+    !faces.some((f) => f.normal[0] !== 0 && f.points.every((p) => Math.abs(p[0] - 0.5) < 1e-8 && Math.abs(p[1]) < 0.2 && p[2] > 0)),
+    "no exposed face inside the joined rock mass",
+  );
+});
+
+test("surface walls occlude a rear worker but a foreground worker is painted over the wall", () => {
+  const p = patch();
+  for (const c of p.cells) {
+    c.valid = true;
+    c.state.place.ground = "open";
+    c.state.ants = [];
+    c.state.queens = [];
+    c.state.place.food = 0;
+    c.state.fallen = 0;
+    c.state.brood = [0, 0, 0];
+  }
+  p.cells[0].state.place.ground = "rock";
+  const worker = { k: 0, i: 0, gen: 1, x: 0, y: 0, heading: 0, carrying: false, quality: 1, infected: false };
+  p.cells[0].state.ants = [
+    { ...worker, y: -1.5 },
+    { ...worker, i: 1, y: 1.5 },
+  ];
+  const order: string[] = [];
+  const image = {} as CanvasImageSource;
+  const ctx = Object.assign(fakeContext(), {
+    fill: () => order.push("wall"),
+    drawImage: (source: CanvasImageSource) => {
+      if (source === image) order.push("ant");
+    },
+  });
+  new InspectionPatchRenderer(canvas).draw(ctx, p, { surface: image }, 384, 320, { scents: false, markers: false });
+  const ants = order.flatMap((value, i) => (value === "ant" ? [i] : []));
+  const walls = order.flatMap((value, i) => (value === "wall" ? [i] : []));
+  assert.equal(ants.length, 2);
+  // Empty leaf paths may fill before actors; actual elevated walls fill between the two ants.
+  assert.ok(walls.some((i) => i > ants[0] && i < ants[1]));
+  assert.ok(ants[1] > Math.max(...walls));
+});

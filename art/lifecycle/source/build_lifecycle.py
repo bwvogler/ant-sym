@@ -25,8 +25,11 @@ queen=copy_group('Queen',1.18)
 for o in queen:
  if o.name.endswith('gaster'):
   center=Vector((-.245*1.18,0,.285*1.18))
+  front=max(v.co.x for v in o.data.vertices)
   for v in o.data.vertices:
-   d=v.co-center;v.co=center+Vector((d.x*1.25-.025,d.y*1.35,d.z*1.15))
+   d=v.co-center
+   # Keep the waist connection fixed while the abdomen extends rearward.
+   v.co=Vector((front+(v.co.x-front)*1.9,center.y+d.y*1.35,center.z+d.z*1.15))
 corpse=copy_group('Fallen worker')
 roll=Matrix.Rotation(math.pi/2,4,'X')
 for o in corpse:

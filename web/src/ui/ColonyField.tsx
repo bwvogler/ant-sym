@@ -1,3 +1,5 @@
+import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
+import { drawLeafTiles, SurfaceLeaves } from "./surfaceFood.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   CHUNK,
@@ -412,6 +414,7 @@ export default function ColonyField({
     const workerSprites = new WorkerSprites();
     const nestSprites = new NestSprites();
     const resourceSprites = new ResourceSprites();
+    const surfaceLeaves = new SurfaceLeaves();
     const workerGait = new WorkerGait();
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
@@ -1305,7 +1308,7 @@ export default function ColonyField({
       const nestImage = hexes ? nestSprites.get(resourceLod) : null;
       const nestStyle = nestImage ? "voxel" : "symbols";
       if (canvas.dataset.nestStyle !== nestStyle) canvas.dataset.nestStyle = nestStyle;
-      // Food amount becomes density, not the size of a morsel. Keep terrain and sensed trails underneath it.
+      // Surface plain-food cells join into tissue; carried food and other qualities stay separate morsels.
       if (resourceImage) {
         for (let y = ry0; y <= ry1; y++)
           for (let x = rx0; x <= rx1; x++) {
@@ -1313,6 +1316,13 @@ export default function ColonyField({
             if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
             const density = foodDensity(amount),
               kind = foodKind(m.quality?.get(x, y) ?? 1);
+            if ((lv === PLANE || (lv < 0 && !m.hasSoil && !m.sky)) && kind === "plain") {
+              const tiles = surfaceLeaves.get(x, y, (a, b) =>
+                rockAt(m, a, b) === OPEN && foodKind(m.quality?.get(a, b) ?? 1) === "plain" ? m.food.get(a, b) : 0,
+              );
+              drawLeafTiles(ctx, tiles, (a, b) => toScreen(c, v, a, b));
+              continue;
+            }
             ctx.globalAlpha = density.alpha;
             for (let j = 0; j < density.marks; j++) {
               const [ox, oy] = FOOD_SPOTS[j]!;
@@ -1785,6 +1795,8 @@ export default function ColonyField({
       if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
       const pn = penRef.current;
       if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
+
+      drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, motion.matches ? 0 : performance.now() / 1000);
 
       // Zoomed in: the minimap, with the view's rectangle.
       if (c.zoom > fitZoom(ext, v) * 1.05) {

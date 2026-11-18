@@ -1,3 +1,4 @@
+import { setMapInspection } from "./mapInspection.ts";
 import { useEffect, useState } from "react";
 import type { AphidClump, Colony, Fungus, WorldMap } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
@@ -41,6 +42,10 @@ export default function LensLayer({
   const at = on ? shownOn(lens, layer) : null;
   const pinned = at?.pinned ?? false;
   const [inspecting, setInspecting] = useState(false);
+  useEffect(() => {
+    setMapInspection(pinned && inspecting && at ? { lv: at.lv, x: at.x, y: at.y } : null);
+    return () => setMapInspection(null);
+  }, [pinned, inspecting, at]);
   // A pinned card: Escape closes it first (before a follow or a drawer), unless a dialog is over it.
   useEffect(() => {
     if (!pinned) return;
