@@ -7201,6 +7201,8 @@ The rest of `--one all` passes on the same seeds in all three arms (`alarm`, `br
 - **Owner (2026-11-15): 1, ×1.5.** The fungus golden is re-recorded; the others are bit-exact. Jev cost unchanged.
 - **Still open:** whether to cap or soften the price past about 20 levels (`ja-52ui.7`).
 
+**Revised after #251 (owner, 2026-11-16; `ja-52ui.8`).** The first drawer (a row of chips for each upgrade, lines in lanes beside them) "doesn't look like a tech tree I'm used to", and a price on every level repeats the one price. Now: tiers left to right (`ui/upgradeBranches.ts` `tierOf`: 7 levels in the first column, then 11, 6, 1 and 1; one row for each upgrade, grouped by branch), boxed levels joined by curves; the next price is in the drawer's header by the mutations in hand ("next 11"), and not on the levels or the phone list's buttons (a level's tooltip still says what it costs). No rule or number changed: goldens bit-exact, Jev cost unchanged.
+
 ## 81. Measuring lockstep (ja-0kys, 2026-11-14)
 
 **What.** `lockstepProbe` (experiment.ts), sampled each second over the ants in the mode their policy chose (carriers left out): `lockAgree`, the share of ants in their situation's commonest mode (1 = every ant in a situation does the same); `lockSwing`, how far the colony's mode mix moves second to second (total variation); `lockBurst`, the Fano factor of mode switches a second (about 1 when ants switch independently); `switchesPerS`. The one-world assay `lockstep` reports them; `--policy precache:<doctrine>` plays the shipped mode answers for both colonies, and `--set both.<param>` sets a parameter on both.
