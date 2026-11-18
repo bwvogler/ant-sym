@@ -91,7 +91,11 @@ test("the tweezers check picks an ant no other ant sits near, as the page's pick
 // toast at the press point, every lift had the canvas there. The check keeps to ants the press reaches.
 test("the tweezers check skips an ant whose press point is not the canvas (ja-w7ef.24)", () => {
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
-  assert.match(script, /^\s*if \(document\.elementFromPoint\(sx, sy\) !== cv\) continue;$/m, "an ant under a toast or the HUD is skipped");
+  assert.match(
+    script,
+    /^\s*if \(document\.elementFromPoint\(sx, sy\) !== cv \|\| document\.elementFromPoint\(sx, sy \+ 50\) !== cv\) continue;\n(?:\s*\/\/.*\n)*\s*const crowded = /m,
+    "an ant under a toast or the HUD is skipped, at the first finger's point and the second's (+50), before the crowded check",
+  );
 });
 
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
