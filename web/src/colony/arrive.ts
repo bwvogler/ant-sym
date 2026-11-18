@@ -3,19 +3,18 @@ import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
 import { crossDown, crossUp } from "./crossing.ts";
-import { dropOut, dropPlane, pickPlane } from "./dig.ts";
-import { cellKey, NO_CELL, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
+import { dropPlane, pickPlane } from "./dig.ts";
+import { cellKey, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
 import { CELL } from "./hex.ts";
 import { atHome, destMark, fromHomePlane, integrate, routeRecord } from "./homing.ts";
 import { nurse, port, undertake } from "./nestWork.ts";
 import { layMark, nestmatesAround, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import { fetches } from "./tunnel.ts";
-import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
+import { CORPSE_GIVE_UP, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
 import { pointDown, rememberSite } from "./plane.ts";
-import { pickLoose } from "./pellets.ts";
 
 export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -101,42 +100,12 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     const corpse = colony.corpse[i] === 1;
     const far = fromHomePlane(colony, i) >= colony.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
     if (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(colony, i);
-  } else if (pellet && ent && !Number.isNaN(colony.spoilTo[i])) {
-    // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
-    colony.spoilT[i] = colony.spoilT[i] + dt;
-    const col = CELL[0];
-    const onGround = isSky(map, col, CELL[1]);
-    if (
-      (onGround && colony.spoilSide[i] * (col - colony.entranceCol) >= colony.spoilTo[i]) ||
-      colony.spoilT[i] > (colony.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
-    )
-      dropOut(colony, i, col);
-    // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
-    // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
   } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL && colony.line !== null) {
     // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
     crossUp(colony, i, colony.entranceCol, colony.entranceRow);
     colony.heading[i] = h;
     s.h = h;
     return true;
-  } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL) {
-    // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
-    // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
-    // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
-    const reach = Math.min(MOUND_REACH, 3 + colony.heaped / (2 * MOUND_HEIGHT));
-    if (colony.corpse[i]) {
-      // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-      colony.spoilTo[i] = colony.middenAt();
-      colony.spoilSide[i] = colony.middenSide();
-    } else {
-      colony.spoilTo[i] = 2 + reach * Math.sqrt(rng());
-      colony.spoilSide[i] = rng() < 0.5 ? -1 : 1;
-    }
-    colony.spoilT[i] = 0;
-    colony.staleWalk[i] = 0;
-    colony.wall[i] = 0;
-    colony.mx[i] = NaN;
-    colony.gx[i] = NO_CELL;
   } else if (pellet && colony.soil[i] === SOIL_FILL && atNest && !(colony.line !== null && colony.cur === PLANE)) {
     // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out. Most do (over
     // 90 %: PRD §40), and that is the rule as meant: see LOOSE_FILL_PICK.
@@ -144,16 +113,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.looseBack++;
     colony.wall[i] = 0;
     colony.mx[i] = NaN;
-  } else if (
-    ent &&
-    !carrying &&
-    !pellet &&
-    mode === EXPLORE &&
-    isSky(map, CELL[0], CELL[1]) &&
-    colony.enteredCell(i) &&
-    pickLoose(colony, i, CELL[0], CELL[1], toEnemy !== null)
-  ) {
-    // Picked up a loose pellet off the mound (see pickLoose).
   } else if (
     colony.line !== null &&
     colony.cur === PLANE &&
