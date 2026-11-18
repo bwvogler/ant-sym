@@ -3,7 +3,7 @@
 
 import { MOUND_REACH } from "./dig.ts";
 
-// The midden (nest slice 7): see undertake, dropOut, middenSmell.
+// The midden (nest slice 7): see undertake, dropPlane, middenSmell.
 /** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
 export const PICK_CORPSE = 1;
 

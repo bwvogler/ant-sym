@@ -3,7 +3,7 @@ import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
 import { crossDown, crossUp } from "./crossing.ts";
-import { dropOut, dropPlane, pickPlane } from "./dig.ts";
+import { dropPlane, pickPlane } from "./dig.ts";
 import { cellKey, NO_CELL, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
 import { CELL } from "./hex.ts";
 import { atHome, destMark, fromHomePlane, integrate, routeRecord } from "./homing.ts";
@@ -15,7 +15,6 @@ import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
 import { pointDown, rememberSite } from "./plane.ts";
-import { pickLoose } from "./pellets.ts";
 
 export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   const p = s.p;
@@ -101,18 +100,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     const corpse = colony.corpse[i] === 1;
     const far = fromHomePlane(colony, i) >= colony.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
     if (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(colony, i);
-  } else if (pellet && ent && !Number.isNaN(colony.spoilTo[i])) {
-    // Carrying a pellet out along the ground (side view): dropped where it stands once far enough out (or stuck).
-    colony.spoilT[i] = colony.spoilT[i] + dt;
-    const col = CELL[0];
-    const onGround = isSky(map, col, CELL[1]);
-    if (
-      (onGround && colony.spoilSide[i] * (col - colony.entranceCol) >= colony.spoilTo[i]) ||
-      colony.spoilT[i] > (colony.corpse[i] ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)
-    )
-      dropOut(colony, i, col);
-    // Dropped, it doesn't turn back: out on the ground, it is asked afresh (most explore it), so the ground near the
-    // nest is searched. Turned straight back in, almost nobody was on the ground to find the food there.
   } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL && colony.line !== null) {
     // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
     crossUp(colony, i, colony.entranceCol, colony.entranceRow);
@@ -144,16 +131,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.looseBack++;
     colony.wall[i] = 0;
     colony.mx[i] = NaN;
-  } else if (
-    ent &&
-    !carrying &&
-    !pellet &&
-    mode === EXPLORE &&
-    isSky(map, CELL[0], CELL[1]) &&
-    colony.enteredCell(i) &&
-    pickLoose(colony, i, CELL[0], CELL[1], toEnemy !== null)
-  ) {
-    // Picked up a loose pellet off the mound (see pickLoose).
   } else if (
     colony.line !== null &&
     colony.cur === PLANE &&

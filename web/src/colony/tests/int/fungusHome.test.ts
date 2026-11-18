@@ -130,7 +130,7 @@ test("on the midden a Bloom host's corpse sporulates; a Garden host's doesn't", 
     k.x = CELL[0];
     k.y = CELL[1];
     assert.ok(c.onBury, "the game hears of each burial");
-    c.onBury!(k); // as #dropOut does when an undertaker puts it on the midden
+    c.onBury!(k); // as dropPlane does when an undertaker puts it on the midden
     return g.fungus.spores.get(k.x, k.y);
   };
   assert.ok(spores(BLOOM) > 0, "Bloom");
