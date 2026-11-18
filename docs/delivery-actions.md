@@ -167,3 +167,25 @@ node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 600 --ants 60 --var
 ```
 
 Repeat with seed 2. The broader calibration remains open under ja-g7nz.3.3; ja-g7nz.3.3.2 tracks long-held loads after redirection before proceeding to a 20-seed promotion sweep. The reverse-cue bug is ja-g7nz.3.3.1. All 28 delivery tests and four unchanged simulation goldens passed after the narrow correction.
+
+## Cue-cycle diagnosis (ja-g7nz.3.3.2), 2026-11-18
+
+The remaining failure is reproducible without a blocked wall or a missing royal chamber. In seed 1's five-second redirection pilot, worker 11 has held food for 547.83 seconds at the end. The final two-second trace repeats cells (-27,65), (-26,65), (-26,66); wall-following is inactive, the royal commitment remains active, and effort stays at its five-second ceiling. None of those cells is a chamber. The worker last visited a marked chamber over 528 seconds earlier, so this trace does **not** establish that its own deposits sustain the loop. Other traffic and field evolution need separate intervention to attribute the marks.
+
+The scorer chooses the largest allowed neighbouring mark even when it is weaker than the current cell. Its no-immediate-retrace rule prevents two-cell reversal, but permits a three-cell cycle with successive 120-degree turns. At the strongest cell, the next cycle cell can beat an open exit. `deliveryLoops.test.ts` reduces this to four open cells with fixed marks. A pending regression asserts escape through the fourth cell and **currently fails**, tracked by ja-g7nz.3.3.2; it is explicitly marked TODO, not counted as a pass. A passing companion test verifies that positive cue following does not suppress the long-attempt signal and that an effort-conditioned carry response can put the food down with exact accounting. Release is not deposition into colony stock, and this isolated test does not establish a useful colony doctrine.
+
+### Rejected local-gradient trial
+
+A trial required a neighbour's cue to exceed the current cell's cue, otherwise using the existing wall-follow search. It was reverted: in seed 1 at 600 seconds, direct royal stored 296 instead of 354; brood→royal at 5 seconds stored 113 instead of 99 but increased maximum loads held over 120 seconds from 28 to 38; at 20 seconds it stored 159 instead of 125 and reduced the maximum from 20 to 5. Improving the last case does not justify the worse controls. No seed-2 run or full sweep was warranted after that failure. The exact rejected patch and raw results are retained as `experiments/delivery-calibration/rejected-uphill.patch` and `seed1-uphill-rejected.json`. The JSON identifies the base commit, original harness hash and trial patch; the patch is **not applied** to production code.
+
+### Reproducing and checking the trace
+
+```sh
+node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 600 --variants royal5 --trace-ant 11 --out experiments/delivery-calibration/seed1-loop-trace.json
+```
+
+`--trace-from` changes the start time (default: the final two seconds). Samples are every three ticks, capped at 600 per variant. They include the physical cell and movement target, local neighbouring marks/solidity, role, effort, wall state and chamber underfoot. These are harness diagnostics, not new policy inputs. Layer binding and the shared cell scratch are restored after reads. Every pre-existing result metric except wall-clock runtime matched the earlier untraced seed-1 royal5 pilot exactly; the trace's harness hash refers to the final script in this commit.
+
+Next work is a researched local loop-recovery design and measurements against this open-exit fixture and the colony controls. A timer that silently chooses another destination, global chamber routing, and uphill-only scoring are not established solutions. The existing long-attempt signal alone does not guarantee progress: the pilot doctrine repeatedly chooses its already-active royal destination. No production behavior, default, response key or token cost changes in this diagnostic slice; no live calls were made.
+
+Validation for this slice: 29 delivery tests passed, with the one explicitly pending escape regression still failing as expected. Typecheck, lint (existing warnings) and changed-file formatting passed. The simulation production files have no diff; build, goldens and the full test suite were not rerun for these harness/test/documentation changes.

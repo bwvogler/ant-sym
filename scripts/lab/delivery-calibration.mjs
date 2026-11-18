@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { Game, gameRng, generateOneWorld, responses } from "../../web/src/colony/index.ts";
+import { Game, gameRng, generateOneWorld, responses, CELL, cellOf, nx, ny, rockAt } from "../../web/src/colony/index.ts";
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => {
@@ -26,6 +26,10 @@ const variants = {
   redirect20: { lane: 1, limit: 20, doctrine: "redirect" },
   redirect60: { lane: 1, limit: 60, doctrine: "redirect" },
 };
+const traceAnt = Number(value("--trace-ant", -1));
+const traceFrom = Number(value("--trace-from", Math.max(0, seconds - 2)));
+if (!Number.isInteger(traceAnt) || traceAnt < -1 || !Number.isFinite(traceFrom) || traceFrom < 0)
+  throw Error("trace-ant must be a nonnegative slot (or -1); trace-from must be nonnegative seconds");
 const results = [];
 const output = value("--out", null);
 const report = {
@@ -51,6 +55,8 @@ for (const name of requested.split(",")) {
   });
   const c = g.player;
   const chambers = c.map.chambers;
+  if (traceAnt >= c.n) throw Error("trace-ant exceeds allocated ant slots");
+  const trace = [];
   const initialAlive = c.alive.reduce((a, b) => a + b, 0);
   const initialLarder = c.larder;
   let carryCalls = 0,
@@ -82,6 +88,47 @@ for (const name of requested.split(",")) {
   for (let tick = 0; tick < seconds * 30; tick++) {
     prior.set(c.deliveryRole);
     g.tick(1 / 30);
+    // Diagnostic reads only: restore the bound layer and shared cell scratch.
+    // At most 600 samples per variant; sample the final two seconds by default.
+    if (traceAnt >= 0 && tick / 30 >= traceFrom && tick % 3 === 0 && trace.length < 600) {
+      const i = traceAnt,
+        layer = c.cur,
+        savedCell = [...CELL];
+      c.bind(c.layer[i]);
+      cellOf(c.x[i], c.y[i]);
+      const [cx, cy] = CELL;
+      const role = ["royal", "brood", "store", "reception"][c.deliveryRole[i] - 1];
+      const mark = role ? c.ph.fields[role] : null;
+      trace.push({
+        tick: tick + 1,
+        alive: !!c.alive[i],
+        layer: c.layer[i],
+        x: c.x[i],
+        y: c.y[i],
+        cx,
+        cy,
+        gx: c.gx[i],
+        gy: c.gy[i],
+        heading: c.heading[i],
+        direction: c.gdir[i],
+        wall: c.wall[i],
+        carrying: c.carrying[i],
+        role: role ?? null,
+        state: c.deliveryState[i],
+        effort: c.deliveryTime[i],
+        lastRole: c.lastRole[i],
+        sinceRole: c.sinceRole[i],
+        chamber: c.placeAt(cx, cy),
+        cue: mark?.get(cx, cy) ?? 0,
+        neighbours: Array.from({ length: 6 }, (_, direction) => {
+          const x = nx(cx, cy, direction),
+            y = ny(cy, direction);
+          return { direction, x, y, rock: rockAt(c.map, x, y), cue: mark?.get(x, y) ?? 0 };
+        }),
+      });
+      c.bind(layer);
+      CELL.set(savedCell);
+    }
     let held = 0,
       active = 0,
       heldOver120 = 0;
@@ -109,6 +156,7 @@ for (const name of requested.split(",")) {
   const result = {
     name,
     ...v,
+    ...(traceAnt >= 0 ? { traceAnt, traceFrom, trace } : {}),
     initialAlive,
     initialLarder,
     finalAlive: c.alive.reduce((a, b) => a + b, 0),
