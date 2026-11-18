@@ -718,7 +718,7 @@ export const raidFind = raidFindAssay((spec) => spec);
  * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
  * a raid stance with its rival sealed in rock, and a food pile it could forage. A raid stance is a bias, not an order: ants not
  * recruited by a scout's trail go on foraging, and scouts that find no one tire and come home. (The first version made
- * raiders wait at home for a trail that never came, and the strategist raids when no food comes in, so it never ate: 10 of
+ * raiders wait at home for a trail that never came, and a raid stance told to every ant (since removed) left it no forager, so it never ate: 10 of
  * 7,400.) Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least RAID_STOP_FOOD
  * of it. Reported: the share outside in the last 3 min.
  */

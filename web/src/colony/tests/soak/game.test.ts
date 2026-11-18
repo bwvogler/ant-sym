@@ -241,7 +241,6 @@ test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside go
       b.alive[i] = i === 0 ? 1 : 0;
     }
     // Ant 0 is out on the field beside a stranger, on a scout's errand.
-    g.tick(1 / 30); // the strategist's first answer sets the stance
     putOn(a, 0, 20, 6);
     putOn(b, 0, 20, 6);
     a.recruited[0] = 1;
@@ -407,4 +406,20 @@ test("raid stance is a bias (behaviour MR 5.2): an ant with no trail forages, a 
     t.tick(1 / 30);
   }
   assert.equal(touch(t, 0, false).stance, "raid", "a trail recruits it");
+  // A recruited raider that has been away and comes home with no trail under it is done: its raid is over.
+  const r = colony();
+  r.recruited[0] = 1;
+  r.gone[0] = 1;
+  put(r, 0, 4, 6);
+  r.tick(1 / 30);
+  assert.equal(r.recruited[0], 0, "home with no trail: its raid is over");
+  assert.equal(touch(r, 0, false).stance, "forage");
+  // With a trail still under it at home, it stays a raider.
+  const k = colony();
+  k.recruited[0] = 1;
+  k.gone[0] = 1;
+  put(k, 0, 4, 6);
+  for (let y = 4; y <= 8; y++) for (let x = 2; x <= 6; x++) k.ph.deposit("raid", at(x, y).x, at(x, y).y, 1);
+  k.tick(1 / 30);
+  assert.equal(k.recruited[0], 1, "a trail under it keeps it recruited");
 });

@@ -65,7 +65,7 @@ export interface Situation {
   alarm: Trail;
   /** an ant of another colony within two cells */
   enemy: "none" | "near";
-  /** what the colony as a whole is doing (the strategist's choice) */
+  /** what this ant is doing: its own stance, from what it senses (defend near home under threat, raid once recruited) */
   stance: Stance;
 }
 

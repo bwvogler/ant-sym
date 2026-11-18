@@ -29,8 +29,8 @@ export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
 // `rival` are the first and second colony, named for history (the stack's
 // tests and scripts use them); the page calls them by colour, Ink and Amber. Each tick: the colonies move (each seeing the other's
 // ants through an enemy grid), then fights are resolved, then — every few
-// seconds — each colony's strategist picks its stance from a coarse view of
-// itself. A colony with no ants and too little food for one more is beaten.
+// seconds — it looks for a living rival (whether the colonies may raid, and
+// whom). A colony with no ants and too little food for one more is beaten.
 // The fungus (the player, fungus.ts) spans every colony, like fights do: after
 // fights, load spreads by contact across colonies and is groomed off within them.
 // Who fights whom is recognition (recognition.ts): strangers by odour, not by
@@ -78,9 +78,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); 14: the rival check's clock is `nextRivalCheck`, and the strategist's fields are gone (S2.3b: a 13 save would load with no clock and never refresh `raidable`); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -305,7 +305,6 @@ export class Game {
   #recs: Recognition[];
   params: GameParams;
   time = 0;
-  /** stance choices made by strategists */
   /** each layer's occupancy, per colony: [layer][colony] */
   #grids: CountGrid[][];
   /** fight deaths, fading over ~60 s, and when the last one was */

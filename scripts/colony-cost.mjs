@@ -1,8 +1,8 @@
 // Offline, no key, no spend: what would Jev cost a game? Runs the game
 // headless for a play session — your colony against the rival's — with a
-// stand-in for Jev (the local rule and the local strategist, so the colony
+// stand-in for Jev (the local rule, so the colony
 // behaves the same) behind the real cache logic: each new (doctrine, ant
-// situation) and each new (doctrine, strategist view) is one question, asked
+// situation) is one question, asked
 // once. You retune the doctrine every couple of minutes, back to one used
 // before at the end, and paint alarm now and then. The rival plays the local
 // rule (free). Tokens per question are estimated from request size

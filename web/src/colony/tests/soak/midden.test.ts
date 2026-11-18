@@ -8,8 +8,8 @@ import { curtainHole, own, planeHole, smallOne } from "../builders.ts";
 
 // Nest slice 7 (docs/nest-and-home.md §3.7): the dead lie where they fall until an undertaker (middle-aged) carries
 // them out to the midden past the mound's edge; the midden marks the colony's ground, and raiders shy from it. On one world
-// the carrying out, the ring and the shying are soak/oneWorldMound's and int/oneWorldMoundGates' (S2.3c). The raid tests set
-// the colony's raid stance, which goes with the strategist (ja-fnd.3.3.2).
+// the carrying out, the ring and the shying are soak/oneWorldMound's and int/oneWorldMoundGates' (S2.3c). The raid tests make the rival's ants
+// raiders by their own stance (`recruited`).
 
 const middleAged = (c: Colony) => {
   for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;

@@ -16,7 +16,7 @@ export interface Species {
   /**
    * The words the species asks Jev under, by lane (vocab.ts LaneWords: legend, criteria, version), so its answers are cached under its own
    * contexts (the lane rows take them as their `lane` argument). The fungus's lane has none yet (its words by host come with the fungus levers,
-   * ja-rf5.7). A lane absent here is one the species does not have. The rows' `lane` argument is not that: absent there it means the generic ant's words, so a caller checks `lanes.stance` before it asks (nothing reads absence yet; the desert ant, ja-rf5.3, is the first without a stance lane, and its wiring does the check).
+   * ja-rf5.7). A lane absent here is one the species does not have. The rows' `lane` argument is not that: absent there it means the generic ant's words, so a caller checks `lanes.mode` before it asks.
    */
   lanes: { mode?: LaneWords<Mode> };
   /**

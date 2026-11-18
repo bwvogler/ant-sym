@@ -154,8 +154,8 @@ export { BACKFILL, DEFAULT_COLONY, LIFESPAN, MIDDLE, YOUNG, channelParams, type 
 // in is the one choice, asked only when a non-carrying ant's situation
 // changes, never every frame. That choice is a `Policy`: the local rule, or
 // Jev cached per situation (colonyBrain.ts, ui/colonyJev.ts). Above the
-// ants, the colony's stance (forage, defend, raid) is the strategist's
-// choice, made every few seconds from a coarse view of the colony (game.ts).
+// ants, each ant's stance (forage, defend, raid) is its own, from what it
+// senses (stance.ts): nobody chooses one for the colony.
 
 /** A dead worker in the curtain (nest slice 7): the cell it lies in, who carries it (−1 none), when it died, and the fungus in it. */
 export interface Corpse {
@@ -278,7 +278,7 @@ export class Colony {
   responses: Responses = localResponses;
   /**
    * whether a rival lives, as the game last found (review of #53, S1): where each ant's stance is its own, nobody raids without one. An
-   * interim rule until the world grows a new neighbour when none is left (ja-5hm). The game sets it every strategy tick.
+   * interim rule until the world grows a new neighbour when none is left (ja-5hm). The game sets it every rival check (`rivalEvery`).
    */
   raidable = true;
   /** the situation handed to a response, refilled for each call (touchProbe): a response reads it and does not keep it */
@@ -360,7 +360,7 @@ export class Colony {
   portTrips = 0;
   /** foragers that found food waiting at reception and carried theirs on to where it was wanted */
   handedOn = 0;
-  /** food porters are carrying between chambers: still the colony's (the queen's reserve and the strategist count it) */
+  /** food porters are carrying between chambers: still the colony's (the queen's reserve counts it) */
   inJaws = 0;
   /** food in the crops of the colony's ants (cropFeed, ja-638i): still the colony's, like inJaws */
   inCrops = 0;
@@ -793,7 +793,7 @@ export class Colony {
   }
 
   /**
-   * Food at home that won't become ants (what the strategist reads as a full larder). On the plane the larder
+   * Food at home that won't become ants (a full larder). On the plane the larder
    * becomes ants at once while there is room, so it is all of it. With a queen (the curtain) the larder also holds
    * what her brood will be fed, and fills while the colony grows: only food beyond that, at the cap, is spare.
    */
@@ -1007,7 +1007,7 @@ export class Colony {
     return this.queen !== null && !this.queen.alive;
   }
 
-  /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss to the strategist (a fight), not old age. */
+  /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss (a fight), not old age. */
   kill(i: number, lost = true): void {
     const l = this.layer[i];
     if (l === this.cur) return killOn(this, i, lost);

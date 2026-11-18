@@ -510,7 +510,7 @@ test("route memory: the hole's sight takes over at any moment of a retrace", () 
 });
 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
-  assert.equal(SAVE_VERSION, 13);
+  assert.equal(SAVE_VERSION, 14);
   const make = (): Game =>
     new Game(
       generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
