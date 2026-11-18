@@ -39,6 +39,7 @@ test("wander: a point is bent the same way every time, by no more than MAX_WANDE
     assert.ok(d <= MAX_WANDER + 1e-9, `moved ${d}`);
     moved += d;
   }
+  assert.ok(MAX_WANDER < 1.2, "and the bend stays under about a cell, so the curves stay on their cells");
   assert.ok(moved / 400 > 0.1, "it does bend things: on average by more than a tenth of a cell");
   // Smooth: points a hundredth of a cell apart bend by nearly the same amount (a path through them stays whole).
   wander(5.2, 7.7, a);
@@ -57,6 +58,15 @@ test("smoothThrough passes through every point and starts at the first", () => {
     [20, -3],
     [31, 8],
   ]);
+  // Smooth through a joint: the control points either side of it lie on one line through it, one each way.
+  const joints = calls.filter((c) => c.op === "bezierCurveTo");
+  for (let j = 0; j + 1 < joints.length; j++) {
+    const [, , c2x, c2y, px, py] = joints[j]!.args as [number, number, number, number, number, number];
+    const [c1x, c1y] = joints[j + 1]!.args as [number, number];
+    const cross = (c2x - px) * (c1y - py) - (c2y - py) * (c1x - px);
+    const dot = (c2x - px) * (c1x - px) + (c2y - py) * (c1y - py);
+    assert.ok(Math.abs(cross) < 1e-9 && dot <= 0, `joint ${j + 1} is smooth`);
+  }
   const one = recorder();
   smoothThrough(one.path, [1, 2]);
   assert.equal(one.calls.length, 0, "a lone point draws nothing");

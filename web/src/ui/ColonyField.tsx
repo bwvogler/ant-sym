@@ -284,15 +284,21 @@ interface DrawnChain extends Chain {
 }
 
 /**
- * The runs of a hyphal tree (ui/hyphaeLook.ts chainsOf) with their bent positions, kept between frames: found again when its size
- * changes, or every 150 ms (a cut or a sprout that leaves the size alone shows a moment late). A cell never moves, so only the
+ * The runs of a hyphal tree (ui/hyphaeLook.ts chainsOf) with their bent positions, kept between frames: found again when the
+ * tree's size changes, but no sooner than REBUILD_MIN ms after the last time (a growing tree changes every tick), and at the
+ * latest every REBUILD_MAX ms (a cut and a sprout that leave the size alone show a moment late). A cell never moves, so only the
  * tree's shape needs finding again, not the camera's view of it.
  */
+const REBUILD_MIN = 60;
+const REBUILD_MAX = 150;
 const chainCache = new WeakMap<Hyphae, { size: number; cords: number; at: number; chains: DrawnChain[] }>();
 function chainsFor(h: Hyphae): DrawnChain[] {
   const now = performance.now();
   const hit = chainCache.get(h);
-  if (hit && hit.size === h.parent.size && hit.cords === h.cords.size && now - hit.at < 150) return hit.chains;
+  if (hit) {
+    const age = now - hit.at;
+    if (age < REBUILD_MIN || (age < REBUILD_MAX && hit.size === h.parent.size && hit.cords === h.cords.size)) return hit.chains;
+  }
   const spot = [0, 0];
   const chains = chainsOf(h.parent, h.cords, HYPHA_ROOT).map((ch): DrawnChain => {
     const world: number[] = [];
