@@ -96,8 +96,8 @@ export interface WorldMap {
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
   /**
-   * The side view's cells of loose soil on the map. Nothing writes it any more (S2.3f deleted the side view's heapMound and
-   * takeLoose: one world's mound is the plane's `spoil`), so it counts none; the layer stays for the readers that still test it.
+   * Cells of spoil on the map: on one world's plane heapPlane adds one and takePlane takes one. The curtain's stays 0: S2.3f deleted
+   * the side view's heapMound and takeLoose, so `loose` is never set now and stays only for the readers that still test it.
    */
   moundCells?: number;
   /**

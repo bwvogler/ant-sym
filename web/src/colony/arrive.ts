@@ -4,14 +4,14 @@ import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
 import { crossDown, crossUp } from "./crossing.ts";
 import { dropPlane, pickPlane } from "./dig.ts";
-import { cellKey, NO_CELL, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
+import { cellKey, SOIL_FILL, SOIL_LOOSE } from "./grid.ts";
 import { CELL } from "./hex.ts";
 import { atHome, destMark, fromHomePlane, integrate, routeRecord } from "./homing.ts";
 import { nurse, port, undertake } from "./nestWork.ts";
 import { layMark, nestmatesAround, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import { fetches } from "./tunnel.ts";
-import { CORPSE_GIVE_UP, MOUND_HEIGHT, MOUND_REACH, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
+import { CORPSE_GIVE_UP, REST, ROAD_SIGN, SPOIL_GIVE_UP } from "./tuning.ts";
 import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN, STRONG } from "./vocab.ts";
 import { isSky, qualityAt, takeFoodCell } from "./world.ts";
 import { pointDown, rememberSite } from "./plane.ts";
@@ -106,24 +106,6 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.heading[i] = h;
     s.h = h;
     return true;
-  } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL) {
-    // Up and out of the hole: it carries the pellet on out along the ground to drop it, farther as the mound grows
-    // (MOUND_REACH at most; more of them farther out, √ of a uniform draw), so the mound spreads as a disc, its area
-    // tracking the nest's volume (Tschinkel 2015), where you see them drop it.
-    const reach = Math.min(MOUND_REACH, 3 + colony.heaped / (2 * MOUND_HEIGHT));
-    if (colony.corpse[i]) {
-      // A corpse goes to the midden: one heap just past the mound's edge (harvesters: at the edge of the cleared disc).
-      colony.spoilTo[i] = colony.middenAt();
-      colony.spoilSide[i] = colony.middenSide();
-    } else {
-      colony.spoilTo[i] = 2 + reach * Math.sqrt(rng());
-      colony.spoilSide[i] = rng() < 0.5 ? -1 : 1;
-    }
-    colony.spoilT[i] = 0;
-    colony.staleWalk[i] = 0;
-    colony.wall[i] = 0;
-    colony.mx[i] = NaN;
-    colony.gx[i] = NO_CELL;
   } else if (pellet && colony.soil[i] === SOIL_FILL && atNest && !(colony.line !== null && colony.cur === PLANE)) {
     // A loose pellet taken down to fill unused space, and none found on the way: it carries it back out. Most do (over
     // 90 %: PRD §40), and that is the rule as meant: see LOOSE_FILL_PICK.
