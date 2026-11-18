@@ -1,5 +1,6 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { EGG, GYNE, LARVA, LARVA_FOOD, PUPA, foodOf, isFed, owed, type BroodItem } from "./brood.ts";
 import { type Chamber } from "./chambers.ts";
@@ -55,9 +56,9 @@ import {
 } from "./tuning.ts";
 import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { restFetches } from "./tunnel.ts";
-import { isSky } from "./world.ts";
+import { isSky, rockAt, OPEN } from "./world.ts";
 import { climbOut } from "./homing.ts";
-import { around, touch } from "./sense.ts";
+import { around, touch, perceivedPlace } from "./sense.ts";
 import { ageWorkers, dropBrood } from "./body.ts";
 import { clearPellet, markMiddenPlane } from "./pellets.ts";
 
@@ -171,6 +172,38 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   const cy = CELL[1];
   let here = ch.at(cx, cy);
   if (col.carrying[i]) {
+    const destination = requestedDelivery(col, i);
+    if (destination) {
+      // Only the chamber physically underfoot: no address, neighbour deposit or
+      // fallback to the colony-wide hunger/chamber tables for an explicit goal.
+      const site = here >= 0 ? ch.list[here] : undefined;
+      if (
+        col.onPlane ||
+        !site ||
+        site.colony !== col.params.nest ||
+        rockAt(col.map, cx, cy) !== OPEN ||
+        site.role === "none" ||
+        perceivedPlace(col, i, site.role) !== destination
+      )
+        return false;
+      if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) {
+        col.deliveryState[i] = DELIVERY_KEEP;
+        return false;
+      }
+      col.carrying[i] = 0;
+      col.stock(site, 1);
+      if (col.porter[i]) {
+        col.portTrips++;
+        col.inJaws--;
+      } else col.stored++;
+      col.portTo[i] = -1;
+      col.porter[i] = 0;
+      col.mode[i] = EXPLORE;
+      col.asked[i] = col.question[i] = -1;
+      col.since[i] = 0;
+      endDelivery(col, i, DELIVERY_DONE);
+      return true;
+    }
     const target = col.foodTo(i);
     if (target < 0) return false; // no chamber to take it to (a colony always has its royal one: can't happen)
     // In its chamber, or beside it (a store a cell or two wide is passed by more often than stood in: review of slice 5).

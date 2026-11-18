@@ -128,3 +128,5 @@ One scripted behaviour per change:
 ### Contact action gap
 
 [Contact actions](contact-actions.md): proximity currently causes damage even when both ants withdraw. The opt-in directed combat experiment closes this gap using the existing stranger cue and contact response; no new sense. Default promotion awaits colony-scale measurements.
+
+[Delivery actions](delivery-actions.md), ja-g7nz.3: explicit food destinations use role cues and physical arrival, bypassing the chamber-table target while active. Legacy recruitment and default porter routing remain in ja-k4k.4; this does not close that broader gap.

@@ -236,9 +236,9 @@ export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANC
 
 /**
  * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
- * responses no longer apply. 13: contact can ignore a stranger; 12 kept Jev's probabilities.
+ * responses no longer apply. 14: carry can choose food destination roles; 13 added peaceful contact.
  */
-export const RESPONSE_BRAIN_VERSION = 13;
+export const RESPONSE_BRAIN_VERSION = 14;
 
 // Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
 // before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
@@ -319,8 +319,12 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
           type: "choice",
           instructions: `Going by the doctrine, ${ant} is carrying what carrying says: what should it do with it?`,
           criteria: {
-            take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
+            take: "take: keep carrying to its selected destination, or where it normally belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
             "put down": "put down: put it down here, where it stands, and do something else",
+            "to reception": "to reception: with food and delivery enabled, seek a reception by local floor cues",
+            "to store": "to store: with food and delivery enabled, seek a store by local floor cues",
+            "to brood": "to brood: with food and delivery enabled, seek a brood chamber by local floor cues",
+            "to royal": "to royal: with food and delivery enabled, seek the royal chamber by local floor cues",
           },
         },
       };

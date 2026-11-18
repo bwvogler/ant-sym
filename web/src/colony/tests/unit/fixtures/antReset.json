@@ -540,6 +540,12 @@
   ],
   "attackLayer": [
    -1
+  ],
+  "deliveryRole": [
+   0
+  ],
+  "deliveryState": [
+   0
   ]
  },
  "asIs": {
@@ -1082,6 +1088,12 @@
    41
   ],
   "attackLayer": [
+   41
+  ],
+  "deliveryRole": [
+   41
+  ],
+  "deliveryState": [
    41
   ]
  }

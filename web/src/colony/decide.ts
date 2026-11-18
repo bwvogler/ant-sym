@@ -1,4 +1,5 @@
 // Decide (docs/refactor.md S3.4): the third stage of an ant's step in tick. Where homing heads (the goal: its chamber, the hole, a brood or food chamber), the mode it takes (a load sends it home; else the mode policy is asked when its situation changed, or it waits held at the gate), and strangers in reach, where the contact response decides over the policy. Moved out of Colony.tick verbatim but for `this` becoming `col`; what it decided goes to the next stages through the step record.
+import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { contactAction } from "./contactAction.ts";
 import { chamberGoal, putDown } from "./dig.ts";
@@ -48,7 +49,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   if (nursing && goal === col.nest && col.entrance) goal = chamberGoal(col, col.broodTo[i]);
   // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
   // its food to (a forager: reception, or the royal chamber until there is one).
-  else if (carrying && col.queen && goal === col.nest && col.entrance) goal = chamberGoal(col, col.foodTo(i));
+  else if (carrying && col.queen && goal === col.nest && col.entrance && !requestedDelivery(col, i)) goal = chamberGoal(col, col.foodTo(i));
   let nest = goal;
   const x0 = col.x[i];
   const y0 = col.y[i];

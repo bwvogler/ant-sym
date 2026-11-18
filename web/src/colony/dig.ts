@@ -1,5 +1,6 @@
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
+import { endDelivery, DELIVERY_RELEASED } from "./deliveryAction.ts";
 import type { Colony, Corpse, HoleCell } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { type Role } from "./chambers.ts";
@@ -460,6 +461,7 @@ export function putDown(self: Colony, i: number): void {
       self.putAt[i] = cellKey(cx, cy);
     }
     self.carrying[i] = 0;
+    endDelivery(self, i, DELIVERY_RELEASED);
   } else if (self.pellet[i]) {
     if (self.line !== null && self.cur === PLANE)
       dropPlane(self, i, true); // one world's plane: spoil heaped where it stands, a corpse on the midden if out on its ring

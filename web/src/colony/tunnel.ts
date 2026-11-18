@@ -1,5 +1,6 @@
 // Walking a tunnel (docs/refactor.md S3.3): an ant underground steers along the walls, widens a crowded chamber, and goes for food, brood or the way out. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { localDelivery, DELIVERY_SEARCH, DELIVERY_TRAVEL } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { type Chamber } from "./chambers.ts";
@@ -146,6 +147,7 @@ export function upOut(col: Colony, cx: number, cy: number): number {
  * that touched soil a moment ago keeps its hand on a chamber's wall too (see hug).
  */
 export function walkTunnel(col: Colony, i: number, mode: number, step: number): boolean {
+  const delivering = mode === RETURN && localDelivery(col, i);
   const { map } = col;
   const x = col.x[i];
   const y = col.y[i];
@@ -176,13 +178,13 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && !col.onPlane && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
   const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);
-  if (fresh && !hugging && !groundHome && col.noTunnel[i] === packed) {
+  if (fresh && !hugging && !groundHome && !delivering && col.noTunnel[i] === packed) {
     col.gx[i] = NO_CELL; // looked here already: open ground
     return false;
   }
   const cx = fresh ? hx : col.gx[i];
   const cy = fresh ? hy : col.gy[i];
-  if (!groundHome && !tunnel(map, cx, cy)) {
+  if (!groundHome && !delivering && !tunnel(map, cx, cy)) {
     if (hugging) return hug(col, i, cx, cy, fresh);
     col.gx[i] = NO_CELL;
     if (fresh) col.noTunnel[i] = packed;
@@ -269,7 +271,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // trail only where there are none.
     const signs = mode === RETURN && col.entrance && !isSky(map, cx, cy) ? col.ph.fields[destMark(col, i)] : null;
     const signGain = SIGN_WEIGHT * col.gainHome[i] * col.gainMarks[i]; // the fungus's home and marks levers bend road signs
-    const byVector = mode === RETURN && col.stallT[i] > TUNNEL_STALL;
+    const byVector = mode === RETURN && !delivering && col.stallT[i] > TUNNEL_STALL;
     const hx = col.goalX - centreX(cx, cy);
     const hy = col.goalY - centreY(cy);
     let best = -1;
@@ -281,12 +283,13 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
       if (!walkable(map, tx, ty)) continue;
       const v = byVector
         ? Math.cos(DIR_ANGLE[d]) * hx + Math.sin(DIR_ANGLE[d]) * hy
-        : (signs ? signs.get(tx, ty) * signGain : 0) + field.get(tx, ty);
+        : (signs ? signs.get(tx, ty) * signGain : 0) + (delivering ? 0 : field.get(tx, ty));
       if (v > bestV) {
         bestV = v;
         best = d;
       }
     }
+    if (delivering) col.deliveryState[i] = best < 0 ? DELIVERY_SEARCH : DELIVERY_TRAVEL;
     dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
   } else if (mode === EXPLORE && ent && isSky(map, cx, cy)) {
     // On the ground line (side view) an explorer walks on along the ground the way it is going, turning back only

@@ -1,4 +1,5 @@
 import {
+  deliveryExplanation,
   type Colony,
   MODES,
   TRAILS,
@@ -97,10 +98,11 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
           </button>
         </span>
       </div>
+      {!carrying && col.params.deliveryLane > 0 && col.deliveryState[i] > 0 && (
+        <p className="mt-2 text-xs text-fg-3">{deliveryExplanation(col, i)}</p>
+      )}
       {carrying ? (
-        <p className="mt-2 text-xs text-fg-3">
-          Carrying food home: a mechanic, not a choice. It is asked again once it puts the food down.
-        </p>
+        <p className="mt-2 text-xs text-fg-3">{deliveryExplanation(col, i)}</p>
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>

@@ -104,8 +104,8 @@ export type Contact = (typeof CONTACT)[number];
 
 export type TrailKind = "food" | "home" | "none";
 
-/** What a carrier does with its load: take it where it belongs, or put it down where it stands. */
-export const CARRY = ["take", "put down"] as const;
+/** Retain/release a load, or (deliveryLane) choose a locally recognised food destination role. */
+export const CARRY = ["take", "put down", "to reception", "to store", "to brood", "to royal"] as const;
 export type Carry = (typeof CARRY)[number];
 
 /**
@@ -119,7 +119,8 @@ export interface Responses {
   /**
    * Carrying anything (asked every step while carrying; the mode policy is not asked then): take it where it belongs
    * (food home to the nest's chambers, a porter's to the chamber that wants it, soil out to the mound, a corpse to the
-   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh. (Carrying no
+   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh.
+   * With deliveryLane, explicit food roles select a locally sensed destination; take then retains that choice. (Carrying no
    * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
    */
   carry(t: Touch, draw?: AntDraw): Carry;

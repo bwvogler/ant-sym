@@ -1,5 +1,6 @@
 // Homing (docs/refactor.md S3.3): path integration, where an ant believes home is, route memory and search, the home field, and the way to and out of the hole. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` and `goal` becoming `homeGoal`.
 
+import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { NO_CELL, SOIL_FILL, UP_FIRST, gauss, walkable } from "./grid.ts";
 import { CELL, R, cellOf, centreX, centreY, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
@@ -518,6 +519,8 @@ export function destMark(c: Colony, i: number): Mark {
 }
 
 export function trueDestMark(c: Colony, i: number): Mark {
+  const chosen = requestedDelivery(c, i);
+  if (chosen) return chosen;
   if (c.broodHeld[i]) return "brood";
   if (c.carrying[i] && c.queen) {
     const role = c.map.chambers?.list[c.foodTo(i)]?.role;
