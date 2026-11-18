@@ -14,6 +14,8 @@ const seed = Number(value("--seed", 1));
 const seconds = Number(value("--seconds", 120));
 const ants = Number(value("--ants", 60));
 if (![seed, seconds, ants].every((x) => Number.isInteger(x) && x > 0)) throw Error("seed, seconds and ants must be positive integers");
+const royalCap = Number(value("--royal-cap", 20));
+if (!Number.isFinite(royalCap) || royalCap <= 0) throw Error("royal-cap must be positive and finite");
 const requested = value("--variants", "baseline,retain,persist,redirect5,redirect20");
 const variants = {
   royal: { lane: 1, limit: 5, doctrine: "royal" },
@@ -42,6 +44,7 @@ const report = {
   seed,
   seconds,
   ants,
+  royalCap,
   design:
     "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
   results,
@@ -55,6 +58,12 @@ for (const name of requested.split(",")) {
   });
   const c = g.player;
   const chambers = c.map.chambers;
+  // A harness-only intervention, applied before ticks and only to this colony's
+  // home-layer royal channel. Copy parameters; never mutate shared defaults.
+  const initialLayer = c.cur;
+  c.bind(c.home);
+  c.ph.params = { ...c.ph.params, royal: { ...c.ph.params.royal, max: royalCap } };
+  c.bind(initialLayer);
   if (traceAnt >= c.n) throw Error("trace-ant exceeds allocated ant slots");
   const trace = [];
   const initialAlive = c.alive.reduce((a, b) => a + b, 0);
@@ -153,7 +162,21 @@ for (const name of requested.split(",")) {
     maxHeld = Math.max(maxHeld, held);
     maxActive = Math.max(maxActive, active);
   }
+  const finalLayer = c.cur;
+  c.bind(c.home);
+  let markedCells = 0,
+    nearCapCells = 0,
+    maxRoyal = 0;
+  c.ph.fields.royal.forEach((_x, _y, cells) => {
+    for (const level of cells) {
+      if (level >= 0.05) markedCells++;
+      if (level >= royalCap * 0.9) nearCapCells++;
+      maxRoyal = Math.max(maxRoyal, level);
+    }
+  });
+  c.bind(finalLayer);
   const result = {
+    royalField: { markedCells, nearCapCells, max: maxRoyal },
     name,
     ...v,
     ...(traceAnt >= 0 ? { traceAnt, traceFrom, trace } : {}),

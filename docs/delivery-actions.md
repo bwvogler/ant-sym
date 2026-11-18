@@ -223,3 +223,36 @@ Raw final results: `seed1-sampled-turns.json`, `seed2-sampled-turns.json`. Each 
 For play, explicit deliveries can deviate from a local cue cycle while retaining their role, and distorted marks still influence movement. There is no new player control or response-cache dimension. Incremental Jev token cost is zero; no live calls were made. Broader colony calibration, remaining trapped loads and absent-role doctrines still need work before default promotion.
 
 Final validation: all34 delivery tests and all four simulation goldens pass unchanged; typecheck, lint (existing warnings), changed-file formatting and production build pass. The full all-tier suite and multi-minute slow guards were not rerun. Final populations for direct/5-second/20-second treatments are90/90/89 in seed1 and90/90/90 in seed2; queens survive, with no adult hunger deaths or brood starvation recorded. These short pilots still do not establish long-term survival.
+
+## Remaining carriers and royal-mark capacity (ja-g7nz.3.3.2.2), 2026-11-18
+
+After sampled turns, remaining long-held loads are not necessarily frozen or cycling over three cells. In seed1's final60 seconds, the royal20 worker54 visited83 distinct cells and the royal5 worker33 visited119, sampled every three ticks. Neither entered a chamber; both had wall state0 in all600 samples. Travel/search sample counts were584/16 and577/23. Royal cues were often near the cap20. These observations motivated a capacity intervention; they do not establish that saturation caused either worker's failed delivery. Trace summaries and visited-cell counts are in `remaining-carrier-traces.json`; the full traces can be reproduced at its recorded commit with `--trace-ant 54 --variants royal20 --trace-from 540` or slot33/royal5, seed1,600 seconds.
+
+The pilot harness now accepts `--royal-cap` (default20), changing only the player's home-layer royal channel before the first tick, using the existing per-channel capacity setting. It copies parameter objects so other colonies and shared defaults are untouched. This is a **harness intervention**, not a production setting or changed default. Final `royalField` reports cells with cue>=0.05, cells at>=90% of the selected cap, and the maximum value. Those are end-of-run counts, not time-integrated saturation or a policy input.
+
+Same generated worlds,60 starting ants,600 simulated seconds, no rival/live calls:
+
+| Doctrine | Seed1 stored, cap20 →80 | Seed2 stored, cap20 →80 | Peak loads held>120s, seed1 | Peak loads held>120s, seed2 |
+|---|---:|---:|---:|---:|
+| Default / retain-only |444 →491|698 →690|1 →0|0 →0|
+| Direct royal |420 →331|680 →656|0 →0|1 →0|
+| Brood →royal at5s |166 →154|372 →430|3 →0|0 →0|
+| Brood →royal at20s |135 →165|311 →333|5 →2|0 →0|
+
+The cap80 intervention **fails as a general fix**. It reduces retained loads in several cases but hurts direct-royal throughput in both seeds and five-second throughput in seed1. It also changes the default colony's behavior, so its treatments must be judged against the corresponding cap80 baseline, not only cap20. In the five-second treatment, final near-cap cells fall214→34 /218→58; this confirms a field change, not a uniquely identified cause of delivery improvement. Trajectory-dependent random draws diverge as usual. Production capacity remains20; no threshold or doctrine is promoted.
+
+Raw results are `seed{1,2}-royal-cap{20,80}.json`. Example:
+
+```sh
+node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 600 --variants baseline,retain,royal,royal5,royal20 --royal-cap 80 --out pilot.json
+```
+
+All four runs completed. At cap20, every previously recorded metric except runtime matches the prior sampled-turn pilot exactly. Default and retain-only controls agree in each seed/cap pair. The recorded harness hash matches the committed script. Syntax checking and formatting pass; production code is unchanged, so build and simulation tests were not repeated for this diagnostic slice.
+
+### Next policy-context slice (ja-g7nz.3.2.4)
+
+The carry response currently receives coarse `place` (chamber/tunnel/etc.) and effort, but neither its own committed destination nor the recognised role underfoot. Thus a stateless cached policy cannot distinguish a long brood attempt from a long royal fallback when its other fields match. The pilot deliberately persists at its royal fallback; reducing repeated small loops cannot make a missing brood chamber appear.
+
+Proposed next change: expose the existing commitment and locally perceived delivery role **only to carry**. Each is one of none/royal/brood/store/reception. Underfoot recognition must reuse fungal attenuation/swap semantics and physical position, with no search for unseen chambers, global availability flags or colony hunger totals. This adds no new physical sense: it carries the existing floor-mark recognition and the ant's own selected action into the decision context. It does expand carry's possible keys by at most25 combinations, so it needs a response-version bump and offline request-size measurements; other response payloads/keys should remain unchanged. Defaults stay off.
+
+Tests before promotion: distinguish identical effort with different commitments; swapped/erased underfoot cues; surface/foreign-place handling; carry-only payload/key isolation; same-role retention versus explicit change/release; save/replay; and paired generated-world doctrines that exploit this context without reading hidden role availability. The broader navigation and colony-calibration beads remain open. This paragraph is a plan, not a claim that the new fields or a successful doctrine are implemented.
