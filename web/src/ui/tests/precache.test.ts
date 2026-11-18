@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
+  responseContext,
   SITUATIONS,
   MODES,
   STANCES,
@@ -43,6 +44,7 @@ const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT, neglectus
 const DIR = fileURLToPath(new URL("../../../public/precache/", import.meta.url));
 const index = JSON.parse(readFileSync(`${DIR}index.json`, "utf8")) as PrecacheIndex;
 const CONTEXT: Record<string, (words: string) => string> = {
+  get: (words) => responseContext("get", words),
   mode: policyContext,
   stance: stanceContext,
   fungus: (aim) => fungusContext(aim),
@@ -52,6 +54,7 @@ const CONTEXT: Record<string, (words: string) => string> = {
 // The steer lane's answers under its default weights (search, memory: ja-ykmu.3): a level each, −1, 0 or 1.
 const LEVELS = ["-1", "0", "1"];
 const VALID: Record<string, readonly string[]> = {
+  get: ["true", "false"],
   mode: MODES,
   stance: STANCES,
   growth: GROWTH_CHOICES,

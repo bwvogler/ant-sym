@@ -51,26 +51,26 @@ const FUNGAL_SEEN: FungalSituation[] = [
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the five lanes, each with its flags, variants, words and batching", () => {
+test("the registry lists the six lanes, each with its flags, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
-    ["mode", "stance", "fungus", "growth", "steer"],
+    ["mode", "stance", "fungus", "growth", "steer", "get"],
   );
   for (const l of LANE_LIST) assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], [""], [""], [""]],
+    [[""], [""], [""], [""], [""], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
-    ["doctrine", "doctrine", "aim", "aim", "doctrine"],
+    ["doctrine", "doctrine", "aim", "aim", "doctrine", "doctrine"],
   );
   assert.equal(LANES.mode.presets, DOCTRINES);
   assert.equal(LANES.stance.presets, DOCTRINES);
   assert.equal(LANES.fungus.presets, AIMS);
   assert.equal(LANES.growth.presets, AIMS, "the growth lane asks under the fungus's aim");
   assert.equal(LANES.steer.presets, DOCTRINES, "the steer lane asks under the colony's doctrine (ja-ykmu.3)");
-  // Only the fungus's lanes gather a fuller request and have a batch of their own (the ants' lanes take the client's).
+  // Fungus lanes and pickup gather; pickup uses the client batch size.
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
     [
@@ -79,6 +79,7 @@ test("the registry lists the five lanes, each with its flags, variants, words an
       [true, 50],
       [true, 48],
       [false, null],
+      [true, null],
     ],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);

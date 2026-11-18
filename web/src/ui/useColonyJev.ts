@@ -54,7 +54,10 @@ export function useColonyJev(
   journal: Journal | null = null,
   species: Species = GENERIC_ANT,
 ) {
-  const jev = useMemo(() => new ColonyJev({}, browserCache), []);
+  const jev = useMemo(
+    () => new ColonyJev({ pickupPolicy: new URLSearchParams(window.location.search).get("pickupPolicy") === "1" }, browserCache),
+    [],
+  );
   jev.journal = journal;
   const [state, setState] = useState<ColonyJevState>(jev.state);
   const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);

@@ -55,7 +55,7 @@ export const LOCAL_FUNGUS_RULES: string[] = [
   "Otherwise: what your strain, Garden, does by default: hosts carry the fungus's odour and tolerate strangers a little (blend), as far as your Recognition upgrade reaches. Levers off the menu stay as they are.",
 ];
 
-/** The ant's small responses on this page: decided by the local rule (responses.ts localResponses), never asked live here. */
+/** The ant's small responses on this page: local defaults (responses.ts localResponses); the opt-in pickupPolicy experiment can override food get. */
 export const LOCAL_RESPONSE_RULES: [hook: string, rule: string][] = [
   ["get", "Pick food up unless fighting; soil, corpses and brood whenever the chance comes."],
   ["carry", "Take whatever it holds where it belongs: food home, soil to the mound, the dead to the midden, brood to a brood chamber."],

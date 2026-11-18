@@ -35,14 +35,14 @@ test("only the ants' mode lane is tallied as hits and misses; the fungus's repli
   );
   assert.deepEqual(
     NAMES.filter((n) => !LANE_KINDS[n].reconsiders),
-    ["fungus", "growth"],
+    ["get", "fungus", "growth"],
   );
 });
 
 test("a request's items carry the ids of their lane's row: s0 for ants' modes, c0 for stances, h0 for the fungus, g0 for its tips", () => {
   assert.deepEqual(
     Object.fromEntries(NAMES.map((n) => [n, LANE_KINDS[n].idPrefix])),
-    { mode: "s", stance: "c", fungus: "h", growth: "g", steer: "w" },
+    { mode: "s", stance: "c", fungus: "h", growth: "g", steer: "w", get: "p" },
     "these are on the wire and in the cached requests",
   );
   const sample = {

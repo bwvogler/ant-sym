@@ -261,6 +261,7 @@ test("each lane's flags: id prefix, context prefix, hits, reconsidering, situati
     stance: { idPrefix: "c", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
     fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
     growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    get: { idPrefix: "p", contextPrefix: "get-", countsHits: false, reconsiders: false, perRequest: 100 },
     steer: { idPrefix: "w", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
   });
 });
@@ -284,6 +285,7 @@ test("the client's state carries these fields, in this order (the page shows and
     fungus: { asked: 0, cached: 0 },
     growth: { asked: 0, cached: 0 },
     steer: { asked: 0, cached: 0 },
+    get: { asked: 0, cached: 0 },
   });
 });
 

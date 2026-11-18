@@ -51,6 +51,9 @@ import {
   topOf,
   weightsOf,
   steeringOf,
+  responseOf,
+  type Touch,
+  type Responses,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -69,6 +72,8 @@ import {
 // a 409 ends the run and everyone carries on locally.
 
 export interface ColonyJevOptions {
+  /** Experimental food pickup response; false keeps the species' local responses. */
+  pickupPolicy: boolean;
   batch: number;
   inFlight: number;
   intervalMs: number;
@@ -78,7 +83,14 @@ export interface ColonyJevOptions {
   saveMs: number;
 }
 
-export const DEFAULT_COLONY_JEV: ColonyJevOptions = { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: FUNGUS_GATHER_MS, saveMs: 1000 };
+export const DEFAULT_COLONY_JEV: ColonyJevOptions = {
+  pickupPolicy: false,
+  batch: 100,
+  inFlight: 2,
+  intervalMs: 300,
+  gatherMs: FUNGUS_GATHER_MS,
+  saveMs: 1000,
+};
 
 /**
  * The caps a game's run starts with: none that bind (GAME_CAPS). A run stays open from the first miss until the page
@@ -164,7 +176,7 @@ interface Lane<S, A extends string> {
   queue: Map<string, S>;
 }
 
-/** The growth lane's `local` while a situation has no answer: not an answer (validGrowth rejects it), so the tip plays its own rule. */
+/** No cached answer: growth and pickup keep their own local response, outside the string-valued lane. */
 const NO_ANSWER = "";
 
 /** How many earlier contexts a lane falls back on. */
@@ -186,6 +198,8 @@ function lane<S, A extends string>(
 
 /** A colony this client drives: its lanes, null for a lane its species does not have (Species.lanes): nothing is asked or counted there. */
 interface Driven {
+  gets: Lane<Touch, string> | null;
+  baseResponses: Responses;
   colony: Colony;
   /** answers are weighted (Jev's mode with its probabilities, colony/weighted.ts): the colony's policy draws from them */
   modes: Lane<Situation, string> | null;
@@ -234,7 +248,7 @@ function steerLane(words: string): Lane<SteerSituation, string> {
 }
 
 /** A colony's lanes, asking under `words` (its doctrine) in its species' lane words; a lane the species lacks is null. */
-function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
+function colonyLanes(words: string, species: Species): Omit<Driven, "colony" | "gets" | "baseResponses"> {
   const { mode, stance } = species.lanes;
   return {
     // the stand-in while a situation is unanswered is the species' own local rule (ja-fnd.5.9)
@@ -418,7 +432,9 @@ export class ColonyJev {
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
     const steers = new Map<string, number>();
+    const gets = new Map<string, number>();
     for (const d of this.#driven) {
+      if (d.gets) gets.set(d.gets.context, this.#cache(d.gets).size);
       if (d.modes) modes.set(d.modes.context, this.#cache(d.modes).size);
       if (d.stances) stances.set(d.stances.context, this.#cache(d.stances).size);
       if (d.steers) steers.set(d.steers.context, this.#cache(d.steers).size);
@@ -430,6 +446,7 @@ export class ColonyJev {
       fungus: this.#cache(this.#fungal).size,
       growth: this.#cache(this.#growth).size,
       steer: sum(steers),
+      get: sum(gets),
     };
     return {
       lanes: perLane((name) => ({ asked: this.#state.lanes[name].asked, cached: cached[name] })),
@@ -469,7 +486,7 @@ export class ColonyJev {
       if (l.queue.size === 0) l.since = Date.now();
       l.queue.set(key, s);
     }
-    return (this.#canAsk ? null : this.#earlier(l, key)) ?? l.local(s);
+    return (this.#canAsk || l.name === "get" ? null : this.#earlier(l, key)) ?? l.local(s);
   }
 
   /** Whether situation `key` of lane l still needs asking under its words: not cached, not in flight, not queued. */
@@ -695,10 +712,34 @@ export class ColonyJev {
    * situations depend on neither the colony nor the map). Each colony's policies become its own lanes.
    */
   attachColonies(colonies: readonly Colony[], species: Species = GENERIC_ANT): void {
+    for (const d of this.#driven) if (d.gets) d.colony.responses = d.baseResponses;
     this.#species = species;
     this.#driven = colonies.map((colony, k) => {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
-      const d: Driven = { colony, ...colonyLanes(words, species) };
+      const baseResponses = colony.responses;
+      const gets = this.opts.pickupPolicy
+        ? lane<Touch, string>({
+            ...LANES.get,
+            key: (s) => LANES.get.key(s, undefined),
+            contextOf: (w) => LANES.get.contextOf(w),
+            asks: (s) => LANES.get.asks(s, undefined),
+            local: () => NO_ANSWER,
+            batch: undefined,
+            words,
+          })
+        : null;
+      const d: Driven = { colony, gets, baseResponses, ...colonyLanes(words, species) };
+      if (gets)
+        colony.responses = {
+          ...baseResponses,
+          get: (t, draw) => {
+            if (!LANES.get.asks(t, undefined)) return baseResponses.get(t, draw);
+            // Touch is reused, and place is a lazy getter: materialise it before queuing.
+            const snapshot = { ...t };
+            const answer = this.#lookup(gets, snapshot);
+            return answer === NO_ANSWER ? baseResponses.get(t, draw) : (responseOf("get", gets.key(snapshot), answer, draw) as boolean);
+          },
+        };
       // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
       const { modes, stances, steers } = d;
       if (modes) colony.bindPolicy("mode", this.#modePolicy(modes));
@@ -728,7 +769,8 @@ export class ColonyJev {
       const a = d.modes ? this.#recontext(d.modes, text) : false;
       const b = d.stances ? this.#recontext(d.stances, text) : false;
       const c = d.steers ? this.#recontext(d.steers, text) : false;
-      if (a || b || c) d.colony.reconsider();
+      const pickup = d.gets ? this.#recontext(d.gets, text) : false;
+      if (a || b || c || pickup) d.colony.reconsider();
     });
   }
 
@@ -845,6 +887,7 @@ export class ColonyJev {
     for (const d of this.#driven) {
       if (d.stances) out.push(d.stances as Lane<unknown, string>);
       if (d.modes) out.push(d.modes as Lane<unknown, string>);
+      if (d.gets) out.push(d.gets as Lane<unknown, string>);
       if (d.steers) out.push(d.steers as Lane<unknown, string>);
     }
     out.push(this.#fungal as Lane<unknown, string>, this.#growth as Lane<unknown, string>);
