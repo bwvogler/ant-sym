@@ -11,7 +11,7 @@ import {
   inspectionMarkers,
   type InspectionOverlays,
 } from "./inspectionOverlays.ts";
-import { drawLeafTiles, SurfaceLeaves } from "./surfaceFood.ts";
+import { drawLeafTiles, SurfaceLeaves, type LeafTile } from "./surfaceFood.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 
 export const BELOW_ATLAS_URL = new URL("../assets/inspection/below-atlas.png", import.meta.url).href;
@@ -199,6 +199,8 @@ export class InspectionPatchRenderer {
   private createCanvas: () => HTMLCanvasElement;
   private raised: Face[] = [];
   private leaves = new SurfaceLeaves();
+  private leafSources: LeafTile[][] = [];
+  private leafUnion: LeafTile[] = [];
   constructor(createCanvas: () => HTMLCanvasElement = () => document.createElement("canvas")) {
     this.createCanvas = createCanvas;
   }
@@ -306,6 +308,7 @@ export class InspectionPatchRenderer {
         .filter((c) => c.valid && c.state.place.ground === "open" && foodKind(c.state.quality) === "plain")
         .map((c): [number, number] => [cellKey(...c.state.cell), c.state.place.food]),
     ]);
+    const sheets: LeafTile[][] = [];
     const scale = ppu / 96;
     for (const cell of patch.cells) {
       if (!cell.valid || cell.surfaceStrip || cell.state.place.ground === "air") continue;
@@ -411,8 +414,7 @@ export class InspectionPatchRenderer {
       const food = foodDensity(p.food);
       if (mode === "surface" && p.ground === "open" && foodKind(s.quality) === "plain") {
         const tiles = this.leaves.get(...s.cell, (a, b) => lookup.get(cellKey(a, b)) ?? 0);
-        const [gx, gy] = patch.selected.cell;
-        drawLeafTiles(ctx, tiles, (a, b, z) => point(a - centreX(gx, gy), b - centreY(gy), z));
+        sheets.push(tiles);
       } else {
         ctx.globalAlpha = food.alpha;
         for (let i = 0; i < food.marks; i++) sprite("food-" + foodKind(s.quality), x + FOOD_SPOTS[i][0], y + FOOD_SPOTS[i][1]);
@@ -425,6 +427,21 @@ export class InspectionPatchRenderer {
         ctx.globalAlpha = 1;
       }
     }
+    if (sheets.length !== this.leafSources.length || sheets.some((sheet, i) => sheet !== this.leafSources[i])) {
+      this.leafSources = sheets;
+      this.leafUnion = sheets.flat();
+    }
+    const [gx, gy] = patch.selected.cell,
+      ox = centreX(gx, gy),
+      oy = centreY(gy);
+    if (mode === "surface")
+      drawLeafTiles(
+        ctx,
+        this.leafUnion,
+        (a, b, z) => point(a - ox, b - oy, z),
+        true,
+        (a, b, z, paint) => drawAt(a - ox, b - oy, z, paint),
+      );
     const bodies = patch.cells
       .filter((c) => c.valid)
       .flatMap((cell) => [

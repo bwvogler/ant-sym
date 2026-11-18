@@ -1,5 +1,5 @@
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
-import { drawLeafTiles, SurfaceLeaves } from "./surfaceFood.ts";
+import { MapLeafSprites, SurfaceLeaves } from "./surfaceFood.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   CHUNK,
@@ -415,6 +415,7 @@ export default function ColonyField({
     const nestSprites = new NestSprites();
     const resourceSprites = new ResourceSprites();
     const surfaceLeaves = new SurfaceLeaves();
+    const mapLeaves = new MapLeafSprites();
     const workerGait = new WorkerGait();
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
@@ -1320,7 +1321,7 @@ export default function ColonyField({
               const tiles = surfaceLeaves.get(x, y, (a, b) =>
                 rockAt(m, a, b) === OPEN && foodKind(m.quality?.get(a, b) ?? 1) === "plain" ? m.food.get(a, b) : 0,
               );
-              drawLeafTiles(ctx, tiles, (a, b) => toScreen(c, v, a, b));
+              mapLeaves.draw(ctx, tiles, c.zoom, v.w / 2 - c.x * c.zoom, v.h / 2 - c.y * c.zoom);
               continue;
             }
             ctx.globalAlpha = density.alpha;
