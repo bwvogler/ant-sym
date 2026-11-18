@@ -190,6 +190,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
    - an input hook
    - the HUD
    - a read-only scene adapter, so a species or nest kind brings its own drawer
+   Built, slice 0 (`ja-fnd.6.3`): `scripts/field-shots.mjs`, the map's pixel guard. `record <dir>` renders 14 fixed scenes of the one world's canvas in Chromium (seed 3 from a fresh paused game, stepped a fixed number of ticks: above and below, each nest zoomed with the minimap, a followed ant on each layer, the queen's pen, and the dark scheme) and hashes each; `check <dir>` renders again and names the scenes that differ, saving them beside the baseline. The scenes are deterministic (a record and two checks agree), and a change to one draw call shows in only the scenes that draw it. A pure move of drawing code is `record` on main, then `check` after the move; the baseline belongs to the machine and its Chromium, never committed. Not covered yet, to add when a slice moves that layer: the builder's marks, a pinned specimen, a phone-sized page.
 4. **A small kit:** buttons, segmented control, card, one dialog/drawer with a single Escape and focus manager, one policy editor (it exists three times today), lever chips, stats, bars.
 5. **One theme.**
    - The canvas colours map into `@theme`.
