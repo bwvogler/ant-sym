@@ -1,13 +1,14 @@
-// The Mutations drawer's upgrades as a tree (ja-52ui, PRD §80): branches of upgrades, each a row of its levels, and a
-// line from each level another needs to the level that needs it. At phone width the same rows fall back to the list:
-// the level it is at and the next one's button, or what that level still needs.
+// The Mutations drawer's upgrades as a tech tree (ja-52ui, PRD §80). Wide: tiers left to right, one box for each level you
+// can keep, a row for each upgrade, curves from a level to what it leads on to (owner 2026-11-16). A phone keeps the list:
+// the level an upgrade is at and its next level's button, or what that level still needs. The price is not on the boxes: it
+// is one price, and the drawer's header shows it beside the mutations in hand.
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { LETHAL_LEVERS, UPGRADES, canKeep, nextCost, unmet, type Upgrade } from "../colony/index.ts";
+import { LETHAL_LEVERS, UPGRADES, canKeep, unmet, upgrade, type Upgrade } from "../colony/index.ts";
 import Tip from "./Tip.tsx";
 import { NextBody, UpgradeBody } from "./UpgradeTips.tsx";
 import { needText } from "./upgradeText.ts";
-import { BRANCHES } from "./upgradeBranches.ts";
+import { BRANCHES, TIER_COUNT, tierOf } from "./upgradeBranches.ts";
 
 function nameClass(u: Upgrade): string {
   return u.kind === "spread" ? "text-spore" : u.levers?.every((id) => LETHAL_LEVERS.has(id)) ? "text-err" : "text-accent";
@@ -22,12 +23,21 @@ interface Props {
   wide: boolean;
 }
 
-/** The upgrades: a tree when `wide`, else a list. One `li` per upgrade, its name first and its one button (the next level) after. */
+/** A line to draw: from the level (`from`) to the level it leads on to (`to`). */
+const links = UPGRADES.flatMap((u) =>
+  u.steps.slice(1).flatMap((_, j) => {
+    const k = j + 1;
+    const from: [string, number][] = (u.needs[j] ?? []).map((n) => [n.id, n.level]);
+    if (k > 1) from.push([u.id, k - 1]);
+    return from.map(([id, level]) => ({ id, level, toId: u.id, toLevel: k }));
+  }),
+);
+
+/** The upgrades: a tree when `wide`, else a list. */
 export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState<{ d: string; met: boolean }[]>([]);
-  // Lines from each needed level to the level that needs it, measured off the drawn chips.
-  // The chips move only when a level changes, not on every stats update (a fresh `levels` object each time).
+  // The boxes move only when a level changes, not on every stats update (a fresh `levels` object each time).
   const levelsKey = UPGRADES.map((u) => levels[u.id] ?? 0).join();
   useLayoutEffect(() => {
     const el = box.current;
@@ -36,26 +46,21 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
     const measure = () => {
       const o = el.getBoundingClientRect();
       const at = (id: string, level: number) => el.querySelector<HTMLElement>(`[data-level="${id}:${level}"]`)?.getBoundingClientRect();
-      // Each line leaves the needed level's right side, runs down its own lane right of every chip, and enters the level
-      // that needs it from the right: lanes in order of length, so short ones sit nearest the chips.
-      const pairs: { a: DOMRect; b: DOMRect; met: boolean }[] = [];
-      let right = 0;
-      for (const c of el.querySelectorAll<HTMLElement>("[data-level]")) right = Math.max(right, c.getBoundingClientRect().right - o.left);
-      for (const u of UPGRADES)
-        u.needs.forEach((ns, k) => {
-          for (const n of ns) {
-            const a = at(n.id, n.level);
-            const b = at(u.id, k + 1);
-            if (a && b) pairs.push({ a, b, met: kept[UPGRADES.findIndex((x) => x.id === n.id)]! >= n.level });
-          }
-        });
-      pairs.sort((p, q) => Math.abs(p.a.top - p.b.top) - Math.abs(q.a.top - q.b.top));
-      const out = pairs.map(({ a, b, met }, i) => {
-        const lane = right + 10 + 6 * i;
+      const out: { d: string; met: boolean }[] = [];
+      for (const l of links) {
+        const a = at(l.id, l.level);
+        const b = at(l.toId, l.toLevel);
+        if (!a || !b) continue;
+        const x1 = a.right - o.left;
+        const x2 = b.left - o.left;
         const y1 = a.top + a.height / 2 - o.top;
         const y2 = b.top + b.height / 2 - o.top;
-        return { d: `M${a.right - o.left},${y1} H${lane} V${y2} H${b.right - o.left}`, met };
-      });
+        const xm = (x1 + x2) / 2;
+        out.push({
+          d: y1 === y2 ? `M${x1},${y1} H${x2}` : `M${x1},${y1} C${xm},${y1} ${xm},${y2} ${x2},${y2}`,
+          met: kept[UPGRADES.findIndex((x) => x.id === l.id)]! >= l.level,
+        });
+      }
       setEdges(out);
     };
     measure();
@@ -64,63 +69,76 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
     return () => ro.disconnect();
   }, [wide, levelsKey]);
 
-  const row = (u: Upgrade) => {
+  /** One level of an upgrade, as a box in the tree. */
+  const node = (u: Upgrade, k: number) => {
     const level = levels[u.id] ?? 0;
-    const cost = nextCost(levels, u.id);
     const missing = unmet(levels, u.id);
-    const next = (
-      <Tip tip={<NextBody u={u} levels={levels} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
+    const next = k === level + 1;
+    const buyable = next && missing.length === 0;
+    const look =
+      k <= level
+        ? "border-spore/40 text-fg shadow-[inset_0_0_0_99px_color-mix(in_oklab,var(--spore)_14%,transparent)]"
+        : buyable
+          ? "border-accent text-fg hover:bg-raised"
+          : `border-dashed border-line ${next ? "text-fg-2" : "text-fg-3"}`;
+    const box = `relative block w-full rounded-md border bg-panel px-1.5 py-1 text-left ${look}`;
+    const body = (
+      <>
+        <span className={`block text-[10px] leading-tight ${nameClass(u)}`}>{u.name}</span>
+        <span className="block text-[11px] leading-tight break-words">{u.steps[k]}</span>
+        {idle(u) && <span className="block text-[9px] leading-tight text-fg-3">not on the menu</span>}
+      </>
+    );
+    return buyable ? (
+      <Tip tip={<NextBody u={u} levels={levels} />} className="block" dotted={false} tapToOpen={false} tabStop={false}>
         <button
           type="button"
-          data-level={wide ? `${u.id}:${level + 1}` : undefined}
-          className={`rounded-md border bg-panel px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40 ${missing.length ? "border-dashed border-line" : "border-accent"}`}
+          data-level={`${u.id}:${k}`}
+          className={`${box} disabled:pointer-events-none disabled:opacity-50`}
           disabled={!canKeep(levels, mutations, u.id)}
           onClick={() => evolve(u.id)}
         >
-          {u.steps[level + 1]} · {cost?.toLocaleString()}
+          {body}
         </button>
       </Tip>
-    );
-    const name = (
-      <Tip tip={<UpgradeBody u={u} level={level} />} className="min-w-0 truncate">
-        <span className={nameClass(u)}>{u.name}</span>
-        {!wide && <span className="text-fg-3"> {u.steps[level]}</span>}
-        {idle(u) && <span className="text-fg-3"> (not on the menu)</span>}
+    ) : (
+      <Tip tip={next ? <NextBody u={u} levels={levels} /> : <UpgradeBody u={u} level={level} />} className="block" dotted={false}>
+        <span data-level={`${u.id}:${k}`} className={box}>
+          {body}
+        </span>
       </Tip>
     );
-    if (!wide)
-      return (
-        <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
-          {name}
-          {cost === null ? (
-            <span className="shrink-0 text-fg-3">at its most</span>
-          ) : missing.length ? (
-            <Tip tip={<NextBody u={u} levels={levels} />} className="shrink-0 text-right text-fg-3" tapToOpen>
-              needs {missing.map(needText).join(", ")}
-            </Tip>
-          ) : (
-            next
-          )}
-        </li>
-      );
+  };
+
+  /** A phone's row for an upgrade: its name and level, and its next level's button or what it needs. */
+  const row = (u: Upgrade) => {
+    const level = levels[u.id] ?? 0;
+    const missing = unmet(levels, u.id);
     return (
-      <li key={u.id} className="grid grid-cols-[6.5rem_1fr] items-center gap-2 text-[11px]">
-        {name}
-        <span className="relative flex flex-wrap items-center gap-1">
-          {u.steps.map((s, k) =>
-            k === level + 1 ? (
-              <span key={s}>{next}</span>
-            ) : (
-              <span
-                key={s}
-                data-level={`${u.id}:${k}`}
-                className={`rounded-md border px-1.5 py-0.5 ${k <= level ? "border-spore/40 bg-panel text-fg shadow-[inset_0_0_0_99px_color-mix(in_oklab,var(--spore)_10%,transparent)]" : "border-dashed border-line bg-panel text-fg-3"}`}
-              >
-                {s}
-              </span>
-            ),
-          )}
-        </span>
+      <li key={u.id} className="flex items-center justify-between gap-2 text-xs">
+        <Tip tip={<UpgradeBody u={u} level={level} />} className="min-w-0 truncate">
+          <span className={nameClass(u)}>{u.name}</span>
+          <span className="text-fg-3"> {u.steps[level]}</span>
+          {idle(u) && <span className="text-fg-3"> (not on the menu)</span>}
+        </Tip>
+        {level >= u.steps.length - 1 ? (
+          <span className="shrink-0 text-fg-3">at its most</span>
+        ) : missing.length ? (
+          <Tip tip={<NextBody u={u} levels={levels} />} className="shrink-0 text-right text-fg-3" tapToOpen>
+            needs {missing.map(needText).join(", ")}
+          </Tip>
+        ) : (
+          <Tip tip={<NextBody u={u} levels={levels} />} className="shrink-0" dotted={false} tapToOpen={false} tabStop={false}>
+            <button
+              type="button"
+              className="rounded-md border border-accent bg-panel px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
+              disabled={!canKeep(levels, mutations, u.id)}
+              onClick={() => evolve(u.id)}
+            >
+              {u.steps[level + 1]}
+            </button>
+          </Tip>
+        )}
       </li>
     );
   };
@@ -141,11 +159,24 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
           ))}
         </svg>
       )}
-      <div className={`flex flex-col ${wide ? "gap-2" : "gap-1"}`} aria-label="upgrades">
+      <div className={`flex flex-col ${wide ? "gap-3" : "gap-1"}`} aria-label="upgrades">
         {BRANCHES.map((b) => (
           <section key={b.name} aria-label={b.name}>
             {wide && <h3 className="mb-1.5 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">{b.name}</h3>}
-            <ul className={`flex flex-col ${wide ? "gap-3" : "gap-1"}`}>{b.ids.map((id) => row(UPGRADES.find((u) => u.id === id)!))}</ul>
+            {wide ? (
+              <ul className="grid gap-x-3 gap-y-1.5" style={{ gridTemplateColumns: `repeat(${TIER_COUNT}, minmax(0, 1fr))` }}>
+                {b.ids.flatMap((id, r) => {
+                  const u = upgrade(id);
+                  return u.steps.slice(1).map((_, j) => (
+                    <li key={`${id}:${j + 1}`} style={{ gridColumn: tierOf(id, j + 1) + 1, gridRow: r + 1 }}>
+                      {node(u, j + 1)}
+                    </li>
+                  ));
+                })}
+              </ul>
+            ) : (
+              <ul className="flex flex-col gap-1">{b.ids.map((id) => row(upgrade(id)))}</ul>
+            )}
           </section>
         ))}
       </div>

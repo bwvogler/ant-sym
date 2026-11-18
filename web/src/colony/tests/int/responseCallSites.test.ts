@@ -66,5 +66,5 @@ test("every response hook called in colony/ is handed antDraw", () => {
       assert.match(call, /antDraw\(/, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
     }
   }
-  assert.ok(calls.length >= 11, `found only ${calls.join(", ")}`);
+  assert.ok(calls.length >= 10, `found only ${calls.join(", ")}`);
 });

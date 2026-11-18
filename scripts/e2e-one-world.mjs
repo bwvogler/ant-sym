@@ -764,14 +764,14 @@ try {
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
   section("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
-  const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
-  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
+  const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first(); // Infectivity: fair, a root of the tree
+  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first(); // on a phone's list: the upgrade's name
   // The upgrades live in the Mutations drawer (PRD §69): the rail opens it, and the button shows it pressed.
   const mutations = (p) => p.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Mutations", exact: true });
   await mutations(page).click();
   check((await mutations(page).getAttribute("aria-pressed")) === "true", "the rail opens the Mutations drawer");
-  await nameOf(page).hover();
-  await until(async () => (await tips(page)) === 1, "a hover opens an upgrade's tooltip", 3000, 50);
+  await firstUpgrade(page).hover();
+  await until(async () => (await tips(page)) === 1, "a hover opens a level's tooltip", 3000, 50);
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes a tooltip");
   await page.mouse.move(2, 2);
@@ -782,13 +782,15 @@ try {
   });
   const buy = firstUpgrade(page).getByRole("button");
   await until(() => buy.isEnabled(), "the next-level button, once mutations are to keep", 5000, 100);
-  await nameOf(page).focus();
-  await page.keyboard.press("Tab"); // from the name onto its next-level button: a keyboard focus opens that button's tooltip
-  await until(async () => (await tips(page)) === 1, "Tab onto the next-level button opens its tooltip", 3000, 50);
+  await buy.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab"); // onto the level's button from the keyboard: a keyboard focus opens its tooltip
+  await until(async () => (await tips(page)) === 1, "Tab onto a level's button opens its tooltip", 3000, 50);
   check(
     /^Infectivity: fair for \d+ mutations?/.test(await page.getByRole("tooltip").innerText()),
-    "the next-level tooltip (not the name's) says what it costs",
+    "the level's tooltip says what it gives and costs",
   );
+  check(/next \d+/.test(await page.getByLabel("evolution").innerText()), "the next price is by the mutations in hand, not on the levels");
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes it");
   // Escape closes one thing at a time (review of #182, S1 and S7): with an ant followed and the map focused, the first
