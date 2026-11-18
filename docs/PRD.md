@@ -7379,3 +7379,9 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Checked.** Unit tests for the helpers (`ui/tests/hyphaeLook.test.ts`: same place, same bend, bounded; the spline passes through every point; runs cover every edge once and cut at cord changes; twigs fixed by the key). Before and after screenshots at the same moment of the same game.
 
+
+## 84. Contact actions and directed aggression (ja-g7nz)
+
+[Research and plan](contact-actions.md). Owner approved smaller sensed actions, baseline tests, implementation, and publishing. The first slice preserves behavior; the next makes combat honor explicit attack decisions and allows ignoring a stranger. `fight.intent` defaults off until colony-scale survival and food guards are measured. Tests cover paired seeds 1–20, mutual withdrawal, unilateral and mutual tolerance, matching odours, load protection, reach, layers and deterministic continuation. Inspect and sustained commitment remain later work.
+
+**Built, experimental.** Attack intent is recorded per ant/layer, resolved through reusable odour-band pressure grids, and cleared on the next decision or slot reuse. Ignore continues work without attack or load release. Response cache version 13. The 20-seed 120 s contact sweep reduced median losses from 33.5 to 0 and raised median food from 532.5 to 593.5; worst paired food fell to 0.898 (seed 5). Defaults remain legacy until ja-g7nz.4's full-duration defense/survival/throughput guards. See the [note and paired results](contact-actions.md#implemented-and-measured-2026-11-18).
