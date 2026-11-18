@@ -110,9 +110,9 @@ interface Props {
   onFollow: (f: Followed | null) => void;
   /** with chamber labels on, a click on a chamber (no ant under it): colony k's chamber `id` (the Learn drawer's Nest tab) */
   onChamber?: (k: number, id: number) => void;
-  /** one world: the plane and the curtain, drawn one at a time (`view`); null or absent on a game on one map, drawn as ever */
-  world?: OneWorld | null;
-  /** which of one world's layers to show: PLANE (above) or CURTAIN (below); ignored without `world` */
+  /** one world: the plane and the curtain, drawn one at a time (`view`) */
+  world: OneWorld;
+  /** which of one world's layers to show: PLANE (above) or CURTAIN (below) */
   view?: number;
   /**
    * One world: a click (no ant under it) on the line in the top view, or on the side view's strip or the sky over it,
@@ -147,7 +147,7 @@ export interface FieldBuild {
   tool: BuildTool | "tweezers" | null;
   /** smell vision (owner, PRD §73): every colony's trails and alarm, everywhere, each trail in its colony's tone */
   smell: boolean;
-  /** a piece of a stroke at world points on `layer` (PLANE, CURTAIN, or 0 on one map); `first`: a new drag begins */
+  /** a piece of a stroke at world points on `layer` (PLANE or CURTAIN); `first`: a new drag begins */
   onStroke: (layer: number, points: { x: number; y: number }[], first: boolean) => void;
   /** the tweezers carry colony k's ant i to world (x, y) on the plane; `first`: a new lift begins */
   onTweeze?: (k: number, i: number, x: number, y: number, first: boolean) => void;
@@ -156,7 +156,7 @@ export interface FieldBuild {
 /** What the page may ask of the field's cameras. */
 export interface FieldApi {
   /**
-   * Centre view `view`'s camera (PLANE, CURTAIN, or the one map's) on world (x, y): it is the camera that view opens
+   * Centre view `view`'s camera (PLANE or CURTAIN) on world (x, y): it is the camera that view opens
    * with. At the shown view's zoom; `close`: at least LINK_ZOOM, so the place shows; `span`: zoomed so that many world
    * units fit across the box's shorter side.
    */
@@ -205,9 +205,6 @@ const APHID_SPOTS: readonly (readonly [number, number])[] = [
 
 /** No specimens: one empty list, so the default prop is the same each render. */
 const NO_SPECIMENS: readonly Specimen[] = [];
-
-/** The camera key of a game on one map (one world's are PLANE and CURTAIN). */
-const ONE_MAP = -1;
 
 /** A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. */
 const extentOf = (m: WorldMap): Extent & { x0: number } => ({ x0: m.x0, ...worldExtent(m) });
@@ -331,7 +328,7 @@ export default function ColonyField({
   followed,
   onFollow,
   onChamber,
-  world = null,
+  world,
   view = CURTAIN,
   onLink,
   onCross,
@@ -378,10 +375,10 @@ export default function ColonyField({
     labelsOn.current = labels;
   }, [labels]);
   const layers = useRef({ food: showFoodTrail, home: showHomeTrail });
-  /** each view's camera (ViewCam), by view: one world's PLANE and CURTAIN, or ONE_MAP */
+  /** each view's camera (ViewCam), by view: PLANE and CURTAIN */
   const cams = useRef(new Map<number, ViewCam>());
-  /** the view shown: one world's PLANE or CURTAIN, ONE_MAP on any other game. Read each frame, so switching draws no new field */
-  const shown = useRef(world ? view : ONE_MAP);
+  /** the view shown: PLANE or CURTAIN. Read each frame, so switching draws no new field */
+  const shown = useRef(view);
   const follow = useRef<Followed | null>(followed);
   /** the nest `n` went to last: it cycles through the colonies' nests */
   const nestTurn = useRef(0);
@@ -405,8 +402,8 @@ export default function ColonyField({
     if (!s) cams.current.set(shown.current, (s = NEW_CAM()));
     return s;
   };
-  /** The shown view's map: one world's plane or curtain, or the game's one map (the colony's, between ticks). */
-  const shownMap = (): WorldMap => (world ? (shown.current === PLANE ? world.plane : world.curtain) : anyColony.map);
+  /** The shown view's map: the plane or the curtain. */
+  const shownMap = (): WorldMap => (shown.current === PLANE ? world.plane : world.curtain);
   /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
   const extent = () => extentOf(shownMap());
   // A new game starts zoomed out, in both views.
@@ -414,8 +411,8 @@ export default function ColonyField({
     cams.current.clear();
   }, [colonies]);
   useEffect(() => {
-    shown.current = world ? view : ONE_MAP;
-  }, [world, view]);
+    shown.current = view;
+  }, [view]);
   useEffect(() => {
     layers.current = { food: showFoodTrail, home: showHomeTrail };
   }, [showFoodTrail, showHomeTrail]);
@@ -462,7 +459,7 @@ export default function ColonyField({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
+    // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
     let lv = -1;
     let m: WorldMap = anyColony.map;
@@ -515,17 +512,17 @@ export default function ColonyField({
     };
     /** Read the shown view: its layer, map, scent and spores (each frame). */
     const bind = () => {
-      lv = world ? shown.current : -1;
-      m = world ? (lv === PLANE ? world.plane : world.curtain) : anyColony.map;
+      lv = shown.current;
+      m = lv === PLANE ? world.plane : world.curtain;
       if (m !== geoMap || m.x0 !== gx0 || m.size.w !== gw || m.size.h !== gh) rebuild(m);
-      spores = lv < 0 ? fungus.spores : (fungus.sporesOn(lv)?.spores ?? fungus.spores);
-      strip = world !== null && lv === CURTAIN;
+      spores = fungus.sporesOn(lv)?.spores ?? fungus.spores;
+      strip = lv === CURTAIN;
       trails = [];
       alarms = [];
-      sensedLayer = sensed.layer(lv < 0 ? 0 : lv);
+      sensedLayer = sensed.layer(lv);
       smellAll = !!buildRef.current?.smell;
       for (const col of colonies) {
-        const p = lv < 0 ? col.ph : col.layers[lv]?.ph;
+        const p = col.layers[lv]?.ph;
         if (!p) continue;
         alarms.push(p.fields.alarm);
         trails.push({ food: p.fields.food, home: p.fields.home, odour: col.nestOdour });
@@ -610,7 +607,7 @@ export default function ColonyField({
      * minimap's; paintChunk inlines it.)
      */
     const stripAt = (s: number, y: number): readonly number[] | null => {
-      if (!world || y > STRIP || !cellAt(world.line, s)) return null;
+      if (y > STRIP || !cellAt(world.line, s)) return null;
       const qx = CELL[0];
       const qy = CELL[1];
       const plane = world.plane;
@@ -747,7 +744,7 @@ export default function ColonyField({
       }
       // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
       // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
-      if (strip && world && cy === STRIP >> 6) {
+      if (strip && cy === STRIP >> 6) {
         const line = world.line;
         const plane = world.plane;
         const ly = STRIP - y0;
@@ -833,7 +830,7 @@ export default function ColonyField({
           // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
           const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
           for (let i = 0; i < col.n; i++) {
-            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || col.load[i] >= INFECTED !== sick) continue;
+            if (!col.alive[i] || col.layer[i] !== lv || col.load[i] >= INFECTED !== sick) continue;
             const mx = Math.floor((col.x[i] - gx0) / 2);
             const my = Math.floor(col.y[i] / 2);
             if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
@@ -1307,7 +1304,7 @@ export default function ColonyField({
       // world, an ant on the other layer than the view's holds the camera where it was (carrying it across: U5.2).
       const f = follow.current;
       const fcol = f ? followedColony(colonies, f) : null;
-      const fHere = f !== null && fcol !== null && (lv < 0 || fcol.layer[f.i] === lv);
+      const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
       if (f && !fcol) {
         follow.current = null;
         followCb.current(null);
@@ -1317,7 +1314,7 @@ export default function ColonyField({
       }
       // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
       // told, and carries the camera across (U5.2).
-      if (f && fcol && lv >= 0) {
+      if (f && fcol) {
         const layer = fcol.layer[f.i];
         const was = antLayer.current;
         if (carryTo.current === lv || !was || was.f !== f) carryTo.current = null;
@@ -1368,7 +1365,7 @@ export default function ColonyField({
       if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
       // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
       const hp = colonies[0]?.params;
-      if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
+      if (hp && hp.heatDay > 0 && lv === PLANE) {
         const k = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
         ctx.globalAlpha = 0.28 * k;
         ctx.fillStyle = theme.warn;
@@ -1381,10 +1378,10 @@ export default function ColonyField({
         }
         ctx.globalAlpha = 1;
       }
-      const hy = fungus.hyphaeOn(lv < 0 ? 0 : lv);
-      if (hy) drawHyphae(hy, c, v, d, lv === PLANE || (lv < 0 && !m.sky), rx0, rx1, ry0, ry1);
+      const hy = fungus.hyphaeOn(lv);
+      if (hy) drawHyphae(hy, c, v, d, lv === PLANE, rx0, rx1, ry0, ry1);
       // Stalks (ja-2bw.10): a short upright stroke on each colonised corpse that has grown one.
-      const stalks = fungus.stalksOn(lv < 0 ? 0 : lv);
+      const stalks = fungus.stalksOn(lv);
       if (stalks.length) {
         ctx.save();
         ctx.strokeStyle = theme.ink;
@@ -1414,13 +1411,13 @@ export default function ColonyField({
       const half = len / 2;
       const crumb = Math.max(1.5, len * 0.35);
       const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
-      if (world && lv === PLANE) drawLine(world, c, v, d);
-      if (world && lv === CURTAIN) drawBends(world, c, v, d);
+      if (lv === PLANE) drawLine(world, c, v, d);
+      if (lv === CURTAIN) drawBends(world, c, v, d);
       for (const col of [...colonies].reverse()) {
         // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
-        const nest = lv < 0 ? col.nest : (col.layers[lv] ?? col.layers[0]!).nest;
+        const nest = (col.layers[lv] ?? col.layers[0]!).nest;
         // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
-        const home = lv < 0 || lv === col.home;
+        const home = lv === col.home;
         const [nx, ny] = toScreen(c, v, nest.x, nest.y);
         // The side view's and the open map's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
         if (col.soilOut > 0 && !nest.entrance && !m.spoil) {
@@ -1493,7 +1490,7 @@ export default function ColonyField({
         ctx.beginPath();
         for (const k of col.corpses) {
           // One world: a corpse lies on its layer (carried up to the plane's midden, or dropped there; home when unset).
-          if (k.held >= 0 || (lv >= 0 && (k.layer ?? col.home) !== lv)) continue;
+          if (k.held >= 0 || (k.layer ?? col.home) !== lv) continue;
           const wx = centreX(k.x, k.y);
           const wy = centreY(k.y);
           if (!inView(wx, wy)) continue;
@@ -1568,12 +1565,12 @@ export default function ColonyField({
         ctx.globalAlpha = 0.85;
         // One stroke per odour band (most frames: one band per colony).
         let bands = 0;
-        for (let i = 0; i < col.n; i++) if (col.alive[i] && (lv < 0 || col.layer[i] === lv)) bands |= 1 << binOf(col.odour[i]);
+        for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === lv) bands |= 1 << binOf(col.odour[i]);
         for (let b = 0; b < BINS; b++) {
           if (!(bands & (1 << b))) continue;
           ctx.beginPath();
           for (let i = 0; i < col.n; i++) {
-            if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+            if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
             const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
             const hc = Math.cos(col.heading[i]) * half;
             const hs = Math.sin(col.heading[i]) * half;
@@ -1594,7 +1591,7 @@ export default function ColonyField({
           ctx.globalAlpha = alpha;
           for (let i = 0; i < col.n; i++) {
             const l = col.load[i];
-            if (!col.alive[i] || l < lo || l >= hi || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+            if (!col.alive[i] || l < lo || l >= hi || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
             const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
             ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
           }
@@ -1602,7 +1599,7 @@ export default function ColonyField({
         ctx.globalAlpha = 1;
         ctx.fillStyle = theme.accent;
         for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.carrying[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+          if (!col.alive[i] || !col.carrying[i] || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
           const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
           ctx.fillRect(x + Math.cos(col.heading[i]) * half - crumb / 2, y + Math.sin(col.heading[i]) * half - crumb / 2, crumb, crumb);
         }
@@ -1611,7 +1608,7 @@ export default function ColonyField({
         ctx.lineWidth = Math.max(1, d * 0.8);
         ctx.beginPath();
         for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.pellet[i] || (lv >= 0 && col.layer[i] !== lv) || !inView(col.x[i], col.y[i])) continue;
+          if (!col.alive[i] || !col.pellet[i] || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
           const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
           const px = x + Math.cos(col.heading[i]) * half;
           const py = y + Math.sin(col.heading[i]) * half;
@@ -1626,7 +1623,7 @@ export default function ColonyField({
         }
         ctx.stroke();
       }
-      if (strip && world) drawStripAnts(world, c, v, len, crumb, inView);
+      if (strip) drawStripAnts(world, c, v, len, crumb, inView);
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       if (labelsOn.current && m.chambers) {
@@ -1660,7 +1657,7 @@ export default function ColonyField({
       // The builder's aphids (docs/aphids.md, ja-nzkg.6): one to four green dots a cell, as many as the clump has aphids a
       // cell, fading as it crashes. On the top view (or the one map).
       const clumps = aphidsRef.current?.();
-      if (clumps?.length && (world ? lv === PLANE : true)) {
+      if (clumps?.length && lv === PLANE) {
         ctx.fillStyle = theme.aphid;
         const r = Math.max(1.2 * d, 0.13 * c.zoom);
         for (const cl of clumps) {
@@ -1690,7 +1687,7 @@ export default function ColonyField({
       if (tr) {
         const now = performance.now();
         tr.update(now);
-        if (world && lv === PLANE)
+        if (lv === PLANE)
           for (const t of tr.traces) {
             const n = t.xs.length;
             const a = traceAlpha(t, now);
@@ -1733,7 +1730,7 @@ export default function ColonyField({
       // after these so its tag stays on top (review of #218).
       for (const s of pinnedRef.current) {
         const sc = followedColony(colonies, s);
-        if (!sc || (lv >= 0 && sc.layer[s.i] !== lv) || (f && sameAnt(f, s))) continue;
+        if (!sc || sc.layer[s.i] !== lv || (f && sameAnt(f, s))) continue;
         const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
         const r = Math.max(7 * d, c.zoom * 1.3);
         ctx.beginPath();
@@ -1761,9 +1758,9 @@ export default function ColonyField({
         pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-      if (world && lv === PLANE) drawHoleNames(world, c, v, d, inView);
+      if (lv === PLANE) drawHoleNames(world, c, v, d, inView);
       const pn = penRef.current;
-      if (world && lv === PLANE && pn) drawPen(world, pn, c, v, d);
+      if (lv === PLANE && pn) drawPen(world, pn, c, v, d);
 
       // Zoomed in: the minimap, with the view's rectangle.
       if (c.zoom > fitZoom(ext, v) * 1.05) {
@@ -1838,8 +1835,8 @@ export default function ColonyField({
     s.zoomedIn = cam.zoom > fz * 1.05;
     s.fitted = cam.zoom <= fz * 1.0001;
   };
-  /** View `v`'s map: one world's plane or curtain, or the game's one map. */
-  const mapOf = (v: number): WorldMap => (world ? (v === PLANE ? world.plane : world.curtain) : anyColony.map);
+  /** View `v`'s map: the plane or the curtain. */
+  const mapOf = (v: number): WorldMap => (v === PLANE ? world.plane : world.curtain);
   // The page's handle on the cameras: a view opens where it is asked (a linked click, an ant carried across).
   useEffect(() => {
     if (!api) return;
@@ -1872,7 +1869,7 @@ export default function ColonyField({
   });
   /** A click on nothing in one world: on the line above, the side view at its column; on the strip below (or the sky over it), the top view at P(s). */
   const link = (x: number, y: number) => {
-    if (!world || !onLink) return;
+    if (!onLink) return;
     const [wx, wy] = toWorld(camera(), viewport(), x, y);
     if (shown.current === PLANE) {
       const s = columnNear(world.line, wx, wy);
@@ -1905,17 +1902,17 @@ export default function ColonyField({
     const [wx, wy] = fromMinimap(extent(), viewport(), dpr(), x, y);
     setCamera({ ...camera(), x: wx, y: wy });
   };
-  /** The nearest ant (any colony, on the view's layer in one world) within PICK_PX of the point, or null. */
+  /** The nearest ant (any colony, on the view's layer) within PICK_PX of the point, or null. */
   const pick = (x: number, y: number): Followed | null => {
     const c = camera();
     const [wx, wy] = toWorld(c, viewport(), x, y);
     const reach = (PICK_PX * dpr()) / c.zoom;
-    const lv = world ? shown.current : -1;
+    const lv = shown.current;
     let best: Followed | null = null;
     let bestD = reach * reach;
     for (const [k, col] of colonies.entries()) {
       for (let i = 0; i < col.n; i++) {
-        if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv)) continue;
+        if (!col.alive[i] || col.layer[i] !== lv) continue;
         const dx = col.x[i] - wx;
         const dy = col.y[i] - wy;
         const dd = dx * dx + dy * dy;
@@ -1942,8 +1939,8 @@ export default function ColonyField({
     return k < 0 ? null : { k, id };
   };
 
-  /** The builder's layer for the shown view: PLANE or CURTAIN in one world, 0 on one map. */
-  const buildLayer = () => (world ? shown.current : 0);
+  /** The builder's layer for the shown view: PLANE or CURTAIN. */
+  const buildLayer = () => shown.current;
   /** Send a piece of stroke, device points to world, to the builder. */
   const paint = (pts: [number, number][], first: boolean) => {
     const b = buildRef.current;
@@ -1982,7 +1979,7 @@ export default function ColonyField({
       jumpMini(x, y);
     } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
       // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
-      const ant = world && shown.current === PLANE ? pick(x, y) : null;
+      const ant = shown.current === PLANE ? pick(x, y) : null;
       if (ant) {
         // A finger waits to see whether a second joins it (a pinch); a mouse lifts at once.
         const held = e.pointerType !== "mouse";
@@ -2008,7 +2005,7 @@ export default function ColonyField({
     const r = cv.getBoundingClientRect();
     const k = cv.width / r.width;
     const [wx, wy] = toWorld(camera(), viewport(), x, y);
-    probeCb.current({ sx: r.left + x / k, sy: r.top + y / k, lv: world ? shown.current : -1, x: wx, y: wy, ant: pick(x, y), pinned });
+    probeCb.current({ sx: r.left + x / k, sy: r.top + y / k, lv: shown.current, x: wx, y: wy, ant: pick(x, y), pinned });
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
@@ -2083,10 +2080,10 @@ export default function ColonyField({
     if (e.type === "pointerup" && g.kind === "paint" && g.pending) paint([[g.sx, g.sy]], true);
     if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
-      if (lensRef.current && !(world && pn && shown.current === PLANE)) {
+      if (lensRef.current && !(pn && shown.current === PLANE)) {
         // The lens on: a click (a tap) says what is there, and keeps the card up; it follows nothing. The queen's pen keeps its click.
         probeAt(p.x, p.y, true);
-      } else if (world && pn && shown.current === PLANE) {
+      } else if (pn && shown.current === PLANE) {
         // The queen's pen: a click on the top view is where she flies (the page founds there, or says why not).
         const [wx, wy] = toWorld(camera(), viewport(), p.x, p.y);
         pn.onPick({ x: wx, y: wy });
@@ -2149,7 +2146,7 @@ export default function ColonyField({
     unfollow();
     // The side view: between the entrance and the chamber, so both the ground line and the nest are in view. One world:
     // the nest on the shown layer (its hole on the plane above, its shaft and chamber below).
-    const nest = world ? (col.layers[shown.current] ?? col.layers[0]!).nest : col.nest;
+    const nest = (col.layers[shown.current] ?? col.layers[0]!).nest;
     const e = nest.entrance;
     const hx = e ? (e.x + nest.x) / 2 : nest.x;
     const hy = e ? (e.y + nest.y) / 2 : nest.y;
@@ -2166,7 +2163,7 @@ export default function ColonyField({
         tabIndex={0}
         className={`absolute inset-0 block h-full w-full touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${build?.tool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
         role="application"
-        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${world ? (pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there") : ""}`}
+        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there"}`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
@@ -2209,7 +2206,7 @@ export default function ColonyField({
                 {colonyName(k)} nest
               </button>
             ))}
-            {(world ? (view === PLANE ? world.plane : world.curtain) : anyColony.map).chambers && (
+            {(view === PLANE ? world.plane : world.curtain).chambers && (
               <button
                 type="button"
                 className={labels ? `${item} text-accent` : item}

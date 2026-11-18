@@ -9,7 +9,7 @@ export interface FieldProbe {
   /** the pointer, in the page's (client) pixels */
   sx: number;
   sy: number;
-  /** the layer shown (PLANE or CURTAIN; −1 on a game of one map) and the world point */
+  /** the layer shown (PLANE or CURTAIN) and the world point */
   lv: number;
   x: number;
   y: number;
