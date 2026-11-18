@@ -1,5 +1,6 @@
 // Sensing (docs/refactor.md S3.3): what an ant feels around it (nestmates, returning foragers, enemies and their heading), the situation it touches, the raid smell, and the floor marks it reads and lays. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` (and `around`, which never read the colony, losing that parameter).
 
+import { deliveryAttempt } from "./deliveryAction.ts";
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
 import { inReachShared } from "./grid.ts";
@@ -37,6 +38,7 @@ export function touch(
 /** touch, with ant i's layer bound. */
 export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item: Item, offered: Item): Touch {
   const t = c.t;
+  t.deliveryAttempt = deliveryAttempt(c, i);
   t.mode = MODES[mode] as Mode;
   t.carrying = item;
   t.porter = c.porter[i] === 1;

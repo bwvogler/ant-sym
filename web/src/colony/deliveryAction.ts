@@ -22,10 +22,26 @@ export function localDelivery(c: Colony, i: number): boolean {
   return requestedDelivery(c, i) !== null && !c.onPlane && c.goalKind[i] === 0;
 }
 
+/** Effort only, not a destination decision. Outside travel pauses the attempt. */
+export function ageDelivery(c: Colony, i: number, dt: number): void {
+  const limit = c.params.deliveryReconsider;
+  if (!(limit > 0) || !requestedDelivery(c, i)) {
+    c.deliveryTime[i] = 0;
+    return;
+  }
+  if (localDelivery(c, i)) c.deliveryTime[i] = Math.min(limit, c.deliveryTime[i] + dt);
+}
+
+export function deliveryAttempt(c: Colony, i: number): "none" | "brief" | "long" {
+  const limit = c.params.deliveryReconsider;
+  return !(limit > 0) || !requestedDelivery(c, i) ? "none" : c.deliveryTime[i] >= Math.fround(limit) ? "long" : "brief";
+}
+
 /** Apply an answer, not a new policy call. `take` keeps a chosen goal until release. */
 export function chooseDelivery(c: Colony, i: number, answer: Carry): void {
   if (c.params.deliveryLane <= 0 || !c.carrying[i]) {
     c.deliveryRole[i] = 0;
+    c.deliveryTime[i] = 0;
     return;
   }
   const role = DELIVERY_ROLES.findIndex((r) => answer === `to ${r}`);
@@ -36,6 +52,7 @@ export function chooseDelivery(c: Colony, i: number, answer: Carry): void {
   }
   if (c.deliveryRole[i] === role + 1) return;
   c.deliveryRole[i] = role + 1;
+  c.deliveryTime[i] = 0;
   c.deliveryState[i] = DELIVERY_TRAVEL;
   if (c.porter[i] && c.portTo[i] >= 0) {
     const old = c.portTo[i];
@@ -49,6 +66,7 @@ export function chooseDelivery(c: Colony, i: number, answer: Carry): void {
 }
 
 export function endDelivery(c: Colony, i: number, state: number): void {
+  c.deliveryTime[i] = 0;
   if (c.deliveryRole[i]) {
     c.deliveryRole[i] = 0;
     c.deliveryState[i] = state;
@@ -65,7 +83,7 @@ export function deliveryExplanation(c: Colony, i: number): string {
         : c.deliveryState[i] === DELIVERY_SEARCH
           ? "no destination cue; searching with food"
           : "following local floor cues after returning to its entrance";
-    return `Food to ${role}: ${reason}.`;
+    return `Food to ${role}: ${reason}${deliveryAttempt(c, i) === "long" ? "; long attempt, carry policy may reconsider" : ""}.`;
   }
   if (!c.carrying[i] && c.deliveryState[i] === DELIVERY_DONE) return "Last delivery: food deposited at a recognised destination.";
   if (!c.carrying[i] && c.deliveryState[i] === DELIVERY_RELEASED)

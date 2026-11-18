@@ -27,6 +27,7 @@ const near: Touch = {
   returns: "none",
   raid: "none",
   crowd: "few",
+  deliveryAttempt: "none",
 };
 
 test("pickFor draws once with the ant's draw for its salt; with no draw, or a certain or bare answer, Jev's own", () => {

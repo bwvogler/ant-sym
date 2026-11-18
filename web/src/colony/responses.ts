@@ -48,6 +48,8 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
  * colony fills one shared object per call, so a response must read it and not keep it.
  */
 export interface Touch {
+  /** Coarse effort on an explicit local delivery, enabled only by deliveryReconsider. Carry alone receives it. */
+  deliveryAttempt: "none" | "brief" | "long";
   mode: Mode;
   carrying: Item;
   /** carrying food between chambers (side view, nest slice 5), not home from outside */
@@ -222,6 +224,7 @@ export const CROWD = ["few", "many"] as const;
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
 const TOUCH_FIELDS: readonly FieldOf<Touch>[] = [
+  { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },
   { name: "mode", values: MODES },
   { name: "carrying", values: ITEMS },
   { name: "porter", values: [false, true], key: (v) => (v ? "porter" : "-") },

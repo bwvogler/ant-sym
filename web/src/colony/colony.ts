@@ -313,6 +313,7 @@ export class Colony {
       odds: "none",
       returns: "none",
       crowd: "few",
+      deliveryAttempt: "none",
     } as Touch,
     "place",
     { get: () => this.place(this.ti), enumerable: true },

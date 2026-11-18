@@ -546,6 +546,9 @@
   ],
   "deliveryState": [
    0
+  ],
+  "deliveryTime": [
+   0
   ]
  },
  "asIs": {
@@ -1095,6 +1098,9 @@
   ],
   "deliveryState": [
    41
+  ],
+  "deliveryTime": [
+   42
   ]
  }
 }

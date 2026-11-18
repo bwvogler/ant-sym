@@ -45,6 +45,7 @@ const touch = (t: Partial<Touch>): Touch =>
     returns: "none",
     raid: "strong",
     crowd: "few",
+    deliveryAttempt: "none",
     ...t,
   }) as Touch;
 
@@ -586,8 +587,8 @@ test("contact (behaviour MR 4): raiders and defenders fight; foraging, every ant
   );
   assert.equal(
     responseKey("carry", touch({ odds: "even", alarm: "strong" })),
-    "explore|none|-|-|out|none|clear|forage",
-    "the other lanes, never sent them, don't",
+    "deliveryAttempt:none|explore|none|-|-|out|none|clear|forage",
+    "carry keys on effort, not the contact-only alarm and odds",
   );
 });
 

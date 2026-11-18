@@ -130,3 +130,5 @@ One scripted behaviour per change:
 [Contact actions](contact-actions.md): proximity currently causes damage even when both ants withdraw. The opt-in directed combat experiment closes this gap using the existing stranger cue and contact response; no new sense. Default promotion awaits colony-scale measurements.
 
 [Delivery actions](delivery-actions.md), ja-g7nz.3: explicit food destinations use role cues and physical arrival, bypassing the chamber-table target while active. Legacy recruitment and default porter routing remain in ja-k4k.4; this does not close that broader gap.
+
+**Delivery effort (experimental, ja-g7nz.3.2.2).** Extend the own-body sense with coarse time spent on the current local delivery attempt (`deliveryAttempt`: none/brief/long). This is a design approximation, not knowledge of an unreachable chamber; see [delivery reconsideration](delivery-actions.md#bounded-reconsideration-design-ja-g7nz322) for primary evidence and limitations. Only carry receives it. No chamber-table gap is closed by this signal.

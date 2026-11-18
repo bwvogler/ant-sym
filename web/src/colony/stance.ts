@@ -1,6 +1,6 @@
 // Stance and raid bookkeeping (docs/refactor.md S3.4): the second stage of an ant's step in tick. Whether it is held at the gate, what it has felt of strangers (foes, threat, defending), its place in a raid (recruited, gone, past the end, a finder home to tell), a load the carry response puts down, and what it carries now. Moved out of Colony.tick verbatim but for `this` becoming `col`; what it decided goes to the next stages through the step record.
 
-import { chooseDelivery } from "./deliveryAction.ts";
+import { chooseDelivery, ageDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { carryOut, holdsAt } from "./crossing.ts";
 import { putDown } from "./dig.ts";
@@ -112,6 +112,7 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
   // this step (its trip is over: see `arrive`).
   // (The local carry response always takes, so it isn't asked: building a Touch for every carrier every step cost
   // the side view ~11 % a tick for nothing, review of #35.)
+  ageDelivery(col, i, s.dt);
   if (col.responses.carry !== localResponses.carry && (col.carrying[i] || col.pellet[i] || col.broodHeld[i])) {
     const answer = col.responses.carry(touch(col, i, toEnemy !== null), col.antDraw(i));
     chooseDelivery(col, i, answer);

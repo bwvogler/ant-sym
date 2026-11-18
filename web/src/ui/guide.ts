@@ -544,7 +544,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   {
     note: "delivery-actions",
     title: "Delivery actions",
-    covers: "Experimental food destinations, local floor cues and separate drop consent.",
+    covers: "Experimental food destinations, local floor cues, effort-based reconsideration and separate drop consent.",
   },
   {
     note: "contact-actions",

@@ -84,3 +84,53 @@ Typecheck, lint (existing warnings only), formatting and production build passed
 These are synthetic contract assays, not biological timing calibration or colony-scale survival evidence. No production behavior, question wording, cache key, or default setting changes in this slice; incremental Jev cost is zero. The same-seed trace comparison holds random draws equal only while inspection is the sole intervention; diverging trajectories must not be described as having identical subsequent draws merely because their seeds match.
 
 The broader ja-g7nz.3.2 remains open. Its children separate the remaining decisions: ja-g7nz.3.2.2 researches locally sensed failed-search evidence and bounded policy commitment; ja-g7nz.3.2.3 researches timed feeding and passage congestion. A hidden timer that chooses another chamber would bypass the policy, so it is not added as an unmeasured fallback. The player still gets the existing delivery explanation; there is no new control or implied colony-scale readiness.
+
+## Bounded reconsideration design (ja-g7nz.3.2.2)
+
+Bolek, Wittlinger and Wolf (2012), *Cataglyphis fortis*, found that food quantity and successful experience alter the focus of later searches. Their abstract reports that repeated success can maintain thorough searching even when food quantity is low. Joshi and Dornhaus (2026, accepted/in press), *Solenopsis xyloni*, report that removing a trail segment prompted abandonment in many workers, but a richer resource increased persistence. These are primary-study abstracts; full-text quantitative timing is **unverified**. Neither establishes a give-up deadline for food delivery inside a nest. This is evidence against a compulsory fixed-time destination switch.
+
+**In the game:** an opt-in `deliveryReconsider` setting supplies the number of seconds at which the current delivery attempt is described to carry as `long`, versus `brief`; `none` means no enabled active attempt. This is a **design** approximation to internal effort/experience, extending the own-body sense row. It measures time spent with a chosen role in the ant's own underground nest, including retaining food at a destination. It does not measure true distance, hunger elsewhere, or whether an unseen chamber exists. Outside/foreign travel pauses the clock. The timer saturates at the threshold; repeated `take` or the same role cannot reset it. A genuinely different role starts another attempt, and actual release/completion/disabled tracking clears it. A policy may still persist indefinitely; the bound is when it receives evidence, not a guarantee of delivery or compulsory abandonment.
+
+The three-valued field `deliveryAttempt` belongs only to carry's cache key and payload. Other response payloads omit it. No extra policy call or RNG draw is added; one Float32 field costs four bytes per ant. The setting defaults to zero, so ordinary execution and simulation goldens must remain unchanged. The carry state space grows by at most threefold; token-size estimates will be recorded after implementation, and cached execution remains free. Existing local carry remains `take`; an offline experimental doctrine can redirect `long` attempts to store or choose release.
+
+Assays first: threshold crossing; same-answer retention without resetting; changed-role reset; release and slot reuse; surface pause; disabled tracking; full-game lost-role recovery across seeds 1–20 driven only by the new Touch field; a persistent policy retaining food after the threshold; deterministic saves and readonly inspection. The timer also covers successful cue following without arrival, preventing positive but misleading marks from indefinitely postponing the signal. It does not add meal durations or doorway exclusion.
+
+For play, the ant card reports a long unresolved attempt and the current goal. Existing fungal cue distortion can make that state occur, but the fungus receives no direct target command. No default promotion is planned until colony-scale survival and throughput tests exist.
+
+Additional primary sources (abstracts retrieved 2026-11-18):
+- Bolek, Wittlinger and Wolf 2012, *What counts for ants?* https://doi.org/10.1242/jeb.071761 (https://pubmed.ncbi.nlm.nih.gov/22915712/)
+- Joshi and Dornhaus 2026, *Persist or give up?* https://doi.org/10.1007/s00040-026-01089-7 (https://experts.arizona.edu/en/publications/persist-or-give-up-fire-ants-motivated-to-search-for-a-high-quali/)
+
+### Implemented reconsideration and checks
+
+`deliveryReconsider` defaults to 0; a positive value is the effort threshold in seconds. `Touch.deliveryAttempt` is none/brief/long and is transmitted/keyed only for carry. One Float32 per ant stores the saturated duration. Response brain version 15 invalidates old response contexts; shipped page bundles are unaffected because response lanes are not shipped by the page (the precache checks pass). No extra call or draw is made. The shared response legend does describe the field to every response lane, even though only carry receives its value.
+
+Seven new effort tests passed. In 20/20 fixed-fixture RNG seeds, a policy conditioned solely on `deliveryAttempt` redirected a load from a removed brood role to a store within six seconds, without changing doctrine during the run. A persistent policy instead kept its food after the threshold. Surface/foreign travel pauses, repeated-answer retention, changed-role reset, release/completion, slot reuse, carry-only keys/payloads and mid-attempt save continuation are covered. These are controlled recovery results, not whole-colony survival measurements.
+
+The 54-test focused run passed; all four simulation goldens stayed unchanged. Typecheck, lint (existing warnings) and production build passed.
+
+Offline single-situation request estimates (`estimateTokens`, doctrine `forage`, the same empty worker/chamber fixture before and after):
+
+| Lane | Before | After |
+|---|---:|---:|
+| get | 1,976 | 2,100 |
+| carry | 2,303 | 2,439 |
+| drop | 1,976 | 2,100 |
+| trail | 2,090 | 2,215 |
+| contact | 2,130 | 2,255 |
+| leave | 2,247 | 2,372 |
+
+Carry adds 136 estimated input tokens per single-item request (~5.9%), or $0.000005712 at the repository's $0.042/M estimate. This is not a measured hourly bill: batching and encountered situations matter. Other lanes incur shared-legend overhead, but no extra state dimension. Carry has at most three states for a prior situation. No live Jev call was made; cached execution remains free.
+
+Example offline doctrine, with `deliveryLane = 1` and `deliveryReconsider = 1` (one second is an assay choice, not a recommended biological threshold):
+
+```ts
+game.player.responses = responses({
+  carry: t => t.deliveryAttempt === "long" ? "to store"
+    : t.deliveryAttempt === "none" ? "to brood" : "take",
+});
+```
+
+This deliberately uses one fallback role. Choosing the same fallback again does not reset effort. A policy that alternates different roles can still thrash, and a persistent policy can still strand a load; neither is repaired by an omniscient default. Threshold calibration, colony-scale survival/throughput and timed meals/traffic remain open.
+
+The complete unit tier passed 575/575. The response regression file passed 29 tests and found one old carry-key assertion; the assertion was updated to include effort while still excluding contact-only alarm/odds, and the two targeted contact tests then passed. Formatting passed. The full all-tier suite was not repeated for this slice; its known Node 24 CI-report fixture issue remains tracked separately as ja-dkgo.

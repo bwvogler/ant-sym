@@ -236,15 +236,19 @@ export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANC
 
 /**
  * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
- * responses no longer apply. 14: carry can choose food destination roles; 13 added peaceful contact.
+ * responses no longer apply. 15: carry senses delivery effort. 14: carry can choose food destination roles; 13 added peaceful contact.
  */
-export const RESPONSE_BRAIN_VERSION = 14;
+export const RESPONSE_BRAIN_VERSION = 15;
 
 // Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
 // before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
 export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. ",
   fields: [
+    [
+      "deliveryAttempt",
+      "deliveryAttempt, sent only to carry, is effort on a chosen delivery: none (not tracked), brief, or long (the local attempt has lasted a while). Long is not proof that a destination is unreachable. The policy may persist, choose another role, or release the load. ",
+    ],
     ["mode", "mode is what it is doing: explore, follow (a food scent), return (home) or fight. "],
     [
       "carrying",
@@ -377,19 +381,21 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
     // alarm and odds only to `contact`; returns only to `leave`.
-    const { offered, quality, alarm, odds, returns, raid, crowd, ...rest } = t;
+    const { offered, quality, alarm, odds, returns, raid, crowd, deliveryAttempt, ...rest } = t;
     ants[it.id] =
-      hook === "get"
-        ? { ...rest, offered, quality }
-        : hook === "trail"
-          ? { ...rest, quality }
-          : hook === "contact"
-            ? { ...rest, alarm, odds }
-            : hook === "leave"
-              ? t.mode === "fight"
-                ? { ...rest, raid }
-                : { ...rest, returns, crowd }
-              : { ...rest };
+      hook === "carry"
+        ? { ...rest, deliveryAttempt }
+        : hook === "get"
+          ? { ...rest, offered, quality }
+          : hook === "trail"
+            ? { ...rest, quality }
+            : hook === "contact"
+              ? { ...rest, alarm, odds }
+              : hook === "leave"
+                ? t.mode === "fight"
+                  ? { ...rest, raid }
+                  : { ...rest, returns, crowd }
+                : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -461,8 +467,15 @@ export function responseOf(hook: ResponseHook, key: string, answer: string, draw
  * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
  */
 export function responseKey(hook: ResponseHook, t: Touch): string {
-  return hook === "contact" ? CONTACT_KEY.key(t) : hook === "leave" ? (t.mode === "fight" ? RAIDER_KEY : FORAGER_KEY).key(t) : touchKey(t);
+  return hook === "carry"
+    ? CARRY_KEY.key(t)
+    : hook === "contact"
+      ? CONTACT_KEY.key(t)
+      : hook === "leave"
+        ? (t.mode === "fight" ? RAIDER_KEY : FORAGER_KEY).key(t)
+        : touchKey(t);
 }
+const CARRY_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "deliveryAttempt"]);
 const CONTACT_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "alarm", "odds"]);
 const RAIDER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "raid"]);
 const FORAGER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "returns", "crowd"]);

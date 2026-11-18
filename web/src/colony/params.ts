@@ -99,6 +99,8 @@ export interface ColonyParams {
   steerLane: number;
   /** Permit explicit food destination roles from carry responses; 0 preserves legacy routing. */
   deliveryLane: number;
+  /** Seconds before carry senses a long local delivery attempt; 0 disables tracking (design). */
+  deliveryReconsider: number;
   /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
   findNear: number;
   /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
@@ -474,6 +476,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   rerollLaw: 0,
   steerLane: 0,
   deliveryLane: 0,
+  deliveryReconsider: 0,
   findNear: 8,
   searchSpan: 1.33,
   foodTrailPlane: 1,
