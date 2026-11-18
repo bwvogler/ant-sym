@@ -96,9 +96,8 @@ export interface WorldMap {
   /** the side view: 1 for loose soil heaped on the mound (dug soil brought up and out); ants walk on it and never dig it again */
   loose?: ChunkLayer<Uint8Array>;
   /**
-   * The side view: cells of loose soil on the map (heapMound adds one, takeLoose takes one). The mound is every colony's:
-   * ants pick up whichever spoil they meet, so only this total is a count of cells (a colony's own count went negative
-   * when it took more of a rival's spoil than of its own: review of MR 15). One world's plane: pellets in `spoil`.
+   * Cells of spoil on the map: on one world's plane heapPlane adds one and takePlane takes one. The curtain's stays 0: S2.3f deleted
+   * the side view's heapMound and takeLoose, so `loose` is never set now and stays only for the readers that still test it.
    */
   moundCells?: number;
   /**
@@ -938,78 +937,16 @@ export function groundTop(map: WorldMap, x: number): number {
   return map.size.h;
 }
 
-/**
- * Heap one cell of loose soil on the mound by the entrance in column `ex` (side view), as a sandpile: it lands
- * two to four columns off the hole on `side` (−1 west, +1 east) and slides downhill (to the lower neighbouring
- * column, outward on a tie) while one is a row or more lower. At most one row per column is about 41°, the
- * angle of repose of damp soil (dry sand ≈ 34°). Near the hole a column holds no more than a row per column of
- * distance from it, so the inner side slopes down into the hole at the same angle: a ring with a funnel-shaped
- * crater, the hole open at its bottom. Every hole in `holes` (all nests' entrance columns; its own by default)
- * keeps its funnel, so one colony's mound never buries another's way in. Food on the cell it buries is lifted on top.
- * Returns the cell heaped, or null if there is no room on that side (the sky's top, the map's edge).
- */
-export function heapMound(
-  map: WorldMap,
-  ex: number,
-  side: -1 | 1,
-  land: number,
-  holes: readonly number[] = [ex],
-  from?: number,
-): [number, number] | null {
-  if (!map.sky || !map.loose || map.surfaceRows) return null; // the curtain: the mound is the plane's (one-world §4)
-  const tops = holes.map((h) => groundTop(map, h));
-  // Room in column c: on the map, no hole's column, and below every funnel's slope up from its hole.
-  const lo = map.x0;
-  const hi = map.x0 + map.size.w - 1;
-  const ok = (c: number) => {
-    if (c < lo || c > hi) return false;
-    const top = groundTop(map, c);
-    for (let k = 0; k < holes.length; k++) {
-      const h = holes[k];
-      if (c === h || tops[k] - top >= Math.abs(c - h) - 1) return false;
-    }
-    return true;
-  };
-  // Landing beyond the map's edge lands at the edge; then out from the funnel if it is inside it, else back in.
-  // `from`: the column it is dropped in (by an ant standing there); else `land` columns past the crater's rim.
-  let x = Math.max(lo, Math.min(hi, from ?? ex + side * (2 + land)));
-  while (x >= lo && x <= hi && !ok(x)) x += side;
-  if (x < lo || x > hi) {
-    x = Math.max(lo, Math.min(hi, x));
-    while (x !== ex && !ok(x)) x -= side;
-    if (x === ex) return null;
-  }
-  for (let guard = 0; guard < map.size.w; guard++) {
-    const here = groundTop(map, x);
-    const out = x + side;
-    const back = x - side;
-    const dOut = ok(out) ? groundTop(map, out) - here : -Infinity;
-    const dBack = ok(back) ? groundTop(map, back) - here : -Infinity;
-    if (dOut >= 1 && dOut >= dBack) x = out;
-    else if (dBack >= 1) x = back;
-    else break;
-  }
-  const y = groundTop(map, x) - 1;
-  if (y < 1) return null;
-  moveFoodCell(map, x, y, x, y - 1);
-  map.rock.set(x, y, SOIL);
-  map.sky.set(x, y, 0);
-  map.loose.set(x, y, 1);
-  map.moundCells = (map.moundCells ?? 0) + 1;
-  updateSurface(map, x, y);
-  return [x, y];
-}
-
 /** One world's plane: how far (cells) heapPlane looks round where a pellet is dropped for a cell with room, when that one has none. */
 export const SPOIL_SEARCH = 16;
 
 /**
- * One world's plane (U3c, docs/one-world.md §4): heap a pellet of spoil dropped at cell (x, y), as a 2D sandpile (the side
- * view's heapMound on the plane). It slides to its lowest neighbour (outward from the nearest hole on a tie, then the first
+ * One world's plane (U3c, docs/one-world.md §4): heap a pellet of spoil dropped at cell (x, y), as a 2D sandpile.
+ * It slides to its lowest neighbour (outward from the nearest hole on a tie, then the first
  * way round) while that one is a level or more lower: at most a level a cell, ≈41°, the angle of repose of damp soil. Round
  * every hole in `holes` (plane cells, every nest's), a cell holds at most (hex distance to the hole − 1) levels: a ring whose
  * inner side slopes down into the hole at that same angle, a crater with the hole open at its bottom, so no mound ever
- * buries a way in, a rival's included. It is the sandpile's physics, as the side view's funnel is, not an ant's choice.
+ * buries a way in, a rival's included. It is the sandpile's physics, not an ant's choice.
  * Only open ground takes spoil, and food on a heaped cell stays on top. Where (x, y) has no room (rock, the crater, off
  * the plane) it lands on the nearest cell that has, within SPOIL_SEARCH. Returns the cell heaped, or null if none had room.
  */
@@ -1084,25 +1021,5 @@ export function takePlane(map: WorldMap, x: number, y: number): boolean {
   if (h <= 0) return false;
   spoil.set(x, y, h - 1);
   map.moundCells = (map.moundCells ?? 0) - 1;
-  return true;
-}
-
-/**
- * The side view: take a pellet of loose soil at cell (x, y) off the mound's top (an ant picks one up), so it is the
- * column's top that goes (above ground again, walkway or sky), never a hole under hanging spoil. False if (x, y) isn't
- * loose soil at its column's top. (Taking from inside the heap, the column settled a cell; nothing ever did: review of MR 15.)
- */
-export function takeLoose(map: WorldMap, x: number, y: number): boolean {
-  if (!map.sky || !map.loose || map.loose.get(x, y) !== 1 || rockAt(map, x, y) !== SOIL || groundTop(map, x) !== y) return false;
-  map.loose.set(x, y, 0);
-  map.moundCells = (map.moundCells ?? 0) - 1;
-  map.rock.set(x, y, OPEN);
-  map.sky.set(x, y, 1);
-  updateSurface(map, x, y);
-  // Food on top of the cell taken, left in the sky, comes down with it.
-  const above = ny(y, 4);
-  for (const ax of [nx(x, y, 4), nx(x, y, 5)]) {
-    if (map.food.get(ax, above) > 0 && rockAt(map, ax, above) !== OPEN && rockAt(map, x, y) === OPEN) moveFoodCell(map, ax, above, x, y);
-  }
   return true;
 }
