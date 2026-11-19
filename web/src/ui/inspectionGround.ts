@@ -33,7 +33,7 @@ export const CLOSE_SPRITE_GROUND = {
   back: average([INSPECTION_GROUND.back]),
 };
 
-/** Bring in the close material palette ahead of the first voxel blend, at 48 CSS px per hex. */
+/** Bring in the close material palette before the voxel blend. */
 export function inspectionGroundMix(cssZoom: number): number {
   const t = Math.max(0, Math.min(1, (cssZoom - 18) / (48 - 18)));
   return t * t * (3 - 2 * t);

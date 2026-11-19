@@ -12,8 +12,11 @@ const smooth = (x: number) => {
   x = Math.max(0, Math.min(1, x));
   return x * x * (3 - 2 * x);
 };
+const WEBGL_START = 120;
+const SOFTWARE_START = 160;
+
 export function mapVoxelAlpha(cssZoom: number, accelerated = true): number {
-  return accelerated ? smooth((cssZoom - 48) / 24) : smooth((cssZoom - 120) / 24);
+  return accelerated ? smooth((cssZoom - WEBGL_START) / 30) : smooth((cssZoom - SOFTWARE_START) / 20);
 }
 
 /** Lazy close-map pass. Distant views never load models or sample voxel cells; map input and HUD stay on the existing canvas. */
@@ -47,7 +50,7 @@ export class MapVoxelPass {
     const cssZoom = camera.zoom / dpr;
     // The projected ground strip still owns its aerial ants and linking affordances in the 2D renderer.
     const strip = !!g.world && layer === CURTAIN && camera.y - view.h / camera.zoom / 2 <= centreY(STRIP) + SIDE;
-    if (this.disposed || this.failed || !allow || strip || cssZoom < 48) return { alpha: 0, renderer: "sprites" };
+    if (this.disposed || this.failed || !allow || strip || cssZoom <= WEBGL_START) return { alpha: 0, renderer: "sprites" };
     if (!this.scene && !this.loading) {
       this.loading = true;
       this.surface = this.canvas();

@@ -42,12 +42,12 @@ test("zoom reaches the same inspection-scale CSS size at DPR 1 and 2 and keeps t
     assert.deepEqual(toWorld(next, view, 600 * dpr, 200 * dpr), point);
     assert.equal(clamp({ ...camera, zoom: 9999 }, world, view).zoom / dpr, MAX_ZOOM);
   }
-  assert.equal(mapVoxelAlpha(48), 0);
-  assert.equal(mapVoxelAlpha(60), 0.5);
-  assert.equal(mapVoxelAlpha(72), 1);
-  assert.equal(mapVoxelAlpha(120, false), 0);
-  assert.equal(mapVoxelAlpha(132, false), 0.5);
-  assert.equal(mapVoxelAlpha(144, false), 1);
+  assert.equal(mapVoxelAlpha(120), 0);
+  assert.equal(mapVoxelAlpha(135), 0.5);
+  assert.equal(mapVoxelAlpha(150), 1);
+  assert.equal(mapVoxelAlpha(160, false), 0);
+  assert.equal(mapVoxelAlpha(170, false), 0.5);
+  assert.equal(mapVoxelAlpha(180, false), 1);
 });
 
 const game = buildGame({ species: "generic", seed: 3, antCount: 50, rival: false, generation: 0 }),
@@ -92,7 +92,7 @@ function harness(accelerated = true) {
         return { width: 0, height: 0 } as HTMLCanvasElement;
       },
     ),
-    draw = (zoom = 60, layer = PLANE, y = camera.y, allow = true) =>
+    draw = (zoom = 135, layer = PLANE, y = camera.y, allow = true) =>
       pass.draw(ctx, game, sensed, layer, { ...camera, zoom, y }, view, 1, { food: false, home: false }, [], palette, allow);
   return { pass, draw, calls, sizes, scene, stats: () => ({ creates, canvases, ready, disposed, images }) };
 }
@@ -101,20 +101,21 @@ const loaded = () => new Promise<void>((resolve) => setImmediate(resolve));
 test("distant map never loads or draws the voxel renderer; close blending uses the live camera without a second cell highlight", async () => {
   const h = harness();
   for (let i = 0; i < 20; i++) assert.deepEqual(h.draw(12), { alpha: 0, renderer: "sprites" });
+  assert.deepEqual(h.draw(120), { alpha: 0, renderer: "sprites" });
   assert.equal(h.stats().creates, 0);
   assert.equal(h.stats().canvases, 0);
   assert.equal(h.draw().renderer, "loading");
   await loaded();
   assert.equal(h.stats().ready, 1);
   assert.deepEqual(h.draw(), { alpha: 0.5, renderer: "voxel-webgl" });
-  assert.deepEqual(h.sizes[0], { width: 200, height: 120, pixelsPerWorld: 30, x: 0, y: 0 });
+  assert.deepEqual(h.sizes[0], { width: 200, height: 120, pixelsPerWorld: 67.5, x: 0, y: 0 });
   assert.equal(h.calls[0].options.selection, false);
   assert.equal(h.calls[0].options.chambers, true);
   assert.equal(h.calls[0].patch.selected.cell[0], 50);
   assert.ok(h.calls[0].patch.cells.length > 7);
   assert.equal(h.draw(12).alpha, 0);
   assert.equal(h.calls.length, 1, "zooming away stops all voxel sampling/rendering");
-  assert.equal(h.draw(72).alpha, 1);
+  assert.equal(h.draw(150).alpha, 1);
   assert.equal(h.stats().creates, 1);
   h.pass.dispose();
   assert.equal(h.stats().disposed, 1);
@@ -122,12 +123,12 @@ test("distant map never loads or draws the voxel renderer; close blending uses t
 
 test("software blending stays at close zoom and projected strip or smell vision retain the 2D map", async () => {
   const h = harness(false);
-  h.draw(60);
+  h.draw(135);
   await loaded();
-  assert.equal(h.draw(60).alpha, 0);
+  assert.equal(h.draw(160).alpha, 0);
   assert.equal(h.calls.length, 0);
-  assert.equal(h.draw(132).alpha, 0.5);
-  assert.equal(h.draw(144).alpha, 1);
+  assert.equal(h.draw(170).alpha, 0.5);
+  assert.equal(h.draw(180).alpha, 1);
   assert.equal(h.draw(180, CURTAIN, centreY(STRIP)).alpha, 0);
   assert.equal(h.draw(180, PLANE, camera.y, false).alpha, 0);
   h.pass.dispose();
@@ -140,9 +141,9 @@ test("failed rendering restores sprites and disposing a pending load releases it
   h.scene.draw = () => {
     throw Error("context lost");
   };
-  assert.equal(h.draw(72).alpha, 0);
+  assert.equal(h.draw(150).alpha, 0);
   assert.equal(h.stats().disposed, 1);
-  assert.equal(h.draw(72).renderer, "sprites");
+  assert.equal(h.draw(150).renderer, "sprites");
   assert.equal(h.stats().creates, 1);
   const pending = harness();
   pending.draw();
@@ -150,5 +151,5 @@ test("failed rendering restores sprites and disposing a pending load releases it
   await loaded();
   assert.equal(pending.stats().disposed, 1);
   assert.equal(pending.stats().ready, 0);
-  assert.equal(pending.draw(72).alpha, 0);
+  assert.equal(pending.draw(150).alpha, 0);
 });
