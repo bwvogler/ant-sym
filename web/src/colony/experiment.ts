@@ -912,6 +912,11 @@ export function defendControl(
 /** Count decisions before movement and combat exposure at the hazard calculation. */
 function observedDefence(spec: RunSpec): RunSpec {
   const counts: Record<string, number> = {};
+  const withdrawals = new Map<number, { contact: number; pressure: number; missed: boolean; clearTicks: number }>();
+  const countWithdrawal = (key: string) => {
+    const metric = `defender.withdrawal.${key}`;
+    counts[metric] = (counts[metric] ?? 0) + 1;
+  };
   return {
     ...spec,
     events: [
@@ -947,6 +952,14 @@ function observedDefence(spec: RunSpec): RunSpec {
             const dt = spec.dt ?? 1 / 30;
             combatObservers.set(colony, {
               contact(action, ant, sensed, heading) {
+                if (side === 0 && game.time <= 30) {
+                  const episode = withdrawals.get(ant);
+                  if (episode) episode.contact = game.time;
+                  else if (action.movement === "withdraw") {
+                    withdrawals.set(ant, { contact: game.time, pressure: 0, missed: false, clearTicks: 0 });
+                    countWithdrawal("started");
+                  }
+                }
                 if (side === 0 && game.time <= 30)
                   contacts.set(ant, {
                     time: game.time,
@@ -966,6 +979,10 @@ function observedDefence(spec: RunSpec): RunSpec {
                 add("exposed");
                 add("pressure", pressure);
                 add("hazardInput", pressure / allies);
+                if (side === 0 && game.time <= 30) {
+                  const episode = withdrawals.get(ant);
+                  if (episode) episode.pressure = game.time;
+                }
                 const contact = contacts.get(ant);
                 const current = contact?.time === game.time ? contact : undefined;
                 if (side === 0 && game.time <= 30) {
@@ -1013,7 +1030,32 @@ function observedDefence(spec: RunSpec): RunSpec {
         },
       },
     ],
-    probes: [...(spec.probes ?? []), { tick() {}, summary: () => counts }],
+    probes: [
+      ...(spec.probes ?? []),
+      {
+        tick(game) {
+          if (game.time > 30) return;
+          for (const [ant, episode] of withdrawals) {
+            const contact = episode.contact === game.time;
+            const pressure = episode.pressure === game.time;
+            if (!contact && pressure) countWithdrawal("pressureTicksWithoutContact");
+            if (!game.player.alive[ant]) {
+              countWithdrawal(pressure ? "combatDeaths" : "otherDeaths");
+              withdrawals.delete(ant);
+              continue;
+            }
+            if (contact && episode.missed) countWithdrawal("renewedContact");
+            episode.missed = !contact;
+            episode.clearTicks = contact || pressure ? 0 : episode.clearTicks + 1;
+            if (episode.clearTicks === 3) {
+              countWithdrawal("cleared");
+              withdrawals.delete(ant);
+            }
+          }
+        },
+        summary: () => ({ ...counts, "defender.withdrawal.openAtCutoff": withdrawals.size }),
+      },
+    ],
   };
 }
 

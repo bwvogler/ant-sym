@@ -211,3 +211,21 @@ Faster retreat reduced early deaths in each pilot seed and changed seed 5 from a
 The holdout reduced total defender losses and increased raid food on both seeds, but seed 2 went from a pass to a fail and both neutral runs lost food. Across all five seeds, A13 passes stayed at 1/5. A speed boost helps ants survive exposure, but this version shifts how effectively they repel raids and forage. Keep it as an experiment. The next comparison should match incoming pressure to the ant's contact perception and measure an entire withdrawal through separation, renewed contact or death, including the ticks after an enemy falls out of sense range.
 
 Reproduce the trace with `node scripts/experiment.mjs defendHome --seeds 3,5,6 --seconds 30 --set game.fight.intent=true --jobs 3`. Reproduce the speed experiment with `node scripts/experiment.mjs defendHome contact --seeds 2-6 --set game.fight.intent=true --set colony.withdrawalSpeed=1.25 --jobs 4`.
+
+### Withdrawal episodes and gaps in perception
+
+An episode starts at an explicit withdrawal. It clears after three consecutive ticks with neither contact nor incoming pressure, and ends earlier if the ant dies. Renewed contact counts each return after a gap during the same episode. Episodes still open at the 30-second cutoff are counted separately. Pressure is measured at combat resolution, after movement. Contact uses the colony's earlier recognition snapshot and its own tolerance, so these measurements can disagree.
+
+| First 30 seconds, A13 seeds 2–6 | Directed baseline | 1.25× withdrawal speed |
+|---|---:|---:|
+| Episodes started | 271 | 467 |
+| Cleared | 208 | 432 |
+| Combat deaths within episodes | 44 | 25 |
+| Open at cutoff | 11 | 10 |
+| Renewed-contact events | 160 | 359 |
+| Pressure ticks without contact, anywhere | 47 | 10 |
+| Of those, inside an active withdrawal episode | 0 | 0 |
+
+The speed increase improved clearance per episode from 77% to 93%, while repeated contact within episodes rose from 0.59 to 0.77 events per start. Episode counts are not counts of unique ants. The pressure-only ticks did not occur inside recently active withdrawals under this three-tick definition, so these runs do not support blaming continued pressure after contact drops out for the repeated withdrawal problem. The separate perception gap remains real. No-contact deaths fell from three to one.
+
+Reproduce with `node scripts/experiment.mjs defendHome --seeds 2-6 --seconds 30 --set game.fight.intent=true --set colony.withdrawalSpeed=1,1.25 --jobs 5`.
