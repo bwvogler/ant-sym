@@ -30,7 +30,7 @@ export interface Viewport {
 }
 
 /** Closest zoom in CSS pixels per world unit, reaching inspection-scale detail. */
-export const MAX_ZOOM = 180;
+export const MAX_ZOOM = 360;
 
 /** The zoom at which the whole map fits the view. */
 export function fitZoom(world: Extent, view: Viewport): number {
@@ -77,6 +77,7 @@ export function zoomAt(c: Camera, view: Viewport, sx: number, sy: number, factor
  */
 export function zoomBy(c: Camera, world: Extent, view: Viewport, sx: number, sy: number, factor: number): Camera {
   const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom * factor));
+  if (zoom === c.zoom) return clamp(c, world, view);
   return clamp(zoomAt(c, view, sx, sy, zoom / c.zoom), world, view);
 }
 

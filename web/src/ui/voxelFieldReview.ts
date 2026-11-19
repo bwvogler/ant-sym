@@ -1,3 +1,4 @@
+import { MAX_ZOOM } from "./camera.ts";
 import { buildGame } from "./useColony.ts";
 import { SensedMap } from "./fungusSight.ts";
 import { inspectViewport } from "./inspectionPatch.ts";
@@ -47,7 +48,7 @@ const draw = () => {
   status.textContent = `${scene.accelerated ? "WebGL" : "Software 3D"} · ${patch.cells.length} cells including edge overscan · ${patch.cells.reduce((n, c) => n + c.state.ants.length, 0)} workers in region · zoom ${(zoom / 60).toFixed(2)}× · ${terrain.active} terrain chunks (${terrain.rebuilt} rebuilt, ${terrain.cached} cached) · ${playing ? "running" : "paused"}`;
 };
 const setZoom = (next: number, offsetX = 0, offsetY = 0) => {
-  next = Math.max(48, Math.min(180, next));
+  next = Math.max(48, Math.min(MAX_ZOOM, next));
   x += offsetX / zoom - offsetX / next;
   y += offsetY / zoom - offsetY / next;
   zoom = next;
