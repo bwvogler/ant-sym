@@ -1,0 +1,88 @@
+# Bounded offline comparison for the experimental action branch; no live policy calls.
+name: Delivery calibration
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/delivery-calibration.yml"
+      - "scripts/lab/delivery-calibration.mjs"
+      - "scripts/lab/loose-food-ledger*"
+permissions:
+  contents: read
+concurrency:
+  group: delivery-calibration-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  seed:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fungus-action-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        seed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - run: node --test scripts/lab/loose-food-ledger.test.mjs
+      - name: Fixed doctrines under temporary cue loss
+        env:
+          SEED: ${{ matrix.seed }}
+        run: node scripts/lab/delivery-calibration.mjs --seed "$SEED" --seconds 600 --ants 60 --cue-loss-from 120 --cue-loss-to 300 --variants baseline,contextPersist5,contextRelease5,contextRelease20 --out "seed-$SEED.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: delivery-seed-${{ matrix.seed }}
+          path: seed-${{ matrix.seed }}.json
+          retention-days: 30
+  report:
+    needs: seed
+    if: ${{ !cancelled() && needs.seed.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: delivery-seed-*
+          path: out
+          merge-multiple: true
+      - name: Complete seed table
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json, pathlib
+          rows = []
+          sources = set()
+          for seed in range(1, 21):
+              p = pathlib.Path(f'out/seed-{seed}.json')
+              if not p.exists():
+                  raise SystemExit(f'Missing seed {seed}; the sweep is incomplete')
+              d = json.loads(p.read_text())
+              if d['seed'] != seed or d['seconds'] != 600 or d['cueLoss'] != {'from': 120, 'to': 300, 'gain': 0, 'restoredGain': 1}:
+                  raise SystemExit(f'Unexpected experiment configuration for seed {seed}')
+              sources.add((d['commit'], d['harnessSha256'], d['ledgerSha256']))
+              expected = ['baseline', 'contextPersist5', 'contextRelease5', 'contextRelease20']
+              if [r['name'] for r in d['results']] != expected:
+                  raise SystemExit(f'Incomplete variants for seed {seed}')
+              for r in d['results']:
+                  restored = r['checkpoints'][1]
+                  backlog = restored['held'] + restored['looseFood']['addedBacklog']
+                  if r['name'] != 'baseline' and (r['cueLossRecognisedCalls'] or r['cueLossUncommittedDrops']):
+                      raise SystemExit(f'Cue isolation failed for seed {seed}')
+                  rows.append((seed, 'training' if seed <= 10 else 'confirmation', r['name'], r['stored'], r['releases'], backlog, r['looseFood']['peakAddedBacklog'], r['diedHungry'], r['broodStarved']))
+          if len(sources) != 1:
+              raise SystemExit('Mixed source revisions in seed reports')
+          print('| Seed | Group | Policy | Stored | Releases | Backlog at 300s | Peak ground deposits | Hunger deaths | Starved brood |')
+          print('| --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+          for row in rows:
+              print('| ' + ' | '.join(map(str, row)) + ' |')
+          print('\nFixed policies; no automatic threshold selection or default promotion. Training includes prior exploratory seeds.')
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: delivery-calibration
+          path: out/*.json
+          retention-days: 30

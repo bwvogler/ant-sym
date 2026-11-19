@@ -1,5 +1,6 @@
 // Offline pilot for ja-g7nz.3.3. No live policy calls and no default changes.
 // node scripts/lab/delivery-calibration.mjs --seed 1 --seconds 120 --ants 60 --out experiments/delivery-pilot-seed1.json
+import { observeLooseFood } from "./loose-food-ledger.mjs";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -54,6 +55,9 @@ const report = {
   harnessSha256: createHash("sha256")
     .update(readFileSync(new URL(import.meta.url)))
     .digest("hex"),
+  ledgerSha256: createHash("sha256")
+    .update(readFileSync(new URL("./loose-food-ledger.mjs", import.meta.url)))
+    .digest("hex"),
   commit: execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim(),
@@ -79,6 +83,9 @@ for (const name of requested.split(",")) {
   // home-layer royal channel. Copy parameters; never mutate shared defaults.
   const initialLayer = c.cur;
   c.bind(c.home);
+  const homeMap = c.map;
+  let observedTime = 0;
+  const foodLedger = observeLooseFood(homeMap.food, () => observedTime);
   c.ph.params = { ...c.ph.params, royal: { ...c.ph.params.royal, max: royalCap } };
   c.bind(initialLayer);
   if (traceAnt >= c.n) throw Error("trace-ant exceeds allocated ant slots");
@@ -102,6 +109,7 @@ for (const name of requested.split(",")) {
   const checkpoint = (at) => ({
     at,
     stored: c.stored,
+    looseFood: foodLedger.snapshot(),
     deliveries,
     releases,
     releaseCalls,
@@ -148,7 +156,25 @@ for (const name of requested.split(",")) {
         return t.deliveryAttempt === "none" ? "to brood" : "take";
       },
     });
+  const originalGet = c.responses.get;
+  c.responses = {
+    ...c.responses,
+    get: (t, draw) => {
+      foodLedger.clearPickup();
+      const answer = originalGet(t, draw);
+      if (answer && t.offered === "food" && c.map === homeMap) {
+        const x = CELL[0],
+          y = CELL[1];
+        cellOf(c.x[c.ti], c.y[c.ti]);
+        foodLedger.expectPickup(CELL[0], CELL[1]);
+        CELL[0] = x;
+        CELL[1] = y;
+      }
+      return answer;
+    },
+  };
   for (let tick = 0; tick < seconds * 30; tick++) {
+    observedTime = tick / 30;
     if (cueLoss) {
       if (g.fungus.active) throw Error("controlled gain intervention requires an inactive fungus");
       if (tick === cueLossFrom * 30 || tick === cueLossTo * 30) checkpoints.push(checkpoint(tick / 30));
@@ -157,6 +183,7 @@ for (const name of requested.split(",")) {
     }
     prior.set(c.deliveryRole);
     g.tick(1 / 30);
+    foodLedger.clearPickup();
     // Diagnostic reads only: restore the bound layer and shared cell scratch.
     // At most 600 samples per variant; sample the final two seconds by default.
     if (traceAnt >= 0 && tick / 30 >= traceFrom && tick % 3 === 0 && trace.length < 600) {
@@ -223,6 +250,7 @@ for (const name of requested.split(",")) {
     maxHeld = Math.max(maxHeld, held);
     maxActive = Math.max(maxActive, active);
   }
+  observedTime = seconds;
   if (cueLoss) {
     c.gainMarks.fill(1);
     checkpoints.push(checkpoint(seconds));
@@ -242,6 +270,7 @@ for (const name of requested.split(",")) {
   });
   c.bind(finalLayer);
   const result = {
+    looseFood: foodLedger.snapshot(),
     royalField: { markedCells, nearCapCells, max: maxRoyal },
     name,
     ...v,

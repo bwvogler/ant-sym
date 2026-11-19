@@ -479,3 +479,68 @@ Use the prior section's cue-loss command with this production fix. The harness i
 unchanged and its source hashes match. Report commit identifiers name the pre-edit
 base; these runs include the `arrive` change in this commit. Full training/holdout
 validation remains open under ja-g7nz.3.3.
+
+### Loose-food backlog and repeated collection (ja-g7nz.3.3.6)
+
+An observational ledger now measures home-layer food additions, actual removals
+following approved pickup, repeated collection sites, peak deposited-food backlog
+and its time integral. It wraps existing field writes and the original get rule;
+it changes no answer or RNG draw. Checkpoints independently sum the field and
+assert `initial + additions - removals = ground`. The original 6,216/8,172 loose
+food units in these generated underground maps are excluded from deposited-food
+backlog. The ledger records mixing with initial food; these runs have none.
+
+The ledger tracks quantities and sites, **not food-unit identities**. Repeated
+site pickup is not proof that one particular unit was collected repeatedly. If
+initial food and new deposits mix, the accounting convention removes deposits
+first and flags that ambiguity. In these treatments, additions equal successful
+releases and every added unit is eventually collected again.
+
+Fixed cue-loss pilots, seeds 3/4 (same 60 ants, 600 seconds, gain loss120–300s):
+
+| Policy | Final stored | Releases / re-collected deposits | Peak ground deposits | Held + ground deposits at restoration |
+| --- | ---: | ---: | ---: | ---: |
+| Persistence | 394 / 210 | 0 / 0 | 0 / 0 | 49 / 40 |
+| Release after 5s | 410 / 228 | 1,256 / 753 | 50 / 17 | 98 / 55 |
+| Release after 20s | 413 / 236 | 317 / 178 | 16 / 7 | 75 / 54 |
+
+For five-second release, 1,188/675 pickup events revisit previously used pickup
+sites; one site sees70/25 collections. At restoration,40/10 deposited units are
+still on the ground. Twenty-second release cuts total release/recollection events
+by about75%, reduces peak ground backlog, and slightly increases final stored food
+on both exploratory seeds. It still has more undelivered food at restoration than
+persistence. Ground backlog reaches zero by600s in all cases; that does not mean
+all food is delivered, since some remains carried. All eight runs retain their
+queen, produce30 births and have no hunger deaths or starved brood. The scripted
+baseline remains595/293 stored and is not a sensory-equivalent policy.
+
+All six repeated baseline/persistence/release5 treatments match every previous
+simulation metric, including phase checkpoints, after excluding added ledger
+fields and runtime. Both harness and ledger source hashes are recorded and
+verified. Two ledger tests cover repeated-site collection, unrelated removal,
+initial-food mixing, cancelling pickup attribution, integration and conservation.
+Syntax, formatting and diff checks pass. This slice changes experiment tooling,
+not production behavior; production build/goldens were not repeated.
+
+Reports: `experiments/delivery-calibration/seed{3,4}-backlog.json`. Reproduce with
+`--variants baseline,contextPersist5,contextRelease5,contextRelease20` and the prior
+cue-loss command. The report commit field is the pre-edit base; source hashes
+identify the changed harness and ledger. Initial measurement runs were stopped
+while separating initial food from deposits; the committed reports contain all
+four completed variants with the final ledger.
+
+### Fixed runner comparison (ja-g7nz.3.3.7)
+
+`.github/workflows/delivery-calibration.yml` runs the same four frozen doctrines
+on seeds1–20, at most four concurrent runners, with a ten-minute limit per seed.
+It is manually runnable, and PR changes to these experiment files start it only
+on the experimental action branch. It has read-only repository permissions and
+makes no live policy calls. Artifacts and a complete per-seed report are retained
+for30 days. Missing seeds/variants, mismatched source/configuration or recognised
+rooms/uncommitted drops during cue loss fail the report.
+
+Seeds1–10 are training (including already explored seeds);11–20 are confirmation.
+Doctrines and timing are fixed before this batch. The workflow does not select a
+threshold or promote defaults. Its PR trigger supplies the runner route despite
+the connector lacking manual dispatch. Runner results must be inspected before
+claiming the sweep complete.
