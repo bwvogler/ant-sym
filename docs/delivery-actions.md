@@ -544,3 +544,55 @@ Doctrines and timing are fixed before this batch. The workflow does not select a
 threshold or promote defaults. Its PR trigger supplies the runner route despite
 the connector lacking manual dispatch. Runner results must be inspected before
 claiming the sweep complete.
+
+### Twenty-seed runner result: no release-policy promotion
+
+[Run 44433318190](https://github.com/bwvogler/ant-sym/actions/runs/44433318190)
+completed all 20 seed jobs and its report successfully at commit `c632fc9a`:
+80 games, four frozen policies per seed. CI and E2E at that commit also pass.
+The exact downloaded artifact is `experiments/delivery-calibration/runner-44433318190.zip`
+(SHA256 `c7cfe1317fffc5f051166d3359d5cd98fb659e36a0e3f1728b61e8ff9841058f`);
+it contains `seed-1.json` through `seed-20.json`. Descriptive group/paired summaries
+are in `runner-44433318190-summary.json`. All source commits, seed completeness and
+cue-isolation counters were checked. No default, doctrine or timing changed
+between training and confirmation.
+
+| Group | Policy | Median stored [min,max] | Median releases | Median held + deposited food at restoration |
+| --- | --- | ---: | ---: | ---: |
+| Training 1–10 | Scripted default | 405.5 [202,908] | 0 | 10.5 |
+| Training 1–10 | Persistence | 249.5 [162,523] | 0 | 46.5 |
+| Training 1–10 | Release after 5s | 272.5 [160,532] | 961.5 | 70.5 |
+| Training 1–10 | Release after 20s | 272 [171,553] | 288.5 | 61 |
+| Confirmation 11–20 | Scripted default | 409 [37,826] | 0 | 9.5 |
+| Confirmation 11–20 | Persistence | 274.5 [51,425] | 0 | 45 |
+| Confirmation 11–20 | Release after 5s | 257.5 [32,419] | 1,033 | 70 |
+| Confirmation 11–20 | Release after 20s | 256.5 [35,414] | 267 | 61 |
+
+Release after 20s beats persistence on 9/10 training seeds (median paired gain 24.5 food),
+but only 4/10 confirmation seeds (median paired difference −7, worst −45 on seed 13).
+Release after 5s likewise loses to persistence on 6/10 confirmation seeds (median paired
+−7, worst −56 on seed 11). Comparing release after 20s directly with release after 5s, confirmation
+wins/losses are 4/6, median paired difference −5.5 and worst −56 on seed 20. These are
+descriptive comparisons, not significance tests or claims of a universal optimum.
+
+**Decision: do not promote either timeout-release policy.** The twenty-second
+threshold substantially reduces repeated dropping relative to five seconds, but
+that does not establish a reliable delivery improvement. Both increase backlog
+at cue restoration compared with persistence. This rejects the promising
+exploratory advantage; it is not an invitation to tune against the same
+confirmation seeds. All 80 games had zero queen/hunger deaths and zero starved
+brood during 600s; this limited horizon does not validate longer-term survival.
+The scripted default still has direct chamber-target access, so its throughput
+is not a sensory-equivalent biological baseline.
+
+The calibrated experimental choices remain available, with defaults off. Further
+policy changes should target a new hypothesis (e.g. a release decision conditioned
+on a useful local cue) with fresh confirmation seeds, rather than another sweep
+of the same timer. Other workplan gates, including independent review, full-colony
+contact validation and timed feeding/traffic, remain open.
+
+The workflow now has a latest-commit change gate: documentation/result/workflow-only
+updates skip the 80 games; simulator/harness changes or manual dispatch run them.
+The gate is checked with a temporary Git fixture (documentation skip, manual run,
+simulation change run). This keeps recording results from automatically repeating
+the entire completed experiment.

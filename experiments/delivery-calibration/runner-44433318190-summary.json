@@ -1,0 +1,417 @@
+{
+  "run": "https://github.com/bwvogler/ant-sym/actions/runs/44433318190",
+  "commit": "c632fc9a1d5863ccf2a3a6236cc14b9012395d22",
+  "artifactSha256": "c7cfe1317fffc5f051166d3359d5cd98fb659e36a0e3f1728b61e8ff9841058f",
+  "training": {
+    "policies": {
+      "baseline": {
+        "storedMedian": 405.5,
+        "storedMin": 202,
+        "storedMax": 908,
+        "releasesMedian": 0.0,
+        "restorationBacklogMedian": 10.5,
+        "restorationBacklogMax": 21,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextPersist5": {
+        "storedMedian": 249.5,
+        "storedMin": 162,
+        "storedMax": 523,
+        "releasesMedian": 0.0,
+        "restorationBacklogMedian": 46.5,
+        "restorationBacklogMax": 51,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextRelease5": {
+        "storedMedian": 272.5,
+        "storedMin": 160,
+        "storedMax": 532,
+        "releasesMedian": 961.5,
+        "restorationBacklogMedian": 70.5,
+        "restorationBacklogMax": 98,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextRelease20": {
+        "storedMedian": 272.0,
+        "storedMin": 171,
+        "storedMax": 553,
+        "releasesMedian": 288.5,
+        "restorationBacklogMedian": 61.0,
+        "restorationBacklogMax": 86,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      }
+    },
+    "paired": {
+      "contextRelease20 minus contextRelease5": {
+        "medianDifference": 2.5,
+        "wins": 6,
+        "ties": 0,
+        "losses": 4,
+        "worst": [
+          1,
+          -18
+        ],
+        "differences": [
+          [
+            1,
+            -18
+          ],
+          [
+            2,
+            21
+          ],
+          [
+            3,
+            3
+          ],
+          [
+            4,
+            8
+          ],
+          [
+            5,
+            -17
+          ],
+          [
+            6,
+            2
+          ],
+          [
+            7,
+            19
+          ],
+          [
+            8,
+            11
+          ],
+          [
+            9,
+            -6
+          ],
+          [
+            10,
+            -9
+          ]
+        ]
+      },
+      "contextRelease20 minus contextPersist5": {
+        "medianDifference": 24.5,
+        "wins": 9,
+        "ties": 0,
+        "losses": 1,
+        "worst": [
+          5,
+          -28
+        ],
+        "differences": [
+          [
+            1,
+            23
+          ],
+          [
+            2,
+            30
+          ],
+          [
+            3,
+            19
+          ],
+          [
+            4,
+            26
+          ],
+          [
+            5,
+            -28
+          ],
+          [
+            6,
+            30
+          ],
+          [
+            7,
+            15
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            9,
+            39
+          ],
+          [
+            10,
+            45
+          ]
+        ]
+      },
+      "contextRelease5 minus contextPersist5": {
+        "medianDifference": 17.0,
+        "wins": 7,
+        "ties": 0,
+        "losses": 3,
+        "worst": [
+          5,
+          -11
+        ],
+        "differences": [
+          [
+            1,
+            41
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            16
+          ],
+          [
+            4,
+            18
+          ],
+          [
+            5,
+            -11
+          ],
+          [
+            6,
+            28
+          ],
+          [
+            7,
+            -4
+          ],
+          [
+            8,
+            -2
+          ],
+          [
+            9,
+            45
+          ],
+          [
+            10,
+            54
+          ]
+        ]
+      }
+    }
+  },
+  "confirmation": {
+    "policies": {
+      "baseline": {
+        "storedMedian": 409.0,
+        "storedMin": 37,
+        "storedMax": 826,
+        "releasesMedian": 0.0,
+        "restorationBacklogMedian": 9.5,
+        "restorationBacklogMax": 21,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextPersist5": {
+        "storedMedian": 274.5,
+        "storedMin": 51,
+        "storedMax": 425,
+        "releasesMedian": 0.0,
+        "restorationBacklogMedian": 45.0,
+        "restorationBacklogMax": 54,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextRelease5": {
+        "storedMedian": 257.5,
+        "storedMin": 32,
+        "storedMax": 419,
+        "releasesMedian": 1033.0,
+        "restorationBacklogMedian": 70.0,
+        "restorationBacklogMax": 99,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      },
+      "contextRelease20": {
+        "storedMedian": 256.5,
+        "storedMin": 35,
+        "storedMax": 414,
+        "releasesMedian": 267.0,
+        "restorationBacklogMedian": 61.0,
+        "restorationBacklogMax": 93,
+        "queenDeaths": 0,
+        "hungerDeaths": 0,
+        "broodStarved": 0
+      }
+    },
+    "paired": {
+      "contextRelease20 minus contextRelease5": {
+        "medianDifference": -5.5,
+        "wins": 4,
+        "ties": 0,
+        "losses": 6,
+        "worst": [
+          20,
+          -56
+        ],
+        "differences": [
+          [
+            11,
+            45
+          ],
+          [
+            12,
+            -39
+          ],
+          [
+            13,
+            -18
+          ],
+          [
+            14,
+            -5
+          ],
+          [
+            15,
+            87
+          ],
+          [
+            16,
+            -24
+          ],
+          [
+            17,
+            17
+          ],
+          [
+            18,
+            -6
+          ],
+          [
+            19,
+            3
+          ],
+          [
+            20,
+            -56
+          ]
+        ]
+      },
+      "contextRelease20 minus contextPersist5": {
+        "medianDifference": -7.0,
+        "wins": 4,
+        "ties": 0,
+        "losses": 6,
+        "worst": [
+          13,
+          -45
+        ],
+        "differences": [
+          [
+            11,
+            -11
+          ],
+          [
+            12,
+            -10
+          ],
+          [
+            13,
+            -45
+          ],
+          [
+            14,
+            24
+          ],
+          [
+            15,
+            50
+          ],
+          [
+            16,
+            -7
+          ],
+          [
+            17,
+            4
+          ],
+          [
+            18,
+            -7
+          ],
+          [
+            19,
+            -16
+          ],
+          [
+            20,
+            9
+          ]
+        ]
+      },
+      "contextRelease5 minus contextPersist5": {
+        "medianDifference": -7.0,
+        "wins": 4,
+        "ties": 0,
+        "losses": 6,
+        "worst": [
+          11,
+          -56
+        ],
+        "differences": [
+          [
+            11,
+            -56
+          ],
+          [
+            12,
+            29
+          ],
+          [
+            13,
+            -27
+          ],
+          [
+            14,
+            29
+          ],
+          [
+            15,
+            -37
+          ],
+          [
+            16,
+            17
+          ],
+          [
+            17,
+            -13
+          ],
+          [
+            18,
+            -1
+          ],
+          [
+            19,
+            -19
+          ],
+          [
+            20,
+            65
+          ]
+        ]
+      }
+    }
+  }
+}

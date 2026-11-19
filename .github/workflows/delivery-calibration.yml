@@ -13,8 +13,29 @@ concurrency:
   group: delivery-calibration-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  seed:
+  changes:
     if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fungus-action-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.changed.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] || ! git diff --quiet HEAD^ HEAD -- web/src/colony scripts/lab/delivery-calibration.mjs scripts/lab/loose-food-ledger.mjs scripts/lab/loose-food-ledger.test.mjs; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
+  seed:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
