@@ -5,7 +5,7 @@ import { cadaverArtFixture } from "../inspectionArtFixture.ts";
 import { buildGame } from "../useColony.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { inspectViewport } from "../inspectionPatch.ts";
-import { inspectionMoundFloor, moundBalls } from "../inspectionMound.ts";
+import { inspectionDirtBalls, inspectionMoundFloor, moundBalls } from "../inspectionMound.ts";
 import { buildPatchTerrain } from "../drawInspectionPatch.ts";
 import { buildVoxelTerrainChunk, terrainChunkDescriptors, VoxelTerrainCache } from "../voxelTerrainChunks.ts";
 import { PLANE, CURTAIN, centreX, centreY, cellKey } from "../../colony/index.ts";
@@ -144,6 +144,42 @@ test("spoil adds round pellets above a flat ground plane and raises the ant's fo
   cache.dispose();
 });
 
+test("neighbouring piles share supported, non-overlapping world positions as levels grow", () => {
+  const patch = cadaverArtFixture(false, 0, 0);
+  for (const c of patch.cells) {
+    c.valid = true;
+    c.state.place.ground = "open";
+    c.state.place.hole = -1;
+    c.state.place.mound = 7;
+  }
+  const balls = inspectionDirtBalls(patch),
+    rawCount = patch.cells.reduce((sum, c) => sum + moundBalls(7, cellKey(...c.state.cell)).length, 0);
+  assert.ok(balls.length < rawCount, "shared boundary pellets render only once");
+  assert.equal(new Set(balls.map((b) => b.id)).size, balls.length);
+  for (let i = 0; i < balls.length; i++) {
+    const a = balls[i];
+    let supports = 0;
+    for (let j = 0; j < balls.length; j++) {
+      if (i === j) continue;
+      const b = balls[j],
+        distance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+      assert.ok(distance >= a.radius + b.radius - 1e-8, "balls never intersect, including across cells");
+      if (b.z < a.z && Math.abs(distance - a.radius - b.radius) < 1e-8) supports++;
+    }
+    assert.ok(Math.abs(a.z - a.radius) < 1e-8 || supports >= 3, "every raised ball rests on three lower balls");
+  }
+  const cell = patch.cells[0],
+    seed = cellKey(...cell.state.cell),
+    low = moundBalls(2, seed),
+    high = moundBalls(3, seed);
+  assert.deepEqual(high.slice(0, low.length), low, "new layers preserve all existing positions");
+  assert.ok(Math.max(...high.map((b) => b.z)) > Math.max(...low.map((b) => b.z)));
+  assert.ok(high.filter((b) => b.z === high.at(-1)!.z).length > 0);
+  cell.state.place.mound = 8;
+  const grown = new Map(inspectionDirtBalls(patch).map((b) => [b.id, b]));
+  for (const ball of balls) assert.deepEqual(grown.get(ball.id), ball, "a changed neighbour never rearranges the shared pile");
+});
+
 test("surface and below terrain cache independently, including projected strip terrain", () => {
   let serial = 0;
   const cache = new VoxelTerrainCache(
@@ -178,7 +214,7 @@ for (const layer of [PLANE, CURTAIN])
     if (layer === PLANE) {
       const mound = patch.cells.find((c) => c.state.cell[0] === 50 && c.state.cell[1] === 50)!;
       mound.state.place.hole = -1;
-      mound.state.place.mound = 3;
+      mound.state.place.mound = 7;
     }
     const below = layer === CURTAIN,
       signature = (f: ReturnType<typeof buildPatchTerrain>[number], dx = 0, dy = 0) => {

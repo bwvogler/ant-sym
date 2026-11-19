@@ -1,4 +1,5 @@
-import { centreX, centreY, SIDE } from "../colony/index.ts";
+import { moundBalls } from "./inspectionMound.ts";
+import { cellKey, centreX, centreY, SIDE } from "../colony/index.ts";
 import { buildPatchTerrain } from "./drawInspectionPatch.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 import { VOXEL_CHUNK_SIZE } from "./voxelViewport.ts";
@@ -17,7 +18,18 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
     cy = centreY(patch.selected.cell[1]),
     b = patch.bounds,
     size = VOXEL_CHUNK_SIZE,
-    out: VoxelTerrainChunk[] = [];
+    out: VoxelTerrainChunk[] = [],
+    extents = new Map(
+      patch.cells
+        .filter(
+          (c) =>
+            patch.mode === "surface" && c.valid && c.state.place.ground === "open" && c.state.place.hole < 0 && c.state.place.mound > 0,
+        )
+        .map((c) => {
+          const balls = moundBalls(c.state.place.mound, cellKey(...c.state.cell));
+          return [c, Math.max(SIDE + 0.061, ...balls.map((ball) => Math.hypot(ball.x, ball.y) + ball.radius + 0.061))] as const;
+        }),
+    );
   for (let y = Math.floor((cy + b.top) / size); y < Math.round((cy + b.bottom) / size); y++)
     for (let x = Math.floor((cx + b.left) / size); x < Math.round((cx + b.right) / size); x++) {
       const wx = x * size,
@@ -27,7 +39,8 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
           .filter((c) => {
             const xx = centreX(...c.state.cell),
               yy = centreY(c.state.cell[1]);
-            return xx >= wx - halo && xx <= wx + size + halo && yy >= wy - halo && yy <= wy + size + halo;
+            const reach = extents.get(c) ?? halo;
+            return xx >= wx - reach && xx <= wx + size + reach && yy >= wy - reach && yy <= wy + size + reach;
           })
           .sort((a, b) => a.state.cell[1] - b.state.cell[1] || a.state.cell[0] - b.state.cell[0]);
       out.push({

@@ -187,8 +187,11 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
       for (let x = Math.max(left * 2, Math.floor((bx - r) / pelletStep)); x < Math.min(right * 2, Math.ceil((bx + r) / pelletStep)); x++)
         for (let y = Math.max(top * 2, Math.floor((by - r) / pelletStep)); y < Math.min(bottom * 2, Math.ceil((by + r) / pelletStep)); y++)
           for (let z = Math.max(0, Math.floor((ball.z - r) / pelletStep)); z < Math.ceil((ball.z + r) / pelletStep); z++) {
-            if (((x + 0.5) * pelletStep - bx) ** 2 + ((y + 0.5) * pelletStep - by) ** 2 + ((z + 0.5) * pelletStep - ball.z) ** 2 > r * r)
-              continue;
+            // Include touching voxels so a sphere's support contacts survive rasterization.
+            const dx = Math.max(0, Math.abs((x + 0.5) * pelletStep - bx) - pelletStep / 2),
+              dy = Math.max(0, Math.abs((y + 0.5) * pelletStep - by) - pelletStep / 2),
+              dz = Math.max(0, Math.abs((z + 0.5) * pelletStep - ball.z) - pelletStep / 2);
+            if (dx * dx + dy * dy + dz * dz > r * r) continue;
             pellets.set(`${x},${y},${z}`, { x, y, z, grain: ball.grain });
           }
     }

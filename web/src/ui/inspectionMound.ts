@@ -1,7 +1,8 @@
-import { cellKey, centreX, centreY } from "../colony/index.ts";
+import { CELL, cellOf, cellKey, keyX, keyY, centreX, centreY } from "../colony/index.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 
 export interface DirtBall {
+  id: string;
   x: number;
   y: number;
   z: number;
@@ -10,47 +11,77 @@ export interface DirtBall {
 }
 
 const pileCache = new Map<string, DirtBall[]>();
+const RADIUS = 0.075,
+  SPACING = RADIUS * 2,
+  ROW_HEIGHT = (SPACING * Math.sqrt(3)) / 2,
+  LAYER_HEIGHT = SPACING * Math.sqrt(2 / 3);
 
-/** Deterministic loose pellets. Adding soil retains the existing balls and stacks new ones on them. */
+/** A shared close-packed lattice gives touching spheres identical positions on both sides of every hex boundary. */
 export function moundBalls(level: number, seed: number): readonly DirtBall[] {
-  const count = Math.ceil(8 * (level <= 8 ? level : 8 + Math.log2(level - 7))),
+  const count = Math.ceil(8 * (level <= 4 ? level : 4 + Math.log2(level - 3) / 2)),
     key = `${seed}:${count}`;
   const cached = pileCache.get(key);
   if (cached) return cached;
-  let state = seed | 0;
-  const random = () => {
-    state = (Math.imul(state, 1664525) + 1013904223) | 0;
-    return (state >>> 0) / 0x100000000;
-  };
-  const balls: DirtBall[] = [];
-  for (let i = 0; i < count; i++) {
-    const angle = random() * Math.PI * 2,
-      distance = Math.sqrt(random()) * 0.39,
-      radius = 0.085 + random() * 0.025,
-      x = Math.cos(angle) * distance,
-      y = Math.sin(angle) * distance;
-    let z = radius * 0.85;
-    for (const other of balls) {
-      const d2 = (x - other.x) ** 2 + (y - other.y) ** 2,
-        contact = (radius + other.radius) * 0.94;
-      if (d2 < contact * contact) z = Math.max(z, other.z + Math.sqrt(contact * contact - d2));
+  const gx = keyX(seed),
+    gy = keyY(seed),
+    ox = centreX(gx, gy),
+    oy = centreY(gy),
+    balls = new Map<string, DirtBall>();
+  const position = (layer: number, column: number, row: number) => ({
+    x: SPACING * (column + row / 2 + (layer % 2) / 2),
+    y: ROW_HEIGHT * (row + (layer % 2) / 3),
+  });
+  const add = (layer: number, column: number, row: number): void => {
+    const id = `${layer}:${column}:${row}`;
+    if (balls.has(id)) return;
+    if (layer > 0) {
+      const side = layer % 2 ? 1 : -1;
+      add(layer - 1, column, row);
+      add(layer - 1, column + side, row);
+      add(layer - 1, column, row + side);
     }
-    balls.push({ x, y, z, radius, grain: Math.floor(random() * 5) });
+    const { x, y } = position(layer, column, row);
+    balls.set(id, {
+      id,
+      x: x - ox,
+      y: y - oy,
+      z: RADIUS + layer * LAYER_HEIGHT,
+      radius: RADIUS,
+      grain: Math.abs((column * 73856093) ^ (row * 19349663) ^ (layer * 83492791)) % 5,
+    });
+  };
+  let additions = 0;
+  for (let layer = 0; additions < count; layer++) {
+    const candidates: { column: number; row: number; distance: number }[] = [];
+    for (let row = Math.floor(oy / ROW_HEIGHT) - 5; row <= Math.ceil(oy / ROW_HEIGHT) + 5; row++)
+      for (let column = Math.floor(ox / SPACING - row / 2) - 5; column <= Math.ceil(ox / SPACING - row / 2) + 5; column++) {
+        const { x, y } = position(layer, column, row);
+        cellOf(x, y);
+        if (CELL[0] === gx && CELL[1] === gy) candidates.push({ column, row, distance: (x - ox) ** 2 + (y - oy) ** 2 });
+      }
+    candidates.sort((a, b) => a.distance - b.distance || a.row - b.row || a.column - b.column);
+    for (const { column, row } of candidates.slice(0, 8)) {
+      if (additions >= count) break;
+      add(layer, column, row);
+      additions++;
+    }
   }
+  const result = [...balls.values()];
   if (pileCache.size >= 256) pileCache.delete(pileCache.keys().next().value!);
-  pileCache.set(key, balls);
-  return balls;
+  pileCache.set(key, result);
+  return result;
 }
 
 export function inspectionDirtBalls(patch: InspectionPatch): DirtBall[] {
   if (patch.mode !== "surface") return [];
-  const balls: DirtBall[] = [];
+  const balls = new Map<string, DirtBall>();
   for (const { valid, x, y, state } of patch.cells) {
     const p = state.place;
     if (!valid || p.ground !== "open" || p.hole >= 0 || p.mound <= 0) continue;
-    for (const ball of moundBalls(p.mound, cellKey(...state.cell))) balls.push({ ...ball, x: x + ball.x, y: y + ball.y });
+    for (const ball of moundBalls(p.mound, cellKey(...state.cell)))
+      if (!balls.has(ball.id)) balls.set(ball.id, { ...ball, x: x + ball.x, y: y + ball.y });
   }
-  return balls;
+  return [...balls.values()];
 }
 
 /** Feet follow the tops of the actual pellets, with a short continuous approach at each edge. */

@@ -75,11 +75,16 @@ export function inspectViewport(
     map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map,
     coords: [number, number][] = [[gx, gy]],
     bounds = voxelRegionBounds(x, y, width, height);
-  // An odd surface row can put a mound centre one column farther left of the crop.
-  for (let yy = Math.max(0, Math.floor(bounds.top / R) - 1); yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + 1); yy++)
+  // Surface piles can spill across cell edges. Read enough source cells for their supported bases.
+  const margin = layer === CURTAIN ? 1 : 3;
+  for (
+    let yy = Math.max(0, Math.floor(bounds.top / R) - margin);
+    yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + margin);
+    yy++
+  )
     for (
-      let xx = Math.max(map.x0, Math.floor(bounds.left) - (layer === CURTAIN ? 1 : 2));
-      xx <= Math.min(map.x0 + map.size.w - 1, Math.ceil(bounds.right) + 1);
+      let xx = Math.max(map.x0, Math.floor(bounds.left) - margin);
+      xx <= Math.min(map.x0 + map.size.w - 1, Math.ceil(bounds.right) + margin);
       xx++
     )
       if (xx !== gx || yy !== gy) coords.push([xx, yy]);
