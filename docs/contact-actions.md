@@ -104,3 +104,18 @@ Entrance defense passed A13 on both seeds, including seed 3, which previously fa
 In paired neutral A9 runs, seed 1 was unchanged on food and loss (2,355 stored and zero losses). Seed 3 still passed A9, but food fell from 2,182 to 2,134 and combined losses rose from zero to six. The rule is worth testing across more seeds, with absolute defender losses and neutral food and losses as separate guards. Directed combat stays opt-in.
 
 Run the 300-second pilot with `node scripts/experiment.mjs defendEntrance contactEntrance contact --seeds 1,3 --set game.fight.intent=true --jobs 3`. The existing A13 controls are reproduced with `node scripts/experiment.mjs defendHome --seeds 1,3 --set game.fight.intent=false,true --jobs 2`.
+
+### Entrance-only defense confirmation
+
+Directed damage is the design baseline. This comparison tests whether entrance defense should become the default contact response under that damage model.
+
+| Seed | A13 food, directed → entrance | A13 defender losses | A13 raider losses | A9 food, both colonies | A9 losses, both colonies |
+|---:|---:|---:|---:|---:|---:|
+| 2 | 315 → 373 | 124 → 114 | 42 → 44 | 1,559 → 1,559 | 0 → 0 |
+| 4 | 106 → 118 | 127 → 93 | 29 → 27 | 2,070 → 2,086 | 0 → 1 |
+| 5 | 77 → 118 | 158 → 166 | 36 → 31 | 2,061 → 1,622 | 3 → 0 |
+| 6 | 78 → 103 | 147 → 138 | 39 → 43 | 1,557 → 1,455 | 0 → 0 |
+
+Across the two pilot seeds and four confirmation seeds, entrance defense increased A13 food in all six and improved the A13 pass count from 2/6 to 4/6. Seed 5 still cost eight additional defenders. Every neutral A9 run passed, but seed 5 lost 21% of its food throughput even as casualties fell. The entrance cue alone is insufficient for default adoption. A follow-up should test whether an existing locally sensed threat cue can distinguish a raid from a neutral encounter near the hole.
+
+Reproduce the confirmation with `node scripts/experiment.mjs defendHome defendEntrance contact contactEntrance --seeds 2,4-6 --set game.fight.intent=true --jobs 4`.

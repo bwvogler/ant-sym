@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defendControl } from "../../experiment.ts";
+import { defendControl, oneAssay } from "../../experiment.ts";
+import { Colony } from "../../colony.ts";
+import { localResponses, type Touch } from "../../responses.ts";
+import { mulberry32 } from "../../world.ts";
+import { arena } from "../builders.ts";
 
 for (const intent of [false, true]) {
   test(`A13 controls preserve combat settings and duration (intent=${intent})`, () => {
@@ -20,3 +24,24 @@ for (const intent of [false, true]) {
     assert.equal(fight.rate, 0.75);
   });
 }
+
+test("the entrance assay only changes an unladen defender facing an enemy at the hole", () => {
+  const base = oneAssay("defendHome").spec(1);
+  const treatment = oneAssay("defendEntrance").spec(1);
+  const colony = new Colony(arena(), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+  const contact = treatment.sides!.responses!.contact;
+  const draw = colony.antDraw(0);
+  const atHole: Touch = { ...colony.t, mode: "explore", stance: "forage", enemy: true, place: "hole", carrying: "none" };
+  assert.equal(localResponses.contact(atHole, draw), "flee");
+  assert.equal(contact(atHole, draw), "fight");
+  for (const touch of [
+    { ...atHole, place: "out" },
+    { ...atHole, place: "tunnel" },
+    { ...atHole, carrying: "food" },
+    { ...atHole, enemy: false },
+  ] satisfies Touch[]) {
+    assert.equal(contact(touch, draw), localResponses.contact(touch, draw));
+  }
+  assert.equal(treatment.game!.fight!.intent, true);
+  assert.equal(treatment.sides!.rivalResponses, base.sides!.rivalResponses);
+});
