@@ -84,7 +84,7 @@ export function gatesFor(p: ColonyParams, open: boolean, one: boolean, dt: numbe
   const hold = p.leaveGate > 0 && one && !open;
   const leak = p.leaveGate > 0 && (open || one);
   const rgate = p.raidGate > 0 && open;
-  const sgate = p.stanceGate > 0 && open;
+  const sgate = open;
   return {
     hold,
     leak,

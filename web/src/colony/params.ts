@@ -369,12 +369,6 @@ export interface ColonyParams {
    * weak and patchy: the trail recruits and points the way, and the search does the rest (ja-sf1, review of #44)
    */
   raidOnward: number;
-  /**
-   * on a top-down map, each ant's stance is its own, from what it senses (1, docs/stance.md): raid once recruited, defend while
-   * it senses a threat on home ground, else forage; and raid scouts go out on the `leave` answer "raid". 0: the colony's
-   * strategist chooses one stance for every ant, as on the side view
-   */
-  stanceGate: number;
   /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
   defendAt: number;
   /** how far from its nest an ant is on home ground: by sight of its hole where it sees it, else by its home vector (world units) */
@@ -395,8 +389,7 @@ export interface ColonyParams {
   raidRecruit: number;
   /**
    * the rate per second an ant at home goes out to look for the rival: answering `leave` "raid" (each ant's own stance,
-   * docs/stance.md), or, where the colony's stance is broadcast, on a raid stance with no raid trail under it (a scout: a
-   * spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
+   * docs/stance.md; a scout: a spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
    */
   raidScout: number;
   /**
@@ -532,7 +525,6 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidLay: 1,
   findAt: 0.3,
   raidOnward: 1,
-  stanceGate: 1,
   defendAt: 1,
   homeGround: 10,
   broodOdour: 0,

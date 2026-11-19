@@ -23,7 +23,7 @@ function bare(seed: number): OneWorld {
 
 /** A bare colony on world `w`'s curtain, bound to it. */
 function colony(w: OneWorld, params: Partial<ColonyParams>, seed: number, policy?: Policy): Colony {
-  const c = new Colony(w.curtain, params, mulberry32(seed), policy, undefined, { plane: w.plane, line: w.line });
+  const c = new Colony(w.curtain, params, mulberry32(seed), policy, { plane: w.plane, line: w.line });
   c.bind(CURTAIN);
   return c;
 }

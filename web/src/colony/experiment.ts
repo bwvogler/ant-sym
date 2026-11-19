@@ -481,13 +481,9 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
-    // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
-    // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
     sides: {
       policy: always<Mode>("fight"),
-      stance: always<Stance>("raid"),
-      colony: { raidGate: 0, stanceGate: 0 },
-      rival: { stanceGate: 0 },
+      colony: { raidGate: 0 },
     },
   };
 }
@@ -537,19 +533,9 @@ export const passWalked: Assay = {
   title: `${pass.title} (one world, attackers walked)`,
 };
 
-/** A battle spec with its colony-wide stances taken off (no stance policy, no stanceGate 0) and side `k` walked at side `to`'s hole. */
+/** A battle spec with side `k` walked at side `to`'s hole. */
 function walked(spec: RunSpec, k: number, to: number): RunSpec {
-  const { stance: _s, rivalStance: _r, colony, rival, ...sides } = spec.sides ?? {};
-  const own = (p?: Partial<ColonyParams>) => {
-    if (!p) return undefined;
-    const { stanceGate: _g, ...rest } = p;
-    return rest;
-  };
-  return {
-    ...spec,
-    sides: { ...sides, ...(own(colony) ? { colony: own(colony) } : {}), ...(own(rival) ? { rival: own(rival) } : {}) },
-    probes: [...(spec.probes ?? []), marchProbe(k, to)],
-  };
+  return { ...spec, probes: [...(spec.probes ?? []), marchProbe(k, to)] };
 }
 export const open: Assay = {
   id: "open",
@@ -686,7 +672,7 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
         { x: 100, y: 30, r: 3 },
       ]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { stance: always<Stance>("raid"), responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
+    sides: { responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
     probes: [raidProbe(own, rival)],
   };
 }
@@ -732,7 +718,7 @@ export const raidFind = raidFindAssay((spec) => spec);
  * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
  * a raid stance with its rival sealed in rock, and a food pile it could forage. A raid stance is a bias, not an order: ants not
  * recruited by a scout's trail go on foraging, and scouts that find no one tire and come home. (The first version made
- * raiders wait at home for a trail that never came, and the strategist raids when no food comes in, so it never ate: 10 of
+ * raiders wait at home for a trail that never came, and a raid stance told to every ant (since removed) left it no forager, so it never ate: 10 of
  * 7,400.) Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least RAID_STOP_FOOD
  * of it. Reported: the share outside in the last 3 min.
  */
@@ -753,7 +739,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
       ]);
     },
     game: { antCount: 300, rivalAnts: 30 },
-    sides: { stance: always<Stance>(stance), responses: stance === "raid" ? RAIDING : NEVER_RAID },
+    sides: { responses: stance === "raid" ? RAIDING : NEVER_RAID },
     probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
@@ -797,7 +783,7 @@ export const contact: Assay = {
         { x: 108, y: 30, r: 3 },
       ]),
     game: { antCount: 200, rivalAnts: 200 },
-    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage"), responses: NEVER_RAID, rivalResponses: NEVER_RAID },
+    sides: { responses: NEVER_RAID, rivalResponses: NEVER_RAID },
   }),
   score: (r) => {
     const lost = r.metrics["you.losses"] + r.metrics["rival.losses"];
@@ -814,10 +800,9 @@ export const contact: Assay = {
  * threshold raised by encounters, Hoover et al. 2016; Pheidole: the fight moves closer to the nest as it grows). Score: food
  * stored against the same seed with the war party sealed in rock (`foodShare`), the strangers killed per ant lost
  * (`exchange`), and, sampled each second from 20 s, the colony's fighters within NEAR_HOME of its nest (`fightNear`) and its
- * ants at the pile that are not fighting (`atPile`). `broadcast` is the same battle with the colony's stance chosen by its
- * strategist and told to every ant (stanceGate 0, as before). Design mark: food at least DEFEND_FOOD of the broadcast's
- * share, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an 80-strong
- * war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
+ * ants at the pile that are not fighting (`atPile`). Design mark (defendWalked): food at least DEFEND_FOOD of the same colony's
+ * with nobody defending, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an
+ * 80-strong war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
  */
 export const DEFEND_FOOD = 0.9;
 export const NEAR_HOME = 15;
@@ -843,8 +828,7 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     sides: {
       ...(colony ? { colony } : {}),
       rivalPolicy: always<Mode>("fight"),
-      rivalStance: always<Stance>("raid"),
-      rival: { raidGate: 0, stanceGate: 0 },
+      rival: { raidGate: 0 },
     },
     probes: [
       {
@@ -868,9 +852,8 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
   };
 }
 /**
- * A13 on one world with no colony-wide stance (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with
- * its own stance, walked to the colony's hole by the harness (marchProbe). The broadcast arm has no one-world twin (the
- * colony-wide stance is what S2 deletes); in its place `noDefence` is the same battle with nobody defending (defendAt ∞).
+ * A13 on one world (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with its own stance, walked to the
+ * colony's hole by the harness (marchProbe). `noDefence` is the same battle with nobody defending (defendAt ∞).
  * Design mark (owner, 2026-11-15, S2.2c): food at least DEFEND_FOOD of the no-defence colony's, and at least half the war
  * party killed: defending by its senses should cost the colony no more than not defending, and stop the raiders.
  */
@@ -908,34 +891,6 @@ export const defendWalked: Assay = {
       atPile: r.metrics.atPile as number,
       marched: r.metrics.marched as number,
       pass: vsNone >= DEFEND_FOOD && killed >= half ? 1 : 0,
-    };
-  },
-};
-
-export const defendHome: Assay = {
-  id: "defendHome",
-  title: "A13 defence from senses: the nest is defended, the far pile still worked",
-  target: `food (against the same colony with no war party) ≥ ${DEFEND_FOOD * 100} % of the broadcast stance's, and ≥ half the war party killed (design marks; docs/stance.md)`,
-  seconds: 300,
-  spec: (seed) => defendSpec(seed, false),
-  score: (r) => {
-    const stored = r.metrics["you.stored"];
-    const control = runGame(defendSpec(r.seed, true)).result.metrics["you.stored"];
-    const foodShare = control > 0 ? stored / control : NaN;
-    const killed = r.metrics["rival.losses"];
-    const lost = r.metrics["you.losses"];
-    const broadcast = runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"] / Math.max(1, control);
-    return {
-      stored,
-      control,
-      foodShare,
-      broadcast,
-      killed,
-      lost,
-      exchange: killed / Math.max(1, lost),
-      fightNear: r.metrics.fightNear as number,
-      atPile: r.metrics.atPile as number,
-      pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0,
     };
   },
 };

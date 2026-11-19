@@ -20,7 +20,7 @@ export const MARKER = "<!-- pr-notes (scripts/pr-notes.mjs) -->";
 export const isGolden = (f) => /^web\/src\/colony\/tests\/.*golden.*\.json$/i.test(f);
 
 /**
- * colony-cost.mjs's figures: the session's $/h for the lanes the page asks (modes and stances), tokens a question, and
+ * colony-cost.mjs's figures: the session's $/h for the lanes the page asks (modes), tokens a question, and
  * the response lanes' $/h, reported apart (not asked by the page yet).
  */
 export function readColonyCost(text) {
@@ -70,8 +70,8 @@ export function notes({ changed, body, colony, fungus, costRan = false }) {
     if (colony || fungus) out.push("| lane | base | head | change |", "|---|---|---|---|");
     const row = (name, a, b, f) => out.push(`| ${name} | ${f(a)} | ${f(b)} | ${delta(a, b, f)} |`);
     if (colony) {
-      row("modes and stances, $/h", colony.base.usdPerHour, colony.head.usdPerHour, usd);
-      row("modes and stances, tokens a question", colony.base.tokPerQuestion, colony.head.tokPerQuestion, tok);
+      row("modes, $/h", colony.base.usdPerHour, colony.head.usdPerHour, usd);
+      row("modes, tokens a question", colony.base.tokPerQuestion, colony.head.tokPerQuestion, tok);
       row("response lanes (not asked yet), $/h", colony.base.responsesUsdPerHour, colony.head.responsesUsdPerHour, usd);
     }
     if (fungus) {

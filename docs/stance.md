@@ -45,7 +45,7 @@ The paper hosts were mostly outside this session's network allowlist. As in `rai
 
 ## Play
 
-Built on top-down maps only (PRD §54). The page starts in the side view, which keeps the colony's strategist (`ja-1a9`).
+Built on top-down maps only (PRD §54). The side view kept the colony's strategist (`ja-1a9`); both are gone (S2: one world, `ja-fnd.3.3.2`).
 - **See:**
   - A war party at a nest is met by the ants near it, while foragers far off keep carrying.
   - Raids start small: a few scouts leave a crowded nest, and recruits follow a finder's trail by degrees, not in one wave.
@@ -70,7 +70,7 @@ Built on top-down maps only (PRD §54). The page starts in the side view, which 
 
 ## Left out
 
-- **The side view** keeps the colony-level strategist until its raids follow trails underground (`ja-1a9`).
+- ~~**The side view** keeps the colony-level strategist until its raids follow trails underground (`ja-1a9`).~~ Deleted with the side view and the strategist (S2.3b): every ant's stance is its own, on both layers.
 - **Brood need** as a raid cue (the slave-makers' motive) is left out: the game's raids take no brood (`ja-gkl`).
 - **Colony-wide wars by recruitment from fights:** alarm already draws defenders. A separate fight-recruitment signal is not built.
 

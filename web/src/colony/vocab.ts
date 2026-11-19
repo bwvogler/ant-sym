@@ -65,7 +65,7 @@ export interface Situation {
   alarm: Trail;
   /** an ant of another colony within two cells */
   enemy: "none" | "near";
-  /** what the colony as a whole is doing (the strategist's choice) */
+  /** what this ant is doing: its own stance, from what it senses (defend near home under threat, raid once recruited) */
   stance: Stance;
 }
 
@@ -112,35 +112,6 @@ export interface CellCounts {
 
 /** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */
 export const ENEMY = 0.5;
-
-/** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
-export interface StanceSituation {
-  stance: Stance;
-  /** living ants against the colony's cap */
-  ants: "few" | "some" | "many";
-  /** ants lost lately (a 30 s fading count) */
-  losses: "none" | "some" | "heavy";
-  enemyNearNest: boolean;
-  /**
-   * food brought home lately, per ant (behaviour MR 5, docs/activation.md: a colony knows its food only as the rate
-   * foragers bring it in, never as what is left on the map): none, some or plenty
-   */
-  intake: "none" | "some" | "plenty";
-  /** food stored but not yet turned into ants (the colony is at its cap) */
-  larder: "low" | "full";
-}
-
-/** The strategist's fields: 3 × 3 × 3 × 2 × 3 × 2 = 324 views. */
-export const STANCE_SCHEMA = defineSchema<StanceSituation>([
-  { name: "stance", values: STANCES },
-  { name: "ants", values: ["few", "some", "many"] },
-  { name: "losses", values: ["none", "some", "heavy"] },
-  { name: "enemyNearNest", values: [false, true], key: (v) => (v ? "enemy" : "clear") },
-  { name: "intake", values: ["none", "some", "plenty"], key: (v) => `intake:${v}` },
-  { name: "larder", values: ["low", "full"] },
-]);
-
-export type StancePolicy = (s: StanceSituation) => Stance;
 
 /** How far an odour may sit from an ant's own before it is a stranger. Tied to MAX_MASK, FUNGAL and BINS (above); colonies built alone use it too. */
 export const TOLERANCE = 0.35;

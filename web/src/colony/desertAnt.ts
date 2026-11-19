@@ -10,7 +10,7 @@ import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } 
 // The desert ant, Cataglyphis (docs/desert-ant.md, PRD §60; ja-rf5.3): the first real species on the descriptor (docs/species.md), made only of
 // its pieces. Modelled on C. fortis (Dillier & Wehner 2004, full text): one nest, about 200 workers. Its foragers work alone: no trail pheromone
 // and no recruitment to a place (Razin et al. 2013, full text; Wolf & Wehner 2000, unverified), so it lays and reads no trail and no alarm, and
-// has no follow mode and no stance lane; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Built since: food odour in the air
+// has no follow mode; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Built since: food odour in the air
 // (ja-rf5.4), heat with the sun's height and the night (ja-rf5.5, ja-rf5.12; docs/desert-heat.md). Still to come: the invitation (ja-rf5.6).
 
 /** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), what it sees of the sun (ja-rf5.12), whether strangers are near. No trails, alarm or stance to sense. */
@@ -97,7 +97,6 @@ export const DESERT_ANT: Species = {
     channelSet: MARKS,
     homeTrail: 0,
     raidGate: 0,
-    stanceGate: 0,
     undertakes: false,
     // Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): C. fortis turns in to food odour up to about 6 m (5.9 m the longest;
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,

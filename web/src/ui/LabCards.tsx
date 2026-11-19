@@ -175,7 +175,7 @@ export function JevCard({ jev }: Props) {
         <Stat label="situations asked" value={String(jev.state.lanes.mode.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.lanes.mode.cached} · ${jev.state.stanceLane ? `${jev.state.lanes.stance.cached} stances` : "no stance lane"} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
+          value={`${jev.state.lanes.mode.cached} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
         />
         <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>

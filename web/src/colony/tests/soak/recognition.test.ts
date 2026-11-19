@@ -424,21 +424,16 @@ test("unity: the meeting and its latch are saved, and a save from before them lo
   assert.equal(old.unity().unified, false);
 });
 
-test("a colony whose nest smells like ours is no rival: the strategist forages instead of raiding kin", () => {
-  const g = new Game(oneArena(arena(6.5), 2), { antCount: 5, rivalAnts: 5, strategyEvery: 1 }, mulberry32(2));
+test("a colony whose nest smells like ours is no rival: kin are not raided", () => {
+  const g = new Game(oneArena(arena(6.5), 2), { antCount: 5, rivalAnts: 5, rivalEvery: 1 }, mulberry32(2));
   const [a, b] = g.colonies as [Colony, Colony];
-  // A strategist that would always raid a rival (the colony's stance, told to every ant: on open ground only with stanceGate 0).
-  for (const c of [a, b]) {
-    c.bindPolicy("stance", () => "raid");
-    c.params.stanceGate = 0;
-  }
   g.tick(1 / 30);
-  assert.equal(a.stance, "raid", "strangers: raid");
+  assert.equal(a.raidable, true, "strangers: a rival to raid");
   a.nestOdour = 0.45;
   b.nestOdour = 0.55;
   for (let k = 0; k < 31; k++) g.tick(1 / 30);
-  assert.equal(a.stance, "forage", "kin: nobody to raid");
-  assert.equal(b.stance, "forage");
+  assert.equal(a.raidable, false, "kin: nobody to raid");
+  assert.equal(b.raidable, false);
 });
 
 // A whole game, so slower than the rest: its own timeout, and a small one world (160 × 100 plane).

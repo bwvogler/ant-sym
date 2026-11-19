@@ -41,7 +41,7 @@ export function hashGame(g: Game): string {
       else if (v instanceof ChunkLayer) layer(v);
     }
   };
-  text([g.time, g.strategyChoices, g.regrown, g.revealed, g.landed, g.founded, g.flights]);
+  text([g.time, g.regrown, g.revealed, g.landed, g.founded, g.flights]);
   g.layers.forEach((m: WorldMap) => {
     text([m.x0, m.size, m.foodLeft, m.foodTotal, m.dug, m.filled, m.moundCells ?? null, m.nests]);
     walk(m);
@@ -69,7 +69,6 @@ export function hashGame(g: Game): string {
       c.losses,
       c.decisions,
       c.larder,
-      c.stance,
       c.queen,
       c.brood.items,
       c.corpses,
@@ -83,8 +82,8 @@ export function hashGame(g: Game): string {
     text(c.saveState().private);
   }
   text(g.fungus.saveState());
-  // What the game reads off its occupancy grids and recognition bands (Game.#refresh): unity, and strangers by each nest.
-  text([g.unity(), g.colonies.map((_, k) => g.enemiesNearNest(k))]);
+  // What the game reads off its occupancy grids and recognition bands (Game.#refresh): unity.
+  text([g.unity()]);
   return (h >>> 0).toString(16);
 }
 

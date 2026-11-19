@@ -125,7 +125,6 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
   col.digT[i] = 0;
   if (lost) {
     col.losses++;
-    col.recentLosses++;
   }
 }
 
