@@ -143,7 +143,8 @@ export function decide(col: Colony, i: number, s: AntStep): void {
         stance: col.stanceOf(i),
       };
       mode = MODES.indexOf(col.policy(sit, col.policyDraw));
-      col.redraw[i] = col.policyDrew && p.reroll > 0 ? p.reroll : -1;
+      // How long it holds this draw: `reroll` seconds, or with rerollLaw 1 a time drawn from an exponential law of that mean.
+      col.redraw[i] = col.policyDrew && p.reroll > 0 ? (p.rerollLaw > 0 ? -p.reroll * Math.log(1 - col.rng()) : p.reroll) : -1;
       if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
       if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
       // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put

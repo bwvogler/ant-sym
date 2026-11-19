@@ -764,14 +764,14 @@ try {
   // ——— 6. The Mutations drawer's tooltips: a mouse hovers, a keyboard tabs, a finger taps (ui/Tip.tsx) ———
   section("6. the Mutations drawer's tooltips");
   const tips = (p) => p.getByRole("tooltip").count();
-  const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first();
-  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first();
+  const firstUpgrade = (p) => p.getByLabel("upgrades").locator("li").first(); // Infectivity: fair, a root of the tree
+  const nameOf = (p) => firstUpgrade(p).locator("[tabindex='0']").first(); // on a phone's list: the upgrade's name
   // The upgrades live in the Mutations drawer (PRD §69): the rail opens it, and the button shows it pressed.
   const mutations = (p) => p.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Mutations", exact: true });
   await mutations(page).click();
   check((await mutations(page).getAttribute("aria-pressed")) === "true", "the rail opens the Mutations drawer");
-  await nameOf(page).hover();
-  await until(async () => (await tips(page)) === 1, "a hover opens an upgrade's tooltip", 3000, 50);
+  await firstUpgrade(page).hover();
+  await until(async () => (await tips(page)) === 1, "a hover opens a level's tooltip", 3000, 50);
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes a tooltip");
   await page.mouse.move(2, 2);
@@ -782,13 +782,15 @@ try {
   });
   const buy = firstUpgrade(page).getByRole("button");
   await until(() => buy.isEnabled(), "the next-level button, once mutations are to keep", 5000, 100);
-  await nameOf(page).focus();
-  await page.keyboard.press("Tab"); // from the name onto its next-level button: a keyboard focus opens that button's tooltip
-  await until(async () => (await tips(page)) === 1, "Tab onto the next-level button opens its tooltip", 3000, 50);
+  await buy.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab"); // onto the level's button from the keyboard: a keyboard focus opens its tooltip
+  await until(async () => (await tips(page)) === 1, "Tab onto a level's button opens its tooltip", 3000, 50);
   check(
     /^Infectivity: fair for \d+ mutations?/.test(await page.getByRole("tooltip").innerText()),
-    "the next-level tooltip (not the name's) says what it costs",
+    "the level's tooltip says what it gives and costs",
   );
+  check(/next \d+/.test(await page.getByLabel("evolution").innerText()), "the next price is by the mutations in hand, not on the levels");
   await page.keyboard.press("Escape");
   check((await tips(page)) === 0, "Escape closes it");
   // Escape closes one thing at a time (review of #182, S1 and S7): with an ant followed and the map focused, the first
@@ -1440,6 +1442,11 @@ try {
           const sy = ((c.y[i] - cam.y) * cam.zoom + cv.height / 2) * k;
           const d = Math.hypot(sx - cv.clientWidth / 2, sy - cv.clientHeight * 0.4);
           if (!(sx > 40 && sx < cv.clientWidth - 40 && sy > 160 && sy < cv.clientHeight * 0.6) || (best && d >= best.d)) continue;
+          // Only an ant the press reaches: a notice floats over the map as a button that takes the press, and it does so just
+          // when this check runs (an ant has found the sugar a few game seconds in): the drag then lands on the toast and the ant
+          // stays put (ja-w7ef.24: 4 of 40 fresh pages, each with a toast at the press point; every other page had the canvas).
+          // The two-finger check presses 50 px below it too, with the second finger: that point needs the canvas as well.
+          if (document.elementFromPoint(sx, sy) !== cv || document.elementFromPoint(sx, sy + 50) !== cv) continue;
           // The tweezers lift the nearest live ant of any colony within PICK_PX (14 CSS px, ColonyField's pick): with another
           // ant within twice that, the drag can lift that one and leave this one where it was (run 43721564508; review of
           // #233, S3). Only an ant alone there.

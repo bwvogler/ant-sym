@@ -61,6 +61,7 @@ test("responseOf: get and drop read as booleans; validResponse holds an answer t
 
 test("an ant keeps the answer it drew while its situation holds; ants in one situation differ, by Jev's odds", () => {
   const c = colony();
+  c.params.sampleTemp = 1; // Jev's odds as given, whatever the default
   assert.equal(c.drawSalt, -1, "nothing drawn yet");
   const r = responsesFromAnswers({ contact: { [responseKey("contact", near)]: "fight=0.3,flee=0.7" } });
   let fights = 0;

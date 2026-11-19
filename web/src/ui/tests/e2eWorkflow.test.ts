@@ -86,6 +86,18 @@ test("the tweezers check picks an ant no other ant sits near, as the page's pick
   assert.match(script, /const crowded = window\.jevAnts\.game\.colonies\.some\(/, "every colony's ants, as pick() looks at every colony");
 });
 
+// A notice floats over the map as a button that takes the press: the tweezers' drag from an ant under one lands on the toast and
+// the ant stays put. It flaked on CI for days (11 failures in three days, ja-w7ef.24): every miss reproduced locally had a
+// toast at the press point, every lift had the canvas there. The check keeps to ants the press reaches.
+test("the tweezers check skips an ant whose press point is not the canvas (ja-w7ef.24)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(
+    script,
+    /^\s*if \(document\.elementFromPoint\(sx, sy\) !== cv \|\| document\.elementFromPoint\(sx, sy \+ 50\) !== cv\) continue;\n(?:\s*\/\/.*\n)*\s*const crowded = /m,
+    "an ant under a toast or the HUD is skipped, at the first finger's point and the second's (+50), before the crowded check",
+  );
+});
+
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(script, /let off = null;\s*await until\(/, "the value the check reads is declared before the poll");

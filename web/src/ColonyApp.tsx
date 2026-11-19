@@ -5,6 +5,9 @@ import {
   type Upgrade,
   LETHAL_LEVERS,
   canKeep,
+  keptLevels,
+  nextCost,
+  price,
   MAX_COLONIES,
   MET,
   type Game,
@@ -1286,6 +1289,8 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
 }
 
 function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
+  // One price for every level, rising with each one kept (PRD §80): shown here, by the mutations in hand, not on each level.
+  const next = UPGRADES.some((u) => nextCost(e.levels, u.id) !== null) ? price(keptLevels(e.levels)) : null;
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1300,6 +1305,7 @@ function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: str
         <Tip tip={MUTATION_TIP}>Mutations</Tip>
         <span className="font-mono tabular-nums">
           <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
+          {next !== null && <span className="text-fg-2"> · next {next.toLocaleString()}</span>}
           <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
         </span>
       </div>
