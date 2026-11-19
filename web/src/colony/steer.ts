@@ -1,3 +1,4 @@
+import { departureHeading } from "./departure.ts";
 // Steer (docs/refactor.md S3.4): the fourth stage of an ant's step in tick. The heading it walks this step: homing to where it believes its goal is (its vector, the hole, a pellet up the shaft, trails, walls, backfill and stale tunnels), following a trail, fighting or raiding, exploring and digging; then fleeing, alarm, the trail it lays, the wait at home, and the last stretch into its hole. Moved out of Colony.tick verbatim but for `this` becoming `col`; the heading goes to the next stages through the step record.
 import { NO_KEY } from "./ants.ts";
 import type { Colony, HoleCell } from "./colony.ts";
@@ -554,6 +555,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       h += matesW > 0 ? climb(ml, mf, mr, p.turnRate * dt * NEST_W) : avoid(ml, mf, mr, p.turnRate * dt * NEST_W);
     }
   }
+  if (col.departure) h = departureHeading(col, i, s, h);
   // Fleeing (behaviour MR 4): straight away from the strangers while they are in reach (then it resumes). Homing alone, the
   // fleeing ant often walked along them, or toward them, and died: G′ seed 2, 1,127 of the dead were fleeing.
   if (fleeFrom !== null && (col.onPlane || !col.under[i])) h = turnToward(h, fleeFrom + Math.PI, p.turnRate * dt * 2);

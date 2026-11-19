@@ -1,3 +1,4 @@
+import { enableDeparture } from "./departure.ts";
 // D1: fixed-patch departure baseline (PRD §85). No departure action is implemented here.
 import { Colony } from "./colony.ts";
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
@@ -46,7 +47,14 @@ export class DepartureProbe {
 }
 
 /** Single-ant motor assay, not a whole-colony fitness assay. Refuse every food offer. */
-export function runDepartureBaseline(seed: number, geometry: DepartureGeometry, seconds = 30, observe = true) {
+export function runDepartureBaseline(
+  seed: number,
+  geometry: DepartureGeometry,
+  seconds = 30,
+  observe = true,
+  action: "off" | "continue" | "pass-by" = "off",
+  duration = 1,
+) {
   if (!Number.isInteger(seed) || seed < 1 || !DEPARTURE_GEOMETRIES.includes(geometry) || !Number.isFinite(seconds) || seconds <= 0)
     throw new Error("invalid departure assay arguments");
   const w = 60,
@@ -83,6 +91,10 @@ export function runDepartureBaseline(seed: number, geometry: DepartureGeometry, 
       return false;
     },
   });
+  if (action !== "off") {
+    enableDeparture(c, duration);
+    c.responses = { ...c.responses, depart: () => action };
+  }
   const probe = new DepartureProbe();
   const initialFood = map.foodLeft;
   let rockSamples = 0;

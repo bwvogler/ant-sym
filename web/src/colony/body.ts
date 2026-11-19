@@ -36,6 +36,7 @@ const spawnResets = (params: ColonyParams): [string, number][] => {
 };
 
 export function placeNewborn(col: Colony, i: number): void {
+  if (col.departure) delete col.departure.ants[i];
   const a = col.rng() * Math.PI * 2;
   const r = col.rng() * col.nest.r * 0.8;
   col.x[i] = col.nest.x + Math.cos(a) * r;
@@ -70,6 +71,7 @@ export function spawnHome(col: Colony, x: number | undefined, y: number | undefi
 
 /** kill, with ant i's layer bound. */
 export function killOn(col: Colony, i: number, lost: boolean): void {
+  if (col.departure) delete col.departure.ants[i];
   if (!col.alive[i]) return;
   if (col.broodHeld[i]) dropBrood(col, i);
   if (col.carrying[i] && col.porter[i]) {

@@ -114,6 +114,8 @@ export type Carry = (typeof CARRY)[number];
  * situation answer differently, each keeping its draw while the situation lasts. The local rules never draw.
  */
 export interface Responses {
+  /** Experimental choice after refusing food. Absent means continue. */
+  depart?(t: Touch, draw?: AntDraw): "continue" | "pass-by";
   /** Empty jaws, touching something it could take (`offered`: food, loose soil, a corpse, brood): take it? */
   get(t: Touch, draw?: AntDraw): boolean;
   /**

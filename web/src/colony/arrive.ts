@@ -1,3 +1,4 @@
+import { pickupWithDeparture } from "./departure.ts";
 // Arrive (docs/refactor.md S3.4): the last stage of an ant's step in tick. Where the step landed it: food picked up, spoil or a corpse carried out and dropped, a pellet onto the mound or back as fill, a loose pellet or the plane's spoil taken up, home at the nest (food stored, a hand chosen, rest), tiredness, home and leaving again, and the bookkeeping of its home vector, floor marks, nest work and route on the plane. Moved out of Colony.tick verbatim but for `this` becoming `colony` (the moved code has its own `col` and `c`); a pellet carrier crossing up at its hole, or an ant on the plane going down a hole (its own, or a raided foe's), ends its step here (returns true).
 import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
@@ -80,7 +81,9 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     !pellet &&
     colony.putAt[i] === NO_KEY &&
     map.food.get(CELL[0], CELL[1]) > 0 &&
-    resp.get(touch(colony, i, toEnemy !== null, mode, item, "food"), colony.antDraw(i)) &&
+    (colony.departure
+      ? pickupWithDeparture(colony, i, s)
+      : resp.get(touch(colony, i, toEnemy !== null, mode, item, "food"), colony.antDraw(i))) &&
     ((prey = colony.cur === PLANE || colony.onPlane ? colony.preyAphid(CELL[0], CELL[1]) : false) || takeFoodCell(map, CELL[0], CELL[1]))
   ) {
     colony.carrying[i] = 1;

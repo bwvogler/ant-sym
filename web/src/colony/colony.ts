@@ -1,3 +1,4 @@
+import type { DepartureState } from "./departure.ts";
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import type { OutField } from "./homing.ts";
@@ -283,6 +284,7 @@ export class Colony {
   readonly steerPolicy: SteerPolicy = localSteer;
   /** the ant's small responses: pick food up, what to do carrying, put it down, which trail and how much, shy from alarm, raise it (responses.ts) */
   responses: Responses = localResponses;
+  declare departure?: DepartureState;
   stance: Stance = "forage";
   /**
    * whether a rival lives, as the game last found (review of #53, S1): where each ant's stance is its own, nobody raids without one. An

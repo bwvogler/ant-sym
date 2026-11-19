@@ -68,6 +68,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "stancePolicy",
   "steerPolicy",
   "responses",
+  "departure",
   "onBury",
   "onDie",
   "enemies",
@@ -97,6 +98,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
 export function saveColony(c: Colony): Record<string, unknown> {
   return {
     fields: saveFields(c, COLONY_SKIP),
+    ...(c.departure && Object.keys(c.departure.ants).length ? { departure: structuredClone(c.departure) } : {}),
     // One world (U4b): each layer's own state but the bound one's (null: in `fields` and `private`), by LAYER_STATE.
     ...(c.layers.length > 1
       ? {
@@ -109,6 +111,8 @@ export function saveColony(c: Colony): Record<string, unknown> {
 
 /** A saved state back into this colony (saveState), in place where it can be: a fresh colony of the same world and params. */
 export function loadColony(c: Colony, saved: Record<string, unknown>): void {
+  if (saved.departure) c.departure = structuredClone(saved.departure) as NonNullable<Colony["departure"]>;
+  else if (c.departure) c.departure.ants = {};
   const r = saved.private as Record<string, unknown>;
   // `fields` and the private fields hold the bound layer's scent, map state and way out: the same layer must be bound
   // here (between ticks it is home, so this only fails for another game's colony).

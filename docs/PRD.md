@@ -7468,3 +7468,14 @@ Open and corridor runs all exit within 30 seconds. Eight broad-patch seeds never
 No departure behavior is built. Cached-continue parity, actuator duration selection and new-lane cost remain gates for `ja-ygs9.2`. The research note is also listed in the Learn guide's required notes index.
 
 D1 validation: 591 unit tests and four bit-exact golden tests pass; typecheck, lint (seven existing warnings), changed-code formatting and diff checks pass. No paid live-policy requests, browser run or slow-guard run.
+
+
+### Bounded pass-by motor experiment (ja-ygs9.2, not promoted)
+
+An optional `Responses.depart` and explicit `enableDeparture` support a motor-only prototype. Default/off and stateless continue preserve saved state and RNG. A pass-by holds its entry heading for a bounded duration, before ordinary alarm/flee steering and collision handling; active-state save/load, cancellation and episode latching have regression tests. No UI flag or cached live lane is added at this stage; fungus gains and sensory fields are unchanged.
+
+Development tested 0.5/1/2 seconds on seeds 1–10. One second was the shortest candidate eliminating broad-patch non-exiters (5/10 to 0/10); two seconds did not improve worst first-exit time. Fixed one-second validation on seeds 11–20 reduced broad-patch non-exiters from 3/10 to 0/10, but small-patch seed 11's completed-episode p95 regressed, as did six corridor seeds. **Promotion gate failed.** Keep the candidate experimental, do not retune on those validation seeds, and investigate collision-aware cancellation before live-policy wiring. Across 160 evaluated geometry/seed/duration pairs, continue matches off exactly; food stays unchanged and no rock/out-of-bounds samples occur. Blocked patches never produce an exit. [Results and limitations](../experiments/food-departure/PASS-BY.md).
+
+This is an engine/assay milestone, not a completed action-policy lane. No Jev schema or cost change; zero live requests. Cached decisions, weighted live answers, doctrine invalidation and measured tick-overhead gates remain for a later passing candidate.
+
+Motor-prototype validation: 596 unit, 10 focused action/save and four bit-exact golden tests pass; typecheck, lint (seven existing warnings), formatting and diff checks pass. Both experiment files reproduce byte-for-byte. `ja-ygs9.3` blocks promotion of `ja-ygs9.2`; it must investigate narrow terrain and lingering after reentry using fresh held-out seeds.
