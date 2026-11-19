@@ -44,6 +44,8 @@ export interface ColonyParams {
   nest: number;
   /** cells per second */
   speed: number;
+  /** Experimental surface retreat speed multiplier for an unladen ant moving away from a sensed threat. */
+  withdrawalSpeed?: number;
   /** how far ahead the three sensors sit, cells */
   sensorDistance: number;
   /** left and right sensors, radians off the heading */

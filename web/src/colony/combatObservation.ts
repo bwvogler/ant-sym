@@ -4,7 +4,7 @@ import type { Touch } from "./responses.ts";
 
 /** Optional headless instrumentation. Observers never participate in policy or combat. */
 export interface CombatObserver {
-  contact(action: ContactAction, ant: number, sensed: Readonly<Touch>): void;
+  contact(action: ContactAction, ant: number, sensed: Readonly<Touch>, enemyHeading: number): void;
   exposure(pressure: number, allies: number, killed: boolean, ant: number): void;
 }
 

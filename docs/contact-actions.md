@@ -188,3 +188,26 @@ In untreated directed combat, only 7 of the 32 early casualties had sensed alarm
 Early losses are already occurring in the field when these policies are waiting for a close-to-home cue. The next comparison should trace withdrawal and repeated exposure there, including the pressure that reaches ants without a contact decision, before broadening automatic fighting. Food, total losses and pass scores reproduced the existing arms exactly.
 
 Reproduce with `node scripts/experiment.mjs defendHome defendAlarmApproach --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
+
+### Withdrawal under sustained pressure
+
+In the first 30 seconds across three directed A13 seeds, 308 of 538 positive-pressure defender ticks followed another positive-pressure tick for the same ant. Of 460 exposed ticks with a same-layer withdrawal decision, the ant stepped away from its initially sensed enemy heading on 388 and stayed stationary on only four. This projection measures the defender's movement relative to the sensed bearing. It does not measure separation from a moving attacker. Seed 6 also had 39 positive-pressure ticks without a same-tick contact decision.
+
+That made retreat speed a useful intervention to test. The opt-in `colony.withdrawalSpeed=1.25` changes only movement on the surface for ants without food or soil that are already stepping away under an explicit flee heading. It uses the existing collision handling and leaves the decision and damage rules in place.
+
+| Pilot seed | A13 early exposure ticks, base / faster | Early defender deaths | Total defender losses | A13 food | A9 food |
+|---:|---:|---:|---:|---:|---:|
+| 3 | 151 / 35 | 5 / 2 | 106 / 110 | 336 / 154 | 2,182 / 2,232 |
+| 5 | 101 / 27 | 8 / 2 | 158 / 110 | 77 / 150 | 2,061 / 1,954 |
+| 6 | 286 / 179 | 19 / 7 | 147 / 74 | 78 / 480 | 1,557 / 1,621 |
+
+Faster retreat reduced early deaths in each pilot seed and changed seed 5 from an A13 fail to a pass. Seed 3 still failed and brought home less than half as much food, while seed 6 still fell short of the raider-loss threshold despite better survival and storage. Every A9 run still passed.
+
+| Holdout seed | A13 total defender losses, base / faster | A13 food | A13 raider losses | A9 food |
+|---:|---:|---:|---:|---:|
+| 2 | 124 / 89 | 315 / 529 | 42 / 38 | 1,559 / 1,398 |
+| 4 | 127 / 81 | 106 / 116 | 29 / 26 | 2,070 / 1,974 |
+
+The holdout reduced total defender losses and increased raid food on both seeds, but seed 2 went from a pass to a fail and both neutral runs lost food. Across all five seeds, A13 passes stayed at 1/5. A speed boost helps ants survive exposure, but this version shifts how effectively they repel raids and forage. Keep it as an experiment. The next comparison should match incoming pressure to the ant's contact perception and measure an entire withdrawal through separation, renewed contact or death, including the ticks after an enemy falls out of sense range.
+
+Reproduce the trace with `node scripts/experiment.mjs defendHome --seeds 3,5,6 --seconds 30 --set game.fight.intent=true --jobs 3`. Reproduce the speed experiment with `node scripts/experiment.mjs defendHome contact --seeds 2-6 --set game.fight.intent=true --set colony.withdrawalSpeed=1.25 --jobs 4`.

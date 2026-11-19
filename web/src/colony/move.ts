@@ -29,8 +29,11 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
   // Move; rock or the edge turns the ant back somewhere random.
   // Rounded to float32 first, as stored: checked in float64, 192.999996 is open ground, and stored as
   // 193.0 it would land the ant inside the soil cell beyond, where every step is blocked.
-  const nx = Math.fround(col.x[i] + Math.cos(h) * p.speed * dt);
-  const ny = Math.fround(col.y[i] + Math.sin(h) * p.speed * dt);
+  let speed = p.speed;
+  if (p.withdrawalSpeed !== undefined && col.onPlane && !carrying && !pellet && s.fleeFrom !== null && Math.cos(h - s.fleeFrom) < 0)
+    speed *= p.withdrawalSpeed;
+  const nx = Math.fround(col.x[i] + Math.cos(h) * speed * dt);
+  const ny = Math.fround(col.y[i] + Math.sin(h) * speed * dt);
   col.detour[i] = col.detour[i] - dt;
   col.bumps[i] = Math.max(0, col.bumps[i] - dt / 4);
   // The cell the step lands in: open ground (most steps) moves at once, with no more to check.

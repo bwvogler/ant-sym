@@ -187,7 +187,7 @@ export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObse
     const answer = resp.contact(sensed, col.antDraw(i));
     const action = contactAction(answer, carrying || pellet || nursing, reporting);
     s.contactAction = action;
-    observer?.contact(action, i, sensed);
+    observer?.contact(action, i, sensed, toEnemy);
     if (action.movement === "attack") {
       mode = FIGHT;
       col.attackLayer[i] = col.layer[i];

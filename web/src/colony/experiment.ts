@@ -939,14 +939,23 @@ function observedDefence(spec: RunSpec): RunSpec {
               "combatDeaths",
             ])
               add(key, 0);
-            const contacts = new Map<number, { time: number; alarm: string; movement: string; homeSeen: boolean }>();
+            const contacts = new Map<
+              number,
+              { time: number; alarm: string; movement: string; homeSeen: boolean; x: number; y: number; layer: number; heading: number }
+            >();
+            const exposures = new Map<number, { time: number; streak: number }>();
+            const dt = spec.dt ?? 1 / 30;
             combatObservers.set(colony, {
-              contact(action, ant, sensed) {
+              contact(action, ant, sensed, heading) {
                 if (side === 0 && game.time <= 30)
                   contacts.set(ant, {
                     time: game.time,
                     alarm: sensed.alarm,
                     movement: action.movement,
+                    x: colony.x[ant],
+                    y: colony.y[ant],
+                    layer: colony.layer[ant],
+                    heading,
                     homeSeen: colony.s[3] === SEEN || colony.s[4] === SEEN || colony.s[5] === SEEN,
                   });
                 add(action.movement);
@@ -957,6 +966,27 @@ function observedDefence(spec: RunSpec): RunSpec {
                 add("exposed");
                 add("pressure", pressure);
                 add("hazardInput", pressure / allies);
+                const contact = contacts.get(ant);
+                const current = contact?.time === game.time ? contact : undefined;
+                if (side === 0 && game.time <= 30) {
+                  const previous = exposures.get(ant);
+                  const repeated = previous !== undefined && Math.abs(game.time - previous.time - dt) < 1e-8;
+                  const streak = repeated ? previous.streak + 1 : 1;
+                  if (killed) exposures.delete(ant);
+                  else exposures.set(ant, { time: game.time, streak });
+                  add("earlyExposures");
+                  add("earlyExposuresWithoutContact", Number(!current));
+                  add("earlyRepeatedExposures", Number(repeated));
+                  if (current?.movement === "withdraw" && current.layer === colony.layer[ant]) {
+                    const dx = colony.x[ant] - current.x;
+                    const dy = colony.y[ant] - current.y;
+                    const toward = dx * Math.cos(current.heading) + dy * Math.sin(current.heading);
+                    add("earlyWithdrawalExposures");
+                    add("earlyWithdrawalSteppedAway", Number(toward < -1e-8));
+                    add("earlyWithdrawalStationary", Number(Math.hypot(dx, dy) < 1e-8));
+                    if (killed) add("earlyWithdrawalDeathExposureTicks", streak);
+                  }
+                }
                 if (killed) {
                   add("combatDeaths");
                   counts[`${prefix}.firstCombatDeath`] ??= game.time;
@@ -964,8 +994,6 @@ function observedDefence(spec: RunSpec): RunSpec {
                   const layer = colony.layer[ant];
                   const nest = colony.layers[layer]!.nest;
                   const distance = Math.hypot(colony.x[ant] - nest.x, colony.y[ant] - nest.y);
-                  const contact = contacts.get(ant);
-                  const current = contact?.time === game.time ? contact : undefined;
                   add("earlyDeaths");
                   add("earlyDeathsOutsideNest", Number(distance >= nest.r));
                   add("earlyDeathsWithoutContact", Number(!current));

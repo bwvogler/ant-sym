@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony } from "../../colony.ts";
 import { decide } from "../../decide.ts";
+import { moveDig } from "../../move.ts";
 import { responses, type Contact } from "../../responses.ts";
 import { AntStep } from "../../step.ts";
 import { EXPLORE, FIGHT, RETURN } from "../../vocab.ts";
@@ -125,4 +126,22 @@ test("ignore ends attack steering, keeps loads, and old attack intent clears wit
   assert.equal(loaded.c.carrying[0], 1);
   assert.equal(loaded.c.mode[0], RETURN);
   assert.equal(loaded.c.attackLayer[0], -1);
+});
+
+test("experimental withdrawal speed only applies to an unladen ant stepping away", () => {
+  for (const [loaded, heading, multiplier] of [
+    [false, Math.PI, 1.25],
+    [false, 0, 1],
+    [true, Math.PI, 1],
+  ] as const) {
+    const { c, s } = encounter("flee", loaded);
+    c.params.withdrawalSpeed = 1.25;
+    decide(c, 0, s);
+    s.map = c.map;
+    s.nest = c.nest;
+    s.h = heading;
+    const expected = Math.fround(c.x[0] + Math.cos(heading) * (c.params.speed * multiplier) * s.dt);
+    assert.equal(moveDig(c, 0, s), false);
+    assert.equal(c.x[0], expected);
+  }
 });
