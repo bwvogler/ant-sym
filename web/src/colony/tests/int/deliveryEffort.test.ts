@@ -227,3 +227,39 @@ test("a policy can accept a recognised room instead of repeatedly selecting an a
     assert.equal(touch(c, 0, false).deliveryTarget, "none");
   }
 });
+
+test("long attempts in a tunnel exercise persistence, redirection and release without counting drops as delivery", () => {
+  for (const choice of ["persist", "redirect", "release"] as const) {
+    for (let seed = 1; seed <= 20; seed++) {
+      const { c, g, brood, store, y } = setup(seed);
+      brood.role = "none";
+      store.role = "none";
+      put(c, 0, 23, y);
+      c.params.deliveryReconsider = 1;
+      chooseDelivery(c, 0, "to brood");
+      ageDelivery(c, 0, 1);
+      const storedBefore = c.stored;
+      const groundBefore = c.map.food.get(23, y);
+      let longCalls = 0;
+      c.responses = responses({
+        carry: (t) => {
+          if (t.deliveryPlace !== "none") return `to ${t.deliveryPlace}`;
+          if (t.deliveryAttempt === "long") {
+            longCalls++;
+            if (choice === "release") return "put down";
+            if (choice === "redirect" && t.deliveryTarget === "brood") return "to royal";
+          }
+          return "take";
+        },
+      });
+      g.tick(1 / 30);
+      assert.ok(longCalls > 0, `${choice} seed ${seed} exercises its long-attempt branch`);
+      assert.equal(c.stored, storedBefore, "a decision is not a successful delivery");
+      assert.equal(requestedDelivery(c, 0), choice === "release" ? null : choice === "redirect" ? "royal" : "brood");
+      assert.equal(c.carrying[0], choice === "release" ? 0 : 1);
+      assert.equal(c.map.food.get(23, y), groundBefore + (choice === "release" ? 1 : 0));
+      if (choice === "persist") assert.equal(c.deliveryTime[0], 1, "persistence retains saturated effort");
+      else assert.equal(c.deliveryTime[0], 0, "change or release resets effort");
+    }
+  }
+});

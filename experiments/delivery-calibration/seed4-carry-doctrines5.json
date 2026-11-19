@@ -1,0 +1,140 @@
+{
+  "harnessSha256": "f69b08deb8e8d173a7dbb7200731083ca7c10f5965d53e49249684febe57a988",
+  "commit": "d813a864dc337385a89acd20a66bbffcd51f0446",
+  "seed": 4,
+  "seconds": 600,
+  "ants": 60,
+  "royalCap": 20,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "royalField": {
+        "markedCells": 167,
+        "nearCapCells": 148,
+        "max": 20
+      },
+      "name": "contextPersist5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "contextPersist",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 178.42298523751734
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 300,
+      "portTrips": 0,
+      "finalLarder": 178.42298523751734,
+      "carriedDown": 301,
+      "held": 13,
+      "maxHeld": 14,
+      "maxActive": 14,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 313,
+      "switches": 48,
+      "deliveries": 300,
+      "releases": 0,
+      "releaseCalls": 0,
+      "activeSeconds": 4068.233333333556,
+      "longSeconds": 0,
+      "carryCalls": 137057,
+      "longCalls": 0,
+      "wallSeconds": 16.302129826999998
+    },
+    {
+      "royalField": {
+        "markedCells": 167,
+        "nearCapCells": 148,
+        "max": 20
+      },
+      "name": "context5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "context",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 178.42298523751734
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 300,
+      "portTrips": 0,
+      "finalLarder": 178.42298523751734,
+      "carriedDown": 301,
+      "held": 13,
+      "maxHeld": 14,
+      "maxActive": 14,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 313,
+      "switches": 48,
+      "deliveries": 300,
+      "releases": 0,
+      "releaseCalls": 0,
+      "activeSeconds": 4068.233333333556,
+      "longSeconds": 0,
+      "carryCalls": 137057,
+      "longCalls": 0,
+      "wallSeconds": 16.698884874000004
+    },
+    {
+      "royalField": {
+        "markedCells": 167,
+        "nearCapCells": 148,
+        "max": 20
+      },
+      "name": "contextRelease5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "contextRelease",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 178.42298523751734
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 300,
+      "portTrips": 0,
+      "finalLarder": 178.42298523751734,
+      "carriedDown": 301,
+      "held": 13,
+      "maxHeld": 14,
+      "maxActive": 14,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 313,
+      "switches": 48,
+      "deliveries": 300,
+      "releases": 0,
+      "releaseCalls": 0,
+      "activeSeconds": 4068.233333333556,
+      "longSeconds": 0,
+      "carryCalls": 137057,
+      "longCalls": 0,
+      "wallSeconds": 15.984463631999999
+    }
+  ]
+}

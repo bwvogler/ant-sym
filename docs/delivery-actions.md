@@ -305,3 +305,61 @@ precache tests, typecheck, lint and production build pass. Existing lint warning
 and the large-bundle build warning remain. Next: broaden generated-world
 validation and test context-aware persistence/release doctrines before choosing
 any default or reconsideration threshold (ja-g7nz.3.3).
+
+### Persistence versus redirection versus release (ja-g7nz.3.3.3)
+
+Fresh seeds 3 and 4 were compared with 60 initial ants for 600 seconds. All three
+context policies accept a recognised room underfoot and otherwise start toward
+brood. Their long-attempt choices differ: keep the target, switch brood to royal,
+or put the food down. Both 20-second and 5-second thresholds were tested. Actual
+release transitions and release requests are now counted separately from
+successful deliveries and stored food. The harness also counts long carry calls
+for context policies (previously that diagnostic counter skipped their branch).
+
+| Policy | Seed 3 stored | Seed 4 stored | Long calls / releases |
+| --- | ---: | ---: | --- |
+| Default | 590 | 295 | 0 / 0 |
+| Context persistence, 5s or 20s | 409 | 300 | 0 / 0 |
+| Context redirection, 5s or 20s | 409 | 300 | 0 / 0 |
+| Context release, 5s or 20s | 409 | 300 | 0 / 0 |
+
+All six context variants match in every simulation metric within each seed
+(excluding policy metadata and runtime). All 14 games retain their queen,
+produce 30 births, and have no hunger deaths, starved brood or loads held over
+120 seconds. **These maps do not exercise any timeout choice, even at five
+seconds.** They support the effect of accepting a local recognised room; they
+cannot establish that persistence, redirection or release is the better timeout
+response. The context approach still loses 181 stored food on seed 3 and gains
+only five on seed 4 relative to the scripted baseline. No winner or threshold is
+selected, and defaults remain off.
+
+A positive-control integration test supplies a long brood attempt in a tunnel
+with no recognised delivery rooms, then lets the real game tick apply the policy.
+Across 20 seeds per choice (60 cases), persistence retains the goal and saturated
+effort; redirection selects royal and resets effort; release clears the goal and
+places exactly one food unit on the ground. None increases stored food. This
+checks action execution and accounting, not colony-scale timeout performance.
+
+Reproduce from this change:
+
+```sh
+node scripts/lab/delivery-calibration.mjs --seed 3 --seconds 600 --ants 60 --variants baseline,contextPersist20,context20,contextRelease20 --out /tmp/delivery3-20.json
+node scripts/lab/delivery-calibration.mjs --seed 3 --seconds 600 --ants 60 --variants contextPersist5,context5,contextRelease5 --out /tmp/delivery3-5.json
+# Repeat with --seed 4.
+```
+
+Reports: `experiments/delivery-calibration/seed{3,4}-carry-doctrines{,5}.json`.
+Their commit field identifies the pre-edit base, not the changed working tree.
+The exact 20-second run source is `context-doctrines-harness20.txt`; five-second
+reports match the current harness source hash. All source hashes and matched
+context metrics were checked. The 25 pre-existing delivery action/effort tests
+pass, and the expanded effort suite passes all 11 tests including the 60-case
+positive control. Harness syntax, formatting, diff whitespace and typecheck pass.
+Production behavior is unchanged; build and goldens were not repeated for this
+experiment/test-only change.
+
+Next calibration needs a generated-world stress condition that actually produces
+long attempts (such as loss of recognised floor cues), followed by the planned
+1–10 training / 11–20 confirmation sweep. Do not interpret unexercised branches
+as equivalent policies. The available GitHub connector cannot dispatch the assay
+workflow, so the full runner sweep has not been started or claimed complete.

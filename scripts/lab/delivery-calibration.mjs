@@ -18,6 +18,11 @@ const royalCap = Number(value("--royal-cap", 20));
 if (!Number.isFinite(royalCap) || royalCap <= 0) throw Error("royal-cap must be positive and finite");
 const requested = value("--variants", "baseline,retain,persist,redirect5,redirect20");
 const variants = {
+  contextPersist5: { lane: 1, limit: 5, doctrine: "contextPersist" },
+  contextRelease5: { lane: 1, limit: 5, doctrine: "contextRelease" },
+  context5: { lane: 1, limit: 5, doctrine: "context" },
+  contextPersist20: { lane: 1, limit: 20, doctrine: "contextPersist" },
+  contextRelease20: { lane: 1, limit: 20, doctrine: "contextRelease" },
   context20: { lane: 1, limit: 20, doctrine: "context" },
   royal: { lane: 1, limit: 5, doctrine: "royal" },
   royal5: { lane: 1, limit: 5, doctrine: "redirectRoyal" },
@@ -75,7 +80,9 @@ for (const name of requested.split(",")) {
     maxActive = 0,
     switches = 0,
     starts = 0,
-    deliveries = 0;
+    deliveries = 0,
+    releases = 0,
+    releaseCalls = 0;
   let activeSeconds = 0,
     longSeconds = 0;
   const prior = new Uint8Array(c.n);
@@ -86,14 +93,20 @@ for (const name of requested.split(",")) {
       carry: (t) => {
         carryCalls++;
         if (t.carrying !== "food" || v.doctrine === "retain") return "take";
+        if (t.deliveryAttempt === "long") longCalls++;
         if (v.doctrine === "royal") return "to royal";
-        if (v.doctrine === "context") {
+        if (["context", "contextPersist", "contextRelease"].includes(v.doctrine)) {
           if (t.deliveryPlace !== "none") return `to ${t.deliveryPlace}`;
-          if (t.deliveryAttempt === "long" && t.deliveryTarget === "brood") return "to royal";
+          if (t.deliveryAttempt === "long") {
+            if (v.doctrine === "contextRelease") {
+              releaseCalls++;
+              return "put down";
+            }
+            if (v.doctrine === "context" && t.deliveryTarget === "brood") return "to royal";
+          }
           return t.deliveryTarget === "none" ? "to brood" : "take";
         }
         if (t.deliveryAttempt === "long") {
-          longCalls++;
           if (v.doctrine === "redirectRoyal") return "to royal";
           if (v.doctrine === "redirect") return "to store";
         }
@@ -162,6 +175,7 @@ for (const name of requested.split(",")) {
         else if (prior[i] !== role) switches++;
         if (c.deliveryTime[i] >= v.limit && v.limit > 0) longSeconds += 1 / 30;
       } else if (prior[i] && c.deliveryState[i] === 4) deliveries++;
+      else if (prior[i] && c.deliveryState[i] === 5) releases++;
     }
     activeSeconds += active / 30;
     maxHeldOver120 = Math.max(maxHeldOver120, heldOver120);
@@ -217,6 +231,8 @@ for (const name of requested.split(",")) {
     starts,
     switches,
     deliveries,
+    releases,
+    releaseCalls,
     activeSeconds,
     longSeconds,
     carryCalls,
