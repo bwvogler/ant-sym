@@ -5,10 +5,10 @@ import { cadaverArtFixture } from "../inspectionArtFixture.ts";
 import { buildGame } from "../useColony.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { inspectViewport } from "../inspectionPatch.ts";
-import { inspectionMoundFloor, moundHeight } from "../inspectionMound.ts";
-import { buildPatchTerrain, faceColour } from "../drawInspectionPatch.ts";
+import { inspectionMoundFloor, moundBalls } from "../inspectionMound.ts";
+import { buildPatchTerrain } from "../drawInspectionPatch.ts";
 import { buildVoxelTerrainChunk, terrainChunkDescriptors, VoxelTerrainCache } from "../voxelTerrainChunks.ts";
-import { PLANE, CURTAIN, centreX, centreY } from "../../colony/index.ts";
+import { PLANE, CURTAIN, centreX, centreY, cellKey } from "../../colony/index.ts";
 
 const game = buildGame({ species: "generic", seed: 3, antCount: 50, rival: false, generation: 0 }),
   sensed = new SensedMap(),
@@ -100,7 +100,7 @@ test("digging invalidates neighbouring chunk halos locally, and viewport evictio
   assert.ok(values.every((v) => v.released));
 });
 
-test("spoil raises the walking surface, changes its colour, and invalidates nearby terrain", () => {
+test("spoil adds round pellets above a flat ground plane and raises the ant's footing", () => {
   const patch = read(),
     selected = patch.selected.cell,
     cell = patch.cells.find((c) => c.state.cell[0] === selected[0] && c.state.cell[1] === selected[1])!,
@@ -108,30 +108,39 @@ test("spoil raises the walking surface, changes its colour, and invalidates near
       () => ({}),
       () => {},
     );
-  cell.state.place.ground = "open";
+  for (const c of patch.cells) {
+    c.state.place.ground = "open";
+    c.state.place.hole = -1;
+    c.state.place.mound = 0;
+  }
   const first = cache.update(patch);
-  const top = () => {
-    const face = buildPatchTerrain(patch, true).find(
-      (f) => f.normal[2] === 1 && Math.abs(f.points[0][0]) < 0.2 && Math.abs(f.points[0][1]) < 0.2,
-    )!;
-    return face;
-  };
-  const colours = [faceColour(top(), "surface")];
-  let previousHeight = 0;
+  let previousBalls: ReturnType<typeof moundBalls> = [],
+    previousTop = 0;
   for (const level of [1, 2, 4, 6, 7]) {
     cell.state.place.mound = level;
     cache.update(patch);
     assert.ok(cache.rebuilt > 0 && cache.rebuilt < first.length);
-    const face = top();
-    if (level <= 4) colours.push(faceColour(face, "surface"));
-    const z = face.points[0][2];
-    assert.ok(z > previousHeight);
-    previousHeight = z;
-    const floor = inspectionMoundFloor(patch)!;
-    assert.ok(Math.abs(floor(0, 0) - moundHeight(level)) < 1e-6);
-    assert.ok(Math.abs(floor(0.4999, 0) - floor(0.5001, 0)) < 0.001, "no height jump when an ant crosses the hex edge");
+    const balls = moundBalls(level, cellKey(...selected)),
+      top = Math.max(...balls.map((b) => b.z + b.radius)),
+      floor = inspectionMoundFloor(patch)!,
+      mesh = buildPatchTerrain(patch, true);
+    assert.ok(balls.length > previousBalls.length);
+    assert.ok(top >= previousTop);
+    assert.ok(
+      mesh.some((f) => f.moundLevel > 0 && f.normal[2] < 0),
+      "pellets have exposed undersides between their contact points",
+    );
+    assert.ok(
+      mesh.filter((f) => f.moundLevel === 0 && f.normal[2] === 1).every((f) => f.points.every((p) => p[2] === 0)),
+      "the earth remains flat under the dirt balls",
+    );
+    for (const ball of balls)
+      assert.ok(floor(ball.x, ball.y) >= ball.z + ball.radius - 1e-6, "an ant is supported above the visible balls");
+    assert.ok(Math.abs(floor(0.4999, 0) - floor(0.5001, 0)) < 0.003);
+    assert.deepEqual(balls.slice(0, previousBalls.length), previousBalls);
+    previousBalls = balls;
+    previousTop = top;
   }
-  assert.equal(new Set(colours).size, colours.length);
   cache.dispose();
 });
 

@@ -1,5 +1,5 @@
-import { dugSoilGrain, inspectionMoundFloor, moundHeight } from "./inspectionMound.ts";
-import { INSPECTION_GROUND, MOUND_GROUND, moundGroundLevel } from "./inspectionGround.ts";
+import { inspectionDirtBalls, inspectionMoundFloor } from "./inspectionMound.ts";
+import { INSPECTION_GROUND } from "./inspectionGround.ts";
 import surface from "../assets/inspection/projection.json" with { type: "json" };
 import lifecycle from "../assets/inspection/lifecycle-manifest.json" with { type: "json" };
 import below from "../assets/inspection/below-manifest.json" with { type: "json" };
@@ -35,6 +35,7 @@ interface Face {
   grain: number;
   front: boolean;
   moundLevel: number;
+  voxelStep?: number;
 }
 const SIDES: [Point3, Point3[]][] = [
   [
@@ -113,9 +114,7 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
     columns = right - left,
     lower = new Int16Array(rows * columns),
     upper = new Int16Array(rows * columns),
-    kinds = new Uint8Array(rows * columns),
-    mounds = new Uint8Array(rows * columns),
-    floor = inspectionMoundFloor(patch);
+    kinds = new Uint8Array(rows * columns);
   // Every terrain column is a solid depth interval. Keep that interval instead of allocating every buried voxel.
   for (let ix = left; ix < right; ix++)
     for (let iz = top; iz < bottom; iz++) {
@@ -131,16 +130,6 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
         lower[index] = -4;
         upper[index] = ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0;
         kinds[index] = ground === "rock" ? 2 : 1;
-        if (floor && ground === "open" && slot.state.place.hole < 0) {
-          const height = floor(x, -axis);
-          // The bed follows the slope, with more loose clods on deeper deposits.
-          if (height >= step / 2) {
-            const level = moundGroundLevel(Math.max(1, Math.round(height / moundHeight(1))));
-            const clod = dugSoilGrain(ix, iz, 9) < Math.min(3, level) && dugSoilGrain(ix + 7, iz - 4, 0) === 0;
-            upper[index] = Math.max(1, Math.round(height / step)) + Number(clod);
-            mounds[index] = level;
-          }
-        }
       } else {
         if (slot.surfaceStrip) {
           if (slot.surfaceEntrance || !slot.projectedGround || axis > -slot.y + Math.min(0.24, (slot.projectedSpoil ?? 0) * 0.04)) continue;
@@ -174,19 +163,56 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
             (z + c) * step - (isBelow ? originY : 0),
           ]);
           const depth = points.reduce((sum, p) => sum + p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2], 0) / 4;
-          const moundLevel = h >= 0 ? mounds[index] : 0;
           faces.push({
             points,
             normal,
             kind,
             depth,
-            grain: moundLevel ? dugSoilGrain(x, y, z) : Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
-            moundLevel,
+            grain: Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
+            moundLevel: 0,
             front: isBelow && kind !== "back",
           });
         }
       }
     }
+  if (!isBelow) {
+    // Loose round pellets sit on the original soil plane. Rasterize their union
+    // separately so there are air gaps between the balls and no filled earth ramp.
+    const pelletStep = step / 2;
+    const pellets = new Map<string, { x: number; y: number; z: number; grain: number }>();
+    for (const ball of inspectionDirtBalls(patch)) {
+      const bx = ball.x + originX,
+        by = -ball.y + originY,
+        r = ball.radius;
+      for (let x = Math.max(left * 2, Math.floor((bx - r) / pelletStep)); x < Math.min(right * 2, Math.ceil((bx + r) / pelletStep)); x++)
+        for (let y = Math.max(top * 2, Math.floor((by - r) / pelletStep)); y < Math.min(bottom * 2, Math.ceil((by + r) / pelletStep)); y++)
+          for (let z = Math.max(0, Math.floor((ball.z - r) / pelletStep)); z < Math.ceil((ball.z + r) / pelletStep); z++) {
+            if (((x + 0.5) * pelletStep - bx) ** 2 + ((y + 0.5) * pelletStep - by) ** 2 + ((z + 0.5) * pelletStep - ball.z) ** 2 > r * r)
+              continue;
+            pellets.set(`${x},${y},${z}`, { x, y, z, grain: ball.grain });
+          }
+    }
+    for (const { x, y, z, grain } of pellets.values())
+      for (const [normal, corners] of SIDES) {
+        if (!allSides && normal[0] * eye[0] + normal[1] * eye[1] + normal[2] * eye[2] <= 0) continue;
+        if (z + normal[2] < 0 || pellets.has(`${x + normal[0]},${y + normal[1]},${z + normal[2]}`)) continue;
+        const points = corners.map(([a, b, c]): Point3 => [
+          (x + a) * pelletStep - originX,
+          (y + b) * pelletStep - originY,
+          (z + c) * pelletStep,
+        ]);
+        faces.push({
+          points,
+          normal,
+          kind: "soil",
+          depth: points.reduce((sum, p) => sum + p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2], 0) / 4,
+          grain,
+          moundLevel: 1,
+          voxelStep: pelletStep,
+          front: false,
+        });
+      }
+  }
   return faces.sort((a, b) => a.depth - b.depth);
 }
 
@@ -206,7 +232,9 @@ export function faceColour(face: Face, mode: InspectionPatch["mode"]): string {
       ? INSPECTION_GROUND.back
       : face.kind === "rock"
         ? INSPECTION_GROUND.rock[face.grain]
-        : (mode === "below" ? INSPECTION_GROUND.belowSoil : MOUND_GROUND[face.moundLevel])[face.grain];
+        : (mode === "below" ? INSPECTION_GROUND.belowSoil : face.moundLevel ? INSPECTION_GROUND.dugSoil : INSPECTION_GROUND.surfaceSoil)[
+            face.grain
+          ];
   const shade =
     mode === "surface"
       ? face.normal[2] > 0

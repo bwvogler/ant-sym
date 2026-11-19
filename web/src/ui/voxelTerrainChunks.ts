@@ -27,12 +27,7 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
           .filter((c) => {
             const xx = centreX(...c.state.cell),
               yy = centreY(c.state.cell[1]);
-            // Interpolated slopes can reach farther than a solid hex. Only
-            // positive mound samples need the extra halo.
-            const { place } = c.state;
-            const margin =
-              patch.mode === "surface" && c.valid && place.ground === "open" && place.hole < 0 && place.mound > 0 ? 1 + 0.061 : halo;
-            return xx >= wx - margin && xx <= wx + size + margin && yy >= wy - margin && yy <= wy + size + margin;
+            return xx >= wx - halo && xx <= wx + size + halo && yy >= wy - halo && yy <= wy + size + halo;
           })
           .sort((a, b) => a.state.cell[1] - b.state.cell[1] || a.state.cell[0] - b.state.cell[0]);
       out.push({
@@ -78,8 +73,9 @@ export function buildVoxelTerrainChunk(chunk: VoxelTerrainChunk): ReturnType<typ
         midX += p[0] / face.points.length;
         midY += p[below ? 2 : 1] / face.points.length;
       }
-      const wx = midX - (face.normal[0] * step) / 2 + cx,
-        wy = cy - (midY - (face.normal[below ? 2 : 1] * step) / 2);
+      const voxel = face.voxelStep ?? step,
+        wx = midX - (face.normal[0] * voxel) / 2 + cx,
+        wy = cy - (midY - (face.normal[below ? 2 : 1] * voxel) / 2);
       return wx >= x - 1e-7 && wx < x + VOXEL_CHUNK_SIZE - 1e-7 && wy >= y - 1e-7 && wy < y + VOXEL_CHUNK_SIZE - 1e-7;
     })
     .map((face) => ({ ...face, points: face.points.map((p) => p.map((v, i) => v - offset[i]) as [number, number, number]) }));
