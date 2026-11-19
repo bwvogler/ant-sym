@@ -878,6 +878,18 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
 const defendArm = (seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec =>
   walked(onPlane(defendSpec(seed, sealed, colony)), 1, 0);
 
+/** Match the treatment's combat and elapsed time in both A13 comparison games. */
+export function defendControl(
+  seed: number,
+  sealed: boolean,
+  seconds: number,
+  fight: Game["params"]["fight"],
+  colony?: Partial<ColonyParams>,
+): RunSpec {
+  const spec = defendArm(seed, sealed, colony);
+  return { ...spec, seconds, game: { ...spec.game, fight: { ...fight } } };
+}
+
 export const defendWalked: Assay = {
   id: "defendHome",
   title: "A13 defence from senses (one world, the war party walked)",
@@ -885,7 +897,8 @@ export const defendWalked: Assay = {
   seconds: 300,
   spec: (seed) => defendArm(seed, false),
   score: (r, game) => {
-    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => runGame(defendArm(r.seed, sealed, colony)).result.metrics;
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) =>
+      runGame(defendControl(r.seed, sealed, r.seconds, game.params.fight, colony)).result.metrics;
     const stored = r.metrics["you.stored"];
     const control = run(true)["you.stored"];
     const none = run(false, { defendAt: Infinity });
