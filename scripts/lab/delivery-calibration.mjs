@@ -16,6 +16,16 @@ const ants = Number(value("--ants", 60));
 if (![seed, seconds, ants].every((x) => Number.isInteger(x) && x > 0)) throw Error("seed, seconds and ants must be positive integers");
 const royalCap = Number(value("--royal-cap", 20));
 if (!Number.isFinite(royalCap) || royalCap <= 0) throw Error("royal-cap must be positive and finite");
+const cueLossFrom = Number(value("--cue-loss-from", -1));
+const cueLossTo = Number(value("--cue-loss-to", seconds));
+const cueLoss = cueLossFrom >= 0;
+if (
+  !Number.isInteger(cueLossFrom) ||
+  cueLossFrom < -1 ||
+  !Number.isInteger(cueLossTo) ||
+  (cueLoss && !(cueLossFrom < cueLossTo && cueLossTo <= seconds))
+)
+  throw Error("cue loss requires integer 0 <= from < to <= seconds (or from=-1 to disable)");
 const requested = value("--variants", "baseline,retain,persist,redirect5,redirect20");
 const variants = {
   contextPersist5: { lane: 1, limit: 5, doctrine: "contextPersist" },
@@ -51,8 +61,9 @@ const report = {
   seconds,
   ants,
   royalCap,
+  cueLoss: cueLoss ? { from: cueLossFrom, to: cueLossTo, gain: 0, restoredGain: 1 } : null,
   design:
-    "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+    "One colony on a generated 160x100 plane; no rival, no forced food, loads or locations. Optional timed mark-gain loss is an experimental intervention, not simulated fungal infection. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
   results,
 };
 for (const name of requested.split(",")) {
@@ -82,7 +93,22 @@ for (const name of requested.split(",")) {
     starts = 0,
     deliveries = 0,
     releases = 0,
-    releaseCalls = 0;
+    releaseCalls = 0,
+    cueLossCarryCalls = 0,
+    cueLossRecognisedCalls = 0,
+    cueLossUncommittedDrops = 0;
+  let cueLossActive = false;
+  const checkpoints = [];
+  const checkpoint = (at) => ({
+    at,
+    stored: c.stored,
+    deliveries,
+    releases,
+    releaseCalls,
+    longCalls,
+    held: c.carrying.reduce((n, x, i) => n + (c.alive[i] && x === 1 ? 1 : 0), 0),
+    alive: c.alive.reduce((n, x) => n + x, 0),
+  });
   let activeSeconds = 0,
     longSeconds = 0;
   const prior = new Uint8Array(c.n);
@@ -90,8 +116,17 @@ for (const name of requested.split(",")) {
   let maxHeldOver120 = 0;
   if (v.doctrine !== "local")
     c.responses = responses({
+      // Observational wrapper of local drop=true; no new decision or draw.
+      drop: (t) => {
+        if (cueLossActive && t.deliveryTarget === "none") cueLossUncommittedDrops++;
+        return true;
+      },
       carry: (t) => {
         carryCalls++;
+        if (cueLossActive && t.carrying === "food") {
+          cueLossCarryCalls++;
+          if (t.deliveryPlace !== "none") cueLossRecognisedCalls++;
+        }
         if (t.carrying !== "food" || v.doctrine === "retain") return "take";
         if (t.deliveryAttempt === "long") longCalls++;
         if (v.doctrine === "royal") return "to royal";
@@ -114,6 +149,12 @@ for (const name of requested.split(",")) {
       },
     });
   for (let tick = 0; tick < seconds * 30; tick++) {
+    if (cueLoss) {
+      if (g.fungus.active) throw Error("controlled gain intervention requires an inactive fungus");
+      if (tick === cueLossFrom * 30 || tick === cueLossTo * 30) checkpoints.push(checkpoint(tick / 30));
+      cueLossActive = tick >= cueLossFrom * 30 && tick < cueLossTo * 30;
+      c.gainMarks.fill(cueLossActive ? 0 : 1);
+    }
     prior.set(c.deliveryRole);
     g.tick(1 / 30);
     // Diagnostic reads only: restore the bound layer and shared cell scratch.
@@ -182,6 +223,11 @@ for (const name of requested.split(",")) {
     maxHeld = Math.max(maxHeld, held);
     maxActive = Math.max(maxActive, active);
   }
+  if (cueLoss) {
+    c.gainMarks.fill(1);
+    checkpoints.push(checkpoint(seconds));
+    if (cueLossRecognisedCalls) throw Error("floor recognition leaked through erased cues");
+  }
   const finalLayer = c.cur;
   c.bind(c.home);
   let markedCells = 0,
@@ -233,6 +279,10 @@ for (const name of requested.split(",")) {
     deliveries,
     releases,
     releaseCalls,
+    cueLossCarryCalls,
+    cueLossRecognisedCalls,
+    cueLossUncommittedDrops,
+    checkpoints,
     activeSeconds,
     longSeconds,
     carryCalls,

@@ -363,3 +363,68 @@ long attempts (such as loss of recognised floor cues), followed by the planned
 1–10 training / 11–20 confirmation sweep. Do not interpret unexercised branches
 as equivalent policies. The available GitHub connector cannot dispatch the assay
 workflow, so the full runner sweep has not been started or claimed complete.
+
+### Temporary floor-cue loss and recovery (ja-g7nz.3.3.4)
+
+A harness-only intervention now sets every player worker's existing `gainMarks`
+to zero before each tick from 120 through 300 seconds, then restores one. It
+requires an inactive fungus; this isolates the perception effect and is **not**
+a simulated infection, dose-response experiment or new fungal ability. Workers
+born during the interval receive the intervention on the next tick. Carry calls
+are audited for recognised rooms during loss; any leak fails the run. Counters
+at 120, 300 and 600 seconds separate suppression and recovery. Invalid windows
+are rejected before simulation.
+
+Two generated seeds, 60 initial workers, 600 seconds, five-second effort limit:
+
+| Policy | Final stored, seeds 3 / 4 | Stored during loss | Stored after restoration | Releases | Peak loads held >120s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Scripted default | 595 / 293 | 164 / 86 | 336 / 161 | 0 / 0 | 0 / 0 |
+| Context persistence | 394 / 210 | 0 / 0 | 318 / 168 | 0 / 0 | 36 / 22 |
+| Context redirection | 364 / 210 | 0 / 0 | 288 / 168 | 0 / 0 | 39 / 22 |
+| Context release | 422 / 234 | 103 / 66 | 243 / 126 | 372 / 173 | 0 / 0 |
+
+All six context treatments exercised long-attempt responses. None recognised a
+room during suppression (53,842–211,387 observed food-carry calls per treatment).
+All eight stressed games retained their queen, produced 30 births, and had no
+hunger deaths or starved brood. An untreated seed-3 context control exactly
+reproduces the earlier 409-food result and every prior simulation metric.
+Persistence and redirection accumulate loads while marks are unreadable and
+resume delivery after restoration. These two exploratory seeds do not establish
+a generally preferable policy or biologically justified deadline.
+
+**Release throughput is confounded (ja-g7nz.3.3.5).** The default delivery path
+uses `foodTo` and chamber data without requiring the explicit action's perceived
+room recognition. In `arrive`, pickup can be followed by `port` in the same tick;
+`stanceStep` has already run the carry decision earlier. A newly picked-up load
+with no explicit destination can therefore enter scripted delivery before the
+carry policy chooses one. An observational wrapper of the existing `drop=true`
+response on seed 3 counted **103 drop approvals with no chosen target during cue
+loss**, exactly matching its 103 stored food in that interval. The audit preserves
+all prior simulation metrics. Release itself remains separate from stored food:
+372 releases versus 319 completed explicit deliveries and 422 total stored.
+The accounting discrepancy is a policy-coverage gap, not evidence that erased
+room cues were sensed or that the release action duplicated food.
+
+Fix and regression-test this pickup-to-delivery gap before using these totals to
+select a release policy. The scripted default is an implementation benchmark,
+not a sensory-equivalent control. All production defaults remain unchanged.
+
+Reproduce (repeat stressed command with seed 4):
+
+```sh
+node scripts/lab/delivery-calibration.mjs --seed 3 --seconds 600 --ants 60 --cue-loss-from 120 --cue-loss-to 300 --variants baseline,contextPersist5,context5,contextRelease5 --out /tmp/cue-loss3.json
+node scripts/lab/delivery-calibration.mjs --seed 3 --seconds 600 --ants 60 --variants context5 --out /tmp/cue-control3.json
+node scripts/lab/delivery-calibration.mjs --seed 3 --seconds 600 --ants 60 --cue-loss-from 120 --cue-loss-to 300 --variants contextRelease5 --out /tmp/cue-audit3.json
+```
+
+Raw reports are `seed{3,4}-cue-loss.json`, `seed3-cue-control.json` and
+`seed3-cue-drop-audit.json` under `experiments/delivery-calibration/`. The first
+nine games match `cue-loss-harness.txt`; the drop audit matches the current
+harness. Their commit identifiers name the pre-edit base; source hashes are
+verified separately. Ten games ran locally; the full runner training/holdout
+sweep remains pending. All 11 delivery-effort tests pass, including the prior
+60-case action/accounting control. Harness syntax, formatting, diff whitespace,
+three invalid-window checks, report completeness, source hashes and unchanged
+control/audit metrics pass. Production code is unchanged; build and goldens were
+not rerun for this measurement-only slice.

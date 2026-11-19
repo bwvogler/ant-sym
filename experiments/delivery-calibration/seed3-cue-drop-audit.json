@@ -1,0 +1,95 @@
+{
+  "harnessSha256": "2530f467b938c8e3a31986829ebe8f05d9fee4ddf9a094fc888343f41d7668ff",
+  "commit": "117bafc0a080388b021aedfb032dae24abf2eaa4",
+  "seed": 3,
+  "seconds": 600,
+  "ants": 60,
+  "royalCap": 20,
+  "cueLoss": {
+    "from": 120,
+    "to": 300,
+    "gain": 0,
+    "restoredGain": 1
+  },
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads or locations. Optional timed mark-gain loss is an experimental intervention, not simulated fungal infection. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "royalField": {
+        "markedCells": 155,
+        "nearCapCells": 137,
+        "max": 20
+      },
+      "name": "contextRelease5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "contextRelease",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 300.46657758407787
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 422,
+      "portTrips": 0,
+      "finalLarder": 300.46657758407787,
+      "carriedDown": 423,
+      "held": 10,
+      "maxHeld": 23,
+      "maxActive": 23,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 701,
+      "switches": 58,
+      "deliveries": 319,
+      "releases": 372,
+      "releaseCalls": 372,
+      "cueLossCarryCalls": 92844,
+      "cueLossRecognisedCalls": 0,
+      "cueLossUncommittedDrops": 103,
+      "checkpoints": [
+        {
+          "at": 120,
+          "stored": 76,
+          "deliveries": 76,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 4,
+          "alive": 69
+        },
+        {
+          "at": 300,
+          "stored": 179,
+          "deliveries": 76,
+          "releases": 370,
+          "releaseCalls": 370,
+          "longCalls": 370,
+          "held": 15,
+          "alive": 90
+        },
+        {
+          "at": 600,
+          "stored": 422,
+          "deliveries": 319,
+          "releases": 372,
+          "releaseCalls": 372,
+          "longCalls": 372,
+          "held": 10,
+          "alive": 90
+        }
+      ],
+      "activeSeconds": 7025.033333332656,
+      "longSeconds": 0,
+      "carryCalls": 221736,
+      "longCalls": 372,
+      "wallSeconds": 15.69443515
+    }
+  ]
+}
