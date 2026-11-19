@@ -1,4 +1,7 @@
+import type { InspectionOrbit } from "./inspectionOrbit.ts";
+
 export interface VoxelViewport {
+  orbit?: InspectionOrbit;
   /** Raster dimensions; CSS may enlarge them to retain pixelated detail. */
   width: number;
   height: number;

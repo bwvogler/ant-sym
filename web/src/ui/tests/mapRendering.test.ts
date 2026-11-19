@@ -1,3 +1,4 @@
+import type { InspectionOrbit } from "../inspectionOrbit.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MapChunkPaintCache } from "../mapChunkPaintCache.ts";
@@ -75,6 +76,8 @@ function harness(accelerated = true) {
     ctx = {
       save: () => {},
       restore: () => {},
+      fillRect: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
       drawImage: () => {
         images++;
       },
@@ -92,8 +95,8 @@ function harness(accelerated = true) {
         return { width: 0, height: 0 } as HTMLCanvasElement;
       },
     ),
-    draw = (zoom = 135, layer = PLANE, y = camera.y, allow = true) =>
-      pass.draw(ctx, game, sensed, layer, { ...camera, zoom, y }, view, 1, { food: false, home: false }, [], palette, allow);
+    draw = (zoom = 135, layer = PLANE, y = camera.y, allow = true, orbit?: InspectionOrbit) =>
+      pass.draw(ctx, game, sensed, layer, { ...camera, zoom, y }, view, 1, { food: false, home: false }, [], palette, allow, orbit);
   return { pass, draw, calls, sizes, scene, stats: () => ({ creates, canvases, ready, disposed, images }) };
 }
 const loaded = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -131,6 +134,21 @@ test("software blending stays at close zoom and projected strip or smell vision 
   assert.equal(h.draw(180).alpha, 1);
   assert.equal(h.draw(180, CURTAIN, centreY(STRIP)).alpha, 0);
   assert.equal(h.draw(180, PLANE, camera.y, false).alpha, 0);
+  h.pass.dispose();
+});
+
+test("the close surface can orbit after the voxel transition and the tilted terrain sample stays bounded", async () => {
+  const h = harness();
+  const orbit = { yaw: 0.4, tilt: 1.15 };
+  h.draw(135, PLANE, camera.y, true, orbit);
+  await loaded();
+  h.draw(135, PLANE, camera.y, true, orbit);
+  assert.equal(h.sizes.at(-1)?.orbit, undefined);
+  assert.equal(h.draw(150, PLANE, camera.y, true, orbit).angled, true);
+  assert.deepEqual(h.sizes.at(-1)?.orbit, orbit);
+  const bounds = h.calls.at(-1)?.patch.bounds;
+  assert.ok(bounds && bounds.right - bounds.left <= 24 && bounds.bottom - bounds.top <= 24);
+  assert.equal(h.draw(150, PLANE, camera.y, true, { yaw: 0, tilt: 0 }).angled, undefined);
   h.pass.dispose();
 });
 

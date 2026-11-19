@@ -1,3 +1,4 @@
+import type { InspectionOrbit } from "./inspectionOrbit.ts";
 import type { InspectionScene } from "./InspectionScene.ts";
 import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
@@ -46,6 +47,7 @@ export class MapVoxelPass {
     clumps: readonly AphidClump[],
     palette: { ink: string; warn: string },
     allow = true,
+    orbit?: InspectionOrbit,
   ) {
     const cssZoom = camera.zoom / dpr;
     // The projected ground strip still owns its aerial ants and linking affordances in the 2D renderer.
@@ -76,7 +78,20 @@ export class MapVoxelPass {
       alpha = mapVoxelAlpha(cssZoom, scene.accelerated);
     if (!alpha) return { alpha: 0, renderer: "sprites" };
     try {
-      const patch = inspectViewport(g, sensed, layer, camera.x, camera.y, view.w / camera.zoom, view.h / camera.zoom, trails, clumps),
+      const angled = layer !== CURTAIN && alpha === 1 && orbit && (orbit.yaw !== 0 || orbit.tilt !== 0);
+      const span = Math.hypot(view.w, view.h) / camera.zoom;
+      const range = Math.min(16, span / Math.cos(orbit?.tilt ?? 0) + 2);
+      const patch = inspectViewport(
+          g,
+          sensed,
+          layer,
+          camera.x,
+          camera.y,
+          angled ? range : view.w / camera.zoom,
+          angled ? range : view.h / camera.zoom,
+          trails,
+          clumps,
+        ),
         scale = 1 / (dpr * 2),
         width = Math.max(1, Math.round(view.w * scale)),
         height = Math.max(1, Math.round(view.h * scale));
@@ -84,6 +99,7 @@ export class MapVoxelPass {
       scene.setViewport({
         width,
         height,
+        ...(angled ? { orbit } : {}),
         pixelsPerWorld: camera.zoom * scale,
         x: camera.x - centreX(...patch.selected.cell),
         y: camera.y - centreY(patch.selected.cell[1]),
@@ -93,11 +109,22 @@ export class MapVoxelPass {
       try {
         ctx.globalAlpha = alpha;
         ctx.imageSmoothingEnabled = false;
+        if (angled) {
+          ctx.fillStyle = "#b7b5aa";
+          ctx.fillRect(0, 0, view.w, view.h);
+        }
         ctx.drawImage(this.surface, 0, 0, view.w, view.h);
+        if (angled && Math.abs(orbit.tilt) > 0.5) {
+          const fog = ctx.createLinearGradient(0, 0, 0, view.h * 0.56);
+          fog.addColorStop(0, `rgba(183,181,170,${Math.min(1, (Math.abs(orbit.tilt) - 0.5) * 2)})`);
+          fog.addColorStop(1, "rgba(183,181,170,0)");
+          ctx.fillStyle = fog;
+          ctx.fillRect(0, 0, view.w, view.h * 0.56);
+        }
       } finally {
         ctx.restore();
       }
-      return { alpha, renderer: scene.accelerated ? "voxel-webgl" : "voxel-software" };
+      return { alpha, ...(angled ? { angled: true } : {}), renderer: scene.accelerated ? "voxel-webgl" : "voxel-software" };
     } catch {
       scene.dispose();
       this.scene = null;

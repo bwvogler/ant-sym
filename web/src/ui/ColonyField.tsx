@@ -1,3 +1,4 @@
+import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { moundBalls, type DirtBall } from "./inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, inspectionGroundMix, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
@@ -357,6 +358,10 @@ export default function ColonyField({
   const count = colonies.length;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
+  const orbitAxes = useRef<HTMLButtonElement>(null);
+  const orbit = useRef(mapOrbit());
+  const orbitDrag = useRef<{ id: number; x: number; y: number; start: InspectionOrbit } | null>(null);
+  const angled = useRef(false);
   const [labels, setLabels] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
   const goRef = useRef<HTMLDivElement>(null);
@@ -1880,13 +1885,19 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
+        orbit.current,
       );
+      const canRotate = lv === PLANE && voxel.alpha === 1;
+      if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
+      if (!canRotate) orbit.current = mapOrbit();
+      angled.current = "angled" in voxel && voxel.angled === true;
       canvas.dataset.mapRenderer = voxel.renderer;
       canvas.dataset.voxelAlpha = voxel.alpha.toFixed(3);
       if (import.meta.env.DEV) {
         canvas.dataset.chunkPaints = String(framePaints);
         canvas.dataset.chunkCacheHits = String(frameHits);
       }
+      if (angled.current) return; // Map labels and hit targets use the overhead projection.
       if (voxel.alpha > 0) {
         // Alates keep their existing body/wing atlas until the shared mesh contains their separate wings.
         for (const drawAlates of alateOverlays) drawAlates();
@@ -2085,7 +2096,14 @@ export default function ColonyField({
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: k };
       const s = vc();
       const we = extent();
-      const c = zoomBy(s.cam ?? fit(we, v), we, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
+      const c = zoomBy(
+        s.cam ?? fit(we, v),
+        we,
+        v,
+        angled.current ? v.w / 2 : (e.clientX - r.left) * k,
+        angled.current ? v.h / 2 : (e.clientY - r.top) * k,
+        Math.exp(-e.deltaY * 0.0015),
+      );
       s.cam = c;
       s.aim = null;
       s.zoomedIn = c.zoom > fitZoom(we, v) * 1.05;
@@ -2253,6 +2271,7 @@ export default function ColonyField({
   };
 
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (angled.current) return;
     if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
     // The builder sets a palm aside (a child's resting hand is no finger: docs/builder.md, design).
     if (buildRef.current && isPalm(e)) {
@@ -2304,6 +2323,7 @@ export default function ColonyField({
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
+    if (angled.current) return;
     const [x, y] = devicePoint(e);
     hover.current = [x, y];
     // The lens follows a mouse over the map (no button down); a finger taps instead (onUp).
@@ -2470,6 +2490,60 @@ export default function ColonyField({
         onKeyDown={onKey}
         onContextMenu={(e) => e.preventDefault()}
       />
+      <button
+        ref={orbitAxes}
+        hidden
+        type="button"
+        aria-label="Rotate close map. Arrow keys turn and tilt. Home resets."
+        title="Drag to turn and tilt · Home or double-click resets"
+        className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel/80 p-1 shadow-sm active:cursor-grabbing"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          orbitDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: orbit.current };
+        }}
+        onPointerMove={(e) => {
+          const drag = orbitDrag.current;
+          if (drag?.id === e.pointerId) {
+            const next = dragOrbit(drag.start, e.clientX - drag.x, e.clientY - drag.y);
+            orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
+          }
+        }}
+        onLostPointerCapture={() => {
+          orbitDrag.current = null;
+        }}
+        onDoubleClick={() => {
+          orbit.current = mapOrbit();
+        }}
+        onKeyDown={(e) => {
+          const moves: Record<string, [number, number]> = {
+            ArrowLeft: [-12, 0],
+            ArrowRight: [12, 0],
+            ArrowUp: [0, 12],
+            ArrowDown: [0, -12],
+          };
+          if (e.key === "Home" || e.key === "Escape") orbit.current = mapOrbit();
+          else if (moves[e.key]) {
+            const next = dragOrbit(orbit.current, ...moves[e.key]);
+            orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
+          } else return;
+          e.preventDefault();
+        }}
+      >
+        <svg
+          aria-hidden="true"
+          width="32"
+          height="32"
+          viewBox="0 0 32 32"
+          fill="none"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path stroke="#e95151" d="M15 17h13m-4-4 4 4-4 4" />
+          <path stroke="#36a45c" d="m15 17-9 10m0-5v5h5" />
+          <path stroke="#3888de" d="M15 17V4m-4 4 4-4 4 4" />
+        </svg>
+      </button>
       {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
       <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
         <button

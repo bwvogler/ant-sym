@@ -585,8 +585,8 @@ export class InspectionScene {
         if (p.band.instanceColor) p.band.instanceColor.needsUpdate = true;
       }
     }
-    const orbit = orbitCamera(mode, this.orbit),
-      view = this.viewport,
+    const view = this.viewport,
+      orbit = orbitCamera(mode, view?.orbit ?? this.orbit),
       target = new T.Vector3(view?.x ?? 0, mode === "below" ? 0.6 : -(view?.y ?? 0), mode === "surface" ? 0.15 : -(view?.y ?? 0));
     this.camera.position.copy(target).add(new T.Vector3(...orbit.position));
     this.camera.up.set(...orbit.up);
