@@ -112,27 +112,6 @@
       "answers": 151
     },
     {
-      "lane": "stance",
-      "doctrine": "cautious",
-      "context": "stance-v4-b1ce9ef4",
-      "file": "stance-cautious.json",
-      "answers": 324
-    },
-    {
-      "lane": "stance",
-      "doctrine": "forage",
-      "context": "stance-v4-657ca221",
-      "file": "stance-forage.json",
-      "answers": 324
-    },
-    {
-      "lane": "stance",
-      "doctrine": "warlike",
-      "context": "stance-v4-1cc01e21",
-      "file": "stance-warlike.json",
-      "answers": 324
-    },
-    {
       "lane": "steer",
       "doctrine": "cautious",
       "context": "steer-v7-2489f87e",
@@ -156,7 +135,6 @@
   ],
   "versions": {
     "colony": 7,
-    "stance": 4,
     "fungus": 8,
     "growth": 4
   }
