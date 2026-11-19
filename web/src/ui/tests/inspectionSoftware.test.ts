@@ -77,6 +77,9 @@ test("software inspection keeps every instance through movement, count changes a
   camera.position.set(0, 0, 8);
   camera.lookAt(0, 0, 0);
   geometry.setAttribute("position", new T.Float32BufferAttribute([-0.3, -0.3, 0, 0.3, -0.3, 0, 0, 0.3, 0], 3));
+  // Abdomen bands carry the exported dark chitin attribute, but their
+  // unlit material must use the instance's colony colour directly.
+  geometry.setAttribute("color", new T.Float32BufferAttribute(new Float32Array(9).fill(0.02), 3));
   const material = new T.MeshBasicMaterial(),
     ants = new T.InstancedMesh(geometry, material, 64),
     matrix = (i: number) => new T.Matrix4().makeTranslation(-3.5 + (i % 8), -3.5 + Math.floor(i / 8), 0),

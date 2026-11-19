@@ -90,7 +90,8 @@ export class InspectionSoftware {
         index = g.index,
         count = index?.count ?? pos.count;
       const material = Array.isArray(object.material) ? object.material[0] : object.material,
-        unlit = material instanceof T.MeshBasicMaterial;
+        unlit = material instanceof T.MeshBasicMaterial,
+        vertexColours = material.vertexColors;
       const p = new Float64Array(9),
         normal = new T.Vector3();
       for (let at = 0; at < (object instanceof T.InstancedMesh ? object.count : 1); at++) {
@@ -120,9 +121,9 @@ export class InspectionSoftware {
           const id = index ? index.getX(f) : f;
           if (normals) normal.fromBufferAttribute(normals, id).applyMatrix3(normalMatrix).normalize();
           const shade = unlit ? 1 : 0.58 + 0.65 * Math.max(0, normal.dot(light)),
-            r = srgb((colors ? colors.getX(id) : 1) * rgb.r * shade),
-            green = srgb((colors ? colors.getY(id) : 1) * rgb.g * shade),
-            b = srgb((colors ? colors.getZ(id) : 1) * rgb.b * shade),
+            r = srgb((vertexColours && colors ? colors.getX(id) : 1) * rgb.r * shade),
+            green = srgb((vertexColours && colors ? colors.getY(id) : 1) * rgb.g * shade),
+            b = srgb((vertexColours && colors ? colors.getZ(id) : 1) * rgb.b * shade),
             packed = (255 << 24) | (b << 16) | (green << 8) | r;
           const left = Math.max(0, Math.floor(Math.min(x0, x1, x2))),
             right = Math.min(w - 1, Math.ceil(Math.max(x0, x1, x2))),

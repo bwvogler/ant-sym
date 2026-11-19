@@ -5,7 +5,7 @@ import { cadaverArtFixture } from "../inspectionArtFixture.ts";
 import { buildGame } from "../useColony.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { inspectViewport } from "../inspectionPatch.ts";
-import { buildPatchTerrain } from "../drawInspectionPatch.ts";
+import { buildPatchTerrain, faceColour } from "../drawInspectionPatch.ts";
 import { buildVoxelTerrainChunk, terrainChunkDescriptors, VoxelTerrainCache } from "../voxelTerrainChunks.ts";
 import { PLANE, CURTAIN, centreX, centreY } from "../../colony/index.ts";
 
@@ -25,7 +25,18 @@ test("column meshing preserves the pre-optimization geometry, grain and face ord
     if (wide) patch.bounds = { left: -3, right: 3, top: -3, bottom: 3 };
     assert.equal(
       createHash("sha256")
-        .update(JSON.stringify(buildPatchTerrain(patch, true)))
+        .update(
+          JSON.stringify(
+            buildPatchTerrain(patch, true).map(({ points, kind, normal, depth, grain, front }) => ({
+              points,
+              normal,
+              kind,
+              depth,
+              grain,
+              front,
+            })),
+          ),
+        )
         .digest("hex"),
       expected,
     );
@@ -86,6 +97,33 @@ test("digging invalidates neighbouring chunk halos locally, and viewport evictio
   );
   cache.dispose();
   assert.ok(values.every((v) => v.released));
+});
+
+test("mound levels change surface soil colours and invalidate nearby terrain", () => {
+  const patch = read(),
+    selected = patch.selected.cell,
+    cell = patch.cells.find((c) => c.state.cell[0] === selected[0] && c.state.cell[1] === selected[1])!,
+    cache = new VoxelTerrainCache(
+      () => ({}),
+      () => {},
+    );
+  cell.state.place.ground = "open";
+  const first = cache.update(patch);
+  const topColour = () => {
+    const face = buildPatchTerrain(patch, true).find(
+      (f) => f.normal[2] === 1 && Math.abs(f.points[0][0]) < 0.2 && Math.abs(f.points[0][1]) < 0.2,
+    )!;
+    return faceColour(face, "surface");
+  };
+  const colours = [topColour()];
+  for (const level of [1, 2, 4]) {
+    cell.state.place.mound = level;
+    cache.update(patch);
+    assert.ok(cache.rebuilt > 0 && cache.rebuilt < first.length);
+    colours.push(topColour());
+  }
+  assert.equal(new Set(colours).size, colours.length);
+  cache.dispose();
 });
 
 test("surface and below terrain cache independently, including projected strip terrain", () => {

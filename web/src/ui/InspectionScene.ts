@@ -1,6 +1,7 @@
 import * as T from "three";
 import { voxelFrustum, type VoxelViewport } from "./voxelViewport.ts";
 import { VoxelTerrainCache, buildVoxelTerrainChunk } from "./voxelTerrainChunks.ts";
+import { INSPECTION_GROUND, moundGroundLevel } from "./inspectionGround.ts";
 import { ROLE_RGB } from "./palette.ts";
 import { InspectionSoftware } from "./inspectionSoftware.ts";
 import { buildPatchTerrain, faceColour } from "./drawInspectionPatch.ts";
@@ -98,6 +99,7 @@ export class InspectionScene {
   private models = new Map<string, { body: T.BufferGeometry; band: T.BufferGeometry }>();
   private pools = new Map<string, Pool>();
   private material = new T.MeshLambertMaterial({ vertexColors: true });
+  private bandMaterial = new T.MeshBasicMaterial();
   private unlit = new T.MeshBasicMaterial({ vertexColors: true });
   private terrain = new T.Group();
   private terrainWasViewport = false;
@@ -118,8 +120,9 @@ export class InspectionScene {
   private contentsKey = "";
   private overlayKey = "";
   private cube = new T.Object3D();
-  private ink = new T.Color("#302A24");
-  private amber = new T.Color("#AB761D");
+  private bandInk = new T.Color("#302A24");
+  private bandAmber = new T.Color("#AB761D");
+  private bandTone = new T.Color();
   private viewport: VoxelViewport | null = null;
   private paletteKey = "";
   static async create(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"]): Promise<InspectionScene> {
@@ -147,7 +150,18 @@ export class InspectionScene {
     key.position.set(-3, -5, 8);
     fill.position.set(5, 2, 3);
     this.scene.add(key, fill, this.terrain, this.contents, this.overlays);
-    for (const [name, m] of Object.entries(models)) this.models.set(name, { body: geometry(m.body), band: geometry(m.band) });
+    for (const [name, m] of Object.entries(models)) {
+      const body = geometry(m.body);
+      if (m.band.positions.length) {
+        // Match the warm chitin in the aerial worker atlas. Use the original
+        // material assignment to keep the limbs darker than the body.
+        const colours = body.getAttribute("color");
+        const shell = colour("#65513F"),
+          limbs = colour("#4C4137");
+        for (let i = 0; i < colours.count; i++) colours.setXYZ(i, ...(colours.getZ(i) > 0.027 ? shell : limbs));
+      }
+      this.models.set(name, { body, band: geometry(m.band) });
+    }
     for (const [name, c] of [
       ["infection", "#B18DD1"],
       ["dead-cross", "#B34840"],
@@ -162,8 +176,7 @@ export class InspectionScene {
     }
     const style = getComputedStyle(canvas);
     try {
-      this.ink.set(style.getPropertyValue("--ink").trim() || "#302A24");
-      this.amber.set(style.getPropertyValue("--warn").trim() || "#AB761D");
+      this.setPalette(style.getPropertyValue("--ink").trim() || "#302A24", style.getPropertyValue("--warn").trim() || "#AB761D");
     } catch {
       /* neutral defaults */
     }
@@ -187,8 +200,8 @@ export class InspectionScene {
   setPalette(ink: string, amber: string): void {
     const key = ink + "/" + amber;
     if (key === this.paletteKey) return;
-    this.ink.fromArray(inspectionColour(ink));
-    this.amber.fromArray(inspectionColour(amber));
+    this.bandInk.fromArray(inspectionColour(ink)).convertLinearToSRGB();
+    this.bandAmber.fromArray(inspectionColour(amber)).convertLinearToSRGB();
     this.paletteKey = key;
   }
   angle(): void {
@@ -214,7 +227,7 @@ export class InspectionScene {
       const capacity = pool ? pool.capacity * 2 : 32,
         used = pool?.used ?? 0,
         body = new T.InstancedMesh(model.body, this.material, capacity),
-        band = model.band.getAttribute("position").count ? new T.InstancedMesh(model.band, this.material, capacity) : null;
+        band = model.band.getAttribute("position").count ? new T.InstancedMesh(model.band, this.bandMaterial, capacity) : null;
       body.frustumCulled = false;
       if (band) band.frustumCulled = false;
       if (pool) {
@@ -247,7 +260,10 @@ export class InspectionScene {
     pool.body.setMatrixAt(pool.used, this.cube.matrix);
     if (pool.band) {
       pool.band.setMatrixAt(pool.used, this.cube.matrix);
-      pool.band.setColorAt(pool.used, this.ink.clone().lerp(this.amber, Math.max(0, Math.min(1, odour ?? 0))));
+      // Sample the UI palette in sRGB, as the sprite tint does. The geometry's
+      // dark chitin must not multiply the colony colour a second time.
+      const t = Math.max(0, Math.min(1, odour ?? 0));
+      pool.band.setColorAt(pool.used, this.bandTone.copy(this.bandInk).lerp(this.bandAmber, t).convertSRGBToLinear());
     }
     pool.used++;
   }
@@ -262,7 +278,15 @@ export class InspectionScene {
       mode,
       patch.bounds,
       patch.selected.cell,
-      patch.cells.map((c) => [c.valid, c.surfaceStrip, c.state.place.ground, c.projectedGround, c.projectedSpoil, c.surfaceEntrance]),
+      patch.cells.map((c) => [
+        c.valid,
+        c.surfaceStrip,
+        c.state.place.ground,
+        c.projectedGround,
+        c.projectedSpoil,
+        c.surfaceEntrance,
+        moundGroundLevel(c.state.place.mound),
+      ]),
     ]);
     this.terrainChunks.rebuilt = 0;
     if (terrainKey !== this.terrainKey) {
@@ -443,7 +467,7 @@ export class InspectionScene {
         if (options.chambers && mode === "below" && s.place.chamber) {
           const rgb = ROLE_RGB[s.place.chamber.role];
           if (rgb) {
-            const tint = new T.Color("#503B2D").lerp(new T.Color(`rgb(${rgb.join(",")})`), 0.2).toArray() as V;
+            const tint = new T.Color(INSPECTION_GROUND.back).lerp(new T.Color(`rgb(${rgb.join(",")})`), 0.2).toArray() as V;
             const hex: V[] = Array.from({ length: 6 }, (_, j) =>
               this.point(
                 x + Math.cos(Math.PI / 6 + (j * Math.PI) / 3) / Math.sqrt(3),
@@ -520,13 +544,6 @@ export class InspectionScene {
       for (let i = 0; i < Math.min(5, stores); i++) this.actor("food-plain", x + FOOD_SPOTS[i][0], y + FOOD_SPOTS[i][1]);
       const aphids = aphidDensity(s.aphidDensity, 1);
       for (let i = 0; i < aphids.marks; i++) this.actor("aphid", x + APHID_SPOTS[i][0], y + APHID_SPOTS[i][1]);
-      if (mode === "surface" && s.place.mound > 0)
-        for (const [a, b] of [
-          [-0.25, 0.1],
-          [0.23, 0.24],
-          [-0.1, -0.25],
-        ])
-          this.actor("food-crumb", x + a, y + b);
       for (const q of s.queens) {
         this.actor(q.alive ? "queen" : "queen-dead", x + q.x, y + q.y, 0, 0, q.odour);
         if (!q.alive) this.actor("dead-cross", x + q.x, y + q.y, 0.18);
@@ -595,6 +612,7 @@ export class InspectionScene {
     }
     this.material.dispose();
     this.unlit.dispose();
+    this.bandMaterial.dispose();
     this.renderer.dispose();
   }
 }

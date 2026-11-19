@@ -1,3 +1,4 @@
+import { INSPECTION_GROUND, MOUND_GROUND, moundGroundLevel } from "./inspectionGround.ts";
 import surface from "../assets/inspection/projection.json" with { type: "json" };
 import lifecycle from "../assets/inspection/lifecycle-manifest.json" with { type: "json" };
 import below from "../assets/inspection/below-manifest.json" with { type: "json" };
@@ -31,6 +32,7 @@ interface Face {
   depth: number;
   grain: number;
   front: boolean;
+  moundLevel: number;
 }
 const SIDES: [Point3, Point3[]][] = [
   [
@@ -109,7 +111,8 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
     columns = right - left,
     lower = new Int16Array(rows * columns),
     upper = new Int16Array(rows * columns),
-    kinds = new Uint8Array(rows * columns);
+    kinds = new Uint8Array(rows * columns),
+    mounds = new Uint8Array(rows * columns);
   // Every terrain column is a solid depth interval. Keep that interval instead of allocating every buried voxel.
   for (let ix = left; ix < right; ix++)
     for (let iz = top; iz < bottom; iz++) {
@@ -125,6 +128,7 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
         lower[index] = -4;
         upper[index] = ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0;
         kinds[index] = ground === "rock" ? 2 : 1;
+        if (ground === "open") mounds[index] = moundGroundLevel(slot.state.place.mound);
       } else {
         if (slot.surfaceStrip) {
           if (slot.surfaceEntrance || !slot.projectedGround || axis > -slot.y + Math.min(0.24, (slot.projectedSpoil ?? 0) * 0.04)) continue;
@@ -164,6 +168,7 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
             kind,
             depth,
             grain: Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
+            moundLevel: mounds[index],
             front: isBelow && kind !== "back",
           });
         }
@@ -182,18 +187,13 @@ export function patchPoint(mode: InspectionPatch["mode"], width: number, height:
   ];
 }
 
-const surfaceSoil = ["#DB9B59", "#E3A363", "#D29454", "#E8AB6B", "#D89B5B"];
-const belowSoil = ["#AF855E", "#B58B63", "#A77D56", "#BA916B", "#A9825C"];
-const rocks = ["#858D88", "#929A95", "#7D8681", "#9AA19B", "#818985"];
 export function faceColour(face: Face, mode: InspectionPatch["mode"]): string {
   const hex =
     face.kind === "back"
-      ? "#503B2D"
+      ? INSPECTION_GROUND.back
       : face.kind === "rock"
-        ? rocks[face.grain]
-        : mode === "below"
-          ? belowSoil[face.grain]
-          : surfaceSoil[face.grain];
+        ? INSPECTION_GROUND.rock[face.grain]
+        : (mode === "below" ? INSPECTION_GROUND.belowSoil : MOUND_GROUND[face.moundLevel])[face.grain];
   const shade =
     mode === "surface"
       ? face.normal[2] > 0
@@ -228,7 +228,15 @@ export class InspectionPatchRenderer {
       w,
       h,
       patch.selected.cell,
-      patch.cells.map((c) => [c.valid, c.state.place.ground, c.surfaceStrip, c.projectedGround, c.projectedSpoil, c.surfaceEntrance]),
+      patch.cells.map((c) => [
+        c.valid,
+        c.state.place.ground,
+        c.surfaceStrip,
+        c.projectedGround,
+        c.projectedSpoil,
+        c.surfaceEntrance,
+        moundGroundLevel(c.state.place.mound),
+      ]),
     ]);
     if (key === this.key && this.terrain) return true;
     const back = this.createCanvas(),
@@ -381,13 +389,6 @@ export class InspectionPatchRenderer {
         ctx.closePath();
         ctx.fill();
       }
-      if (p.mound > 0 && mode === "surface")
-        for (const [a, b] of [
-          [-0.25, 0.1],
-          [0.23, 0.24],
-          [-0.1, -0.25],
-        ])
-          sprite("food-crumb", x + a, y + b);
       if (p.hypha) {
         ctx.strokeStyle = "#7A4FA0";
         ctx.fillStyle = "#7A4FA0";

@@ -1,3 +1,4 @@
+import { CLOSE_SPRITE_GROUND, inspectionGroundMix, moundGroundLevel } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
 import { MapVoxelPass } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
@@ -45,6 +46,7 @@ import {
   type Transect,
   AIR,
   OPEN,
+  ROCK,
   rockAt,
   SOIL,
   type WorldMap,
@@ -907,7 +909,15 @@ export default function ColonyField({
     const paths = new Map<number, Path2D>();
     const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number) => {
       // The background: soil underground (most cells), the paper on the open surface (no soil at all).
-      const bg = m.hasSoil ? theme.soil : theme.paperRgb;
+      const showCutaway = lv === CURTAIN && c.y - v.h / c.zoom / 2 > centreY(STRIP) + SIDE;
+      const look = !smellAll && (lv === PLANE || showCutaway) ? inspectionGroundMix(c.zoom / (v.dpr ?? 1)) : 0;
+      const mix = (base: readonly number[], close: readonly number[]) => base.map((value, i) => value + (close[i] - value) * look);
+      const paper = mix(theme.paperRgb, lv === PLANE ? CLOSE_SPRITE_GROUND.surface : CLOSE_SPRITE_GROUND.back);
+      const rock = mix(theme.rock, CLOSE_SPRITE_GROUND.rock);
+      const soil = mix(theme.soil, CLOSE_SPRITE_GROUND.soil);
+      const spoil = mix(theme.spoil, CLOSE_SPRITE_GROUND.soil);
+      const mound = CLOSE_SPRITE_GROUND.mound.map((colour) => mix(theme.paperRgb, colour));
+      const bg = (m.hasSoil ? soil : paper).map(Math.round);
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
       const [ax, ay] = toScreen(c, v, gx0, 0);
@@ -931,7 +941,6 @@ export default function ColonyField({
         number,
         number,
       ];
-      const pr = theme.paperRgb;
       const ox = v.w / 2 - c.x * c.zoom;
       const oy = v.h / 2 - c.y * c.zoom;
       for (let y = ry0; y <= ry1; y++) {
@@ -941,18 +950,32 @@ export default function ColonyField({
         const shift = 0.5 + 0.5 * (y & 1);
         let chunkX = NO_CHUNK; // a chunk column can be −1 (one world's curtain): none is a value no chunk takes
         let data: Uint8ClampedArray | null = null;
+        let terrain: Uint8Array | undefined;
+        let heaps: Uint16Array | undefined;
+        let loose: Uint8Array | undefined;
         for (let x = rx0; x <= rx1; x++) {
           if (x >> 6 !== chunkX) {
             chunkX = x >> 6;
             data = chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
+            terrain = look ? m.rock.chunk(chunkX, cy) : undefined;
+            heaps = look && lv === PLANE ? m.spoil?.chunk(chunkX, cy) : undefined;
+            loose = look ? m.loose?.chunk(chunkX, cy) : undefined;
           }
           if (!data) continue;
-          const o = ((ly << 6) | (x & 63)) * 4;
-          // The cell over the paper, its alpha in 16 steps (so trails batch into few colours).
-          const a = Math.round((data[o + 3] / 255) * 15) / 15;
-          const r = Math.round(data[o] * a + pr[0] * (1 - a));
-          const g = Math.round(data[o + 1] * a + pr[1] * (1 - a));
-          const b = Math.round(data[o + 2] * a + pr[2] * (1 - a));
+          const index = (ly << 6) | (x & 63);
+          const o = index * 4;
+          // Leave scent, food and chamber washes in their own colours over the shared ground palette.
+          const kind = terrain?.[index];
+          const heap = heaps?.[index] ?? 0;
+          const solid = kind === ROCK ? rock : kind === SOIL ? (loose?.[index] ? spoil : soil) : null;
+          const base = heap > 0 ? mound[moundGroundLevel(heap)] : paper;
+          // The original spoil wash fades out as the shared mound colour takes over.
+          const spoilWash = heap > 0 && data[o] === theme.spoil[0] && data[o + 1] === theme.spoil[1] && data[o + 2] === theme.spoil[2];
+          const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
+          const a = spoilWash ? opacity * (1 - look) : opacity;
+          const r = Math.round(solid ? solid[0] : data[o] * a + base[0] * (1 - a));
+          const g = Math.round(solid ? solid[1] : data[o + 1] * a + base[1] * (1 - a));
+          const b = Math.round(solid ? solid[2] : data[o + 2] * a + base[2] * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
           let path = paths.get(key);

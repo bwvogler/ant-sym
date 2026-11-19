@@ -1,3 +1,4 @@
+import { moundGroundLevel } from "./inspectionGround.ts";
 import { centreX, centreY, SIDE } from "../colony/index.ts";
 import { buildPatchTerrain } from "./drawInspectionPatch.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
@@ -42,6 +43,7 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
             c.state.place.ground,
             c.projectedGround,
             c.projectedSpoil,
+            moundGroundLevel(c.state.place.mound),
             c.surfaceEntrance,
           ]),
         ),
