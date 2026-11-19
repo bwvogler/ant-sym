@@ -52,15 +52,20 @@ export function moundBalls(level: number, seed: number): readonly DirtBall[] {
   };
   let additions = 0;
   for (let layer = 0; additions < count; layer++) {
-    const candidates: { column: number; row: number; distance: number }[] = [];
+    const candidates: { column: number; row: number; order: number }[] = [];
     for (let row = Math.floor(oy / ROW_HEIGHT) - 5; row <= Math.ceil(oy / ROW_HEIGHT) + 5; row++)
       for (let column = Math.floor(ox / SPACING - row / 2) - 5; column <= Math.ceil(ox / SPACING - row / 2) + 5; column++) {
         const { x, y } = position(layer, column, row);
         cellOf(x, y);
-        if (CELL[0] === gx && CELL[1] === gy) candidates.push({ column, row, distance: (x - ox) ** 2 + (y - oy) ** 2 });
+        if (CELL[0] !== gx || CELL[1] !== gy) continue;
+        const hash = Math.imul(column, 73856093) ^ Math.imul(row, 19349663) ^ Math.imul(layer, 83492791);
+        const noise = (Math.imul(hash ^ (hash >>> 13), 0x85ebca6b) >>> 0) / 0x100000000;
+        // Spread the base to the edges. Higher pellets favour the interior, with irregular shoulders.
+        const order = noise + layer * 0.8 * ((x - ox) ** 2 + (y - oy) ** 2);
+        candidates.push({ column, row, order });
       }
-    candidates.sort((a, b) => a.distance - b.distance || a.row - b.row || a.column - b.column);
-    for (const { column, row } of candidates.slice(0, 8)) {
+    candidates.sort((a, b) => a.order - b.order || a.row - b.row || a.column - b.column);
+    for (const { column, row } of candidates.slice(0, layer === 0 ? 24 : 12)) {
       if (additions >= count) break;
       add(layer, column, row);
       additions++;

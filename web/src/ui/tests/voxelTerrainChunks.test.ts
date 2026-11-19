@@ -170,8 +170,8 @@ test("neighbouring piles share supported, non-overlapping world positions as lev
   }
   const cell = patch.cells[0],
     seed = cellKey(...cell.state.cell),
-    low = moundBalls(2, seed),
-    high = moundBalls(3, seed);
+    low = moundBalls(3, seed),
+    high = moundBalls(4, seed);
   assert.deepEqual(high.slice(0, low.length), low, "new layers preserve all existing positions");
   assert.ok(Math.max(...high.map((b) => b.z)) > Math.max(...low.map((b) => b.z)));
   assert.ok(high.filter((b) => b.z === high.at(-1)!.z).length > 0);
