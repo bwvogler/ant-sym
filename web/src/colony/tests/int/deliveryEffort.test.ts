@@ -263,3 +263,58 @@ test("long attempts in a tunnel exercise persistence, redirection and release wi
     }
   }
 });
+
+test("new food waits for an enabled carry policy before scripted delivery in the pickup tick", () => {
+  for (const answer of ["to brood", "take", "put down"] as const) {
+    const { c, g, store, y } = setup();
+    c.carrying[0] = 0;
+    put(c, 0, 22, y);
+    c.map.food.set(22, y, 1);
+    c.map.foodLeft++;
+    c.foodTo = () => store.id;
+    c.gainMarks[0] = 0;
+    let calls = 0;
+    c.responses = responses({
+      get: () => true,
+      carry: () => {
+        calls++;
+        return answer;
+      },
+    });
+    g.tick(1 / 30);
+    assert.equal(calls, 0, "pickup follows this tick's carry stage");
+    assert.equal(c.carrying[0], 1, answer);
+    assert.equal(c.stored, 0, "no scripted delivery before policy sees new load");
+    assert.equal(store.food, 0);
+    const replay = setup();
+    replay.g.load(JSON.parse(JSON.stringify(g.save())));
+    replay.c.foodTo = () => store.id;
+    replay.c.responses = responses({ get: () => true, carry: () => answer });
+    g.tick(1 / 30);
+    replay.g.tick(1 / 30);
+    assert.deepEqual(g.save(), replay.g.save(), "save after pickup preserves the pending next-tick choice");
+    assert.equal(calls, 1, "one ordinary carry call next tick, no extra draw");
+    assert.equal(c.stored, answer === "take" ? 1 : 0);
+    assert.equal(store.food, answer === "take" ? 1 : 0);
+    assert.equal(c.carrying[0], answer === "to brood" ? 1 : 0);
+    if (answer === "put down") assert.equal(c.map.food.get(22, y), 1);
+    if (answer === "to brood") assert.equal(requestedDelivery(c, 0), "brood");
+  }
+});
+
+test("lane-off and local carry preserve immediate legacy pickup delivery", () => {
+  for (const lane of [0, 1]) {
+    const { c, g, store, y } = setup();
+    c.params.deliveryLane = lane;
+    c.carrying[0] = 0;
+    put(c, 0, 22, y);
+    c.map.food.set(22, y, 1);
+    c.map.foodLeft++;
+    c.foodTo = () => store.id;
+    c.responses = responses({ get: () => true, ...(lane === 0 ? { carry: () => "to brood" as const } : {}) });
+    g.tick(1 / 30);
+    assert.equal(c.stored, 1);
+    assert.equal(store.food, 1);
+    assert.equal(c.carrying[0], 0);
+  }
+});

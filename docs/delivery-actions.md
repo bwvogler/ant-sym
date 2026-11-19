@@ -428,3 +428,54 @@ sweep remains pending. All 11 delivery-effort tests pass, including the prior
 three invalid-window checks, report completeness, source hashes and unchanged
 control/audit metrics pass. Production code is unchanged; build and goldens were
 not rerun for this measurement-only slice.
+
+### Pickup decision ordering fixed (ja-g7nz.3.3.5)
+
+The failing integration regression reproduced a load being picked up and stored
+without the custom carry response seeing it. `arrive` now defers `port` for a
+newly picked-up food load when the delivery lane is enabled and a custom carry
+policy is installed. The ordinary next tick's `stanceStep` chooses its action
+before delivery. No extra response call, random draw, persisted field, cache
+contract or token cost is added. Local carry and lane-off behavior retain immediate
+legacy delivery. An explicit `take` answer can still use the existing scripted
+route after the policy has had its choice; choosing a role uses its sensory gate.
+
+Regression coverage includes destination selection under erased cues, explicit
+`take`, release with food conservation, local/lane-off compatibility, and JSON
+save/replay between pickup and the next carry choice. The pickup test fails before
+the fix and passes after it. All 40 delivery tests and four unchanged golden
+simulations pass; the strengthened pickup/replay tests also pass. Typecheck,
+lint, production build, formatting and diff checks pass (existing lint and bundle
+size warnings remain).
+
+Matched cue-loss reruns use seeds 3/4, 60 initial workers, 600 seconds, zero mark
+gain during 120–300 seconds and restoration afterward:
+
+| Policy | Final stored, seeds 3 / 4 | Stored during cue loss | Releases | Loads held at restoration |
+| --- | ---: | ---: | ---: | ---: |
+| Scripted default | 595 / 293 | 164 / 86 | 0 / 0 | 10 / 6 |
+| Context persistence | 394 / 210 | 0 / 0 | 0 / 0 | 49 / 40 |
+| Context redirection | 364 / 210 | 0 / 0 | 0 / 0 | 51 / 40 |
+| Context release, fixed | 410 / 228 | 0 / 0 | 1,256 / 753 | 58 / 45 |
+
+The default, persistence and redirection match every previous simulation metric
+(except runtime). Release's formerly uncommitted deliveries during cue loss fall
+from 103/66 to **zero**, and its final food changes from 422/234 to 410/228. Room
+recognition also remains zero during loss. All eight games retain their queen,
+produce 30 births and avoid hunger deaths/starved brood. This closes the measured
+pickup bypass; it does not remove the explicitly retained scripted `take` path.
+
+Release recovers 16/18 more stored food than persistence, but generates over a
+thousand/several hundred releases and has more held loads when cues return.
+Repeated dropping/collection is a tradeoff, not successful delivery. The
+`maxHeldOver120` metric counts observed continuous carrying, not the age of a food
+unit through successive carriers; release can lower it without clearing backlog.
+Before choosing a policy, measure ground-food backlog and repeated collection,
+then compare recovery and survival on the planned broader seeds. No doctrine or
+threshold is promoted; experimental defaults stay off.
+
+Raw reports: `experiments/delivery-calibration/seed{3,4}-cue-loss-pickup-fixed.json`.
+Use the prior section's cue-loss command with this production fix. The harness is
+unchanged and its source hashes match. Report commit identifiers name the pre-edit
+base; these runs include the `arrive` change in this commit. Full training/holdout
+validation remains open under ja-g7nz.3.3.
