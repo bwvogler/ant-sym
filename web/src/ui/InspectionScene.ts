@@ -1,3 +1,4 @@
+import { wander } from "./hyphaeLook.ts";
 import { inspectionMoundFloor } from "./inspectionMound.ts";
 import * as T from "three";
 import { voxelFrustum, type VoxelViewport } from "./voxelViewport.ts";
@@ -394,7 +395,7 @@ export class InspectionScene {
             edges.add(key);
             const shape = hyphaShape(a, b),
               target = patch.cells.find((n) => n.valid && Math.abs(n.x - c.x - dx) < 1e-5 && Math.abs(n.y - c.y - dy) < 1e-5),
-              pts = target ? shape.points : shape.points.slice(0, 3),
+              pts = target ? shape.points : shape.points.slice(0, 5),
               cord = s.cord || target?.state.cord;
             for (let i = 1; i < pts.length; i++) {
               const a = pts[i - 1],
@@ -426,8 +427,10 @@ export class InspectionScene {
           }
         if (s.place.hypha && !s.threads.length && !s.knot && !s.tips?.length)
           f.box(this.point(c.x, c.y, 0.035), [0.07, 0.07, 0.07], colour(HYPHA_COLOURS.body));
+        const spot = [0, 0];
+        wander(cx + c.x, cy + c.y, spot);
         for (const p of fungalPrimitives({ ...s, stalkLevel: mode === "surface" ? s.stalkLevel : 0 }, cellKey(...s.cell))) {
-          const point = (p: V) => this.point(c.x + p[0], c.y + p[1], p[2]);
+          const point = (p: V) => this.point(spot[0] - cx + p[0], spot[1] - cy + p[1], p[2]);
           if (p.kind === "beam") f.beam(point(p.a), point(p.b), p.width, colour(p.colour));
           else f.box(point(p.at), mode === "surface" ? p.size : [p.size[0], p.size[2], p.size[1]], colour(p.colour));
         }

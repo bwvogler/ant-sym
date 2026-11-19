@@ -4,7 +4,7 @@ import { MapVoxelPass } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
 import { FungalMapSprites } from "./fungalStructures.ts";
-import { hyphaShape, HYPHA_COLOURS } from "./hyphaVisual.ts";
+import { HYPHA_COLOURS } from "./hyphaVisual.ts";
 import { chamberFoodSpots } from "./chamberFood.ts";
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
 import { MapLeafSprites, SurfaceLeaves } from "./surfaceFood.ts";
@@ -83,7 +83,7 @@ import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import { type AntTraces, traceAlpha } from "./trace.ts";
-import { type Chain, chainsOf, hash, smoothThrough, wander } from "./hyphaeLook.ts";
+import { type Chain, chainsOf, hash, smoothThrough, twigsOf, wander } from "./hyphaeLook.ts";
 import type { FieldProbe } from "./lensStore.ts";
 import { WorkerGait, WorkerSprites, drawWorkerSprite, workerLod } from "./workerSprites.ts";
 import { NestSprites, drawNestSprite, type NestSprite } from "./nestSprites.ts";
@@ -1019,7 +1019,7 @@ export default function ColonyField({
     ) => {
       const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
       const distant = c.zoom < HEX_ZOOM * d;
-      if (distant) {
+      {
         const spot = [0, 0];
         /** the screen position of cell (x, y)'s centre, bent by the warp */
         const at = (x: number, y: number): [number, number] => {
@@ -1061,57 +1061,40 @@ export default function ColonyField({
         ctx.lineWidth = Math.max(2.5 * d, Math.min(8 * d, c.zoom * 0.32));
         ctx.stroke(cords);
         ctx.restore();
-      } else {
-        const path = new Path2D(),
-          cords = new Path2D(),
-          hairs = new Path2D();
-        const segment = (a: number, b: number, into: Path2D = path) => {
-          const [ax, ay] = hyphaCell(a),
-            [bx, by] = hyphaCell(b);
-          if (!inView(ax, ay) && !inView(bx, by)) return;
-          const shape = hyphaShape([centreX(ax, ay), centreY(ay)], [centreX(bx, by), centreY(by)]);
-          shape.points.forEach(([x, y], i) => {
-            const p = toScreen(c, v, x, y);
-            if (i === 0) into.moveTo(...p);
-            else into.lineTo(...p);
-          });
-          if (c.zoom / d >= 12)
-            for (const [a, b] of shape.hairs) {
-              hairs.moveTo(...toScreen(c, v, ...a));
-              hairs.lineTo(...toScreen(c, v, ...b));
+        if (!distant) {
+          const twigs = new Path2D();
+          for (const ch of chainsFor(h)) {
+            if (ch.cord || ch.x1 < rx0 - 1 || ch.x0 > rx1 + 1 || ch.y1 < ry0 - 1 || ch.y0 > ry1 + 1) continue;
+            for (let i = 1; i < ch.cells.length; i++) {
+              const j = 2 * i;
+              const x = ch.world[j],
+                y = ch.world[j + 1];
+              const [hx, hy] = hyphaCell(ch.cells[i]);
+              if (!inView(hx, hy)) continue;
+              const [sx, sy] = toScreen(c, v, x, y);
+              const angle = Math.atan2(y - ch.world[j - 1], x - ch.world[j - 2]);
+              twigsOf(twigs, ch.cells[i], sx, sy, angle, c.zoom * 0.12, 0.65);
             }
-        };
-        for (const [k, p] of h.parent) if (p !== HYPHA_ROOT) segment(p, k, h.cords.has(k) ? cords : path);
-        for (let i = 0; i + 1 < h.fusions.length; i += 2) segment(h.fusions[i], h.fusions[i + 1]);
-        ctx.save();
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        const fine = Math.max(1.3 * d, Math.min(4 * d, c.zoom * 0.17)),
-          thick = Math.max(2.8 * d, Math.min(9 * d, c.zoom * 0.35));
-        ctx.globalAlpha = 0.72;
-        ctx.strokeStyle = HYPHA_COLOURS.edge;
-        ctx.lineWidth = fine + 1.2 * d;
-        ctx.stroke(path);
-        ctx.lineWidth = thick + 1.3 * d;
-        ctx.stroke(cords);
-        ctx.globalAlpha = under ? 0.92 : 1;
-        ctx.strokeStyle = HYPHA_COLOURS.body;
-        ctx.lineWidth = fine;
-        ctx.stroke(path);
-        ctx.lineWidth = thick;
-        ctx.stroke(cords);
-        ctx.strokeStyle = HYPHA_COLOURS.core;
-        ctx.lineWidth = Math.max(0.8 * d, c.zoom * 0.045);
-        ctx.stroke(hairs);
-        ctx.restore();
+          }
+          ctx.save();
+          ctx.strokeStyle = HYPHA_COLOURS.core;
+          ctx.lineWidth = Math.max(d, c.zoom * 0.025);
+          ctx.stroke(twigs);
+          ctx.restore();
+        }
       }
+      const bent = (x: number, y: number): [number, number] => {
+        const point = [0, 0];
+        wander(centreX(x, y), centreY(y), point);
+        return toScreen(c, v, point[0], point[1]);
+      };
       ctx.save();
       ctx.fillStyle = HYPHA_COLOURS.body;
       ctx.globalAlpha = 1;
       const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
       for (const t of h.tips) {
         if (!inView(t.x, t.y)) continue;
-        const [x, y] = toScreen(c, v, centreX(t.x, t.y), centreY(t.y)),
+        const [x, y] = bent(t.x, t.y),
           dx = centreX(neighbourX(t.x, t.y, t.heading), neighbourY(t.y, t.heading)) - centreX(t.x, t.y),
           dy = centreY(neighbourY(t.y, t.heading)) - centreY(t.y);
         fungalSprites.draw(ctx, { tips: [[dx, dy]] }, 0, x, y, c.zoom);
@@ -1122,7 +1105,7 @@ export default function ColonyField({
         if (load < HYPHA_MASS * 0.1) continue;
         const [lx, ly] = hyphaCell(k);
         if (!inView(lx, ly)) continue;
-        const [x, y] = toScreen(c, v, centreX(lx, ly), centreY(ly));
+        const [x, y] = bent(lx, ly);
         const full = Math.min(1, load / (HYPHA_MASS * 2));
         ctx.globalAlpha = (under ? 0.3 : 0.5) * full;
         ctx.beginPath();
@@ -1134,7 +1117,7 @@ export default function ColonyField({
       for (const k of new Set([...h.knots.keys(), ...fruits])) {
         const [kx, ky] = hyphaCell(k);
         if (!inView(kx, ky)) continue;
-        const [x, y] = toScreen(c, v, centreX(kx, ky), centreY(ky));
+        const [x, y] = bent(kx, ky);
         fungalSprites.draw(
           ctx,
           { knot: h.knots.has(k), knotSprouted: h.knots.get(k)?.sprouted ?? false, fruit: fruits.has(k) },
