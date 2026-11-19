@@ -241,7 +241,7 @@ export function resolveFights(
         if (loud > 0) ph.deposit("alarm", c.x[i], c.y[i], p.alarm * dt * loud);
       }
       const killed = rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies);
-      observer?.exposure(enemies, allies, killed);
+      observer?.exposure(enemies, allies, killed, i);
       if (killed) deaths[k]!.push(i);
     }
   });

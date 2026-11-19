@@ -69,13 +69,13 @@ test("combat observation reports incoming pressure and casualties on the receivi
   cs.forEach((colony, side) => {
     combatObservers.set(colony, {
       contact() {},
-      exposure(pressure, allies, killed) {
-        exposures.push([side, pressure, allies, Number(killed)]);
+      exposure(pressure, allies, killed, ant) {
+        exposures.push([side, ant, pressure, allies, Number(killed)]);
       },
     });
   });
   assert.deepEqual(fight(cs, false), [0, 1]);
-  assert.deepEqual(exposures, [[1, 1, 1, 1]]);
+  assert.deepEqual(exposures, [[1, 0, 1, 1, 1]]);
 });
 
 test("a single ant with narrow tolerance cannot attack itself", () => {

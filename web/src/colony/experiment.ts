@@ -939,19 +939,45 @@ function observedDefence(spec: RunSpec): RunSpec {
               "combatDeaths",
             ])
               add(key, 0);
+            const contacts = new Map<number, { time: number; alarm: string; movement: string; homeSeen: boolean }>();
             combatObservers.set(colony, {
-              contact(action) {
+              contact(action, ant, sensed) {
+                if (side === 0 && game.time <= 30)
+                  contacts.set(ant, {
+                    time: game.time,
+                    alarm: sensed.alarm,
+                    movement: action.movement,
+                    homeSeen: colony.s[3] === SEEN || colony.s[4] === SEEN || colony.s[5] === SEEN,
+                  });
                 add(action.movement);
                 if (action.reason === "protect load") add("protectedLoad");
                 if (action.reason === "report home") add("reporting");
               },
-              exposure(pressure, allies, killed) {
+              exposure(pressure, allies, killed, ant) {
                 add("exposed");
                 add("pressure", pressure);
                 add("hazardInput", pressure / allies);
                 if (killed) {
                   add("combatDeaths");
                   counts[`${prefix}.firstCombatDeath`] ??= game.time;
+                  if (side !== 0 || game.time > 30) return;
+                  const layer = colony.layer[ant];
+                  const nest = colony.layers[layer]!.nest;
+                  const distance = Math.hypot(colony.x[ant] - nest.x, colony.y[ant] - nest.y);
+                  const contact = contacts.get(ant);
+                  const current = contact?.time === game.time ? contact : undefined;
+                  add("earlyDeaths");
+                  add("earlyDeathsOutsideNest", Number(distance >= nest.r));
+                  add("earlyDeathsWithoutContact", Number(!current));
+                  add("earlyDeathsWithAlarm", Number(current !== undefined && current.alarm !== "none"));
+                  add("earlyDeathsWithHomeInSight", Number(current?.homeSeen ?? false));
+                  if (counts[`${prefix}.earlyDeaths`] === 1) {
+                    add("firstDeathLayer", layer);
+                    add("firstDeathX", colony.x[ant]);
+                    add("firstDeathY", colony.y[ant]);
+                    add("firstDeathDistanceFromNest", distance);
+                    add(`firstDeathAction.${current?.movement ?? "noContact"}`);
+                  }
                 }
               },
             });

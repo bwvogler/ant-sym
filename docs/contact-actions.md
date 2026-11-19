@@ -172,3 +172,19 @@ The approach assay allows alarm-gated defense outside the hole when one of the c
 The approach rule qualified on 57, 59 and 81 contact decisions in A13. None occurred before the first defender death. It traded a pass on seed 6 for a pass on seed 5. No approach contact qualified in the three neutral A9 runs, whose food and losses reproduced untreated directed combat exactly. Keep the approach rule experimental. To target early losses, first identify where the early casualties occur and what the ants there actually sense.
 
 Reproduce with `node scripts/experiment.mjs defendAlarmApproach contactAlarmApproach --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
+
+### Where early casualties occur
+
+The first defender death was on the surface and occurred at the same time and position with or without approach defense on each seed. Each first casualty had chosen to withdraw earlier that tick.
+
+| A13 seed | First death | Distance from own nest center | Defender deaths in first 30 s, directed / approach | Deaths outside nest radius, directed / approach |
+|---:|---:|---:|---:|---:|
+| 3 | 17.50 s | 25.78 world units | 5 / 5 | 5 / 5 |
+| 5 | 19.70 s | 69.71 world units | 8 / 8 | 8 / 8 |
+| 6 | 11.20 s | 48.73 world units | 19 / 25 | 13 / 19 |
+
+In untreated directed combat, only 7 of the 32 early casualties had sensed alarm at contact that tick, and only 3 saw home in the home sensors. Three died without a same-tick contact decision. The equivalent counts with approach defense were 8, 4 and 1 of 38. Contact observations are recorded before movement and joined to damage by colony, ant slot and tick. An absent contact record means the policy received no contact question for that ant that tick.
+
+Early losses are already occurring in the field when these policies are waiting for a close-to-home cue. The next comparison should trace withdrawal and repeated exposure there, including the pressure that reaches ants without a contact decision, before broadening automatic fighting. Food, total losses and pass scores reproduced the existing arms exactly.
+
+Reproduce with `node scripts/experiment.mjs defendHome defendAlarmApproach --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.

@@ -2,6 +2,7 @@
 import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { contactAction } from "./contactAction.ts";
+import type { CombatObserver } from "./combatObservation.ts";
 import { chamberGoal, putDown } from "./dig.ts";
 import { homeField, homeGoal } from "./homing.ts";
 import type { Item } from "./responses.ts";
@@ -23,7 +24,7 @@ import {
   trailLevel,
 } from "./vocab.ts";
 
-export function decide(col: Colony, i: number, s: AntStep): void {
+export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObserver): void {
   const p = s.p;
   const dt = s.dt;
   const fl = s.fl;
@@ -182,9 +183,11 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
-    const answer = resp.contact(touch(col, i, true, mode, item), col.antDraw(i));
+    const sensed = touch(col, i, true, mode, item);
+    const answer = resp.contact(sensed, col.antDraw(i));
     const action = contactAction(answer, carrying || pellet || nursing, reporting);
     s.contactAction = action;
+    observer?.contact(action, i, sensed);
     if (action.movement === "attack") {
       mode = FIGHT;
       col.attackLayer[i] = col.layer[i];

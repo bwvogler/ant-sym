@@ -1492,8 +1492,7 @@ export class Colony {
       if (map.sky) unbury(this, i);
       perceive(this, i, s);
       stanceStep(this, i, s);
-      decide(this, i, s);
-      if (combatObserver && s.contactAction) combatObserver.contact(s.contactAction);
+      decide(this, i, s, combatObserver);
       steer(this, i, s);
       const moveDigDone = moveDig(this, i, s);
       if (moveDigDone) continue;
