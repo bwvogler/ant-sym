@@ -1,3 +1,4 @@
+import { DEFAULT_FIGHT } from "./battle.ts";
 import { combatObservers } from "./combatObservation.ts";
 // The assay catalogue (docs/refactor.md S3.6, ja-fnd.4.6): the arena assays and the lists ASSAYS, ONE_ASSAYS and ONE_PENDING. The
 // harness they run on (runGame, the probes, Arena, oneArena) is harness.ts; the whole-game and one-world assays are oneAssays.ts and
@@ -1482,6 +1483,36 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * Also the one-world assays of their own (S1, F1, R1), the desert ant's, the builder's, and the lifecycle assays (L ×3,
  * lifecycleOne) on a solo one world, 30 minutes each.
  */
+/** Experimental response using the contact policy's existing perception of its own entrance. */
+function entranceDefence(spec: RunSpec): RunSpec {
+  const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
+  return {
+    ...spec,
+    sides: {
+      ...spec.sides,
+      responses: {
+        ...base,
+        contact: (t, draw) => (t.enemy && t.place === "hole" && t.carrying === "none" ? "fight" : base.contact(t, draw)),
+      },
+    },
+    game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
+  };
+}
+
+const defendEntrance: Assay = {
+  ...defendWalked,
+  id: "defendEntrance",
+  title: "A13 directed combat with contact defense at the entrance",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed)),
+};
+
+const contactEntrance: Assay = {
+  ...onPlaneAssay(contact),
+  id: "contactEntrance",
+  title: "A9 neutral contact with entrance defense enabled for one colony",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed))),
+};
+
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
@@ -1513,6 +1544,8 @@ export const ONE_ASSAYS: Assay[] = [
   ...BUILDER_ASSAYS,
   ...lifecycleOne,
   defendWalked,
+  defendEntrance,
+  contactEntrance,
 ];
 
 /** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */

@@ -89,3 +89,18 @@ The 300-second A13 trace counts contact decisions before movement and measures i
 All other defender contact outcomes were withdrawals. No requested attack was overridden by load protection or reporting in these runs. In legacy mode a nearby enemy can cause damage even while withdrawing. In directed mode the scripted raiders attacked at every contact, so defenders received about 3.5 times the raiders' cumulative hazard input on both seeds. The data establish an action asymmetry and its realized pressure. They do not explain every withdrawal or isolate eligibility, reach, and subsequent movement as independent causes.
 
 A controlled follow-up should change only the defender's contact answer at a locally recognized nest entrance, hold the raider doctrine fixed, and compare survival and food with both existing modes. Include an untreated neutral-contact control and keep distant foragers on the existing policy.
+
+### Entrance-only defense pilot
+
+The `defendEntrance` and `contactEntrance` assays change only the player's contact response. An empty-jawed ant that senses an enemy and recognizes its current location as its own hole asks to fight. Other contacts use the existing policy. The raider doctrine, contact action eligibility rules, and existing A13 controls are retained. These are assay policies and require no new sensed field.
+
+| A13 seed | Legacy food / defenders lost / raiders lost | Directed | Directed + entrance |
+|---:|---:|---:|---:|
+| 1 | 791 / 45 / 47 | 319 / 147 / 43 | 440 / 134 / 51 |
+| 3 | 807 / 24 / 43 | 336 / 106 / 35 | 550 / 105 / 41 |
+
+Entrance defense passed A13 on both seeds, including seed 3, which previously failed under directed combat. It increased food stored relative to untreated directed combat by 121 and 214, respectively. Defender losses stayed well above legacy. Cumulative defender hazard fell from 2,988 to 2,809 on seed 1 and from 2,239 to 1,968 on seed 3.
+
+In paired neutral A9 runs, seed 1 was unchanged on food and loss (2,355 stored and zero losses). Seed 3 still passed A9, but food fell from 2,182 to 2,134 and combined losses rose from zero to six. The rule is worth testing across more seeds, with absolute defender losses and neutral food and losses as separate guards. Directed combat stays opt-in.
+
+Run the 300-second pilot with `node scripts/experiment.mjs defendEntrance contactEntrance contact --seeds 1,3 --set game.fight.intent=true --jobs 3`. The existing A13 controls are reproduced with `node scripts/experiment.mjs defendHome --seeds 1,3 --set game.fight.intent=false,true --jobs 2`.
