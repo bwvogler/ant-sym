@@ -2,7 +2,7 @@ import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts"
 import { moundBalls, type DirtBall } from "./inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, inspectionGroundMix, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
-import { MapVoxelPass } from "./mapVoxel.ts";
+import { MAP_ORBIT_READY_ZOOM, MAP_ORBIT_SHOW_ZOOM, MapVoxelPass } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
 import { FungalMapSprites } from "./fungalStructures.ts";
@@ -1887,7 +1887,7 @@ export default function ColonyField({
         !smellAll,
         orbit.current,
       );
-      const canRotate = lv === PLANE && voxel.alpha === 1;
+      const canRotate = lv === PLANE && !smellAll && c.zoom / d >= MAP_ORBIT_SHOW_ZOOM;
       if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
       if (!canRotate) orbit.current = mapOrbit();
       angled.current = "angled" in voxel && voxel.angled === true;
@@ -2147,6 +2147,13 @@ export default function ColonyField({
     const fz = fitZoom(we, viewport());
     s.zoomedIn = cam.zoom > fz * 1.05;
     s.fitted = cam.zoom <= fz * 1.0001;
+  };
+  const turnMap = (start: InspectionOrbit, dx: number, dy: number) => {
+    const next = dragOrbit(start, dx, dy);
+    const current = camera();
+    const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
+    if (current.zoom < readyZoom) setCamera({ ...current, zoom: readyZoom });
+    orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
   };
   /** View `v`'s map: the plane or the curtain. */
   const mapOf = (v: number): WorldMap => (v === PLANE ? world.plane : world.curtain);
@@ -2496,7 +2503,7 @@ export default function ColonyField({
         type="button"
         aria-label="Rotate close map. Arrow keys turn and tilt. Home resets."
         title="Drag to turn and tilt · Home or double-click resets"
-        className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel/80 p-1 shadow-sm active:cursor-grabbing"
+        className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel px-2 py-1 text-xs text-fg-2 shadow-md active:cursor-grabbing"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           orbitDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: orbit.current };
@@ -2504,8 +2511,7 @@ export default function ColonyField({
         onPointerMove={(e) => {
           const drag = orbitDrag.current;
           if (drag?.id === e.pointerId) {
-            const next = dragOrbit(drag.start, e.clientX - drag.x, e.clientY - drag.y);
-            orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
+            turnMap(drag.start, e.clientX - drag.x, e.clientY - drag.y);
           }
         }}
         onLostPointerCapture={() => {
@@ -2523,8 +2529,7 @@ export default function ColonyField({
           };
           if (e.key === "Home" || e.key === "Escape") orbit.current = mapOrbit();
           else if (moves[e.key]) {
-            const next = dragOrbit(orbit.current, ...moves[e.key]);
-            orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
+            turnMap(orbit.current, ...moves[e.key]);
           } else return;
           e.preventDefault();
         }}
@@ -2543,6 +2548,7 @@ export default function ColonyField({
           <path stroke="#36a45c" d="m15 17-9 10m0-5v5h5" />
           <path stroke="#3888de" d="M15 17V4m-4 4 4-4 4 4" />
         </svg>
+        Rotate
       </button>
       {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
       <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
