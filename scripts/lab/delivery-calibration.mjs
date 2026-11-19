@@ -18,6 +18,7 @@ const royalCap = Number(value("--royal-cap", 20));
 if (!Number.isFinite(royalCap) || royalCap <= 0) throw Error("royal-cap must be positive and finite");
 const requested = value("--variants", "baseline,retain,persist,redirect5,redirect20");
 const variants = {
+  context20: { lane: 1, limit: 20, doctrine: "context" },
   royal: { lane: 1, limit: 5, doctrine: "royal" },
   royal5: { lane: 1, limit: 5, doctrine: "redirectRoyal" },
   royal20: { lane: 1, limit: 20, doctrine: "redirectRoyal" },
@@ -86,6 +87,11 @@ for (const name of requested.split(",")) {
         carryCalls++;
         if (t.carrying !== "food" || v.doctrine === "retain") return "take";
         if (v.doctrine === "royal") return "to royal";
+        if (v.doctrine === "context") {
+          if (t.deliveryPlace !== "none") return `to ${t.deliveryPlace}`;
+          if (t.deliveryAttempt === "long" && t.deliveryTarget === "brood") return "to royal";
+          return t.deliveryTarget === "none" ? "to brood" : "take";
+        }
         if (t.deliveryAttempt === "long") {
           longCalls++;
           if (v.doctrine === "redirectRoyal") return "to royal";

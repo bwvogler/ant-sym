@@ -47,7 +47,12 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
  * What a response may depend on: few values, so an answer could be cached per situation. The
  * colony fills one shared object per call, so a response must read it and not keep it.
  */
+export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "reception";
+
 export interface Touch {
+  /** Own commitment and recognised chamber underfoot; sent only to carry. */
+  deliveryTarget: DeliveryContextRole;
+  deliveryPlace: DeliveryContextRole;
   /** Coarse effort on an explicit local delivery, enabled only by deliveryReconsider. Carry alone receives it. */
   deliveryAttempt: "none" | "brief" | "long";
   mode: Mode;
@@ -224,6 +229,8 @@ export const CROWD = ["few", "many"] as const;
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
 const TOUCH_FIELDS: readonly FieldOf<Touch>[] = [
+  { name: "deliveryTarget", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryTarget:${v}` },
+  { name: "deliveryPlace", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryPlace:${v}` },
   { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },
   { name: "mode", values: MODES },
   { name: "carrying", values: ITEMS },

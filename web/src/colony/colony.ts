@@ -314,6 +314,8 @@ export class Colony {
       returns: "none",
       crowd: "few",
       deliveryAttempt: "none",
+      deliveryTarget: "none",
+      deliveryPlace: "none",
     } as Touch,
     "place",
     { get: () => this.place(this.ti), enumerable: true },

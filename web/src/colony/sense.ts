@@ -1,13 +1,13 @@
 // Sensing (docs/refactor.md S3.3): what an ant feels around it (nestmates, returning foragers, enemies and their heading), the situation it touches, the raid smell, and the floor marks it reads and lays. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` (and `around`, which never read the colony, losing that parameter).
 
-import { deliveryAttempt } from "./deliveryAction.ts";
+import { deliveryAttempt, requestedDelivery } from "./deliveryAction.ts";
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
 import { inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
-import { qualityOf, type Item, type Odds, type Touch, type Where } from "./responses.ts";
+import { qualityOf, type Item, type Odds, type Touch, type DeliveryContextRole, type Where } from "./responses.ts";
 import { MARK_DECAY, RETURNS_MANY } from "./tuning.ts";
 import { ENEMY, MODES, PLANE, trailLevel, type CellCounts, type Mode } from "./vocab.ts";
 import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt } from "./world.ts";
@@ -39,6 +39,8 @@ export function touch(
 export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item: Item, offered: Item): Touch {
   const t = c.t;
   t.deliveryAttempt = deliveryAttempt(c, i);
+  t.deliveryTarget = requestedDelivery(c, i) ?? "none";
+  t.deliveryPlace = c.params.deliveryLane > 0 && item === "food" ? deliveryPlaceOn(c, i) : "none";
   t.mode = MODES[mode] as Mode;
   t.carrying = item;
   t.porter = c.porter[i] === 1;
@@ -62,6 +64,22 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   t.raid = raidSmelt(c, i);
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;
+}
+
+/** Existing floor-mark recognition at the physical cell, with this ant's layer bound. */
+function deliveryPlaceOn(c: Colony, i: number): DeliveryContextRole {
+  if (c.onPlane) return "none";
+  const x = CELL[0],
+    y = CELL[1];
+  try {
+    c.antCell(i);
+    if (rockAt(c.map, CELL[0], CELL[1]) !== OPEN) return "none";
+    const role = perceivedPlace(c, i, c.placeAt(CELL[0], CELL[1]));
+    return role === "royal" || role === "brood" || role === "store" || role === "reception" ? role : "none";
+  } finally {
+    CELL[0] = x;
+    CELL[1] = y;
+  }
 }
 
 /** place, with ant i's layer bound. */

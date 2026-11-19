@@ -256,3 +256,52 @@ The carry response currently receives coarse `place` (chamber/tunnel/etc.) and e
 Proposed next change: expose the existing commitment and locally perceived delivery role **only to carry**. Each is one of none/royal/brood/store/reception. Underfoot recognition must reuse fungal attenuation/swap semantics and physical position, with no search for unseen chambers, global availability flags or colony hunger totals. This adds no new physical sense: it carries the existing floor-mark recognition and the ant's own selected action into the decision context. It does expand carry's possible keys by at most25 combinations, so it needs a response-version bump and offline request-size measurements; other response payloads/keys should remain unchanged. Defaults stay off.
 
 Tests before promotion: distinguish identical effort with different commitments; swapped/erased underfoot cues; surface/foreign-place handling; carry-only payload/key isolation; same-role retention versus explicit change/release; save/replay; and paired generated-world doctrines that exploit this context without reading hidden role availability. The broader navigation and colony-calibration beads remain open. This paragraph is a plan, not a claim that the new fields or a successful doctrine are implemented.
+
+### Carry context results (ja-g7nz.3.2.4)
+
+Carry now receives `deliveryTarget` (its existing commitment) and `deliveryPlace`
+(the existing chamber-floor role recognised at its physical cell). Both use
+none/royal/brood/store/reception. Recognition uses the ant's layer, an open cell,
+its own chamber, and existing mark availability, gain and brood/store swapping.
+Neither field certifies a distant destination exists. Disabled delivery and
+non-food local-place queries report none. No new saved arrays, random draws,
+policy calls, automatic fallback, or default changes were added.
+
+Response version 16 separates the new cache contract. The fields appear only in
+carry payloads and keys (at most 25 times the prior carry combinations); other
+lanes retain their situation keys. The shared legend changes all response context
+hashes. For one food-carrying situation with target brood/place store and doctrine
+forage, the repository's offline token estimator rises from 2,439 to 2,626 tokens
+for carry (+187). Other response requests gain 163–164 estimated tokens from the
+345-character shared legend addition; their situation payloads are unchanged.
+These are estimates, not billed usage; no live calls were made. See
+`experiments/delivery-calibration/carry-context-cost.json`.
+
+The `context20` pilot policy accepts a recognised delivery room underfoot,
+otherwise starts toward brood and changes a long brood attempt to royal. It keeps
+an existing royal commitment. This is a test doctrine, not the local default.
+Generated maps, 60 initial workers, 600 seconds, royal cap 20:
+
+| Doctrine | Seed 1 stored | Seed 2 stored | Maximum loads held >120s, seeds 1/2 |
+| --- | ---: | ---: | --- |
+| Default / retain | 444 | 698 | 1 / 0 |
+| Previous brood→royal after 20s | 135 | 311 | 5 / 0 |
+| Context-aware 20s | 279 | 562 | 0 / 0 |
+
+All eight runs retained their queen, produced 30 births and had no hunger deaths
+or starved brood. Baseline and retain match exactly in simulation metrics. The
+new doctrine improves these two seeds but remains below baseline throughput;
+there is no threshold selection or default promotion. Raw reports are
+`seed1-carry-context.json` and `seed2-carry-context.json` in the same experiment
+directory. Report commit identifiers name the pre-edit base; these reports were
+run with this change. Harness formatting occurred while the pilots ran, so their
+source hashes may differ despite identical policy logic.
+
+Validation: all 37 delivery tests pass, including 20-seed recovery at a recognised
+store, cue distortion, foreign/surface isolation, all 25 key combinations and
+other-lane payload isolation. Save continuation now uses a target-aware policy.
+The four simulation goldens remain bit-exact; schema/response-draw tests, shipped
+precache tests, typecheck, lint and production build pass. Existing lint warnings
+and the large-bundle build warning remain. Next: broaden generated-world
+validation and test context-aware persistence/release doctrines before choosing
+any default or reconsideration threshold (ja-g7nz.3.3).

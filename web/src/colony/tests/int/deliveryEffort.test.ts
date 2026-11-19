@@ -152,7 +152,8 @@ test("mid-attempt JSON continuation preserves the effort clock and policy outcom
   a.c.params.deliveryReconsider = 1;
   a.brood.role = "none";
   const policy = responses({
-    carry: (t) => (t.deliveryAttempt === "long" ? "to store" : t.deliveryAttempt === "none" ? "to brood" : "take"),
+    carry: (t) =>
+      t.deliveryTarget === "brood" && t.deliveryAttempt === "long" ? "to store" : t.deliveryTarget === "none" ? "to brood" : "take",
   });
   a.c.responses = policy;
   for (let k = 0; k < 15; k++) a.g.tick(1 / 30);
@@ -163,4 +164,66 @@ test("mid-attempt JSON continuation preserves the effort clock and policy outcom
     b.g.tick(1 / 30);
   }
   assert.deepEqual(a.g.save(), b.g.save());
+});
+
+test("carry sees only its commitment and physically recognised floor role, through fungal distortion", () => {
+  const { c, store, brood, y } = setup();
+  put(c, 0, 22, y);
+  chooseDelivery(c, 0, "to brood");
+  brood.role = "none";
+  assert.equal(touch(c, 0, false).deliveryTarget, "brood", "commitment does not certify a room exists");
+  assert.equal(touch(c, 0, false).deliveryPlace, "store");
+  c.swapMarks[0] = 1;
+  assert.equal(touch(c, 0, false).deliveryPlace, "brood");
+  c.gainMarks[0] = 0;
+  assert.equal(touch(c, 0, false).deliveryPlace, "none");
+  c.gainMarks[0] = 1;
+  c.swapMarks[0] = 0;
+  store.colony = 1;
+  assert.equal(touch(c, 0, false).deliveryPlace, "none", "foreign room");
+  store.colony = 0;
+  c.layer[0] = PLANE;
+  assert.equal(touch(c, 0, false).deliveryPlace, "none", "surface cannot read curtain floor");
+  assert.equal(c.cur, CURTAIN, "temporary layer restored");
+  c.layer[0] = CURTAIN;
+  c.params.deliveryLane = 0;
+  assert.equal(touch(c, 0, false).deliveryTarget, "none");
+  assert.equal(touch(c, 0, false).deliveryPlace, "none");
+});
+
+test("every carry target/place combination has a distinct key without leaking to other lanes", () => {
+  const { c } = setup();
+  const base = { ...touch(c, 0, false) };
+  const keys = new Set<string>();
+  const roles = ["none", "royal", "brood", "store", "reception"] as const;
+  for (const deliveryTarget of roles)
+    for (const deliveryPlace of roles) {
+      const t = { ...base, deliveryTarget, deliveryPlace };
+      keys.add(responseKey("carry", t));
+      for (const hook of RESPONSE_HOOKS) {
+        if (hook !== "carry") assert.equal(responseKey(hook, t), responseKey(hook, base));
+        const request = packResponseRequest(hook, [{ id: "s0", situation: t }], "forage");
+        const ant = (request.state as { ants: Record<string, object> }).ants.s0;
+        for (const field of ["deliveryTarget", "deliveryPlace"]) assert.equal(field in ant, hook === "carry");
+      }
+    }
+  assert.equal(keys.size, 25);
+});
+
+test("a policy can accept a recognised room instead of repeatedly selecting an absent role", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const { c, g, store, brood, y } = setup(seed);
+    brood.role = "none";
+    c.params.deliveryReconsider = 0.5;
+    chooseDelivery(c, 0, "to brood");
+    ageDelivery(c, 0, 0.5);
+    put(c, 0, 22, y);
+    c.responses = responses({
+      carry: (t) => (t.deliveryAttempt === "long" && t.deliveryTarget === "brood" && t.deliveryPlace === "store" ? "to store" : "take"),
+    });
+    for (let k = 0; k < 60 && c.carrying[0]; k++) g.tick(1 / 30);
+    assert.equal(store.food, 1, `seed ${seed}`);
+    assert.equal(c.carrying[0], 0);
+    assert.equal(touch(c, 0, false).deliveryTarget, "none");
+  }
 });

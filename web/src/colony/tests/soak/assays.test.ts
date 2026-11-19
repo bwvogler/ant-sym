@@ -70,6 +70,8 @@ test("overrides: responses replace the assay's own hook by hook", () => {
     raid: "strong",
     crowd: "few",
     deliveryAttempt: "none",
+    deliveryTarget: "none",
+    deliveryPlace: "none",
   } as const;
   assert.equal(spec.sides?.responses?.get(t), false);
   assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
