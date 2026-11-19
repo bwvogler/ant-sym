@@ -1484,7 +1484,7 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * lifecycleOne) on a solo one world, 30 minutes each.
  */
 /** Experimental response using the contact policy's existing perception of its own entrance. */
-function entranceDefence(spec: RunSpec): RunSpec {
+function entranceDefence(spec: RunSpec, requireAlarm = false): RunSpec {
   const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
   return {
     ...spec,
@@ -1492,7 +1492,8 @@ function entranceDefence(spec: RunSpec): RunSpec {
       ...spec.sides,
       responses: {
         ...base,
-        contact: (t, draw) => (t.enemy && t.place === "hole" && t.carrying === "none" ? "fight" : base.contact(t, draw)),
+        contact: (t, draw) =>
+          t.enemy && t.place === "hole" && t.carrying === "none" && (!requireAlarm || t.alarm !== "none") ? "fight" : base.contact(t, draw),
       },
     },
     game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
@@ -1511,6 +1512,20 @@ const contactEntrance: Assay = {
   id: "contactEntrance",
   title: "A9 neutral contact with entrance defense enabled for one colony",
   spec: (seed) => entranceDefence(onPlane(contact.spec(seed))),
+};
+
+const defendAlarmEntrance: Assay = {
+  ...defendEntrance,
+  id: "defendAlarmEntrance",
+  title: "A13 directed combat with alarm-gated entrance defense",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), true),
+};
+
+const contactAlarmEntrance: Assay = {
+  ...contactEntrance,
+  id: "contactAlarmEntrance",
+  title: "A9 neutral contact with alarm-gated entrance defense for one colony",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), true),
 };
 
 export const ONE_ASSAYS: Assay[] = [
@@ -1546,6 +1561,8 @@ export const ONE_ASSAYS: Assay[] = [
   defendWalked,
   defendEntrance,
   contactEntrance,
+  defendAlarmEntrance,
+  contactAlarmEntrance,
 ];
 
 /** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */

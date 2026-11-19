@@ -119,3 +119,17 @@ Directed damage is the design baseline. This comparison tests whether entrance d
 Across the two pilot seeds and four confirmation seeds, entrance defense increased A13 food in all six and improved the A13 pass count from 2/6 to 4/6. Seed 5 still cost eight additional defenders. Every neutral A9 run passed, but seed 5 lost 21% of its food throughput even as casualties fell. The entrance cue alone is insufficient for default adoption. A follow-up should test whether an existing locally sensed threat cue can distinguish a raid from a neutral encounter near the hole.
 
 Reproduce the confirmation with `node scripts/experiment.mjs defendHome defendEntrance contact contactEntrance --seeds 2,4-6 --set game.fight.intent=true --jobs 4`.
+
+### Alarm-gated entrance defense
+
+The alarm-gated assays add one condition to entrance defense: the ant must sense faint or strong alarm. Otherwise it delegates to the existing contact policy. Both variants use the same directed damage model.
+
+| Seed | A13 food, directed / entrance / alarm-gated | A13 defender losses | A13 raider losses | A9 food, directed / entrance / alarm-gated |
+|---:|---:|---:|---:|---:|
+| 3 | 336 / 550 / 373 | 106 / 105 / 126 | 35 / 41 / 37 | 2,182 / 2,134 / 2,182 |
+| 5 | 77 / 118 / 99 | 158 / 166 / 156 | 36 / 31 / 34 | 2,061 / 1,622 / 2,061 |
+| 6 | 78 / 103 / 199 | 147 / 138 / 124 | 39 / 43 / 45 | 1,557 / 1,455 / 1,557 |
+
+Alarm gating restored neutral food and casualties to the untreated directed results on all three seeds. Under raid pressure it increased food on all three and passed on seed 6 (untreated directed passed none). Seed 3 lost 20 additional defenders and reverted from a pass with entrance-only defense to a fail with alarm gating, so the policy stays experimental. Compare attack and alarm timing on seeds 3 and 6 to check whether the cue arrives after defenders already start withdrawing.
+
+Reproduce with `node scripts/experiment.mjs defendAlarmEntrance contactAlarmEntrance --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
