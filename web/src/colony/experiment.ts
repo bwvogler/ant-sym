@@ -1,3 +1,4 @@
+import { combatObservers } from "./combatObservation.ts";
 // The assay catalogue (docs/refactor.md S3.6, ja-fnd.4.6): the arena assays and the lists ASSAYS, ONE_ASSAYS and ONE_PENDING. The
 // harness they run on (runGame, the probes, Arena, oneArena) is harness.ts; the whole-game and one-world assays are oneAssays.ts and
 // the desert ant's desertAssays.ts. Everything is re-exported here, so scripts and tests import experiment.ts by name.
@@ -906,12 +907,63 @@ export function defendControl(
   return { ...spec, seconds, game: { ...spec.game, fight: { ...fight } } };
 }
 
+/** Count decisions before movement and combat exposure at the hazard calculation. */
+function observedDefence(spec: RunSpec): RunSpec {
+  const counts: Record<string, number> = {};
+  return {
+    ...spec,
+    events: [
+      ...(spec.events ?? []),
+      {
+        at: 0,
+        kind: "call",
+        run(game) {
+          game.colonies.forEach((colony, side) => {
+            const prefix = side === 0 ? "defender" : "raider";
+            const add = (key: string, value = 1) => {
+              const metric = `${prefix}.${key}`;
+              counts[metric] = (counts[metric] ?? 0) + value;
+            };
+            for (const key of [
+              "attack",
+              "withdraw",
+              "continue",
+              "ignore",
+              "protectedLoad",
+              "reporting",
+              "exposed",
+              "pressure",
+              "hazardInput",
+              "combatDeaths",
+            ])
+              add(key, 0);
+            combatObservers.set(colony, {
+              contact(action) {
+                add(action.movement);
+                if (action.reason === "protect load") add("protectedLoad");
+                if (action.reason === "report home") add("reporting");
+              },
+              exposure(pressure, allies, killed) {
+                add("exposed");
+                add("pressure", pressure);
+                add("hazardInput", pressure / allies);
+                if (killed) add("combatDeaths");
+              },
+            });
+          });
+        },
+      },
+    ],
+    probes: [...(spec.probes ?? []), { tick() {}, summary: () => counts }],
+  };
+}
+
 export const defendWalked: Assay = {
   id: "defendHome",
   title: "A13 defence from senses (one world, the war party walked)",
   target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
   seconds: 300,
-  spec: (seed) => defendArm(seed, false),
+  spec: (seed) => observedDefence(defendArm(seed, false)),
   score: (r, game) => {
     const run = (sealed: boolean, colony?: Partial<ColonyParams>) =>
       runGame(defendControl(r.seed, sealed, r.seconds, game.params.fight, colony)).result.metrics;

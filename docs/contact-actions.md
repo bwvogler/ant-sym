@@ -74,3 +74,18 @@ Keep `fight.intent` opt-in. The next experiment should measure, by side, which l
 A 90-second local diagnostic pilot sampled eligible attack markers once per second near the home hole. In directed mode, seed 1 averaged 0.23 defenders and 0.42 raiders with a current-layer attack marker. Seed 3 averaged 0.15 and 0.31. The corresponding defender counts in fight mode were 1.24 and 0.73. These samples show that fight mode is a poor proxy for directed attack intent. They do not measure delivered pressure or identify why a defender chose another action.
 
 A separate local 300-second reproduction confirmed that seed 1 passes in both modes and seed 3 passes only in legacy mode. Seed 1 defender losses rose from 45 to 147, even though the score still passed, and food stored fell from 791 to 319. Seed 3 losses rose from 24 to 106 and food stored fell from 807 to 336. Beads follow-up `ja-g7nz.4.2` tracks tracing eligibility and incoming pressure before considering a policy change.
+
+### Where the defense imbalance comes from
+
+The 300-second A13 trace counts contact decisions before movement and measures incoming pressure where the damage hazard is computed. The four runs reproduced the previous pass, stored-food, and casualty counts exactly. Counts below are per ant-step, so the same ant can appear repeatedly. The hazard input is the sum of incoming pressure divided by nearby allies before multiplying by the common fight rate and time step.
+
+| Seed | Combat | Defender attacks / contacts | Raider attacks / contacts | Hazard input on defenders / raiders | Defender / raider combat deaths |
+|---:|---|---:|---:|---:|---:|
+| 1 | Legacy | 1.7% (76 / 4,568) | 100% (4,342 / 4,342) | 815 / 855 | 45 / 47 |
+| 1 | Directed | 15.5% (1,355 / 8,730) | 100% (7,834 / 7,834) | 2,988 / 865 | 147 / 43 |
+| 3 | Legacy | 1.2% (37 / 3,001) | 100% (2,859 / 2,859) | 536 / 570 | 24 / 43 |
+| 3 | Directed | 14.8% (1,035 / 7,016) | 100% (6,055 / 6,055) | 2,239 / 631 | 106 / 35 |
+
+All other defender contact outcomes were withdrawals. No requested attack was overridden by load protection or reporting in these runs. In legacy mode a nearby enemy can cause damage even while withdrawing. In directed mode the scripted raiders attacked at every contact, so defenders received about 3.5 times the raiders' cumulative hazard input on both seeds. The data establish an action asymmetry and its realized pressure. They do not explain every withdrawal or isolate eligibility, reach, and subsequent movement as independent causes.
+
+A controlled follow-up should change only the defender's contact answer at a locally recognized nest entrance, hold the raider doctrine fixed, and compare survival and food with both existing modes. Include an untreated neutral-contact control and keep distant foragers on the existing policy.

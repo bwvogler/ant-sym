@@ -1,3 +1,4 @@
+import { combatObservers } from "./combatObservation.ts";
 import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import { type Colony, type Layer } from "./colony.ts";
 import { ENEMY } from "./vocab.ts";
@@ -195,6 +196,7 @@ export function resolveFights(
   const pressure = p.intent ? attackPressure(colonies, rec !== null, layer) : null;
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
+    const observer = combatObservers.get(c);
     const on = layer < 0 ? null : (c.layers[layer] as Layer);
     const map = (on ?? c).map;
     const ph = (on ?? c).ph;
@@ -238,7 +240,9 @@ export function resolveFights(
         const loud = (1 - c.quiet[i]) * c.responses.raiseAlarm(touch(c, i, true));
         if (loud > 0) ph.deposit("alarm", c.x[i], c.y[i], p.alarm * dt * loud);
       }
-      if (rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies)) deaths[k]!.push(i);
+      const killed = rng() < 1 - Math.exp((-p.rate * dt * enemies) / allies);
+      observer?.exposure(enemies, allies, killed);
+      if (killed) deaths[k]!.push(i);
     }
   });
   colonies.forEach((c, k) => {

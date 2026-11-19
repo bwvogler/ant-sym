@@ -4,6 +4,7 @@ import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { Game, gameRng } from "../../game.ts";
 import { run, smallOne } from "../builders.ts";
 import { Colony } from "../../colony.ts";
+import { combatObservers } from "../../combatObservation.ts";
 import { Recognition } from "../../recognition.ts";
 import { mulberry32 } from "../../world.ts";
 import { hexMap, put } from "../hexmaps.ts";
@@ -59,6 +60,22 @@ test("colony recognition fallback still requires directional attack intent", () 
   const cs = pair();
   cs[1].attackLayer[0] = -1;
   assert.deepEqual(fight(cs, false), [0, 1]);
+});
+
+test("combat observation reports incoming pressure and casualties on the receiving side", () => {
+  const cs = pair();
+  cs[1].attackLayer[0] = -1;
+  const exposures: number[][] = [];
+  cs.forEach((colony, side) => {
+    combatObservers.set(colony, {
+      contact() {},
+      exposure(pressure, allies, killed) {
+        exposures.push([side, pressure, allies, Number(killed)]);
+      },
+    });
+  });
+  assert.deepEqual(fight(cs, false), [0, 1]);
+  assert.deepEqual(exposures, [[1, 1, 1, 1]]);
 });
 
 test("a single ant with narrow tolerance cannot attack itself", () => {
