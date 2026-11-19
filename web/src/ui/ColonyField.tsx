@@ -1,4 +1,5 @@
-import { CLOSE_SPRITE_GROUND, inspectionGroundMix, moundGroundLevel } from "./inspectionGround.ts";
+import { moundBalls, type DirtBall } from "./inspectionMound.ts";
+import { CLOSE_SPRITE_GROUND, inspectionGroundMix, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
 import { MapVoxelPass } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
@@ -916,7 +917,7 @@ export default function ColonyField({
       const rock = mix(theme.rock, CLOSE_SPRITE_GROUND.rock);
       const soil = mix(theme.soil, CLOSE_SPRITE_GROUND.soil);
       const spoil = mix(theme.spoil, CLOSE_SPRITE_GROUND.soil);
-      const mound = CLOSE_SPRITE_GROUND.mound.map((colour) => mix(theme.paperRgb, colour));
+      const pellets = new Map<string, DirtBall>();
       const bg = (m.hasSoil ? soil : paper).map(Math.round);
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
@@ -968,14 +969,18 @@ export default function ColonyField({
           const kind = terrain?.[index];
           const heap = heaps?.[index] ?? 0;
           const solid = kind === ROCK ? rock : kind === SOIL ? (loose?.[index] ? spoil : soil) : null;
-          const base = heap > 0 ? mound[moundGroundLevel(heap)] : paper;
-          // The original spoil wash fades out as the shared mound colour takes over.
+          if (heap > 0 && (kind ?? OPEN) === OPEN) {
+            // Shared world positions let the flat pellets cross hex edges and stack in the same order as voxels.
+            for (const ball of moundBalls(heap, cellKey(x, y)))
+              if (!pellets.has(ball.id)) pellets.set(ball.id, { ...ball, x: ball.x + x + shift, y: ball.y + (y + 0.5) * R });
+          }
+          // The spoil wash fades out as the overhead pellets appear.
           const spoilWash = heap > 0 && data[o] === theme.spoil[0] && data[o + 1] === theme.spoil[1] && data[o + 2] === theme.spoil[2];
           const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
           const a = spoilWash ? opacity * (1 - look) : opacity;
-          const r = Math.round(solid ? solid[0] : data[o] * a + base[0] * (1 - a));
-          const g = Math.round(solid ? solid[1] : data[o + 1] * a + base[1] * (1 - a));
-          const b = Math.round(solid ? solid[2] : data[o + 2] * a + base[2] * (1 - a));
+          const r = Math.round(solid ? solid[0] : data[o] * a + paper[0] * (1 - a));
+          const g = Math.round(solid ? solid[1] : data[o + 1] * a + paper[1] * (1 - a));
+          const b = Math.round(solid ? solid[2] : data[o + 2] * a + paper[2] * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
           let path = paths.get(key);
@@ -992,6 +997,17 @@ export default function ColonyField({
           path.lineTo(sx + c5, sy + s5);
           path.closePath();
         }
+      }
+      if (pellets.size) {
+        ctx.save();
+        ctx.globalAlpha = look;
+        for (const ball of [...pellets.values()].sort((a, b) => a.z - b.z)) {
+          ctx.fillStyle = INSPECTION_GROUND.dugSoil[ball.grain];
+          ctx.beginPath();
+          ctx.arc(ball.x * c.zoom + ox, ball.y * c.zoom + oy, ball.radius * c.zoom, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
       }
       for (const [key, path] of paths) {
         ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;

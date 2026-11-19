@@ -13,20 +13,7 @@ function average(colours: readonly string[]): [number, number, number] {
   return [channel(1), channel(3), channel(5)];
 }
 
-// More pellets cover more of the pale ground. This is the distant average of
-// the same fixed dirt material, with shadow becoming stronger as balls stack.
-const bare = average(INSPECTION_GROUND.surfaceSoil),
-  dug = average(INSPECTION_GROUND.dugSoil);
-const moundColours = [0, 0.23, 0.37, 0.47, 0.55, 0.62].map((coverage, level) =>
-  bare.map((channel, i) => Math.round(channel * (1 - coverage) + dug[i] * coverage * (1 - level * 0.015))),
-);
-
-export function moundGroundLevel(height: number): number {
-  return Math.min(moundColours.length - 1, height);
-}
-
 export const CLOSE_SPRITE_GROUND = {
-  mound: moundColours,
   surface: average(INSPECTION_GROUND.surfaceSoil),
   soil: average(INSPECTION_GROUND.belowSoil),
   rock: average(INSPECTION_GROUND.rock),
