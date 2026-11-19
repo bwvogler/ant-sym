@@ -1,7 +1,8 @@
+import { inspectionMoundFloor } from "./inspectionMound.ts";
 import * as T from "three";
 import { voxelFrustum, type VoxelViewport } from "./voxelViewport.ts";
 import { VoxelTerrainCache, buildVoxelTerrainChunk } from "./voxelTerrainChunks.ts";
-import { INSPECTION_GROUND, moundGroundLevel } from "./inspectionGround.ts";
+import { INSPECTION_GROUND } from "./inspectionGround.ts";
 import { ROLE_RGB } from "./palette.ts";
 import { InspectionSoftware } from "./inspectionSoftware.ts";
 import { buildPatchTerrain, faceColour } from "./drawInspectionPatch.ts";
@@ -216,10 +217,11 @@ export class InspectionScene {
   private add(g: T.Group, f: Faces, lit = true): void {
     if (f.positions.length) g.add(new T.Mesh(geometry(f), lit ? this.material : this.unlit));
   }
+  private floor: ReturnType<typeof inspectionMoundFloor>;
   private point(x: number, y: number, z = 0): V {
-    return this.mode === "surface" ? [x, -y, z] : [x, 1.08 - z, -y];
+    return this.mode === "surface" ? [x, -y, z + (this.floor?.(x, y) ?? 0)] : [x, 1.08 - z, -y];
   }
-  private actor(name: string, x: number, y: number, z = 0, heading = 0, odour?: number): void {
+  private actor(name: string, x: number, y: number, z = 0, heading = 0, odour?: number, pitch = 0): void {
     const model = this.models.get(name);
     if (!model) return;
     let pool = this.pools.get(name);
@@ -255,6 +257,7 @@ export class InspectionScene {
     }
     this.cube.position.set(...this.point(x, y, z));
     this.cube.quaternion.setFromAxisAngle(new T.Vector3(0, 0, 1), -heading);
+    if (pitch) this.cube.quaternion.multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -pitch));
     if (this.mode === "below") this.cube.quaternion.premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), Math.PI / 2));
     this.cube.updateMatrix();
     pool.body.setMatrixAt(pool.used, this.cube.matrix);
@@ -274,6 +277,7 @@ export class InspectionScene {
       this.reset();
       this.terrainKey = this.contentsKey = this.overlayKey = "";
     }
+    this.floor = inspectionMoundFloor(patch);
     const terrainKey = JSON.stringify([
       mode,
       patch.bounds,
@@ -285,7 +289,8 @@ export class InspectionScene {
         c.projectedGround,
         c.projectedSpoil,
         c.surfaceEntrance,
-        moundGroundLevel(c.state.place.mound),
+        c.state.place.mound,
+        mode === "surface" && c.state.place.hole >= 0,
       ]),
     ]);
     this.terrainChunks.rebuilt = 0;
@@ -344,6 +349,7 @@ export class InspectionScene {
           heights = new Map(
             tiles.map((t) => [`${Math.round(t.x / LEAF_STEP)},${Math.round(t.y / LEAF_STEP)}`, t.vein ? LEAF_VEIN_TOP : LEAF_TOP]),
           );
+        const onGround = (x: number, y: number, z: number) => this.point(x, -y, z);
         for (const t of tiles) {
           const x = t.x - cx,
             y = t.y - cy,
@@ -352,21 +358,16 @@ export class InspectionScene {
             ix = Math.round(t.x / s),
             iy = Math.round(t.y / s);
           f.face(
-            [
-              [x, -y, h],
-              [x + s, -y, h],
-              [x + s, -y - s, h],
-              [x, -y - s, h],
-            ].reverse() as V[],
+            [onGround(x, -y - s, h), onGround(x + s, -y - s, h), onGround(x + s, -y, h), onGround(x, -y, h)],
             colour(t.vein ? "#A3B85B" : "#627C37"),
           );
           f.face(
             [
-              [x, -y, LEAF_BOTTOM],
-              [x + s, -y, LEAF_BOTTOM],
-              [x + s, -y - s, LEAF_BOTTOM],
-              [x, -y - s, LEAF_BOTTOM],
-            ] as V[],
+              onGround(x, -y, LEAF_BOTTOM),
+              onGround(x + s, -y, LEAF_BOTTOM),
+              onGround(x + s, -y - s, LEAF_BOTTOM),
+              onGround(x, -y - s, LEAF_BOTTOM),
+            ],
             colour("#4C622C"),
           );
           for (const [dx, dy, a, b] of [
@@ -376,16 +377,7 @@ export class InspectionScene {
             [0, -1, [x, -y], [x + s, -y]],
           ] as [number, number, [number, number], [number, number]][]) {
             const other = heights.get(`${ix + dx},${iy + dy}`) ?? LEAF_BOTTOM;
-            if (other < h)
-              f.face(
-                [
-                  [...a, other],
-                  [...b, other],
-                  [...b, h],
-                  [...a, h],
-                ].reverse() as V[],
-                colour("#4C622C"),
-              );
+            if (other < h) f.face([onGround(...a, h), onGround(...b, h), onGround(...b, other), onGround(...a, other)], colour("#4C622C"));
           }
         }
       }
@@ -552,14 +544,33 @@ export class InspectionScene {
       for (const a of s.ants) {
         const ax = x + a.x,
           ay = y + a.y,
-          hx = ax + Math.cos(a.heading) * 0.46,
-          hy = ay + Math.sin(a.heading) * 0.46;
-        this.actor("worker", ax, ay, 0, a.heading, a.odour);
-        if (a.infected) this.actor("infection", ax, ay, 0.43);
-        if (a.carrying) this.actor("food-" + foodKind(a.quality), hx, hy, 0.16, a.heading);
-        else if (a.cargo === "brood" && a.broodStage !== undefined) this.actor("brood-" + a.broodStage, hx, hy, 0.16, a.heading);
-        else if (a.cargo === "corpse") this.actor(`corpse-${a.corpseStage ?? 0}`, hx, hy, 0.16, a.heading);
-        else if (a.cargo === "soil") this.actor("food-crumb", hx, hy, 0.16, a.heading);
+          ux = Math.cos(a.heading),
+          uy = Math.sin(a.heading),
+          dx = ux * 0.22,
+          dy = uy * 0.22,
+          height = this.floor?.(ax, ay) ?? 0,
+          clearance = Math.min(height, 0.025),
+          rise = this.floor ? this.floor(ax + dx, ay + dy) - this.floor(ax - dx, ay - dy) : 0,
+          pitch = Math.atan2(rise, 0.44);
+        this.actor("worker", ax, ay, clearance, a.heading, a.odour, pitch);
+        if (a.infected) this.actor("infection", ax, ay, 0.43 + clearance);
+        const cargo = a.carrying
+          ? "food-" + foodKind(a.quality)
+          : a.cargo === "brood" && a.broodStage !== undefined
+            ? "brood-" + a.broodStage
+            : a.cargo === "corpse"
+              ? `corpse-${a.corpseStage ?? 0}`
+              : a.cargo === "soil"
+                ? "food-crumb"
+                : undefined;
+        if (cargo) {
+          // Keep the load at the mouth as the body tilts uphill or downhill.
+          const reach = 0.46 * Math.cos(pitch) - 0.16 * Math.sin(pitch),
+            hx = ax + ux * reach,
+            hy = ay + uy * reach,
+            hz = height + clearance + 0.46 * Math.sin(pitch) + 0.16 * Math.cos(pitch) - (this.floor?.(hx, hy) ?? 0);
+          this.actor(cargo, hx, hy, hz, a.heading, undefined, pitch);
+        }
       }
     }
     for (const p of this.pools.values()) {
@@ -578,10 +589,11 @@ export class InspectionScene {
     this.camera.up.set(...orbit.up);
     this.camera.lookAt(target);
     const bounds: V[] = [];
-    if (mode === "surface")
+    if (mode === "surface" && !view)
       for (const c of patch.cells)
-        if (c.valid && !c.surfaceStrip && c.state.place.ground === "open" && c.state.stalkLevel) {
-          const h = STALK_HEIGHT[c.state.stalkLevel >= 2 ? 2 : 1];
+        if (c.valid && !c.surfaceStrip && c.state.place.ground === "open" && (c.state.stalkLevel || c.state.place.mound > 0)) {
+          const h = c.state.stalkLevel ? STALK_HEIGHT[c.state.stalkLevel >= 2 ? 2 : 1] : 0;
+          if (this.floor && c.state.place.mound > 0) bounds.push(this.point(c.x, c.y));
           for (const x of [c.x - 0.22, c.x + 0.48])
             for (const y of [c.y - 0.2, c.y + 0.29]) for (const z of [0, h + 0.04]) bounds.push(this.point(x, y, z));
         }

@@ -1,4 +1,3 @@
-import { moundGroundLevel } from "./inspectionGround.ts";
 import { centreX, centreY, SIDE } from "../colony/index.ts";
 import { buildPatchTerrain } from "./drawInspectionPatch.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
@@ -28,7 +27,12 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
           .filter((c) => {
             const xx = centreX(...c.state.cell),
               yy = centreY(c.state.cell[1]);
-            return xx >= wx - halo && xx <= wx + size + halo && yy >= wy - halo && yy <= wy + size + halo;
+            // Interpolated slopes can reach farther than a solid hex. Only
+            // positive mound samples need the extra halo.
+            const { place } = c.state;
+            const margin =
+              patch.mode === "surface" && c.valid && place.ground === "open" && place.hole < 0 && place.mound > 0 ? 1 + 0.061 : halo;
+            return xx >= wx - margin && xx <= wx + size + margin && yy >= wy - margin && yy <= wy + size + margin;
           })
           .sort((a, b) => a.state.cell[1] - b.state.cell[1] || a.state.cell[0] - b.state.cell[0]);
       out.push({
@@ -43,7 +47,8 @@ export function terrainChunkDescriptors(patch: InspectionPatch): VoxelTerrainChu
             c.state.place.ground,
             c.projectedGround,
             c.projectedSpoil,
-            moundGroundLevel(c.state.place.mound),
+            c.state.place.mound,
+            patch.mode === "surface" && c.state.place.hole >= 0,
             c.surfaceEntrance,
           ]),
         ),

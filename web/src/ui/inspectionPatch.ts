@@ -75,8 +75,13 @@ export function inspectViewport(
     map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map,
     coords: [number, number][] = [[gx, gy]],
     bounds = voxelRegionBounds(x, y, width, height);
+  // An odd surface row can put a mound centre one column farther left of the crop.
   for (let yy = Math.max(0, Math.floor(bounds.top / R) - 1); yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + 1); yy++)
-    for (let xx = Math.max(map.x0, Math.floor(bounds.left) - 1); xx <= Math.min(map.x0 + map.size.w - 1, Math.ceil(bounds.right) + 1); xx++)
+    for (
+      let xx = Math.max(map.x0, Math.floor(bounds.left) - (layer === CURTAIN ? 1 : 2));
+      xx <= Math.min(map.x0 + map.size.w - 1, Math.ceil(bounds.right) + 1);
+      xx++
+    )
       if (xx !== gx || yy !== gy) coords.push([xx, yy]);
   const patch = readPatch(g, sensed, layer, selected, coords, trails, clumps),
     cx = centreX(gx, gy),

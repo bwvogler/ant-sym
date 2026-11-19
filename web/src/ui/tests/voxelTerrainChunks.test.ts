@@ -5,6 +5,7 @@ import { cadaverArtFixture } from "../inspectionArtFixture.ts";
 import { buildGame } from "../useColony.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { inspectViewport } from "../inspectionPatch.ts";
+import { inspectionMoundFloor, moundHeight } from "../inspectionMound.ts";
 import { buildPatchTerrain, faceColour } from "../drawInspectionPatch.ts";
 import { buildVoxelTerrainChunk, terrainChunkDescriptors, VoxelTerrainCache } from "../voxelTerrainChunks.ts";
 import { PLANE, CURTAIN, centreX, centreY } from "../../colony/index.ts";
@@ -99,7 +100,7 @@ test("digging invalidates neighbouring chunk halos locally, and viewport evictio
   assert.ok(values.every((v) => v.released));
 });
 
-test("mound levels change surface soil colours and invalidate nearby terrain", () => {
+test("spoil raises the walking surface, changes its colour, and invalidates nearby terrain", () => {
   const patch = read(),
     selected = patch.selected.cell,
     cell = patch.cells.find((c) => c.state.cell[0] === selected[0] && c.state.cell[1] === selected[1])!,
@@ -109,18 +110,26 @@ test("mound levels change surface soil colours and invalidate nearby terrain", (
     );
   cell.state.place.ground = "open";
   const first = cache.update(patch);
-  const topColour = () => {
+  const top = () => {
     const face = buildPatchTerrain(patch, true).find(
       (f) => f.normal[2] === 1 && Math.abs(f.points[0][0]) < 0.2 && Math.abs(f.points[0][1]) < 0.2,
     )!;
-    return faceColour(face, "surface");
+    return face;
   };
-  const colours = [topColour()];
-  for (const level of [1, 2, 4]) {
+  const colours = [faceColour(top(), "surface")];
+  let previousHeight = 0;
+  for (const level of [1, 2, 4, 6, 7]) {
     cell.state.place.mound = level;
     cache.update(patch);
     assert.ok(cache.rebuilt > 0 && cache.rebuilt < first.length);
-    colours.push(topColour());
+    const face = top();
+    if (level <= 4) colours.push(faceColour(face, "surface"));
+    const z = face.points[0][2];
+    assert.ok(z > previousHeight);
+    previousHeight = z;
+    const floor = inspectionMoundFloor(patch)!;
+    assert.ok(Math.abs(floor(0, 0) - moundHeight(level)) < 1e-6);
+    assert.ok(Math.abs(floor(0.4999, 0) - floor(0.5001, 0)) < 0.001, "no height jump when an ant crosses the hex edge");
   }
   assert.equal(new Set(colours).size, colours.length);
   cache.dispose();
@@ -157,13 +166,18 @@ for (const layer of [PLANE, CURTAIN])
       c.surfaceStrip = false;
       c.state.place.ground = c.state.cell[0] >= 51 ? "rock" : "open";
     }
+    if (layer === PLANE) {
+      const mound = patch.cells.find((c) => c.state.cell[0] === 50 && c.state.cell[1] === 50)!;
+      mound.state.place.hole = -1;
+      mound.state.place.mound = 3;
+    }
     const below = layer === CURTAIN,
       signature = (f: ReturnType<typeof buildPatchTerrain>[number], dx = 0, dy = 0) => {
         const points = f.points.map((p) => [p[0] + dx + cx, p[1] + (below ? 0 : dy - cy), p[2] + (below ? dy - cy : 0)]),
           x = points.reduce((s, p) => s + p[0] / points.length, 0),
           y = -points.reduce((s, p) => s + p[below ? 2 : 1] / points.length, 0);
         if (x <= 48.1 || x >= 53.9 || y <= 42.1 || y >= 44.9) return null;
-        return JSON.stringify([points.map((p) => p.map((v) => +v.toFixed(5))), f.normal, f.kind, f.grain]);
+        return JSON.stringify([points.map((p) => p.map((v) => +v.toFixed(5))), f.normal, f.kind, f.grain, f.moundLevel]);
       },
       expected = buildPatchTerrain(patch, true)
         .map((f) => signature(f))

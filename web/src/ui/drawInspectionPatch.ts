@@ -1,3 +1,4 @@
+import { dugSoilGrain, inspectionMoundFloor, moundHeight } from "./inspectionMound.ts";
 import { INSPECTION_GROUND, MOUND_GROUND, moundGroundLevel } from "./inspectionGround.ts";
 import surface from "../assets/inspection/projection.json" with { type: "json" };
 import lifecycle from "../assets/inspection/lifecycle-manifest.json" with { type: "json" };
@@ -24,6 +25,7 @@ export interface PatchImages {
 }
 /** Worker crown is about 0.4 world units above its walking plane. */
 export const SURFACE_ROCK_HEIGHT = 1;
+const SURFACE_VOXEL = 0.05;
 type Point3 = [number, number, number];
 interface Face {
   points: Point3[];
@@ -94,7 +96,7 @@ const SIDES: [Point3, Point3[]][] = [
 /** Terrain from the supplied cells, cropped to the inspection or viewport bounds. No simulation geometry is written. */
 export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Face[] {
   const isBelow = patch.mode === "below",
-    step = isBelow ? 0.06 : 0.05,
+    step = isBelow ? 0.06 : SURFACE_VOXEL,
     limit = isBelow ? 26 : 31;
   const [gx, gy] = patch.selected.cell,
     cx = centreX(gx, gy),
@@ -112,7 +114,8 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
     lower = new Int16Array(rows * columns),
     upper = new Int16Array(rows * columns),
     kinds = new Uint8Array(rows * columns),
-    mounds = new Uint8Array(rows * columns);
+    mounds = new Uint8Array(rows * columns),
+    floor = inspectionMoundFloor(patch);
   // Every terrain column is a solid depth interval. Keep that interval instead of allocating every buried voxel.
   for (let ix = left; ix < right; ix++)
     for (let iz = top; iz < bottom; iz++) {
@@ -128,7 +131,16 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
         lower[index] = -4;
         upper[index] = ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0;
         kinds[index] = ground === "rock" ? 2 : 1;
-        if (ground === "open") mounds[index] = moundGroundLevel(slot.state.place.mound);
+        if (floor && ground === "open" && slot.state.place.hole < 0) {
+          const height = floor(x, -axis);
+          // The bed follows the slope, with more loose clods on deeper deposits.
+          if (height >= step / 2) {
+            const level = moundGroundLevel(Math.max(1, Math.round(height / moundHeight(1))));
+            const clod = dugSoilGrain(ix, iz, 9) < Math.min(3, level) && dugSoilGrain(ix + 7, iz - 4, 0) === 0;
+            upper[index] = Math.max(1, Math.round(height / step)) + Number(clod);
+            mounds[index] = level;
+          }
+        }
       } else {
         if (slot.surfaceStrip) {
           if (slot.surfaceEntrance || !slot.projectedGround || axis > -slot.y + Math.min(0.24, (slot.projectedSpoil ?? 0) * 0.04)) continue;
@@ -162,13 +174,14 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
             (z + c) * step - (isBelow ? originY : 0),
           ]);
           const depth = points.reduce((sum, p) => sum + p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2], 0) / 4;
+          const moundLevel = h >= 0 ? mounds[index] : 0;
           faces.push({
             points,
             normal,
             kind,
             depth,
-            grain: Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
-            moundLevel: mounds[index],
+            grain: moundLevel ? dugSoilGrain(x, y, z) : Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
+            moundLevel,
             front: isBelow && kind !== "back",
           });
         }
@@ -235,7 +248,8 @@ export class InspectionPatchRenderer {
         c.projectedGround,
         c.projectedSpoil,
         c.surfaceEntrance,
-        moundGroundLevel(c.state.place.mound),
+        c.state.place.mound,
+        patch.mode === "surface" && c.state.place.hole >= 0,
       ]),
     ]);
     if (key === this.key && this.terrain) return true;
@@ -282,7 +296,9 @@ export class InspectionPatchRenderer {
     ctx.drawImage(this.terrain!.back, 0, 0);
     const mode = patch.mode,
       ppu = (Math.min(w / 384, h / 320) * 384) / (mode === "below" ? 4 : 4.15),
-      point = (x: number, y: number, z = 0) => patchPoint(mode, w, h, x, y, z);
+      floor = inspectionMoundFloor(patch),
+      project = (x: number, y: number, z = 0) => patchPoint(mode, w, h, x, y, z),
+      point = (x: number, y: number, z = 0) => project(x, y, z + (floor?.(x, y) ?? 0));
     const layers: { depth: number; draw: () => void }[] = [];
     const drawAt = (x: number, y: number, z: number, draw: () => void) => {
       if (mode === "surface") layers.push({ depth: x * 1.1 + y * 3.3 + z * 2.43, draw });
@@ -295,7 +311,7 @@ export class InspectionPatchRenderer {
           ctx.fillStyle = faceColour(face, mode);
           ctx.beginPath();
           face.points.forEach(([x, y, z], i) => {
-            const p = point(x, -y, z).map(Math.round) as [number, number];
+            const p = project(x, -y, z).map(Math.round) as [number, number];
             if (i === 0) ctx.moveTo(...p);
             else ctx.lineTo(...p);
           });
@@ -311,7 +327,7 @@ export class InspectionPatchRenderer {
       const p = point(x, y, z),
         factor = ppu / (desc.frame / desc.worldFrame);
       const alpha = ctx.globalAlpha;
-      drawAt(x, y, z + 0.15, () => {
+      drawAt(x, y, z + 0.15 + (floor?.(x, y) ?? 0), () => {
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.drawImage(
@@ -459,7 +475,7 @@ export class InspectionPatchRenderer {
         this.leafUnion,
         (a, b, z) => point(a - ox, b - oy, z),
         true,
-        (a, b, z, paint) => drawAt(a - ox, b - oy, z, paint),
+        (a, b, z, paint) => drawAt(a - ox, b - oy, z + (floor?.(a - ox, b - oy) ?? 0), paint),
       );
     const bodies = patch.cells
       .filter((c) => c.valid)
@@ -475,7 +491,7 @@ export class InspectionPatchRenderer {
         const q = entity.body;
         sprite(q.alive ? "queen" : "queen-dead", x, y);
         const p = point(x, y, q.alive ? 0.3 : 0.12);
-        drawAt(x, y, 0.31, () => {
+        drawAt(x, y, 0.31 + (floor?.(x, y) ?? 0), () => {
           if (!q.alive) {
             ctx.strokeStyle = "#B34840";
             ctx.lineWidth = 2 * scale;
@@ -501,7 +517,7 @@ export class InspectionPatchRenderer {
       else if (a.cargo === "brood" && a.broodStage !== undefined) sprite("brood-" + a.broodStage, hx, hy, 0.16);
       else if (a.cargo === "corpse") sprite("corpse", hx, hy, 0.16);
       else if (a.cargo === "soil") sprite("food-crumb", hx, hy, 0.16);
-      drawAt(x, y, 0.3, () => {
+      drawAt(x, y, 0.3 + (floor?.(x, y) ?? 0), () => {
         if (a.infected) {
           const p = point(x, y, 0.27);
           ctx.fillStyle = "#B18DD1";
