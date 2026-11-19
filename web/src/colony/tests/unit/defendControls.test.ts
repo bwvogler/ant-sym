@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { defendControl, oneAssay } from "../../experiment.ts";
-import { Colony } from "../../colony.ts";
+import { Colony, PLANE } from "../../colony.ts";
 import { localResponses, type Touch } from "../../responses.ts";
+import { Game } from "../../game.ts";
+import { SEEN } from "../../params.ts";
 import { mulberry32 } from "../../world.ts";
-import { arena } from "../builders.ts";
+import { arena, smallOne } from "../builders.ts";
 
 for (const intent of [false, true]) {
   test(`A13 controls preserve combat settings and duration (intent=${intent})`, () => {
@@ -55,4 +57,29 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
   }
   assert.equal(treatment.game!.fight!.intent, true);
   assert.equal(treatment.sides!.rivalResponses, base.sides!.rivalResponses);
+});
+
+test("approach defense requires both a currently sensed entrance and alarm", () => {
+  const spec = oneAssay("defendAlarmApproach").spec(1);
+  const game = new Game(smallOne(1), { antCount: 1 }, mulberry32(1));
+  for (const event of spec.events ?? []) if (event.kind === "call" && event.at === 0) event.run(game);
+  const colony = game.player;
+  colony.bind(PLANE);
+  const contact = spec.sides!.responses!.contact;
+  const draw = colony.antDraw(0);
+  const approach: Touch = {
+    ...colony.t,
+    mode: "explore",
+    stance: "forage",
+    enemy: true,
+    place: "out",
+    carrying: "none",
+    alarm: "strong",
+  };
+  colony.s[4] = SEEN - 1;
+  assert.equal(contact(approach, draw), "flee");
+  colony.s[4] = SEEN;
+  assert.equal(contact({ ...approach, alarm: "none" }, draw), "flee");
+  assert.equal(contact({ ...approach, carrying: "food" }, draw), "flee");
+  assert.equal(contact(approach, draw), "fight");
 });

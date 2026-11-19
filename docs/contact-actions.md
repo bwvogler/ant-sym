@@ -158,3 +158,17 @@ A second policy also authorized entrance defense if the ant sensed it was outnum
 Neutral A9 food and combined losses again matched untreated directed combat on all three seeds. Under raids the extra trigger cost more defenders on every seed and improved neither food nor passes. Retain alarm-only as the better entrance experiment and leave both policies experimental. Future comparisons should measure the defense decisions available along the approach to the nest, since the first deaths in both traced runs preceded any eligible entrance encounter.
 
 Reproduce the timing with `node scripts/experiment.mjs defendEntrance defendAlarmEntrance --seeds 3,6 --set game.fight.intent=true --jobs 4`. Reproduce the follow-up with `node scripts/experiment.mjs defendThreatEntrance contactThreatEntrance --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
+
+### Alarm at the nest approach
+
+The approach assay allows alarm-gated defense outside the hole when one of the current ant's existing home sensors reads `SEEN`. Ordinary contact policy inputs stay as before. This experiment confers neither a broader detection radius nor access to a raider's intent.
+
+| A13 seed | First defender combat death | First qualifying approach contact | Food, entrance / approach | Defender losses | Raider losses | Pass, entrance / approach |
+|---:|---:|---:|---:|---:|---:|---|
+| 3 | 17.50 s | 40.83 s | 373 / 450 | 126 / 110 | 37 / 35 | fail / fail |
+| 5 | 19.70 s | 42.67 s | 99 / 111 | 156 / 147 | 34 / 45 | fail / pass |
+| 6 | 11.20 s | 20.70 s | 199 / 95 | 124 / 134 | 45 / 35 | pass / fail |
+
+The approach rule qualified on 57, 59 and 81 contact decisions in A13. None occurred before the first defender death. It traded a pass on seed 6 for a pass on seed 5. No approach contact qualified in the three neutral A9 runs, whose food and losses reproduced untreated directed combat exactly. Keep the approach rule experimental. To target early losses, first identify where the early casualties occur and what the ants there actually sense.
+
+Reproduce with `node scripts/experiment.mjs defendAlarmApproach contactAlarmApproach --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.

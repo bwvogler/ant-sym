@@ -1,3 +1,4 @@
+import { SEEN } from "./params.ts";
 import { DEFAULT_FIGHT } from "./battle.ts";
 import { combatObservers } from "./combatObservation.ts";
 // The assay catalogue (docs/refactor.md S3.6, ja-fnd.4.6): the arena assays and the lists ASSAYS, ONE_ASSAYS and ONE_PENDING. The
@@ -1487,11 +1488,12 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * lifecycleOne) on a solo one world, 30 minutes each.
  */
 /** Experimental response using the contact policy's existing perception of its own entrance. */
-function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or outnumbered" = "any contact"): RunSpec {
+function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or outnumbered" | "approach alarm" = "any contact"): RunSpec {
   const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
   let game: Game | undefined;
   let entranceContacts = 0;
   let entranceContactsWithAlarm = 0;
+  let approachAlarmContacts = 0;
   const times: Record<string, number> = {};
   return {
     ...spec,
@@ -1505,7 +1507,10 @@ function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or
         },
       },
     ],
-    probes: [...(spec.probes ?? []), { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, ...times }) }],
+    probes: [
+      ...(spec.probes ?? []),
+      { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, approachAlarmContacts, ...times }) },
+    ],
     sides: {
       ...spec.sides,
       responses: {
@@ -1519,6 +1524,22 @@ function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or
               if (game) times.firstEntranceContactWithAlarm ??= game.time;
             }
             if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
+          }
+          // The assay reuses the current ant's three home sensors. The ordinary contact policy has no home-sensor field.
+          if (
+            cue === "approach alarm" &&
+            game?.player.onPlane &&
+            t.enemy &&
+            t.place === "out" &&
+            t.carrying === "none" &&
+            t.alarm !== "none"
+          ) {
+            const sensed = game.player.s;
+            if (sensed[3] === SEEN || sensed[4] === SEEN || sensed[5] === SEEN) {
+              approachAlarmContacts++;
+              times.firstApproachAlarmContact ??= game.time;
+              return "fight";
+            }
           }
           return base.contact(t, draw);
         },
@@ -1570,6 +1591,20 @@ const contactThreatEntrance: Assay = {
   spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "alarm or outnumbered"),
 };
 
+const defendAlarmApproach: Assay = {
+  ...defendEntrance,
+  id: "defendAlarmApproach",
+  title: "A13 alarm-gated defense at a locally sensed nest approach",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "approach alarm"),
+};
+
+const contactAlarmApproach: Assay = {
+  ...contactEntrance,
+  id: "contactAlarmApproach",
+  title: "A9 neutral contact with alarm-gated defense at the nest approach",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "approach alarm"),
+};
+
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
@@ -1607,6 +1642,8 @@ export const ONE_ASSAYS: Assay[] = [
   contactAlarmEntrance,
   defendThreatEntrance,
   contactThreatEntrance,
+  defendAlarmApproach,
+  contactAlarmApproach,
 ];
 
 /** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */
