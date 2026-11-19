@@ -1,4 +1,6 @@
 import * as T from "three";
+import { voxelFrustum, type VoxelViewport } from "./voxelViewport.ts";
+import { VoxelTerrainCache, buildVoxelTerrainChunk } from "./voxelTerrainChunks.ts";
 import { InspectionSoftware } from "./inspectionSoftware.ts";
 import { buildPatchTerrain, faceColour } from "./drawInspectionPatch.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
@@ -16,7 +18,10 @@ interface Part {
 }
 export type InspectionModels = Record<string, { body: Part; band: Part }>;
 const MODEL_URL = new URL("../assets/inspection-3d/models.json", import.meta.url).href;
-const colour = (hex: string): V => new T.Color(hex).toArray() as V;
+/** The map palette uses CSS space-separated rgb(), while Three's parser expects commas. */
+export const inspectionColour = (hex: string): V =>
+  new T.Color(hex.replace(/^rgb\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/, "rgb($1,$2,$3)")).toArray() as V;
+const colour = inspectionColour;
 function geometry(p: Part): T.BufferGeometry {
   const g = new T.BufferGeometry();
   g.setAttribute("position", new T.Float32BufferAttribute(p.positions, 3));
@@ -85,7 +90,7 @@ interface Pool {
 export class InspectionScene {
   readonly scene = new T.Scene();
   readonly camera = new T.OrthographicCamera(-2.15, 2.15, 1.792, -1.792, 0.05, 50);
-  readonly renderer: Pick<T.WebGLRenderer, "render" | "dispose">;
+  readonly renderer: Pick<T.WebGLRenderer, "render" | "dispose" | "setSize">;
   readonly accelerated: boolean;
   orbit: InspectionOrbit = mapOrbit();
   private mode: InspectionPatch["mode"];
@@ -94,6 +99,18 @@ export class InspectionScene {
   private material = new T.MeshLambertMaterial({ vertexColors: true });
   private unlit = new T.MeshBasicMaterial({ vertexColors: true });
   private terrain = new T.Group();
+  private terrainWasViewport = false;
+  private terrainChunks = new VoxelTerrainCache<T.Mesh>(
+    (chunk) => {
+      const f = new Faces();
+      for (const face of buildVoxelTerrainChunk(chunk)) f.face(face.points, colour(faceColour(face, chunk.patch.mode)));
+      return new T.Mesh(geometry(f), this.material);
+    },
+    (mesh) => {
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+    },
+  );
   private contents = new T.Group();
   private overlays = new T.Group();
   private terrainKey = "";
@@ -102,6 +119,7 @@ export class InspectionScene {
   private cube = new T.Object3D();
   private ink = new T.Color("#302A24");
   private amber = new T.Color("#AB761D");
+  private viewport: VoxelViewport | null = null;
   static async create(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"]): Promise<InspectionScene> {
     const r = await fetch(MODEL_URL);
     if (!r.ok) throw Error("Voxel models could not load");
@@ -150,6 +168,19 @@ export class InspectionScene {
   }
   reset(): void {
     this.orbit = mapOrbit();
+  }
+  setViewport(view: VoxelViewport): void {
+    const next = voxelFrustum(view);
+    if (!this.viewport || next.width !== this.viewport.width || next.height !== this.viewport.height)
+      this.renderer.setSize(next.width, next.height, false);
+    this.viewport = next;
+  }
+  get terrainStats() {
+    return {
+      active: this.terrainWasViewport ? this.terrain.children.length : 0,
+      cached: this.terrainChunks.size,
+      rebuilt: this.terrainChunks.rebuilt,
+    };
   }
   angle(): void {
     this.orbit = { yaw: 0, tilt: 0.65 };
@@ -220,14 +251,27 @@ export class InspectionScene {
     }
     const terrainKey = JSON.stringify([
       mode,
+      patch.bounds,
       patch.selected.cell,
       patch.cells.map((c) => [c.valid, c.surfaceStrip, c.state.place.ground, c.projectedGround, c.projectedSpoil, c.surfaceEntrance]),
     ]);
+    this.terrainChunks.rebuilt = 0;
     if (terrainKey !== this.terrainKey) {
-      this.clear(this.terrain);
-      const f = new Faces();
-      for (const face of buildPatchTerrain(patch, true)) f.face(face.points, colour(faceColour(face, mode)));
-      this.add(this.terrain, f);
+      if (this.terrainWasViewport) this.terrain.clear();
+      else this.clear(this.terrain);
+      if (patch.bounds) {
+        const cx = centreX(...patch.selected.cell),
+          cy = centreY(patch.selected.cell[1]);
+        for (const chunk of this.terrainChunks.update(patch)) {
+          chunk.value.position.set(chunk.x - cx, mode === "surface" ? cy - chunk.y : 0, mode === "below" ? cy - chunk.y : 0);
+          this.terrain.add(chunk.value);
+        }
+      } else {
+        const f = new Faces();
+        for (const face of buildPatchTerrain(patch, true)) f.face(face.points, colour(faceColour(face, mode)));
+        this.add(this.terrain, f);
+      }
+      this.terrainWasViewport = !!patch.bounds;
       this.terrainKey = terrainKey;
     }
     const [gx, gy] = patch.selected.cell,
@@ -488,7 +532,8 @@ export class InspectionScene {
       }
     }
     const orbit = orbitCamera(mode, this.orbit),
-      target = new T.Vector3(0, mode === "below" ? 0.6 : 0, mode === "surface" ? 0.15 : 0);
+      view = this.viewport,
+      target = new T.Vector3(view?.x ?? 0, mode === "below" ? 0.6 : -(view?.y ?? 0), mode === "surface" ? 0.15 : -(view?.y ?? 0));
     this.camera.position.copy(target).add(new T.Vector3(...orbit.position));
     this.camera.up.set(...orbit.up);
     this.camera.lookAt(target);
@@ -500,17 +545,21 @@ export class InspectionScene {
           for (const x of [c.x - 0.22, c.x + 0.48])
             for (const y of [c.y - 0.2, c.y + 0.29]) for (const z of [0, h + 0.04]) bounds.push(this.point(x, y, z));
         }
-    const frame = inspectionFrameScale(bounds, mode, this.orbit);
-    this.camera.left = -2.15 * frame;
-    this.camera.right = 2.15 * frame;
-    this.camera.top = 1.792 * frame;
-    this.camera.bottom = -1.792 * frame;
+    const frame = inspectionFrameScale(bounds, mode, this.orbit),
+      halfWidth = view ? view.width / view.pixelsPerWorld / 2 : 2.15 * frame,
+      halfHeight = view ? view.height / view.pixelsPerWorld / 2 : 1.792 * frame;
+    this.camera.left = -halfWidth;
+    this.camera.right = halfWidth;
+    this.camera.top = halfHeight;
+    this.camera.bottom = -halfHeight;
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();
     this.renderer.render(this.scene, this.camera);
   }
   dispose(): void {
-    this.clear(this.terrain);
+    if (this.terrainWasViewport) this.terrain.clear();
+    else this.clear(this.terrain);
+    this.terrainChunks.dispose();
     this.clear(this.contents);
     this.clear(this.overlays);
     for (const p of this.pools.values()) {

@@ -4,6 +4,7 @@ import {
   OPEN,
   SOIL,
   STRIP,
+  R,
   cellAt,
   cellKey,
   centreX,
@@ -17,6 +18,7 @@ import {
 import { inspectCell, type CellInspectionState } from "./cellInspection.ts";
 import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
+import { voxelRegionBounds } from "./voxelViewport.ts";
 
 export interface InspectionPatchCell {
   state: CellInspectionState;
@@ -32,10 +34,12 @@ export interface InspectionPatchCell {
 export interface InspectionPatch {
   selected: CellInspectionState;
   mode: "surface" | "below";
-  /** Centre first, then the six game neighbours; invalid edge slots remain present but empty. */
+  /** Centre first. inspectPatch adds six neighbours; inspectViewport adds the visible region and overscan. */
   cells: InspectionPatchCell[];
-  /** One extra ring for leaf joins beyond the seven-cell crop. */
+  /** One extra ring for leaf joins beyond the crop. */
   surfaceFood?: Map<number, number>;
+  /** Optional viewport crop in map-world offsets from the selected hex centre. */
+  bounds?: { left: number; right: number; top: number; bottom: number };
 }
 
 export function inspectPatch(
@@ -49,9 +53,55 @@ export function inspectPatch(
 ): InspectionPatch {
   const selected = inspectCell(g, sensed, layer, x, y, trails, clumps),
     [gx, gy] = selected.cell;
+  const coords: [number, number][] = [[gx, gy], ...Array.from({ length: 6 }, (_, d): [number, number] => [nx(gx, gy, d), ny(gy, d)])];
+  return readPatch(g, sensed, layer, selected, coords, trails, clumps);
+}
+
+/** Live, read-only region for a close-map viewport. One hex of overscan retains boundary actors and leaf joins. */
+export function inspectViewport(
+  g: LensWorld,
+  sensed: SensedMap,
+  layer: number,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  trails: { food: boolean; home: boolean },
+  clumps: readonly AphidClump[] = [],
+): InspectionPatch {
+  if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw Error("Invalid voxel viewport");
+  const selected = inspectCell(g, sensed, layer, x, y, trails, clumps),
+    [gx, gy] = selected.cell,
+    map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map,
+    coords: [number, number][] = [[gx, gy]],
+    bounds = voxelRegionBounds(x, y, width, height);
+  for (let yy = Math.max(0, Math.floor(bounds.top / R) - 1); yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + 1); yy++)
+    for (let xx = Math.max(map.x0, Math.floor(bounds.left) - 1); xx <= Math.min(map.x0 + map.size.w - 1, Math.ceil(bounds.right) + 1); xx++)
+      if (xx !== gx || yy !== gy) coords.push([xx, yy]);
+  const patch = readPatch(g, sensed, layer, selected, coords, trails, clumps),
+    cx = centreX(gx, gy),
+    cy = centreY(gy);
+  patch.bounds = {
+    left: bounds.left - cx,
+    right: bounds.right - cx,
+    top: bounds.top - cy,
+    bottom: bounds.bottom - cy,
+  };
+  return patch;
+}
+
+function readPatch(
+  g: LensWorld,
+  sensed: SensedMap,
+  layer: number,
+  selected: CellInspectionState,
+  coords: [number, number][],
+  trails: { food: boolean; home: boolean },
+  clumps: readonly AphidClump[],
+): InspectionPatch {
+  const [gx, gy] = selected.cell;
   const map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map;
   const mode = selected.place.view === "below" || (selected.place.view === "map" && map.hasSoil) ? "below" : "surface";
-  const coords: [number, number][] = [[gx, gy], ...Array.from({ length: 6 }, (_, d): [number, number] => [nx(gx, gy, d), ny(gy, d)])];
   const cx = centreX(gx, gy),
     cy = centreY(gy);
   const cells = coords.map(([xx, yy], i): InspectionPatchCell => {

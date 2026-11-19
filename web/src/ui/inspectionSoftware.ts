@@ -17,6 +17,7 @@ const meshKey = (o: T.Mesh) =>
   ].join("/");
 /** Same real mesh geometry and depth test as the GPU path, with cached static mesh layers. */
 export class InspectionSoftware {
+  private privateCanvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private image: ImageData;
   private pixels: Uint32Array;
@@ -28,6 +29,7 @@ export class InspectionSoftware {
   private instances = new WeakMap<T.InstancedMesh, { matrices: Float32Array; colours: Float32Array | null }>();
   private cache = new WeakMap<T.Mesh, { key: string; pixels: Uint32Array; depth: Float32Array }>();
   constructor(privateCanvas: HTMLCanvasElement) {
+    this.privateCanvas = privateCanvas;
     const ctx = privateCanvas.getContext("2d");
     if (!ctx) throw Error("No inspection canvas context");
     this.ctx = ctx;
@@ -36,6 +38,17 @@ export class InspectionSoftware {
     this.depth = new Float32Array(this.pixels.length);
     this.background = new Uint32Array(this.pixels.length);
     this.backgroundDepth = new Float32Array(this.pixels.length);
+  }
+  setSize(width: number, height: number): void {
+    if (this.image.width === width && this.image.height === height) return;
+    this.privateCanvas.width = width;
+    this.privateCanvas.height = height;
+    this.image = this.ctx.createImageData(width, height);
+    this.pixels = new Uint32Array(this.image.data.buffer);
+    this.depth = new Float32Array(this.pixels.length);
+    this.background = new Uint32Array(this.pixels.length);
+    this.backgroundDepth = new Float32Array(this.pixels.length);
+    this.dispose();
   }
   render(scene: T.Scene, camera: T.Camera): void {
     scene.updateMatrixWorld();

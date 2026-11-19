@@ -89,7 +89,7 @@ const SIDES: [Point3, Point3[]][] = [
   ],
 ];
 
-/** Actual seven-cell terrain only. Added cut thickness is visual; no simulation geometry is written. */
+/** Terrain from the supplied cells, cropped to the inspection or viewport bounds. No simulation geometry is written. */
 export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Face[] {
   const isBelow = patch.mode === "below",
     step = isBelow ? 0.06 : 0.05,
@@ -98,58 +98,76 @@ export function buildPatchTerrain(patch: InspectionPatch, allSides = false): Fac
     cx = centreX(gx, gy),
     cy = centreY(gy);
   const slots = new Map(patch.cells.filter((c) => c.valid).map((c) => [cellKey(...c.state.cell), c]));
-  const voxels = new Map<string, { p: Point3; kind: Face["kind"] }>();
-  for (let ix = -limit; ix < limit; ix++)
-    for (let iz = -limit; iz < limit; iz++) {
-      const x = (ix + 0.5) * step,
-        axis = (iz + 0.5) * step;
+  const b = patch.bounds,
+    originX = b ? cx : 0,
+    originY = b ? -cy : 0,
+    left = b ? Math.floor((b.left + originX) / step) : -limit,
+    right = b ? Math.ceil((b.right + originX) / step) : limit,
+    top = b ? Math.floor((-b.bottom + originY) / step) : -limit,
+    bottom = b ? Math.ceil((-b.top + originY) / step) : limit,
+    rows = bottom - top,
+    columns = right - left,
+    lower = new Int16Array(rows * columns),
+    upper = new Int16Array(rows * columns),
+    kinds = new Uint8Array(rows * columns);
+  // Every terrain column is a solid depth interval. Keep that interval instead of allocating every buried voxel.
+  for (let ix = left; ix < right; ix++)
+    for (let iz = top; iz < bottom; iz++) {
+      const x = (ix + 0.5) * step - originX,
+        axis = (iz + 0.5) * step - originY;
       cellOf(cx + x, cy - axis);
       const slot = slots.get(cellKey(CELL[0], CELL[1]));
       if (!slot) continue;
-      const ground = slot.state.place.ground;
+      const ground = slot.state.place.ground,
+        index = (ix - left) * rows + iz - top;
       if (!isBelow) {
         if (ground === "air") continue;
-        for (let h = -4; h < (ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0); h++) {
-          const p: Point3 = [ix, iz, h];
-          voxels.set(p.join(","), { p, kind: ground === "rock" ? "rock" : "soil" });
-        }
+        lower[index] = -4;
+        upper[index] = ground === "rock" ? SURFACE_ROCK_HEIGHT / step : 0;
+        kinds[index] = ground === "rock" ? 2 : 1;
       } else {
         if (slot.surfaceStrip) {
           if (slot.surfaceEntrance || !slot.projectedGround || axis > -slot.y + Math.min(0.24, (slot.projectedSpoil ?? 0) * 0.04)) continue;
         } else if (ground === "air") continue;
         const open = !slot.surfaceStrip && ground === "open";
-        for (let d = 0; d < 20; d++) {
-          if (open && d < 18) continue;
-          const p: Point3 = [ix, d, iz];
-          voxels.set(p.join(","), {
-            p,
-            kind: open ? "back" : (slot.surfaceStrip ? slot.projectedGround : ground) === "rock" ? "rock" : "soil",
-          });
-        }
+        lower[index] = open ? 18 : 0;
+        upper[index] = 20;
+        kinds[index] = open ? 3 : (slot.surfaceStrip ? slot.projectedGround : ground) === "rock" ? 2 : 1;
       }
     }
   const eye: Point3 = isBelow ? [1.8, -7.5, 1.25] : [1.1, -3.3, 2.43],
     faces: Face[] = [];
-  for (const {
-    p: [x, y, z],
-    kind,
-  } of voxels.values())
-    for (const [normal, corners] of SIDES) {
-      if (
-        (!allSides && normal[0] * eye[0] + normal[1] * eye[1] + normal[2] * eye[2] <= 0) ||
-        voxels.has([x + normal[0], y + normal[1], z + normal[2]].join(","))
-      )
-        continue;
-      const points = corners.map(([a, b, c]): Point3 => [(x + a) * step, (y + b) * step, (z + c) * step]);
-      const depth = points.reduce((sum, p) => sum + p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2], 0) / 4;
-      faces.push({
-        points,
-        normal,
-        kind,
-        depth,
-        grain: Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
-        front: isBelow && kind !== "back",
-      });
+  for (let ix = left; ix < right; ix++)
+    for (let iz = top; iz < bottom; iz++) {
+      const index = (ix - left) * rows + iz - top,
+        kind: Face["kind"] = kinds[index] === 3 ? "back" : kinds[index] === 2 ? "rock" : "soil";
+      for (let h = lower[index]; h < upper[index]; h++) {
+        const x = ix,
+          y = isBelow ? h : iz,
+          z = isBelow ? iz : h;
+        for (const [normal, corners] of SIDES) {
+          if (!allSides && normal[0] * eye[0] + normal[1] * eye[1] + normal[2] * eye[2] <= 0) continue;
+          const xx = ix + normal[0],
+            zz = iz + normal[isBelow ? 2 : 1],
+            hh = h + normal[isBelow ? 1 : 2],
+            neighbour = (xx - left) * rows + zz - top;
+          if (xx >= left && xx < right && zz >= top && zz < bottom && hh >= lower[neighbour] && hh < upper[neighbour]) continue;
+          const points = corners.map(([a, b, c]): Point3 => [
+            (x + a) * step - originX,
+            (y + b) * step - (isBelow ? 0 : originY),
+            (z + c) * step - (isBelow ? originY : 0),
+          ]);
+          const depth = points.reduce((sum, p) => sum + p[0] * eye[0] + p[1] * eye[1] + p[2] * eye[2], 0) / 4;
+          faces.push({
+            points,
+            normal,
+            kind,
+            depth,
+            grain: Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) % 5,
+            front: isBelow && kind !== "back",
+          });
+        }
+      }
     }
   return faces.sort((a, b) => a.depth - b.depth);
 }
