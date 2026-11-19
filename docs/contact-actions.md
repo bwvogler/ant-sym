@@ -54,3 +54,23 @@ Exploratory **120-second** A9 contact assay, 200 ants per colony, local policies
 The median paired food ratio is 1.063. Food decreased on 4/20 seeds; worst was seed 5, ratio 0.898. Losses include all causes, not only fighting. Runtime figures are not comparable because the full test suite overlapped early sweep runs. This supports continuing the experiment, **not enabling it by default**: full-duration defense, colony survival, throughput and cost guards are tracked in ja-g7nz.4.
 
 Validation: full suite ran 1,345 tests, with four existing TODOs. Three reset-fixture/count failures caused by the added per-ant field were corrected and their tests rerun successfully. The remaining CI-reporter failure is the already-reproduced Node 24 timeout-reporting mismatch (ja-dkgo). New encounter tests, guide checks, typecheck, lint and formatting pass; lint retains existing warnings.
+
+## Standard-duration validation, 2026-11-19
+
+[GitHub run 44522426448](https://github.com/bwvogler/ant-sym/actions/runs/44522426448) verified all six assay/mode combinations for each of 20 paired seeds at `dc5d858f`. The A13 sealed and no-defense controls used the treatment's combat settings and elapsed duration.
+
+| Assay | Duration | Legacy passes, seeds 1–10 / 11–20 | Directed passes, seeds 1–10 / 11–20 |
+|---|---:|---:|---:|
+| A9 neutral contact | 300 s | 3/10 / 5/10 | 10/10 / 10/10 |
+| A13 home defense | 300 s | 3/10 / 6/10 | 2/10 / 2/10 |
+| G1 full game | 600 s | 8/10 / 9/10 | 9/10 / 6/10 |
+
+A9 median food brought home by both colonies rose from 1,706 to 1,760, and the worst losses per 100 food fell from 8.25 to 0.34. In A13, median defender losses rose from 35.5 to 144 and median food stored fell from 265 to 117. Median food relative to the sealed control fell from 0.94 to 0.39, with a minimum of 0.08. The directed no-defense control had a median of zero raiders lost, versus 40 in the legacy control, so the pass criterion's comparison against no-defense food is insufficient on its own to evaluate colony survival.
+
+In G1, median losses for our colony fell from 74 to 1, while median food stored fell from 2,746 to 2,559. The confirmation half added failures on seeds 12, 14 and 19. Median observed G1 runtime rose from 8.82 to 9.27 ms/tick across the distributed runners. Distinct situations were measured with local policies, which does not establish live-cache coverage.
+
+Keep `fight.intent` opt-in. The next experiment should measure, by side, which local decision kept a defender from attacking and how many raiders and defenders contributed actual damage pressure. Use seed 3 as an A13 legacy-pass/directed-fail contrast and seed 1 as a shared-pass control. Preserve A9 peaceful contact and treat absolute defender survival and food as guards alongside the A13 pass mark.
+
+A 90-second local diagnostic pilot sampled eligible attack markers once per second near the home hole. In directed mode, seed 1 averaged 0.23 defenders and 0.42 raiders with a current-layer attack marker. Seed 3 averaged 0.15 and 0.31. The corresponding defender counts in fight mode were 1.24 and 0.73. These samples show that fight mode is a poor proxy for directed attack intent. They do not measure delivered pressure or identify why a defender chose another action.
+
+A separate local 300-second reproduction confirmed that seed 1 passes in both modes and seed 3 passes only in legacy mode. Seed 1 defender losses rose from 45 to 147, even though the score still passed, and food stored fell from 791 to 319. Seed 3 losses rose from 24 to 106 and food stored fell from 807 to 336. Beads follow-up `ja-g7nz.4.2` tracks tracing eligibility and incoming pressure before considering a policy change.

@@ -825,6 +825,8 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
   const nest = at(60, 30);
   const pile = at(15, 30);
   let fightNear = 0;
+  let defenderIntentNear = 0;
+  let raiderIntentNear = 0;
   let atPile = 0;
   let samples = 0;
   let next = 20;
@@ -857,12 +859,26 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
             const x = c.x[i];
             const y = c.y[i];
             const fighting = MODES[c.mode[i]] === "fight";
-            if (fighting && Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) fightNear++;
+            if (Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) {
+              if (fighting) fightNear++;
+              if (c.attackLayer[i] >= 0 && c.attackLayer[i] === c.layer[i]) defenderIntentNear++;
+            }
             if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
           }
+          const rival = game.rival;
+          if (rival)
+            for (let i = 0; i < rival.n; i++) {
+              if (!rival.alive[i] || rival.attackLayer[i] < 0 || rival.attackLayer[i] !== rival.layer[i]) continue;
+              if (Math.hypot(rival.x[i] - nest.x, rival.y[i] - nest.y) <= NEAR_HOME) raiderIntentNear++;
+            }
           samples++;
         },
-        summary: () => ({ fightNear: samples ? fightNear / samples : 0, atPile: samples ? atPile / samples : 0 }),
+        summary: () => ({
+          fightNear: samples ? fightNear / samples : 0,
+          atPile: samples ? atPile / samples : 0,
+          defenderIntentNear: samples ? defenderIntentNear / samples : 0,
+          raiderIntentNear: samples ? raiderIntentNear / samples : 0,
+        }),
       },
     ],
   };
