@@ -918,6 +918,7 @@ export default function ColonyField({
       const soil = mix(theme.soil, CLOSE_SPRITE_GROUND.soil);
       const spoil = mix(theme.spoil, CLOSE_SPRITE_GROUND.soil);
       const pelletAlpha = !smellAll && lv === PLANE ? Math.max(0, Math.min(1, (c.zoom / (v.dpr ?? 1) - HEX_ZOOM) / 8)) : 0;
+      const moundTints = new Map<number, Path2D>();
       const pellets = new Map<string, DirtBall>();
       const bg = (m.hasSoil ? soil : paper).map(Math.round);
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
@@ -978,16 +979,17 @@ export default function ColonyField({
           // The spoil wash fades out as the overhead pellets appear.
           const spoilWash = heap > 0 && data[o] === theme.spoil[0] && data[o + 1] === theme.spoil[1] && data[o + 2] === theme.spoil[2];
           const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
-          const a = spoilWash ? opacity * (1 - pelletAlpha) : opacity;
+          const a = spoilWash ? opacity * (1 - pelletAlpha * pelletAlpha) : opacity;
           const r = Math.round(solid ? solid[0] : data[o] * a + paper[0] * (1 - a));
           const g = Math.round(solid ? solid[1] : data[o + 1] * a + paper[1] * (1 - a));
           const b = Math.round(solid ? solid[2] : data[o + 2] * a + paper[2] * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
-          let path = paths.get(key);
+          const paint = spoilWash ? moundTints : paths;
+          let path = paint.get(key);
           if (!path) {
             path = new Path2D();
-            paths.set(key, path);
+            paint.set(key, path);
           }
           const sx = (x + shift) * c.zoom + ox;
           path.moveTo(sx + c0, sy + s0);
@@ -998,6 +1000,11 @@ export default function ColonyField({
           path.lineTo(sx + c5, sy + s5);
           path.closePath();
         }
+      }
+      // Keep the returning brown tint behind the fading pellets so both are visible.
+      for (const [key, path] of moundTints) {
+        ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
+        ctx.fill(path);
       }
       if (pellets.size) {
         ctx.save();
