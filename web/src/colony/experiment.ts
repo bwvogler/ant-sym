@@ -948,7 +948,10 @@ function observedDefence(spec: RunSpec): RunSpec {
                 add("exposed");
                 add("pressure", pressure);
                 add("hazardInput", pressure / allies);
-                if (killed) add("combatDeaths");
+                if (killed) {
+                  add("combatDeaths");
+                  counts[`${prefix}.firstCombatDeath`] ??= game.time;
+                }
               },
             });
           });
@@ -1484,16 +1487,41 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * lifecycleOne) on a solo one world, 30 minutes each.
  */
 /** Experimental response using the contact policy's existing perception of its own entrance. */
-function entranceDefence(spec: RunSpec, requireAlarm = false): RunSpec {
+function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or outnumbered" = "any contact"): RunSpec {
   const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
+  let game: Game | undefined;
+  let entranceContacts = 0;
+  let entranceContactsWithAlarm = 0;
+  const times: Record<string, number> = {};
   return {
     ...spec,
+    events: [
+      ...(spec.events ?? []),
+      {
+        at: 0,
+        kind: "call",
+        run: (started) => {
+          game = started;
+        },
+      },
+    ],
+    probes: [...(spec.probes ?? []), { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, ...times }) }],
     sides: {
       ...spec.sides,
       responses: {
         ...base,
-        contact: (t, draw) =>
-          t.enemy && t.place === "hole" && t.carrying === "none" && (!requireAlarm || t.alarm !== "none") ? "fight" : base.contact(t, draw),
+        contact(t, draw) {
+          if (t.enemy && t.place === "hole" && t.carrying === "none") {
+            entranceContacts++;
+            if (game) times.firstEntranceContact ??= game.time;
+            if (t.alarm !== "none") {
+              entranceContactsWithAlarm++;
+              if (game) times.firstEntranceContactWithAlarm ??= game.time;
+            }
+            if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
+          }
+          return base.contact(t, draw);
+        },
       },
     },
     game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
@@ -1518,14 +1546,28 @@ const defendAlarmEntrance: Assay = {
   ...defendEntrance,
   id: "defendAlarmEntrance",
   title: "A13 directed combat with alarm-gated entrance defense",
-  spec: (seed) => entranceDefence(defendWalked.spec(seed), true),
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "alarm"),
 };
 
 const contactAlarmEntrance: Assay = {
   ...contactEntrance,
   id: "contactAlarmEntrance",
   title: "A9 neutral contact with alarm-gated entrance defense for one colony",
-  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), true),
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "alarm"),
+};
+
+const defendThreatEntrance: Assay = {
+  ...defendEntrance,
+  id: "defendThreatEntrance",
+  title: "A13 entrance defense on local alarm or when outnumbered",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "alarm or outnumbered"),
+};
+
+const contactThreatEntrance: Assay = {
+  ...contactEntrance,
+  id: "contactThreatEntrance",
+  title: "A9 neutral contact with alarm-or-outnumbered entrance defense",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "alarm or outnumbered"),
 };
 
 export const ONE_ASSAYS: Assay[] = [
@@ -1563,6 +1605,8 @@ export const ONE_ASSAYS: Assay[] = [
   contactEntrance,
   defendAlarmEntrance,
   contactAlarmEntrance,
+  defendThreatEntrance,
+  contactThreatEntrance,
 ];
 
 /** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */

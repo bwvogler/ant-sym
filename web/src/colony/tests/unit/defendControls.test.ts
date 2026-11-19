@@ -31,6 +31,7 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
   const colony = new Colony(arena(), { antCount: 1, maxAnts: 1 }, mulberry32(1));
   const contact = treatment.sides!.responses!.contact;
   const alarmContact = oneAssay("defendAlarmEntrance").spec(1).sides!.responses!.contact;
+  const threatContact = oneAssay("defendThreatEntrance").spec(1).sides!.responses!.contact;
   const draw = colony.antDraw(0);
   const atHole: Touch = { ...colony.t, mode: "explore", stance: "forage", enemy: true, place: "hole", carrying: "none" };
   assert.equal(localResponses.contact(atHole, draw), "flee");
@@ -38,6 +39,8 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
   assert.equal(alarmContact({ ...atHole, alarm: "none" }, draw), "flee");
   assert.equal(alarmContact({ ...atHole, alarm: "faint" }, draw), "fight");
   assert.equal(alarmContact({ ...atHole, alarm: "strong" }, draw), "fight");
+  assert.equal(threatContact({ ...atHole, alarm: "none", odds: "even" }, draw), "flee");
+  assert.equal(threatContact({ ...atHole, alarm: "none", odds: "outnumbered" }, draw), "fight");
   for (const touch of [
     { ...atHole, place: "out" },
     { ...atHole, place: "tunnel" },
@@ -47,6 +50,8 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
     assert.equal(contact(touch, draw), localResponses.contact(touch, draw));
     const withAlarm = { ...touch, alarm: "strong" } as const;
     assert.equal(alarmContact(withAlarm, draw), localResponses.contact(withAlarm, draw));
+    const outnumbered = { ...touch, alarm: "none", odds: "outnumbered" } as const;
+    assert.equal(threatContact(outnumbered, draw), localResponses.contact(outnumbered, draw));
   }
   assert.equal(treatment.game!.fight!.intent, true);
   assert.equal(treatment.sides!.rivalResponses, base.sides!.rivalResponses);

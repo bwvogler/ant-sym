@@ -133,3 +133,28 @@ The alarm-gated assays add one condition to entrance defense: the ant must sense
 Alarm gating restored neutral food and casualties to the untreated directed results on all three seeds. Under raid pressure it increased food on all three and passed on seed 6 (untreated directed passed none). Seed 3 lost 20 additional defenders and reverted from a pass with entrance-only defense to a fail with alarm gating, so the policy stays experimental. Compare attack and alarm timing on seeds 3 and 6 to check whether the cue arrives after defenders already start withdrawing.
 
 Reproduce with `node scripts/experiment.mjs defendAlarmEntrance contactAlarmEntrance --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
+
+### When the entrance cue becomes available
+
+The timing probes reproduced the earlier food, losses and pass marks on seeds 3 and 6. They count empty-jawed encounters at the ant's own entrance and record the first such encounter with and without a sensed alarm. First defender combat death is measured anywhere on the map.
+
+| Alarm-gated A13 seed | First defender combat death | First eligible entrance encounter | First eligible entrance encounter with alarm | Entrance encounters with alarm |
+|---:|---:|---:|---:|---:|
+| 3 | 17.50 s | 37.40 s | 40.10 s | 265 / 579 |
+| 6 | 11.20 s | 19.73 s | 22.40 s | 323 / 764 |
+
+Both seeds had lost defenders before the first eligible contact at the entrance. Alarm became available for an eligible encounter about 2.7 seconds after the first eligible contact on both seeds. That initial delay alone does not explain why seed 3 failed and seed 6 passed. The alarm-gated condition was present on fewer than half of eligible contacts across both runs.
+
+### Alarm or locally outnumbered
+
+A second policy also authorized entrance defense if the ant sensed it was outnumbered. This checks whether a local cue can cover the gap before alarm becomes available. The policy remains confined to empty-jawed ants that sense an enemy at their own entrance.
+
+| A13 seed | Food, alarm / alarm or outnumbered | Defender losses | Raider losses | Pass, both arms |
+|---:|---:|---:|---:|---:|
+| 3 | 373 / 365 | 126 / 153 | 37 / 33 | fail |
+| 5 | 99 / 99 | 156 / 159 | 34 / 33 | fail |
+| 6 | 199 / 116 | 124 / 134 | 45 / 45 | pass |
+
+Neutral A9 food and combined losses again matched untreated directed combat on all three seeds. Under raids the extra trigger cost more defenders on every seed and improved neither food nor passes. Retain alarm-only as the better entrance experiment and leave both policies experimental. Future comparisons should measure the defense decisions available along the approach to the nest, since the first deaths in both traced runs preceded any eligible entrance encounter.
+
+Reproduce the timing with `node scripts/experiment.mjs defendEntrance defendAlarmEntrance --seeds 3,6 --set game.fight.intent=true --jobs 4`. Reproduce the follow-up with `node scripts/experiment.mjs defendThreatEntrance contactThreatEntrance --seeds 3,5,6 --set game.fight.intent=true --jobs 4`.
