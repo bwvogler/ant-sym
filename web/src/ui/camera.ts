@@ -25,10 +25,12 @@ export interface Camera {
 export interface Viewport {
   w: number;
   h: number;
+  /** Backing pixels per CSS pixel; absent means 1. */
+  dpr?: number;
 }
 
-/** Closest zoom: a cell this many device pixels wide. */
-export const MAX_ZOOM = 28;
+/** Closest zoom in CSS pixels per world unit, reaching inspection-scale detail. */
+export const MAX_ZOOM = 180;
 
 /** The zoom at which the whole map fits the view. */
 export function fitZoom(world: Extent, view: Viewport): number {
@@ -42,7 +44,7 @@ export function fit(world: Extent, view: Viewport): Camera {
 
 /** Zoom between "the whole map" and MAX_ZOOM; the centre kept so the view stays over the map (or centred on an axis the map doesn't fill). */
 export function clamp(c: Camera, world: Extent, view: Viewport): Camera {
-  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM, c.zoom));
+  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom));
   const halfW = view.w / zoom / 2;
   const halfH = view.h / zoom / 2;
   const x0 = world.x0 ?? 0;
@@ -74,7 +76,7 @@ export function zoomAt(c: Camera, view: Viewport, sx: number, sy: number, factor
  * whole map) leaves the view where it is instead of sliding it toward the pointer.
  */
 export function zoomBy(c: Camera, world: Extent, view: Viewport, sx: number, sy: number, factor: number): Camera {
-  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM, c.zoom * factor));
+  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom * factor));
   return clamp(zoomAt(c, view, sx, sy, zoom / c.zoom), world, view);
 }
 

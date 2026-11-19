@@ -4,6 +4,9 @@ import { HOME_RGB, ROLE_RGB, css } from "./palette.ts";
 export interface InspectionOverlays {
   scents: boolean;
   markers: boolean;
+  /** The inspector highlights its centre; the map already owns its selected-cell marker. */
+  selection?: boolean;
+  chambers?: boolean;
 }
 export const DEFAULT_INSPECTION_OVERLAYS: InspectionOverlays = { scents: true, markers: true };
 export const SCENT_STYLES = {

@@ -1,4 +1,6 @@
 import { CadaverSprites } from "./cadaverSprites.ts";
+import { MapVoxelPass } from "./mapVoxel.ts";
+import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
 import { FungalMapSprites } from "./fungalStructures.ts";
 import { hyphaShape, HYPHA_COLOURS } from "./hyphaVisual.ts";
@@ -425,6 +427,10 @@ export default function ColonyField({
     const surfaceLeaves = new SurfaceLeaves();
     const mapLeaves = new MapLeafSprites();
     const workerGait = new WorkerGait();
+    const voxelMap = new MapVoxelPass(() => draw());
+    const tilePaint = new MapChunkPaintCache();
+    let framePaints = 0,
+      frameHits = 0;
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: one world's PLANE or CURTAIN, −1 on one map), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
@@ -521,6 +527,7 @@ export default function ColonyField({
       chamber: rgb("#a39a8a"),
     };
     const retheme = () => {
+      tilePaint.clear();
       workerSprites.clearTints();
       nestSprites.clearTints();
       theme = {
@@ -621,6 +628,39 @@ export default function ColonyField({
       const px = c.img.data;
       const x0 = cx * CHUNK;
       const y0 = cy * CHUNK;
+      // The strip also depends on projected plane cells; keep its existing live repaint path.
+      if (!(strip && world && cy === STRIP >> 6)) {
+        const tag = JSON.stringify([
+          foodAsSprites,
+          show.food,
+          show.home,
+          smellAll,
+          gx0,
+          gw,
+          gh,
+          sensedC && !smellAll ? now : 0,
+          chambers?.list.map((ch) => ch.role),
+          trailC.map((t) => t.tone),
+        ]);
+        if (
+          !tilePaint.needsPaint(c, tag, [
+            rc,
+            fc,
+            lc,
+            qc,
+            sensedC,
+            sporeC,
+            spoilC,
+            chamberC,
+            ...trailC.flatMap((t) => [t.food, t.home]),
+            ...alarmC,
+          ])
+        ) {
+          frameHits++;
+          return;
+        }
+      }
+      framePaints++;
       for (let ly = 0; ly < CHUNK; ly++) {
         for (let lx = 0; lx < CHUNK; lx++) {
           const i = ly * CHUNK + lx;
@@ -1046,7 +1086,7 @@ export default function ColonyField({
     };
 
     /** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
-    const drawLine = (w: OneWorld, c: Camera, v: Viewport, d: number) => {
+    const drawLine = (w: OneWorld, c: Camera, v: Viewport, d: number, holes = true) => {
       const line = w.line;
       const k = line.holes.length - 1;
       ctx.strokeStyle = theme.ink;
@@ -1065,12 +1105,13 @@ export default function ColonyField({
       ctx.setLineDash([]);
       ctx.globalAlpha = 0.9;
       ctx.fillStyle = theme.ink;
-      for (const h of line.holes) {
-        const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
-        ctx.beginPath();
-        ctx.arc(x, y, Math.max(2.5 * d, 0.6 * c.zoom), 0, Math.PI * 2);
-        ctx.fill();
-      }
+      if (holes)
+        for (const h of line.holes) {
+          const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
+          ctx.beginPath();
+          ctx.arc(x, y, Math.max(2.5 * d, 0.36 * c.zoom), 0, Math.PI * 2);
+          ctx.fill();
+        }
       ctx.globalAlpha = 1;
     };
 
@@ -1246,9 +1287,11 @@ export default function ColonyField({
     };
 
     const draw = () => {
+      const started = import.meta.env.DEV ? performance.now() : 0;
       bind();
-      const v: Viewport = { w: canvas.width, h: canvas.height };
       const d = Math.min(2, window.devicePixelRatio || 1);
+      const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
+      framePaints = frameHits = 0;
       const s = vc();
       // Follow an ant: the camera centres on it; an ant that is gone (dead, or its slot reborn) ends the follow. In one
       // world, an ant on the other layer than the view's holds the camera where it was (carrying it across: U5.2).
@@ -1409,6 +1452,7 @@ export default function ColonyField({
       const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
       if (world && lv === PLANE) drawLine(world, c, v, d);
       if (world && lv === CURTAIN) drawBends(world, c, v, d);
+      const alateOverlays: (() => void)[] = [];
       for (const col of [...colonies].reverse()) {
         // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
         const nest = lv < 0 ? col.nest : (col.layers[lv] ?? col.layers[0]!).nest;
@@ -1530,34 +1574,40 @@ export default function ColonyField({
           }
         }
         // Alates (ja-lo8.9): new queens, smaller than the queen, with wings, as they wait and walk out to fly.
-        for (const al of col.alates) {
-          if (!home || !inView(al.x, al.y)) continue;
-          const [x, y] = toScreen(c, v, al.x, al.y);
-          const ar = Math.max(2.5, len * 0.7);
-          const alateImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
-          if (alateImage) {
-            drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
-            drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
-          } else {
-            ctx.beginPath();
-            ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
-            ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
-            ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
-            ctx.globalAlpha = 0.5;
-            ctx.fillStyle = theme.paper;
-            ctx.fill();
-            ctx.globalAlpha = 1;
+        const drawAlates = () => {
+          for (const al of col.alates) {
+            if (!home || !inView(al.x, al.y)) continue;
+            const [x, y] = toScreen(c, v, al.x, al.y);
+            const ar = Math.max(2.5, len * 0.7);
+            const alateImage = hexes
+              ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites)
+              : null;
+            if (alateImage) {
+              drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
+              drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
+            } else {
+              ctx.beginPath();
+              ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
+              ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+              ctx.fill();
+              ctx.beginPath();
+              ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
+              ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
+              ctx.globalAlpha = 0.5;
+              ctx.fillStyle = theme.paper;
+              ctx.fill();
+              ctx.globalAlpha = 1;
+            }
+            if (al.load > 0) {
+              ctx.beginPath();
+              ctx.arc(x, y, Math.max(1.5, ar * 0.45), 0, Math.PI * 2);
+              ctx.fillStyle = theme.spore;
+              ctx.fill();
+            }
           }
-          if (al.load > 0) {
-            ctx.beginPath();
-            ctx.arc(x, y, Math.max(1.5, ar * 0.45), 0, Math.PI * 2);
-            ctx.fillStyle = theme.spore;
-            ctx.fill();
-          }
-        }
+        };
+        drawAlates();
+        if (col.alates.length) alateOverlays.push(drawAlates);
         ctx.lineCap = "round";
         ctx.lineWidth = Math.max(1, len * 0.3);
         ctx.globalAlpha = 0.85;
@@ -1692,6 +1742,43 @@ export default function ColonyField({
       }
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
+      const voxel = voxelMap.draw(
+        ctx,
+        { colonies, fungus, world },
+        sensed,
+        lv,
+        c,
+        v,
+        d,
+        layers.current,
+        aphidsRef.current?.() ?? [],
+        theme,
+        !smellAll,
+      );
+      canvas.dataset.mapRenderer = voxel.renderer;
+      canvas.dataset.voxelAlpha = voxel.alpha.toFixed(3);
+      if (import.meta.env.DEV) {
+        canvas.dataset.chunkPaints = String(framePaints);
+        canvas.dataset.chunkCacheHits = String(frameHits);
+      }
+      if (voxel.alpha > 0) {
+        // Alates keep their existing body/wing atlas until the shared mesh contains their separate wings.
+        for (const drawAlates of alateOverlays) drawAlates();
+        if (hp && hp.heatDay > 0 && (lv === PLANE || (lv < 0 && !m.sky))) {
+          const heat = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
+          ctx.globalAlpha = voxel.alpha * 0.28 * heat;
+          ctx.fillStyle = theme.warn;
+          ctx.fillRect(0, 0, v.w, v.h);
+          if (sunDown(hp, colonies[0]!.time)) {
+            ctx.globalAlpha = voxel.alpha * 0.3;
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, v.w, v.h);
+          }
+          ctx.globalAlpha = 1;
+        }
+        if (world && lv === PLANE) drawLine(world, c, v, d, false);
+        if (world && lv === CURTAIN) drawBends(world, c, v, d);
+      }
       if (labelsOn.current && m.chambers) {
         const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
         ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -1723,7 +1810,7 @@ export default function ColonyField({
       // Aphid marks show aggregate clump density, not individually simulated insects. Fixed-size glyphs at hex zoom;
       // the original green dots farther out / while loading, fading by the same clump-life convention.
       const clumps = aphidsRef.current?.();
-      if (clumps?.length && (world ? lv === PLANE : true)) {
+      if (voxel.alpha < 1 && clumps?.length && (world ? lv === PLANE : true)) {
         ctx.fillStyle = theme.aphid;
         const r = Math.max(1.2 * d, 0.13 * c.zoom);
         for (const cl of clumps) {
@@ -1855,6 +1942,7 @@ export default function ColonyField({
         const y0 = Math.max(0, vis.y0);
         ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
       }
+      if (import.meta.env.DEV) canvas.dataset.fieldDrawMs = (performance.now() - started).toFixed(2);
     };
     cadaverSprites.load(draw);
     workerSprites.load(draw);
@@ -1868,7 +1956,7 @@ export default function ColonyField({
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
       const k = canvas.width / r.width;
-      const v: Viewport = { w: canvas.width, h: canvas.height };
+      const v: Viewport = { w: canvas.width, h: canvas.height, dpr: k };
       const s = vc();
       const we = extent();
       const c = zoomBy(s.cam ?? fit(we, v), we, v, (e.clientX - r.left) * k, (e.clientY - r.top) * k, Math.exp(-e.deltaY * 0.0015));
@@ -1880,6 +1968,7 @@ export default function ColonyField({
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
       off();
+      voxelMap.dispose();
       cadaverSprites.dispose();
       workerSprites.dispose();
       nestSprites.dispose();
@@ -1898,7 +1987,7 @@ export default function ColonyField({
 
   const dpr = () => Math.min(2, window.devicePixelRatio || 1);
   const slop = () => CLICK_SLOP_PX * dpr();
-  const viewport = (): Viewport => ({ w: canvasRef.current?.width ?? 1, h: canvasRef.current?.height ?? 1 });
+  const viewport = (): Viewport => ({ w: canvasRef.current?.width ?? 1, h: canvasRef.current?.height ?? 1, dpr: dpr() });
   const camera = (): Camera => {
     const s = vc();
     const we = extent();

@@ -1,6 +1,7 @@
 import * as T from "three";
 import { voxelFrustum, type VoxelViewport } from "./voxelViewport.ts";
 import { VoxelTerrainCache, buildVoxelTerrainChunk } from "./voxelTerrainChunks.ts";
+import { ROLE_RGB } from "./palette.ts";
 import { InspectionSoftware } from "./inspectionSoftware.ts";
 import { buildPatchTerrain, faceColour } from "./drawInspectionPatch.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
@@ -120,6 +121,7 @@ export class InspectionScene {
   private ink = new T.Color("#302A24");
   private amber = new T.Color("#AB761D");
   private viewport: VoxelViewport | null = null;
+  private paletteKey = "";
   static async create(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"]): Promise<InspectionScene> {
     const r = await fetch(MODEL_URL);
     if (!r.ok) throw Error("Voxel models could not load");
@@ -181,6 +183,13 @@ export class InspectionScene {
       cached: this.terrainChunks.size,
       rebuilt: this.terrainChunks.rebuilt,
     };
+  }
+  setPalette(ink: string, amber: string): void {
+    const key = ink + "/" + amber;
+    if (key === this.paletteKey) return;
+    this.ink.fromArray(inspectionColour(ink));
+    this.amber.fromArray(inspectionColour(amber));
+    this.paletteKey = key;
   }
   angle(): void {
     this.orbit = { yaw: 0, tilt: 0.65 };
@@ -431,7 +440,21 @@ export class InspectionScene {
         const { x, y, state: s } = c;
         const line = (a: [number, number], b: [number, number], w: number, hex: string, z = 0.015) =>
           f.beam(this.point(x + a[0], y + a[1], z), this.point(x + b[0], y + b[1], z), w, colour(hex));
-        if (at === 0)
+        if (options.chambers && mode === "below" && s.place.chamber) {
+          const rgb = ROLE_RGB[s.place.chamber.role];
+          if (rgb) {
+            const tint = new T.Color("#503B2D").lerp(new T.Color(`rgb(${rgb.join(",")})`), 0.2).toArray() as V;
+            const hex: V[] = Array.from({ length: 6 }, (_, j) =>
+              this.point(
+                x + Math.cos(Math.PI / 6 + (j * Math.PI) / 3) / Math.sqrt(3),
+                y + Math.sin(Math.PI / 6 + (j * Math.PI) / 3) / Math.sqrt(3),
+                0.005,
+              ),
+            );
+            f.face(hex.reverse(), tint);
+          }
+        }
+        if (at === 0 && options.selection !== false)
           for (let j = 0; j < 6; j++) {
             const a = (j * Math.PI) / 3 + Math.PI / 6,
               b = ((j + 1) * Math.PI) / 3 + Math.PI / 6;
