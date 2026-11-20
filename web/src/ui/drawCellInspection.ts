@@ -49,12 +49,20 @@ export function drawCellInspection(
       256 * scale,
     );
   };
-  const nestSprite = (name: string, x = 0, y = 0, z = 0) => {
+  const nestSprite = (name: string, x = 0, y = 0, z = 0, heading = 0) => {
     if (!lifecycle) return;
     const i = lifecycleProjection.names.indexOf(name);
     if (i < 0) return;
     const p = point(x, y, z);
     const pixelScale = (lifecycleProjection.worldFrame / projection.worldFrame) * (projection.frame / lifecycleProjection.frame) * scale;
+    if (heading) {
+      const east = point(x + 1, y, z);
+      const forward = point(x + Math.cos(heading), y + Math.sin(heading), z);
+      ctx.save();
+      ctx.translate(...p);
+      ctx.rotate(Math.atan2(forward[1] - p[1], forward[0] - p[0]) - Math.atan2(east[1] - p[1], east[0] - p[0]));
+      ctx.translate(-p[0], -p[1]);
+    }
     ctx.drawImage(
       lifecycle,
       (i % lifecycleProjection.cols) * lifecycleProjection.stride + 1,
@@ -66,6 +74,7 @@ export function drawCellInspection(
       lifecycleProjection.frame * pixelScale,
       lifecycleProjection.frame * pixelScale,
     );
+    if (heading) ctx.restore();
   };
   const p = state.place;
   if (p.ground !== "air") sprite(p.ground === "rock" ? "ground-rock" : p.ground === "soil" ? "ground-soil" : "ground-open");
@@ -157,7 +166,8 @@ export function drawCellInspection(
   ctx.globalAlpha = aphids.alpha;
   for (let i = 0; i < aphids.marks; i++) sprite("aphid-" + (i & 3), ...APHID_SPOTS[i]);
   ctx.globalAlpha = 1;
-  if (state.fallen > 0) nestSprite("corpse");
+  if (state.cadavers?.length) for (const dead of state.cadavers) nestSprite("corpse", 0, 0, 0, dead.heading);
+  else if (state.fallen > 0) nestSprite("corpse");
   const broodSpots = [
     [-0.22, -0.18],
     [0, 0.14],

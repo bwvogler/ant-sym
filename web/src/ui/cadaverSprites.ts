@@ -16,10 +16,19 @@ export function drawCadaverSprite(
   x: number,
   y: number,
   zoom: number,
+  heading = 0,
 ): void {
   const atlas = CADAVER_ATLAS[lod],
     size = zoom * 2.25;
-  ctx.drawImage(image, stage * atlas.stride + 1, 1, atlas.frame, atlas.frame, x - size / 2, y - size / 2, size, size);
+  if (!heading) {
+    ctx.drawImage(image, stage * atlas.stride + 1, 1, atlas.frame, atlas.frame, x - size / 2, y - size / 2, size, size);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(heading);
+  ctx.drawImage(image, stage * atlas.stride + 1, 1, atlas.frame, atlas.frame, -size / 2, -size / 2, size, size);
+  ctx.restore();
 }
 export class CadaverSprites {
   private images = new Map<WorkerLod, HTMLImageElement>();
@@ -41,10 +50,10 @@ export class CadaverSprites {
       im.src = URLS[lod];
     }
   }
-  draw(ctx: CanvasRenderingContext2D, lod: WorkerLod, stage: DecayStage, x: number, y: number, zoom: number): boolean {
+  draw(ctx: CanvasRenderingContext2D, lod: WorkerLod, stage: DecayStage, x: number, y: number, zoom: number, heading = 0): boolean {
     const im = this.images.get(lod);
     if (!im) return false;
-    drawCadaverSprite(ctx, im, lod, stage, x, y, zoom);
+    drawCadaverSprite(ctx, im, lod, stage, x, y, zoom, heading);
     return true;
   }
   get(lod: WorkerLod): CanvasImageSource | null {

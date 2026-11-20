@@ -1665,9 +1665,13 @@ export default function ColonyField({
           const wy = centreY(k.y);
           if (!inView(wx, wy)) continue;
           const [x, y] = toScreen(c, v, wx, wy);
-          if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, k.died), x, y, c.zoom)) continue;
+          if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, k.died), x, y, c.zoom, k.heading)) continue;
           if (nestImage) {
-            drawNestSprite(ctx, nestImage, resourceLod, "corpse", x, y, c.zoom);
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(k.heading ?? 0);
+            drawNestSprite(ctx, nestImage, resourceLod, "corpse", 0, 0, c.zoom);
+            ctx.restore();
             continue;
           }
           ctx.moveTo(x - bd, y - bd);

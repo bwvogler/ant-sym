@@ -34,6 +34,23 @@ test("surface deaths retain one passive cadaver without entering the undertaker 
   assert.equal(read(g, CURTAIN).cadavers?.length, 0);
 });
 
+test("grounded cadavers preserve the worker's heading on either layer", () => {
+  for (const layer of [PLANE, CURTAIN]) {
+    const g = game(),
+      c = g.colonies[0];
+    c.layer[0] = layer;
+    c.x[0] = centreX(50, 50);
+    c.y[0] = centreY(50);
+    c.heading[0] = Math.PI / 2;
+    const heading = c.heading[0];
+    c.kill(0);
+    c.heading[0] = 0;
+    c.time += CORPSE_ROT / 2;
+    assert.equal(read(g, layer).cadavers?.[0].heading, heading);
+    assert.equal(read(g, layer).cadavers?.[0].stage, 2);
+  }
+});
+
 test("cadavers age in discrete simulation-time steps, pause on repeated reads, and expire at the existing lifetime", () => {
   const g = game(),
     c = g.colonies[0];

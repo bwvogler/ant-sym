@@ -350,7 +350,7 @@ export class InspectionPatchRenderer {
           ctx.fill();
         },
       });
-    const sprite = (name: string, x: number, y: number, z = 0) => {
+    const sprite = (name: string, x: number, y: number, z = 0, heading = 0) => {
       const desc = mode === "below" ? below : surface.names.includes(name) ? surface : lifecycle;
       const image = mode === "below" ? images.below : surface.names.includes(name) ? images.surface : images.lifecycle;
       const i = desc.names.indexOf(name);
@@ -361,14 +361,21 @@ export class InspectionPatchRenderer {
       drawAt(x, y, z + 0.15 + (floor?.(x, y) ?? 0), () => {
         ctx.save();
         ctx.globalAlpha = alpha;
+        const origin = heading ? [0, 0] : p;
+        if (heading) {
+          const east = point(x + 1, y, z);
+          const forward = point(x + Math.cos(heading), y + Math.sin(heading), z);
+          ctx.translate(...p);
+          ctx.rotate(Math.atan2(forward[1] - p[1], forward[0] - p[0]) - Math.atan2(east[1] - p[1], east[0] - p[0]));
+        }
         ctx.drawImage(
           image,
           (i % desc.cols) * desc.stride + 1,
           Math.floor(i / desc.cols) * desc.stride + 1,
           desc.frame,
           desc.frame,
-          p[0] - desc.anchor[0] * factor,
-          p[1] - desc.anchor[1] * factor,
+          origin[0] - desc.anchor[0] * factor,
+          origin[1] - desc.anchor[1] * factor,
           desc.frame * factor,
           desc.frame * factor,
         );
@@ -463,7 +470,8 @@ export class InspectionPatchRenderer {
           ctx.fillRect(q[0], q[1], 3 * scale, 3 * scale);
         }
       }
-      if (s.fallen > 0) sprite("corpse", x, y);
+      if (s.cadavers?.length) for (const dead of s.cadavers) sprite("corpse", x, y, 0, dead.heading);
+      else if (s.fallen > 0) sprite("corpse", x, y);
       for (let i = 0; i < 3; i++) if (s.brood[i] > 0) sprite("brood-" + i, x + [-0.22, 0, 0.23][i], y + [-0.18, 0.14, -0.12][i]);
       if (s.stalk) {
         ctx.strokeStyle = "#574361";

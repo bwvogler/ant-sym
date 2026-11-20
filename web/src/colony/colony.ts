@@ -164,6 +164,8 @@ export interface Corpse {
   y: number;
   held: number;
   died: number;
+  /** The worker’s heading at death. Older saves may omit it. */
+  heading?: number;
   load: number;
   strain: number;
   /** the layer it lies on (one world, U3c: carried up onto the plane, or dropped there by a carrier that died); absent, the colony's home */
