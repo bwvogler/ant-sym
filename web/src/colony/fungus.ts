@@ -1404,9 +1404,9 @@ export class Fungus {
     e.feed(CORPSE.mass);
     if (!fresh) return;
     if (!h.has(x, y)) h.addCell(x, y);
-    // The two tips leave along the body's axis, snapped to opposite hex edges.
-    const axis = dirOf(heading ?? 0);
-    const headings = heading === undefined ? CORPSE.headings : [axis, (axis + 3) % 6];
+    // Order the opposite hex edges by axis so flipping the body cannot change which tip grows first.
+    const axis = dirOf(heading ?? 0) % 3;
+    const headings = heading === undefined ? CORPSE.headings : [axis, axis + 3];
     for (const d of headings) h.root(x, y, d);
     // With flow on, the cadaver's substance enters the hyphae at its own cell (ja-tgw9).
     if (this.params.flow) h.addLoad(k, CORPSE.mass);

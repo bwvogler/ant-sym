@@ -156,7 +156,7 @@ test("a host that died of the fungus, buried on the midden, is a new start that 
   assert.equal(plane.tips.length, tips + 2, "two tips set out from the corpse");
   assert.deepEqual(
     plane.tips.slice(tips).map((tip) => tip.heading),
-    [5, 2],
+    [2, 5],
   );
   assert.ok(plane.has(x, y));
   assert.equal(g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y)), CORPSE.spores);
