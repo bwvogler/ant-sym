@@ -104,9 +104,11 @@ const loaded = () => new Promise<void>((resolve) => setImmediate(resolve));
 test("distant map never loads or draws the voxel renderer; close blending uses the live camera without a second cell highlight", async () => {
   const h = harness();
   for (let i = 0; i < 20; i++) assert.deepEqual(h.draw(12), { alpha: 0, renderer: "sprites" });
-  assert.deepEqual(h.draw(120), { alpha: 0, renderer: "sprites" });
+  assert.deepEqual(h.draw(99), { alpha: 0, renderer: "sprites" });
   assert.equal(h.stats().creates, 0);
   assert.equal(h.stats().canvases, 0);
+  assert.deepEqual(h.draw(110), { alpha: 0, renderer: "sprites" });
+  assert.equal(h.stats().creates, 1);
   assert.equal(h.draw().renderer, "loading");
   await loaded();
   assert.equal(h.stats().ready, 1);

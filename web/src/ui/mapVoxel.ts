@@ -16,6 +16,7 @@ const smooth = (x: number) => {
 export const MAP_ORBIT_SHOW_ZOOM = 120;
 export const MAP_ORBIT_READY_ZOOM = 180;
 const SOFTWARE_START = 160;
+const PRELOAD_ZOOM = 100;
 
 export function mapVoxelAlpha(cssZoom: number, accelerated = true): number {
   return accelerated
@@ -55,7 +56,7 @@ export class MapVoxelPass {
     const cssZoom = camera.zoom / dpr;
     // The projected ground strip still owns its aerial ants and linking affordances in the 2D renderer.
     const strip = !!g.world && layer === CURTAIN && camera.y - view.h / camera.zoom / 2 <= centreY(STRIP) + SIDE;
-    if (this.disposed || this.failed || !allow || strip || cssZoom <= MAP_ORBIT_SHOW_ZOOM) return { alpha: 0, renderer: "sprites" };
+    if (this.disposed || this.failed || !allow || strip || cssZoom < PRELOAD_ZOOM) return { alpha: 0, renderer: "sprites" };
     if (!this.scene && !this.loading) {
       this.loading = true;
       this.surface = this.canvas();
@@ -76,6 +77,7 @@ export class MapVoxelPass {
           this.loading = false;
         });
     }
+    if (cssZoom <= MAP_ORBIT_SHOW_ZOOM) return { alpha: 0, renderer: "sprites" };
     if (!this.scene || !this.surface) return { alpha: 0, renderer: "loading" };
     const scene = this.scene,
       alpha = mapVoxelAlpha(cssZoom, scene.accelerated);

@@ -68,6 +68,22 @@ export interface CellInspectionState extends FungalStructures {
 }
 
 /** Read-only: no relocation, caps, random calls, or extra trail visibility. Cell membership uses the game hex geometry. */
+/** Group workers once for a multi-cell read. The index lives only for that synchronous read. */
+export function indexInspectedWorkers(g: LensWorld, layer: number) {
+  return g.colonies.map((c) => {
+    const cells = new Map<number, number[]>();
+    for (let i = 0; i < c.n; i++) {
+      if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
+      cellOf(c.x[i], c.y[i]);
+      const key = cellKey(CELL[0], CELL[1]);
+      const workers = cells.get(key);
+      if (workers) workers.push(i);
+      else cells.set(key, [i]);
+    }
+    return cells;
+  });
+}
+
 export function inspectCell(
   g: LensWorld,
   sensed: SensedMap,
@@ -76,6 +92,7 @@ export function inspectCell(
   y: number,
   trails: { food: boolean; home: boolean },
   clumps: readonly AphidClump[] = [],
+  workers?: ReturnType<typeof indexInspectedWorkers>,
 ): CellInspectionState {
   cellOf(x, y);
   const gx = CELL[0],
@@ -103,10 +120,14 @@ export function inspectCell(
   };
   for (let k = 0; k < g.colonies.length; k++) {
     const c = g.colonies[k];
-    for (let i = 0; i < c.n; i++) {
-      if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
-      cellOf(c.x[i], c.y[i]);
-      if (CELL[0] !== gx || CELL[1] !== gy) continue;
+    const local = workers?.[k].get(cellKey(gx, gy));
+    for (let slot = 0; slot < (workers ? (local?.length ?? 0) : c.n); slot++) {
+      const i = local ? local[slot] : slot;
+      if (!workers) {
+        if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
+        cellOf(c.x[i], c.y[i]);
+        if (CELL[0] !== gx || CELL[1] !== gy) continue;
+      }
       out.ants.push({
         k,
         i,

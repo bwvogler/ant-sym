@@ -15,7 +15,7 @@ import {
   rockAt,
   type AphidClump,
 } from "../colony/index.ts";
-import { inspectCell, type CellInspectionState } from "./cellInspection.ts";
+import { indexInspectedWorkers, inspectCell, type CellInspectionState } from "./cellInspection.ts";
 import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { voxelRegionBounds } from "./voxelViewport.ts";
@@ -70,7 +70,8 @@ export function inspectViewport(
   clumps: readonly AphidClump[] = [],
 ): InspectionPatch {
   if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) throw Error("Invalid voxel viewport");
-  const selected = inspectCell(g, sensed, layer, x, y, trails, clumps),
+  const workers = indexInspectedWorkers(g, layer),
+    selected = inspectCell(g, sensed, layer, x, y, trails, clumps, workers),
     [gx, gy] = selected.cell,
     map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map,
     coords: [number, number][] = [[gx, gy]],
@@ -88,7 +89,7 @@ export function inspectViewport(
       xx++
     )
       if (xx !== gx || yy !== gy) coords.push([xx, yy]);
-  const patch = readPatch(g, sensed, layer, selected, coords, trails, clumps),
+  const patch = readPatch(g, sensed, layer, selected, coords, trails, clumps, workers),
     cx = centreX(gx, gy),
     cy = centreY(gy);
   patch.bounds = {
@@ -108,6 +109,7 @@ function readPatch(
   coords: [number, number][],
   trails: { food: boolean; home: boolean },
   clumps: readonly AphidClump[],
+  workers?: ReturnType<typeof indexInspectedWorkers>,
 ): InspectionPatch {
   const [gx, gy] = selected.cell;
   const map = g.world ? (layer === CURTAIN ? g.world.curtain : g.world.plane) : g.colonies[0]!.map;
@@ -116,7 +118,7 @@ function readPatch(
     cy = centreY(gy);
   const cells = coords.map(([xx, yy], i): InspectionPatchCell => {
     const valid = inBounds(map, xx, yy),
-      state = i === 0 ? selected : inspectCell(g, sensed, layer, centreX(xx, yy), centreY(yy), trails, clumps);
+      state = i === 0 ? selected : inspectCell(g, sensed, layer, centreX(xx, yy), centreY(yy), trails, clumps, workers);
     const out: InspectionPatchCell = {
       state,
       x: centreX(xx, yy) - cx,
