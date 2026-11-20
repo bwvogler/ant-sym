@@ -102,7 +102,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.spoilT[i] = colony.spoilT[i] + dt;
     const corpse = colony.corpse[i] === 1;
     const far = fromHomePlane(colony, i) >= colony.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-    if (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(colony, i);
+    if (
+      (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) &&
+      resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))
+    )
+      dropPlane(colony, i);
   } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL && colony.line !== null) {
     // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
     crossUp(colony, i, colony.entranceCol, colony.entranceRow);
@@ -152,7 +156,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       colony.stored++;
       colony.larder++;
       h += Math.PI;
-    } else if (pellet && !ent && colony.line === null) {
+    } else if (pellet && !ent && colony.line === null && resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))) {
       // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
       // spoil is carried out by vector, dropPlane; a pellet going home to backfill goes on down its hole.)
       colony.pellet[i] = 0;

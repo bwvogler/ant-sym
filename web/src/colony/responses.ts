@@ -131,7 +131,7 @@ export interface Responses {
    * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
    */
   carry(t: Touch, draw?: AntDraw): Carry;
-  /** Carrying food or brood, at a place it can put the load down: put it down? */
+  /** Carrying a load, at a place it can put it down: put it down? */
   drop(t: Touch, draw?: AntDraw): boolean;
   /** Which trail to lay this step. */
   trail(t: Touch, draw?: AntDraw): TrailKind;

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, MIDDEN_MIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
+import { responses } from "../../responses.ts";
 import { fromHomePlane } from "../../homing.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
@@ -163,6 +164,20 @@ test("one world: spoil carried up the shaft goes out onto the plane with its car
   assert.equal(c.pellet[i], 1, "still carrying it");
   assert.equal(c.soilOut, out, "nothing put down at the hole");
   assert.equal(c.crossedUp, 1);
+  let offered = false;
+  c.responses = responses({
+    drop(t) {
+      if (t.carrying !== "soil") return true;
+      offered = true;
+      return false;
+    },
+  });
+  for (let k = 0; k < Math.round(20 / DT) && !offered; k++) g.tick(DT);
+  assert.equal(offered, true);
+  assert.equal(c.pellet[i], 1);
+  assert.equal(c.soilOut, out);
+  assert.equal(g.world!.plane.moundCells, 0);
+  c.responses = responses({ drop: () => true });
   for (let k = 0; k < Math.round(20 / DT) && c.pellet[i]; k++) g.tick(DT);
   assert.equal(c.pellet[i], 0, "put down out on the plane");
   assert.equal(c.soilOut, out + 1);

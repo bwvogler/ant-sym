@@ -205,7 +205,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       col.enteredCell(i);
     const lx = CELL[0];
     const ly = CELL[1];
-    if (look && backfill(col, i, lx, ly)) {
+    if (look && backfill(col, i, lx, ly, toEnemy !== null)) {
       // Dropped its pellet into unused space beside it: the trip is done; turned round, it is asked afresh next tick.
       h += Math.PI;
       col.gx[i] = NO_CELL;
