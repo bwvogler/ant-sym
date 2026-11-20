@@ -118,11 +118,13 @@ export class MapVoxelPass {
         }
         ctx.drawImage(this.surface, 0, 0, view.w, view.h);
         if (angled && Math.abs(orbit.tilt) > 0.5) {
-          const fog = ctx.createLinearGradient(0, 0, 0, view.h * 0.56);
+          const horizon = orbit.tilt < 0 ? view.h : 0;
+          const inner = horizon === 0 ? view.h * 0.56 : view.h * 0.44;
+          const fog = ctx.createLinearGradient(0, horizon, 0, inner);
           fog.addColorStop(0, `rgba(183,181,170,${Math.min(1, (Math.abs(orbit.tilt) - 0.5) * 2)})`);
           fog.addColorStop(1, "rgba(183,181,170,0)");
           ctx.fillStyle = fog;
-          ctx.fillRect(0, 0, view.w, view.h * 0.56);
+          ctx.fillRect(0, Math.min(horizon, inner), view.w, Math.abs(horizon - inner));
         }
       } finally {
         ctx.restore();

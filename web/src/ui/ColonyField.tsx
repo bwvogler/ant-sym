@@ -2149,7 +2149,7 @@ export default function ColonyField({
     s.fitted = cam.zoom <= fz * 1.0001;
   };
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.max(0, dragOrbit(start, 0, dy).tilt);
+    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
@@ -2503,7 +2503,7 @@ export default function ColonyField({
         hidden
         type="button"
         aria-label="Tilt close map. Up and down arrow keys tilt. Home resets."
-        title="Drag vertically to tilt · Home or double-click resets"
+        title="Drag up to lift the near edge · Home or double-click resets"
         className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel px-2 py-1 text-xs text-fg-2 shadow-md active:cursor-grabbing"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -2523,7 +2523,7 @@ export default function ColonyField({
         }}
         onKeyDown={(e) => {
           if (e.key === "Home" || e.key === "Escape") orbit.current = mapOrbit();
-          else if (e.key === "ArrowUp" || e.key === "ArrowDown") tiltMap(orbit.current, e.key === "ArrowUp" ? 12 : -12);
+          else if (e.key === "ArrowUp" || e.key === "ArrowDown") tiltMap(orbit.current, e.key === "ArrowUp" ? -12 : 12);
           else return;
           e.preventDefault();
         }}
