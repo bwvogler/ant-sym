@@ -81,39 +81,35 @@ export function IconButton({
   );
 }
 
-// Inline icons (24-unit grid, stroked with the text colour): no icon dependency.
+// Monochrome utility glyphs share the 24-pixel illustration grid.
 const PATHS = {
-  play: "M7 5v14l11-7z",
-  pause: "M8 5v14M16 5v14",
-  close: "M6 6l12 12M18 6L6 18",
-  bell: "M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10.2 20.5a2 2 0 0 0 3.6 0",
-  external: "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5",
-  search: "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4-4",
-  lens: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01",
+  play: "M7 4h3v2h3v2h3v2h3v4h-3v2h-3v2h-3v2H7z",
+  pause: "M6 4h4v16H6zM14 4h4v16h-4z",
+  close: "M5 5h3v2h2v2h4V7h2V5h3v3h-2v2h-2v4h2v2h2v3h-3v-2h-2v-2h-4v2H8v2H5v-3h2v-2h2v-4H7V8H5z",
+  bell: "M10 3h4v2h3v2h2v8h2v3H3v-3h2V7h2V5h3zM10 19h4v2h-4z",
+  external: "M13 3h8v8h-3V8l-7 7-2-2 7-7h-3zM3 7h7v3H6v8h8v-4h3v7H3z",
+  search: "M7 3h8v2h2v2h2v8h-2v2h2v2h2v2h-3v-2h-2v-2H7v-2H5v-2H3V7h2V5h2zM8 6v2H6v4h2v2h6v-2h2V8h-2V6z",
+  lens: "M8 3h8v2h3v3h2v8h-2v3h-3v2H8v-2H5v-3H3V8h2V5h3zM9 6v2H8v1H6v6h2v1h1v2h6v-2h1v-1h2V9h-2V8h-1V6zM11 8h2v2h-2zM11 12h2v5h-2z",
 } as const;
-/** Menu icons drawn as illustrations (web/public/ui-icons/menu/<name>.png) rather than stroked paths. */
+/** Menu icons drawn as illustrations (web/public/ui-icons/menu/<name>.png). */
 type ImageIconName = (typeof IMAGE_ICONS)[number];
 const isImageIcon = (name: string): name is ImageIconName => (IMAGE_ICONS as readonly string[]).includes(name);
 export type IconName = keyof typeof PATHS | ImageIconName;
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {
-  // The illustrations carry their own colour, so they ignore the text colour; they default to a larger size (size-8) than
-  // the stroked glyphs (size-5) because they are detailed pictures, not outlines.
   if (isImageIcon(name))
-    return <img src={iconUrl("menu", name)} alt="" aria-hidden draggable={false} className={`${className ?? "size-8"} object-contain`} />;
-  const filled = name === "play";
+    return (
+      <img
+        src={iconUrl("menu", name)}
+        alt=""
+        aria-hidden
+        draggable={false}
+        className={`${className ?? "size-8"} shrink-0 object-contain [image-rendering:pixelated]`}
+      />
+    );
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className ?? "size-5"}
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d={PATHS[name]} />
+    <svg viewBox="0 0 24 24" className={className ?? "size-5"} fill="currentColor" aria-hidden>
+      <path d={PATHS[name]} fillRule="evenodd" />
     </svg>
   );
 }

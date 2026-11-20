@@ -726,7 +726,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                   <button
                     key={v}
                     type="button"
-                    className={`${seg(controls.view === v)} max-sm:px-1.5 max-sm:text-[13px]`}
+                    className={`${seg(controls.view === v)} flex items-center justify-center gap-1 max-sm:px-1.5`}
                     onClick={() => setView(v)}
                     aria-pressed={controls.view === v}
                     title={
@@ -735,7 +735,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                         : "Underground: the curtain under the line, unrolled, with every nest (v)"
                     }
                   >
-                    {v}
+                    <Icon name={v} className="size-5" />
+                    <span className="max-sm:sr-only">{v}</span>
                   </button>
                 ))}
               </div>
