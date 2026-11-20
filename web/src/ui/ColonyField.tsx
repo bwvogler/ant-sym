@@ -360,7 +360,7 @@ export default function ColonyField({
   /** chamber names drawn on the side view's nests (the Labels button); a click on a chamber then inspects it */
   const orbitAxes = useRef<HTMLButtonElement>(null);
   const orbit = useRef(mapOrbit());
-  const orbitDrag = useRef<{ id: number; x: number; y: number; start: InspectionOrbit } | null>(null);
+  const orbitDrag = useRef<{ id: number; y: number; start: InspectionOrbit } | null>(null);
   const angled = useRef(false);
   const [labels, setLabels] = useState(false);
   const [goOpen, setGoOpen] = useState(false);
@@ -2148,12 +2148,13 @@ export default function ColonyField({
     s.zoomedIn = cam.zoom > fz * 1.05;
     s.fitted = cam.zoom <= fz * 1.0001;
   };
-  const turnMap = (start: InspectionOrbit, dx: number, dy: number) => {
-    const next = dragOrbit(start, dx, dy);
+  const tiltMap = (start: InspectionOrbit, dy: number) => {
+    const tilt = Math.max(0, dragOrbit(start, 0, dy).tilt);
+    if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
     if (current.zoom < readyZoom) setCamera({ ...current, zoom: readyZoom });
-    orbit.current = { yaw: next.yaw, tilt: Math.max(0, next.tilt) };
+    orbit.current = { yaw: 0, tilt };
   };
   /** View `v`'s map: the plane or the curtain. */
   const mapOf = (v: number): WorldMap => (v === PLANE ? world.plane : world.curtain);
@@ -2501,17 +2502,17 @@ export default function ColonyField({
         ref={orbitAxes}
         hidden
         type="button"
-        aria-label="Rotate close map. Arrow keys turn and tilt. Home resets."
-        title="Drag to turn and tilt · Home or double-click resets"
+        aria-label="Tilt close map. Up and down arrow keys tilt. Home resets."
+        title="Drag vertically to tilt · Home or double-click resets"
         className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel px-2 py-1 text-xs text-fg-2 shadow-md active:cursor-grabbing"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
-          orbitDrag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: orbit.current };
+          orbitDrag.current = { id: e.pointerId, y: e.clientY, start: orbit.current };
         }}
         onPointerMove={(e) => {
           const drag = orbitDrag.current;
           if (drag?.id === e.pointerId) {
-            turnMap(drag.start, e.clientX - drag.x, e.clientY - drag.y);
+            tiltMap(drag.start, e.clientY - drag.y);
           }
         }}
         onLostPointerCapture={() => {
@@ -2521,16 +2522,9 @@ export default function ColonyField({
           orbit.current = mapOrbit();
         }}
         onKeyDown={(e) => {
-          const moves: Record<string, [number, number]> = {
-            ArrowLeft: [-12, 0],
-            ArrowRight: [12, 0],
-            ArrowUp: [0, 12],
-            ArrowDown: [0, -12],
-          };
           if (e.key === "Home" || e.key === "Escape") orbit.current = mapOrbit();
-          else if (moves[e.key]) {
-            turnMap(orbit.current, ...moves[e.key]);
-          } else return;
+          else if (e.key === "ArrowUp" || e.key === "ArrowDown") tiltMap(orbit.current, e.key === "ArrowUp" ? 12 : -12);
+          else return;
           e.preventDefault();
         }}
       >
@@ -2548,7 +2542,7 @@ export default function ColonyField({
           <path stroke="#36a45c" d="m15 17-9 10m0-5v5h5" />
           <path stroke="#3888de" d="M15 17V4m-4 4 4-4 4 4" />
         </svg>
-        Rotate
+        Tilt
       </button>
       {/* Where to look (PRD §69): one compact menu, so the overlay never runs off a phone's width. */}
       <div ref={goRef} className={`pointer-events-none absolute flex flex-col items-start gap-1 ${toolsAt}`}>
