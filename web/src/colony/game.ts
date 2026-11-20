@@ -443,12 +443,13 @@ export class Game {
         if (d.load >= INFECTED && this.fungus.strains[d.strain]?.sporulates)
           this.fungus.paint([], centreX(d.x, d.y), centreY(d.y), 0.6, MIDDEN_SPORES, 0, d.strain, layer);
         // With hyphae, a host that died of the evolving fungus is a new start on the midden (ja-2bw.7).
-        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y);
+        if (d.load >= INFECTED && d.strain === this.fungus.evolution?.strain) this.fungus.colonise(layer, d.x, d.y, d.heading);
       };
       // A host that dies of the evolving fungus on the plane, outside, is a new start where it lies (owner,
       // 2026-11-12): no corpse is kept there, and none carried in, so the fungus grows out of it at once.
       c.onDie = (i, layer, x, y) => {
-        if (layer === PLANE && c.load[i]! >= INFECTED && c.strain[i] === this.fungus.evolution?.strain) this.fungus.colonise(PLANE, x, y);
+        if (layer === PLANE && c.load[i]! >= INFECTED && c.strain[i] === this.fungus.evolution?.strain)
+          this.fungus.colonise(PLANE, x, y, c.heading[i]);
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {

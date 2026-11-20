@@ -1390,7 +1390,7 @@ export class Fungus {
    * CORPSE.spores in all at CORPSE.rate a second, paid by the corpse. Another corpse on a cell already colonised adds its
    * spores. Nothing without hyphae and an evolving fungus, or on rock.
    */
-  colonise(layer: number, x: number, y: number): void {
+  colonise(layer: number, x: number, y: number, heading?: number): void {
     const e = this.#evolution;
     if (!e || !this.params.hyphae) return;
     const L = this.#layers[layer];
@@ -1404,7 +1404,10 @@ export class Fungus {
     e.feed(CORPSE.mass);
     if (!fresh) return;
     if (!h.has(x, y)) h.addCell(x, y);
-    for (const d of CORPSE.headings) h.root(x, y, d);
+    // The two tips leave along the body's axis, snapped to opposite hex edges.
+    const axis = dirOf(heading ?? 0);
+    const headings = heading === undefined ? CORPSE.headings : [axis, (axis + 3) % 6];
+    for (const d of headings) h.root(x, y, d);
     // With flow on, the cadaver's substance enters the hyphae at its own cell (ja-tgw9).
     if (this.params.flow) h.addLoad(k, CORPSE.mass);
   }
