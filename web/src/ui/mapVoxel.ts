@@ -18,6 +18,15 @@ export const MAP_ORBIT_READY_ZOOM = 180;
 const SOFTWARE_START = 160;
 const PRELOAD_ZOOM = 100;
 
+/** The projected ground strip uses a different projection and stays in 2D. */
+export function canTiltMap(layer: number, hasWorld: boolean, camera: Camera, view: Viewport, dpr: number, allow: boolean): boolean {
+  return allow && camera.zoom / dpr >= MAP_ORBIT_SHOW_ZOOM && supportsVoxelMap(layer, hasWorld, camera, view);
+}
+
+function supportsVoxelMap(layer: number, hasWorld: boolean, camera: Camera, view: Viewport): boolean {
+  return !hasWorld || layer !== CURTAIN || camera.y - view.h / camera.zoom / 2 > centreY(STRIP) + SIDE;
+}
+
 export function mapVoxelAlpha(cssZoom: number, accelerated = true): number {
   return accelerated
     ? smooth((cssZoom - MAP_ORBIT_SHOW_ZOOM) / 30)
@@ -54,9 +63,8 @@ export class MapVoxelPass {
     orbit?: InspectionOrbit,
   ) {
     const cssZoom = camera.zoom / dpr;
-    // The projected ground strip still owns its aerial ants and linking affordances in the 2D renderer.
-    const strip = !!g.world && layer === CURTAIN && camera.y - view.h / camera.zoom / 2 <= centreY(STRIP) + SIDE;
-    if (this.disposed || this.failed || !allow || strip || cssZoom < PRELOAD_ZOOM) return { alpha: 0, renderer: "sprites" };
+    if (this.disposed || this.failed || !allow || cssZoom < PRELOAD_ZOOM || !supportsVoxelMap(layer, !!g.world, camera, view))
+      return { alpha: 0, renderer: "sprites" };
     if (!this.scene && !this.loading) {
       this.loading = true;
       this.surface = this.canvas();
@@ -83,7 +91,7 @@ export class MapVoxelPass {
       alpha = mapVoxelAlpha(cssZoom, scene.accelerated);
     if (!alpha) return { alpha: 0, renderer: "sprites" };
     try {
-      const angled = layer !== CURTAIN && alpha === 1 && orbit && (orbit.yaw !== 0 || orbit.tilt !== 0);
+      const angled = alpha === 1 && orbit && (orbit.yaw !== 0 || orbit.tilt !== 0);
       const span = Math.hypot(view.w, view.h) / camera.zoom;
       const range = Math.min(16, span / Math.cos(orbit?.tilt ?? 0) + 2);
       const patch = inspectViewport(
@@ -115,11 +123,11 @@ export class MapVoxelPass {
         ctx.globalAlpha = alpha;
         ctx.imageSmoothingEnabled = false;
         if (angled) {
-          ctx.fillStyle = "#b7b5aa";
+          ctx.fillStyle = layer === CURTAIN ? "#3e2b20" : "#b7b5aa";
           ctx.fillRect(0, 0, view.w, view.h);
         }
         ctx.drawImage(this.surface, 0, 0, view.w, view.h);
-        if (angled && Math.abs(orbit.tilt) > 0.5) {
+        if (angled && layer !== CURTAIN && Math.abs(orbit.tilt) > 0.5) {
           const horizon = orbit.tilt < 0 ? view.h : 0;
           const inner = horizon === 0 ? view.h * 0.56 : view.h * 0.44;
           const fog = ctx.createLinearGradient(0, horizon, 0, inner);

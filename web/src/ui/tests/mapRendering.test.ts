@@ -2,7 +2,7 @@ import type { InspectionOrbit } from "../inspectionOrbit.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MapChunkPaintCache } from "../mapChunkPaintCache.ts";
-import { MapVoxelPass, mapVoxelAlpha, type MapVoxelScene } from "../mapVoxel.ts";
+import { MapVoxelPass, canTiltMap, mapVoxelAlpha, type MapVoxelScene } from "../mapVoxel.ts";
 import { buildGame } from "../useColony.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { PLANE, CURTAIN, STRIP, centreX, centreY } from "../../colony/index.ts";
@@ -151,6 +151,23 @@ test("the close surface can orbit after the voxel transition and the tilted terr
   const bounds = h.calls.at(-1)?.patch.bounds;
   assert.ok(bounds && bounds.right - bounds.left <= 24 && bounds.bottom - bounds.top <= 24);
   assert.equal(h.draw(150, PLANE, camera.y, true, { yaw: 0, tilt: 0 }).angled, undefined);
+  h.pass.dispose();
+});
+
+test("the underground camera tilts at close zoom while the projected strip stays flat", async () => {
+  const h = harness();
+  const underground = { ...camera, y: centreY(STRIP + 8), zoom: 180 };
+  const strip = { ...underground, y: centreY(STRIP) };
+  const orbit = { yaw: 0, tilt: 0.65 };
+  assert.equal(canTiltMap(CURTAIN, true, underground, view, 1, true), true);
+  assert.equal(canTiltMap(CURTAIN, true, strip, view, 1, true), false);
+  assert.equal(canTiltMap(CURTAIN, true, underground, view, 2, true), false);
+  h.draw(180, CURTAIN, underground.y);
+  await loaded();
+  assert.equal(h.draw(180, CURTAIN, underground.y, true, orbit).angled, true);
+  assert.equal(h.calls.at(-1)?.patch.mode, "below");
+  assert.deepEqual(h.sizes.at(-1)?.orbit, orbit);
+  assert.equal(h.draw(180, CURTAIN, strip.y, true, orbit).renderer, "sprites");
   h.pass.dispose();
 });
 

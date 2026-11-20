@@ -2,7 +2,7 @@ import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts"
 import { moundBalls, type DirtBall } from "./inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
-import { MAP_ORBIT_READY_ZOOM, MAP_ORBIT_SHOW_ZOOM, MapVoxelPass } from "./mapVoxel.ts";
+import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
 import { FungalMapSprites } from "./fungalStructures.ts";
@@ -1890,7 +1890,7 @@ export default function ColonyField({
         !smellAll,
         orbit.current,
       );
-      const canRotate = lv === PLANE && !smellAll && c.zoom / d >= MAP_ORBIT_SHOW_ZOOM;
+      const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
       if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
       if (!canRotate) orbit.current = mapOrbit();
       angled.current = "angled" in voxel && voxel.angled === true;
