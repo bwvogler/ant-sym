@@ -101,7 +101,6 @@ export class InspectionScene {
   private models = new Map<string, { body: T.BufferGeometry; band: T.BufferGeometry }>();
   private pools = new Map<string, Pool>();
   private material = new T.MeshLambertMaterial({ vertexColors: true });
-  private bandMaterial = new T.MeshBasicMaterial({ vertexColors: true });
   private unlit = new T.MeshBasicMaterial({ vertexColors: true });
   private terrain = new T.Group();
   private terrainWasViewport = false;
@@ -162,21 +161,27 @@ export class InspectionScene {
           const positions = mesh.getAttribute("position");
           const colours = mesh.getAttribute("color");
           const normals = mesh.getAttribute("normal");
-          const seam = new T.Color("#342821");
-          const crown = new T.Color("#9A7857");
-          const limb = new T.Color("#54443A");
+          // Match the baked tones in the medium walk atlas. Keep them in model
+          // space so tilting the map and changing renderers preserve the palette.
+          const shadow = new T.Color("#231F1C");
+          const edge = new T.Color("#362F29");
+          const midtone = new T.Color("#4C4137");
+          const topFace = new T.Color("#65513F");
+          const highlight = new T.Color("#896B4D");
           const tone = new T.Color();
           for (let i = 0; i < positions.count; i += 3) {
             const z = (positions.getZ(i) + positions.getZ(i + 1) + positions.getZ(i + 2)) / (3 * height);
             const top = Math.max(0, normals.getZ(i));
-            const light = Math.min(1, 0.62 * z + 0.24 * top);
+            // Bias the upper facets toward one flank, as in the aerial sprite.
+            const y = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / (3 * height);
+            const light = T.MathUtils.clamp(0.6 * z + 0.27 * top + 0.28 * y, 0, 1);
             if (stripe) {
-              // Neutral vertex shading keeps the colony's instance tint visible.
-              tone.setScalar(0.5 + 0.64 * light);
+              // Like the sprite mask, modulate the colony tint with a neutral ramp.
+              tone.setScalar(0.65 + 0.5 * light).convertSRGBToLinear();
             } else if (colours.getZ(i) > 0.027) {
-              tone.copy(seam).lerp(crown, light);
+              tone.copy(light > 0.84 ? highlight : light > 0.66 ? topFace : light > 0.4 ? midtone : edge);
             } else {
-              tone.copy(seam).lerp(limb, 0.28 + 0.55 * top);
+              tone.copy(top > 0.5 ? edge : shadow);
             }
             for (let j = i; j < i + 3; j++) colours.setXYZ(j, tone.r, tone.g, tone.b);
           }
@@ -251,8 +256,9 @@ export class InspectionScene {
     if (!pool || pool.used >= pool.capacity) {
       const capacity = pool ? pool.capacity * 2 : 32,
         used = pool?.used ?? 0,
-        body = new T.InstancedMesh(model.body, this.material, capacity),
-        band = model.band.getAttribute("position").count ? new T.InstancedMesh(model.band, this.bandMaterial, capacity) : null;
+        hasBand = model.band.getAttribute("position").count > 0,
+        body = new T.InstancedMesh(model.body, hasBand ? this.unlit : this.material, capacity),
+        band = hasBand ? new T.InstancedMesh(model.band, this.unlit, capacity) : null;
       body.frustumCulled = false;
       if (band) band.frustumCulled = false;
       if (pool) {
@@ -652,7 +658,6 @@ export class InspectionScene {
     }
     this.material.dispose();
     this.unlit.dispose();
-    this.bandMaterial.dispose();
     this.renderer.dispose();
   }
 }
