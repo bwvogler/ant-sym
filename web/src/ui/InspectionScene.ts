@@ -573,7 +573,7 @@ export class InspectionScene {
     for (const c of patch.cells) {
       if (!c.valid || c.surfaceStrip || c.state.place.ground !== "open") continue;
       const { x, y, state: s } = c;
-      for (const d of s.cadavers ?? []) this.actor(`corpse-${d.stage}`, x, y);
+      for (const d of s.cadavers ?? []) this.actor(`corpse-${d.stage}`, x, y, 0, d.heading ?? 0);
       if (!s.cadavers && s.fallen > 0) this.actor("corpse", x, y);
       for (let i = 0; i < 3; i++) if (s.brood[i] > 0) this.actor("brood-" + i, x + [-0.22, 0, 0.23][i], y + [-0.18, 0.14, -0.12][i]);
       const food = foodDensity(s.place.food);

@@ -11,6 +11,7 @@ export function decayStage(now: number, died: number): DecayStage {
 export interface InspectedCadaver {
   stage: DecayStage;
   fungal: boolean;
+  heading?: number;
 }
 /** Exact corpse records stay separate from the visual history of surface deaths and midden deposits. */
 export function visibleCadavers(

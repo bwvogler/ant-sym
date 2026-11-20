@@ -169,7 +169,12 @@ export function inspectCell(
       } else if (home && b.x === gx && b.y === gy) out.brood[b.stage]++;
     }
     for (const dead of visibleCadavers(c, layer))
-      if (dead.x === gx && dead.y === gy) out.cadavers!.push({ stage: decayStage(c.time, dead.died), fungal: false });
+      if (dead.x === gx && dead.y === gy)
+        out.cadavers!.push({
+          stage: decayStage(c.time, dead.died),
+          fungal: false,
+          ...(dead.heading === undefined ? {} : { heading: dead.heading }),
+        });
     for (const dead of c.remains)
       if (c.time - dead.died <= CORPSE_ROT && (layer < 0 || (dead.layer ?? c.home) === layer) && dead.x === gx && dead.y === gy)
         out.recentRemains!++;
