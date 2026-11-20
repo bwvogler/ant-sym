@@ -48,7 +48,6 @@ import {
   type Transect,
   AIR,
   OPEN,
-  ROCK,
   rockAt,
   SOIL,
   type WorldMap,
