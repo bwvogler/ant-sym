@@ -1,6 +1,6 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
-// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance]
+// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack]
 import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
@@ -77,19 +77,73 @@ function run(seed, directed, contextual, recover) {
 
 const args = process.argv.slice(2);
 if (args[0] === "--guard") {
-  const [, id, seedArg, distanceArg] = args;
+  const [, id, seedArg, distanceArg, defense] = args;
   const seed = Number(seedArg);
   if (!id || !Number.isSafeInteger(seed) || seed <= 0) throw Error("--guard requires an assay id and positive integer seed");
   const attackDistance = distanceArg === undefined ? directedFight.attackDistance : Number(distanceArg);
   if (!(attackDistance > 0 && attackDistance <= 1)) throw Error("attackDistance must be in (0, 1]");
   const assay = oneAssay(id);
+  if (defense !== undefined && !["counterattack", "alarm-counterattack", "attack-counterattack"].includes(defense))
+    throw Error("Unknown defense rule");
   const existing = runAssay(assay, seed).metrics;
-  const candidate = runAssay(assay, seed, {
+  const baseContact = assay.spec(seed).sides?.responses?.contact ?? localResponses.contact;
+  let defender;
+  let attackers = [];
+  const observed =
+    defense === "attack-counterattack"
+      ? {
+          ...assay,
+          spec(seed) {
+            const spec = assay.spec(seed);
+            return {
+              ...spec,
+              probes: [
+                ...(spec.probes ?? []),
+                {
+                  tick(game) {
+                    defender = game.player;
+                    attackers = [];
+                    const rival = game.rival;
+                    if (!rival) return;
+                    for (let i = 0; i < rival.n; i++) {
+                      if (rival.alive[i] && rival.attackLayer[i] === rival.layer[i])
+                        attackers.push({ x: rival.x[i], y: rival.y[i], layer: rival.layer[i] });
+                    }
+                  },
+                  summary: () => ({}),
+                },
+              ],
+            };
+          },
+        }
+      : assay;
+  function sawAttack() {
+    if (!defender) return false;
+    const i = defender.ti;
+    return attackers.some(({ x, y, layer }) => layer === defender.layer[i] && (x - defender.x[i]) ** 2 + (y - defender.y[i]) ** 2 <= 1);
+  }
+  const candidate = runAssay(observed, seed, {
     game: { fight: { ...directedFight, attackDistance } },
     colony: { deliveryLane: 1, dropRefusalLimit: 2 },
-    responses: { drop: (t, draw) => !refuseTunnelDrop(t) && localResponses.drop(t, draw) },
+    responses: {
+      drop: (t, draw) => !refuseTunnelDrop(t) && localResponses.drop(t, draw),
+      ...(defense
+        ? {
+            contact(t, draw) {
+              if (
+                t.enemy &&
+                t.carrying === "none" &&
+                t.odds === "outnumbering" &&
+                (defense === "counterattack" || (defense === "alarm-counterattack" ? t.alarm !== "none" : sawAttack()))
+              )
+                return "fight";
+              return baseContact(t, draw);
+            },
+          }
+        : {}),
+    },
   }).metrics;
-  console.log(JSON.stringify({ id, seed, attackDistance, existing, candidate }));
+  console.log(JSON.stringify({ id, seed, attackDistance, defense, existing, candidate }));
   process.exit(0);
 }
 const isolate = args.includes("--isolate");

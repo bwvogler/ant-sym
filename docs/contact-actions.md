@@ -342,3 +342,27 @@ On the same four seeds, we also ran legacy combat and combined the 0.65 radius w
 Adding the alarm gate to the short reach raised defender food on all four seeds and produced two A13 passes (11 and 20), matching the legacy pass count. Defender losses rose on seeds 11 and 14, fell on 17 and 20, and exceeded legacy on all four. The combined rule reproduced short reach's neutral results seed for seed. The guard count alone would miss the remaining survival regression: the combined condition lost 341 defenders against legacy's 156. Retain the short reach as a candidate, with the alarm-gated policy useful as a comparison arm.
 
 Reproduce the additional arms with `node scripts/experiment.mjs defendHome contact --seeds 11,14,17,20 --set game.fight.intent=false --jobs 4` and `node scripts/experiment.mjs defendAlarmEntrance contactAlarmEntrance --seeds 11,14,17,20 --set game.fight.intent=true --set game.fight.attackDistance=0.65 --jobs 4`.
+
+### Counterattack at favorable local odds
+
+The A13 raid and A9 neutral guards use directed reach 0.65 and the contextual unloading candidate. An empty-jawed worker that perceives it outnumbers strangers can choose to counterattack. The variants differ in the cue required.
+
+| Guard | Seed | Directed baseline food / losses | Outnumbering alone | Outnumbering with alarm |
+| --- | ---: | ---: | ---: | ---: |
+| A13 defending colony | 11 | 147 / 93 | 188 / 43 | 145 / 96 |
+| A13 defending colony | 17 | 144 / 111 | 197 / 38 | 160 / 88 |
+| A9 both colonies | 11 | 2152 / 1 | 622 / 210 | 2152 / 1 |
+| A9 both colonies | 17 | 1678 / 0 | 294 / 209 | 1678 / 0 |
+
+Outnumbering alone passed both raid guards and failed both neutral guards. The alarm requirement preserved neutral outcomes and left raid passes at one of two. A third arm uses a previous-tick snapshot of a rival declaring attack within one world unit on the same layer. The prototype checks distance and layer and has no line-of-sight test.
+
+Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 11 0.65 counterattack`. Other variants are `alarm-counterattack` and `attack-counterattack`. Use the `contact` guard for neutral encounters.
+
+| Raid seed | Directed food / losses | Nearby attack cue food / losses | Raiders killed with cue |
+| --- | ---: | ---: | ---: |
+| 11 | 147 / 93 | 174 / 60 | 44 |
+| 14 | 177 / 86 | 221 / 59 | 32 |
+| 17 | 144 / 111 | 271 / 82 | 39 |
+| 20 | 458 / 89 | 482 / 70 | 36 |
+
+The attack cue improved defender food and survival on all four maps against the earlier matched directed baseline. Losses fell from 379 to 271. All four neutral runs reproduced the directed baseline, including losses and food. Raid passes remained one of four, compared with two of four under existing combat, which lost 156 defenders. The cue is an assay-only result. A gameplay implementation needs an observable signal, with occlusion and timing checks, and further raid validation.
