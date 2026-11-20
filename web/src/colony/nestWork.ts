@@ -323,18 +323,15 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     // In its chamber, or beside it (a chamber a cell or two wide can be passed by), it puts the brood down there;
     // holding it too long (lost round a ring of tunnels: review of slice 4), wherever it is (a held larva goes unfed).
     const to = col.broodTo[i];
-    if (ch.at(cx, cy) === to) dropBrood(col, i);
-    else {
-      for (let d = 0; d < 6; d++) {
-        const ax = stepX(cx, cy, d);
-        const ay = stepY(cy, d);
-        if (ch.at(ax, ay) === to) {
-          dropBrood(col, i, ax, ay);
-          return;
-        }
-      }
-      if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX) dropBrood(col, i);
+    for (let d = -1; d < 6; d++) {
+      const ax = d < 0 ? cx : stepX(cx, cy, d);
+      const ay = d < 0 ? cy : stepY(cy, d);
+      if (ch.at(ax, ay) !== to) continue;
+      if (col.responses.drop(touch(col, i, enemy, col.mode[i], "brood"), col.antDraw(i))) dropBrood(col, i, ax, ay);
+      return;
     }
+    if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX && col.responses.drop(touch(col, i, enemy, col.mode[i], "brood"), col.antDraw(i)))
+      dropBrood(col, i);
     return;
   }
   // Zoned by age (slice 6): the young nurse; the middle-aged also take in stray brood; the old forage.

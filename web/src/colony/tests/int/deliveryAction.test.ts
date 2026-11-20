@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { Game, gameRng } from "../../game.ts";
 import { CURTAIN, PLANE } from "../../colony.ts";
 import { chooseDelivery, deliveryExplanation, requestedDelivery, localDelivery } from "../../deliveryAction.ts";
-import { port, becomePorter } from "../../nestWork.ts";
+import { port, becomePorter, nurse } from "../../nestWork.ts";
 import { putDown } from "../../dig.ts";
 import { responses } from "../../responses.ts";
 import { destMark } from "../../homing.ts";
@@ -14,6 +14,7 @@ import { NO_CELL } from "../../grid.ts";
 import { decide } from "../../decide.ts";
 import { stanceStep } from "../../stance.ts";
 import { AntStep } from "../../step.ts";
+import { HOLD_MAX } from "../../tuning.ts";
 import { EXPLORE, RETURN } from "../../vocab.ts";
 import { smallOne, run } from "../builders.ts";
 import { put } from "../hexmaps.ts";
@@ -131,6 +132,51 @@ test("a chamber food pickup can be refused without changing stock or committing 
   assert.equal(store.food, 0);
   assert.equal(c.larder + c.inJaws, food);
 });
+
+for (const [label, x, destinationX] of [
+  ["inside", 24, 24],
+  ["adjacent", 23, 24],
+  ["timed out", 20, 20],
+] as const) {
+  test(`nurse asks before placing brood ${label}`, () => {
+    const { c, brood, y } = setup();
+    const egg = c.brood.add(x, y, -1);
+    egg.held = 0;
+    c.carrying[0] = 0;
+    c.broodHeld[0] = 1;
+    c.broodTo[0] = brood.id;
+    put(c, 0, x, y);
+    let allow = false;
+    let calls = 0;
+    c.responses = responses({
+      drop(t) {
+        assert.equal(t.carrying, "brood");
+        assert.equal(t.enemy, true);
+        calls++;
+        return allow;
+      },
+    });
+    if (label === "timed out") {
+      nurse(c, 0, 0.1, true);
+      assert.equal(calls, 0);
+      c.holdT[0] = HOLD_MAX;
+    }
+    nurse(c, 0, 0.1, true);
+    assert.equal(calls, 1);
+    assert.equal(egg.held, 0);
+    assert.equal(c.broodHeld[0], 1);
+    assert.equal(c.broodTo[0], brood.id);
+    assert.equal(brood.brood, 0);
+    allow = true;
+    nurse(c, 0, 0.1, true);
+    assert.equal(calls, 2);
+    assert.equal(egg.held, -1);
+    assert.equal(egg.x, destinationX);
+    assert.equal(egg.chamber, label === "timed out" ? -1 : brood.id);
+    assert.equal(brood.brood, label === "timed out" ? 0 : 1);
+    assert.equal(c.broodHeld[0], 0);
+  });
+}
 
 test("a porter's redirected food is counted once and release ends its destination", () => {
   const { c, store } = setup();

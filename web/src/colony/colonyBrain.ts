@@ -322,7 +322,7 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
       return {
         [`${id}_drop`]: {
           type: "noul",
-          instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?`,
+          instructions: `Going by the doctrine, ${ant} can put down the food or brood named by carrying: should it put the load down here?`,
         },
       };
     case "carry":
