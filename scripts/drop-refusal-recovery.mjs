@@ -1,8 +1,9 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
-// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack]
-import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
+// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack]
+import { CELL, CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
+import { blocked } from "../web/src/colony/world.ts";
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
 
 const dt = 1 / 30;
@@ -83,14 +84,20 @@ if (args[0] === "--guard") {
   const attackDistance = distanceArg === undefined ? directedFight.attackDistance : Number(distanceArg);
   if (!(attackDistance > 0 && attackDistance <= 1)) throw Error("attackDistance must be in (0, 1]");
   const assay = oneAssay(id);
-  if (defense !== undefined && !["counterattack", "alarm-counterattack", "attack-counterattack"].includes(defense))
+  if (
+    defense !== undefined &&
+    !["counterattack", "alarm-counterattack", "attack-counterattack", "visible-counterattack", "visible-even-counterattack"].includes(
+      defense,
+    )
+  )
     throw Error("Unknown defense rule");
   const existing = runAssay(assay, seed).metrics;
   const baseContact = assay.spec(seed).sides?.responses?.contact ?? localResponses.contact;
   let defender;
   let attackers = [];
+  const wallAware = defense === "visible-counterattack" || defense === "visible-even-counterattack";
   const observed =
-    defense === "attack-counterattack"
+    defense === "attack-counterattack" || wallAware
       ? {
           ...assay,
           spec(seed) {
@@ -120,7 +127,24 @@ if (args[0] === "--guard") {
   function sawAttack() {
     if (!defender) return false;
     const i = defender.ti;
-    return attackers.some(({ x, y, layer }) => layer === defender.layer[i] && (x - defender.x[i]) ** 2 + (y - defender.y[i]) ** 2 <= 1);
+    const fromX = defender.x[i],
+      fromY = defender.y[i];
+    return attackers.some(({ x, y, layer }) => {
+      const dx = x - fromX,
+        dy = y - fromY;
+      if (layer !== defender.layer[i] || dx * dx + dy * dy > 1) return false;
+      if (!wallAware) return true;
+      const [cellX, cellY] = CELL;
+      try {
+        for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+          if (blocked(defender.map, fromX + fraction * dx, fromY + fraction * dy)) return false;
+        }
+        return true;
+      } finally {
+        CELL[0] = cellX;
+        CELL[1] = cellY;
+      }
+    });
   }
   const candidate = runAssay(observed, seed, {
     game: { fight: { ...directedFight, attackDistance } },
@@ -133,7 +157,7 @@ if (args[0] === "--guard") {
               if (
                 t.enemy &&
                 t.carrying === "none" &&
-                t.odds === "outnumbering" &&
+                (t.odds === "outnumbering" || (defense === "visible-even-counterattack" && t.odds === "even")) &&
                 (defense === "counterattack" || (defense === "alarm-counterattack" ? t.alarm !== "none" : sawAttack()))
               )
                 return "fight";

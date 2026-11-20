@@ -366,3 +366,29 @@ Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 11 0.6
 | 20 | 458 / 89 | 482 / 70 | 36 |
 
 The attack cue improved defender food and survival on all four maps against the earlier matched directed baseline. Losses fell from 379 to 271. All four neutral runs reproduced the directed baseline, including losses and food. Raid passes remained one of four, compared with two of four under existing combat, which lost 156 defenders. The cue is an assay-only result. A gameplay implementation needs an observable signal, with occlusion and timing checks, and further raid validation.
+
+### Wall-aware cue at even odds
+
+The wall-aware guard follows the nearby hostile-attack prototype and samples both endpoints and three intermediate points for solid terrain. It preserves the simulation's shared cell coordinates. The cue still uses previous-tick attack markers, and the wall check samples a short segment. These are assay rules.
+
+| Guard | Seed | Wall-aware, outnumbering | Wall-aware, outnumbering or even |
+| --- | ---: | ---: | ---: |
+| Raid, defender food / losses / raiders killed | 11 | 174 / 60 / 44 | 161 / 36 / 40 |
+| Raid, defender food / losses / raiders killed | 17 | 271 / 82 / 39 | 253 / 48 / 45 |
+| Neutral, combined food / losses | 11 | 2152 / 1 | 1859 / 0 |
+| Neutral, combined food / losses | 17 | 1678 / 0 | 1678 / 0 |
+
+The wall-aware outnumbering rule reproduced the earlier nearby-attack results on both seeds. Allowing even odds passed both raids, compared with one for the outnumbering rule. It reduced defender losses by 58 across the two raids, while storing 31 less food. Both neutral guards passed, with 14% less food on seed 11 and identical outcomes on seed 17.
+
+Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 11 0.65 visible-even-counterattack`. Use `visible-counterattack` for outnumbering only and `contact` for the neutral guard.
+
+The additional seeds reproduce the advantage in defender survival and add one raid pass.
+
+| Guard | Seed | Wall-aware, outnumbering | Wall-aware, outnumbering or even |
+| --- | ---: | ---: | ---: |
+| Raid, defender food / losses / raiders killed | 14 | 221 / 59 / 32 | 284 / 40 / 38 |
+| Raid, defender food / losses / raiders killed | 20 | 482 / 70 / 36 | 620 / 40 / 44 |
+| Neutral, combined food / losses | 14 | 2737 / 0 | 2737 / 0 |
+| Neutral, combined food / losses | 20 | 2214 / 0 | 2214 / 0 |
+
+Across all four raid maps, allowing even odds passes 3/4, versus 1/4 for outnumbering and 2/4 for existing combat. Defender losses are 164 versus 271 and 156 respectively. Combined neutral passes are 4/4 in both wall-aware arms. The even-odds arm is the candidate to carry into a production sensor and fresh seeds.
