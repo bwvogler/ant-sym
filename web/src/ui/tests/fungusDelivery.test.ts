@@ -30,7 +30,11 @@ const dampAim = "Dampen the host's sense of chamber floor marks.";
 
 function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
   const words = hook === "carry" ? doctrine : "Lay a food trail in recognized chambers and leave no trail in tunnels.";
-  const game = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 1, rival: false }, mulberry32(3));
+  const game = new Game(
+    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
+    { antCount: hook === "trail" ? 2 : 1, rival: false },
+    mulberry32(3),
+  );
   const colony = game.player;
   const fungus = game.fungus;
   const queen = colony.queen!;
@@ -38,6 +42,12 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
   colony.mode[0] = MODES.indexOf("return");
   colony.carrying[0] = 1;
   colony.params.deliveryLane = 1;
+  if (hook === "trail") {
+    colony.putAnt(1, PLANE, 20, 20);
+    // Keep the cue above the decision threshold on the receiver’s first tick.
+    colony.params.deposit = 100;
+    colony.params.sensorDistance = 0.25;
+  }
   fungus.menu = ["marks"];
   const strain = STRAINS.findIndex((s) => s.id === "garden");
   fungus.paint([colony], queen.x, queen.y, 1, 0, 1, strain, CURTAIN);
@@ -76,13 +86,26 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
     const trail = colony.ph.fields.food;
     const trailBefore = trail.get(x, y);
     game.tick(DT);
+    const trailAdded = trail.get(x, y) - trailBefore;
+    const choice = cachedActionTrace(colony, 0).find((action) => action.hook === hook)?.choice;
+    let receiver;
+    if (hook === "trail") {
+      colony.putAnt(1, CURTAIN, queen.x - colony.params.sensorDistance, queen.y);
+      colony.mode[1] = MODES.indexOf("explore");
+      colony.heading[1] = 0;
+      colony.reconsider();
+      assert.equal(colony.load[1], 0);
+      game.tick(DT);
+      receiver = { question: colony.lastQuestion(1), mode: MODES[colony.mode[1]], load: colony.load[1] };
+    }
     return {
+      receiver,
       input: colony.fungal[0],
       hostLoad: colony.load[0],
       perceived: sensed.deliveryPlace,
       place: sensed.place,
-      trailAdded: trail.get(x, y) - trailBefore,
-      choice: cachedActionTrace(colony, 0).find((action) => action.hook === hook)?.choice,
+      trailAdded,
+      choice,
       stored: colony.stored,
       loose: game.world!.curtain.foodLeft - before,
     };
@@ -113,4 +136,10 @@ test("fungus aim changes the cached trail choice and the scent laid with one fix
   assert.equal(damp.choice, "none");
   assert.ok(clear.trailAdded > 0);
   assert.equal(damp.trailAdded, 0);
+  assert.equal(clear.receiver?.question?.foodTrail, "strong");
+  assert.equal(damp.receiver?.question?.foodTrail, "none");
+  assert.equal(clear.receiver?.mode, "follow");
+  assert.equal(damp.receiver?.mode, "explore");
+  assert.equal(clear.receiver?.load, 0);
+  assert.equal(damp.receiver?.load, 0);
 });
