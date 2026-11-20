@@ -8,6 +8,7 @@ import { Game } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { encode } from "./save.ts";
+import { localResponses } from "./responses.ts";
 import { dropFood, heapPlane, mulberry32, rockAt, OPEN, type Nest, type WorldMap } from "./world.ts";
 
 import { type Assay, type Event, mean, gateProbe, heldProbe, sideName, type Probe, type RunSpec } from "./harness.ts";
@@ -51,6 +52,60 @@ export const game1: Assay = {
     return { ...m, maxHeld: worst, maxHeldPlane: both("maxHeldPlane"), maxPorting: both("maxPorting"), pass: worst <= 2 ? 1 : 0 };
   },
 };
+
+/** Compare an explicit chamber destination without changing surface homing. */
+function gameRoyalRouting(id: string, title: string, after: number): Assay {
+  return {
+    ...game1,
+    id,
+    title,
+    spec(seed) {
+      const base = game1.spec(seed);
+      let player: Colony | undefined;
+      let royalChoices = 0;
+      return {
+        ...base,
+        events: [
+          ...(base.events ?? []),
+          {
+            at: 0,
+            kind: "call",
+            run(game) {
+              player = game.player;
+            },
+          },
+        ],
+        sides: {
+          colony: { deliveryLane: 1 },
+          responses: {
+            ...localResponses,
+            carry(t, draw) {
+              // Elapsed time since pickup is an assay input here; the carry policy schema is unchanged.
+              const aged = after === 0 || (player !== undefined && player.since[player.ti] >= after);
+              if (aged && t.carrying === "food" && (t.place === "tunnel" || t.place === "chamber") && t.deliveryTarget === "none") {
+                royalChoices++;
+                return "to royal";
+              }
+              return localResponses.carry(t, draw);
+            },
+          },
+        },
+        probes: [...(base.probes ?? []), { tick() {}, summary: () => ({ royalChoices }) }],
+      };
+    },
+  };
+}
+
+export const gameRoyalDelivery = gameRoyalRouting(
+  "gameRoyalDelivery",
+  "G1 with explicit royal delivery after sensing an own tunnel or chamber",
+  0,
+);
+export const gameRoyalRecovery = gameRoyalRouting(
+  "gameRoyalRecovery",
+  "G1 with explicit royal delivery after holding food for 60 seconds",
+  60,
+);
 
 /** The open ground of a plane joined to a hole's cell, as a flag per cell (x + y × width): ground a forager can have walked to. */
 function joinedOpen(plane: WorldMap, hc: HoleCell): Uint8Array {

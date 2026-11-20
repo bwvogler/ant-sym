@@ -1,0 +1,1461 @@
+{
+  "harnessSha256": "cb104e39be570d41392a6c67d889fa31d0002f6e361a743efd6840a36112ea28",
+  "commit": "c6b0ed4e515713951267fe8299a8c9eb67a81fce",
+  "seed": 1,
+  "seconds": 600,
+  "ants": 60,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "name": "royal5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "redirectRoyal",
+      "traceAnt": 11,
+      "traceFrom": 598,
+      "trace": [
+        {
+          "tick": 17941,
+          "alive": true,
+          "layer": 1,
+          "x": -25.47948455810547,
+          "y": 57.55180740356445,
+          "cx": -26,
+          "cy": 66,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563127994537354,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 528.8924560546875,
+          "chamber": null,
+          "cue": 9.914307594299316,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.719143867492676
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 67,
+              "rock": 1,
+              "cue": 0
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 67,
+              "rock": 0,
+              "cue": 7.557416915893555
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.089452743530273
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.3060245513916
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.131404876708984
+            }
+          ]
+        },
+        {
+          "tick": 17944,
+          "alive": true,
+          "layer": 1,
+          "x": -25.852310180664062,
+          "y": 56.95935821533203,
+          "cx": -27,
+          "cy": 65,
+          "gx": -27,
+          "gy": 65,
+          "heading": -2.132474899291992,
+          "direction": 4,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 528.992431640625,
+          "chamber": null,
+          "cue": 16.49219512939453,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.101720809936523
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.887869834899902
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.06254768371582
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.654793739318848
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17947,
+          "alive": true,
+          "layer": 1,
+          "x": -25.510257720947266,
+          "y": 56.74410629272461,
+          "cx": -27,
+          "cy": 65,
+          "gx": -26,
+          "gy": 65,
+          "heading": -0.03808482363820076,
+          "direction": 0,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.0924072265625,
+          "chamber": null,
+          "cue": 16.56878089904785,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.25463581085205
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.887869834899902
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.06254768371582
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.654793739318848
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17950,
+          "alive": true,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "cx": -26,
+          "cy": 65,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563137531280518,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.1923828125,
+          "chamber": null,
+          "cue": 11.407211303710938,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 65,
+              "rock": 0,
+              "cue": 1.4078933000564575
+            },
+            {
+              "direction": 1,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.695893287658691
+            },
+            {
+              "direction": 2,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.887869834899902
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.56878089904785
+            },
+            {
+              "direction": 4,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 5,
+              "x": -25,
+              "y": 64,
+              "rock": 0,
+              "cue": 9.1408052444458
+            }
+          ]
+        },
+        {
+          "tick": 17953,
+          "alive": true,
+          "layer": 1,
+          "x": -25.47948455810547,
+          "y": 57.55180740356445,
+          "cx": -26,
+          "cy": 66,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563127994537354,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.2923583984375,
+          "chamber": null,
+          "cue": 9.861502647399902,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.672704696655273
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 67,
+              "rock": 1,
+              "cue": 0
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 67,
+              "rock": 0,
+              "cue": 7.517164707183838
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.035714149475098
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.52459716796875
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.376791954040527
+            }
+          ]
+        },
+        {
+          "tick": 17956,
+          "alive": true,
+          "layer": 1,
+          "x": -25.852310180664062,
+          "y": 56.95935821533203,
+          "cx": -27,
+          "cy": 65,
+          "gx": -27,
+          "gy": 65,
+          "heading": -2.132474899291992,
+          "direction": 4,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.392333984375,
+          "chamber": null,
+          "cue": 16.52459716796875,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.376791954040527
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.861502647399902
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.035714149475098
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.626380920410156
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17959,
+          "alive": true,
+          "layer": 1,
+          "x": -25.510257720947266,
+          "y": 56.74410629272461,
+          "cx": -27,
+          "cy": 65,
+          "gx": -26,
+          "gy": 65,
+          "heading": -0.03808482363820076,
+          "direction": 0,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.4923095703125,
+          "chamber": null,
+          "cue": 16.52459716796875,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.376791954040527
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.861502647399902
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.035714149475098
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.626380920410156
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17962,
+          "alive": true,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "cx": -26,
+          "cy": 65,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563137531280518,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.59228515625,
+          "chamber": null,
+          "cue": 11.346453666687012,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 65,
+              "rock": 0,
+              "cue": 1.4003945589065552
+            },
+            {
+              "direction": 1,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.649577140808105
+            },
+            {
+              "direction": 2,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.835205078125
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.480531692504883
+            },
+            {
+              "direction": 4,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 5,
+              "x": -25,
+              "y": 64,
+              "rock": 0,
+              "cue": 9.319082260131836
+            }
+          ]
+        },
+        {
+          "tick": 17965,
+          "alive": true,
+          "layer": 1,
+          "x": -25.47948455810547,
+          "y": 57.55180740356445,
+          "cx": -26,
+          "cy": 66,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563127994537354,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.6922607421875,
+          "chamber": null,
+          "cue": 9.835205078125,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.649577140808105
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 67,
+              "rock": 1,
+              "cue": 0
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 67,
+              "rock": 0,
+              "cue": 7.497118949890137
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.008952140808105
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.480531692504883
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.346453666687012
+            }
+          ]
+        },
+        {
+          "tick": 17968,
+          "alive": true,
+          "layer": 1,
+          "x": -25.852310180664062,
+          "y": 56.95935821533203,
+          "cx": -27,
+          "cy": 65,
+          "gx": -27,
+          "gy": 65,
+          "heading": -2.132474899291992,
+          "direction": 4,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.792236328125,
+          "chamber": null,
+          "cue": 16.43658447265625,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.31619644165039
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.808978080749512
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.982261657714844
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.569782257080078
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17971,
+          "alive": true,
+          "layer": 1,
+          "x": -25.510257720947266,
+          "y": 56.74410629272461,
+          "cx": -27,
+          "cy": 65,
+          "gx": -26,
+          "gy": 65,
+          "heading": -0.03808482363820076,
+          "direction": 0,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.8922119140625,
+          "chamber": null,
+          "cue": 16.43658447265625,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.31619644165039
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.808978080749512
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.982261657714844
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.569782257080078
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17974,
+          "alive": true,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "cx": -26,
+          "cy": 65,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563137531280518,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 529.9921875,
+          "chamber": null,
+          "cue": 11.31619644165039,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 65,
+              "rock": 0,
+              "cue": 1.3966602087020874
+            },
+            {
+              "direction": 1,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.626511573791504
+            },
+            {
+              "direction": 2,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.808978080749512
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.43658447265625
+            },
+            {
+              "direction": 4,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 5,
+              "x": -25,
+              "y": 64,
+              "rock": 0,
+              "cue": 9.294231414794922
+            }
+          ]
+        },
+        {
+          "tick": 17977,
+          "alive": true,
+          "layer": 1,
+          "x": -25.47948455810547,
+          "y": 57.55180740356445,
+          "cx": -26,
+          "cy": 66,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563127994537354,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.0921630859375,
+          "chamber": null,
+          "cue": 9.782820701599121,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.603507995605469
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 67,
+              "rock": 1,
+              "cue": 0
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 67,
+              "rock": 0,
+              "cue": 7.457187652587891
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.955642700195312
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.39275360107422
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.286020278930664
+            }
+          ]
+        },
+        {
+          "tick": 17980,
+          "alive": true,
+          "layer": 1,
+          "x": -25.852310180664062,
+          "y": 56.95935821533203,
+          "cx": -27,
+          "cy": 65,
+          "gx": -27,
+          "gy": 65,
+          "heading": -2.132474899291992,
+          "direction": 4,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.192138671875,
+          "chamber": null,
+          "cue": 16.39275360107422,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.286020278930664
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.782820701599121
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.955642700195312
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.541596412658691
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17983,
+          "alive": true,
+          "layer": 1,
+          "x": -25.510257720947266,
+          "y": 56.74410629272461,
+          "cx": -27,
+          "cy": 65,
+          "gx": -26,
+          "gy": 65,
+          "heading": -0.03808482363820076,
+          "direction": 0,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.2921142578125,
+          "chamber": null,
+          "cue": 16.39275360107422,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.286020278930664
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.782820701599121
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.955642700195312
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.541596412658691
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17986,
+          "alive": true,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "cx": -26,
+          "cy": 65,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563137531280518,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.39208984375,
+          "chamber": null,
+          "cue": 11.255924224853516,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 65,
+              "rock": 0,
+              "cue": 1.3892213106155396
+            },
+            {
+              "direction": 1,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.580565452575684
+            },
+            {
+              "direction": 2,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.756732940673828
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.34903907775879
+            },
+            {
+              "direction": 4,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 5,
+              "x": -25,
+              "y": 64,
+              "rock": 0,
+              "cue": 9.244728088378906
+            }
+          ]
+        },
+        {
+          "tick": 17989,
+          "alive": true,
+          "layer": 1,
+          "x": -25.47948455810547,
+          "y": 57.55180740356445,
+          "cx": -26,
+          "cy": 66,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563127994537354,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.4920654296875,
+          "chamber": null,
+          "cue": 9.756732940673828,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 8.580565452575684
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 67,
+              "rock": 1,
+              "cue": 0
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 67,
+              "rock": 0,
+              "cue": 7.4373016357421875
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.929094314575195
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.34903907775879
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.255924224853516
+            }
+          ]
+        },
+        {
+          "tick": 17992,
+          "alive": true,
+          "layer": 1,
+          "x": -25.852310180664062,
+          "y": 56.95935821533203,
+          "cx": -27,
+          "cy": 65,
+          "gx": -27,
+          "gy": 65,
+          "heading": -2.132474899291992,
+          "direction": 4,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.592041015625,
+          "chamber": null,
+          "cue": 16.30544090270996,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.225908279418945
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.730714797973633
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.902616500854492
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.48544979095459
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17995,
+          "alive": true,
+          "layer": 1,
+          "x": -25.510257720947266,
+          "y": 56.74410629272461,
+          "cx": -27,
+          "cy": 65,
+          "gx": -26,
+          "gy": 65,
+          "heading": -0.03808482363820076,
+          "direction": 0,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.6920166015625,
+          "chamber": null,
+          "cue": 16.30544090270996,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -26,
+              "y": 65,
+              "rock": 0,
+              "cue": 11.225908279418945
+            },
+            {
+              "direction": 1,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.845476150512695
+            },
+            {
+              "direction": 2,
+              "x": -27,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.903169631958008
+            },
+            {
+              "direction": 3,
+              "x": -28,
+              "y": 65,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 4,
+              "x": -27,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.48544979095459
+            },
+            {
+              "direction": 5,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            }
+          ]
+        },
+        {
+          "tick": 17998,
+          "alive": true,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "cx": -26,
+          "cy": 65,
+          "gx": -26,
+          "gy": 66,
+          "heading": 2.0563137531280518,
+          "direction": 2,
+          "wall": 0,
+          "carrying": 1,
+          "role": "royal",
+          "state": 1,
+          "effort": 5,
+          "lastRole": 1,
+          "sinceRole": 530.7919921875,
+          "chamber": null,
+          "cue": 11.541263580322266,
+          "neighbours": [
+            {
+              "direction": 0,
+              "x": -25,
+              "y": 65,
+              "rock": 0,
+              "cue": 1.3855167627334595
+            },
+            {
+              "direction": 1,
+              "x": -25,
+              "y": 66,
+              "rock": 0,
+              "cue": 9.017390251159668
+            },
+            {
+              "direction": 2,
+              "x": -26,
+              "y": 66,
+              "rock": 0,
+              "cue": 10.188995361328125
+            },
+            {
+              "direction": 3,
+              "x": -27,
+              "y": 65,
+              "rock": 0,
+              "cue": 16.30580711364746
+            },
+            {
+              "direction": 4,
+              "x": -26,
+              "y": 64,
+              "rock": 2,
+              "cue": 0
+            },
+            {
+              "direction": 5,
+              "x": -25,
+              "y": 64,
+              "rock": 0,
+              "cue": 10.065241813659668
+            }
+          ]
+        }
+      ],
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 82,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 4.20417340761967
+        }
+      ],
+      "queenAlive": true,
+      "births": 22,
+      "diedHungry": 0,
+      "stored": 99,
+      "portTrips": 0,
+      "finalLarder": 4.20417340761967,
+      "carriedDown": 130,
+      "held": 34,
+      "maxHeld": 44,
+      "maxActive": 44,
+      "maxHeldOver120": 28,
+      "broodStarved": 0,
+      "unresolved": [
+        {
+          "i": 0,
+          "role": 1,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "heldSeconds": 411.800000000112,
+          "state": 1
+        },
+        {
+          "i": 1,
+          "role": 1,
+          "layer": 1,
+          "x": -25.15281867980957,
+          "y": 56.93270492553711,
+          "heldSeconds": 440.4666666668015,
+          "state": 1
+        },
+        {
+          "i": 3,
+          "role": 1,
+          "layer": 1,
+          "x": -25.74342155456543,
+          "y": 56.75299072265625,
+          "heldSeconds": 404.5000000001062,
+          "state": 1
+        },
+        {
+          "i": 5,
+          "role": 1,
+          "layer": 1,
+          "x": -25.043930053710938,
+          "y": 56.72633743286133,
+          "heldSeconds": 394.06666666676455,
+          "state": 1
+        },
+        {
+          "i": 6,
+          "role": 1,
+          "layer": 1,
+          "x": -25.370595932006836,
+          "y": 57.34543991088867,
+          "heldSeconds": 432.43333333346175,
+          "state": 1
+        },
+        {
+          "i": 9,
+          "role": 1,
+          "layer": 1,
+          "x": -25.72803497314453,
+          "y": 57.15684127807617,
+          "heldSeconds": 405.10000000010666,
+          "state": 1
+        },
+        {
+          "i": 10,
+          "role": 1,
+          "layer": 1,
+          "x": -25.370595932006836,
+          "y": 57.34543991088867,
+          "heldSeconds": 410.66666666677776,
+          "state": 1
+        },
+        {
+          "i": 11,
+          "role": 1,
+          "layer": 1,
+          "x": -25.370595932006836,
+          "y": 57.34543991088867,
+          "heldSeconds": 547.8333333334924,
+          "state": 1
+        },
+        {
+          "i": 12,
+          "role": 1,
+          "layer": 1,
+          "x": -25.2770938873291,
+          "y": 56.73522186279297,
+          "heldSeconds": 451.9000000001439,
+          "state": 1
+        },
+        {
+          "i": 15,
+          "role": 1,
+          "layer": 1,
+          "x": -33.8705940246582,
+          "y": 59.94351577758789,
+          "heldSeconds": 521.5666666668496,
+          "state": 1
+        }
+      ],
+      "starts": 133,
+      "switches": 130,
+      "deliveries": 99,
+      "activeSeconds": 16704.133333333415,
+      "longSeconds": 13539.099999971275,
+      "carryCalls": 512514,
+      "longCalls": 406343,
+      "wallSeconds": 11.296599609000001
+    }
+  ]
+}

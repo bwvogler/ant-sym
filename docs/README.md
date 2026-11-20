@@ -6,6 +6,8 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 
 | Note | Kind | What it covers |
 |---|---|---|
+| [Delivery actions](delivery-actions.md) | research + design (experimental) | Food destination choices, local floor cues, commitment and misdelivery tests. |
+| [Contact actions](contact-actions.md) | research + design (experimental) | Directed aggression, peaceful encounters, and asymmetric recognition. |
 | [ant-communication.md](ant-communication.md) | research | Signal channels (trail, alarm, contact, vibration, trophallaxis), their ranges and lifetimes, recognising rival colonies, and combat laws. |
 | [nest-and-home.md](nest-and-home.md) | research + design (built) | How ants find home outside (path integration, landmarks, entrance odour) and inside (gravity, memory, floor marks); the queen; nest architecture; jobs by place and age. Designs nest slices 0–9. |
 | [foraging-tunnels.md](foraging-tunnels.md) | research + design (option 1 built, off until larvae are fed: `ja-16rp.5`, PRD §70) | Do ants dig to reach food, and what steers the dig: fire ants keep a standing network of shallow foraging tunnels under the territory, not aimed at food (Tschinkel 2011; Ni et al. 2025; Markin et al. 1975 unverified); termites tunnel to find wood, and a gradient through soil (CO₂) draws some species (Bernklau et al. 2005, unverified) but not others. Basis for foraging tunnels to the side view's buried pockets (PRD §70). |

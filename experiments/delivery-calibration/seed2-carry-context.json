@@ -1,0 +1,175 @@
+{
+  "harnessSha256": "370118629cb20dbd3c978d3ce85001688796ebe98abe75c059bc08941e534898",
+  "commit": "ac50fb707999b61e9b1dbcd429b18ceb6e29c230",
+  "seed": 2,
+  "seconds": 600,
+  "ants": 60,
+  "royalCap": 20,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "royalField": {
+        "markedCells": 125,
+        "nearCapCells": 117,
+        "max": 20
+      },
+      "name": "baseline",
+      "lane": 0,
+      "limit": 0,
+      "doctrine": "local",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 576.1235271590646
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 698,
+      "portTrips": 0,
+      "finalLarder": 576.1235271590646,
+      "carriedDown": 700,
+      "held": 8,
+      "maxHeld": 33,
+      "maxActive": 0,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 0,
+      "switches": 0,
+      "deliveries": 0,
+      "activeSeconds": 0,
+      "longSeconds": 0,
+      "carryCalls": 0,
+      "longCalls": 0,
+      "wallSeconds": 21.10513664
+    },
+    {
+      "royalField": {
+        "markedCells": 125,
+        "nearCapCells": 117,
+        "max": 20
+      },
+      "name": "retain",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "retain",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 576.1235271590646
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 698,
+      "portTrips": 0,
+      "finalLarder": 576.1235271590646,
+      "carriedDown": 700,
+      "held": 8,
+      "maxHeld": 33,
+      "maxActive": 0,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 0,
+      "switches": 0,
+      "deliveries": 0,
+      "activeSeconds": 0,
+      "longSeconds": 0,
+      "carryCalls": 261915,
+      "longCalls": 0,
+      "wallSeconds": 16.641516304000003
+    },
+    {
+      "royalField": {
+        "markedCells": 142,
+        "nearCapCells": 137,
+        "max": 20
+      },
+      "name": "royal20",
+      "lane": 1,
+      "limit": 20,
+      "doctrine": "redirectRoyal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 189.7430383691552
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 311,
+      "portTrips": 0,
+      "finalLarder": 189.7430383691552,
+      "carriedDown": 316,
+      "held": 16,
+      "maxHeld": 32,
+      "maxActive": 32,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 327,
+      "switches": 205,
+      "deliveries": 311,
+      "activeSeconds": 10668.63333333382,
+      "longSeconds": 0,
+      "carryCalls": 331789,
+      "longCalls": 312,
+      "wallSeconds": 17.145751340999997
+    },
+    {
+      "royalField": {
+        "markedCells": 232,
+        "nearCapCells": 158,
+        "max": 20
+      },
+      "name": "context20",
+      "lane": 1,
+      "limit": 20,
+      "doctrine": "context",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 440.64346294330164
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 562,
+      "portTrips": 0,
+      "finalLarder": 440.64346294330164,
+      "carriedDown": 564,
+      "held": 14,
+      "maxHeld": 21,
+      "maxActive": 21,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 576,
+      "switches": 88,
+      "deliveries": 562,
+      "activeSeconds": 7227.533333332799,
+      "longSeconds": 0,
+      "carryCalls": 229051,
+      "longCalls": 0,
+      "wallSeconds": 17.459583064
+    }
+  ]
+}

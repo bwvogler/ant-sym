@@ -47,7 +47,14 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
  * What a response may depend on: few values, so an answer could be cached per situation. The
  * colony fills one shared object per call, so a response must read it and not keep it.
  */
+export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "reception";
+
 export interface Touch {
+  /** Own commitment and recognised chamber underfoot; sent only to carry. */
+  deliveryTarget: DeliveryContextRole;
+  deliveryPlace: DeliveryContextRole;
+  /** Coarse effort on an explicit local delivery, enabled only by deliveryReconsider. Carry alone receives it. */
+  deliveryAttempt: "none" | "brief" | "long";
   mode: Mode;
   carrying: Item;
   /** carrying food between chambers (side view, nest slice 5), not home from outside */
@@ -99,13 +106,13 @@ export type Leave = (typeof LEAVE)[number];
 export type Odds = (typeof ODDS)[number];
 
 /** What an ant does on meeting strangers (behaviour MR 4, docs/combat.md). */
-export const CONTACT = ["fight", "flee", "drop and run"] as const;
+export const CONTACT = ["fight", "flee", "drop and run", "ignore"] as const;
 export type Contact = (typeof CONTACT)[number];
 
 export type TrailKind = "food" | "home" | "none";
 
-/** What a carrier does with its load: take it where it belongs, or put it down where it stands. */
-export const CARRY = ["take", "put down"] as const;
+/** Retain/release a load, or (deliveryLane) choose a locally recognised food destination role. */
+export const CARRY = ["take", "put down", "to reception", "to store", "to brood", "to royal"] as const;
 export type Carry = (typeof CARRY)[number];
 
 /**
@@ -119,11 +126,12 @@ export interface Responses {
   /**
    * Carrying anything (asked every step while carrying; the mode policy is not asked then): take it where it belongs
    * (food home to the nest's chambers, a porter's to the chamber that wants it, soil out to the mound, a corpse to the
-   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh. (Carrying no
+   * midden, brood to a brood chamber), going home to do it; or put it down here, and be asked afresh.
+   * With deliveryLane, explicit food roles select a locally sensed destination; take then retains that choice. (Carrying no
    * longer has a mode to choose: told to explore or fight with food in its jaws, an ant stranded it, ja-1pm.)
    */
   carry(t: Touch, draw?: AntDraw): Carry;
-  /** Carrying food, at a place it can put it down (the nest on a top-down map; its chamber in the side view): put it down? */
+  /** Carrying a load, at a place it can put it down: put it down? */
   drop(t: Touch, draw?: AntDraw): boolean;
   /** Which trail to lay this step. */
   trail(t: Touch, draw?: AntDraw): TrailKind;
@@ -221,6 +229,9 @@ export const CROWD = ["few", "many"] as const;
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
 const TOUCH_FIELDS: readonly FieldOf<Touch>[] = [
+  { name: "deliveryTarget", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryTarget:${v}` },
+  { name: "deliveryPlace", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryPlace:${v}` },
+  { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },
   { name: "mode", values: MODES },
   { name: "carrying", values: ITEMS },
   { name: "porter", values: [false, true], key: (v) => (v ? "porter" : "-") },

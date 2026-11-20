@@ -1,3 +1,6 @@
+import { SEEN } from "./params.ts";
+import { DEFAULT_FIGHT } from "./battle.ts";
+import { combatObservers } from "./combatObservation.ts";
 // The assay catalogue (docs/refactor.md S3.6, ja-fnd.4.6): the arena assays and the lists ASSAYS, ONE_ASSAYS and ONE_PENDING. The
 // harness they run on (runGame, the probes, Arena, oneArena) is harness.ts; the whole-game and one-world assays are oneAssays.ts and
 // the desert ant's desertAssays.ts. Everything is re-exported here, so scripts and tests import experiment.ts by name.
@@ -9,7 +12,7 @@ import { Game } from "./game.ts";
 import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, type OneWorld } from "./oneWorld.ts";
-import { holeRaid } from "./sense.ts";
+import { enemyHeading, holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
 import { isSky, takeFoodCell, OPEN, rockAt, type WorldMap } from "./world.ts";
 
@@ -42,7 +45,7 @@ export * from "./builderAssays.ts";
 import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
 import { neglectusImmunisation, neglectusTolerance } from "./neglectusAssays.ts";
-import { forage1, game1, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
+import { forage1, game1, gameRoyalDelivery, gameRoyalRecovery, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
 
 const always =
   <T extends string>(v: T) =>
@@ -810,6 +813,8 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
   const nest = at(60, 30);
   const pile = at(15, 30);
   let fightNear = 0;
+  let defenderIntentNear = 0;
+  let raiderIntentNear = 0;
   let atPile = 0;
   let samples = 0;
   let next = 20;
@@ -841,12 +846,26 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
             const x = c.x[i];
             const y = c.y[i];
             const fighting = MODES[c.mode[i]] === "fight";
-            if (fighting && Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) fightNear++;
+            if (Math.hypot(x - nest.x, y - nest.y) <= NEAR_HOME) {
+              if (fighting) fightNear++;
+              if (c.attackLayer[i] >= 0 && c.attackLayer[i] === c.layer[i]) defenderIntentNear++;
+            }
             if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
           }
+          const rival = game.rival;
+          if (rival)
+            for (let i = 0; i < rival.n; i++) {
+              if (!rival.alive[i] || rival.attackLayer[i] < 0 || rival.attackLayer[i] !== rival.layer[i]) continue;
+              if (Math.hypot(rival.x[i] - nest.x, rival.y[i] - nest.y) <= NEAR_HOME) raiderIntentNear++;
+            }
           samples++;
         },
-        summary: () => ({ fightNear: samples ? fightNear / samples : 0, atPile: samples ? atPile / samples : 0 }),
+        summary: () => ({
+          fightNear: samples ? fightNear / samples : 0,
+          atPile: samples ? atPile / samples : 0,
+          defenderIntentNear: samples ? defenderIntentNear / samples : 0,
+          raiderIntentNear: samples ? raiderIntentNear / samples : 0,
+        }),
       },
     ],
   };
@@ -861,14 +880,203 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
 const defendArm = (seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec =>
   walked(onPlane(defendSpec(seed, sealed, colony)), 1, 0);
 
+/** Match the treatment's combat and elapsed time in both A13 comparison games. */
+export function defendControl(
+  seed: number,
+  sealed: boolean,
+  seconds: number,
+  fight: Game["params"]["fight"],
+  colony?: Partial<ColonyParams>,
+): RunSpec {
+  const spec = defendArm(seed, sealed, colony);
+  return { ...spec, seconds, game: { ...spec.game, fight: { ...fight } } };
+}
+
+/** Count decisions before movement and combat exposure at the hazard calculation. */
+function observedDefence(spec: RunSpec): RunSpec {
+  const counts: Record<string, number> = {};
+  const withdrawals = new Map<number, { contact: number; pressure: number; missed: boolean; clearTicks: number }>();
+  const countWithdrawal = (key: string) => {
+    const metric = `defender.withdrawal.${key}`;
+    counts[metric] = (counts[metric] ?? 0) + 1;
+  };
+  return {
+    ...spec,
+    events: [
+      ...(spec.events ?? []),
+      {
+        at: 0,
+        kind: "call",
+        run(game) {
+          game.colonies.forEach((colony, side) => {
+            const prefix = side === 0 ? "defender" : "raider";
+            const add = (key: string, value = 1) => {
+              const metric = `${prefix}.${key}`;
+              counts[metric] = (counts[metric] ?? 0) + value;
+            };
+            for (const key of [
+              "attack",
+              "withdraw",
+              "continue",
+              "ignore",
+              "protectedLoad",
+              "reporting",
+              "exposed",
+              "pressure",
+              "hazardInput",
+              "combatDeaths",
+            ])
+              add(key, 0);
+            const contacts = new Map<
+              number,
+              { time: number; alarm: string; movement: string; homeSeen: boolean; x: number; y: number; layer: number; heading: number }
+            >();
+            const exposures = new Map<number, { time: number; streak: number }>();
+            const attacks = new Map<number, { time: number; streak: number }>();
+            const dt = spec.dt ?? 1 / 30;
+            combatObservers.set(colony, {
+              contact(action, ant, sensed, heading) {
+                if (side === 0 && game.time <= 30) {
+                  const episode = withdrawals.get(ant);
+                  if (episode) episode.contact = game.time;
+                  else if (action.movement === "withdraw") {
+                    withdrawals.set(ant, { contact: game.time, pressure: 0, missed: false, clearTicks: 0 });
+                    countWithdrawal("started");
+                  }
+                }
+                if (side === 0 && game.time <= 30)
+                  contacts.set(ant, {
+                    time: game.time,
+                    alarm: sensed.alarm,
+                    movement: action.movement,
+                    x: colony.x[ant],
+                    y: colony.y[ant],
+                    layer: colony.layer[ant],
+                    heading,
+                    homeSeen: colony.s[3] === SEEN || colony.s[4] === SEEN || colony.s[5] === SEEN,
+                  });
+                if (action.movement === "attack" && game.time <= 30) {
+                  const previous = attacks.get(ant);
+                  const repeated = previous !== undefined && Math.abs(game.time - previous.time - dt) < 1e-8;
+                  const streak = repeated ? previous.streak + 1 : 1;
+                  attacks.set(ant, { time: game.time, streak });
+                  add("earlyAttackChoices");
+                  add("earlyRepeatedAttackChoices", Number(repeated));
+                  counts[`${prefix}.earlyLongestAttackSeconds`] = Math.max(counts[`${prefix}.earlyLongestAttackSeconds`] ?? 0, streak * dt);
+                }
+                add(action.movement);
+                if (action.reason === "protect load") add("protectedLoad");
+                if (action.reason === "report home") add("reporting");
+              },
+              exposure(pressure, allies, killed, ant) {
+                add("exposed");
+                add("pressure", pressure);
+                add("hazardInput", pressure / allies);
+                if (side === 0 && game.time <= 30) {
+                  const episode = withdrawals.get(ant);
+                  if (episode) episode.pressure = game.time;
+                }
+                const contact = contacts.get(ant);
+                const current = contact?.time === game.time ? contact : undefined;
+                if (side === 0 && game.time <= 30) {
+                  const previous = exposures.get(ant);
+                  const repeated = previous !== undefined && Math.abs(game.time - previous.time - dt) < 1e-8;
+                  const streak = repeated ? previous.streak + 1 : 1;
+                  if (killed) exposures.delete(ant);
+                  else exposures.set(ant, { time: game.time, streak });
+                  add("earlyExposures");
+                  add("earlyExposuresWithoutContact", Number(!current));
+                  if (!current) {
+                    // Re-read the defender's ordinary recognition from the refreshed, post-movement occupancy.
+                    const [x, y] = CELL;
+                    const previousLayer = colony.cur;
+                    colony.bind(colony.layer[ant]);
+                    try {
+                      if (enemyHeading(colony, ant) !== null) {
+                        add("earlyNoContactPressureVisibleAfterMove");
+                        if (killed) add("earlyNoContactDeathsVisibleAfterMove");
+                      }
+                    } finally {
+                      colony.bind(previousLayer);
+                      CELL[0] = x;
+                      CELL[1] = y;
+                    }
+                  }
+                  add("earlyRepeatedExposures", Number(repeated));
+                  if (current?.movement === "withdraw" && current.layer === colony.layer[ant]) {
+                    const dx = colony.x[ant] - current.x;
+                    const dy = colony.y[ant] - current.y;
+                    const toward = dx * Math.cos(current.heading) + dy * Math.sin(current.heading);
+                    add("earlyWithdrawalExposures");
+                    add("earlyWithdrawalSteppedAway", Number(toward < -1e-8));
+                    add("earlyWithdrawalStationary", Number(Math.hypot(dx, dy) < 1e-8));
+                    if (killed) add("earlyWithdrawalDeathExposureTicks", streak);
+                  }
+                }
+                if (killed) {
+                  add("combatDeaths");
+                  counts[`${prefix}.firstCombatDeath`] ??= game.time;
+                  if (side !== 0 || game.time > 30) return;
+                  const layer = colony.layer[ant];
+                  const nest = colony.layers[layer]!.nest;
+                  const distance = Math.hypot(colony.x[ant] - nest.x, colony.y[ant] - nest.y);
+                  add("earlyDeaths");
+                  add("earlyDeathsOutsideNest", Number(distance >= nest.r));
+                  add("earlyDeathsWithoutContact", Number(!current));
+                  add("earlyDeathsWithAlarm", Number(current !== undefined && current.alarm !== "none"));
+                  add("earlyDeathsWithHomeInSight", Number(current?.homeSeen ?? false));
+                  if (counts[`${prefix}.earlyDeaths`] === 1) {
+                    add("firstDeathLayer", layer);
+                    add("firstDeathX", colony.x[ant]);
+                    add("firstDeathY", colony.y[ant]);
+                    add("firstDeathDistanceFromNest", distance);
+                    add(`firstDeathAction.${current?.movement ?? "noContact"}`);
+                  }
+                }
+              },
+            });
+          });
+        },
+      },
+    ],
+    probes: [
+      ...(spec.probes ?? []),
+      {
+        tick(game) {
+          if (game.time > 30) return;
+          for (const [ant, episode] of withdrawals) {
+            const contact = episode.contact === game.time;
+            const pressure = episode.pressure === game.time;
+            if (!contact && pressure) countWithdrawal("pressureTicksWithoutContact");
+            if (!game.player.alive[ant]) {
+              countWithdrawal(pressure ? "combatDeaths" : "otherDeaths");
+              withdrawals.delete(ant);
+              continue;
+            }
+            if (contact && episode.missed) countWithdrawal("renewedContact");
+            episode.missed = !contact;
+            episode.clearTicks = contact || pressure ? 0 : episode.clearTicks + 1;
+            if (episode.clearTicks === 3) {
+              countWithdrawal("cleared");
+              withdrawals.delete(ant);
+            }
+          }
+        },
+        summary: () => ({ ...counts, "defender.withdrawal.openAtCutoff": withdrawals.size }),
+      },
+    ],
+  };
+}
+
 export const defendWalked: Assay = {
   id: "defendHome",
   title: "A13 defence from senses (one world, the war party walked)",
   target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
   seconds: 300,
-  spec: (seed) => defendArm(seed, false),
+  spec: (seed) => observedDefence(defendArm(seed, false)),
   score: (r, game) => {
-    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => runGame(defendArm(r.seed, sealed, colony)).result.metrics;
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) =>
+      runGame(defendControl(r.seed, sealed, r.seconds, game.params.fight, colony)).result.metrics;
     const stored = r.metrics["you.stored"];
     const control = run(true)["you.stored"];
     const none = run(false, { defendAt: Infinity });
@@ -1356,6 +1564,124 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  * Also the one-world assays of their own (S1, F1, R1), the desert ant's, the builder's, and the lifecycle assays (L ×3,
  * lifecycleOne) on a solo one world, 30 minutes each.
  */
+/** Experimental response using the contact policy's existing perception of its own entrance. */
+function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or outnumbered" | "approach alarm" = "any contact"): RunSpec {
+  const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
+  let game: Game | undefined;
+  let entranceContacts = 0;
+  let entranceContactsWithAlarm = 0;
+  let approachAlarmContacts = 0;
+  const times: Record<string, number> = {};
+  return {
+    ...spec,
+    events: [
+      ...(spec.events ?? []),
+      {
+        at: 0,
+        kind: "call",
+        run: (started) => {
+          game = started;
+        },
+      },
+    ],
+    probes: [
+      ...(spec.probes ?? []),
+      { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, approachAlarmContacts, ...times }) },
+    ],
+    sides: {
+      ...spec.sides,
+      responses: {
+        ...base,
+        contact(t, draw) {
+          if (t.enemy && t.place === "hole" && t.carrying === "none") {
+            entranceContacts++;
+            if (game) times.firstEntranceContact ??= game.time;
+            if (t.alarm !== "none") {
+              entranceContactsWithAlarm++;
+              if (game) times.firstEntranceContactWithAlarm ??= game.time;
+            }
+            if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
+          }
+          // The assay reuses the current ant's three home sensors. The ordinary contact policy has no home-sensor field.
+          if (
+            cue === "approach alarm" &&
+            game?.player.onPlane &&
+            t.enemy &&
+            t.place === "out" &&
+            t.carrying === "none" &&
+            t.alarm !== "none"
+          ) {
+            const sensed = game.player.s;
+            if (sensed[3] === SEEN || sensed[4] === SEEN || sensed[5] === SEEN) {
+              approachAlarmContacts++;
+              times.firstApproachAlarmContact ??= game.time;
+              return "fight";
+            }
+          }
+          return base.contact(t, draw);
+        },
+      },
+    },
+    game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
+  };
+}
+
+const defendEntrance: Assay = {
+  ...defendWalked,
+  id: "defendEntrance",
+  title: "A13 directed combat with contact defense at the entrance",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed)),
+};
+
+const contactEntrance: Assay = {
+  ...onPlaneAssay(contact),
+  id: "contactEntrance",
+  title: "A9 neutral contact with entrance defense enabled for one colony",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed))),
+};
+
+const defendAlarmEntrance: Assay = {
+  ...defendEntrance,
+  id: "defendAlarmEntrance",
+  title: "A13 directed combat with alarm-gated entrance defense",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "alarm"),
+};
+
+const contactAlarmEntrance: Assay = {
+  ...contactEntrance,
+  id: "contactAlarmEntrance",
+  title: "A9 neutral contact with alarm-gated entrance defense for one colony",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "alarm"),
+};
+
+const defendThreatEntrance: Assay = {
+  ...defendEntrance,
+  id: "defendThreatEntrance",
+  title: "A13 entrance defense on local alarm or when outnumbered",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "alarm or outnumbered"),
+};
+
+const contactThreatEntrance: Assay = {
+  ...contactEntrance,
+  id: "contactThreatEntrance",
+  title: "A9 neutral contact with alarm-or-outnumbered entrance defense",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "alarm or outnumbered"),
+};
+
+const defendAlarmApproach: Assay = {
+  ...defendEntrance,
+  id: "defendAlarmApproach",
+  title: "A13 alarm-gated defense at a locally sensed nest approach",
+  spec: (seed) => entranceDefence(defendWalked.spec(seed), "approach alarm"),
+};
+
+const contactAlarmApproach: Assay = {
+  ...contactEntrance,
+  id: "contactAlarmApproach",
+  title: "A9 neutral contact with alarm-gated defense at the nest approach",
+  spec: (seed) => entranceDefence(onPlane(contact.spec(seed)), "approach alarm"),
+};
+
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
@@ -1370,6 +1696,8 @@ export const ONE_ASSAYS: Assay[] = [
   pockets,
   larvae,
   game1,
+  gameRoyalDelivery,
+  gameRoyalRecovery,
   lockstep1,
   searchTight1,
   memory1,
@@ -1387,6 +1715,14 @@ export const ONE_ASSAYS: Assay[] = [
   ...BUILDER_ASSAYS,
   ...lifecycleOne,
   defendWalked,
+  defendEntrance,
+  contactEntrance,
+  defendAlarmEntrance,
+  contactAlarmEntrance,
+  defendThreatEntrance,
+  contactThreatEntrance,
+  defendAlarmApproach,
+  contactAlarmApproach,
 ];
 
 /** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */

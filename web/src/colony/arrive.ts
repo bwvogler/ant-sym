@@ -1,4 +1,5 @@
 // Arrive (docs/refactor.md S3.4): the last stage of an ant's step in tick. Where the step landed it: food picked up, spoil or a corpse carried out and dropped, a pellet onto the mound or back as fill, a loose pellet or the plane's spoil taken up, home at the nest (food stored, a hand chosen, rest), tiredness, home and leaving again, and the bookkeeping of its home vector, floor marks, nest work and route on the plane. Moved out of Colony.tick verbatim but for `this` becoming `colony` (the moved code has its own `col` and `c`); a pellet carrier crossing up at its hole, or an ant on the plane going down a hole (its own, or a raided foe's), ends its step here (returns true).
+import { localResponses } from "./responses.ts";
 import { paceAfter } from "./invite.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
@@ -75,6 +76,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   if (colony.putAt[i] !== here) colony.putAt[i] = NO_KEY;
   // Taken at an aphid clump, it may be one of the aphids rather than honeydew (ja-nzkg.5): the honeydew stays.
   let prey = false;
+  let pickedFood = false;
   if (
     !carrying &&
     !pellet &&
@@ -84,6 +86,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     ((prey = colony.cur === PLANE || colony.onPlane ? colony.preyAphid(CELL[0], CELL[1]) : false) || takeFoodCell(map, CELL[0], CELL[1]))
   ) {
     colony.carrying[i] = 1;
+    pickedFood = true;
     colony.quality[i] = prey ? 1 : qualityAt(map, CELL[0], CELL[1]);
     // Remembered too while ants ask for steering weights (ja-ykmu): the `memory` weight steers by it.
     if ((p.siteFidelity > 0 || p.steerLane > 0) && colony.line !== null && colony.cur === PLANE) rememberSite(colony, i);
@@ -99,7 +102,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     colony.spoilT[i] = colony.spoilT[i] + dt;
     const corpse = colony.corpse[i] === 1;
     const far = fromHomePlane(colony, i) >= colony.spoilTo[i] && (!corpse || (map.spoil?.get(CELL[0], CELL[1]) ?? 0) === 0);
-    if (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) dropPlane(colony, i);
+    if (
+      (far || colony.spoilT[i] > (corpse ? CORPSE_GIVE_UP : SPOIL_GIVE_UP)) &&
+      resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))
+    )
+      dropPlane(colony, i);
   } else if (pellet && atEntrance && colony.soil[i] !== SOIL_FILL && colony.line !== null) {
     // One world: the spoil (or the dead) goes up the hole onto the plane, where it is put down (crossUp).
     crossUp(colony, i, colony.entranceCol, colony.entranceRow);
@@ -149,7 +156,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       colony.stored++;
       colony.larder++;
       h += Math.PI;
-    } else if (pellet && !ent && colony.line === null) {
+    } else if (pellet && !ent && colony.line === null && resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))) {
       // The soil goes on the mound: real ants dump it round the entrance, which is how mounds grow. (One world's plane:
       // spoil is carried out by vector, dropPlane; a pellet going home to backfill goes on down its hole.)
       colony.pellet[i] = 0;
@@ -257,7 +264,11 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     if (colony.map.chambers) layMark(colony, i, dt);
     if (colony.queen) {
       nurse(colony, i, dt, toEnemy !== null);
-      if (port(colony, i, dt, toEnemy !== null)) h += Math.PI;
+      // Pickup happens after stanceStep's carry decision. Give a custom delivery
+      // policy its ordinary next-tick choice before this new load can use foodTo.
+      // The local carry rule and disabled lane keep their legacy immediate delivery.
+      const pendingCarry = pickedFood && p.deliveryLane > 0 && resp.carry !== localResponses.carry;
+      if (!pendingCarry && port(colony, i, dt, toEnemy !== null)) h += Math.PI;
       if (colony.params.undertakes) undertake(colony, i, dt, toEnemy === null);
     }
   }

@@ -155,15 +155,27 @@ export function policyContext(doctrine: string, words: LaneWords<Mode> = MODE_WO
 
 /**
  * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
- * responses no longer apply. 12: kept with Jev's probabilities (readResponse, ja-m7rr), where 11 kept a boolean or a bare choice.
+ * responses no longer apply. 16: carry sees its target and recognised floor role. 15: carry senses delivery effort. 14: carry can choose food destination roles; 13 added peaceful contact.
  */
-export const RESPONSE_BRAIN_VERSION = 12;
+export const RESPONSE_BRAIN_VERSION = 16;
 
 // Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
 // before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
 export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony at a moment it must respond. ",
   fields: [
+    [
+      "deliveryTarget",
+      "deliveryTarget, sent only to carry, is its current chosen food destination: none, royal, brood, store, or reception. It does not imply that destination exists. ",
+    ],
+    [
+      "deliveryPlace",
+      "deliveryPlace, sent only to carry, is the role recognised underfoot: none, royal, brood, store, or reception. Fungal distortion can swap or erase this cue. It reveals no distant rooms. ",
+    ],
+    [
+      "deliveryAttempt",
+      "deliveryAttempt, sent only to carry, is effort on a chosen delivery: none (not tracked), brief, or long (the local attempt has lasted a while). Long is not proof that a destination is unreachable. The policy may persist, choose another role, or release the load. ",
+    ],
     ["mode", "mode is what it is doing: explore, follow (a food scent), return (home) or fight. "],
     [
       "carrying",
@@ -229,7 +241,7 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
       return {
         [`${id}_drop`]: {
           type: "noul",
-          instructions: `Going by the doctrine, ${ant} is carrying food where it can put it down (its nest, or the chamber the food goes to): should it put it down here?`,
+          instructions: `Going by the doctrine, ${ant} can put down the load named by carrying: should it put the load down here?`,
         },
       };
     case "carry":
@@ -238,8 +250,12 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
           type: "choice",
           instructions: `Going by the doctrine, ${ant} is carrying what carrying says: what should it do with it?`,
           criteria: {
-            take: "take: carry it where it belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
+            take: "take: keep carrying to its selected destination, or where it normally belongs (food home into the nest, for the colony's larvae and stores; a porter's food to the chamber that wants it; soil out to the mound; a corpse to the midden; brood to a brood chamber)",
             "put down": "put down: put it down here, where it stands, and do something else",
+            "to reception": "to reception: with food and delivery enabled, seek a reception by local floor cues",
+            "to store": "to store: with food and delivery enabled, seek a store by local floor cues",
+            "to brood": "to brood: with food and delivery enabled, seek a brood chamber by local floor cues",
+            "to royal": "to royal: with food and delivery enabled, seek the royal chamber by local floor cues",
           },
         },
       };
@@ -247,11 +263,12 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
       return {
         [`${id}_contact`]: {
           type: "choice",
-          instructions: `Going by the doctrine, ${ant} has strangers of another colony within reach (odds says how many nestmates are round it against them): what should it do?`,
+          instructions: `Going by the doctrine, ${ant} has strangers within reach (odds says how many nestmates are round it against them): what should it do?`,
           criteria: {
             fight: "fight: attack the strangers where they are",
             flee: "flee: turn away from them and go home, keeping whatever it carries",
             "drop and run": "drop and run: put down what it carries here and flee home",
+            ignore: "ignore: continue its work without attacking, fleeing or releasing its load",
           },
         },
       };
@@ -291,19 +308,21 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
     // alarm and odds only to `contact`; returns only to `leave`.
-    const { offered, quality, alarm, odds, returns, raid, crowd, ...rest } = t;
+    const { offered, quality, alarm, odds, returns, raid, crowd, deliveryAttempt, deliveryTarget, deliveryPlace, ...rest } = t;
     ants[it.id] =
-      hook === "get"
-        ? { ...rest, offered, quality }
-        : hook === "trail"
-          ? { ...rest, quality }
-          : hook === "contact"
-            ? { ...rest, alarm, odds }
-            : hook === "leave"
-              ? t.mode === "fight"
-                ? { ...rest, raid }
-                : { ...rest, returns, crowd }
-              : { ...rest };
+      hook === "carry"
+        ? { ...rest, deliveryAttempt, deliveryTarget, deliveryPlace }
+        : hook === "get"
+          ? { ...rest, offered, quality }
+          : hook === "trail"
+            ? { ...rest, quality }
+            : hook === "contact"
+              ? { ...rest, alarm, odds }
+              : hook === "leave"
+                ? t.mode === "fight"
+                  ? { ...rest, raid }
+                  : { ...rest, returns, crowd }
+                : { ...rest };
     Object.assign(questions, responseQuestion(hook, it.id));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
@@ -374,8 +393,15 @@ export function responseOf(hook: ResponseHook, key: string, answer: string, draw
  * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
  */
 export function responseKey(hook: ResponseHook, t: Touch): string {
-  return hook === "contact" ? CONTACT_KEY.key(t) : hook === "leave" ? (t.mode === "fight" ? RAIDER_KEY : FORAGER_KEY).key(t) : touchKey(t);
+  return hook === "carry"
+    ? CARRY_KEY.key(t)
+    : hook === "contact"
+      ? CONTACT_KEY.key(t)
+      : hook === "leave"
+        ? (t.mode === "fight" ? RAIDER_KEY : FORAGER_KEY).key(t)
+        : touchKey(t);
 }
+const CARRY_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "deliveryAttempt", "deliveryTarget", "deliveryPlace"]);
 const CONTACT_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "alarm", "odds"]);
 const RAIDER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "raid"]);
 const FORAGER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "returns", "crowd"]);

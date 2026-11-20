@@ -9,6 +9,7 @@ import { CROWD_HALF, FOES_HALF, MET_HALF, THREAT_HALF } from "./tuning.ts";
 import type { Item, Responses } from "./responses.ts";
 import type { Pheromones } from "./pheromone.ts";
 import type { Nest, WorldMap } from "./world.ts";
+import type { ContactAction } from "./contactAction.ts";
 
 export class AntStep {
   ca = 0;
@@ -48,6 +49,8 @@ export class AntStep {
   item!: Item;
   resp!: Responses;
   fleeFrom: number | null = null;
+  /** Resolved encounter intent for this ant only; null when no stranger is sensed. */
+  contactAction: ContactAction | null = null;
   map!: WorldMap;
   ph!: Pheromones;
   home!: Nest;

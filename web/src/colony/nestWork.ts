@@ -1,5 +1,6 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { EGG, GYNE, LARVA, LARVA_FOOD, PUPA, foodOf, isFed, owed, type BroodItem } from "./brood.ts";
 import { type Chamber } from "./chambers.ts";
@@ -55,9 +56,9 @@ import {
 } from "./tuning.ts";
 import { ENEMY, EXPLORE, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { restFetches } from "./tunnel.ts";
-import { isSky } from "./world.ts";
+import { isSky, rockAt, OPEN } from "./world.ts";
 import { climbOut } from "./homing.ts";
-import { around, touch } from "./sense.ts";
+import { around, touch, perceivedPlace } from "./sense.ts";
 import { ageWorkers, dropBrood } from "./body.ts";
 import { clearPellet, markMiddenPlane } from "./pellets.ts";
 
@@ -171,6 +172,38 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   const cy = CELL[1];
   let here = ch.at(cx, cy);
   if (col.carrying[i]) {
+    const destination = requestedDelivery(col, i);
+    if (destination) {
+      // Only the chamber physically underfoot: no address, neighbour deposit or
+      // fallback to the colony-wide hunger/chamber tables for an explicit goal.
+      const site = here >= 0 ? ch.list[here] : undefined;
+      if (
+        col.onPlane ||
+        !site ||
+        site.colony !== col.params.nest ||
+        rockAt(col.map, cx, cy) !== OPEN ||
+        site.role === "none" ||
+        perceivedPlace(col, i, site.role) !== destination
+      )
+        return false;
+      if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) {
+        col.deliveryState[i] = DELIVERY_KEEP;
+        return false;
+      }
+      col.carrying[i] = 0;
+      col.stock(site, 1);
+      if (col.porter[i]) {
+        col.portTrips++;
+        col.inJaws--;
+      } else col.stored++;
+      col.portTo[i] = -1;
+      col.porter[i] = 0;
+      col.mode[i] = EXPLORE;
+      col.asked[i] = col.question[i] = -1;
+      col.since[i] = 0;
+      endDelivery(col, i, DELIVERY_DONE);
+      return true;
+    }
     const target = col.foodTo(i);
     if (target < 0) return false; // no chamber to take it to (a colony always has its royal one: can't happen)
     // In its chamber, or beside it (a store a cell or two wide is passed by more often than stood in: review of slice 5).
@@ -266,6 +299,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
     }
   }
   if (to < 0 || to === here) return false;
+  if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "food"), col.antDraw(i))) return false;
   col.stock(c, -1);
   becomePorter(col, i, to);
   return false;
@@ -289,18 +323,15 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     // In its chamber, or beside it (a chamber a cell or two wide can be passed by), it puts the brood down there;
     // holding it too long (lost round a ring of tunnels: review of slice 4), wherever it is (a held larva goes unfed).
     const to = col.broodTo[i];
-    if (ch.at(cx, cy) === to) dropBrood(col, i);
-    else {
-      for (let d = 0; d < 6; d++) {
-        const ax = stepX(cx, cy, d);
-        const ay = stepY(cy, d);
-        if (ch.at(ax, ay) === to) {
-          dropBrood(col, i, ax, ay);
-          return;
-        }
-      }
-      if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX) dropBrood(col, i);
+    for (let d = -1; d < 6; d++) {
+      const ax = d < 0 ? cx : stepX(cx, cy, d);
+      const ay = d < 0 ? cy : stepY(cy, d);
+      if (ch.at(ax, ay) !== to) continue;
+      if (col.responses.drop(touch(col, i, enemy, col.mode[i], "brood"), col.antDraw(i))) dropBrood(col, i, ax, ay);
+      return;
     }
+    if ((col.holdT[i] = col.holdT[i] + dt) > HOLD_MAX && col.responses.drop(touch(col, i, enemy, col.mode[i], "brood"), col.antDraw(i)))
+      dropBrood(col, i);
     return;
   }
   // Zoned by age (slice 6): the young nurse; the middle-aged also take in stray brood; the old forage.

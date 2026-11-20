@@ -1,3 +1,4 @@
+import { responses } from "../../responses.ts";
 import { test } from "node:test";
 import { CountGrid } from "../../battle.ts";
 import { Game } from "../../game.ts";
@@ -849,6 +850,20 @@ test("backfill: a pellet carrier fills an unused dead end beside its way home, a
   const x0 = c.x[0];
   for (let t = 0; t < 30; t++) c.tick(1 / 30);
   assert.ok(c.x[0] > x0 + 0.5, `it went back out: x ${x0.toFixed(2)} → ${c.x[0].toFixed(2)}`);
+  let offered = false;
+  const refused = run((_, worker) => {
+    worker.responses = responses({
+      drop(t) {
+        assert.equal(t.carrying, "soil");
+        offered = true;
+        return false;
+      },
+    });
+  });
+  assert.equal(offered, true);
+  assert.equal(rockAt(refused.m, 12, 5), OPEN);
+  assert.equal(refused.c.pellet[0], 1);
+  assert.equal(refused.c.soilFilled, 0);
   // Left alone: home scent in it (being dug, or walked), food in it, an ant in it.
   const scented = run((_, k) => k.ph.deposit("home", at(12, 5).x, at(12, 5).y, 1));
   assert.equal(rockAt(scented.m, 12, 5), OPEN, "home scent: in use");

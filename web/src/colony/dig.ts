@@ -1,5 +1,6 @@
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
+import { endDelivery, DELIVERY_RELEASED } from "./deliveryAction.ts";
 import type { Colony, Corpse, HoleCell } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { type Role } from "./chambers.ts";
@@ -64,7 +65,7 @@ export function chamberDug(self: Colony, i: number, x: number, y: number): void 
  *   chamber's floor stands on (see floorGround): filling a tunnel dug down out of a chamber builds its floor
  *   back, which is construction, not spare soil put away. Put back under a chamber cell, it stays (see builtFloor).
  */
-export function backfill(self: Colony, i: number, cx: number, cy: number): boolean {
+export function backfill(self: Colony, i: number, cx: number, cy: number, enemy = false): boolean {
   const { map } = self;
   const home = self.ph.fields.home;
   const food = self.ph.fields.food;
@@ -83,6 +84,7 @@ export function backfill(self: Colony, i: number, cx: number, cy: number): boole
     // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
     // in would bury it). Rare enough (every other test passed) to look at each ant.
     if (occupied(self, tx, ty)) continue;
+    if (!self.responses.drop(touch(self, i, enemy, self.mode[i], "soil"), self.antDraw(i))) return false;
     if (!fillCell(map, tx, ty, self.time)) continue;
     // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
     // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
@@ -460,6 +462,7 @@ export function putDown(self: Colony, i: number): void {
       self.putAt[i] = cellKey(cx, cy);
     }
     self.carrying[i] = 0;
+    endDelivery(self, i, DELIVERY_RELEASED);
   } else if (self.pellet[i]) {
     if (self.line !== null && self.cur === PLANE)
       dropPlane(self, i, true); // one world's plane: spoil heaped where it stands, a corpse on the midden if out on its ring

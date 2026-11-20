@@ -1,3 +1,4 @@
+import { combatObservers } from "./combatObservation.ts";
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
 import type { OutField } from "./homing.ts";
@@ -305,6 +306,9 @@ export class Colony {
       odds: "none",
       returns: "none",
       crowd: "few",
+      deliveryAttempt: "none",
+      deliveryTarget: "none",
+      deliveryPlace: "none",
     } as Touch,
     "place",
     { get: () => this.place(this.ti), enumerable: true },
@@ -1433,6 +1437,7 @@ export class Colony {
     s.sgate = sgate;
     s.threatLeak = threatLeak;
     s.crowdKeep = crowdKeep;
+    const combatObserver = combatObservers.get(this);
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -1456,7 +1461,7 @@ export class Colony {
       if (map.sky) unbury(this, i);
       perceive(this, i, s);
       stanceStep(this, i, s);
-      decide(this, i, s);
+      decide(this, i, s, combatObserver);
       steer(this, i, s);
       const moveDigDone = moveDig(this, i, s);
       if (moveDigDone) continue;

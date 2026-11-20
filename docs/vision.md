@@ -124,3 +124,11 @@ One scripted behaviour per change:
 3. Measure the behaviour before and after.
 4. Note the new token cost for the lane in the PR, as CLAUDE.md requires. A new situation field multiplies the question space, so look for a steering-only route first ([ant-communication §1](ant-communication.md#1-how-many-channels): steering is free, the situation is paid).
 5. Close the row's bead and strike the row here.
+
+### Contact action gap
+
+[Contact actions](contact-actions.md): proximity currently causes damage even when both ants withdraw. The opt-in directed combat experiment closes this gap using the existing stranger cue and contact response; no new sense. Default promotion awaits colony-scale measurements.
+
+[Delivery actions](delivery-actions.md), ja-g7nz.3: explicit food destinations use role cues and physical arrival, bypassing the chamber-table target while active. Legacy recruitment and default porter routing remain in ja-k4k.4; this does not close that broader gap.
+
+**Delivery effort (experimental, ja-g7nz.3.2.2).** Extend the own-body sense with coarse time spent on the current local delivery attempt (`deliveryAttempt`: none/brief/long). This is a design approximation, not knowledge of an unreachable chamber; see [delivery reconsideration](delivery-actions.md#bounded-reconsideration-design-ja-g7nz322) for primary evidence and limitations. Only carry receives it. No chamber-table gap is closed by this signal.

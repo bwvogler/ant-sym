@@ -342,6 +342,14 @@ export const ANT_FIELDS = {
   steerCode: { type: Uint16Array, fill: 364, reset: "spawn" },
   /** the weights it steers by near its last find (find `near`), packed as steerCode; STEER_NEUTRAL = none */
   steerNear: { type: Uint16Array, fill: 364, reset: "spawn" },
+  /** Layer on which this step chose to attack; -1 means no attack. */
+  attackLayer: { type: Int8Array, fill: -1, reset: "spawn" },
+  /** Explicit food destination (0 none, otherwise DELIVERY_ROLES index + 1). */
+  deliveryRole: { type: Uint8Array, reset: "spawn" },
+  /** Last delivery outcome, for inspection without policy calls. */
+  deliveryState: { type: Uint8Array, reset: "spawn" },
+  /** Local delivery attempt duration, saturated at deliveryReconsider. */
+  deliveryTime: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

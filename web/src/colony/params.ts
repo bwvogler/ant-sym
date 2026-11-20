@@ -44,6 +44,8 @@ export interface ColonyParams {
   nest: number;
   /** cells per second */
   speed: number;
+  /** Experimental surface retreat speed multiplier for an unladen ant moving away from a sensed threat. */
+  withdrawalSpeed?: number;
   /** how far ahead the three sensors sit, cells */
   sensorDistance: number;
   /** left and right sensors, radians off the heading */
@@ -97,6 +99,10 @@ export interface ColonyParams {
    * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
    */
   steerLane: number;
+  /** Permit explicit food destination roles from carry responses; 0 preserves legacy routing. */
+  deliveryLane: number;
+  /** Seconds before carry senses a long local delivery attempt; 0 disables tracking (design). */
+  deliveryReconsider: number;
   /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
   findNear: number;
   /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
@@ -464,6 +470,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   reroll: 10,
   rerollLaw: 0,
   steerLane: 0,
+  deliveryLane: 0,
+  deliveryReconsider: 0,
   findNear: 8,
   searchSpan: 1.33,
   foodTrailPlane: 1,
