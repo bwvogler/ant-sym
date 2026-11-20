@@ -740,3 +740,21 @@ Shorter attack reaches did not resolve the defense trade-off.
 All tested directed reaches cost more defenders on both seeds. A shorter reach can improve food or losses compared with 0.65, but none preserved the existing defense outcomes on both seeds. Future comparisons should isolate the defenders' local contact decisions while retaining directed attacks.
 
 Reproduce with `ANT_ASSAY_SECONDS=600 node scripts/drop-refusal-recovery.mjs --candidate 71 72 73 74` and `node scripts/drop-refusal-recovery.mjs --guard defendHome 11 0.45`. Use `contact` for the neutral encounter and `game1` for the held-food sample.
+
+The three G1 samples split evenly on pass count (two of three in each arm). Seed 4 improved strongly, seed 1 crossed the threshold in the other direction, and seed 10 stayed within it. The full ten-seed G1 verdict requires seven more pairs.
+
+| G1 seed | Existing peak long-held loads (player / rival) | Candidate peak (player / rival) |
+| --- | ---: | ---: |
+| 1 | 2 / 1 | 3 / 1 |
+| 4 | 5 / 1 | 1 / 1 |
+| 10 | 1 / 1 | 0 / 2 |
+
+| Default-size seed | Player food, existing → candidate | Rival food, existing → candidate | Total worker losses, existing → candidate |
+| --- | ---: | ---: | ---: |
+| 71 | 2612 → 2244 | 3121 → 3075 | 352 → 1 |
+| 72 | 2244 → 2161 | 4162 → 4009 | 178 → 4 |
+| 73 | 3774 → 4143 | 4019 → 4307 | 144 → 8 |
+| 74 | 3980 → 2997 | 4143 → 5057 | 227 → 0 |
+| Total | 12610 → 11545 | 15445 → 16448 | 901 → 13 |
+
+Across four 600-second games, combined food was 28055 versus 27993, down 0.2%. The player's share fell from 44.9% to 41.2%, with less food on three maps. The test combines symmetric directed combat with player-only contextual unloading and cannot isolate the source of that redistribution. Unloading refused 113 times across the candidate matches, concentrated on seed 72. The neutral-contact benefit is clear, but the raid-defense costs and mixed G1 samples leave normal-play adoption pending.
