@@ -686,3 +686,31 @@ Run seed 22 with directed attack reach 0.65 and `routeStallLimit=3` for both col
 | 342 | 18.27 | 309.77 | 206.97 | 102.80 |
 
 Each intervention matched the original pickup and complete logged reset event, including tick, position, route state and search radius, before altering the offset. Each carrier completed the surface leg within 120 seconds of pickup in its own intervention replay (75.30–97.17 seconds). This isolates a cost of preserving the inherited offset for these three trips. Simultaneous colony-wide resets can change which food is picked up, routing interactions and combat exposure. They still need paired whole-game validation on seed 22 and fresh maps.
+
+### Default-world food throughput with directed combat
+
+We ran 120-second pairs on default maps, with 800 workers per colony, rivals, and normal fungal transmission and grooming. Each seed ran four combinations with the same starting floor-mark inoculation. The contextual rules suppress food trail in perceived tunnels and make foragers refuse to unload there, with a bounded loose-food handoff. Directed combat uses the 0.65 world-unit reach from the contact trials.
+
+| Seed set | Existing food / losses | Directed alone | Contextual alone | Combined |
+| --- | ---: | ---: | ---: | ---: |
+| 41–44 | 3452 / 112 | 3628 / 1 | 3518 / 101 | 3285 / 1 |
+| 51–54 | 3831 / 46 | 3977 / 0 | 3794 / 23 | 3569 / 2 |
+
+These are player-colony totals. Directed combat alone increased food overall on both sets and reduced losses on every seed. Adding the contextual doctrine to directed combat reduced food by 343 and 408 respectively. The combined runs ended with fewer observed food pickups and more loads still held than directed alone in both sets. The drop hook issued 108 refusals across the eight combined runs. The strongest evidence is for an interaction between directed combat and the contextual doctrine. The experiment does not yet assign the interaction to trail or drop decisions.
+
+Reproduce with `node scripts/drop-refusal-recovery.mjs --isolate 41 42 43 44 51 52 53 54`. Pickup counts are empty-to-carrying transitions observed across ticks, excluding internal porter pickups. A pickup and unload within the same tick does not appear in this count.
+
+We then held directed combat fixed and replayed four maps where the combined arm regressed. The trail-only arm suppresses food trail in perceived tunnels. The drop-only arm preserves local trail laying and keeps the contextual refusal with bounded handoff.
+
+| Seed | Directed only | With trail suppression | With contextual drop | With both |
+| --- | ---: | ---: | ---: | ---: |
+| 42 | 1245 | 1100 | 1300 | 1080 |
+| 44 | 482 | 375 | 482 | 367 |
+| 52 | 852 | 716 | 847 | 717 |
+| 54 | 1180 | 1047 | 1180 | 1046 |
+
+Trail suppression lowered both pickups and stored food on all four maps. Restoring local food-trail emission while keeping the drop decision recovered the throughput on these maps. Retain the trail hook for fungal or doctrine control, and carry the drop-only doctrine forward for longer whole-game validation.
+
+On two fresh seeds, the drop-only run matched directed combat exactly for stored food and losses. Trail suppression increased stored food on both (781 to 808 and 1018 to 1262). Its effect depends on the map, which argues against suppressing trails in every perceived tunnel in the baseline doctrine.
+
+Reproduce the split with `node scripts/drop-refusal-recovery.mjs --split 42 44 52 54 61 62`.

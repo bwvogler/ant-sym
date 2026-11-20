@@ -1,4 +1,4 @@
-// Default-size, two-colony runs: node scripts/drop-refusal-recovery.mjs [--isolate] [seed ...]
+// Default-size, two-colony runs: node scripts/drop-refusal-recovery.mjs [--isolate | --split] [seed ...]
 import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
 const dt = 1 / 30;
@@ -19,10 +19,10 @@ function run(seed, directed, contextual, recover) {
     colony.responses = {
       ...localResponses,
       trail(t, draw) {
-        return t.carrying === "food" && t.place === "tunnel" ? "none" : localResponses.trail(t, draw);
+        return contextual !== "drop" && t.carrying === "food" && t.place === "tunnel" ? "none" : localResponses.trail(t, draw);
       },
       drop(t, draw) {
-        if (t.carrying === "food" && !t.porter && t.place === "tunnel") {
+        if (contextual !== "trail" && t.carrying === "food" && !t.porter && t.place === "tunnel") {
           dropRefusals++;
           return false;
         }
@@ -71,12 +71,24 @@ function run(seed, directed, contextual, recover) {
 
 const args = process.argv.slice(2);
 const isolate = args.includes("--isolate");
-const seeds = args.filter((arg) => arg !== "--isolate").map(Number);
+const split = args.includes("--split");
+const seeds = args.filter((arg) => arg !== "--isolate" && arg !== "--split").map(Number);
 for (const seed of seeds.length ? seeds : [41, 42, 43, 44]) {
-  const existing = run(seed, false, false, false);
-  const recovery = run(seed, true, true, true);
+  if (split) {
+    console.log(
+      JSON.stringify({
+        seed,
+        directed: run(seed, true, null, false),
+        trail: run(seed, true, "trail", true),
+        drop: run(seed, true, "drop", true),
+      }),
+    );
+    continue;
+  }
+  const existing = run(seed, false, null, false);
+  const recovery = run(seed, true, "both", true);
   const controls = isolate
-    ? { directed: run(seed, true, false, false), contextual: run(seed, false, true, true) }
-    : { actions: run(seed, true, true, false) };
+    ? { directed: run(seed, true, null, false), contextual: run(seed, false, "both", true) }
+    : { actions: run(seed, true, "both", false) };
   console.log(JSON.stringify({ seed, existing, ...controls, recovery }));
 }
