@@ -247,3 +247,43 @@ A separate trial let empty-jawed surface ants continue withdrawal for 0.15 secon
 Raid pass count stayed at 1/5. Neutral food fell on every seed, with a 16% loss on seed 3. The brief heading commitment was rejected and removed. That distinguishes faster separation from making the same withdrawal last longer.
 
 Reproduce the visibility trace with the withdrawal-episode command above. It adds the number of pressure ticks and deaths that became detectable after movement.
+
+### First-visible-tick reaction window
+
+A 300-second trial let a defender survive its first damage tick when the pre-movement contact decision was absent and ordinary post-movement sensing could now detect a stranger. The trial still laid alarm and drew the normal combat random roll. Already detected threats and pressure from threats that were still undetectable followed the ordinary damage rule. Unit checks verified that the first visible tick consumed its roll and that a defender that had already seen the threat still took damage.
+
+| A13 seed | Directed food / defender losses / raiders lost | With reaction window | Pass, directed / window |
+|---:|---:|---:|---|
+| 2 | 315 / 124 / 42 | 289 / 127 / 37 | pass / fail |
+| 3 | 336 / 106 / 35 | 478 / 111 / 35 | fail / fail |
+| 4 | 106 / 127 / 29 | 106 / 127 / 29 | fail / fail |
+| 5 | 77 / 158 / 36 | 115 / 144 / 40 | fail / pass |
+| 6 | 78 / 147 / 39 | 99 / 159 / 37 | fail / fail |
+| 7 | 119 / 121 / 29 | 119 / 121 / 29 | fail / fail |
+| 8 | 103 / 132 / 36 | 103 / 132 / 36 | fail / fail |
+
+Neutral A9 food and casualties matched exactly on all seven seeds. The two holdout raids generated 21 and 25 reaction windows, respectively. None of their rolls would have killed the defender, and both runs matched their controls. Raid passes stayed at 1/7 overall, and the trial was removed. The movement-phase gap is real, but it did not account for the sustained raid losses in these runs. The stronger remaining lead is the raiders' ability to keep applying directed pressure over multiple decisions.
+
+### Sustained attack choices
+
+In the first 30 seconds on seeds 2–8, raiders chose attack 4,978 times. Of those choices, 4,398 (88%) immediately followed another attack choice by the same ant. Defenders chose attack 304 times. The longest uninterrupted attack-choice series per seed ran 1.5–6.5 seconds for raiders and at most 1.13 seconds for defenders. This follows an ant's decisions; the target can change between choices.
+
+The assay can reproduce these counts with `node scripts/experiment.mjs defendHome --seeds 2-8 --seconds 30 --set game.fight.intent=true --jobs 5`.
+
+### Directed attack reach
+
+The next trial limits pressure to the attacker's cell, compared with the standard cell plus its first ring. Detection and contact decisions use the same rules as before. The A13 comparison controls inherit the same combat settings as their treatment.
+
+| Seed | Raid food, standard / same cell | Defender losses | Raider losses | Neutral food |
+|---:|---:|---:|---:|---:|
+| 2 | 315 / 678 | 124 / 66 | 42 / 35 | 1,559 / 1,537 |
+| 3 | 336 / 563 | 106 / 72 | 35 / 38 | 2,182 / 2,102 |
+| 4 | 106 / 205 | 127 / 73 | 29 / 24 | 2,070 / 2,066 |
+| 5 | 77 / 231 | 158 / 84 | 36 / 43 | 2,061 / 1,653 |
+| 6 | 78 / 316 | 147 / 88 | 39 / 37 | 1,557 / 1,557 |
+| 7 | 119 / 141 | 121 / 88 | 29 / 37 | 1,168 / 1,160 |
+| 8 | 103 / 165 | 132 / 86 | 36 / 32 | 1,521 / 1,517 |
+
+All seven raids ended with fewer defender losses and more food (total losses 915 → 557). Raid passes still shifted from seed 2 to seed 5 because most runs miss the raider-loss threshold. Neutral A9 passed on all seeds, but seed 5 lost nearly 20% of food throughput. Collision range substantially changes sustained pressure. The next comparison should measure actual attacker–target distance, since a cell-only rule depends on cell boundaries.
+
+Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 2-8 --set game.fight.intent=true --set game.fight.attackReach=0 --jobs 5`.

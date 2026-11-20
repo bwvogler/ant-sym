@@ -28,6 +28,8 @@ export interface FightParams {
   rate: number;
   /** Experimental directed aggression; absent/false preserves legacy fights. */
   intent?: boolean;
+  /** Reach of directed attacks measured in hex rings. */
+  attackReach?: 0 | 1;
   /** alarm laid per second by an ant in a fight */
   alarm: number;
 }
@@ -134,7 +136,7 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
 // Reused across ticks and layers; only touched cells are cleared. Recognition uses
 // ten target bands, never a list of ant pairs. Without recognition, target colonies.
 const pressureCache = new WeakMap<Colony, SumGrid[]>();
-function attackPressure(colonies: Colony[], recognition: boolean, layer: number): SumGrid[] {
+function attackPressure(colonies: Colony[], recognition: boolean, layer: number, reach: 0 | 1): SumGrid[] {
   if (!colonies.length) return [];
   const count = recognition ? BINS : colonies.length;
   let grids = pressureCache.get(colonies[0]);
@@ -152,7 +154,7 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number)
       c.antCell(i);
       const cx = CELL[0],
         cy = CELL[1];
-      const offsets = discOffsets(1)[cy & 1] as Int16Array;
+      const offsets = discOffsets(reach)[cy & 1] as Int16Array;
       for (let k = 0; k < offsets.length; k += 2) {
         const x = cx + offsets[k],
           y = cy + offsets[k + 1];
@@ -193,7 +195,7 @@ export function resolveFights(
   rec: Recognition | null = null,
   layer = -1,
 ): number[] {
-  const pressure = p.intent ? attackPressure(colonies, rec !== null, layer) : null;
+  const pressure = p.intent ? attackPressure(colonies, rec !== null, layer, p.attackReach ?? 1) : null;
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const observer = combatObservers.get(c);

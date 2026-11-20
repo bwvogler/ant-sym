@@ -949,6 +949,7 @@ function observedDefence(spec: RunSpec): RunSpec {
               { time: number; alarm: string; movement: string; homeSeen: boolean; x: number; y: number; layer: number; heading: number }
             >();
             const exposures = new Map<number, { time: number; streak: number }>();
+            const attacks = new Map<number, { time: number; streak: number }>();
             const dt = spec.dt ?? 1 / 30;
             combatObservers.set(colony, {
               contact(action, ant, sensed, heading) {
@@ -971,6 +972,15 @@ function observedDefence(spec: RunSpec): RunSpec {
                     heading,
                     homeSeen: colony.s[3] === SEEN || colony.s[4] === SEEN || colony.s[5] === SEEN,
                   });
+                if (action.movement === "attack" && game.time <= 30) {
+                  const previous = attacks.get(ant);
+                  const repeated = previous !== undefined && Math.abs(game.time - previous.time - dt) < 1e-8;
+                  const streak = repeated ? previous.streak + 1 : 1;
+                  attacks.set(ant, { time: game.time, streak });
+                  add("earlyAttackChoices");
+                  add("earlyRepeatedAttackChoices", Number(repeated));
+                  counts[`${prefix}.earlyLongestAttackSeconds`] = Math.max(counts[`${prefix}.earlyLongestAttackSeconds`] ?? 0, streak * dt);
+                }
                 add(action.movement);
                 if (action.reason === "protect load") add("protectedLoad");
                 if (action.reason === "report home") add("reporting");
