@@ -310,3 +310,7 @@ The 0.85 radius passed two pilot raids versus one for 0.65, but the shorter radi
 The 0.65 radius improved survival and food on all seven raid seeds and raised passes from 1/7 to 3/7. Across those seeds defender losses fell from 915 to 528. Neutral contact passed on all seven, with zero casualties and a worst food loss of 6.7% (seed 3). This radius is the stronger candidate to take into the existing full-width A9/A13/G1 sweep. Unlike the grid approximation, the distance path visits nearby attacker–victim pairs, so that sweep should also compare tick cost under large clashes.
 
 Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 3,5,6 --set game.fight.intent=true --set game.fight.attackDistance=0.65,0.85 --jobs 6`; holdout `--seeds 2,4,7,8 --set game.fight.attackDistance=0.65` with the same assays and directed intent.
+
+A paired 600-second G1 run on prior failure seed 12 reproduced every gameplay metric at both reaches, including 2,423/2,768 food, zero losses and a maximum of three long-held loads. The latter remains above the pass threshold of two. Observed runtime was 8.86 versus 8.69 ms/tick for the standard and distance paths, respectively, with two workers sharing the machine. This zero-casualty seed does not establish cost under sustained fighting. The remaining G1 failure on this seed belongs to carrying and delivery, even when combat reach changes.
+
+Reproduce with `node scripts/experiment.mjs game1 --seeds 12 --set game.fight.intent=true --set game.fight.attackDistance=0,0.65 --jobs 2`.
