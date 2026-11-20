@@ -6,6 +6,7 @@ import {
   CountGrid,
   CURTAIN,
   decodeFungal,
+  dropFood,
   encodeLevels,
   fungalKey,
   fungusContext,
@@ -96,7 +97,14 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
       colony.reconsider();
       assert.equal(colony.load[1], 0);
       game.tick(DT);
-      receiver = { question: colony.lastQuestion(1), mode: MODES[colony.mode[1]], load: colony.load[1] };
+      const question = colony.lastQuestion(1);
+      const mode = MODES[colony.mode[1]];
+      // Give only the receiver access to the same nearby food after its first decision.
+      colony.putAnt(0, PLANE, 20, 20);
+      const storedBeforePickup = colony.stored;
+      dropFood(game.world!.curtain, queen.x + 1, queen.y, 1);
+      for (let tick = 0; tick < 60 && colony.stored === storedBeforePickup; tick++) game.tick(DT);
+      receiver = { question, mode, load: colony.load[1], delivered: colony.stored - storedBeforePickup };
     }
     return {
       receiver,
@@ -142,4 +150,6 @@ test("fungus aim changes the cached trail choice and the scent laid with one fix
   assert.equal(damp.receiver?.mode, "explore");
   assert.equal(clear.receiver?.load, 0);
   assert.equal(damp.receiver?.load, 0);
+  assert.equal(clear.receiver?.delivered, 1);
+  assert.equal(damp.receiver?.delivered, 1);
 });
