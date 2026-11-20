@@ -21,7 +21,7 @@ import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
 import { openLearn, type LearnTarget } from "./learn.ts";
-import type { DecidedBy } from "./colonyJev.ts";
+import { cachedActionTrace, type DecidedBy } from "./colonyJev.ts";
 import { useSimTick } from "./session.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
@@ -101,6 +101,11 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
       {!carrying && col.params.deliveryLane > 0 && col.deliveryState[i] > 0 && (
         <p className="mt-2 text-xs text-fg-3">{deliveryExplanation(col, i)}</p>
       )}
+      {cachedActionTrace(col, i).map(({ hook, choice }) => (
+        <p key={hook} className="mt-1 text-xs text-fg-3">
+          Last cached {hook} decision · {typeof choice === "boolean" ? (choice ? "yes" : "no") : choice}
+        </p>
+      ))}
       {carrying ? (
         <p className="mt-2 text-xs text-fg-3">{deliveryExplanation(col, i)}</p>
       ) : q ? (

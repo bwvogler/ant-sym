@@ -166,7 +166,7 @@ function fungusAlso() {
 // its key, packing, reading and context (the fungus's in the side view, the one the shipped answers are for), the id its items carry, its
 // request size, and whether it asks under a doctrine or an aim (and which presets).
 const LANES = Object.fromEntries(
-  LANE_LIST.map((l) => [
+  LANE_LIST.filter((l) => l.presets.length > 0).map((l) => [
     l.name,
     {
       situations: l.name === "steer" ? steerSituationsMet : (l.all ?? fungalSituations),

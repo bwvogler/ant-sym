@@ -51,6 +51,13 @@ import {
   topOf,
   weightsOf,
   steeringOf,
+  RESPONSE_HOOKS,
+  type ResponseHook,
+  type Touch,
+  type Responses,
+  type AntDraw,
+  type ResponseAnswer,
+  responseOf,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -192,6 +199,7 @@ interface Driven {
   stances: Lane<StanceSituation, Stance> | null;
   /** its ants' steering weights (ja-ykmu.3): the generic ant's situations only (a species with its own schema has none) */
   steers: Lane<SteerSituation, string> | null;
+  actions: Partial<Record<ResponseHook, Lane<Touch, string>>>;
 }
 
 /**
@@ -233,14 +241,55 @@ function steerLane(words: string): Lane<SteerSituation, string> {
   });
 }
 
+interface ActionTrace {
+  hook: ResponseHook;
+  choice: ResponseAnswer;
+  generation: number;
+}
+const actionTraces = new WeakMap<Colony, Map<number, Partial<Record<ResponseHook, ActionTrace>>>>();
+
+function recordAction(colony: Colony, hook: ResponseHook, choice: ResponseAnswer): void {
+  let ants = actionTraces.get(colony);
+  if (!ants) actionTraces.set(colony, (ants = new Map()));
+  const i = colony.ti;
+  let actions = ants.get(i);
+  if (!actions) ants.set(i, (actions = {}));
+  const last = actions[hook];
+  if (!last || last.choice !== choice || last.generation !== colony.gen[i]) actions[hook] = { hook, choice, generation: colony.gen[i] };
+}
+
+export function cachedActionTrace(colony: Colony, i: number): ActionTrace[] {
+  const actions = actionTraces.get(colony)?.get(i);
+  return actions && colony.alive[i] ? Object.values(actions).filter((action) => action.generation === colony.gen[i]) : [];
+}
+
+// Touch is shared by all ants and its place is a getter over the current ant.
+const snapshotTouch = (t: Touch): Touch => ({ ...t });
+
+function actionLane(hook: ResponseHook, words: string): Lane<Touch, string> {
+  const row = LANES[hook];
+  return lane({
+    name: hook,
+    key: (s: Touch) => row.key(s, undefined),
+    pack: row.pack,
+    read: row.read,
+    local: () => NO_ANSWER,
+    valid: row.valid,
+    contextOf: row.contextOf,
+    gather: row.gather,
+    words,
+  });
+}
+
 /** A colony's lanes, asking under `words` (its doctrine) in its species' lane words; a lane the species lacks is null. */
-function colonyLanes(words: string, species: Species): Omit<Driven, "colony"> {
+function colonyLanes(words: string, species: Species, actions: boolean): Omit<Driven, "colony"> {
   const { mode, stance } = species.lanes;
   return {
     // the stand-in while a situation is unanswered is the species' own local rule (ja-fnd.5.9)
     modes: mode ? antLane<Situation, string>(LANES.mode, words, mode, species.policy ?? LANES.mode.local) : null,
     stances: stance ? antLane(LANES.stance, words, stance) : null,
     steers: mode && !mode.schema ? steerLane(words) : null,
+    actions: actions && mode && !mode.schema ? Object.fromEntries(RESPONSE_HOOKS.map((hook) => [hook, actionLane(hook, words)])) : {},
   };
 }
 
@@ -331,6 +380,7 @@ export class ColonyJev {
   #starts = 0;
   /** where the next cycle starts in the lanes, so no lane waits behind the others' long queues (ja-ytc) */
   #nextLane = 0;
+  #baseResponses = new WeakMap<Colony, Responses>();
   #listeners = new Set<Listener>();
   #state: ColonyJevState = {
     phase: "off",
@@ -418,13 +468,16 @@ export class ColonyJev {
     const modes = new Map<string, number>();
     const stances = new Map<string, number>();
     const steers = new Map<string, number>();
+    const actions = new Map<LaneName, Map<string, number>>(RESPONSE_HOOKS.map((hook) => [hook, new Map()]));
     for (const d of this.#driven) {
       if (d.modes) modes.set(d.modes.context, this.#cache(d.modes).size);
       if (d.stances) stances.set(d.stances.context, this.#cache(d.stances).size);
       if (d.steers) steers.set(d.steers.context, this.#cache(d.steers).size);
+      for (const l of Object.values(d.actions)) actions.get(l.name)!.set(l.context, this.#cache(l).size);
     }
     const sum = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
-    const cached: Record<LaneName, number> = {
+    const cached = {
+      ...perLane((name) => sum(actions.get(name) ?? new Map())),
       mode: sum(modes),
       stance: sum(stances),
       fungus: this.#cache(this.#fungal).size,
@@ -454,7 +507,7 @@ export class ColonyJev {
    * no current answer is queued to be asked, under any words, preset or the player's own; while none is, the miss is
    * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
-  #lookup<S, A extends string>(l: Lane<S, A>, s: S): A {
+  #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S): A {
     if (l.asks && !l.asks(s)) return l.local(s);
     const key = l.key(s);
     const hit = this.#cache(l).get(key);
@@ -467,7 +520,7 @@ export class ColonyJev {
     if (!running) this.wantsRun?.();
     if (running && this.#unasked(l, key)) {
       if (l.queue.size === 0) l.since = Date.now();
-      l.queue.set(key, s);
+      l.queue.set(key, snapshot ? snapshot(s) : s);
     }
     return (this.#canAsk ? null : this.#earlier(l, key)) ?? l.local(s);
   }
@@ -694,16 +747,39 @@ export class ColonyJev {
    * Drive these colonies, each under its own doctrine (a new world is new colonies; the caches carry over:
    * situations depend on neither the colony nor the map). Each colony's policies become its own lanes.
    */
-  attachColonies(colonies: readonly Colony[], species: Species = GENERIC_ANT): void {
+  attachColonies(colonies: readonly Colony[], species: Species = GENERIC_ANT, actions = false): void {
     this.#species = species;
     this.#driven = colonies.map((colony, k) => {
       const words = this.#doctrines[k] ?? this.#doctrines[0] ?? "";
-      const d: Driven = { colony, ...colonyLanes(words, species) };
+      const d: Driven = { colony, ...colonyLanes(words, species, actions) };
       // A lane the species lacks is never asked: the colony keeps the policy the Game gave it (its local rule).
       const { modes, stances, steers } = d;
       if (modes) colony.bindPolicy("mode", this.#modePolicy(modes));
       if (stances) colony.bindPolicy("stance", (s) => this.#lookup(stances, s));
       if (steers) colony.bindPolicy("steer", (s, draw) => steeringOf(steers.key(s), this.#lookup(steers, s), draw));
+      const base = this.#baseResponses.get(colony) ?? colony.responses;
+      this.#baseResponses.set(colony, base);
+      const bound = { ...base };
+      for (const hook of RESPONSE_HOOKS) {
+        const l = d.actions[hook];
+        if (!l) continue;
+        (bound as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
+          const answer = this.#lookup(l, t, snapshotTouch);
+          if (!answer) return base[hook](t, draw);
+          const choice = responseOf(hook, l.key(t), answer, draw);
+          if (
+            hook === "carry" &&
+            t.carrying === "food" &&
+            typeof choice === "string" &&
+            choice.startsWith("to ") &&
+            colony.params.deliveryLane === 0
+          )
+            colony.params.deliveryLane = 1;
+          recordAction(colony, hook, choice);
+          return choice;
+        };
+      }
+      colony.responses = Object.keys(d.actions).length ? bound : base;
       colony.reconsider();
       return d;
     });
@@ -728,6 +804,7 @@ export class ColonyJev {
       const a = d.modes ? this.#recontext(d.modes, text) : false;
       const b = d.stances ? this.#recontext(d.stances, text) : false;
       const c = d.steers ? this.#recontext(d.steers, text) : false;
+      for (const l of Object.values(d.actions)) this.#recontext(l, text);
       if (a || b || c) d.colony.reconsider();
     });
   }
@@ -846,6 +923,7 @@ export class ColonyJev {
       if (d.stances) out.push(d.stances as Lane<unknown, string>);
       if (d.modes) out.push(d.modes as Lane<unknown, string>);
       if (d.steers) out.push(d.steers as Lane<unknown, string>);
+      for (const l of Object.values(d.actions)) out.push(l as Lane<unknown, string>);
     }
     out.push(this.#fungal as Lane<unknown, string>, this.#growth as Lane<unknown, string>);
     return out;
@@ -892,7 +970,7 @@ export class ColonyJev {
           if (batch.length >= (l.batch ?? this.opts.batch)) break;
           l.queue.delete(k);
           // Another colony's lane may be asking it under the same context already: one question, one answer for both.
-          if (this.#asking.has(askKey(l.context, k))) continue;
+          if (this.#cache(l).get(k) || this.#asking.has(askKey(l.context, k))) continue;
           this.#asking.add(askKey(l.context, k));
           batch.push([k, s]);
         }

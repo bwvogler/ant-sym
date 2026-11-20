@@ -20,6 +20,7 @@ import {
   LANES,
   GROWTH_BRAIN_VERSION,
   growthContext,
+  responseContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
 import {
@@ -48,6 +49,12 @@ const CONTEXT: Record<string, (words: string) => string> = {
   fungus: (aim) => fungusContext(aim),
   growth: growthContext,
   steer: steerContext,
+  get: (words) => responseContext("get", words),
+  carry: (words) => responseContext("carry", words),
+  drop: (words) => responseContext("drop", words),
+  trail: (words) => responseContext("trail", words),
+  contact: (words) => responseContext("contact", words),
+  leave: (words) => responseContext("leave", words),
 };
 // The steer lane's answers under its default weights (search, memory: ja-ykmu.3): a level each, −1, 0 or 1.
 const LEVELS = ["-1", "0", "1"];

@@ -2,6 +2,14 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DOCTRINES,
+  CURTAIN,
+  GENERIC_ANT,
+  MODES,
+  LANES,
+  responseContext,
+  responseKey,
+  requestedDelivery,
+  touch as touchAnt,
   Game,
   generateOneWorld,
   mulberry32,
@@ -13,8 +21,9 @@ import {
   steeringOf,
   validSteer,
   type SteerSituation,
+  type Touch,
 } from "../../colony/index.ts";
-import { ColonyJev } from "../colonyJev.ts";
+import { cachedActionTrace, ColonyJev } from "../colonyJev.ts";
 import type { RunSummary } from "../../../shared/jev.ts";
 
 // The steer lane (ja-ykmu.3; docs/steering.md): an explorer's or follower's steering weights, asked per situation under
@@ -60,7 +69,11 @@ function proxy(score: number): { questions: string[] } {
     const answers = Object.fromEntries(
       Object.entries(req.questions).map(([q, v]) => [
         q,
-        v.type === "score" ? { type: "score", score } : { type: "choice", choice: "explore" },
+        v.type === "score"
+          ? { type: "score", score }
+          : v.type === "noul"
+            ? { type: "noul", noul: 0 }
+            : { type: "choice", choice: "explore" },
       ]),
     );
     const body = {
@@ -150,4 +163,63 @@ test("in a run, an explorer's situation is asked under the doctrine, and the ans
   // Another doctrine is another cache.
   j.setDoctrine(DOCTRINES[1]!.text);
   assert.deepEqual(c.steerPolicy(out), NEUTRAL_STEERING);
+});
+
+test("a live cached drop answer keeps food in an ant's jaws and is visible in its trace", () => {
+  const j = new ColonyJev();
+  live.add(j);
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 1, rival: false }, mulberry32(3));
+  const c = g.player;
+  const doctrine = DOCTRINES[0]!.text;
+  j.setDoctrine(doctrine);
+  j.attachColonies([c], GENERIC_ANT, true);
+  c.putAnt(0, CURTAIN, c.queen!.x, c.queen!.y);
+  c.mode[0] = MODES.indexOf("return");
+  c.carrying[0] = 1;
+  const situation = touchAnt(c, 0, false, c.mode[0], "food");
+  const key = responseKey("drop", situation);
+  assert.equal(j.seed(responseContext("drop", doctrine), [[key, "false=1"]]), 1);
+  assert.equal(j.state.lanes.drop.cached, 1);
+  g.tick(1 / 30);
+  assert.equal(c.carrying[0], 1);
+  assert.equal(c.stored, 0);
+  assert.ok(cachedActionTrace(c, 0).some(({ hook, choice }) => hook === "drop" && choice === false));
+
+  j.setDoctrine("Put food down at the first opportunity.");
+  c.putAnt(0, CURTAIN, c.queen!.x, c.queen!.y);
+  g.tick(1 / 30);
+  assert.equal(c.carrying[0], 0);
+  assert.equal(c.stored, 1);
+
+  c.mode[0] = MODES.indexOf("return");
+  c.carrying[0] = 1;
+  const carryKey = responseKey("carry", touchAnt(c, 0, false));
+  assert.equal(j.seed(responseContext("carry", "Put food down at the first opportunity."), [[carryKey, "to store=1"]]), 1);
+  g.tick(1 / 30);
+  assert.equal(requestedDelivery(c, 0), "store");
+  assert.equal(c.carrying[0], 1);
+});
+
+test("live action requests keep the original situation and deduplicate across colonies", async () => {
+  const seen = proxy(0);
+  const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 });
+  live.add(j);
+  const a = colony();
+  const b = colony();
+  j.attachColonies([a, b], GENERIC_ANT, true);
+  const situation: Touch = { ...LANES.get.sample, offered: "food" };
+  const key = responseKey("get", situation);
+  await j.start();
+  for (let i = 0; i < 10; i++) {
+    assert.equal(a.responses.get(situation), true);
+    assert.equal(b.responses.get(situation), true);
+  }
+  situation.offered = "soil";
+  await tick(100);
+  assert.deepEqual(seen.questions, ["aget0_get"]);
+  assert.equal(j.state.lanes.get.asked, 1);
+  assert.equal(j.state.lanes.get.cached, 1);
+  assert.equal(j.seed(responseContext("get", ""), [[key, "true=1"]]), 0);
+  assert.equal(a.responses.get({ ...situation, offered: "food" }), false);
+  assert.equal(b.responses.get({ ...situation, offered: "food" }), false);
 });

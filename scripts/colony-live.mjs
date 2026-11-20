@@ -96,7 +96,7 @@ if (!KEY && !opts.dry) {
 if (!(opts.budget > 0 && opts.budget <= 1)) throw new Error("--budget must be in (0, 1] dollars");
 
 // The lanes: how to key, pack, read and answer locally.
-// An ant's lane is its row of the lane registry (colony/lanes.ts); the responses are asked only from here, so their table stays here.
+// An ant's lane is its row of the lane registry (colony/lanes.ts).
 const antLane = (row) => ({ key: (s) => row.key(s, undefined), pack: row.pack, read: row.read, local: row.local });
 const LANES = {
   mode: antLane(ROWS.mode),

@@ -50,4 +50,5 @@ export * from "./weighted.ts";
 export * from "./steerBrain.ts";
 export * from "./world.ts";
 
-export { deliveryExplanation } from "./deliveryAction.ts";
+export { touch } from "./sense.ts";
+export { deliveryExplanation, requestedDelivery } from "./deliveryAction.ts";

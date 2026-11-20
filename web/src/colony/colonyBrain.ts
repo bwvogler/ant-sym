@@ -44,8 +44,8 @@ import {
 // and cached answers are kept per doctrine (`policyContext`, `stanceContext`).
 // The ant's small responses (responses.ts: get, carry, drop, trail) each have
 // a lane too: one question per response situation (`Touch`), under the same
-// doctrine (`packResponseRequest`, `responseContext`). They are not asked by
-// the page yet: scripts/colony-live.mjs asks them, colony-cost estimates them.
+// doctrine (`packResponseRequest`, `responseContext`). The game page and
+// scripts/colony-live.mjs share those request and cache formats.
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
 export const COLONY_BRAIN_VERSION = 7;
