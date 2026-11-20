@@ -287,3 +287,26 @@ The next trial limits pressure to the attacker's cell, compared with the standar
 All seven raids ended with fewer defender losses and more food (total losses 915 → 557). Raid passes still shifted from seed 2 to seed 5 because most runs miss the raider-loss threshold. Neutral A9 passed on all seeds, but seed 5 lost nearly 20% of food throughput. Collision range substantially changes sustained pressure. The next comparison should measure actual attacker–target distance, since a cell-only rule depends on cell boundaries.
 
 Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 2-8 --set game.fight.intent=true --set game.fight.attackReach=0 --jobs 5`.
+
+### Continuous attack reach
+
+The distance comparison searches nearby attacker cells, then checks actual center-to-center distance and the sampled line between the two ants. It preserves layer separation, directed intent, and the attacker's odour tolerance. The test covers both directions of the boundary artifact: close ants in different cells can fight, and distant ants in the same cell cannot.
+
+| Pilot seed | A13 food, standard / 0.65 / 0.85 | Defender losses | Raider losses | A9 food |
+|---:|---:|---:|---:|---:|
+| 3 | 336 / 370 / 194 | 106 / 64 / 99 | 35 / 31 / 36 | 2,182 / 2,035 / 2,016 |
+| 5 | 77 / 189 / 196 | 158 / 98 / 119 | 36 / 36 / 44 | 2,061 / 2,051 / 1,979 |
+| 6 | 78 / 457 / 207 | 147 / 82 / 119 | 39 / 44 / 46 | 1,557 / 1,557 / 1,557 |
+
+The 0.85 radius passed two pilot raids versus one for 0.65, but the shorter radius yielded more raid food overall, lower defender losses and less neutral food loss. We carried 0.65 into the four-seed holdout based on those outcomes. Neither pilot radius caused neutral casualties.
+
+| Holdout seed | A13 food, standard / 0.65 | Defender losses | Raider losses | A9 food |
+|---:|---:|---:|---:|---:|
+| 2 | 315 / 625 | 124 / 60 | 42 / 44 | 1,559 / 1,731 |
+| 4 | 106 / 280 | 127 / 45 | 29 / 22 | 2,070 / 2,037 |
+| 7 | 119 / 150 | 121 / 85 | 29 / 33 | 1,168 / 1,160 |
+| 8 | 103 / 151 | 132 / 94 | 36 / 41 | 1,521 / 1,517 |
+
+The 0.65 radius improved survival and food on all seven raid seeds and raised passes from 1/7 to 3/7. Across those seeds defender losses fell from 915 to 528. Neutral contact passed on all seven, with zero casualties and a worst food loss of 6.7% (seed 3). This radius is the stronger candidate to take into the existing full-width A9/A13/G1 sweep. Unlike the grid approximation, the distance path visits nearby attacker–victim pairs, so that sweep should also compare tick cost under large clashes.
+
+Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 3,5,6 --set game.fight.intent=true --set game.fight.attackDistance=0.65,0.85 --jobs 6`; holdout `--seeds 2,4,7,8 --set game.fight.attackDistance=0.65` with the same assays and directed intent.

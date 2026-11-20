@@ -19,7 +19,7 @@ function pair(rows = [".....", ".....", "....."]) {
   }
   return cs;
 }
-function fight(cs: Colony[], recognized = true, attackReach: 0 | 1 = 1) {
+function fight(cs: Colony[], recognized = true, attackReach: 0 | 1 = 1, attackDistance?: number) {
   const rec = new Recognition();
   rec.build(cs);
   return resolveFights(
@@ -27,7 +27,7 @@ function fight(cs: Colony[], recognized = true, attackReach: 0 | 1 = 1) {
     cs.map((c) => occupancy(c, new CountGrid())),
     1,
     () => 0,
-    { rate: 1, alarm: 1, intent: true, attackReach },
+    { rate: 1, alarm: 1, intent: true, attackReach, attackDistance },
     recognized ? rec : null,
   );
 }
@@ -50,6 +50,20 @@ test("a zero-ring attack requires both ants to occupy the same cell", () => {
   assert.deepEqual(fight(cs, false, 0), [0, 0]);
   put(cs[1], 0, 2, 1);
   assert.deepEqual(fight(cs, false, 0), [0, 1]);
+});
+
+test("distance reach crosses cell boundaries and excludes distant ants in the same cell", () => {
+  const cs = pair();
+  cs[1].attackLayer[0] = -1;
+  cs[0].x[0] -= 0.4;
+  cs[1].x[0] += 0.4;
+  assert.deepEqual(fight(cs, false, 1, 0.65), [0, 0]);
+
+  put(cs[0], 0, 2, 1);
+  put(cs[1], 0, 3, 1);
+  cs[0].x[0] += 0.4;
+  cs[1].x[0] -= 0.4;
+  assert.deepEqual(fight(cs, false, 1, 0.65), [0, 1]);
 });
 
 test("movement can bring a hostile ant into perception before damage resolves", () => {
