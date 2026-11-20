@@ -596,3 +596,25 @@ updates skip the 80 games; simulator/harness changes or manual dispatch run them
 The gate is checked with a temporary Git fixture (documentation skip, manual run,
 simulation change run). This keeps recording results from automatically repeating
 the entire completed experiment.
+
+### G1 seed 12 long-held food
+
+The directed-combat run at attack distance 0.65 reproduced the seed 12 failure: 2,423 food stored for the player colony, zero casualties, and three simultaneous forager loads held past 120 seconds. A one-second position trace identified the three concurrent loads as ants 609, 805 and 721. Each picked up food underground (at about 429.6, 439.8 and 465.0 seconds), stayed underground, and reached within 12 world units of its nest center less than 13 seconds after pickup. At 600 seconds, all three still held the load, 6.7–7.9 units from the nest center. Their final minute covered 19–25 distinct rounded positions per ant, so these were localized movement loops rather than stationary carriers or a surface entry failure.
+
+The rival's long-held cases were on the surface and did not exceed the two-load limit. The player's earlier long surface trip resolved before the three concurrent underground loads appeared. A trace of distance to the nest center does not establish that any of the three actually stood in an accepting chamber.
+
+Two 600-second comparisons use the same combat settings. After a carrier senses its own tunnel or chamber, the first rule selects a royal destination immediately. The second uses the same selection only after `since` reaches 60 seconds. This age is read by the assay from the current ant; it does not add information to the carry policy schema. The comparisons cover eligible indoor carriers, including porters. Both leave surface homing to the existing movement rules.
+
+| Seed 12 arm | Player / rival food stored | Peak long-held forager loads, player / rival | Player porter trips | Royal choices | G1 |
+|---|---:|---:|---:|---:|---|
+| Existing delivery | 2,423 / 2,768 | 3 / 2 | 2,865 | 0 | fail |
+| Immediate royal selection | 2,116 / 3,028 | 4 / 1 | 16,863 | 19,058 | fail |
+| Royal selection after 60 s | 2,331 / 3,275 | 1 / 1 | 3,111 | 118 | pass |
+
+The narrower rule cleared the seed 12 hold threshold with 92 fewer food units stored by the player. The runs diverge before the three baseline pickups, so this is a colony-level comparison. It does not establish that the same three trips would recover.
+
+Reproduce with `node scripts/experiment.mjs game1 gameRoyalDelivery gameRoyalRecovery --seeds 12 --set game.fight.intent=true --set game.fight.attackDistance=0.65 --jobs 3`.
+
+The independent seed 14 pair used the same 600-second settings. The delayed rule took the player from three to two long-held loads, but the rival still had five and G1 failed both runs. Player food fell from 3,419 to 2,914 (14.8%); rival food fell from 2,439 to 2,354. The peak on the surface was six in the base run and five after the player-side change. That remaining failure requires surface return navigation, while the player's throughput cost rules out promoting a blanket royal redirection. Next isolate the stalled trips themselves and distinguish chamber recognition failures from route failures before changing where carriers deposit.
+
+Reproduce the holdout with `node scripts/experiment.mjs game1 gameRoyalRecovery --seeds 14 --set game.fight.intent=true --set game.fight.attackDistance=0.65 --jobs 2`.

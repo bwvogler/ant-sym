@@ -45,7 +45,7 @@ export * from "./builderAssays.ts";
 import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
 import { neglectusImmunisation, neglectusTolerance } from "./neglectusAssays.ts";
-import { forage1, game1, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
+import { forage1, game1, gameRoyalDelivery, gameRoyalRecovery, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
 
 const always =
   <T extends string>(v: T) =>
@@ -1741,6 +1741,8 @@ export const ONE_ASSAYS: Assay[] = [
   pockets,
   larvae,
   game1,
+  gameRoyalDelivery,
+  gameRoyalRecovery,
   lockstep1,
   searchTight1,
   memory1,
