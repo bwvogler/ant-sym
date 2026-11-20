@@ -151,45 +151,59 @@ export class InspectionScene {
     key.position.set(-3, -5, 8);
     fill.position.set(5, 2, 3);
     this.scene.add(key, fill, this.terrain, this.contents, this.overlays);
+    // The queen's nest atlas has cooler shadows and lighter shell facets than
+    // the worker atlas. Keep these tones in model space for either renderer.
+    const workerPalette = ["#231F1C", "#362F29", "#4C4137", "#65513F", "#896B4D"];
+    const queenPalette = ["#1B1D23", "#3D3432", "#514644", "#7B6559", "#846B5C"];
     for (const [name, m] of Object.entries(models)) {
       const body = geometry(m.body);
       const band = geometry(m.band);
-      if (m.band.positions.length) {
-        body.computeBoundingBox();
-        const height = body.boundingBox!.max.z;
-        const shellShade = (mesh: T.BufferGeometry, stripe: boolean) => {
-          const positions = mesh.getAttribute("position");
-          const colours = mesh.getAttribute("color");
-          const normals = mesh.getAttribute("normal");
-          // Match the baked tones in the medium walk atlas. Keep them in model
-          // space so tilting the map and changing renderers preserve the palette.
-          const shadow = new T.Color("#231F1C");
-          const edge = new T.Color("#362F29");
-          const midtone = new T.Color("#4C4137");
-          const topFace = new T.Color("#65513F");
-          const highlight = new T.Color("#896B4D");
-          const tone = new T.Color();
-          for (let i = 0; i < positions.count; i += 3) {
-            const z = (positions.getZ(i) + positions.getZ(i + 1) + positions.getZ(i + 2)) / (3 * height);
-            const top = Math.max(0, normals.getZ(i));
-            // Bias the upper facets toward one flank, as in the aerial sprite.
-            const y = (positions.getY(i) + positions.getY(i + 1) + positions.getY(i + 2)) / (3 * height);
-            const light = T.MathUtils.clamp(0.6 * z + 0.27 * top + 0.28 * y, 0, 1);
-            if (stripe) {
-              // Like the sprite mask, modulate the colony tint with a neutral ramp.
-              tone.setScalar(0.65 + 0.5 * light).convertSRGBToLinear();
-            } else if (colours.getZ(i) > 0.027) {
-              tone.copy(light > 0.84 ? highlight : light > 0.66 ? topFace : light > 0.4 ? midtone : edge);
-            } else {
-              tone.copy(top > 0.5 ? edge : shadow);
-            }
-            for (let j = i; j < i + 3; j++) colours.setXYZ(j, tone.r, tone.g, tone.b);
-          }
-        };
-        shellShade(body, false);
-        shellShade(band, true);
-      }
       this.models.set(name, { body, band });
+      if (!m.band.positions.length) continue;
+      const queen = name === "queen" || name === "alate-body";
+      const [shadow, edge, midtone, topFace, highlight] = (queen ? queenPalette : workerPalette).map((hex) => new T.Color(hex));
+      const litLeg = new T.Color(queen ? "#645550" : "#776755");
+      body.computeBoundingBox();
+      const height = body.boundingBox!.max.z;
+      const shellShade = (mesh: T.BufferGeometry, stripe: boolean, tunnel = false) => {
+        const positions = mesh.getAttribute("position");
+        const colours = mesh.getAttribute("color");
+        const normals = mesh.getAttribute("normal");
+        const tone = new T.Color();
+        // Give both triangles of a voxel quad the same tone.
+        const vertices = positions.array;
+        const sameVertex = (a: number, b: number) =>
+          vertices[a] === vertices[b] && vertices[a + 1] === vertices[b + 1] && vertices[a + 2] === vertices[b + 2];
+        for (let i = 0; i < positions.count;) {
+          const quad = i + 5 < positions.count && sameVertex(i * 3, i * 3 + 9) && sameVertex(i * 3 + 6, i * 3 + 12);
+          const end = i + (quad ? 6 : 3);
+          const divisor = (quad ? 2 : 3) * height;
+          const z = (positions.getZ(i) + positions.getZ(i + 2) + (quad ? 0 : positions.getZ(i + 1))) / divisor;
+          const y = (positions.getY(i) + positions.getY(i + 2) + (quad ? 0 : positions.getY(i + 1))) / divisor;
+          const top = Math.max(0, normals.getZ(i));
+          const light = T.MathUtils.clamp(0.6 * z + 0.27 * top + 0.28 * y, 0, 1);
+          if (stripe) {
+            // Like the sprite mask, modulate the colony tint with a neutral ramp.
+            tone.setScalar(0.65 + 0.5 * light).convertSRGBToLinear();
+          } else if (colours.getZ(i) > 0.027) {
+            const shellLight = tunnel ? T.MathUtils.clamp(light + 0.1 * top + 0.18 * y, 0, 1) : light;
+            tone.copy(shellLight > 0.84 ? highlight : shellLight > 0.66 ? topFace : shellLight > 0.4 ? midtone : edge);
+          } else if (tunnel) {
+            // Catch light on the upper edges of the limbs against the dark back wall.
+            tone.copy(shadow).lerp(litLeg, top * (0.64 + 0.36 * T.MathUtils.clamp(z * 2, 0, 1)));
+          } else {
+            tone.copy(top > 0.5 ? edge : shadow);
+          }
+          for (; i < end; i++) colours.setXYZ(i, tone.r, tone.g, tone.b);
+        }
+      };
+      if (name === "worker" || name === "queen") {
+        const tunnelBody = body.clone();
+        shellShade(tunnelBody, false, true);
+        this.models.set(name + "-below", { body: tunnelBody, band });
+      }
+      shellShade(body, false);
+      shellShade(band, true);
     }
     for (const [name, c] of [
       ["infection", "#B18DD1"],
@@ -250,6 +264,7 @@ export class InspectionScene {
     return this.mode === "surface" ? [x, -y, z + (this.floor?.(x, y) ?? 0)] : [x, 1.08 - z, -y];
   }
   private actor(name: string, x: number, y: number, z = 0, heading = 0, odour?: number, pitch = 0): void {
+    if (this.mode === "below" && (name === "worker" || name === "queen")) name += "-below";
     const model = this.models.get(name);
     if (!model) return;
     let pool = this.pools.get(name);
@@ -652,10 +667,7 @@ export class InspectionScene {
       p.body.dispose();
       p.band?.dispose();
     }
-    for (const m of this.models.values()) {
-      m.body.dispose();
-      m.band.dispose();
-    }
+    for (const geometry of new Set([...this.models.values()].flatMap(({ body, band }) => [body, band]))) geometry.dispose();
     this.material.dispose();
     this.unlit.dispose();
     this.renderer.dispose();
