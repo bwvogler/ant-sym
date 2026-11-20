@@ -101,7 +101,7 @@ export class InspectionScene {
   private models = new Map<string, { body: T.BufferGeometry; band: T.BufferGeometry }>();
   private pools = new Map<string, Pool>();
   private material = new T.MeshLambertMaterial({ vertexColors: true });
-  private bandMaterial = new T.MeshBasicMaterial();
+  private bandMaterial = new T.MeshBasicMaterial({ vertexColors: true });
   private unlit = new T.MeshBasicMaterial({ vertexColors: true });
   private terrain = new T.Group();
   private terrainWasViewport = false;
@@ -154,15 +154,37 @@ export class InspectionScene {
     this.scene.add(key, fill, this.terrain, this.contents, this.overlays);
     for (const [name, m] of Object.entries(models)) {
       const body = geometry(m.body);
+      const band = geometry(m.band);
       if (m.band.positions.length) {
-        // Match the warm chitin in the aerial worker atlas. Use the original
-        // material assignment to keep the limbs darker than the body.
-        const colours = body.getAttribute("color");
-        const shell = colour("#65513F"),
-          limbs = colour("#4C4137");
-        for (let i = 0; i < colours.count; i++) colours.setXYZ(i, ...(colours.getZ(i) > 0.027 ? shell : limbs));
+        body.computeBoundingBox();
+        const height = body.boundingBox!.max.z;
+        const shellShade = (mesh: T.BufferGeometry, stripe: boolean) => {
+          const positions = mesh.getAttribute("position");
+          const colours = mesh.getAttribute("color");
+          const normals = mesh.getAttribute("normal");
+          const seam = new T.Color("#342821");
+          const crown = new T.Color("#9A7857");
+          const limb = new T.Color("#54443A");
+          const tone = new T.Color();
+          for (let i = 0; i < positions.count; i += 3) {
+            const z = (positions.getZ(i) + positions.getZ(i + 1) + positions.getZ(i + 2)) / (3 * height);
+            const top = Math.max(0, normals.getZ(i));
+            const light = Math.min(1, 0.62 * z + 0.24 * top);
+            if (stripe) {
+              // Neutral vertex shading keeps the colony's instance tint visible.
+              tone.setScalar(0.5 + 0.64 * light);
+            } else if (colours.getZ(i) > 0.027) {
+              tone.copy(seam).lerp(crown, light);
+            } else {
+              tone.copy(seam).lerp(limb, 0.28 + 0.55 * top);
+            }
+            for (let j = i; j < i + 3; j++) colours.setXYZ(j, tone.r, tone.g, tone.b);
+          }
+        };
+        shellShade(body, false);
+        shellShade(band, true);
       }
-      this.models.set(name, { body, band: geometry(m.band) });
+      this.models.set(name, { body, band });
     }
     for (const [name, c] of [
       ["infection", "#B18DD1"],
@@ -265,7 +287,7 @@ export class InspectionScene {
     if (pool.band) {
       pool.band.setMatrixAt(pool.used, this.cube.matrix);
       // Sample the UI palette in sRGB, as the sprite tint does. The geometry's
-      // dark chitin must not multiply the colony colour a second time.
+      // neutral shading gives the band depth while preserving its hue.
       const t = Math.max(0, Math.min(1, odour ?? 0));
       pool.band.setColorAt(pool.used, this.bandTone.copy(this.bandInk).lerp(this.bandAmber, t).convertSRGBToLinear());
     }
