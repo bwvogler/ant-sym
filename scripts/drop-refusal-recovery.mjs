@@ -1,4 +1,4 @@
-// Default-size, two-colony runs: node scripts/drop-refusal-recovery.mjs [seed ...]
+// Default-size, two-colony runs: node scripts/drop-refusal-recovery.mjs [--isolate] [seed ...]
 import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
 const dt = 1 / 30;
@@ -6,13 +6,15 @@ const seconds = 120;
 const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 const damp = encodeLevels({ marks: 0 }, ["marks"]);
 
-function run(seed, actions, recover) {
+function run(seed, directed, contextual, recover) {
   const game = new Game(generateOneWorld(seed), {}, gameRng(seed));
   const colony = game.player;
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   let dropRefusals = 0;
-  if (actions) {
+  if (directed) {
     game.params.fight = { ...game.params.fight, intent: true, attackReach: 1, attackDistance: 0.65 };
+  }
+  if (contextual) {
     colony.params.deliveryLane = 1;
     colony.responses = {
       ...localResponses,
@@ -35,13 +37,29 @@ function run(seed, actions, recover) {
   const initialHosts = game.fungus.hosts;
   if (initialHosts === 0) throw Error("The initial dose reached no workers");
 
-  for (let tick = 0; tick < seconds / dt; tick++) game.tick(dt);
+  const wasCarrying = new Uint8Array(colony.n);
+  let pickups = 0;
+  let surfacePickups = 0;
+  for (let tick = 0; tick < seconds / dt; tick++) {
+    game.tick(dt);
+    for (let i = 0; i < colony.n; i++) {
+      const carrying = colony.alive[i] ? colony.carrying[i] : 0;
+      if (carrying && !wasCarrying[i] && !colony.porter[i]) {
+        pickups++;
+        if (colony.layer[i] !== CURTAIN) surfacePickups++;
+      }
+      wasCarrying[i] = carrying;
+    }
+  }
   return {
     initialHosts,
     dropRefusals,
     hosts: game.fungus.hosts,
     player: {
       stored: colony.stored,
+      pickups,
+      surfacePickups,
+      handedOn: colony.handedOn,
       losses: colony.losses,
       alive: colony.population,
       held: colony.carrying.reduce((n, load) => n + load, 0),
@@ -51,9 +69,14 @@ function run(seed, actions, recover) {
   };
 }
 
-const seeds = process.argv.slice(2).map(Number);
+const args = process.argv.slice(2);
+const isolate = args.includes("--isolate");
+const seeds = args.filter((arg) => arg !== "--isolate").map(Number);
 for (const seed of seeds.length ? seeds : [41, 42, 43, 44]) {
-  console.log(
-    JSON.stringify({ seed, existing: run(seed, false, false), actions: run(seed, true, false), recovery: run(seed, true, true) }),
-  );
+  const existing = run(seed, false, false, false);
+  const recovery = run(seed, true, true, true);
+  const controls = isolate
+    ? { directed: run(seed, true, false, false), contextual: run(seed, false, true, true) }
+    : { actions: run(seed, true, true, false) };
+  console.log(JSON.stringify({ seed, existing, ...controls, recovery }));
 }
