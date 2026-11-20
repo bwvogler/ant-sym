@@ -299,6 +299,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
     }
   }
   if (to < 0 || to === here) return false;
+  if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "food"), col.antDraw(i))) return false;
   col.stock(c, -1);
   becomePorter(col, i, to);
   return false;

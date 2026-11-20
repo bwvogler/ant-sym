@@ -14,7 +14,7 @@ import { NO_CELL } from "../../grid.ts";
 import { decide } from "../../decide.ts";
 import { stanceStep } from "../../stance.ts";
 import { AntStep } from "../../step.ts";
-import { RETURN } from "../../vocab.ts";
+import { EXPLORE, RETURN } from "../../vocab.ts";
 import { smallOne, run } from "../builders.ts";
 import { put } from "../hexmaps.ts";
 
@@ -92,6 +92,44 @@ test("a changed or missing destination does not trigger a hidden chamber fallbac
   store.colony = 1;
   assert.equal(port(c, 0, 0.1), false, "foreign chamber cannot receive colony food");
   assert.equal(ch.list[0].food >= 0, true);
+});
+
+test("a chamber food pickup can be refused without changing stock or committing a porter", () => {
+  const { c, store, brood, y } = setup();
+  brood.role = "reception";
+  c.stock(brood, 2);
+  c.carrying[0] = 0;
+  c.mode[0] = EXPLORE;
+  c.age[0] = 0;
+  put(c, 0, 24, y);
+  let offers = 0;
+  let take = false;
+  c.responses = responses({
+    get(t) {
+      assert.equal(t.offered, "food");
+      assert.equal(t.carrying, "none");
+      offers++;
+      return take;
+    },
+  });
+  const food = c.larder + c.inJaws;
+  port(c, 0, 1);
+  assert.equal(offers, 1);
+  assert.equal(brood.food, 2);
+  assert.equal(c.carrying[0], 0);
+  assert.equal(c.porter[0], 0);
+  assert.equal(c.portTo[0], -1);
+
+  take = true;
+  port(c, 0, 1);
+  assert.equal(offers, 2);
+  assert.equal(brood.food, 1);
+  assert.equal(c.carrying[0], 1);
+  assert.equal(c.porter[0], 1);
+  assert.notEqual(c.portTo[0], brood.id);
+  assert.ok(c.portTo[0] >= 0);
+  assert.equal(store.food, 0);
+  assert.equal(c.larder + c.inJaws, food);
 });
 
 test("a porter's redirected food is counted once and release ends its destination", () => {
