@@ -660,3 +660,17 @@ Reproduce with `node scripts/experiment.mjs game1 --seeds 14,21,22 --set game.fi
 | 22 | 3 / 0 → 3 / 3 | 2,819 / 2,850 → 2,756 / 3,518 | 0 / 0 → 1 / 0 | fail → fail |
 
 Six 600-second runs completed. The control on seed 14 reproduced the earlier food, losses and held counts. The fallback cleared that seed's hold guard and improved combined food on all three maps. Both fresh maps still exceeded the hold limit. Seed 22 added three long-held rival loads where the control had none, and seed 14 added 12 player losses. The runs report losses from all causes. Keep the control as the default. The next diagnostic needs to distinguish useful waypoint progress from resets during loops and trace the additional surface trips on seed 22 before changing the threshold.
+
+#### Seed 22 trip trace
+
+Replayed both 600-second arms and logged each rival surface load's route state, waypoint index and stall count after each tick. Logged position, distance to the real entrance, search radius and wall state every five seconds. The control reproduced zero long-held rival surface loads and 2,850 stored food. The fallback reproduced a peak of three and 3,518 stored food. The per-tick trace first saw three overlapping loads at 240.57 seconds.
+
+| Ant slot | Pickup (s) | Route cleared (s) | Distance to entrance at clear | Crossed down loaded (s) | Surface time after clear (s) |
+|---:|---:|---:|---:|---:|---:|
+| 199 | 114.50 | 158.93 | 49.6 | 271.27 | 112.33 |
+| 299 | 53.43 | 86.50 | 59.7 | 241.40 | 154.90 |
+| 342 | 120.53 | 178.00 | 32.7 | 309.77 | 131.77 |
+
+Slots 199 and 342 did not recognize a waypoint during their retrace. Slot 299 recognized a waypoint and advanced from target 58 to target 23 before its three consecutive stalls. All three already had nonzero search offsets when their routes cleared (15.9–18.3 world units). The sampled search radii later exceeded 40 for each carrier. All nine rival surface trips that exceeded 120 seconds in the fallback run cleared a route and eventually crossed down carrying before the end of the run.
+
+These traces place most of the delay after route clearing for the three peak trips. They show prolonged widening search, with one of those ants also having made earlier waypoint progress. The two whole-game arms diverge before the pickups, so they do not tell us whether retaining the same routes would have shortened these particular trips. A matched replay can vary the handling of the inherited search offset at the same reset and preserve the earlier path and pickup.
