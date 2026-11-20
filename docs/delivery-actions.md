@@ -632,3 +632,17 @@ The paired replay delivered slot 721's original load at 589.73 seconds, 39.73 se
 #### G1 seed 14 surface return
 
 A separate one-second trace of rival surface foragers reproduced six loads held over 120 seconds. All six remained on the plane at 600 seconds, 60–75 world units from their own entrance. Their final sampled positions cluster in x=205–225, y=77–90. Several of the earlier samples sit near generated rock. For example, the map has 65 solid cells out of 129 within six world units of (228, 97). The traces include both wall-following and free movement, and search radii differ across trips. These observations locate a common area of stalled returns. They leave open whether the ants' perceived entrance, their path around rock, or both caused the stalls.
+
+At 550 seconds, a matched replay still had the six rival loads in slots 41, 48, 443, 510, 530 and 565. Their loads were 122–267 seconds old. Five ants were actively retracing their stored outbound route; one had finished retracing and was searching. The replay set each ant's `driftSurf`, `driftSurfY`, `carriedX`, `carriedY` and `search` to zero, then applied `routeClear` to that ant. That gives it the true entrance as its initial homing goal and keeps its ordinary movement, wall state, and later search behavior. This is a diagnostic using the true goal, not a proposed game rule.
+
+Slots 510, 565 and 41 crossed down carrying at 564.63, 571.63 and 589.93 seconds, respectively. The other three were still on the surface with their loads at 600 seconds. In the baseline all six ended on the surface with their loads. The intervention left G1's peak at six because that peak was already reached before any recovery. Rival food stored was 2,444 versus 2,439 in the baseline. The replay establishes that a change to homing state can recover some of these existing trips without altering the rocks or entrance.
+
+The second matched replay used only `routeClear` at 550 seconds. It preserved the ants' vector error, current search offset and obstacle state. Four of the six crossed down with food within the next 39 seconds (565 at 570.37, 510 at 574.93, 443 at 575.97, and 41 at 588.67). Slots 48 and 530 still carried on the surface at 600 seconds. Rival food stored was 2,445. The peak was again six.
+
+| Seed 14 arm | Matched loads brought underground by 600 s | Rival food stored | Rival peak long-held loads |
+|---|---:|---:|---:|
+| Baseline | 0 / 6 | 2,439 | 6 |
+| Clear route and correct initial home estimate | 3 / 6 | 2,444 | 6 |
+| Clear route only | 4 / 6 | 2,445 | 6 |
+
+Clearing route memory alone was enough for four of these trips. That supports testing a return to ordinary homing when retracing repeatedly fails. The intervention used trip identities and a late timestamp for diagnosis. A policy needs a local trigger and evidence from fresh nests that resetting memory does not discard routes that were helping.
