@@ -2149,7 +2149,7 @@ export default function ColonyField({
     s.fitted = cam.zoom <= fz * 1.0001;
   };
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
+    const tilt = Math.max(0, dragOrbit(start, 0, -dy).tilt);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();

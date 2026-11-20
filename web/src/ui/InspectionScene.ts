@@ -605,8 +605,11 @@ export class InspectionScene {
       halfHeight = view ? view.height / view.pixelsPerWorld / 2 : 1.792 * frame;
     this.camera.left = -halfWidth;
     this.camera.right = halfWidth;
-    this.camera.top = halfHeight;
-    this.camera.bottom = -halfHeight;
+    // Keep the far ground edge at the top as the near edge comes toward the camera.
+    const tilt = view?.orbit?.tilt ?? 0;
+    const hinge = tilt > 0 ? halfHeight * (Math.cos(tilt) - 1) - target.z * Math.sin(tilt) : 0;
+    this.camera.top = halfHeight + hinge;
+    this.camera.bottom = -halfHeight + hinge;
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();
     this.renderer.render(this.scene, this.camera);
