@@ -244,6 +244,7 @@ function odourColour(ink: [number, number, number], warn: [number, number, numbe
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 const HEX_ZOOM = 12;
+const BRICK_ZOOM = 9;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
@@ -913,7 +914,7 @@ export default function ColonyField({
      * background, and the rest are batched into one path per colour, so a frame is a few dozen fills.
      */
     const paths = new Map<number, Path2D>();
-    const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number) => {
+    const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number, hexMix: number) => {
       // The background: soil underground (most cells), the paper on the open surface (no soil at all).
       const showCutaway = lv === CURTAIN && c.y - v.h / c.zoom / 2 > centreY(STRIP) + SIDE;
       const look = !smellAll && (lv === PLANE || showCutaway) ? inspectionGroundMix(c.zoom / (v.dpr ?? 1)) : 0;
@@ -925,30 +926,19 @@ export default function ColonyField({
       const pelletAlpha = !smellAll && lv === PLANE ? Math.max(0, Math.min(1, (c.zoom / (v.dpr ?? 1) - HEX_ZOOM) / 8)) : 0;
       const moundTints = new Map<number, Path2D>();
       const pellets = new Map<string, DirtBall>();
-      const bg = (m.hasSoil ? soil : paper).map(Math.round);
+      const bg = (m.hasSoil ? paper.map((value, i) => value + (soil[i] - value) * hexMix) : paper).map(Math.round);
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
       const [ax, ay] = toScreen(c, v, gx0, 0);
       const [bx, by] = toScreen(c, v, gx0 + ext.w, ext.h);
       ctx.fillRect(ax, ay, bx - ax, by - ay);
       paths.clear();
-      const k = SIDE * c.zoom * 1.04; // a hair over, so neighbours meet without seams
-      const [c0, c1, c2, c3, c4, c5] = [0, 1, 2, 3, 4, 5].map((j) => Math.cos(Math.PI / 6 + (j * Math.PI) / 3) * k) as [
-        number,
-        number,
-        number,
-        number,
-        number,
-        number,
-      ];
-      const [s0, s1, s2, s3, s4, s5] = [0, 1, 2, 3, 4, 5].map((j) => Math.sin(Math.PI / 6 + (j * Math.PI) / 3) * k) as [
-        number,
-        number,
-        number,
-        number,
-        number,
-        number,
-      ];
+      // At the distant end these six vertices describe the same staggered rectangles as the chunk pass.
+      const x = c.zoom * 0.5 * (1 + 0.04 * hexMix);
+      const shoulder = c.zoom * (R / 2 + (SIDE * 0.52 - R / 2) * hexMix);
+      const tip = c.zoom * (R / 2 + (SIDE * 1.04 - R / 2) * hexMix);
+      const [c0, c1, c2, c3, c4, c5] = [x, 0, -x, -x, 0, x];
+      const [s0, s1, s2, s3, s4, s5] = [shoulder, tip, shoulder, -shoulder, -tip, -shoulder];
       const ox = v.w / 2 - c.x * c.zoom;
       const oy = v.h / 2 - c.y * c.zoom;
       for (let y = ry0; y <= ry1; y++) {
@@ -1465,7 +1455,10 @@ export default function ColonyField({
       const ry1 = Math.min(gh - 1, Math.ceil(vis.y1 / R) + 1);
       const rx0 = Math.max(gx0, Math.floor(vis.x0) - 1);
       const rx1 = Math.min(gx0 + gw - 1, Math.ceil(vis.x1) + 1);
-      const hexes = c.zoom >= HEX_ZOOM * d;
+      const zoom = c.zoom / d;
+      const hexes = zoom >= HEX_ZOOM;
+      const blend = Math.max(0, Math.min(1, (zoom - BRICK_ZOOM) / (16 - BRICK_ZOOM)));
+      const hexMix = blend * blend * (3 - 2 * blend);
       const resourceLod = workerLod(c.zoom, d);
       const darkSprites = theme.paperRgb[0] * 0.2126 + theme.paperRgb[1] * 0.7152 + theme.paperRgb[2] * 0.0722 < 100;
       // Read-only browser diagnostics: actual CSS scale and the available worker representation.
@@ -1481,7 +1474,7 @@ export default function ColonyField({
           if (!rc) continue;
           const cc = chunkCanvas(cx, cy);
           paintChunk(cx, cy, cc, rc, !!resourceImage);
-          if (hexes) continue;
+          if (hexMix > 0) continue;
           // Zoomed out: bricks. Each row of the chunk is a strip one cell high (R), odd rows shifted
           // half a cell right: the same six neighbours as hexagons, and a few draws per chunk.
           const ly0 = Math.max(0, ry0 - cy * CHUNK);
@@ -1495,8 +1488,10 @@ export default function ColonyField({
             ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
           }
         }
-      if (hexes) drawHexes(c, v, rx0, rx1, ry0, ry1);
-      if (hexes)
+      if (hexMix > 0) drawHexes(c, v, rx0, rx1, ry0, ry1, hexMix);
+      if (hexMix > 0) {
+        ctx.save();
+        ctx.globalAlpha = hexMix;
         drawMapTerrainGrain(
           ctx,
           c.zoom,
@@ -1511,6 +1506,8 @@ export default function ColonyField({
           theme.ink,
           theme.paper,
         );
+        ctx.restore();
+      }
       const nestImage = hexes ? nestSprites.get(resourceLod) : null;
       const nestStyle = nestImage ? "voxel" : "symbols";
       if (canvas.dataset.nestStyle !== nestStyle) canvas.dataset.nestStyle = nestStyle;
@@ -1753,23 +1750,27 @@ export default function ColonyField({
           if (!(bands & (1 << b))) continue;
           const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
           const sprite = hexes ? workerSprites.get(lod, colour, darkSprites) : null;
+          const spriteMix = sprite ? Math.min(1, (zoom - HEX_ZOOM) / 2) : 0;
           ctx.beginPath();
           for (let i = 0; i < col.n; i++) {
             if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
             const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-            if (sprite) {
+            if (sprite && spriteMix > 0) {
+              ctx.globalAlpha = spriteMix;
               const pose = lod === "walk" && !motion.matches ? workerGait.pose(col, i) : 0;
               drawWorkerSprite(ctx, sprite, lod, col.heading[i], pose, x, y, c.zoom);
-            } else {
+            }
+            if (spriteMix < 1) {
               const hc = Math.cos(col.heading[i]) * half;
               const hs = Math.sin(col.heading[i]) * half;
               ctx.moveTo(x - hc, y - hs);
               ctx.lineTo(x + hc, y + hs);
             }
           }
+          ctx.globalAlpha = 1 - spriteMix;
           ctx.strokeStyle = theme.ink;
           ctx.stroke();
-          if (!sprite) {
+          if (spriteMix < 1) {
             ctx.beginPath();
             for (let i = 0; i < col.n; i++) {
               if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;

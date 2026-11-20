@@ -34,11 +34,12 @@ export function drawMapTerrainGrain(
       dark.rect(Math.round(sx), Math.round(sy), size, Math.max(1, size / 2));
       if (kind !== OPEN) light.rect(Math.round(sx - 0.2 * zoom), Math.round(sy + 0.13 * zoom), size, Math.max(1, size / 2));
     }
+  const opacity = ctx.globalAlpha;
   ctx.save();
-  ctx.globalAlpha = 0.065;
+  ctx.globalAlpha = 0.065 * opacity;
   ctx.fillStyle = ink;
   ctx.fill(dark);
-  ctx.globalAlpha = 0.08;
+  ctx.globalAlpha = 0.08 * opacity;
   ctx.fillStyle = paper;
   ctx.fill(light);
   ctx.restore();
