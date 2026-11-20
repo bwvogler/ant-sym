@@ -7,6 +7,7 @@ import {
   CURTAIN,
   decodeFungal,
   dropFood,
+  digCell,
   encodeLevels,
   fungalKey,
   fungusContext,
@@ -29,7 +30,7 @@ const doctrine = "Carry food to a recognized royal chamber. Release food if the 
 const clearAim = "Preserve the host's sense of chamber floor marks.";
 const dampAim = "Dampen the host's sense of chamber floor marks.";
 
-function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
+function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry", fork = false) {
   const words = hook === "carry" ? doctrine : "Lay a food trail in recognized chambers and leave no trail in tunnels.";
   const game = new Game(
     generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
@@ -39,6 +40,14 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
   const colony = game.player;
   const fungus = game.fungus;
   const queen = colony.queen!;
+  const map = game.world!.curtain;
+  if (fork) {
+    cellOf(queen.x, queen.y);
+    const [qx, qy] = CELL;
+    for (let y = qy - 4; y <= qy + 9; y++) {
+      for (let x = qx - 5; x <= qx + 9; x++) digCell(map, x, y);
+    }
+  }
   colony.putAnt(0, CURTAIN, queen.x, queen.y);
   colony.mode[0] = MODES.indexOf("return");
   colony.carrying[0] = 1;
@@ -47,7 +56,7 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
     colony.putAnt(1, PLANE, 20, 20);
     // Keep the cue above the decision threshold on the receiver’s first tick.
     colony.params.deposit = 100;
-    colony.params.sensorDistance = 0.25;
+    colony.params.sensorDistance = fork ? 3 : 0.25;
   }
   fungus.menu = ["marks"];
   const strain = STRAINS.findIndex((s) => s.id === "garden");
@@ -93,7 +102,7 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
     if (hook === "trail") {
       colony.putAnt(1, CURTAIN, queen.x - colony.params.sensorDistance, queen.y);
       colony.mode[1] = MODES.indexOf("explore");
-      colony.heading[1] = 0;
+      colony.heading[1] = fork ? colony.params.sensorAngle : 0;
       colony.reconsider();
       assert.equal(colony.load[1], 0);
       game.tick(DT);
@@ -102,9 +111,35 @@ function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry") {
       // Give only the receiver access to the same nearby food after its first decision.
       colony.putAnt(0, PLANE, 20, 20);
       const storedBeforePickup = colony.stored;
-      dropFood(game.world!.curtain, queen.x + 1, queen.y, 1);
+      let firstSource: "cue side" | "other" | undefined;
+      if (fork) {
+        const patchA = [queen.x + 4.5, queen.y + 2.6] as const;
+        const patchB = [queen.x + 2.2, queen.y + 5.2] as const;
+        const addSource = ([sx, sy]: readonly [number, number]) => {
+          dropFood(map, sx, sy, 1);
+          cellOf(sx, sy);
+          return [...CELL] as [number, number];
+        };
+        const [ax, ay] = addSource(patchA);
+        const [bx, by] = addSource(patchB);
+        const a = map.food.get(ax, ay);
+        const b = map.food.get(bx, by);
+        for (let tick = 0; tick < 300; tick++) {
+          game.tick(DT);
+          if (map.food.get(ax, ay) < a) {
+            firstSource = "cue side";
+            break;
+          }
+          if (map.food.get(bx, by) < b) {
+            firstSource = "other";
+            break;
+          }
+        }
+      } else {
+        dropFood(map, queen.x + 1, queen.y, 1);
+      }
       for (let tick = 0; tick < 60 && colony.stored === storedBeforePickup; tick++) game.tick(DT);
-      receiver = { question, mode, load: colony.load[1], delivered: colony.stored - storedBeforePickup };
+      receiver = { question, mode, firstSource, load: colony.load[1], delivered: colony.stored - storedBeforePickup };
     }
     return {
       receiver,
@@ -152,4 +187,17 @@ test("fungus aim changes the cached trail choice and the scent laid with one fix
   assert.equal(damp.receiver?.load, 0);
   assert.equal(clear.receiver?.delivered, 1);
   assert.equal(damp.receiver?.delivered, 1);
+});
+
+test("a fungus-influenced trail changes which food source an uninfected worker collects", () => {
+  const clear = deliveryWithAim(clearAim, "trail", true);
+  const damp = deliveryWithAim(dampAim, "trail", true);
+  assert.equal(clear.receiver?.mode, "follow");
+  assert.equal(damp.receiver?.mode, "explore");
+  assert.equal(clear.receiver?.firstSource, "cue side");
+  assert.equal(damp.receiver?.firstSource, "other");
+  assert.equal(clear.receiver?.delivered, 1);
+  assert.equal(damp.receiver?.delivered, 1);
+  assert.equal(clear.receiver?.load, 0);
+  assert.equal(damp.receiver?.load, 0);
 });
