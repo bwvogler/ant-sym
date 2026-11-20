@@ -5,7 +5,7 @@ import type { Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import LensCard from "./LensCard.tsx";
 import { lensAnt, lensLines, probe } from "./lens.ts";
-import { shownOn, unpin, useLens } from "./lensStore.ts";
+import { shownOn, unpin, useLens, type FieldProbe } from "./lensStore.ts";
 import CellInspection from "./CellInspection.tsx";
 import { inspectPatch } from "./inspectionPatch.ts";
 import { useSimTick } from "./session.ts";
@@ -41,7 +41,11 @@ export default function LensLayer({
   const lens = useLens();
   const at = on ? shownOn(lens, layer) : null;
   const pinned = at?.pinned ?? false;
-  const [inspecting, setInspecting] = useState(false);
+  const [inspectedPin, setInspectedPin] = useState<FieldProbe | null>(null);
+  const inspecting = pinned && at === inspectedPin;
+  useEffect(() => {
+    if (!on || lens.pinned !== inspectedPin) setInspectedPin(null);
+  }, [on, lens.pinned, inspectedPin]);
   useEffect(() => {
     setMapInspection(pinned && inspecting && at ? { lv: at.lv, x: at.x, y: at.y } : null);
     return () => setMapInspection(null);
@@ -52,7 +56,7 @@ export default function LensLayer({
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       e.preventDefault();
-      if (inspecting) setInspecting(false);
+      if (inspecting) setInspectedPin(null);
       else unpin();
     };
     window.addEventListener("keydown", key, true);
@@ -78,11 +82,11 @@ export default function LensLayer({
           pinned={at.pinned}
           onClose={unpin}
           onFollow={ant ? () => (onFollow(ant), unpin()) : undefined}
-          onInspect={() => setInspecting(true)}
+          onInspect={() => setInspectedPin(at)}
         />
       </div>
       {pinned && inspecting && (
-        <CellInspection state={readInspection()} read={readInspection} onFrame={onFrame} onClose={() => setInspecting(false)} />
+        <CellInspection state={readInspection()} read={readInspection} onFrame={onFrame} onClose={() => setInspectedPin(null)} />
       )}
     </>
   );

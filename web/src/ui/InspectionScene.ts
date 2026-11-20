@@ -126,14 +126,15 @@ export class InspectionScene {
   private bandTone = new T.Color();
   private viewport: VoxelViewport | null = null;
   private paletteKey = "";
-  static async create(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"]): Promise<InspectionScene> {
+  static async create(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"], software = false): Promise<InspectionScene> {
     const r = await fetch(MODEL_URL);
     if (!r.ok) throw Error("Voxel models could not load");
-    return new InspectionScene(canvas, mode, (await r.json()) as InspectionModels);
+    return new InspectionScene(canvas, mode, (await r.json()) as InspectionModels, software);
   }
-  private constructor(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"], models: InspectionModels) {
+  private constructor(canvas: HTMLCanvasElement, mode: InspectionPatch["mode"], models: InspectionModels, software = false) {
     this.mode = mode;
     try {
+      if (software) throw Error("Use software inspection");
       const gpu = new T.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "low-power" });
       gpu.setSize(384, 320, false);
       gpu.setPixelRatio(1);

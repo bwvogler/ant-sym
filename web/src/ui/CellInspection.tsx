@@ -24,6 +24,7 @@ export default function CellInspection({
     reader.current = read;
   }, [read]);
   const [failed, setFailed] = useState(false);
+  const [software, setSoftware] = useState(false);
   const [rendererKind, setRendererKind] = useState<"webgl" | "software" | "fixed" | "loading">("loading");
   const sceneRef = useRef<InspectionScene | null>(null);
   const drag = useRef<{ id: number; x: number; y: number; orbit: InspectionOrbit } | null>(null);
@@ -67,7 +68,7 @@ export default function CellInspection({
     setLoadedMode(null);
     setRendererKind("loading");
     void import("./InspectionScene.ts")
-      .then((m) => m.InspectionScene.create(cv, mode))
+      .then((m) => m.InspectionScene.create(cv, mode, software))
       .then((next) => {
         if (disposed) {
           next.dispose();
@@ -104,16 +105,24 @@ export default function CellInspection({
         }
         draw();
       });
+    const lost = (event: Event) => {
+      event.preventDefault();
+      setLoadedMode(null);
+      setRendererKind("loading");
+      setSoftware(true);
+    };
+    cv.addEventListener("webglcontextlost", lost);
     const off = onFrame(draw);
     return () => {
       disposed = true;
       off();
+      cv.removeEventListener("webglcontextlost", lost);
       redraw.current = null;
       sceneRef.current = null;
       scene?.dispose();
       for (const im of pending) im.onload = im.onerror = null;
     };
-  }, [onFrame, state.mode]);
+  }, [onFrame, state.mode, software]);
   const selected = state.selected,
     p = selected.place;
   return (
@@ -181,6 +190,7 @@ export default function CellInspection({
             </button>
           </div>
           <canvas
+            key={software ? "software" : "default"}
             ref={canvas}
             tabIndex={0}
             style={{ touchAction: "none", cursor: rendererKind === "fixed" ? "default" : "grab" }}

@@ -1900,7 +1900,33 @@ export default function ColonyField({
         canvas.dataset.chunkPaints = String(framePaints);
         canvas.dataset.chunkCacheHits = String(frameHits);
       }
-      if (angled.current) return; // Map labels and hit targets use the overhead projection.
+      const drawMinimap = () => {
+        // Zoomed in: the minimap, with the view's rectangle.
+        if (c.zoom > fitZoom(ext, v) * 1.05) {
+          const now = performance.now();
+          if (now - miniAt > 500) {
+            paintMini();
+            miniAt = now;
+          }
+          const r = minimapRect(ext, v, d);
+          ctx.globalAlpha = 0.92;
+          ctx.drawImage(mini, r.x, r.y, r.w, r.h);
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = theme.line;
+          ctx.lineWidth = d;
+          ctx.strokeRect(r.x, r.y, r.w, r.h);
+          const k = r.w / ext.w;
+          ctx.strokeStyle = theme.accent;
+          ctx.lineWidth = 1.5 * d;
+          const x0 = Math.max(gx0, vis.x0);
+          const y0 = Math.max(0, vis.y0);
+          ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
+        }
+      };
+      if (angled.current) {
+        drawMinimap();
+        return; // Map labels and hit targets use the overhead projection.
+      }
       if (voxel.alpha > 0) {
         // Alates keep their existing body/wing atlas until the shared mesh contains their separate wings.
         for (const drawAlates of alateOverlays) drawAlates();
@@ -2061,27 +2087,7 @@ export default function ColonyField({
 
       drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, motion.matches ? 0 : performance.now() / 1000);
 
-      // Zoomed in: the minimap, with the view's rectangle.
-      if (c.zoom > fitZoom(ext, v) * 1.05) {
-        const now = performance.now();
-        if (now - miniAt > 500) {
-          paintMini();
-          miniAt = now;
-        }
-        const r = minimapRect(ext, v, d);
-        ctx.globalAlpha = 0.92;
-        ctx.drawImage(mini, r.x, r.y, r.w, r.h);
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = theme.line;
-        ctx.lineWidth = d;
-        ctx.strokeRect(r.x, r.y, r.w, r.h);
-        const k = r.w / ext.w;
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 1.5 * d;
-        const x0 = Math.max(gx0, vis.x0);
-        const y0 = Math.max(0, vis.y0);
-        ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
-      }
+      drawMinimap();
       if (import.meta.env.DEV) canvas.dataset.fieldDrawMs = (performance.now() - started).toFixed(2);
     };
     cadaverSprites.load(draw);
@@ -2300,11 +2306,11 @@ export default function ColonyField({
     }
     if (pointers.current.size > 2) return;
     const start = { moved: 0, sx: x, sy: y };
-    if (angled.current) {
-      gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
-    } else if (e.button === 0 && inMini(x, y)) {
+    if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
+    } else if (angled.current) {
+      gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
     } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
       // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
       const ant = shown.current === PLANE ? pick(x, y) : null;

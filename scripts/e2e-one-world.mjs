@@ -1211,19 +1211,41 @@ try {
     "inspection focuses a non-modal side panel",
   );
   const inspectionCanvas = inspection.locator("canvas");
-  await until(
-    () =>
-      inspectionCanvas.evaluate((cv) => {
-        if (cv.dataset.assetsReady !== "true") return false;
-        const data = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
-        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
-        return false;
-      }),
-    "the inspection atlas paints the cell",
-    5000,
-    50,
+  await until(() => inspectionCanvas.evaluate((cv) => cv.dataset.assetsReady === "true"), "the inspection renderer is ready", 5000, 50);
+  const inspectionShot = await inspectionCanvas.screenshot();
+  check(
+    await lp.evaluate(async (base64) => {
+      const image = new Image();
+      image.src = "data:image/png;base64," + base64;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 4; i < data.length; i += 4) if (data[i] !== data[0] || data[i + 1] !== data[1] || data[i + 2] !== data[2]) return true;
+      return false;
+    }, inspectionShot.toString("base64")),
+    "the inspection canvas paints visible detail",
   );
-  check((await inspection.getByRole("status").count()) === 0, "the inspection atlas loads without fallback");
+  check((await inspection.getByRole("status").count()) === 0, "the inspection renderer loads without the fixed atlas");
+  if ((await inspectionCanvas.getAttribute("data-renderer")) === "webgl") {
+    check(
+      await inspectionCanvas.evaluate((cv) => {
+        const lose = cv.getContext("webgl2")?.getExtension("WEBGL_lose_context");
+        lose?.loseContext();
+        return !!lose;
+      }),
+      "the test can simulate WebGL context loss",
+    );
+    await until(
+      () => inspectionCanvas.evaluate((cv) => cv.dataset.renderer === "software" && cv.dataset.assetsReady === "true"),
+      "inspection recovers on a software canvas after WebGL context loss",
+      5000,
+      50,
+    );
+  }
   const scentOverlay = inspection.getByRole("checkbox", { name: "Scents", exact: true });
   await scentOverlay.uncheck();
   check(!(await scentOverlay.isChecked()), "inspection scents can be hidden");
