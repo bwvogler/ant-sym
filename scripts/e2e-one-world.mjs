@@ -1353,6 +1353,41 @@ try {
   await lp.mouse.move(hole.x + 2, hole.y + 2);
   await lp.waitForTimeout(100);
   check((await lensCard.count()) === 0 && (await lensBtn.getAttribute("aria-pressed")) === "false", "i again: the lens off, no card");
+  // The close-map renderer owns a detached canvas, separate from the inspector's visible canvas.
+  await lp.evaluate(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (kind, options) {
+      const context = getContext.call(this, kind, options);
+      if (kind === "webgl2" && context && !this.isConnected) {
+        window.loseCloseMapContext = () => {
+          const extension = context.getExtension("WEBGL_lose_context");
+          extension?.loseContext();
+          return !!extension;
+        };
+        HTMLCanvasElement.prototype.getContext = getContext;
+      }
+      return context;
+    };
+  });
+  const closeMap = lp.locator("canvas").first();
+  await closeMap.evaluate((cv) => {
+    const { left, top, width, height } = cv.getBoundingClientRect();
+    cv.dispatchEvent(new WheelEvent("wheel", { deltaY: -10000, clientX: left + width / 2, clientY: top + height / 2 }));
+  });
+  const tiltButton = lp.getByRole("button", { name: /^Tilt close map/ });
+  await tiltButton.waitFor({ timeout: 5000 });
+  await until(() => closeMap.evaluate((cv) => cv.dataset.voxelAlpha === "1.000"), "close map reaches full voxel detail", 10000, 50);
+  await tiltButton.press("ArrowUp");
+  await lp.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  if ((await closeMap.getAttribute("data-map-renderer")) === "voxel-webgl") {
+    check(await lp.evaluate(() => window.loseCloseMapContext?.()), "the test can simulate tilted map context loss");
+    await until(
+      () => closeMap.evaluate((cv) => cv.dataset.mapRenderer === "voxel-software" && cv.dataset.voxelAlpha === "1.000"),
+      "the tilted map recovers on a software canvas",
+      10000,
+      50,
+    );
+  }
   await lctx.close();
   // The lens button fits the phone's HUD from 360 px wide (review of #196, S4).
   const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });

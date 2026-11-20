@@ -7,8 +7,9 @@ import { inspectViewport } from "./inspectionPatch.ts";
 import { centreX, centreY, CURTAIN, STRIP, SIDE, type AphidClump } from "../colony/index.ts";
 
 export type MapVoxelScene = Pick<InspectionScene, "accelerated" | "setViewport" | "setPalette" | "draw" | "dispose">;
-type Factory = (canvas: HTMLCanvasElement) => Promise<MapVoxelScene>;
-const load: Factory = async (canvas) => (await import("./InspectionScene.ts")).InspectionScene.create(canvas, "surface");
+type Factory = (canvas: HTMLCanvasElement, software: boolean) => Promise<MapVoxelScene>;
+const load: Factory = async (canvas, software) =>
+  (await import("./InspectionScene.ts")).InspectionScene.create(canvas, "surface", software);
 const smooth = (x: number) => {
   x = Math.max(0, Math.min(1, x));
   return x * x * (3 - 2 * x);
@@ -38,6 +39,22 @@ export class MapVoxelPass {
   private scene: MapVoxelScene | null = null;
   private surface: HTMLCanvasElement | null = null;
   private loading = false;
+  private software = false;
+  private contextLost = (event: Event) => {
+    event.preventDefault();
+    if (this.disposed || event.currentTarget !== this.surface) return;
+    this.software = true;
+    this.loading = false;
+    this.releaseSurface();
+    this.ready();
+  };
+
+  private releaseSurface() {
+    this.surface?.removeEventListener("webglcontextlost", this.contextLost);
+    this.surface = null;
+    this.scene?.dispose();
+    this.scene = null;
+  }
   private failed = false;
   private disposed = false;
   private create: Factory;
@@ -67,12 +84,13 @@ export class MapVoxelPass {
       return { alpha: 0, renderer: "sprites" };
     if (!this.scene && !this.loading) {
       this.loading = true;
-      this.surface = this.canvas();
-      this.surface.width = 384;
-      this.surface.height = 320;
-      void this.create(this.surface)
+      const surface = (this.surface = this.canvas());
+      surface.width = 384;
+      surface.height = 320;
+      surface.addEventListener("webglcontextlost", this.contextLost);
+      void this.create(surface, this.software)
         .then((scene) => {
-          if (this.disposed) {
+          if (this.disposed || this.surface !== surface) {
             scene.dispose();
             return;
           }
@@ -81,8 +99,10 @@ export class MapVoxelPass {
           this.ready();
         })
         .catch(() => {
+          if (this.disposed || this.surface !== surface) return;
           this.failed = true;
           this.loading = false;
+          this.releaseSurface();
         });
     }
     if (cssZoom <= MAP_ORBIT_SHOW_ZOOM) return { alpha: 0, renderer: "sprites" };
@@ -141,15 +161,13 @@ export class MapVoxelPass {
       }
       return { alpha, ...(angled ? { angled: true } : {}), renderer: scene.accelerated ? "voxel-webgl" : "voxel-software" };
     } catch {
-      scene.dispose();
-      this.scene = null;
+      this.releaseSurface();
       this.failed = true;
       return { alpha: 0, renderer: "sprites" };
     }
   }
   dispose(): void {
     this.disposed = true;
-    this.scene?.dispose();
-    this.scene = null;
+    this.releaseSurface();
   }
 }

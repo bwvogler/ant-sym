@@ -62,6 +62,7 @@ function harness(accelerated = true) {
     ready = 0,
     disposed = 0,
     images = 0;
+  const surfaces: EventTarget[] = [];
   const calls: { patch: Parameters<MapVoxelScene["draw"]>[0]; options: Parameters<MapVoxelScene["draw"]>[1] }[] = [],
     sizes: Parameters<MapVoxelScene["setViewport"]>[0][] = [],
     scene: MapVoxelScene = {
@@ -86,18 +87,20 @@ function harness(accelerated = true) {
       () => {
         ready++;
       },
-      async () => {
+      async (_canvas, software) => {
         creates++;
-        return scene;
+        return software ? { ...scene, accelerated: false } : scene;
       },
       () => {
         canvases++;
-        return { width: 0, height: 0 } as HTMLCanvasElement;
+        const surface = new EventTarget();
+        surfaces.push(surface);
+        return Object.assign(surface, { width: 0, height: 0 }) as unknown as HTMLCanvasElement;
       },
     ),
     draw = (zoom = 135, layer = PLANE, y = camera.y, allow = true, orbit?: InspectionOrbit) =>
       pass.draw(ctx, game, sensed, layer, { ...camera, zoom, y }, view, 1, { food: false, home: false }, [], palette, allow, orbit);
-  return { pass, draw, calls, sizes, scene, stats: () => ({ creates, canvases, ready, disposed, images }) };
+  return { pass, draw, calls, sizes, scene, surfaces, stats: () => ({ creates, canvases, ready, disposed, images }) };
 }
 const loaded = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -189,4 +192,21 @@ test("failed rendering restores sprites and disposing a pending load releases it
   assert.equal(pending.stats().disposed, 1);
   assert.equal(pending.stats().ready, 0);
   assert.equal(pending.draw(150).alpha, 0);
+});
+
+test("a lost tilted map context falls back and rebuilds on a fresh software canvas", async () => {
+  const h = harness();
+  const orbit = { yaw: 0, tilt: 0.65 };
+  h.draw(180);
+  await loaded();
+  assert.equal(h.draw(180, PLANE, camera.y, true, orbit).renderer, "voxel-webgl");
+  const lost = new Event("webglcontextlost", { cancelable: true });
+  h.surfaces[0].dispatchEvent(lost);
+  assert.equal(lost.defaultPrevented, true);
+  assert.equal(h.stats().disposed, 1);
+  assert.equal(h.draw(180, PLANE, camera.y, true, orbit).alpha, 0);
+  await loaded();
+  assert.equal(h.stats().canvases, 2);
+  assert.deepEqual(h.draw(180, PLANE, camera.y, true, orbit), { alpha: 1, angled: true, renderer: "voxel-software" });
+  h.pass.dispose();
 });
