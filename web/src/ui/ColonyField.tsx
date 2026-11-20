@@ -2278,8 +2278,9 @@ export default function ColonyField({
     );
   };
 
+  const panMap = (c: Camera, dx: number, dy: number) => pan(c, dx, angled.current ? dy / Math.cos(orbit.current.tilt) : dy);
+
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
-    if (angled.current) return;
     if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
     // The builder sets a palm aside (a child's resting hand is no finger: docs/builder.md, design).
     if (buildRef.current && isPalm(e)) {
@@ -2296,7 +2297,9 @@ export default function ColonyField({
     }
     if (pointers.current.size > 2) return;
     const start = { moved: 0, sx: x, sy: y };
-    if (e.button === 0 && inMini(x, y)) {
+    if (angled.current) {
+      gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
+    } else if (e.button === 0 && inMini(x, y)) {
       gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
       jumpMini(x, y);
     } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
@@ -2331,11 +2334,10 @@ export default function ColonyField({
   };
 
   const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
-    if (angled.current) return;
     const [x, y] = devicePoint(e);
     hover.current = [x, y];
     // The lens follows a mouse over the map (no button down); a finger taps instead (onUp).
-    if (lensRef.current && e.pointerType === "mouse" && pointers.current.size === 0) probeAt(x, y, false);
+    if (!angled.current && lensRef.current && e.pointerType === "mouse" && pointers.current.size === 0) probeAt(x, y, false);
     const prev = pointers.current.get(e.pointerId);
     if (!prev) return;
     const g = gesture.current;
@@ -2344,15 +2346,18 @@ export default function ColonyField({
       for (const [id, p] of pointers.current) if (id !== e.pointerId) other = p;
       const before = Math.hypot(prev.x - other.x, prev.y - other.y);
       const after = Math.hypot(x - other.x, y - other.y);
-      const c = zoomBy(camera(), extent(), viewport(), (x + other.x) / 2, (y + other.y) / 2, before > 0 ? after / before : 1);
-      setCamera(pan(c, (x - prev.x) / 2, (y - prev.y) / 2));
+      const v = viewport();
+      const sx = angled.current ? v.w / 2 : (x + other.x) / 2;
+      const sy = angled.current ? v.h / 2 : (y + other.y) / 2;
+      const c = zoomBy(camera(), extent(), v, sx, sy, before > 0 ? after / before : 1);
+      setCamera(panMap(c, (x - prev.x) / 2, (y - prev.y) / 2));
     } else if (g.kind === "pan") {
       const was = g.moved;
       g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
       if (g.moved > slop()) {
         if (follow.current) unfollow();
         // Crossing the slop, catch up from where the drag began, so the ground stays under the pointer.
-        setCamera(was <= slop() ? pan(camera(), x - g.sx, y - g.sy) : pan(camera(), x - prev.x, y - prev.y));
+        setCamera(was <= slop() ? panMap(camera(), x - g.sx, y - g.sy) : panMap(camera(), x - prev.x, y - prev.y));
       }
     } else if (g.kind === "mini" && e.buttons & 1) jumpMini(x, y);
     else if (g.kind === "paint") {
@@ -2401,7 +2406,7 @@ export default function ColonyField({
     pointers.current.delete(e.pointerId);
     // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
     if (e.type === "pointerup" && g.kind === "paint" && g.pending) paint([[g.sx, g.sy]], true);
-    if (e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
+    if (!angled.current && e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
       const pn = penRef.current;
       if (lensRef.current && !(pn && shown.current === PLANE)) {
         // The lens on: a click (a tap) says what is there, and keeps the card up; it follows nothing. The queen's pen keeps its click.
@@ -2447,7 +2452,7 @@ export default function ColonyField({
     const m = moves[key];
     if (m) {
       if (follow.current) unfollow();
-      setCamera(pan(c, m[0], m[1]));
+      setCamera(panMap(c, m[0], m[1]));
     } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 1.25));
     else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
     else if (e.key === "0" || e.key === "Home") showAll();
