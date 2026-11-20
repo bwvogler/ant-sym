@@ -152,8 +152,12 @@ test("a host that died of the fungus, buried on the midden, is a new start that 
   const mass = e.mass;
   // The burial hook as an undertaker calls it, a cell clear of the landing patch.
   const [x, y] = [60, 40];
-  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
+  g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, heading: -Math.PI / 3, load: 0.5, strain: e.strain }, PLANE);
   assert.equal(plane.tips.length, tips + 2, "two tips set out from the corpse");
+  assert.deepEqual(
+    plane.tips.slice(tips).map((tip) => tip.heading),
+    [2, 5],
+  );
   assert.ok(plane.has(x, y));
   assert.equal(g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y)), CORPSE.spores);
   assert.ok(e.mass >= mass + CORPSE.mass - 1e-9, "the cadaver fed the mycelium");
@@ -214,7 +218,14 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
   c.load[i] = 0.5;
   c.strain[i] = g.fungus.evolution!.strain;
   const before = g.fungus.corpsesOn(PLANE).size;
+  c.heading[i] = Math.PI / 3;
+  const tips = g.fungus.hyphaeOn(PLANE)!.tips;
+  const first = tips.length;
   c.kill(i);
+  assert.deepEqual(
+    tips.slice(first).map((tip) => tip.heading),
+    [1, 4],
+  );
   assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
   const j = pick(i + 1);
   assert.ok(j >= 0);
