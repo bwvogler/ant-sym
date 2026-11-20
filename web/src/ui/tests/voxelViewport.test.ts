@@ -48,7 +48,7 @@ test("tilting keeps the center ground line fixed in either map projection", () =
     const ground = new T.Vector3(x, mode === "surface" ? -y : 1.08, mode === "surface" ? 0 : -y);
     const target = new T.Vector3(...mapTiltTarget(mode, x, y));
     const camera = new T.OrthographicCamera(-3, 3, 2, -2, 0.05, 50);
-    for (const tilt of [0, 0.3, 0.65, 1.15]) {
+    for (const tilt of [0, -0.3, -0.65, -1.15]) {
       const orbit = orbitCamera(mode, { yaw: 0, tilt });
       camera.position.copy(target).add(new T.Vector3(...orbit.position));
       camera.up.set(...orbit.up);
