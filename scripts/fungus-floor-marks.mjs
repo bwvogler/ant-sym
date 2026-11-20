@@ -1,5 +1,5 @@
 // Matched generated nests with a fixed chamber-sensitive trail doctrine and a legacy control.
-// Run from the repository root: node scripts/fungus-floor-marks.mjs [seed ...]
+// Run from the repository root: node scripts/fungus-floor-marks.mjs [--recovery] [seed ...]
 import assert from "node:assert/strict";
 import {
   CELL,
@@ -24,11 +24,11 @@ const workers = 96;
 const seconds = 150;
 const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 
-function run(seed, damp, contextual) {
+function run(seed, damp, contextual, recover = false) {
   const world = generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } });
   const game = new Game(world, { antCount: workers, rival: false }, gameRng(seed));
   const colony = game.player;
-  colony.params.dropRefusalLimit = 0; // Keep this assay's original unbounded refusal control.
+  colony.params.dropRefusalLimit = recover ? 2 : 0;
   const queen = colony.queen;
   const nest = world.plane.nests[0];
   cellOf(nest.x, nest.y);
@@ -151,10 +151,12 @@ function run(seed, damp, contextual) {
   };
 }
 
-const seeds = process.argv.slice(2).map(Number);
+const args = process.argv.slice(2);
+const recover = args.includes("--recovery");
+const seeds = args.filter((arg) => arg !== "--recovery").map(Number);
 for (const seed of seeds.length ? seeds : [21, 22, 23, 24, 25, 26]) {
   const legacy = [run(seed, false, false), run(seed, true, false)];
   const contextual = [run(seed, false, true), run(seed, true, true)];
   assert.ok([...legacy, ...contextual].every(({ initialHosts }) => initialHosts === legacy[0].initialHosts));
-  console.log(JSON.stringify({ seed, legacy, contextual }));
+  console.log(JSON.stringify({ seed, legacy, contextual, ...(recover ? { recovery: run(seed, true, true, true) } : {}) }));
 }

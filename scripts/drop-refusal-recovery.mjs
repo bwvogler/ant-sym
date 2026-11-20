@@ -12,7 +12,7 @@ function run(seed, actions, recover) {
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   let dropRefusals = 0;
   if (actions) {
-    Object.assign(game.params.fight, { intent: true, attackReach: 1, attackDistance: 0.65 });
+    game.params.fight = { ...game.params.fight, intent: true, attackReach: 1, attackDistance: 0.65 };
     colony.params.deliveryLane = 1;
     colony.responses = {
       ...localResponses,
