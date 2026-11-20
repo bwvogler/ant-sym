@@ -12,7 +12,7 @@ import { Game } from "./game.ts";
 import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, type OneWorld } from "./oneWorld.ts";
-import { holeRaid } from "./sense.ts";
+import { enemyHeading, holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
 import { isSky, takeFoodCell, OPEN, rockAt, type WorldMap } from "./world.ts";
 
@@ -993,6 +993,22 @@ function observedDefence(spec: RunSpec): RunSpec {
                   else exposures.set(ant, { time: game.time, streak });
                   add("earlyExposures");
                   add("earlyExposuresWithoutContact", Number(!current));
+                  if (!current) {
+                    // Re-read the defender's ordinary recognition from the refreshed, post-movement occupancy.
+                    const [x, y] = CELL;
+                    const previousLayer = colony.cur;
+                    colony.bind(colony.layer[ant]);
+                    try {
+                      if (enemyHeading(colony, ant) !== null) {
+                        add("earlyNoContactPressureVisibleAfterMove");
+                        if (killed) add("earlyNoContactDeathsVisibleAfterMove");
+                      }
+                    } finally {
+                      colony.bind(previousLayer);
+                      CELL[0] = x;
+                      CELL[1] = y;
+                    }
+                  }
                   add("earlyRepeatedExposures", Number(repeated));
                   if (current?.movement === "withdraw" && current.layer === colony.layer[ant]) {
                     const dx = colony.x[ant] - current.x;

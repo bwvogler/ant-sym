@@ -229,3 +229,21 @@ An episode starts at an explicit withdrawal. It clears after three consecutive t
 The speed increase improved clearance per episode from 77% to 93%, while repeated contact within episodes rose from 0.59 to 0.77 events per start. Episode counts are not counts of unique ants. The pressure-only ticks did not occur inside recently active withdrawals under this three-tick definition, so these runs do not support blaming continued pressure after contact drops out for the repeated withdrawal problem. The separate perception gap remains real. No-contact deaths fell from three to one.
 
 Reproduce with `node scripts/experiment.mjs defendHome --seeds 2-6 --seconds 30 --set game.fight.intent=true --set colony.withdrawalSpeed=1,1.25 --jobs 5`.
+
+### Movement timing and withdrawal commitment
+
+The A13 observer re-read the defender's existing recognition after movement and occupancy refresh on each pressure tick without an earlier contact decision. The ant could detect a stranger after movement on all 47 baseline cases and all 10 faster-withdrawal cases, including all four deaths. This puts the observed gap between the decision and damage snapshots. The check does not attribute the damage to the particular stranger the victim detects.
+
+A separate trial let empty-jawed surface ants continue withdrawal for 0.15 seconds after contact dropped out, using the previous movement heading and the existing turning rule at ordinary speed. Fresh contact still chose the action. The trial used 300-second A13 and A9 runs on seeds 2–6.
+
+| Seed | Raid food, base / commitment | Defender losses | Raider losses | Neutral food, base / commitment |
+|---:|---:|---:|---:|---:|
+| 2 | 315 / 398 | 124 / 124 | 42 / 43 | 1,559 / 1,448 |
+| 3 | 336 / 475 | 106 / 106 | 35 / 35 | 2,182 / 1,824 |
+| 4 | 106 / 132 | 127 / 93 | 29 / 25 | 2,070 / 2,041 |
+| 5 | 77 / 48 | 158 / 160 | 36 / 25 | 2,061 / 1,783 |
+| 6 | 78 / 95 | 147 / 153 | 39 / 29 | 1,557 / 1,509 |
+
+Raid pass count stayed at 1/5. Neutral food fell on every seed, with a 16% loss on seed 3. The brief heading commitment was rejected and removed. That distinguishes faster separation from making the same withdrawal last longer.
+
+Reproduce the visibility trace with the withdrawal-episode command above. It adds the number of pressure ticks and deaths that became detectable after movement.

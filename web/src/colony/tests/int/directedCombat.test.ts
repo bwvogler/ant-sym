@@ -6,6 +6,7 @@ import { run, smallOne } from "../builders.ts";
 import { Colony } from "../../colony.ts";
 import { combatObservers } from "../../combatObservation.ts";
 import { Recognition } from "../../recognition.ts";
+import { enemyHeading } from "../../sense.ts";
 import { mulberry32 } from "../../world.ts";
 import { hexMap, put } from "../hexmaps.ts";
 
@@ -40,6 +41,32 @@ test("attack pressure is confined to reachable cells and clears between resoluti
   assert.deepEqual(fight(cs), [0, 0]);
   cs[0].attackLayer[0] = cs[0].layer[0];
   assert.deepEqual(fight(cs), [0, 1]);
+});
+
+test("movement can bring a hostile ant into perception before damage resolves", () => {
+  const [defender, raider] = pair([".......", ".......", "......."]);
+  const colonies = [defender, raider];
+  const recognition = new Recognition();
+  defender.attackLayer[0] = -1;
+  put(raider, 0, 6, 1);
+  defender.wire(0, { enemies: recognition });
+  recognition.build(colonies);
+  assert.equal(enemyHeading(defender, 0), null);
+
+  put(raider, 0, 3, 1);
+  recognition.build(colonies);
+  assert.notEqual(enemyHeading(defender, 0), null);
+  assert.deepEqual(
+    resolveFights(
+      colonies,
+      colonies.map((colony) => occupancy(colony, new CountGrid())),
+      1,
+      () => 0,
+      { rate: 1, alarm: 1, intent: true },
+      recognition,
+    ),
+    [1, 0],
+  );
 });
 
 test("neither soil nor rock can host an attack or receive one", () => {
