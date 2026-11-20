@@ -1,10 +1,16 @@
-// Default-size, two-colony runs: node scripts/drop-refusal-recovery.mjs [--isolate | --split] [seed ...]
+// Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
+// Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
+// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed>
 import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
+import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
+
 const dt = 1 / 30;
-const seconds = 120;
+const seconds = Number(process.env.ANT_ASSAY_SECONDS ?? 120);
 const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 const damp = encodeLevels({ marks: 0 }, ["marks"]);
+const directedFight = { intent: true, attackReach: 1, attackDistance: 0.65 };
+const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place === "tunnel";
 
 function run(seed, directed, contextual, recover) {
   const game = new Game(generateOneWorld(seed), {}, gameRng(seed));
@@ -12,7 +18,7 @@ function run(seed, directed, contextual, recover) {
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   let dropRefusals = 0;
   if (directed) {
-    game.params.fight = { ...game.params.fight, intent: true, attackReach: 1, attackDistance: 0.65 };
+    game.params.fight = { ...game.params.fight, ...directedFight };
   }
   if (contextual) {
     colony.params.deliveryLane = 1;
@@ -22,7 +28,7 @@ function run(seed, directed, contextual, recover) {
         return contextual !== "drop" && t.carrying === "food" && t.place === "tunnel" ? "none" : localResponses.trail(t, draw);
       },
       drop(t, draw) {
-        if (contextual !== "trail" && t.carrying === "food" && !t.porter && t.place === "tunnel") {
+        if (contextual !== "trail" && refuseTunnelDrop(t)) {
           dropRefusals++;
           return false;
         }
@@ -70,10 +76,29 @@ function run(seed, directed, contextual, recover) {
 }
 
 const args = process.argv.slice(2);
+if (args[0] === "--guard") {
+  const [, id, seedArg] = args;
+  const seed = Number(seedArg);
+  if (!id || !Number.isSafeInteger(seed) || seed <= 0) throw Error("--guard requires an assay id and positive integer seed");
+  const assay = oneAssay(id);
+  const existing = runAssay(assay, seed).metrics;
+  const candidate = runAssay(assay, seed, {
+    game: { fight: directedFight },
+    colony: { deliveryLane: 1, dropRefusalLimit: 2 },
+    responses: { drop: (t, draw) => !refuseTunnelDrop(t) && localResponses.drop(t, draw) },
+  }).metrics;
+  console.log(JSON.stringify({ id, seed, existing, candidate }));
+  process.exit(0);
+}
 const isolate = args.includes("--isolate");
 const split = args.includes("--split");
-const seeds = args.filter((arg) => arg !== "--isolate" && arg !== "--split").map(Number);
+const candidate = args.includes("--candidate");
+const seeds = args.filter((arg) => arg !== "--isolate" && arg !== "--split" && arg !== "--candidate").map(Number);
 for (const seed of seeds.length ? seeds : [41, 42, 43, 44]) {
+  if (candidate) {
+    console.log(JSON.stringify({ seed, existing: run(seed, false, null, false), candidate: run(seed, true, "drop", true) }));
+    continue;
+  }
   if (split) {
     console.log(
       JSON.stringify({
