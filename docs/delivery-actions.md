@@ -714,3 +714,29 @@ Trail suppression lowered both pickups and stored food on all four maps. Restori
 On two fresh seeds, the drop-only run matched directed combat exactly for stored food and losses. Trail suppression increased stored food on both (781 to 808 and 1018 to 1262). Its effect depends on the map, which argues against suppressing trails in every perceived tunnel in the baseline doctrine.
 
 Reproduce the split with `node scripts/drop-refusal-recovery.mjs --split 42 44 52 54 61 62`.
+
+### Ten-minute candidate and combat guards
+
+The candidate combines directed combat at 0.65 world units with contextual unloading and bounded handoff. Food-trail emission follows the existing local rule. The 600-second default-size matches keep the same world and fungal inoculation between arms. The named neutral contact, raid defense and held-food guards retain their usual setups.
+
+| Guard | Seed | Existing food / worker losses | Candidate food / worker losses | Existing / candidate pass |
+| --- | ---: | ---: | ---: | ---: |
+| Neutral contact (both colonies) | 11 | 1702 / 57 | 2152 / 1 | pass / pass |
+| Neutral contact (both colonies) | 17 | 1545 / 63 | 1678 / 0 | fail / pass |
+| Raid defense (defending colony) | 11 | 202 / 51 | 147 / 93 | pass / pass |
+| Raid defense (defending colony) | 17 | 194 / 34 | 144 / 111 | fail / fail |
+
+In the raids, the candidate killed 43 and 38 raiders, compared with 48 and 38 under existing combat. The official guard compares food with a no-defense control using matching combat settings. Its unchanged pass count masks the absolute loss of food and defenders.
+
+Shorter attack reaches did not resolve the defense trade-off.
+
+| Raid seed | Reach | Food stored | Defender losses | Raiders killed | Pass |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 11 | 0.45 | 190 | 63 | 32 | fail |
+| 11 | 0.55 | 165 | 102 | 46 | pass |
+| 17 | 0.45 | 258 | 77 | 34 | fail |
+| 17 | 0.55 | 193 | 87 | 35 | fail |
+
+All tested directed reaches cost more defenders on both seeds. A shorter reach can improve food or losses compared with 0.65, but none preserved the existing defense outcomes on both seeds. Future comparisons should isolate the defenders' local contact decisions while retaining directed attacks.
+
+Reproduce with `ANT_ASSAY_SECONDS=600 node scripts/drop-refusal-recovery.mjs --candidate 71 72 73 74` and `node scripts/drop-refusal-recovery.mjs --guard defendHome 11 0.45`. Use `contact` for the neutral encounter and `game1` for the held-food sample.

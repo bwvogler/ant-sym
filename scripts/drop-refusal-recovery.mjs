@@ -1,6 +1,6 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
-// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed>
+// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance]
 import { CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
@@ -77,17 +77,19 @@ function run(seed, directed, contextual, recover) {
 
 const args = process.argv.slice(2);
 if (args[0] === "--guard") {
-  const [, id, seedArg] = args;
+  const [, id, seedArg, distanceArg] = args;
   const seed = Number(seedArg);
   if (!id || !Number.isSafeInteger(seed) || seed <= 0) throw Error("--guard requires an assay id and positive integer seed");
+  const attackDistance = distanceArg === undefined ? directedFight.attackDistance : Number(distanceArg);
+  if (!(attackDistance > 0 && attackDistance <= 1)) throw Error("attackDistance must be in (0, 1]");
   const assay = oneAssay(id);
   const existing = runAssay(assay, seed).metrics;
   const candidate = runAssay(assay, seed, {
-    game: { fight: directedFight },
+    game: { fight: { ...directedFight, attackDistance } },
     colony: { deliveryLane: 1, dropRefusalLimit: 2 },
     responses: { drop: (t, draw) => !refuseTunnelDrop(t) && localResponses.drop(t, draw) },
   }).metrics;
-  console.log(JSON.stringify({ id, seed, existing, candidate }));
+  console.log(JSON.stringify({ id, seed, attackDistance, existing, candidate }));
   process.exit(0);
 }
 const isolate = args.includes("--isolate");
