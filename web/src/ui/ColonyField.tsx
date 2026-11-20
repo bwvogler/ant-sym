@@ -1892,7 +1892,8 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
-        orbit.current,
+        // Above and Below face different planes, so their camera pitch signs differ.
+        lv === PLANE ? { ...orbit.current, tilt: -orbit.current.tilt } : orbit.current,
       );
       const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
       if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
