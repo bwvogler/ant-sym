@@ -341,6 +341,8 @@ export interface ColonyParams {
    * 2008). Steering only.
    */
   routeEnd: number;
+  /** Consecutive stalled retrace targets before resuming ordinary homing. Zero keeps the existing retrace. */
+  routeStallLimit: number;
   /**
    * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): 1 = an ant walking out in `fight` mode stores its
    * places too, as an explorer does (a fighter that then finds food had no way out to retrace: G1 seed 3); 0 = only exploring and
@@ -533,6 +535,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMax: 64,
   routeJoin: 0,
   routeEnd: 1,
+  routeStallLimit: 0,
   routeFight: 0,
   piErrorLaw: 1,
   piErrorAt: 50,

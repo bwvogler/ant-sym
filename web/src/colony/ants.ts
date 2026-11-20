@@ -94,6 +94,7 @@ export const ANT_FIELDS = {
   routeAt: { type: Float32Array, reset: "spawn" },
   /** 0 = recording (or none), 1 = retracing (routeGoal is the place it steers for), 2 = has retraced this trip */
   routeState: { type: Uint8Array, reset: "spawn" },
+  routeStalls: { type: Uint16Array, reset: "spawn" },
   routeGoal: { type: Int16Array, fill: -1, reset: "spawn" },
   /** each ant's age and lifespan, seconds (the side view: workers die of age, so an orphaned colony dwindles) */
   age: { type: Float32Array, reset: "spawn" },

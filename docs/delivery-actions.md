@@ -646,3 +646,17 @@ The second matched replay used only `routeClear` at 550 seconds. It preserved th
 | Clear route only | 4 / 6 | 2,445 | 6 |
 
 Clearing route memory alone was enough for four of these trips. That supports testing a return to ordinary homing when retracing repeatedly fails. The intervention used trip identities and a late timestamp for diagnosis. A policy needs a local trigger and evidence from fresh nests that resetting memory does not discard routes that were helping.
+
+#### Fall back after repeated retrace stalls
+
+The candidate uses the existing progress detector. A retracing carrier skips a target when it stalls, as before, and counts consecutive skipped targets. Recognizing a waypoint clears the count. On the third consecutive stall the carrier discards its route and resumes ordinary homing. Its vector, search offset, wall-following state and load are preserved. Three is a design choice for this comparison, with `routeStallLimit=0` as the control.
+
+Reproduce with `node scripts/experiment.mjs game1 --seeds 14,21,22 --set game.fight.intent=true --set game.fight.attackDistance=0.65 --set both.routeStallLimit=0,3 --jobs 6`. Seed 14 is the diagnosed case, and seeds 21–22 are fresh maps. Measure the long-held peak on each layer together with food stored and casualties.
+
+| Seed | Surface long-held peak, player / rival, control → fallback | Food stored, player / rival, control → fallback | Losses, player / rival, control → fallback | G1 |
+|---:|---|---|---|---|
+| 14 | 3 / 6 → 2 / 1 | 3,419 / 2,439 → 3,935 / 2,735 | 0 / 1 → 12 / 0 | fail → pass |
+| 21 | 1 / 3 → 2 / 3 | 2,025 / 3,489 → 2,393 / 3,944 | 0 / 1 → 0 / 0 | fail → fail |
+| 22 | 3 / 0 → 3 / 3 | 2,819 / 2,850 → 2,756 / 3,518 | 0 / 0 → 1 / 0 | fail → fail |
+
+Six 600-second runs completed. The control on seed 14 reproduced the earlier food, losses and held counts. The fallback cleared that seed's hold guard and improved combined food on all three maps. Both fresh maps still exceeded the hold limit. Seed 22 added three long-held rival loads where the control had none, and seed 14 added 12 player losses. The runs report losses from all causes. Keep the control as the default. The next diagnostic needs to distinguish useful waypoint progress from resets during loops and trace the additional surface trips on seed 22 before changing the threshold.
