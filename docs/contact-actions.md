@@ -314,3 +314,31 @@ Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 3,5,6 --s
 A paired 600-second G1 run on prior failure seed 12 reproduced every gameplay metric at both reaches, including 2,423/2,768 food, zero losses and a maximum of three long-held loads. The latter remains above the pass threshold of two. Observed runtime was 8.86 versus 8.69 ms/tick for the standard and distance paths, respectively, with two workers sharing the machine. This zero-casualty seed does not establish cost under sustained fighting. The remaining G1 failure on this seed belongs to carrying and delivery, even when combat reach changes.
 
 Reproduce with `node scripts/experiment.mjs game1 --seeds 12 --set game.fight.intent=true --set game.fight.attackDistance=0,0.65 --jobs 2`.
+
+### Fresh 300-second reach holdout
+
+We paired the standard directed reach with the 0.65 continuous radius on seeds 11, 14, 17 and 20. These seeds were outside the earlier radius selection set. Both arms used directed intent.
+
+| Seed | A13 defender food, standard / 0.65 | Defender losses | Raider losses | A9 combined food | A9 combined losses |
+|---:|---:|---:|---:|---:|---:|
+| 11 | 123 / 147 | 160 / 93 | 39 / 43 | 2,045 / 2,152 | 7 / 1 |
+| 14 | 78 / 177 | 142 / 86 | 41 / 31 | 2,737 / 2,737 | 0 / 0 |
+| 17 | 59 / 144 | 167 / 111 | 22 / 38 | 1,672 / 1,678 | 1 / 0 |
+| 20 | 85 / 458 | 164 / 89 | 36 / 39 | 2,066 / 2,214 | 0 / 0 |
+
+Defender losses fell from 633 to 379, and food improved on all four raids. A13 still passed once in each arm. The standard reach passed seed 14, and the short reach passed seed 11. The short reach's other three seeds killed 31–39 raiders against the required 40. All eight neutral runs passed. Observed A13 tick time was 1.57–1.72 ms for standard reach and 1.62–2.05 ms for short reach with six shared workers. The parallel run is suitable for detecting a large slowdown, but does not isolate reach overhead from different ant populations and raid outcomes.
+
+Reproduce with `node scripts/experiment.mjs defendHome contact --seeds 11,14,17,20 --set game.fight.intent=true --set game.fight.attackDistance=0,0.65 --jobs 6`.
+
+On the same four seeds, we also ran legacy combat and combined the 0.65 radius with alarm-gated entrance defense. Each arm used its own matched A13 controls.
+
+| Seed | A13 defender food, legacy / short / short + alarm | Defender losses | Raider losses | A9 combined food | A9 combined losses |
+|---:|---:|---:|---:|---:|---:|
+| 11 | 202 / 147 / 148 | 51 / 93 / 107 | 48 / 43 / 47 | 1,702 / 2,152 / 2,152 | 57 / 1 / 1 |
+| 14 | 198 / 177 / 207 | 31 / 86 / 93 | 38 / 31 / 37 | 2,443 / 2,737 / 2,737 | 31 / 0 / 0 |
+| 17 | 194 / 144 / 172 | 34 / 111 / 87 | 38 / 38 / 36 | 1,545 / 1,678 / 1,678 | 63 / 0 / 0 |
+| 20 | 780 / 458 / 513 | 40 / 89 / 54 | 48 / 39 / 42 | 2,326 / 2,214 / 2,214 | 61 / 0 / 0 |
+
+Adding the alarm gate to the short reach raised defender food on all four seeds and produced two A13 passes (11 and 20), matching the legacy pass count. Defender losses rose on seeds 11 and 14, fell on 17 and 20, and exceeded legacy on all four. The combined rule reproduced short reach's neutral results seed for seed. The guard count alone would miss the remaining survival regression: the combined condition lost 341 defenders against legacy's 156. Retain the short reach as a candidate, with the alarm-gated policy useful as a comparison arm.
+
+Reproduce the additional arms with `node scripts/experiment.mjs defendHome contact --seeds 11,14,17,20 --set game.fight.intent=false --jobs 4` and `node scripts/experiment.mjs defendAlarmEntrance contactAlarmEntrance --seeds 11,14,17,20 --set game.fight.intent=true --set game.fight.attackDistance=0.65 --jobs 4`.
