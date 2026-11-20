@@ -8,6 +8,7 @@ import { voxelFrustum } from "../voxelViewport.ts";
 import { PLANE, CURTAIN, STRIP, centreX, centreY, cellKey } from "../../colony/index.ts";
 import { InspectionSoftware } from "../inspectionSoftware.ts";
 import * as T from "three";
+import { mapTiltTarget, orbitCamera } from "../inspectionOrbit.ts";
 import { inspectionColour } from "../InspectionScene.ts";
 import { css, HOME_RGB, ROLE_RGB } from "../palette.ts";
 
@@ -38,6 +39,31 @@ test("voxel viewport preserves world scale and aspect across raster sizes and zo
     ["x", NaN],
   ] as const)
     assert.throws(() => voxelFrustum({ ...invalid, [key]: value }));
+});
+
+test("tilting keeps the center ground line fixed in either map projection", () => {
+  const x = 0.22;
+  const y = -0.31;
+  for (const mode of ["surface", "below"] as const) {
+    const ground = new T.Vector3(x, mode === "surface" ? -y : 1.08, mode === "surface" ? 0 : -y);
+    const target = new T.Vector3(...mapTiltTarget(mode, x, y));
+    const camera = new T.OrthographicCamera(-3, 3, 2, -2, 0.05, 50);
+    for (const tilt of [0, 0.3, 0.65, 1.15]) {
+      const orbit = orbitCamera(mode, { yaw: 0, tilt });
+      camera.position.copy(target).add(new T.Vector3(...orbit.position));
+      camera.up.set(...orbit.up);
+      camera.lookAt(target);
+      camera.updateMatrixWorld();
+      for (const dx of [-1, 0, 1]) {
+        const point = ground
+          .clone()
+          .add(new T.Vector3(dx, 0, 0))
+          .project(camera);
+        assert.ok(Math.abs(point.y) < 1e-9, `${mode}, tilt ${tilt}: the axis stays on the center row`);
+        assert.ok(Math.abs(point.x - dx / 3) < 1e-9, `${mode}, tilt ${tilt}: the axis stays fixed horizontally`);
+      }
+    }
+  }
 });
 
 test("live viewport includes the visible region once and preserves crossing ants through camera recentering", () => {
