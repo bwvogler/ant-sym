@@ -1,6 +1,6 @@
 import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { moundBalls, type DirtBall } from "./inspectionMound.ts";
-import { CLOSE_SPRITE_GROUND, inspectionGroundMix, INSPECTION_GROUND } from "./inspectionGround.ts";
+import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { CadaverSprites } from "./cadaverSprites.ts";
 import { MAP_ORBIT_READY_ZOOM, MAP_ORBIT_SHOW_ZOOM, MapVoxelPass } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
@@ -647,8 +647,16 @@ export default function ColonyField({
       return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
     };
 
+    const groundPaper = () => (smellAll ? theme.paperRgb : lv === PLANE ? CLOSE_SPRITE_GROUND.surface : CLOSE_SPRITE_GROUND.back);
+    const groundRock = () => (smellAll ? theme.rock : CLOSE_SPRITE_GROUND.rock);
+    const groundSoil = () => (smellAll ? theme.soil : CLOSE_SPRITE_GROUND.soil);
+    const groundSpoil = () => (smellAll ? theme.spoil : CLOSE_SPRITE_GROUND.spoil);
+
     /** Paint chunk colours: rock/soil, trails, and legacy food washes unless aerial sprites will show the food. */
     const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array, foodAsSprites: boolean) => {
+      const rock = groundRock(),
+        soil = groundSoil(),
+        spoil = groundSpoil();
       const fc = m.food.chunk(cx, cy);
       const lc = m.loose?.chunk(cx, cy);
       // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
@@ -726,7 +734,7 @@ export default function ColonyField({
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? (lc && lc[i] ? theme.spoil : theme.soil) : rc[i] === AIR ? theme.sky : theme.rock;
+            const solid = rc[i] === SOIL ? (lc && lc[i] ? spoil : soil) : rc[i] === AIR ? theme.sky : rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -767,9 +775,9 @@ export default function ColonyField({
           }
           const heap = spoilC ? spoilC[i] : 0;
           if (heap > 0) {
-            px[o] = theme.spoil[0];
-            px[o + 1] = theme.spoil[1];
-            px[o + 2] = theme.spoil[2];
+            px[o] = spoil[0];
+            px[o + 1] = spoil[1];
+            px[o + 2] = spoil[2];
             px[o + 3] = Math.min(255, 110 + heap * 45);
             continue;
           }
@@ -915,18 +923,12 @@ export default function ColonyField({
      */
     const paths = new Map<number, Path2D>();
     const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number, hexMix: number) => {
-      // The background: soil underground (most cells), the paper on the open surface (no soil at all).
-      const showCutaway = lv === CURTAIN && c.y - v.h / c.zoom / 2 > centreY(STRIP) + SIDE;
-      const look = !smellAll && (lv === PLANE || showCutaway) ? inspectionGroundMix(c.zoom / (v.dpr ?? 1)) : 0;
-      const mix = (base: readonly number[], close: readonly number[]) => base.map((value, i) => value + (close[i] - value) * look);
-      const paper = mix(theme.paperRgb, lv === PLANE ? CLOSE_SPRITE_GROUND.surface : CLOSE_SPRITE_GROUND.back);
-      const rock = mix(theme.rock, CLOSE_SPRITE_GROUND.rock);
-      const soil = mix(theme.soil, CLOSE_SPRITE_GROUND.soil);
-      const spoil = mix(theme.spoil, CLOSE_SPRITE_GROUND.soil);
+      const paper = groundPaper();
+      const spoil = groundSpoil();
       const pelletAlpha = !smellAll && lv === PLANE ? Math.max(0, Math.min(1, (c.zoom / (v.dpr ?? 1) - HEX_ZOOM) / 8)) : 0;
       const moundTints = new Map<number, Path2D>();
       const pellets = new Map<string, DirtBall>();
-      const bg = (m.hasSoil ? paper.map((value, i) => value + (soil[i] - value) * hexMix) : paper).map(Math.round);
+      const bg = paper;
       const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
       ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
       const [ax, ay] = toScreen(c, v, gx0, 0);
@@ -950,14 +952,12 @@ export default function ColonyField({
         let data: Uint8ClampedArray | null = null;
         let terrain: Uint8Array | undefined;
         let heaps: Uint16Array | undefined;
-        let loose: Uint8Array | undefined;
         for (let x = rx0; x <= rx1; x++) {
           if (x >> 6 !== chunkX) {
             chunkX = x >> 6;
             data = chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
-            terrain = look || pelletAlpha ? m.rock.chunk(chunkX, cy) : undefined;
+            terrain = pelletAlpha ? m.rock.chunk(chunkX, cy) : undefined;
             heaps = pelletAlpha ? m.spoil?.chunk(chunkX, cy) : undefined;
-            loose = look ? m.loose?.chunk(chunkX, cy) : undefined;
           }
           if (!data) continue;
           const index = (ly << 6) | (x & 63);
@@ -965,19 +965,18 @@ export default function ColonyField({
           // Leave scent, food and chamber washes in their own colours over the shared ground palette.
           const kind = terrain?.[index];
           const heap = heaps?.[index] ?? 0;
-          const solid = !look ? null : kind === ROCK ? rock : kind === SOIL ? (loose?.[index] ? spoil : soil) : null;
           if (heap > 0 && (kind ?? OPEN) === OPEN) {
             // Shared world positions let the flat pellets cross hex edges and stack in the same order as voxels.
             for (const ball of moundBalls(heap, cellKey(x, y)))
               if (!pellets.has(ball.id)) pellets.set(ball.id, { ...ball, x: ball.x + x + shift, y: ball.y + (y + 0.5) * R });
           }
           // The spoil wash fades out as the overhead pellets appear.
-          const spoilWash = heap > 0 && data[o] === theme.spoil[0] && data[o + 1] === theme.spoil[1] && data[o + 2] === theme.spoil[2];
+          const spoilWash = heap > 0 && data[o] === spoil[0] && data[o + 1] === spoil[1] && data[o + 2] === spoil[2];
           const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
           const a = spoilWash ? opacity * (1 - pelletAlpha * pelletAlpha) : opacity;
-          const r = Math.round(solid ? solid[0] : data[o] * a + paper[0] * (1 - a));
-          const g = Math.round(solid ? solid[1] : data[o + 1] * a + paper[1] * (1 - a));
-          const b = Math.round(solid ? solid[2] : data[o + 2] * a + paper[2] * (1 - a));
+          const r = Math.round(data[o] * a + paper[0] * (1 - a));
+          const g = Math.round(data[o + 1] * a + paper[1] * (1 - a));
+          const b = Math.round(data[o + 2] * a + paper[2] * (1 - a));
           const key = (r << 16) | (g << 8) | b;
           if (key === bgKey) continue;
           const paint = spoilWash ? moundTints : paths;
@@ -1447,6 +1446,10 @@ export default function ColonyField({
       ctx.fillStyle = theme.paper;
       ctx.fillRect(0, 0, v.w, v.h);
       ctx.imageSmoothingEnabled = false;
+      const [left, top] = toScreen(c, v, gx0, 0);
+      const [right, bottom] = toScreen(c, v, gx0 + ext.w, ext.h);
+      ctx.fillStyle = `rgb(${groundPaper().join(",")})`;
+      ctx.fillRect(left, top, right - left, bottom - top);
 
       // The rows of hexagons in view, and the chunks they fall in. Every chunk in view is painted
       // into its 64×64 colour buffer (one pixel a cell); then drawn as bricks or as hexagons.

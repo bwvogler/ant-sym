@@ -14,14 +14,9 @@ function average(colours: readonly string[]): [number, number, number] {
 }
 
 export const CLOSE_SPRITE_GROUND = {
+  spoil: average(INSPECTION_GROUND.dugSoil),
   surface: average(INSPECTION_GROUND.surfaceSoil),
   soil: average(INSPECTION_GROUND.belowSoil),
   rock: average(INSPECTION_GROUND.rock),
   back: average([INSPECTION_GROUND.back]),
 };
-
-/** Bring in the close material palette before the voxel blend. */
-export function inspectionGroundMix(cssZoom: number): number {
-  const t = Math.max(0, Math.min(1, (cssZoom - 18) / (48 - 18)));
-  return t * t * (3 - 2 * t);
-}
