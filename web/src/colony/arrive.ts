@@ -86,6 +86,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     ((prey = colony.cur === PLANE || colony.onPlane ? colony.preyAphid(CELL[0], CELL[1]) : false) || takeFoodCell(map, CELL[0], CELL[1]))
   ) {
     colony.carrying[i] = 1;
+    colony.dropRefusalTime[i] = 0;
     pickedFood = true;
     colony.quality[i] = prey ? 1 : qualityAt(map, CELL[0], CELL[1]);
     // Remembered too while ants ask for steering weights (ja-ykmu): the `memory` weight steers by it.

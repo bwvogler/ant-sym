@@ -67,6 +67,7 @@ export function chooseDelivery(c: Colony, i: number, answer: Carry): void {
 
 export function endDelivery(c: Colony, i: number, state: number): void {
   c.deliveryTime[i] = 0;
+  c.dropRefusalTime[i] = 0;
   if (c.deliveryRole[i]) {
     c.deliveryRole[i] = 0;
     c.deliveryState[i] = state;

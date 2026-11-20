@@ -28,6 +28,7 @@ function run(seed, damp, contextual) {
   const world = generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } });
   const game = new Game(world, { antCount: workers, rival: false }, gameRng(seed));
   const colony = game.player;
+  colony.params.dropRefusalLimit = 0; // Keep this assay's original unbounded refusal control.
   const queen = colony.queen;
   const nest = world.plane.nests[0];
   cellOf(nest.x, nest.y);

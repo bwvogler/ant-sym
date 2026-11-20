@@ -1,6 +1,8 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
 import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
+import { putDown } from "./dig.ts";
+import { DEFAULT_COLONY } from "./params.ts";
 import type { Colony } from "./colony.ts";
 import { EGG, GYNE, LARVA, LARVA_FOOD, PUPA, foodOf, isFed, owed, type BroodItem } from "./brood.ts";
 import { type Chamber } from "./chambers.ts";
@@ -149,6 +151,7 @@ export function portInstead(col: Colony, i: number, cx: number, cy: number, targ
 export function becomePorter(col: Colony, i: number, to: number): void {
   col.inJaws += 1;
   col.carrying[i] = 1;
+  col.dropRefusalTime[i] = 0;
   col.porter[i] = 1;
   col.portTo[i] = to;
   col.holdT[i] = 0;
@@ -156,6 +159,19 @@ export function becomePorter(col: Colony, i: number, to: number): void {
   col.mode[i] = RETURN;
   col.homeAfresh(i);
   col.gx[i] = NO_CELL;
+}
+
+function releaseAfterRefusal(col: Colony, i: number, dt: number, enemy: boolean): boolean {
+  const limit = col.params.dropRefusalLimit ?? DEFAULT_COLONY.dropRefusalLimit;
+  if (!(limit > 0) || col.porter[i] || enemy) return false;
+  col.antCell(i);
+  if (rockAt(col.map, CELL[0], CELL[1]) !== OPEN) return false;
+  col.dropRefusalTime[i] = Math.min(limit, col.dropRefusalTime[i] + dt);
+  if (col.dropRefusalTime[i] < Math.fround(limit)) return false;
+  putDown(col, i);
+  col.mode[i] = EXPLORE;
+  col.asked[i] = col.question[i] = -1;
+  return true;
 }
 
 /**
@@ -188,7 +204,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) {
         col.deliveryState[i] = DELIVERY_KEEP;
-        return false;
+        return releaseAfterRefusal(col, i, dt, enemy);
       }
       col.carrying[i] = 0;
       col.stock(site, 1);
@@ -236,7 +252,11 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       }
     }
-    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) return false;
+    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) {
+      // A valid local deposit was declined. Leave the load loose rather than stocking a chamber against the policy.
+      return releaseAfterRefusal(col, i, dt, enemy);
+    }
+    col.dropRefusalTime[i] = 0;
     col.carrying[i] = 0;
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));

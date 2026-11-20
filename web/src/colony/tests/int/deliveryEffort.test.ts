@@ -318,3 +318,24 @@ test("lane-off and local carry preserve immediate legacy pickup delivery", () =>
     assert.equal(c.carrying[0], 0);
   }
 });
+
+test("repeated refusal at an eligible chamber releases food for another worker", () => {
+  const { c, store, y } = setup();
+  c.params.dropRefusalLimit = 0.5;
+  c.responses = responses({ drop: () => false });
+  c.foodTo = () => store.id;
+  const before = c.map.food.get(22, y);
+
+  put(c, 0, 22, y);
+  assert.equal(port(c, 0, 0.25), false);
+  assert.equal(c.carrying[0], 1);
+  put(c, 0, 23, y);
+  assert.equal(port(c, 0, 1), false);
+  assert.equal(c.dropRefusalTime[0], 0.25, "walking away does not count as a refusal");
+  put(c, 0, 22, y);
+  assert.equal(port(c, 0, 0.25), true);
+  assert.equal(c.carrying[0], 0);
+  assert.equal(c.dropRefusalTime[0], 0);
+  assert.equal(c.map.food.get(22, y), before + 1);
+  assert.equal(c.stored, 0, "a loose handoff does not count as a successful delivery");
+});

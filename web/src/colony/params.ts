@@ -103,6 +103,8 @@ export interface ColonyParams {
   deliveryLane: number;
   /** Seconds before carry senses a long local delivery attempt; 0 disables tracking (design). */
   deliveryReconsider: number;
+  /** Cumulative seconds of refused unloading at eligible sites before a forager releases food for pickup. Zero disables recovery. */
+  dropRefusalLimit: number;
   /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
   findNear: number;
   /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
@@ -481,6 +483,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   steerLane: 0,
   deliveryLane: 0,
   deliveryReconsider: 0,
+  dropRefusalLimit: 2,
   findNear: 8,
   searchSpan: 1.33,
   foodTrailPlane: 1,

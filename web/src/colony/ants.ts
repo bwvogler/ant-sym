@@ -351,6 +351,7 @@ export const ANT_FIELDS = {
   deliveryState: { type: Uint8Array, reset: "spawn" },
   /** Local delivery attempt duration, saturated at deliveryReconsider. */
   deliveryTime: { type: Float32Array, reset: "spawn" },
+  dropRefusalTime: { type: Float32Array, reset: "spawn" },
 } as const satisfies Record<string, ArrayField>;
 
 export type AntArrays = { -readonly [K in keyof typeof ANT_FIELDS]: InstanceType<(typeof ANT_FIELDS)[K]["type"]> };

@@ -549,6 +549,12 @@
   ],
   "deliveryTime": [
    0
+  ],
+  "dropRefusalTime": [
+   0
+  ],
+  "routeStalls": [
+   0
   ]
  },
  "asIs": {
@@ -1100,6 +1106,12 @@
    41
   ],
   "deliveryTime": [
+   42
+  ],
+  "dropRefusalTime": [
+   42.25
+  ],
+  "routeStalls": [
    42
   ]
  }

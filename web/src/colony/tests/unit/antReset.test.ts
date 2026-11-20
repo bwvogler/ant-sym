@@ -22,7 +22,8 @@ type Arrays = Record<string, { length: number; [i: number]: number }>;
 const arrays = (c: Colony) => c as unknown as Arrays;
 
 const scribble = (c: Colony, i: number) => {
-  names.forEach((k, j) => {
+  // Keep fixture sentinels stable when a field moves in the implementation table.
+  Object.keys(fixture.asIs).forEach((k, j) => {
     const a = arrays(c)[k]!;
     const per = a.length / c.n;
     for (let q = 0; q < per; q++) a[i * per + q] = 7 + j * 0.25; // a value no reset produces
