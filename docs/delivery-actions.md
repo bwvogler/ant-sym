@@ -674,3 +674,15 @@ Replayed both 600-second arms and logged each rival surface load's route state, 
 Slots 199 and 342 did not recognize a waypoint during their retrace. Slot 299 recognized a waypoint and advanced from target 58 to target 23 before its three consecutive stalls. All three already had nonzero search offsets when their routes cleared (15.9–18.3 world units). The sampled search radii later exceeded 40 for each carrier. All nine rival surface trips that exceeded 120 seconds in the fallback run cleared a route and eventually crossed down carrying before the end of the run.
 
 These traces place most of the delay after route clearing for the three peak trips. They show prolonged widening search, with one of those ants also having made earlier waypoint progress. The two whole-game arms diverge before the pickups, so they do not tell us whether retaining the same routes would have shortened these particular trips. A matched replay can vary the handling of the inherited search offset at the same reset and preserve the earlier path and pickup.
+
+#### Matched search-offset intervention
+
+Run seed 22 with directed attack reach 0.65 and `routeStallLimit=3` for both colonies. In each replay, intervene on one of the three rival loads in the preceding table. At the end of the tick where its route state goes from retracing to cleared after the third stall, set only that ant's `search` to zero. Its movement for the reset tick, inherited home vector, wall state, and search angle are identical through the intervention. Follow the original pickup until it crosses underground loaded or the replay reaches 330 seconds. These single-trip replays test the handoff from retracing to homing and leave broader colony outcomes to a separate validation.
+
+| Ant slot | Inherited search offset | Crossed down keeping offset (s) | Crossed down clearing offset (s) | Time saved (s) |
+|---:|---:|---:|---:|---:|
+| 199 | 18.34 | 271.27 | 211.67 | 59.60 |
+| 299 | 15.89 | 241.40 | 128.73 | 112.67 |
+| 342 | 18.27 | 309.77 | 206.97 | 102.80 |
+
+Each intervention matched the original pickup and complete logged reset event, including tick, position, route state and search radius, before altering the offset. Each carrier completed the surface leg within 120 seconds of pickup in its own intervention replay (75.30–97.17 seconds). This isolates a cost of preserving the inherited offset for these three trips. Simultaneous colony-wide resets can change which food is picked up, routing interactions and combat exposure. They still need paired whole-game validation on seed 22 and fresh maps.
