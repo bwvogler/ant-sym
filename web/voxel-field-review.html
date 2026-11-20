@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ant Sym · continuous voxel field prototype</title>
+    <style>
+      body {
+        margin: 0;
+        background: #eae4d8;
+        color: #29251f;
+        font: 16px system-ui;
+      }
+      main {
+        max-width: 960px;
+        margin: auto;
+        padding: 20px;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      button,
+      select {
+        min-height: 44px;
+        font: inherit;
+        padding: 6px 12px;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        margin-top: 16px;
+        background: #d9c3a4;
+        image-rendering: pixelated;
+        touch-action: none;
+        cursor: grab;
+      }
+      p {
+        line-height: 1.5;
+      }
+      .note {
+        color: #635d54;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Zoom into the voxel field</h1>
+      <p>A live game region using the inspection models across the visible area. Drag to pan; use the wheel or buttons to zoom.</p>
+      <header>
+        <select aria-label="Field layer">
+          <option value="below">Below</option>
+          <option value="surface">Surface</option>
+        </select>
+        <button id="out" aria-label="Zoom out">−</button>
+        <button id="in" aria-label="Zoom in">+</button>
+        <button id="home">Return to nest</button>
+        <button id="play">Run simulation</button>
+        <label><input id="scents" type="checkbox" /> Scents</label>
+        <label><input id="markers" type="checkbox" /> Location markers</label>
+      </header>
+      <canvas width="480" height="300" tabindex="0" aria-label="Live voxel field; drag to pan and use plus or minus to zoom"></canvas>
+      <p id="status" role="status">Loading voxel models…</p>
+      <p class="note">
+        Development prototype. Actual seeded world and ant positions, initially paused; no staged crowds. The canvas uses a fixed low raster
+        resolution for voxel detail. Nearby terrain chunks are cached. The aerial-sprite transition and production-map integration are still
+        to come. Software rendering is a compatibility path, not a mobile performance result.
+      </p>
+    </main>
+    <script type="module" src="/src/ui/voxelFieldReview.ts"></script>
+  </body>
+</html>

@@ -14,6 +14,7 @@ import {
   SOIL,
   SPORE_SHOWN,
   type WorldMap,
+  type Transect,
 } from "../colony/index.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { colonyName } from "./names.ts";
@@ -85,7 +86,7 @@ export interface LensWorld {
   colonies: readonly Colony[];
   fungus: Fungus;
   /** one world's plane and curtain, or null on a game of one map */
-  world: { plane: WorldMap; curtain: WorldMap } | null;
+  world: { plane: WorldMap; curtain: WorldMap; line?: Transect } | null;
 }
 
 /**

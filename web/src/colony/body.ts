@@ -119,6 +119,8 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
       strain: col.strain[i],
       layer: col.home,
     });
+  else
+    col.remains.push({ x: CELL[0], y: CELL[1], held: -1, died: col.time, load: col.load[i], strain: col.strain[i], layer: col.layer[i] });
   clearPellet(col, i);
   col.alive[i] = 0;
   col.carrying[i] = 0;

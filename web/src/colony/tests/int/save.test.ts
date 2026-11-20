@@ -98,6 +98,7 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "raidScouts",
     "raidable",
     "recruits",
+    "remains",
     "seen",
     "soilDug",
     "soilFilled",

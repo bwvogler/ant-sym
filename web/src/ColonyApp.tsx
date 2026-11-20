@@ -406,14 +406,16 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       const t = e.target instanceof HTMLElement ? e.target : null;
+      const toggleInput = t instanceof HTMLInputElement && (t.type === "checkbox" || t.type === "radio");
       const a = pageKey(
         {
           key: e.key,
           ctrl: e.ctrlKey,
           meta: e.metaKey,
           alt: e.altKey,
-          typing: !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)),
-          control: !!t?.closest("button, a[href], summary, [role='button'], [role='option'], [role='tab'], [role='menuitem']"),
+          typing: !!t && (t.isContentEditable || (!toggleInput && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))),
+          control:
+            toggleInput || !!t?.closest("button, a[href], summary, [role='button'], [role='option'], [role='tab'], [role='menuitem']"),
         },
         SPEEDS,
       );
@@ -726,7 +728,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                   <button
                     key={v}
                     type="button"
-                    className={`${seg(controls.view === v)} max-sm:px-1.5 max-sm:text-[13px]`}
+                    className={`${seg(controls.view === v)} flex items-center justify-center gap-1 max-sm:px-1.5`}
                     onClick={() => setView(v)}
                     aria-pressed={controls.view === v}
                     title={
@@ -735,7 +737,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                         : "Underground: the curtain under the line, unrolled, with every nest (v)"
                     }
                   >
-                    {v}
+                    <Icon name={v} className="size-5" />
+                    <span className="max-sm:sr-only">{v}</span>
                   </button>
                 ))}
               </div>
@@ -946,6 +949,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           layer={shownLayer}
           trails={{ food: controls.showFoodTrail, home: controls.showHomeTrail }}
           onFollow={setFollowed}
+          aphids={aphidsNow}
+          onFrame={onFrame}
         />
         {palette && <Palette commands={paletteCommands()} onClose={() => setPalette(false)} />}
         {sheet && <Shortcuts speeds={SPEEDS} onClose={() => setSheet(false)} />}

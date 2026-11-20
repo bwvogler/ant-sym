@@ -16,6 +16,7 @@ export default function LensCard({
   pinned,
   onClose,
   onFollow,
+  onInspect,
 }: {
   lines: readonly LensLine[];
   /** the pointer, in the page's pixels */
@@ -25,6 +26,7 @@ export default function LensCard({
   onClose: () => void;
   /** follow the ant the card names (pinned, with an ant) */
   onFollow?: () => void;
+  onInspect?: () => void;
 }) {
   // Toward the middle of the screen from the pointer, and kept inside it (a phone is narrower than two cards).
   const vw = window.innerWidth;
@@ -75,6 +77,16 @@ export default function LensCard({
           onClick={onFollow}
         >
           Follow this ant
+        </button>
+      )}
+      {pinned && onInspect && (
+        <button
+          data-inspect-cell
+          type="button"
+          className="mt-2 ml-2 rounded-md border border-line px-2.5 py-1 text-xs text-fg-2 hover:bg-raised"
+          onClick={onInspect}
+        >
+          Inspect cell
         </button>
       )}
       {!pinned && <p className="mt-2 text-[11px] text-fg-3">Click to keep this card and follow its links.</p>}

@@ -87,7 +87,15 @@ export default function BuilderTray({
 
 /** A tray button's illustration: decorative (the button carries the name); sized to leave room for a crayon's colour bar. */
 function TrayPicture({ picture }: { picture: string }) {
-  return <img src={trayIconUrl(picture)} alt="" aria-hidden draggable={false} className="size-[78%] object-contain" />;
+  return (
+    <img
+      src={trayIconUrl(picture)}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className="size-[78%] object-contain [image-rendering:pixelated]"
+    />
+  );
 }
 
 /** The first time a tool is picked: a finger shows its gesture over the map, with no words (Hiniker et al. 2015). */
