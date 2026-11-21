@@ -16,5 +16,9 @@ test("the page builds the game with the species its settings name, and refuses o
   const settings = { seed: 3, antCount: 20, rival: true, generation: 0 };
   assert.equal(buildGame({ ...settings, species: "generic" }).params.species, GENERIC_ANT);
   assert.throws(() => buildGame({ ...settings, species: "nope" }), /no "nope"/);
-  assert.equal(buildGame({ ...settings, species: "desert" }).params.species, DESERT_ANT, "the start screen's other choice");
+  const desert = buildGame({ ...settings, species: "desert" });
+  assert.equal(desert.params.species, DESERT_ANT);
+  assert.equal(desert.params.fight.intent, true);
+  assert.equal(desert.params.fight.counterattack, true);
+  assert.equal(desert.player.responses.contact, DESERT_ANT.responses.contact);
 });

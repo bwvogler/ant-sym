@@ -412,4 +412,4 @@ The simulation matches the previous prototype on the two replayed seeds for food
 
 Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 23 0.65 simulation-counterattack`. Omit the last argument for the directed baseline.
 
-New generic-species games started from the page use directed combat at 0.65 world units and the nearby-attack cue. The ten-minute and raid results are recorded above and in [delivery actions](delivery-actions.md). The page selects these combat rules at game creation, and loading a game restores its saved combat parameters.
+New games started from the page use directed combat at 0.65 world units and the nearby-attack cue. The ten-minute and raid results are recorded above and in [delivery actions](delivery-actions.md). The page selects these combat rules at game creation, and loading a game restores its saved combat parameters.

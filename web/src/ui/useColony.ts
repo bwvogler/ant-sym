@@ -107,7 +107,7 @@ export function buildGame(s: GameSettings): Game {
       autoFound: false,
       fungus: { hyphae: true },
       species,
-      ...(species === GENERIC_ANT ? { fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true } } : {}),
+      fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true },
     },
     gameRng(s.seed, s.generation),
   );
