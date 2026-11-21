@@ -4,6 +4,7 @@ import {
   menuFor,
   SPECIES,
   DEFAULT_COLONY,
+  DEFAULT_FIGHT,
   STRAINS,
   Game,
   GAME_REGROW,
@@ -95,6 +96,7 @@ export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
   // Its fungus grows as hyphae (ja-2bw, PRD §63): they fruit where they reach a tunnel, and its dead hosts are new starts.
   const map = generateOneWorld(s.seed);
+  const species = speciesById(s.species);
   return new Game(
     map,
     {
@@ -104,7 +106,8 @@ export function buildGame(s: GameSettings): Game {
       regrow: GAME_REGROW,
       autoFound: false,
       fungus: { hyphae: true },
-      species: speciesById(s.species),
+      species,
+      ...(species === GENERIC_ANT ? { fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true } } : {}),
     },
     gameRng(s.seed, s.generation),
   );

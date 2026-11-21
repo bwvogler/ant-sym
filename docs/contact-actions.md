@@ -411,3 +411,5 @@ The game can now evaluate the even-odds rule from a shared previous-tick snapsho
 The simulation matches the previous prototype on the two replayed seeds for food and casualties. Both fresh raids improve defender survival (168 to 83 losses). Seed 23 gains a pass and seed 29 loses one. The four raid checks pass 3/4 for the simulation cue and 2/4 for the directed baseline. The four neutral checks pass in both arms. Normal-play adoption remains pending full-length and broader-map validation.
 
 Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 23 0.65 simulation-counterattack`. Omit the last argument for the directed baseline.
+
+New generic-species games started from the page use directed combat at 0.65 world units and the nearby-attack cue. The ten-minute and raid results are recorded above and in [delivery actions](delivery-actions.md). The page selects these combat rules at game creation, and loading a game restores its saved combat parameters.
