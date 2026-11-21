@@ -98,6 +98,21 @@ test("the tweezers check skips an ant whose press point is not the canvas (ja-w7
   );
 });
 
+// The HUD fits a 360 px phone with the page's font and with a wide system fallback (ja-9xc1): a player without Inter gets the
+// system's. The check runs once per font; dropping the wide one leaves the bar measured in Inter only.
+test("the 360 px HUD check also runs in a wide fallback font (ja-9xc1)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(script, /for \(const font of \[null, "DejaVu Sans"\]\) \{/, "once with the page's font, once in DejaVu Sans");
+  assert.match(script, /font-family:"\$\{f\}",sans-serif !important/, "the page's text takes that font");
+  assert.match(script, /hudBar\.x \+ hudBar\.width <= 360 - 8/, "and the bar must end inside the gutter");
+  assert.match(script, /lb\.x \+ lb\.width <= 360 - 8/, "and so must the lens button");
+  assert.match(
+    script,
+    /ff\.includes\(font\) && barRight > plainRight \+ 1/,
+    "and the forced font took effect and is installed: it is on the bar and the bar is wider",
+  );
+});
+
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(script, /let off = null;\s*await until\(/, "the value the check reads is declared before the poll");
