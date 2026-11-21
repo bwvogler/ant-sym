@@ -43,19 +43,24 @@ export function seedResult(seed: number, parsed: unknown): { held: Held } | { pr
   const figures: number[] = [];
   for (const k of ["you", "rival", "worst"]) {
     const v = h[k];
-    if (typeof v !== "number" || !Number.isFinite(v)) return { problem: `${k} is ${JSON.stringify(v ?? null)}, not a number` };
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 0) {
+      return { problem: `${k} is ${JSON.stringify(v ?? null)}, not a count of foragers` };
+    }
     figures.push(v);
   }
   return { held: { seed, you: figures[0], rival: figures[1], worst: figures[2] } };
 }
 
-/** The rule over seeds 1-10: a result for every seed, at least WITHIN of them within BOUND, none at CEILING or more. */
-export function judge(held: Held[], seeds: number[] = SEEDS): Verdict {
+/**
+ * The rule over seeds 1-10: a result for every seed, at least WITHIN of them within BOUND, none at CEILING or more. `broken` are
+ * seeds whose file was left out as bad: the caller names each with the cause, so none is also called a failed runner.
+ */
+export function judge(held: Held[], seeds: number[] = SEEDS, broken: number[] = []): Verdict {
   const sorted = [...held].sort((a, b) => a.seed - b.seed);
   const within = sorted.filter((h) => h.worst <= BOUND).length;
   const table = sorted.map((h) => `seed ${h.seed}: ${h.you} / ${h.rival}`).join("; ");
   const failures: string[] = [];
-  const missing = seeds.filter((s) => !sorted.some((h) => h.seed === s));
+  const missing = seeds.filter((s) => !sorted.some((h) => h.seed === s) && !broken.includes(s));
   if (missing.length > 0) failures.push(`no result for seeds ${missing.join(" ")} (their runners failed)`);
   if (within < WITHIN) failures.push(`${within} of ${seeds.length} seeds within ${BOUND} (need ${WITHIN}): ${table}`);
   const jam = sorted.filter((h) => h.worst >= CEILING);
