@@ -230,7 +230,7 @@ export const CROWD = ["few", "many"] as const;
  * key order; porter, digging and enemy read as words, and quality only when it isn't "fair" (so keys from before quality still
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
-const TOUCH_FIELDS: readonly FieldOf<Touch>[] = [
+const TOUCH_FIELDS: readonly FieldOf<Omit<Touch, "recentAttack">>[] = [
   { name: "deliveryTarget", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryTarget:${v}` },
   { name: "deliveryPlace", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryPlace:${v}` },
   { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },
