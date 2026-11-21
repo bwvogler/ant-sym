@@ -413,3 +413,13 @@ The simulation matches the previous prototype on the two replayed seeds for food
 Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 23 0.65 simulation-counterattack`. Omit the last argument for the directed baseline.
 
 New games started from the page use directed combat at 0.65 world units and the nearby-attack cue. The ten-minute and raid results are recorded above and in [delivery actions](delivery-actions.md). The page selects these combat rules at game creation, and loading a game restores its saved combat parameters.
+
+### Other playable species
+
+The desert ant supplies its own contact response: an empty-jawed worker that encounters a stranger chooses to fight, and a worker carrying a load retreats with it. It runs through the same directed combat engine. The invasive garden ant uses the generic contact response and recognizes both nests in its single-population game as friendly.
+
+The normal game constructor was used for paired 600-second runs on seeds 71 and 73. Both arms started with the same fungal landing. Desert colonies started with 200 workers each at their species cap. In both arms their combined food was 2179 on seed 71 and 1738 on seed 73, with zero losses and zero hostile contact decisions. A controlled encounter placed two empty-jawed workers in the same open surface cell and held their positions. Desert workers declared attacks and received combat pressure. Invasive garden workers produced neither.
+
+Invasive garden colonies started with 800 workers each. The two arms matched for both seeds on all recorded metrics. Combined food was 8367 on seed 71 and 8055 on seed 73, with zero losses and zero hostile contact decisions. Seed 71 reported unity in both arms.
+
+Reproduce a long comparison with `node scripts/species-combat.mjs desert 71 existing` and `node scripts/species-combat.mjs desert 71 directed`. Use `neglectus` for the invasive garden ant.

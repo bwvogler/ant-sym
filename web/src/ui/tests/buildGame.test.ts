@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DESERT_ANT, GENERIC_ANT } from "../../colony/index.ts";
+import { centreX, centreY, DESERT_ANT, GENERIC_ANT, NEGLECTUS_ANT, OPEN, PLANE, rockAt } from "../../colony/index.ts";
+import { combatObservers } from "../../colony/combatObservation.ts";
 import { buildGame } from "../useColony.ts";
 
 test("the page builds one world, whatever the settings (PRD §55)", () => {
@@ -21,4 +22,41 @@ test("the page builds the game with the species its settings name, and refuses o
   assert.equal(desert.params.fight.intent, true);
   assert.equal(desert.params.fight.counterattack, true);
   assert.equal(desert.player.responses.contact, DESERT_ANT.responses.contact);
+  const garden = buildGame({ ...settings, species: "neglectus" });
+  assert.equal(garden.params.species, NEGLECTUS_ANT);
+  assert.equal(garden.params.fight.intent, true);
+  assert.equal(garden.params.fight.counterattack, true);
+  assert.equal(garden.player.responses.contact, GENERIC_ANT.responses.contact);
+});
+
+test("directed combat follows species recognition and contact decisions when workers meet", () => {
+  for (const species of ["desert", "neglectus"]) {
+    const game = buildGame({ species, seed: 71, antCount: 1, rival: true, generation: 0 });
+    const y = Math.floor(game.map.size.h / 2);
+    let x = Math.floor(game.map.size.w / 2);
+    while (x < game.map.size.w && rockAt(game.map, x, y) !== OPEN) x++;
+    assert.ok(x < game.map.size.w, "the encounter needs open ground");
+    let attacks = 0;
+    let exposures = 0;
+    for (const colony of game.colonies) {
+      colony.params.speed = 0;
+      colony.putAnt(0, PLANE, centreX(x, y), centreY(y));
+      combatObservers.set(colony, {
+        contact(action) {
+          if (action.movement === "attack") attacks++;
+        },
+        exposure() {
+          exposures++;
+        },
+      });
+    }
+    for (let tick = 0; tick < 12; tick++) game.tick(1 / 30);
+    if (species === "desert") {
+      assert.ok(attacks > 0);
+      assert.ok(exposures > 0);
+    } else {
+      assert.equal(attacks, 0);
+      assert.equal(exposures, 0);
+    }
+  }
 });
