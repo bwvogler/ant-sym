@@ -1392,6 +1392,7 @@ try {
   // The lens button fits the phone's HUD from 360 px wide (review of #196, S4), with the page's own font and with a wide
   // fallback: a player without Inter gets the system's (DejaVu Sans is the widest this runner has: the bar read 357 px
   // of 360 on the page of #233 before the HUD was trimmed; ja-9xc1).
+  let plainRight = 0; // the bar's right edge in the page's own font: the wide pass must come out wider, or it measured nothing new
   for (const font of [null, "DejaVu Sans"]) {
     const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
     const np = await nctx.newPage();
@@ -1412,6 +1413,17 @@ try {
       lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
       `at 360 px${font ? ` in ${font}` : ""} the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
     );
+    const barRight = hudBar.x + hudBar.width;
+    if (!font) plainRight = barRight;
+    else {
+      // The forced font took effect and is installed (review of #289, S1): the style landed on the bar, and the same bar
+      // ends further right than in the page's own font (a missing font falls back to it and would read the same).
+      const ff = await np.getByLabel("game bar").evaluate((el) => getComputedStyle(el).fontFamily);
+      check(
+        ff.includes(font) && barRight > plainRight + 1,
+        `the bar was measured in ${font} (font-family ${ff}; right edge ${Math.round(barRight)} against ${Math.round(plainRight)} in the page's font)`,
+      );
+    }
     await nctx.close();
   }
 

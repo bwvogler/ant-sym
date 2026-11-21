@@ -105,6 +105,12 @@ test("the 360 px HUD check also runs in a wide fallback font (ja-9xc1)", () => {
   assert.match(script, /for \(const font of \[null, "DejaVu Sans"\]\) \{/, "once with the page's font, once in DejaVu Sans");
   assert.match(script, /font-family:"\$\{f\}",sans-serif !important/, "the page's text takes that font");
   assert.match(script, /hudBar\.x \+ hudBar\.width <= 360 - 8/, "and the bar must end inside the gutter");
+  assert.match(script, /lb\.x \+ lb\.width <= 360 - 8/, "and so must the lens button");
+  assert.match(
+    script,
+    /ff\.includes\(font\) && barRight > plainRight \+ 1/,
+    "and the forced font took effect and is installed: it is on the bar and the bar is wider",
+  );
 });
 
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
