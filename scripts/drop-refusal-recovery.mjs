@@ -1,8 +1,9 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate | --counterattack] [seed ...]
-// Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
+// Use ANT_ASSAY_SECONDS=600 for a ten-minute match. Add --trace-combat to record casualty time and position.
 // Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack|simulation-counterattack]
 import { CELL, CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
+import { combatObservers } from "../web/src/colony/combatObservation.ts";
 import { blocked } from "../web/src/colony/world.ts";
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
 
@@ -14,7 +15,7 @@ const damp = encodeLevels({ marks: 0 }, ["marks"]);
 const directedFight = { intent: true, attackReach: 1, attackDistance: 0.65 };
 const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place === "tunnel";
 
-function run(seed, directed, contextual, recover, counterattack = false) {
+function run(seed, directed, contextual, recover, counterattack = false, traceCombat = false) {
   const game = new Game(generateOneWorld(seed), {}, gameRng(seed));
   const colony = game.player;
   colony.params.dropRefusalLimit = recover ? 2 : 0;
@@ -42,6 +43,17 @@ function run(seed, directed, contextual, recover, counterattack = false) {
   game.fungus.menu = ["marks"];
   game.fungus.bindPolicy("fungus", () => damp);
   game.fungus.paint([colony], queen.x, queen.y, 3, 0, 0.95, garden, CURTAIN);
+  const deaths = [];
+  if (traceCombat) {
+    for (const [side, c] of game.colonies.entries()) {
+      combatObservers.set(c, {
+        contact() {},
+        exposure(pressure, allies, killed, i) {
+          if (killed) deaths.push({ time: game.time, side, pressure, allies, layer: c.layer[i], x: c.x[i], y: c.y[i] });
+        },
+      });
+    }
+  }
   const initialHosts = game.fungus.hosts;
   if (initialHosts === 0) throw Error("The initial dose reached no workers");
 
@@ -61,6 +73,7 @@ function run(seed, directed, contextual, recover, counterattack = false) {
   }
   return {
     initialHosts,
+    ...(traceCombat ? { deaths } : {}),
     dropRefusals,
     hosts: game.fungus.hosts,
     player: {
@@ -180,12 +193,16 @@ const isolate = args.includes("--isolate");
 const split = args.includes("--split");
 const candidate = args.includes("--candidate");
 const counterattack = args.includes("--counterattack");
+const traceCombat = args.includes("--trace-combat");
 const seeds = args
-  .filter((arg) => arg !== "--isolate" && arg !== "--split" && arg !== "--candidate" && arg !== "--counterattack")
+  .filter(
+    (arg) => arg !== "--isolate" && arg !== "--split" && arg !== "--candidate" && arg !== "--counterattack" && arg !== "--trace-combat",
+  )
   .map(Number);
+if (traceCombat && !counterattack) throw Error("--trace-combat requires --counterattack");
 for (const seed of seeds.length ? seeds : [41, 42, 43, 44]) {
   if (counterattack) {
-    console.log(JSON.stringify({ seed, seconds, counterattack: run(seed, true, "drop", true, true) }));
+    console.log(JSON.stringify({ seed, seconds, counterattack: run(seed, true, "drop", true, true, traceCombat) }));
     continue;
   }
   if (candidate) {

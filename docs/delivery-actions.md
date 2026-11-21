@@ -758,3 +758,31 @@ The three G1 samples split evenly on pass count (two of three in each arm). Seed
 | Total | 12610 → 11545 | 15445 → 16448 | 901 → 13 |
 
 Across four 600-second games, combined food was 28055 versus 27993, down 0.2%. The player's share fell from 44.9% to 41.2%, with less food on three maps. The test combines symmetric directed combat with player-only contextual unloading and cannot isolate the source of that redistribution. Unloading refused 113 times across the candidate matches, concentrated on seed 72. The neutral-contact benefit is clear, but the raid-defense costs and mixed G1 samples leave normal-play adoption pending.
+
+### Ten-minute matches with the nearby-attack cue
+
+Replaying seeds 71–74 with the simulation cue preserves the previous map, random seed, inoculation and unloading rule. The recorded ten-minute runs above supply the existing and directed baselines. Both colonies can sense the new cue.
+
+| Seed | Player food, directed → cue | Rival food, directed → cue | Total losses, directed → cue |
+| --- | ---: | ---: | ---: |
+| 71 | 2244 → 2356 | 3075 → 2806 | 1 → 34 |
+| 72 | 2161 → 2208 | 4009 → 3931 | 4 → 6 |
+| 73 | 4143 → 4070 | 4307 → 4124 | 8 → 9 |
+| 74 | 2997 → 2997 | 5057 → 5057 | 0 → 0 |
+| Total | 11545 → 11631 | 16448 → 15918 | 13 → 49 |
+
+The cue adds 86 food to the player's stores and reduces combined stores by 444 (1.6%). Seed 71 accounts for 33 of the 36 additional worker losses. Against existing combat, combined losses remain much lower (901 versus 49), while the player's food remains below existing rules (12610 versus 11631).
+
+Reproduce with `ANT_ASSAY_SECONDS=600 node scripts/drop-refusal-recovery.mjs --counterattack 71 72 73 74`. The recorded baselines use `--candidate`.
+
+| G1 seed | Existing peak long-held loads (player / rival) | Directed candidate | Directed candidate with cue |
+| --- | ---: | ---: | ---: |
+| 1 | 2 / 1 | 3 / 1 | 3 / 1 |
+| 4 | 5 / 1 | 1 / 1 | 2 / 1 |
+| 10 | 1 / 1 | 0 / 2 | 0 / 2 |
+
+All three arms pass two of the three sampled G1 seeds. Seven seeds remain outside this sample. The cue's benefit in staged raids does not yet carry over to a general normal-play replacement.
+
+The seed 71 casualty trace reproduced the uninstrumented result exactly. All 34 deaths were on the surface, spanning 35.3 to 598.7 simulation seconds. Twelve occurred in the final minute. The losses accumulated across the match, so a single isolated early skirmish does not explain the regression.
+
+Add `--trace-combat` to the `--counterattack` command to reproduce the casualty timestamps and locations.
