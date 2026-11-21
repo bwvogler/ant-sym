@@ -1,4 +1,4 @@
-// Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
+// Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate | --counterattack] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
 // Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack|simulation-counterattack]
 import { CELL, CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
@@ -14,13 +14,13 @@ const damp = encodeLevels({ marks: 0 }, ["marks"]);
 const directedFight = { intent: true, attackReach: 1, attackDistance: 0.65 };
 const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place === "tunnel";
 
-function run(seed, directed, contextual, recover) {
+function run(seed, directed, contextual, recover, counterattack = false) {
   const game = new Game(generateOneWorld(seed), {}, gameRng(seed));
   const colony = game.player;
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   let dropRefusals = 0;
   if (directed) {
-    game.params.fight = { ...game.params.fight, ...directedFight };
+    game.params.fight = { ...game.params.fight, ...directedFight, counterattack };
   }
   if (contextual) {
     colony.params.deliveryLane = 1;
@@ -179,8 +179,15 @@ if (args[0] === "--guard") {
 const isolate = args.includes("--isolate");
 const split = args.includes("--split");
 const candidate = args.includes("--candidate");
-const seeds = args.filter((arg) => arg !== "--isolate" && arg !== "--split" && arg !== "--candidate").map(Number);
+const counterattack = args.includes("--counterattack");
+const seeds = args
+  .filter((arg) => arg !== "--isolate" && arg !== "--split" && arg !== "--candidate" && arg !== "--counterattack")
+  .map(Number);
 for (const seed of seeds.length ? seeds : [41, 42, 43, 44]) {
+  if (counterattack) {
+    console.log(JSON.stringify({ seed, seconds, counterattack: run(seed, true, "drop", true, true) }));
+    continue;
+  }
   if (candidate) {
     console.log(JSON.stringify({ seed, existing: run(seed, false, null, false), candidate: run(seed, true, "drop", true) }));
     continue;
