@@ -1389,19 +1389,31 @@ try {
     );
   }
   await lctx.close();
-  // The lens button fits the phone's HUD from 360 px wide (review of #196, S4).
-  const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
-  const np = await nctx.newPage();
-  np.on("pageerror", (e) => errors.push(String(e)));
-  await np.goto(url);
-  await np.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
-  const lb = await np.getByRole("button", { name: "Lens: say what is under the pointer (i)" }).boundingBox();
-  const hudBar = await np.getByLabel("game bar").boundingBox();
-  check(
-    lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
-    `at 360 px the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
-  );
-  await nctx.close();
+  // The lens button fits the phone's HUD from 360 px wide (review of #196, S4), with the page's own font and with a wide
+  // fallback: a player without Inter gets the system's (DejaVu Sans is the widest this runner has: the bar read 357 px
+  // of 360 on the page of #233 before the HUD was trimmed; ja-9xc1).
+  for (const font of [null, "DejaVu Sans"]) {
+    const nctx = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+    const np = await nctx.newPage();
+    np.on("pageerror", (e) => errors.push(String(e)));
+    if (font)
+      await np.addInitScript((f) => {
+        document.addEventListener("DOMContentLoaded", () => {
+          const s = document.createElement("style");
+          s.textContent = `*{font-family:"${f}",sans-serif !important}`;
+          document.head.appendChild(s);
+        });
+      }, font);
+    await np.goto(url);
+    await np.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
+    const lb = await np.getByRole("button", { name: "Lens: say what is under the pointer (i)" }).boundingBox();
+    const hudBar = await np.getByLabel("game bar").boundingBox();
+    check(
+      lb !== null && lb.x + lb.width <= 360 - 8 && hudBar.x + hudBar.width <= 360 - 8,
+      `at 360 px${font ? ` in ${font}` : ""} the lens button is whole, the bar inside the gutter (${lb && Math.round(lb.x + lb.width)}, ${hudBar && Math.round(hudBar.x + hudBar.width)})`,
+    );
+    await nctx.close();
+  }
 
   // ——— 11. The builder (docs/builder.md, PRD §73, ja-kjj8.3): on a phone and a tablet ———
   // A shovel on the tab bar opens a tray of picture tools in its place: a tap places, a drag paints, Move pans, undo takes
