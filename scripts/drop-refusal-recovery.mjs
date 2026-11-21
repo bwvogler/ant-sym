@@ -1,6 +1,6 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match.
-// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack]
+// Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack|simulation-counterattack]
 import { CELL, CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
 
 import { blocked } from "../web/src/colony/world.ts";
@@ -10,6 +10,7 @@ const dt = 1 / 30;
 const seconds = Number(process.env.ANT_ASSAY_SECONDS ?? 120);
 const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 const damp = encodeLevels({ marks: 0 }, ["marks"]);
+/** @satisfies {Partial<import("../web/src/colony/battle.ts").FightParams>} */
 const directedFight = { intent: true, attackReach: 1, attackDistance: 0.65 };
 const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place === "tunnel";
 
@@ -86,9 +87,14 @@ if (args[0] === "--guard") {
   const assay = oneAssay(id);
   if (
     defense !== undefined &&
-    !["counterattack", "alarm-counterattack", "attack-counterattack", "visible-counterattack", "visible-even-counterattack"].includes(
-      defense,
-    )
+    ![
+      "counterattack",
+      "alarm-counterattack",
+      "attack-counterattack",
+      "visible-counterattack",
+      "visible-even-counterattack",
+      "simulation-counterattack",
+    ].includes(defense)
   )
     throw Error("Unknown defense rule");
   const existing = runAssay(assay, seed).metrics;
@@ -147,11 +153,11 @@ if (args[0] === "--guard") {
     });
   }
   const candidate = runAssay(observed, seed, {
-    game: { fight: { ...directedFight, attackDistance } },
+    game: { fight: { ...directedFight, attackDistance, counterattack: defense === "simulation-counterattack" } },
     colony: { deliveryLane: 1, dropRefusalLimit: 2 },
     responses: {
       drop: (t, draw) => !refuseTunnelDrop(t) && localResponses.drop(t, draw),
-      ...(defense
+      ...(defense && defense !== "simulation-counterattack"
         ? {
             contact(t, draw) {
               if (

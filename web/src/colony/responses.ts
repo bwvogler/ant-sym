@@ -50,6 +50,8 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
 export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "reception";
 
 export interface Touch {
+  /** Nearby hostile attack cue for the local contact fallback. Set only during the contact call. */
+  recentAttack?: boolean;
   /** Own commitment and recognised chamber underfoot; sent only to carry. */
   deliveryTarget: DeliveryContextRole;
   deliveryPlace: DeliveryContextRole;
@@ -192,7 +194,7 @@ export const localResponses: Responses = {
   // other's fleers (G′ seeds 1–4: 7,482 lost against 6,069 never fighting). `odds` is there for a policy that weighs it.
   // An ant its mode policy sent to fight (a doctrine's, or a raid's) fights: the local policy no longer sends ants to
   // fight just because strangers are near, and it sends a fighter home once the strangers are gone.
-  contact: (t) => (t.carrying !== "none" ? "flee" : t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
+  contact: (t) => (t.carrying !== "none" ? "flee" : t.recentAttack || t.stance !== "forage" || t.mode === "fight" ? "fight" : "flee"),
   // Behaviour MR 5 (docs/activation.md): a waiting forager goes out on the returns of successful foragers (Gordon;
   // Pinter-Wollman et al. 2013); with none, it waits, and only scouts go. A fighting stance doesn't wait for food.
   // A raider (mode fight) home on a raid stance goes on a scout's trail (behaviour MR 5.2); a forager answers its returns, and a

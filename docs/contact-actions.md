@@ -392,3 +392,22 @@ The additional seeds reproduce the advantage in defender survival and add one ra
 | Neutral, combined food / losses | 20 | 2214 / 0 | 2214 / 0 |
 
 Across all four raid maps, allowing even odds passes 3/4, versus 1/4 for outnumbering and 2/4 for existing combat. Defender losses are 164 versus 271 and 156 respectively. Combined neutral passes are 4/4 in both wall-aware arms. The even-odds arm is the candidate to carry into a production sensor and fresh seeds.
+
+### Simulated counterattack cue
+
+The game can now evaluate the even-odds rule from a shared previous-tick snapshot. The cue uses the worker's own stranger tolerance and requires the same layer, a distance of at most one world unit and a clear sampled segment. The local contact response can use it while authored responses retain their existing decisions and cache keys. The snapshot is derived from existing saved attack markers. The no-defense A13 control disables the counterattack rule.
+
+| Guard | Seed | Directed baseline | Simulation cue |
+| --- | ---: | ---: | ---: |
+| Raid, defender food / losses / raiders killed | 11 | 147 / 93 / 43 | 161 / 36 / 40 |
+| Raid, defender food / losses / raiders killed | 17 | 144 / 111 / 38 | 253 / 48 / 45 |
+| Raid, defender food / losses / raiders killed | 23 | 606 / 82 / 37 | 602 / 38 / 42 |
+| Raid, defender food / losses / raiders killed | 29 | 75 / 86 / 45 | 85 / 45 / 38 |
+| Neutral, combined food / losses | 11 | 2152 / 1 | 1859 / 0 |
+| Neutral, combined food / losses | 17 | 1678 / 0 | 1678 / 0 |
+| Neutral, combined food / losses | 23 | 1720 / 0 | 1713 / 1 |
+| Neutral, combined food / losses | 29 | 1621 / 1 | 1528 / 2 |
+
+The simulation matches the previous prototype on the two replayed seeds for food and casualties. Both fresh raids improve defender survival (168 to 83 losses). Seed 23 gains a pass and seed 29 loses one. The four raid checks pass 3/4 for the simulation cue and 2/4 for the directed baseline. The four neutral checks pass in both arms. Normal-play adoption remains pending full-length and broader-map validation.
+
+Reproduce with `node scripts/drop-refusal-recovery.mjs --guard defendHome 23 0.65 simulation-counterattack`. Omit the last argument for the directed baseline.

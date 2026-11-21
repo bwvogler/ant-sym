@@ -1,11 +1,12 @@
 // Decide (docs/refactor.md S3.4): the third stage of an ant's step in tick. Where homing heads (the goal: its chamber, the hole, a brood or food chamber), the mode it takes (a load sends it home; else the mode policy is asked when its situation changed, or it waits held at the gate), and strangers in reach, where the contact response decides over the policy. Moved out of Colony.tick verbatim but for `this` becoming `col`; what it decided goes to the next stages through the step record.
+import type { AttackCue } from "./attackCue.ts";
 import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { contactAction } from "./contactAction.ts";
 import type { CombatObserver } from "./combatObservation.ts";
 import { chamberGoal, putDown } from "./dig.ts";
 import { homeField, homeGoal } from "./homing.ts";
-import type { Item } from "./responses.ts";
+import type { Contact, Item } from "./responses.ts";
 import { touch } from "./sense.ts";
 import { MODE_STRIDE, packSituation } from "./situation.ts";
 import type { AntStep } from "./step.ts";
@@ -24,7 +25,7 @@ import {
   trailLevel,
 } from "./vocab.ts";
 
-export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObserver): void {
+export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObserver, attackCue?: AttackCue): void {
   const p = s.p;
   const dt = s.dt;
   const fl = s.fl;
@@ -184,7 +185,19 @@ export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObse
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
     const sensed = touch(col, i, true, mode, item);
-    const answer = resp.contact(sensed, col.antDraw(i));
+    const draw = col.antDraw(i);
+    let answer: Contact;
+    if (sensed.carrying === "none" && (sensed.odds === "outnumbering" || sensed.odds === "even") && attackCue?.(col, i)) {
+      // The local fallback can counterattack, while an authored contact policy still decides its own response.
+      sensed.recentAttack = true;
+      try {
+        answer = resp.contact(sensed, draw);
+      } finally {
+        delete sensed.recentAttack;
+      }
+    } else {
+      answer = resp.contact(sensed, draw);
+    }
     const action = contactAction(answer, carrying || pellet || nursing, reporting);
     s.contactAction = action;
     observer?.contact(action, i, sensed, toEnemy);

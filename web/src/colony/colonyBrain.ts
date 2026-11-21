@@ -389,7 +389,20 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     const t = it.situation;
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
     // alarm and odds only to `contact`; returns only to `leave`.
-    const { offered, quality, alarm, odds, returns, raid, crowd, deliveryAttempt, deliveryTarget, deliveryPlace, ...rest } = t;
+    const {
+      offered,
+      quality,
+      alarm,
+      odds,
+      returns,
+      raid,
+      crowd,
+      deliveryAttempt,
+      deliveryTarget,
+      deliveryPlace,
+      recentAttack: _recentAttack,
+      ...rest
+    } = t;
     ants[it.id] =
       hook === "carry"
         ? { ...rest, deliveryAttempt, deliveryTarget, deliveryPlace }

@@ -28,6 +28,8 @@ export interface FightParams {
   rate: number;
   /** Experimental directed aggression; absent/false preserves legacy fights. */
   intent?: boolean;
+  /** Let local workers at even or favorable odds react to a nearby attack from the previous tick. */
+  counterattack?: boolean;
   /** Reach of directed attacks measured in hex rings. */
   attackReach?: 0 | 1;
   /** Maximum center-to-center distance for a directed attack, in world units (up to one). */

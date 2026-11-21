@@ -1,3 +1,4 @@
+import type { AttackCue } from "./attackCue.ts";
 import { combatObservers } from "./combatObservation.ts";
 import { leaveRate } from "./invite.ts";
 import { type AntArrays, makeAntArrays, NO_KEY } from "./ants.ts";
@@ -1417,7 +1418,7 @@ export class Colony {
   }
 
   /** Advance by dt seconds: ants decide (when their situation changed), steer, lay trail, move; then the fields evaporate and spread, and stored food becomes ants. */
-  tick(dt: number): void {
+  tick(dt: number, attackCue?: AttackCue): void {
     const p = this.params;
     const rng = this.rng;
     // The layer being stepped (between ticks, and here, home): rebound below for each ant on another layer.
@@ -1492,7 +1493,7 @@ export class Colony {
       if (map.sky) unbury(this, i);
       perceive(this, i, s);
       stanceStep(this, i, s);
-      decide(this, i, s, combatObserver);
+      decide(this, i, s, combatObserver, attackCue);
       steer(this, i, s);
       const moveDigDone = moveDig(this, i, s);
       if (moveDigDone) continue;

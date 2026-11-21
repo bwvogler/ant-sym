@@ -1,4 +1,6 @@
 import { test } from "node:test";
+import { snapshotAttackCue } from "../../attackCue.ts";
+import { CELL } from "../../hex.ts";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
 import { Game, gameRng } from "../../game.ts";
@@ -7,7 +9,7 @@ import { Colony } from "../../colony.ts";
 import { combatObservers } from "../../combatObservation.ts";
 import { Recognition } from "../../recognition.ts";
 import { enemyHeading } from "../../sense.ts";
-import { mulberry32 } from "../../world.ts";
+import { mulberry32, ROCK, setRock } from "../../world.ts";
 import { hexMap, put } from "../hexmaps.ts";
 
 function pair(rows = [".....", ".....", "....."]) {
@@ -156,7 +158,8 @@ test("a recycled ant slot cannot inherit an attack", () => {
 });
 
 test("directed combat games resume deterministically from JSON saves", () => {
-  const make = () => new Game(smallOne(7), { antCount: 20, rivalAnts: 20, fight: { rate: 1.5, alarm: 8, intent: true } }, gameRng(7));
+  const make = () =>
+    new Game(smallOne(7), { antCount: 20, rivalAnts: 20, fight: { rate: 1.5, alarm: 8, intent: true, counterattack: true } }, gameRng(7));
   const g = make();
   run(g, 2);
   const copy = make();
@@ -180,4 +183,25 @@ test("ants at matching coordinates on different layers cannot attack each other"
     resolveFights(g.colonies, grids, 1, () => 0, { rate: 1, alarm: 1, intent: true }, rec, 0),
     [0, 0],
   );
+});
+
+test("attack cues use the previous tick and exclude blocked or friendly attacks", () => {
+  const [worker, stranger] = pair();
+  worker.attackLayer[0] = -1;
+  const cue = snapshotAttackCue([worker, stranger]);
+  stranger.attackLayer[0] = -1;
+  CELL[0] = 0;
+  CELL[1] = 0;
+  assert.equal(cue(worker, 0), true);
+  assert.deepEqual([...CELL], [0, 0]);
+  assert.equal(snapshotAttackCue([worker, stranger])(worker, 0), false);
+
+  worker.tolerance[0] = 2;
+  assert.equal(cue(worker, 0), false);
+  worker.tolerance[0] = 0;
+  worker.layer[0] = 1;
+  assert.equal(cue(worker, 0), false);
+  worker.layer[0] = 0;
+  setRock(worker.map, 2, 1, ROCK);
+  assert.equal(cue(worker, 0), false);
 });

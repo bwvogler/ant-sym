@@ -1092,8 +1092,12 @@ export const defendWalked: Assay = {
   seconds: 300,
   spec: (seed) => observedDefence(defendArm(seed, false)),
   score: (r, game) => {
-    const run = (sealed: boolean, colony?: Partial<ColonyParams>) =>
-      runGame(defendControl(r.seed, sealed, r.seconds, game.params.fight, colony)).result.metrics;
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => {
+      const fight = game.params.fight;
+      // The no-defence control disables both sources of a local defence decision.
+      const controlFight = colony?.defendAt === Infinity && fight.counterattack ? { ...fight, counterattack: false } : fight;
+      return runGame(defendControl(r.seed, sealed, r.seconds, controlFight, colony)).result.metrics;
+    };
     const stored = r.metrics["you.stored"];
     const control = run(true)["you.stored"];
     const none = run(false, { defendAt: Infinity });
