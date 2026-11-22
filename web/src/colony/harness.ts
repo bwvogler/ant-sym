@@ -4,7 +4,7 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
 import { type Policy, type SteerPolicy } from "./vocab.ts";
-import { type ColonySpec, Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
+import { type ColonySpec, DEFAULT_COLONIES, Game, type GameParams, gameRng, isOneWorld } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
@@ -61,12 +61,8 @@ export interface RunSpec {
    */
   map?: WorldMap | OneWorld | ((seed: number) => WorldMap | OneWorld);
   game?: Partial<GameParams>;
-  /**
-   * The colonies the game starts with (docs/game-colonies.md): a list, in order. The pair's words (`antCount`, `rival`, `rivalAnts` in
-   * `game`, and `sides`) are the older way, until the tests move (stage B); a spec uses one or the other.
-   */
+  /** The colonies the game starts with (docs/game-colonies.md): a list, in order; default `DEFAULT_COLONIES`. */
   colonies?: ColonySpec[];
-  sides?: Sides;
   seconds: number;
   /** sim step, seconds; the page steps at most 1/30 s */
   dt?: number;
@@ -95,7 +91,7 @@ export function specMap(spec: RunSpec): OneWorld {
 /** The game a spec starts: its one world, its colonies and its seed (before any tick). */
 export function gameOf(spec: RunSpec): { world: OneWorld; game: Game } {
   const world = specMap(spec);
-  return { world, game: new Game(world, spec.game, gameRng(spec.seed), spec.colonies ?? spec.sides) };
+  return { world, game: new Game(world, spec.game, gameRng(spec.seed), spec.colonies) };
 }
 
 /** Run a game headless and collect the standard numbers plus every probe's. */
@@ -140,7 +136,14 @@ export function sideName(k: number): string {
 function apply(game: Game, e: Event): void {
   // One world: on the plane, where the assays' arenas are, unless the event names a layer.
   if (e.kind === "paint")
-    (game.colonies[e.colony ?? 0] ?? game.player).paint(e.channel, e.x, e.y, e.r, e.amount, e.layer ?? (game.world ? PLANE : undefined));
+    (game.colonies[e.colony ?? 0] ?? game.colonies[0]!).paint(
+      e.channel,
+      e.x,
+      e.y,
+      e.r,
+      e.amount,
+      e.layer ?? (game.world ? PLANE : undefined),
+    );
   // Food added later is not part of foodTotal: foodHome stays a share of what the map started with.
   else if (e.kind === "food") discWorld(game.map.size, e.x, e.y, e.r, (x, y) => dropFood(game.map, centreX(x, y), centreY(y), e.perCell));
   else e.run(game);
@@ -419,14 +422,15 @@ export function cellsIn(size: WorldSize, cx: number, cy: number, r: number): num
 /** Parameter changes from the command line, applied on top of an assay's own. */
 export interface Overrides {
   colony?: ColonyOptions;
-  rival?: ColonyOptions;
+  /** the second colony's params (`--set second.deposit=2`), where the assay has a second colony */
+  second?: ColonyOptions;
   game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
-  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `rival` where they set the same one */
+  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `second` where they set the same one */
   both?: ColonyOptions;
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
-  /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
-  rivalPolicy?: Policy;
+  /** the second colony's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
+  secondPolicy?: Policy;
   /** every colony's steer policy (ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
   steer?: SteerPolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
@@ -449,80 +453,44 @@ export interface Assay {
   score(result: RunResult, game: Game): Record<string, number>;
 }
 
-/** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
+/** An assay's run with overrides merged in (colony and second-colony params deep-merged per channel; fight merged; brains as documented on Overrides). `colony` is the first colony's, `second` the second's (if any), `both` every one's. */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
-  if (spec.colonies) return withColonyOverrides(spec, o);
-  const sides: Sides = { ...spec.sides };
-  if (o.both) {
-    sides.colony = mergeColony(sides.colony, o.both);
-    sides.rival = mergeColony(sides.rival, o.both);
+  const touches = o.both || o.colony || o.second || o.policy || o.secondPolicy || o.responses;
+  const colonies = touches ? (spec.colonies ?? DEFAULT_COLONIES).map((c) => ({ ...c })) : spec.colonies;
+  if (colonies) {
+    const [first, second] = colonies;
+    if (o.both) for (const c of colonies) c.colony = mergeColony(c.colony, o.both);
+    if (o.colony && first) first.colony = mergeColony(first.colony, o.colony);
+    if (o.second && second) second.colony = mergeColony(second.colony, o.second);
+    if (o.policy && first && !first.policy) first.policy = o.policy;
+    if (o.secondPolicy && second && !second.policy) second.policy = o.secondPolicy;
+    if (o.responses && first) first.responses = { ...(first.responses ?? localResponses), ...o.responses };
   }
-  if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
-  if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
-  if (o.policy && !sides.policy) sides.policy = o.policy;
-  if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
   const steer = o.steer;
   const events = steer
     ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
     : spec.events;
-  if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, sides, game, events };
+  return { ...spec, ...(colonies ? { colonies } : {}), game, events };
 }
 
-/** The first colony's responses in a spec, whichever way it names its colonies (the list, or the pair's `sides`). */
+/** The first colony's responses in a spec (the list's first). */
 export function firstResponses(spec: RunSpec): Responses | undefined {
-  return spec.colonies ? spec.colonies[0]?.responses : spec.sides?.responses;
+  return spec.colonies?.[0]?.responses;
 }
 
-/**
- * The spec with its first colony's params and responses patched, whichever way it names its colonies: in the list (docs/game-colonies.md)
- * `sides` is ignored, so an assay that sets the first colony's responses must go through here (the delivery and entrance assays did not
- * after #309 moved the base assays onto the list).
- */
+/** The spec with its first colony's params and responses patched. */
 export function withFirstColony(spec: RunSpec, patch: { colony?: Partial<ColonyParams>; responses?: Responses }): RunSpec {
-  if (spec.colonies) {
-    const [first, ...rest] = spec.colonies;
-    if (!first) throw new Error("withFirstColony: the spec lists no colony");
-    const patched = {
-      ...first,
-      ...(patch.colony ? { colony: { ...first.colony, ...patch.colony } } : {}),
-      ...(patch.responses ? { responses: patch.responses } : {}),
-    };
-    return { ...spec, colonies: [patched, ...rest] };
-  }
-  return {
-    ...spec,
-    sides: {
-      ...spec.sides,
-      ...(patch.colony ? { colony: { ...spec.sides?.colony, ...patch.colony } } : {}),
-      ...(patch.responses ? { responses: patch.responses } : {}),
-    },
+  const [first, ...rest] = spec.colonies ?? DEFAULT_COLONIES;
+  if (!first) throw new Error("withFirstColony: the spec lists no colony");
+  const patched = {
+    ...first,
+    ...(patch.colony ? { colony: { ...first.colony, ...patch.colony } } : {}),
+    ...(patch.responses ? { responses: patch.responses } : {}),
   };
-}
-
-/** `withOverrides` for a spec that names its colonies: `colony` is the first colony's, `rival` the second's (if any), `both` every one's. */
-function withColonyOverrides(spec: RunSpec, o: Overrides): RunSpec {
-  if (o.game && ("antCount" in o.game || "rival" in o.game || "rivalAnts" in o.game))
-    throw new Error("game.antCount, game.rival and game.rivalAnts name no colony when the assay lists its colonies");
-  const colonies = (spec.colonies ?? []).map((c) => ({ ...c }));
-  const [first, second] = colonies;
-  if (o.both) for (const c of colonies) c.colony = mergeColony(c.colony, o.both);
-  if (o.colony && first) first.colony = mergeColony(first.colony, o.colony);
-  if (o.rival && second) second.colony = mergeColony(second.colony, o.rival);
-  if (o.policy && first && !first.policy) first.policy = o.policy;
-  if (o.rivalPolicy && second && !second.policy) second.policy = o.rivalPolicy;
-  if (o.responses && first) first.responses = { ...(first.responses ?? localResponses), ...o.responses };
-  const steer = o.steer;
-  const events = steer
-    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
-    : spec.events;
-  const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
-  if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
-  else delete game.fight;
-  return { ...spec, colonies, game, events };
+  return { ...spec, colonies: [patched, ...rest] };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

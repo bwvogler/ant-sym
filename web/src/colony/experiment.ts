@@ -264,7 +264,7 @@ export const deplete: Assay = {
         crowd.push(antsNear(game, patch.x, patch.y, 6));
         if (Number.isNaN(emptyAt) && foodIn(game.map, patch.x, patch.y, 2) <= 0) emptyAt = game.time;
         if (!Number.isNaN(emptyAt) && Number.isNaN(follow60) && game.time >= emptyAt + 60)
-          follow60 = game.player.counts().follow / Math.max(1, game.player.population);
+          follow60 = game.colonies[0]!.counts().follow / Math.max(1, game.colonies[0]!.population);
       },
       summary(): Record<string, number> {
         if (Number.isNaN(emptyAt)) return { emptyAt: NaN, peakCrowd: NaN, clearAfter: NaN, followAfter60: NaN };
@@ -359,7 +359,7 @@ export function outingProbe(nest: { x: number; y: number }, windows: Record<stri
   let nextAt = 1;
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       if (was.length < c.n) {
         const w = new Uint8Array(c.n);
         w.set(was);
@@ -581,7 +581,7 @@ export function raidProbe(own: { x: number; y: number }, rival: { x: number; y: 
   let samples = 0;
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       // One world (U6b): distances are the plane's, so only plane ants are measured; an ant in the curtain is home (its own
       // nest, where the gate recruits) or down the rival's shaft, which it reached on the plane first.
       const one = game.world !== null;
@@ -638,7 +638,7 @@ export function raidProbe(own: { x: number; y: number }, rival: { x: number; y: 
       let deadHit = 0;
       for (const i of ever) {
         if (reached.has(i)) hit++;
-        if (!game.player.alive[i]) {
+        if (!game.colonies[0]!.alive[i]) {
           dead++;
           if (reached.has(i)) deadHit++;
         }
@@ -839,7 +839,7 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
         tick(game) {
           if (game.time + 1e-9 < next) return;
           next += 1;
-          const c = game.player;
+          const c = game.colonies[0]!;
           for (let i = 0; i < c.n; i++) {
             if (!c.alive[i]) continue;
             const x = c.x[i];
@@ -851,7 +851,7 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
             }
             if (!fighting && Math.hypot(x - pile.x, y - pile.y) <= 8) atPile++;
           }
-          const rival = game.rival;
+          const rival = game.colonies[1];
           if (rival)
             for (let i = 0; i < rival.n; i++) {
               if (!rival.alive[i] || rival.attackLayer[i] < 0 || rival.attackLayer[i] !== rival.layer[i]) continue;
@@ -1047,7 +1047,7 @@ function observedDefence(spec: RunSpec): RunSpec {
             const contact = episode.contact === game.time;
             const pressure = episode.pressure === game.time;
             if (!contact && pressure) countWithdrawal("pressureTicksWithoutContact");
-            if (!game.player.alive[ant]) {
+            if (!game.colonies[0]!.alive[ant]) {
               countWithdrawal(pressure ? "combatDeaths" : "otherDeaths");
               withdrawals.delete(ant);
               continue;
@@ -1194,7 +1194,7 @@ export function nestFlowProbe(): Probe {
   let firstBirth = NaN;
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       if (Number.isNaN(firstBirth) && c.births > 0) firstBirth = game.time;
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 30;
@@ -1222,8 +1222,8 @@ export function nestFlowProbe(): Probe {
         receptionMax,
         starved,
         firstBirth,
-        portTrips: game.player.portTrips,
-        handedOn: game.player.handedOn,
+        portTrips: game.colonies[0]!.portTrips,
+        handedOn: game.colonies[0]!.handedOn,
       };
     },
   };
@@ -1266,7 +1266,7 @@ export function nurseZoneProbe(): Probe {
     tick(game) {
       if (game.time + 1e-9 < nextAt) return;
       nextAt += 30;
-      const c = game.player;
+      const c = game.colonies[0]!;
       // One world: the nest is in the curtain (game.map is the plane).
       const map = game.world?.curtain ?? game.map;
       const lying = c.brood.items.filter((b) => b.held < 0);
@@ -1355,7 +1355,7 @@ export function buriedProbe(): Probe {
         buriedTaken: s.food - end.food,
         buriedShare: s.food > 0 ? (s.food - end.food) / s.food : 0,
         opened: end.open - s.open,
-        soilOut: game.player.soilOut,
+        soilOut: game.colonies[0]!.soilOut,
       };
     },
   };
@@ -1408,7 +1408,7 @@ function starvedProbe(): Probe {
   return {
     tick() {},
     summary(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       return { diedHungry: c.diedHungry, broodStarved: c.broodStarved, diedOld: c.diedOld };
     },
   };
@@ -1460,7 +1460,7 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent", one = false): P
   };
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       if (arm === "signal" && c.queen) c.queen.signal = 0.4;
       if (arm === "scent") c.scentGain.fill(0.3);
       const t = game.time;
@@ -1481,7 +1481,7 @@ export function lifecycleProbe(arm: "none" | "signal" | "scent", one = false): P
           }
     },
     summary(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       return {
         ...Object.fromEntries(Object.entries(at).map(([k, v]) => [`t.${k}`, v])),
         gynes: c.gynes,
@@ -1588,8 +1588,15 @@ function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or
         if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
       }
       // The assay reuses the current ant's three home sensors. The ordinary contact policy has no home-sensor field.
-      if (cue === "approach alarm" && game?.player.onPlane && t.enemy && t.place === "out" && t.carrying === "none" && t.alarm !== "none") {
-        const sensed = game.player.s;
+      if (
+        cue === "approach alarm" &&
+        game?.colonies[0]!.onPlane &&
+        t.enemy &&
+        t.place === "out" &&
+        t.carrying === "none" &&
+        t.alarm !== "none"
+      ) {
+        const sensed = game.colonies[0]!.s;
         if (sensed[3] === SEEN || sensed[4] === SEEN || sensed[5] === SEEN) {
           approachAlarmContacts++;
           times.firstApproachAlarmContact ??= game.time;

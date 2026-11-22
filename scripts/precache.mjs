@@ -186,16 +186,16 @@ function responseSituationsMet(hook) {
       const g = new Game(
         generateOneWorld(seed),
         {
-          antCount: 600,
-          rivalAnts: 600,
-          rival: true,
           regrow: GAME_REGROW,
           autoFound: false,
           fungus: { hyphae: true },
           fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true },
         },
         gameRng(seed, 0),
-        { responses: spy, rivalResponses: spy },
+        [
+          { antCount: 600, responses: spy },
+          { antCount: 600, responses: spy },
+        ],
       );
       for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
     }

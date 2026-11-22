@@ -168,7 +168,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
    One species ships: today's ant, bit-exact. Pheromone channels are per species, and the fungus's levers are gains keyed by channel (perceive, emit) instead of named colony arrays.
 4. **A policy API on the sim.**
    - `colony.bindPolicy(lane, fn)` replaces the UI assigning `colony.policy`, `stancePolicy` and `fungus.policy` (built, `ja-fnd.5.4.1`: `Colony.bindPolicy("mode" | "stance", fn)`, `Fungus.bindPolicy("fungus" | "growth", fn)`, the fields readonly, a source-scan test).
-   - `Game` takes N colony specs instead of a fixed player and rival.
+   - ~~`Game` takes N colony specs instead of a fixed player and rival.~~ Built (`ja-fnd.5.4.2`, [game-colonies.md](game-colonies.md)): `new Game(world, params, rng, specs)` takes a `ColonySpec` list (`DEFAULT_COLONIES`, a pair of 800, when none is given); `Sides`, `rivalAnts`, `rival`, `Game.player` and `Game.rival` are gone, and a source-scan test (`tests/unit/noPair.test.ts`) holds that no caller names them. `SAVE_VERSION` 15.
    - Doctrines are keyed by colony and species, not by position.
 5. **A nest-kind interface** (the dug curtain today): chamber roles, entrances, the mound. This is the hook for new final structures.
 

@@ -28,7 +28,7 @@ const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place ==
 
 function run(seed, directed, contextual, recover, counterattack = false, traceCombat = false) {
   const game = new Game(generateOneWorld(seed), {}, gameRng(seed));
-  const colony = game.player;
+  const colony = game.colonies[0];
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   let dropRefusals = 0;
   if (directed) {
@@ -138,9 +138,9 @@ if (args[0] === "--guard") {
                 ...(spec.probes ?? []),
                 {
                   tick(game) {
-                    defender = game.player;
+                    defender = game.colonies[0];
                     attackers = [];
-                    const rival = game.rival;
+                    const rival = game.colonies[1];
                     if (!rival) return;
                     for (let i = 0; i < rival.n; i++) {
                       if (rival.alive[i] && rival.attackLayer[i] === rival.layer[i])

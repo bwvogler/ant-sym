@@ -84,34 +84,26 @@ test("approach defense requires both a currently sensed entrance and alarm", () 
   assert.equal(contact(approach, draw), "fight");
 });
 
-// Once an assay lists its colonies (docs/game-colonies.md, #309) `sides` is ignored, so an assay that sets the first colony's params and
-// responses must go through withFirstColony (review of #281): a revert to `sides` would play the local rule without a failure.
-test("the royal-routing assays set the first colony's delivery lane and responses on the list, not on sides", () => {
+// An assay names its colonies in a list (docs/game-colonies.md), and sets the first colony's params and responses through withFirstColony
+// (review of #281): the first colony of the list plays them.
+test("the royal-routing assays set the first colony's delivery lane and responses on the list", () => {
   for (const id of ["gameRoyalDelivery", "gameRoyalRecovery"]) {
     const spec = oneAssay(id).spec(1);
     assert.equal(spec.colonies?.[0]?.colony?.deliveryLane, 1, `${id}: the first colony plays explicit delivery`);
     assert.notEqual(firstResponses(spec), undefined, `${id}: the first colony has its own responses`);
     assert.notEqual(firstResponses(spec), localResponses, `${id}: not the local rule`);
-    assert.equal(spec.sides, undefined, `${id}: nothing set on sides, which a listed spec ignores`);
   }
 });
 
-test("withFirstColony patches the first colony of a listed spec and the sides of a paired one", () => {
+test("withFirstColony patches the first colony of a listed spec", () => {
   const mine = { ...localResponses };
   const listed: RunSpec = { seed: 1, seconds: 1, colonies: [{ antCount: 3, colony: { findNear: 2 } }, { antCount: 4 }] };
   const a = withFirstColony(listed, { colony: { deliveryLane: 1 }, responses: mine });
   assert.deepEqual(a.colonies?.[0]?.colony, { findNear: 2, deliveryLane: 1 }, "merged into the colony's own params");
   assert.equal(a.colonies?.[0]?.responses, mine);
   assert.equal(a.colonies?.[1], listed.colonies?.[1], "the second colony is untouched");
-  assert.equal(a.sides, undefined);
   assert.equal(firstResponses(a), mine);
   assert.equal(listed.colonies?.[0]?.responses, undefined, "the spec it was given is not changed");
 
-  const paired: RunSpec = { seed: 1, seconds: 1, sides: { colony: { findNear: 2 } } };
-  const b = withFirstColony(paired, { colony: { deliveryLane: 1 }, responses: mine });
-  assert.deepEqual(b.sides?.colony, { findNear: 2, deliveryLane: 1 });
-  assert.equal(b.sides?.responses, mine);
-  assert.equal(b.colonies, undefined);
-  assert.equal(firstResponses(b), mine);
   assert.throws(() => withFirstColony({ seed: 1, seconds: 1, colonies: [] }, { responses: mine }), /lists no colony/);
 });

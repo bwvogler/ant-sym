@@ -16,7 +16,7 @@
 // --species <id> plays every run's colonies as that species (colony/species.ts SPECIES, e.g. desert); --set's colony values
 // still apply over its own. Not with --policy (a replayed cache holds the generic ant's answers).
 //
-// --set takes a dotted path under colony / rival / game and a comma list of
+// --set takes a dotted path under colony / second / game and a comma list of
 // values; several --set flags run their cross product. Pheromone channels are
 // colony.channels.<food|home|alarm|noEntry>.<evaporation|diffusion>.
 //
@@ -376,7 +376,7 @@ async function work() {
       count("mode", a !== undefined);
       return a === undefined ? localPolicy(s) : pick(a, draw);
     };
-    Object.assign(brains, { policy: mode, rivalPolicy: mode });
+    Object.assign(brains, { policy: mode, secondPolicy: mode });
     // The doctrine's steering weights too, where a bundle ships (ja-ykmu.3): they act only with --set both.steerLane=1.
     const { existsSync } = await import("node:fs");
     const steerFile = `web/public/precache/steer-${policy.slice(9)}.json`;
