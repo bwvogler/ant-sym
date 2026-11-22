@@ -20,8 +20,8 @@ const colony = (w: OneWorld, params: Partial<ColonyParams>, seed: number, policy
 test("the larder is the food lying in the colony's chambers, porters move it, and the queen's brood is raised from it", () => {
   const w = smallOne(2);
   const map = w.curtain;
-  const g = new Game(w, { antCount: 300, rival: false }, mulberry32(4));
-  const c = g.player;
+  const g = new Game(w, {}, mulberry32(4), [{ antCount: 300 }]);
+  const c = g.colonies[0]!;
   for (let k = 0; k < 30 * 300; k++) {
     g.tick(1 / 30);
     if (k % 300 === 0) {
@@ -181,8 +181,8 @@ test("a larva eats what lies in its own chamber, not the royal chamber's", () =>
 test("a larva lying outside any chamber is taken in and raised (review of slice 5: strays starved)", () => {
   const w = smallOne(2);
   const map = w.curtain;
-  const g = new Game(w, { antCount: 80, rival: false }, mulberry32(3));
-  const c = g.player;
+  const g = new Game(w, {}, mulberry32(3), [{ antCount: 80 }]);
+  const c = g.colonies[0]!;
   // A larva on the shaft just below the hole: in no chamber.
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y + 3);
   const stray = c.brood.add(CELL[0], CELL[1], -1);

@@ -1915,10 +1915,9 @@ try {
   check((await list.getByText("No. 2").count()) === 1, "a second: No. 2");
   await list.getByRole("button", { name: new RegExp(`^No\\. 1 #${ants[0]} `) }).click();
   check((await sp.evaluate(() => window.jevAnts.followed()?.i)) === ants[0], "a row follows its specimen");
-  check(
-    (await sp.evaluate(() => window.jevAnts.view())) === "below",
-    "and takes the camera to its view (it is below) (review of #218, S2)",
-  );
+  // Which view that is depends on where the ant stood when the game was paused (a slower runner has run fewer ticks), so read its layer.
+  const its = (await sp.evaluate((i) => window.jevAnts.game.colonies[0].layer[i], ants[0])) === 1 ? "below" : "above";
+  check((await sp.evaluate(() => window.jevAnts.view())) === its, `and takes the camera to its view (it is ${its}) (review of #218, S2)`);
   await list.getByRole("button", { name: "Unpin No. 2" }).click();
   check((await list.getByText("No. 2").count()) === 0, "unpinned");
   check(await list.evaluate((el) => document.activeElement === el.querySelector("h2 button")), "focus goes to the list's header, not lost");

@@ -140,7 +140,7 @@ test("a fighting ant goes for the enemy it can see", () => {
 
 test("the game: both colonies forage and grow, and they meet and fight", () => {
   // On a small one world (S2.3c); that food and ants are conserved is int/oneWorldGame's.
-  const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(11));
+  const g = new Game(smallOne(1), {}, mulberry32(11), [{ antCount: 300 }, { antCount: 300 }]);
   for (let k = 0; k < 30 * 150; k++) g.tick(1 / 30);
   const [you, rival] = g.colonies as [Colony, Colony];
   assert.ok(you.stored > 100 && rival.stored > 50, `stored ${you.stored} / ${rival.stored}`);
@@ -150,15 +150,15 @@ test("the game: both colonies forage and grow, and they meet and fight", () => {
 });
 
 test("the outcome: a colony with no workers and no pupae is beaten", () => {
-  const g = new Game(smallOne(2), { antCount: 10, rivalAnts: 10 }, mulberry32(5));
+  const g = new Game(smallOne(2), {}, mulberry32(5), [{ antCount: 10 }, { antCount: 10 }]);
   // The player is the fungus (docs/fungus-policy.md §9): a colony beaten is a loss for it, whichever colony.
-  for (let i = 0; i < g.rival!.n; i++) g.rival!.kill(i);
-  g.rival!.brood.items.length = 0;
+  for (let i = 0; i < g.colonies[1]!.n; i++) g.colonies[1]!.kill(i);
+  g.colonies[1]!.brood.items.length = 0;
   assert.equal(g.outcome(), "fallen");
   assert.equal(g.fallen(), 1);
-  g.rival!.brood.add(1, 1, -1).stage = PUPA;
+  g.colonies[1]!.brood.add(1, 1, -1).stage = PUPA;
   assert.equal(g.outcome(), "playing", "a pupa will still hatch");
-  for (let i = 0; i < g.player.n; i++) g.player.kill(i);
+  for (let i = 0; i < g.colonies[0]!.n; i++) g.colonies[0]!.kill(i);
   assert.equal(g.outcome(), "fallen");
   assert.equal(g.fallen(), 0);
 });
@@ -196,12 +196,16 @@ test("graded alarm (behaviour MR 4): a faint alarm draws a top-down explorer tow
 
 test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at home, by degrees, never while carrying", () => {
   // 40 ants at home on a strong raid trail, 40 out on one 16 cells away, on the plane; recruited at raidRecruit (0.5/s here) for 1 s.
-  const g = new Game(oneArena(arena(), 21), { antCount: 80, rivalAnts: 5 }, mulberry32(21), {
-    policy: () => "return",
-    responses: responses({ leave: () => "wait" }),
-    colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 },
-  });
-  const c = g.player;
+  const g = new Game(oneArena(arena(), 21), {}, mulberry32(21), [
+    {
+      antCount: 80,
+      colony: { raidRecruit: 0.5, scoutRate: 0, raidScout: 0 },
+      policy: () => "return",
+      responses: responses({ leave: () => "wait" }),
+    },
+    { antCount: 5 },
+  ]);
+  const c = g.colonies[0]!;
   const ph = (c.layers[PLANE] as Layer).ph;
   const home = (i: number) => i < 40;
   const place = () => {
@@ -234,7 +238,7 @@ test("raid trail recruitment (docs/stance.md, review of #53 S2): only ants at ho
 
 test("raids by trail (behaviour MR 5.2): a scout that meets strangers outside goes home laying the raid trail", () => {
   const run = (raidGate: number) => {
-    const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5), { colony: { raidGate } });
+    const g = new Game(oneArena(arena(), 5), {}, mulberry32(5), [{ antCount: 6, colony: { raidGate } }, { antCount: 6 }]);
     const [a, b] = g.colonies as [Colony, Colony];
     for (let i = 0; i < a.n; i++) {
       a.alive[i] = i < 1 ? 1 : 0;
@@ -278,7 +282,7 @@ test("raids by trail (review of #41): a raider with no enemy near climbs the rai
   assert.ok(c.x[0] > x0 + 6, `climbed east: ${x0.toFixed(1)} → ${c.x[0].toFixed(1)}`);
 
   // A stranger beside a raider that stands on a raid trail is fought, not reported: the trail is where a scout was before.
-  const g = new Game(oneArena(arena(), 5), { antCount: 6, rivalAnts: 6 }, mulberry32(5));
+  const g = new Game(oneArena(arena(), 5), {}, mulberry32(5), [{ antCount: 6 }, { antCount: 6 }]);
   const [a, b] = g.colonies as [Colony, Colony];
   for (let i = 0; i < a.n; i++) {
     a.alive[i] = i === 0 ? 1 : 0;

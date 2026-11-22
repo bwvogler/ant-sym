@@ -95,12 +95,11 @@ export function record(s: Scenario): OneSample[] {
   const world = L || s.full ? generateOneWorld(s.seed) : generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
   const page = L || s.full; // the page's game: the full-size world, rival, regrowth, no auto-founding, hyphae, the page's random stream
   const game = page
-    ? new Game(
-        world,
-        { antCount: s.ants, rivalAnts: s.ants, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
-        gameRng(s.seed, 0),
-      )
-    : new Game(world, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
+    ? new Game(world, { regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } }, gameRng(s.seed, 0), [
+        { antCount: s.ants },
+        { antCount: s.ants },
+      ])
+    : new Game(world, {}, mulberry32(s.seed * 7919), [{ antCount: s.ants }, { antCount: s.ants }]);
   const queue = [...UPGRADE_ORDER];
   if (L) {
     const strain = STRAINS.findIndex((x) => x.id === L.strain);
@@ -120,7 +119,7 @@ export function record(s: Scenario): OneSample[] {
   const spot = world.plane.nests[0]!;
   const every = Math.round(10 / DT);
   for (let k = 1; k <= Math.round(s.seconds / DT); k++) {
-    if (alarms.includes(k)) game.player.paint("alarm", spot.x, spot.y, 4, 12, PLANE);
+    if (alarms.includes(k)) game.colonies[0]!.paint("alarm", spot.x, spot.y, 4, 12, PLANE);
     game.tick(DT);
     const e = L && game.fungus.evolution;
     // The first upgrade in the order it can keep now, as progression.mjs buys: one it can't yet afford doesn't hold up a cheaper one.

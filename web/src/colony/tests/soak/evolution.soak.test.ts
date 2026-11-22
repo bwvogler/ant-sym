@@ -14,7 +14,7 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 test("the queen's larger grooming cap is the evolving game's: a lab or test game's queen is groomed as before (PR #43 review, S1)", () => {
   const queenAt = (queenGroomers: number, evolve: boolean, seconds = 45) => {
-    const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300, fungus: { queenGroomers } }, mulberry32(7919));
+    const g = new Game(smallOne(1), { fungus: { queenGroomers } }, mulberry32(7919), [{ antCount: 300 }, { antCount: 300 }]);
     g.land(0, GARDEN, { evolve });
     if (evolve) {
       // Garden as listed, so the fungus reaches her in a short run.

@@ -12,7 +12,7 @@ import { oneColony, own, planeHole, smallOne } from "../builders.ts";
 test("roles and road signs: chambers dug get roles (brood among them), and the royal mark is strongest in the royal chamber", () => {
   const w = smallOne(2);
   const map = w.curtain;
-  const g = new Game(w, { antCount: 400, rival: false }, mulberry32(4));
+  const g = new Game(w, {}, mulberry32(4), [{ antCount: 400 }]);
   for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
   const ch = map.chambers!;
   const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
@@ -26,7 +26,7 @@ test("roles and road signs: chambers dug get roles (brood among them), and the r
     "brood chambers",
   );
   // Mean royal mark in the royal chamber vs in every other chamber.
-  const ph = g.player.layers[CURTAIN]!.ph;
+  const ph = g.colonies[0]!.layers[CURTAIN]!.ph;
   const sum = new Map<number, [number, number]>();
   for (let y = 0; y < map.size.h; y++)
     for (let x = map.x0; x < map.x0 + map.size.w; x++) {

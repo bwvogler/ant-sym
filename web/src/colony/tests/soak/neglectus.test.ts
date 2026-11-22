@@ -11,7 +11,7 @@ import { generateOneWorld } from "../../oneWorld.ts";
 // The invasive garden ant on the descriptor (ja-e668.3, PRD §64.2): one supercolony's tolerance (owner, 2026-11-15) and its own mode words.
 
 const game = (species = GENERIC_ANT, params = {}) =>
-  new Game(generateOneWorld(1), { antCount: 200, rivalAnts: 200, species, ...params }, gameRng(1));
+  new Game(generateOneWorld(1), { species, ...params }, gameRng(1), [{ antCount: 200 }, { antCount: 200 }]);
 
 test("the invasive garden ant is a species the page can name, with its own mode words", () => {
   assert.equal(speciesById("neglectus"), NEGLECTUS_ANT);
