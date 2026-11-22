@@ -144,4 +144,5 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-22 | `ja-fnd.6.3.13`: `FieldEnv`, the frame's result, the prelude as `prepareFrame` (the first three files of `ui/field/`) | #303 |
 | 2026-11-22 | `ja-fnd.6.3.5`: `FieldCtx`, `FieldInputs`, the overlay layers (`overlays.ts`), the recording fake context; four scenes for what the field reads from the page (34 in all) | #304 |
 | 2026-11-22 | `ja-fnd.6.3.6`: the fungus layer (`fungus.ts`), `FieldEnv.newPath`, `zoom.ts` | #310 |
-| 2026-11-22 | `ja-fnd.6.3.7`: the ground (`ground.ts`: `Ground`, `paintChunk`, `drawHexes`, `stripAt`, the chunk cache), `FieldEnv.newCanvas` | (this PR) |
+| 2026-11-22 | `ja-fnd.6.3.7`: the ground (`ground.ts`: `Ground`, `paintChunk`, `drawHexes`, `stripAt`, the chunk cache), `FieldEnv.newCanvas` | #314 |
+| 2026-11-22 | `ja-fnd.6.3.19`: the minimap (`minimap.ts`: `Minimap`, its canvas, buffer and clock) | (this PR) |
