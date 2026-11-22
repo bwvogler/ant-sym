@@ -119,6 +119,24 @@ test("a new follow starts afresh: no crossing for its first frame, whatever laye
   assert.equal(r.antLayer.current?.layer, CURTAIN);
 });
 
+test("an ant that stays on the other layer than the view's is not reported on every frame (review of #303, S1)", () => {
+  const { r, crossed } = refs(ANT);
+  const s = NEW();
+  const below = [colony({ layer: CURTAIN, x: 12, y: 40 })];
+  for (let frame = 0; frame < 3; frame++) prepareFrame(below, PLANE, EXT, V, s, r);
+  assert.deepEqual(crossed, [], "it was on the curtain when the follow began and has not crossed since");
+  assert.equal(r.carryTo.current, null);
+  assert.equal(r.antLayer.current?.layer, CURTAIN);
+});
+
+test("a fitted view draws the whole map whatever camera it holds (a phone turned, the layout reflowing; review of #303, S2)", () => {
+  const { r } = refs(null);
+  const stale: ViewCam = { cam: { x: 10, y: 10, zoom: fitZoom(EXT, V) * 9 }, fitted: true, zoomedIn: true, aim: null };
+  const c = prepareFrame([colony({ layer: PLANE, x: 1, y: 1 })], PLANE, EXT, V, stale, r);
+  assert.deepEqual(c, clamp(fit(EXT, V), EXT, V));
+  assert.equal(stale.zoomedIn, false);
+});
+
 test("without a follow the crossing records are cleared", () => {
   const { r } = refs(null);
   r.antLayer.current = { f: ANT, layer: PLANE };
