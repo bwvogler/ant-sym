@@ -351,7 +351,10 @@ export class Game {
    * the colonies are one; without the latch the outcome would flap and toast each time it came back.
    */
   #haveMet = false;
-  /** colony 0's start count: a founder's cap is 1.5 times the larger of it and her own (addColony) */
+  /**
+   * colony 0's start count: a founder's cap is 1.5 times the larger of it and her own (addColony). From the specs the game was built
+   * with, not the saved `params` (a load pours state into a game built afresh, so the two agree for every caller).
+   */
   #firstAnts = 0;
   #nextRivalCheck = 0;
   #rng: () => number;
@@ -399,6 +402,7 @@ export class Game {
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go (0 and 1 for two). The pair's words name the list unless a list is given.
     const specs = Array.isArray(how) ? how : pairSpecs(this.params, how, home.nests.length);
+    if (specs.length === 0) throw new Error("a game starts with at least one colony");
     if (specs.length > home.nests.length)
       throw new Error(`${specs.length} colonies, and the world has ${home.nests.length} start nests (a founding makes any more)`);
     this.#firstAnts = specs[0]?.antCount ?? this.params.antCount;

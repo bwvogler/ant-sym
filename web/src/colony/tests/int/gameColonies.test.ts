@@ -2,6 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game, gameRng, type ColonySpec } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
+import { MODE_CRITERIA } from "../../colonyBrain.ts";
+import { centreX, centreY } from "../../hex.ts";
+import { defineSchema, legendOf } from "../../schema.ts";
+import { GENERIC_ANT, type Species } from "../../species.ts";
+import { MODES, type LaneWords, type Mode, type SpeciesSituation } from "../../vocab.ts";
 import { smallOne, ticks } from "../builders.ts";
 
 // The game's start colonies as a list (docs/game-colonies.md, stage A): the pair's words and an explicit list build the same game.
@@ -9,6 +14,14 @@ import { smallOne, ticks } from "../builders.ts";
 const ANTS = 14;
 const RIVAL = 9;
 const fresh = (seed = 3) => smallOne(seed);
+/** Mode words over the one field `mode`: every other generic field is left out, so the species needs a local rule of its own. */
+const ONLY_MODE = defineSchema<SpeciesSituation>([{ name: "mode", values: MODES }]);
+const NO_FIELDS: LaneWords<Mode> = {
+  legend: legendOf(ONLY_MODE, { intro: "Each key in `ants` is one worker. ", fields: [["mode", "mode is what it is doing. "]] }),
+  criteria: MODE_CRITERIA,
+  version: 1,
+  schema: ONLY_MODE,
+};
 
 test("the pair's words and the list that names the same colonies build equal games, and play alike", () => {
   const pair = new Game(fresh(), { antCount: ANTS, rivalAnts: RIVAL, rival: true }, gameRng(3), {
@@ -61,4 +74,25 @@ test("precedence: a spec's nest and odour, then its colony overrides; zero ants 
 test("the pair keeps its second colony's nest at 1 whatever Sides.rival says (the list has no such rule)", () => {
   const g = new Game(fresh(), { antCount: ANTS, rivalAnts: RIVAL }, gameRng(3), { rival: { nest: 0 } });
   assert.equal(g.colonies[1]?.params.nest, 1);
+});
+
+test("an empty list is refused", () => {
+  assert.throws(() => new Game(fresh(), {}, gameRng(3), []), /at least one colony/);
+});
+
+test("each colony's situation check runs, whichever way the list is named (a species whose words drop fields needs a rule of its own)", () => {
+  const bare: Species = { ...GENERIC_ANT, id: "bare", lanes: { mode: { ...NO_FIELDS } }, policy: undefined };
+  assert.throws(() => new Game(fresh(), { species: bare, antCount: ANTS }, gameRng(3)), /local rule of its own/, "the pair");
+  assert.throws(
+    () => new Game(fresh(), { species: bare }, gameRng(3), [{ antCount: ANTS }, { antCount: RIVAL }]),
+    /local rule of its own/,
+    "the list",
+  );
+});
+
+test("a founder's cap follows colony 0's start count in the list, not params.antCount", () => {
+  const g = new Game(fresh(), {}, gameRng(3), [{ antCount: 20 }]);
+  const v = g.world!.line.holes[0]!;
+  const k = g.addColony({ x: centreX(v.x, v.y) - 20, y: centreY(v.y), antCount: 5, odour: 0 });
+  assert.equal(g.colonies[k]?.params.maxAnts, Math.round(1.5 * 20));
 });
