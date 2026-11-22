@@ -1,20 +1,20 @@
 import type { JevRequest } from "../../shared/jev.ts";
 import { DEFAULT_MENU, estimateTokens, LANE_KINDS, LANE_LIST, LANES, type LaneName, type LaneWords } from "../colony/index.ts";
 
-// What Jev is sent, pure: the Learn drawer shows the exact request for one
+// What Jev is sent, pure: Lab mode's Policy tab shows the exact request for one
 // situation, and what a question costs. Requests pack many situations behind
 // one shared legend and doctrine (colonyBrain.ts), so the cost of a question
 // is a full request's size over the situations it carries, as useColonyJev's
 // estimates have always been.
 
-export { SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE } from "../colony/index.ts";
+export { SAMPLE_FUNGAL, SAMPLE_SITUATION } from "../colony/index.ts";
 const MENU_ON = new Set(DEFAULT_MENU);
 
 export { PER_REQUEST } from "../colony/index.ts";
 
 /** A sample for lane N: the situation type its row takes (the lane registry's). */
 type SampleOf<N extends LaneName> = { lane: N; situation: (typeof LANES)[N]["sample"] };
-export type Sample = SampleOf<"mode"> | SampleOf<"stance"> | (SampleOf<"fungus"> & { menu?: ReadonlySet<string> });
+export type Sample = SampleOf<"mode"> | (SampleOf<"fungus"> & { menu?: ReadonlySet<string> });
 
 /**
  * The request lane `lane` would send for these situations under these words (doctrine or aim): the lane's own key and pack, with the ids its

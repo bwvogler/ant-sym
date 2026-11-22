@@ -1,76 +1,83 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  bridge,
-  contact,
+  aphidsEaten,
+  aphidsFound,
   desertFirstFind,
   desertInvitation,
   desertNoTrail,
-  faintAlarm,
-  regulate,
-  regulateStop,
-  richPoor,
+  oneAssay,
   runAssay,
-  twin,
   crayonLine,
   wall,
 } from "../../experiment.ts";
 import { DESERT_ANT } from "../../desertAnt.ts";
 
-// The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42). Those today's ants
-// don't pass yet run as `todo`, naming the bead or MR meant to pass them. (G, the whole side-view game, is guarded by
-// slow/side.test.ts.) A11 and A12, the longest, have files of their own (raidFind, raidStop), so the slow tier's shards
+// The behaviour assays too slow for npm test's 60 s per file (experiment.ts, docs/PRD.md §42), on one world (their
+// ONE_ASSAYS twins, S2.2e, PRD §76). The owner's marks rule (2026-11-14, 2026-11-15): an assay that passes is held to its
+// mark; one that fails today (A5, A9, A10 here; A6 and A13 in slow/defence.test.ts) is held only to no worse than its
+// worst seed over 1–20 (PRD §76.1, §76.3) widened by 10 %, until its bead is fixed. Those today's ants don't pass yet and
+// aren't guarded run as `todo`, naming the bead or MR meant to pass them. (G, the whole game, is guarded by G1,
+// slow/g1/oneWorldG1.test.ts.) A11 and A12, the longest, have files of their own (raidFind, raidStop), so the slow tier's shards
 // balance (slow.yml).
 
-// Behaviour MR 3 with ja-00t (carriers home by trail and vector): seeds 1–10 pass 10/10; 1 and 2 are both sides of the fork.
+// One world (PRD §76.1): A1 20/20 on seeds 1–20 (shortShare median 0.90, worst 0.865).
 test("A1 double bridge: ≥ 80 % on the short branch", () => {
   for (const seed of [1, 2]) {
-    const m = runAssay(bridge, seed).metrics;
+    const m = runAssay(oneAssay("bridge"), seed).metrics;
     assert.ok(Number.isFinite(m.shortShare));
     assert.equal(m.pass, 1, `seed ${seed}: shortShare ${m.shortShare}`);
   }
 });
 
-// Behaviour MR 3 (PRD §45): seeds 1–10 pass 10/10 (A2a and A2b).
+// One world (PRD §76.1): A2a 20/20, A2b 17/20 (fails 9, 18, 20).
 test("A2a two equal sources: the colony concentrates on one", () => {
   for (const seed of [1, 2]) {
-    const m = runAssay(twin, seed).metrics;
+    const m = runAssay(oneAssay("twin"), seed).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: majorityShare ${m.majorityShare}`);
   }
 });
 
 test("A2b rich vs poor source: the colony picks the richer", () => {
   for (const seed of [1, 2]) {
-    const m = runAssay(richPoor, seed).metrics;
+    const m = runAssay(oneAssay("richPoor"), seed).metrics;
     assert.equal(m.pass, 1, `seed ${seed}: richShare ${m.richShare}`);
   }
 });
 
-// Behaviour MR 5 (PRD §48): A5 passes 10/10 on seeds 1–10 (0.14 outside before food, 0.85 after); A5b guards that
-// departures still fall once food is gone.
+// One world (PRD §76.1): A5 fails 0/20, more ants outside before food than after (ja-lp4.6.8), so it is guarded: outside
+// before ÷ after at most A5_GUARD (worst seed 2.645, seed 5, + 10 %). A5b passes 18/20 (fails 7, 20) and keeps its mark.
+const A5_GUARD = 2.91;
 for (const seed of [1, 2]) {
-  test(`A5 regulation: foragers stay home without food (seed ${seed})`, () => {
-    const m = runAssay(regulate, seed).metrics;
-    assert.ok(Number.isFinite(m.outsideBefore));
-    assert.equal(m.pass, 1, `outside before ${m.outsideBefore}, after ${m.outsideAfter}`);
+  test(`A5 regulation, guarded (ja-lp4.6.8): no more ants out before food than today's worst seed (seed ${seed})`, () => {
+    const m = runAssay(oneAssay("regulate"), seed).metrics;
+    assert.ok(Number.isFinite(m.outsideBefore) && m.outsideAfter > 0);
+    const ratio = m.outsideBefore / m.outsideAfter;
+    assert.ok(ratio <= A5_GUARD, `outside before ${m.outsideBefore} ÷ after ${m.outsideAfter} = ${ratio}, guard ${A5_GUARD}`);
   });
   test(`A5b foraging stops: departures fall once food is gone (seed ${seed})`, () => {
-    const m = runAssay(regulateStop, seed).metrics;
+    const m = runAssay(oneAssay("regulateStop"), seed).metrics;
     assert.equal(m.pass, 1, `trips out per minute while food flowed ${m.departsFlow}, once gone ${m.departsGone}`);
   });
 }
 
-// Behaviour MR 4 (PRD §46): A9 passes 10/10 on seeds 1–10; A10's draw is weak (median +1.3 ants, mark 2).
-test("A9 strangers meet at food: few lost per food brought home", () => {
+// One world (PRD §76.1): A9 10/20 at its mark of 4 lost per 100 food (ja-lp4.6.4), A10 2/20 at its draw of 2 (ja-je8), so
+// both are guarded: A9 at most A9_GUARD lost per 100 food (worst 8.04, seed 7, + 10 %, rounded up); A10's draw at least A10_GUARD
+// (worst −0.5, seed 6, − 10 %).
+const A9_GUARD = 8.85;
+const A10_GUARD = -0.55;
+test("A9 strangers meet at food, guarded (ja-lp4.6.4): no more lost per food than today's worst seed", () => {
   for (const seed of [1, 2]) {
-    const m = runAssay(contact, seed).metrics;
-    assert.equal(m.pass, 1, `seed ${seed}: ${m.lostPer100Food} lost per 100 food`);
+    const m = runAssay(oneAssay("contact"), seed).metrics;
+    assert.ok(m.lostPer100Food <= A9_GUARD, `seed ${seed}: ${m.lostPer100Food} lost per 100 food, guard ${A9_GUARD}`);
   }
 });
 
-test("A10 faint alarm draws explorers", { todo: "ja-je8: the draw is weak (median +1.3 ants)" }, () => {
-  const m = runAssay(faintAlarm, 1).metrics;
-  assert.equal(m.pass, 1, `draw ${m.draw}`);
+test("A10 faint alarm, guarded (ja-je8): the draw no weaker than today's worst seed", () => {
+  for (const seed of [1, 2]) {
+    const m = runAssay(oneAssay("faintAlarm"), seed).metrics;
+    assert.ok(m.draw >= A10_GUARD, `seed ${seed}: draw ${m.draw}, guard ${A10_GUARD}`);
+  }
 });
 
 // The desert ant's assays (ja-rf5.2, PRD §60.1): landed before the species, so today they measure the generic ant, which fails both.
@@ -93,6 +100,29 @@ test("D3 food odour brings the first find sooner than a blind search", () => {
     const blind = first(true);
     assert.ok(smelt < blind, `seed ${seed}: first find at ${smelt} s with the plume, ${blind} s blind`);
   }
+});
+
+// ja-nzkg.3 (PRD §78.2): the generic ant climbs aphid odour. Judged by the median gain over seeds 1-10 (owner, 2026-11-16,
+// #264): which seeds tie is chance (a finder walking straight at the clump needs no plume), so a strict "sooner" on three
+// fixed seeds re-rolled with any change to play. Median gain 0.40 s under the odometer law, 0.58 s under piErrorLaw 1
+// (plume sooner on 10 and 7 of 10). A design mark: the assay's target is "sooner", no literature figure.
+test("B9 aphid odour brings the first find of a clump sooner than a blind search (median over seeds 1-10)", () => {
+  const gains: number[] = [];
+  for (let seed = 1; seed <= 10; seed++) {
+    const first = (blind: boolean) => runAssay(aphidsFound, seed, blind ? { colony: { aphidPlume: 0 } } : {}).metrics.firstFind;
+    gains.push(first(true) - first(false));
+  }
+  const sorted = [...gains].sort((a, b) => a - b);
+  const median = (sorted[4] + sorted[5]) / 2;
+  assert.ok(median > 0, `median gain ${median.toFixed(2)} s (gains ${gains.map((g) => g.toFixed(2)).join(", ")})`);
+});
+
+// ja-nzkg.5 (PRD §78.4): ants eat a few aphids. With aphidPrey 0.05, 23 % of a clump's aphids at 240 s were eaten on seeds 1–4
+// (18–27 %) and 21 % on 11–20 (Oliver et al. 2012: 20 % fewer); with 0, none.
+test("B12 ants eat some of a clump's aphids, as many as a fifth", () => {
+  const share = runAssay(aphidsEaten, 1).metrics.eatenShare as number;
+  assert.ok(share > 0.1 && share < 0.4, `eaten share ${share}`);
+  assert.equal(runAssay(aphidsEaten, 1, { colony: { aphidPrey: 0 } }).metrics.aphidsEaten, 0);
 });
 
 test(

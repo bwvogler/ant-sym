@@ -1,30 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  Colony,
-  CURTAIN,
-  PLANE,
-  Game,
-  gameRng,
-  CELL,
-  cellOf,
-  generateOneWorld,
-  generateSideWorld,
-  generateWorld,
-  mulberry32,
-} from "../../colony/index.ts";
+import { Colony, CURTAIN, PLANE, Game, gameRng, CELL, cellOf, generateOneWorld, mulberry32 } from "../../colony/index.ts";
 import { nestView } from "../nest.ts";
 
-const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 2 };
-
-test("a top-down map has no nest to show", () => {
-  assert.equal(nestView(new Colony(generateWorld(1), { antCount: 10 }, mulberry32(1))), null);
-});
-
-test("the side view's nest: its own chambers only, the royal one with the queen in it, below the ground line", () => {
-  const map = generateSideWorld(2, SMALL);
-  const a = new Colony(map, { antCount: 40, nest: 0 }, mulberry32(1));
-  const b = new Colony(map, { antCount: 40, nest: 1 }, mulberry32(2));
+test("the nest: its own chambers only, the royal one with the queen in it, below the ground line", () => {
+  // On the curtain of a small one world (S2.3c).
+  const w = generateOneWorld(2, { plane: { size: { w: 160, h: 100 } } });
+  const map = w.curtain;
+  const at = { plane: w.plane, line: w.line };
+  const a = new Colony(map, { antCount: 40, nest: 0 }, mulberry32(1), undefined, at);
+  const b = new Colony(map, { antCount: 40, nest: 1 }, mulberry32(2), undefined, at);
   for (let t = 0; t < 300; t++) {
     a.tick(1 / 10);
     b.tick(1 / 10);

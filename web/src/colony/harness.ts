@@ -3,14 +3,14 @@
 
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { type Policy, type SteerPolicy } from "./vocab.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
-import { centreX, centreY, R } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
-import { oneWorldOn, type OneWorld } from "./oneWorld.ts";
+import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
 import { localResponses, type Responses } from "./responses.ts";
 import type { Channel, ChannelParams } from "./pheromone.ts";
-import { dropFood, generateSideWorld, OPEN, ROCK, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
+import { dropFood, OPEN, ROCK, rockAt, type Nest, type WorldMap, type WorldSize, worldFromArrays } from "./world.ts";
 
 // Experiments, pure: run a game headless from a seed, with scripted events
 // (paint, add food) and probes that measure behaviour, and score it against a
@@ -55,7 +55,10 @@ export interface Probe {
 
 export interface RunSpec {
   seed: number;
-  /** the map or one world (game.ts takes either), or how to make it from the seed; default the page's: generateSideWorld(seed) */
+  /**
+   * The one world, or how to make it from the seed; default the page's: generateOneWorld(seed). An arena (a hand-made top-down
+   * field) is only a spec in waiting: `onPlane` (or `oneArena`) makes it a one world's plane, and `runGame` plays one worlds.
+   */
   map?: WorldMap | OneWorld | ((seed: number) => WorldMap | OneWorld);
   game?: Partial<GameParams>;
   sides?: Sides;
@@ -74,20 +77,22 @@ export interface RunResult {
   metrics: Record<string, number>;
 }
 
-/** Seconds a forager may hold its food before it counts as lost (slow/side.test's guard). */
+/** Seconds a forager may hold its food before it counts as lost (the side view's slow/side.test guard, now G1's). */
 export const STUCK_AFTER = 120;
 
-/** The map (or one world) a spec asks for. */
-export function specMap(spec: RunSpec): WorldMap | OneWorld {
-  return typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateSideWorld(spec.seed));
+/** The one world a spec asks for (an arena map is refused: `onPlane` makes it one). */
+export function specMap(spec: RunSpec): OneWorld {
+  const m = typeof spec.map === "function" ? spec.map(spec.seed) : (spec.map ?? generateOneWorld(spec.seed));
+  if (!isOneWorld(m)) throw new Error("runGame: a game is one world; a spec on an arena goes through onPlane (or oneArena)");
+  return m;
 }
 
 /** Run a game headless and collect the standard numbers plus every probe's. */
 export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
   const world = specMap(spec);
   const game = new Game(world, spec.game, gameRng(spec.seed), spec.sides);
-  // The food the world began with: in one world the plane's piles and the curtain's buried pockets.
-  const foodTotal = isOneWorld(world) ? world.plane.foodTotal + world.curtain.foodTotal : world.foodTotal;
+  // The food the world began with: the plane's piles and the curtain's buried pockets.
+  const foodTotal = world.plane.foodTotal + world.curtain.foodTotal;
   const dt = spec.dt ?? 1 / 30;
   const events = [...(spec.events ?? [])].sort((a, b) => a.at - b.at);
   const probes = [heldProbe(), ...(spec.probes ?? [])];
@@ -149,7 +154,7 @@ export function foodIn(map: WorldMap, wx: number, wy: number, r: number): number
 
 /**
  * Foragers holding food longer than STUCK_AFTER, the most at any 10-s sample from STUCK_AFTER on, per colony
- * (slow/side.test's measure; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
+ * (the side view's slow/side.test measure, now G1's; porters are not counted): `maxHeld`. That measure reads the colony's `since`, which the
  * nest resets every tick, so it misses a carrier that won't put its food down at home; `maxCarrying` counts by the
  * probe's own clock, from pickup to put-down, wherever the ant is (#31's review, ja-1pm). `maxPorting`: porters (food
  * moved between chambers, which both other measures leave out) holding theirs over STUCK_AFTER (review of #36, ja-3po).
@@ -406,9 +411,14 @@ export interface Overrides {
   colony?: ColonyOptions;
   rival?: ColonyOptions;
   game?: Partial<Omit<GameParams, "fight">> & { fight?: Partial<FightParams> };
+  /** parameters for every colony at once (`--set both.sampleTemp=0,1`), under `colony` and `rival` where they set the same one */
+  both?: ColonyOptions;
   /** the player's brains (e.g. Jev's cached answers, replayed); an assay that sets its own policy or stance keeps it */
   policy?: Policy;
-  stance?: StancePolicy;
+  /** the rival's mode policy, the same way (`--policy precache:<doctrine>` gives both colonies the shipped answers) */
+  rivalPolicy?: Policy;
+  /** every colony's steer policy (ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
+  steer?: SteerPolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
 }
@@ -432,15 +442,23 @@ export interface Assay {
 /** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const sides: Sides = { ...spec.sides };
+  if (o.both) {
+    sides.colony = mergeColony(sides.colony, o.both);
+    sides.rival = mergeColony(sides.rival, o.both);
+  }
   if (o.colony) sides.colony = mergeColony(sides.colony, o.colony);
   if (o.rival) sides.rival = mergeColony(sides.rival, o.rival);
   if (o.policy && !sides.policy) sides.policy = o.policy;
-  if (o.stance && !sides.stance) sides.stance = o.stance;
+  if (o.rivalPolicy && !sides.rivalPolicy) sides.rivalPolicy = o.rivalPolicy;
+  const steer = o.steer;
+  const events = steer
+    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
+    : spec.events;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, sides, game };
+  return { ...spec, sides, game, events };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {
@@ -540,3 +558,97 @@ export function gateProbe(): Probe {
 
 /** The mean of a list, NaN for none. */
 export const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+
+/** How near the hole (in steps of the way round) a walked ant counts as arrived and is let go: MARCH_REACH. */
+export const MARCH_REACH = 3;
+
+/**
+ * An experimental device, not a behaviour (owner, review of #184 D2): the harness walks colony `k`'s ants on one world's
+ * plane to colony `to`'s hole, by the open ground's way round, so no colony code marches at coordinates. Every tick each
+ * of them on the plane that has no stranger of colony `to` within its enemy range (+1 cell) is turned toward the cell two
+ * steps on along the way (as R1's walk out); one that has is let go, so the fight is the ants' own. So is one within
+ * MARCH_REACH steps of the hole. Ants in the curtain come up by their own rules. Reported: `marched`, the share of
+ * colony `k`'s ants that reached the hole (within MARCH_REACH steps) at least once. `walks` is [k, to], for tests.
+ */
+export function marchProbe(k: number, to: number): Probe & { walks: readonly [number, number] } {
+  let field: Int32Array | null = null;
+  let w = 0;
+  let h = 0;
+  const arrived = new Set<number>();
+  const build = (game: Game): Int32Array => {
+    const plane = (game.world as OneWorld).plane;
+    w = plane.size.w;
+    h = plane.size.h;
+    const f = new Int32Array(w * h).fill(-1);
+    const nest = game.colonies[to]!.layers[PLANE]!.nest;
+    cellOf(nest.x, nest.y);
+    const queue = [CELL[0] + CELL[1] * w];
+    f[queue[0]!] = 0;
+    for (let q = 0; q < queue.length; q++) {
+      const at = queue[q]!;
+      const x = at % w;
+      const y = (at - x) / w;
+      for (let d = 0; d < 6; d++) {
+        const tx = nx(x, y, d);
+        const ty = ny(y, d);
+        if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+        const t = tx + ty * w;
+        if (f[t] >= 0 || rockAt(plane, tx, ty) !== OPEN) continue;
+        f[t] = f[at]! + 1;
+        queue.push(t);
+      }
+    }
+    return f;
+  };
+  return {
+    walks: [k, to] as const,
+    tick(game) {
+      if (!game.world) throw new Error("marchProbe: one world only");
+      const f = (field ??= build(game));
+      const c = game.colonies[k];
+      const foe = game.colonies[to];
+      if (!c || !foe) return;
+      const reach = c.params.enemyRange + 1;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.layer[i] !== PLANE) continue;
+        const x = c.x[i];
+        const y = c.y[i];
+        cellOf(x, y);
+        let cx = CELL[0];
+        let cy = CELL[1];
+        const here = cx >= 0 && cy >= 0 && cx < w && cy < h ? f[cx + cy * w]! : -1;
+        if (here < 0) continue;
+        if (here <= MARCH_REACH) {
+          arrived.add(i);
+          continue;
+        }
+        let near = false;
+        for (let j = 0; j < foe.n && !near; j++)
+          if (foe.alive[j] && foe.layer[j] === PLANE && Math.hypot(foe.x[j] - x, foe.y[j] - y) <= reach) near = true;
+        if (near) continue;
+        for (let s = 0; s < 2; s++) {
+          let best = f[cx + cy * w]!;
+          let bx = cx;
+          let by = cy;
+          for (let d = 0; d < 6; d++) {
+            const tx = nx(cx, cy, d);
+            const ty = ny(cy, d);
+            if (tx < 0 || ty < 0 || tx >= w || ty >= h) continue;
+            const g = f[tx + ty * w]!;
+            if (g >= 0 && g < best) {
+              best = g;
+              bx = tx;
+              by = ty;
+            }
+          }
+          cx = bx;
+          cy = by;
+        }
+        c.heading[i] = Math.atan2(centreY(cy) - y, centreX(cx, cy) - x);
+      }
+    },
+    summary(game) {
+      return { marched: arrived.size / Math.max(1, game.colonies[k]?.params.antCount ?? 1) };
+    },
+  };
+}

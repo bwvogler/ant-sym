@@ -87,13 +87,28 @@ export interface ColonyParams {
    */
   reroll: number;
   /**
-   * on a top-down map, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
-   * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
-   * is raised instead: foodCapTop.)
+   * How long an ant holds a drawn mode before it draws again: 0, exactly `reroll` seconds; 1, a time drawn from an exponential law
+   * with mean `reroll` (a hazard of dt/reroll a tick: some ants change their mind after a second, others hold for a minute, and
+   * they fall out of step by themselves). Needs `reroll` > 0.
    */
-  foodTrailTop: number;
-  /** on a top-down map, the most food trail a cell holds (behaviour MR 3; the other channels and the side view: MAX_LEVEL 20) */
-  foodCapTop: number;
+  rerollLaw: number;
+  /**
+   * Whether an ant out exploring or following on one world's plane asks the steer policy for its steering weights (
+   * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
+   */
+  steerLane: number;
+  /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
+  findNear: number;
+  /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
+  searchSpan: number;
+  /**
+   * on the plane, the food trail's share of `deposit`: 1. (MR 3 first laid a quarter, to keep the trail under the
+   * field's cap; too weak to reach the level at which explorers follow, it left them wandering: review of #37. The cap
+   * is raised instead: foodCapPlane.)
+   */
+  foodTrailPlane: number;
+  /** on the plane, the most food trail a cell holds (behaviour MR 3; the other channels and the curtain: MAX_LEVEL 20) */
+  foodCapPlane: number;
   /**
    * a food carrier's pull toward the food trail on its way home, top-down (ja-00t): the share of its turning given to the
    * trail where the trail agrees with its home vector, the rest to the vector; 0 = the vector alone (before MR 3)
@@ -122,8 +137,8 @@ export interface ColonyParams {
   /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a homing ant whose vector ran out where no hole was searches in
    * loops out from that spot and back (Wehner & Srinivasan 1981; Müller & Wehner 1994), the first reaching this many σ
-   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × odoSurf; Merkle & Wehner 2010: the
-   * search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
+   * out, σ being its own vector's error per axis at the trip it walked (PI_DRIFT/√2 × piSpan: the odometer, or by the
+   * distance out with piErrorLaw 1; Merkle & Wehner 2010: the search is wider after a longer trip). 0 = U3b's widening four-point spiral, bit for bit: the default (PRD §56: the loops,
    * tuned to 1.5, won S1 but lost G1 and A1 to the spiral with the mound's smell).
    */
   searchLoops: number;
@@ -138,6 +153,18 @@ export interface ColonyParams {
    * loop's next point (1), or starts the next, wider loop (0: U3b's widening on a stall, as loops).
    */
   searchStall: number;
+  /**
+   * One world's plane (ja-lp4.20, docs/nest-search.md "Sizing the search to the vector's error", PRD §79.2): U3b's spiral
+   * (searchLoops 0) sized by the vector's own error, σ = PI_DRIFT/√2 × piSpan (with piErrorLaw 1, PI_SPAN_GAIN ×
+   * √(piErrorAt × distance out)): its first point this many σ out (at least SEARCH_START), each next quarter turn
+   * searchScaleStep/4 σ further (an even spiral, not 1.6× a turn). The search is wider after a longer trip, by the distance
+   * out (Merkle, Knaden & Wehner 2006; Merkle & Wehner 2010), broader with more uncertainty (Vickerstaff & Merkle 2012); the
+   * multiples are design. Not round a stored place (routeEnd): that search is the spiral's. 0 = U3b's spiral, bit for bit;
+   * 1 the default (owner, 2026-11-16, with piErrorLaw 1).
+   */
+  searchScale: number;
+  /** One world's plane, with searchScale: σ a full turn of the spiral adds to its reach (design) */
+  searchScaleStep: number;
   /**
    * One world's plane (ja-lp4.11, docs/nest-search.md): a searching ant (its vector ran out at no hole) on its own mound
    * smells its colony's hydrocarbons there, strongest at the hole (Sturgis, Greene & Gordon 2011), and walks up them to
@@ -164,6 +191,27 @@ export interface ColonyParams {
    * to a remembered spot. 0 = no food odour (the generic ant: main bit for bit).
    */
   foodPlume: number;
+  /**
+   * Aphid odour in the air (ja-nzkg.3, docs/aphids.md finding 1): an outside ant with empty jaws climbs the smell of a living
+   * aphid clump (the builder's) within this many cells of it (aphids.ts, plume.ts). L. niger scouts head toward aphid odour in
+   * olfactometers (Verheggen et al. 2012); no field range was measured, so the range is design. 0 = deaf to it (a species
+   * that takes no honeydew). With no clump on the map it reads nothing: main bit for bit.
+   */
+  aphidPlume: number;
+  /**
+   * Tenders defend (ja-nzkg.4, docs/aphids.md finding 5): an ant touching a living aphid clump (on an aphid cell or beside one) counts
+   * as on home ground for the defend stance, so a threat it senses there makes it stand and fight rather than flee, and it calls no one
+   * from the nest. L. niger caretakers bit an intruder more often than other ants (90 % against 76 %; Gaber et al. 2024); against
+   * rival ants it is design (no study measured colonies fighting over aphids). 0 = no tending defence: main bit for bit.
+   */
+  tendDefend: number;
+  /**
+   * Aphids eaten (ja-nzkg.5, docs/aphids.md finding 6): an ant taking honeydew from a living aphid cell takes one of the aphids
+   * instead with this chance, home as food (quality 1). Ants eat some aphids: with larvae, colonies left 118 against 147 after 7
+   * days (Oliver, Leather & Cook 2012); another study saw none in 10 days (Jossart et al. 2025). The rate is design, and is not
+   * tied to the colony's hunger yet (ja-nzkg.7: no sensed cue for it). 0 = never eaten: main bit for bit.
+   */
+  aphidPrey: number;
   /**
    * Heat (ja-rf5.5, docs/desert-ant.md §4, heat.ts): the length of a day in game seconds, over which the plane's ground heats from heatDawn to
    * heatNoon and back. An ant's body heat moves toward the ground's on the plane and the nest's inside; it senses its own heat (a species' `hot`
@@ -243,13 +291,16 @@ export interface ColonyParams {
    * ja-7r7x (docs/task-reversion.md, PRD §74): the share of old ants that revert to nursing when they meet no young
    * nestmates at home (each by its own draw: individual thresholds). A reverted ant stays in, keeps to the queen and
    * brood as the young do, works inside at the young's threshold and takes no foraging dig; it goes back to foraging
-   * once it meets young again. 0 = off.
+   * once it meets young again. 0 = off; on (1) by default since ja-7r7x.4.
    */
   revert: number;
   /**
    * ja-638i (docs/larval-feeding.md, PRD §75): an ant's crop, in food units. An ant underground that feels some need fills
    * it from a stocked store or reception within reach, passes food mouth to mouth to a needier nestmate, and feeds the
-   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off.
+   * larvae it touches that beg or are still owed their growth food, more for a hungrier one. 0 = off, the default: at 0.1
+   * (with `revert` 1) no worker starved on assay larvae, but one-world A5 brought home less food (12 of 20 seeds worse) and
+   * larvae seed 19 left 47 larvae waiting (PRD §75, review of #236; ja-638i.4). Without reversion 0.1 is worse than off:
+   * larvae seeds 26 and 30 fell to 71 and 65 workers.
    */
   cropFeed: number;
   /**
@@ -291,6 +342,18 @@ export interface ColonyParams {
    */
   routeFight: number;
   /**
+   * One world's plane (ja-lp4.19, docs/nest-search.md "How far the vector is off", PRD §79): how the home vector's error grows.
+   * 0 = with the path walked (the odometer × the trip's drift: linear, and every step but the walk home adds, fighting
+   * too). 1 = with the square root of the distance out (the farthest the ant has been from its hole this trip, straight):
+   * a median miss of PI_MISS_AT × √(piErrorAt × that distance) (Merkle, Knaden & Wehner 2006: 25 % at 5 m, 12 % at 20 m;
+   * Heinze, Narendra & Cheung 2018: uncertainty grows like √distance; Merkle & Wehner 2010: by distance out, not how winding
+   * the path was; the √ itself is design). The same drift draws: the law scales them. Steering, the search's σ and every
+   * belief of home read it. 1 the default (owner, 2026-11-16, with searchScale 1).
+   */
+  piErrorLaw: number;
+  /** piErrorLaw 1: the distance out (cells) at which the median miss is PI_MISS_AT of it: 50 cells stand for 5 m (design: the map keeps ratios, docs/ant-communication.md) */
+  piErrorAt: number;
+  /**
    * Behaviour MR 5.2 (docs/raid-recruitment.md): on a top-down map, raiders are recruited by a trail (1) and not sent at the
    * rival hole's coordinates (0). A scout that meets strangers outside, with nothing in its jaws, goes home laying the
    * `raid` trail; raiders at the nest wait for it (or go as scouts, `scoutRate`), and out, climb it.
@@ -306,12 +369,6 @@ export interface ColonyParams {
    * weak and patchy: the trail recruits and points the way, and the search does the rest (ja-sf1, review of #44)
    */
   raidOnward: number;
-  /**
-   * on a top-down map, each ant's stance is its own, from what it senses (1, docs/stance.md): raid once recruited, defend while
-   * it senses a threat on home ground, else forage; and raid scouts go out on the `leave` answer "raid". 0: the colony's
-   * strategist chooses one stance for every ant, as on the side view
-   */
-  stanceGate: number;
   /** seconds of threat (alarm smelt, strangers in reach; leaking, THREAT_HALF) that make an ant on home ground defend (docs/stance.md) */
   defendAt: number;
   /** how far from its nest an ant is on home ground: by sight of its hole where it sees it, else by its home vector (world units) */
@@ -332,8 +389,7 @@ export interface ColonyParams {
   raidRecruit: number;
   /**
    * the rate per second an ant at home goes out to look for the rival: answering `leave` "raid" (each ant's own stance,
-   * docs/stance.md), or, where the colony's stance is broadcast, on a raid stance with no raid trail under it (a scout: a
-   * spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
+   * docs/stance.md; a scout: a spontaneous rate, like `scoutRate`; the rest carry on foraging until a scout's trail reaches them)
    */
   raidScout: number;
   /**
@@ -404,10 +460,14 @@ export const DEFAULT_COLONY: ColonyParams = {
   planePatience: 1,
   restTime: 30,
   followChoice: 1,
-  sampleTemp: 1,
+  sampleTemp: 0.5,
   reroll: 10,
-  foodTrailTop: 1,
-  foodCapTop: 80,
+  rerollLaw: 0,
+  steerLane: 0,
+  findNear: 8,
+  searchSpan: 1.33,
+  foodTrailPlane: 1,
+  foodCapPlane: 80,
   homeTrail: 0.8,
   homeTrailCone: Math.PI / 2,
   noEntryAvoid: 0,
@@ -419,10 +479,15 @@ export const DEFAULT_COLONY: ColonyParams = {
   searchTurn: GOLDEN_ANGLE,
   searchPetal: Math.PI / 3,
   searchStall: 1,
+  searchScale: 1,
+  searchScaleStep: 0.5,
   moundSmell: 1,
   siteFidelity: 0,
   siteGive: 0,
   foodPlume: 0,
+  aphidPlume: 8,
+  tendDefend: 1,
+  aphidPrey: 0.05,
   heatDay: 0,
   heatDawn: 25,
   heatNoon: 52,
@@ -446,7 +511,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   restFetch: 1,
   forageDig: 0,
   owedBeg: 0,
-  revert: 0,
+  revert: 1,
   cropFeed: 0,
   routeStep: 3,
   routeSee: 3,
@@ -454,11 +519,12 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeJoin: 0,
   routeEnd: 1,
   routeFight: 0,
+  piErrorLaw: 1,
+  piErrorAt: 50,
   raidGate: 1,
   raidLay: 1,
   findAt: 0.3,
   raidOnward: 1,
-  stanceGate: 1,
   defendAt: 1,
   homeGround: 10,
   broodOdour: 0,
@@ -494,6 +560,12 @@ export const NO_ENTRY_DROP = 0.5;
 
 /** "No entry" laid per second at a spent trail's end, as a multiple of the colony's deposit. */
 export const NO_ENTRY_RATE = 4;
+
+/**
+ * How hard a follower shies from "no entry" a child painted (builder.ts), while its colony's own noEntryAvoid is 0: the
+ * value PRD §45 tested (docs/builder.md "Slice 2"; Robinson et al. 2005: 71 % took the unmarked branch).
+ */
+export const NO_ENTRY_PAINTED = 4;
 
 /** Every channel's params: the defaults, with `over` merged in per channel and per field. */
 export function channelParams(over: Partial<Record<Channel, Partial<ChannelParams>>> = {}): Record<Channel, ChannelParams> {

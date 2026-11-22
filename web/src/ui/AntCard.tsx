@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   type Colony,
   MODES,
@@ -12,19 +11,24 @@ import {
   UPGRADES,
   decodeFungal,
   type FungalSituation,
+  decodeSteering,
+  STEER_NEUTRAL,
+  STEER_WEIGHTS,
+  type SteerWeight,
 } from "../colony/index.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
 import { openLearn, type LearnTarget } from "./learn.ts";
 import type { DecidedBy } from "./colonyJev.ts";
+import { useSimTick } from "./session.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
 // that situation under the doctrine, the local rule while Jev has not
 // answered yet, or the local rule. If the fungus is in it, what the fungus
 // runs there and how it bends the ant's senses: the situation shown is the
-// one the ant perceives. Read from the colony's arrays four times a second;
+// one the ant perceives. Read from the colony's arrays about three times a second (useSimTick);
 // the field keeps the camera on the ant.
 
 interface Props {
@@ -50,11 +54,7 @@ const BY: Record<DecidedBy, string> = {
 };
 
 export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields, pinned = false, onPin }: Props) {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setTick((n) => n + 1), 250);
-    return () => clearInterval(t);
-  }, []);
+  useSimTick(250);
   const col = followedColony(colonies, followed);
   const i = followed.i;
   if (!col) return null;
@@ -110,7 +110,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
               type="button"
               className="rounded bg-raised px-1.5 py-0.5 font-mono text-fg-2 hover:text-accent hover:underline"
               onClick={() => openLearn(to)}
-              title={`Codex: ${k}`}
+              title={`${to.tab === "policy" ? "Lab" : "Codex"}: ${k}`}
             >
               {k} {v}
             </button>
@@ -126,6 +126,11 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
           {decided?.weights && decided.weights.length > 1 && col.params.sampleTemp > 0 ? (
             <span className="font-mono text-fg-3" title="Jev's probabilities in this situation: the ant drew its mode from them">
               drawn from {decided.weights.map(([m, p]) => `${m} ${Math.round(p * 100)} %`).join(" · ")}
+            </span>
+          ) : null}
+          {col.params.steerLane > 0 && col.steerCode[i] !== STEER_NEUTRAL && (mode === "explore" || mode === "follow") ? (
+            <span className="font-mono text-fg-3" title="The steering weights its policy gave it: how it weighs each cue out here">
+              steering: {steeringWords(col.steerCode[i])}
             </span>
           ) : null}
           <button
@@ -230,7 +235,7 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
   );
 }
 
-/** The situation's fields, each with where the Learn drawer explains it. */
+/** The situation's fields, each with where it is explained: the Codex's guide, or Lab mode's Policy tab ("mode"). */
 function chips(s: Situation, fields?: readonly string[]): [string, string, LearnTarget][] {
   const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
   // Each chip with the situation field it shows; a species' own schema keeps only its fields (review of #132).
@@ -244,4 +249,22 @@ function chips(s: Situation, fields?: readonly string[]): [string, string, Learn
     ["stance", ["stance", s.stance, { tab: "guide", id: "strangers" }]],
   ];
   return all.filter(([field]) => !fields || fields.includes(field)).map(([, chip]) => chip);
+}
+
+/** What each steering weight's level means, in a few words (ja-ykmu; docs/steering.md). */
+const STEER_WORDS: Record<SteerWeight, [string, string]> = {
+  search: ["searches tight", "ranges wide"],
+  memory: ["ignores its last find", "back to its last find"],
+  trail: ["ignores trails", "holds to trails"],
+  home: ["away from home scent", "near home scent"],
+  vector: ["away from home", "leashed to home"],
+  nestmates: ["spreads out", "gathers"],
+};
+
+/** An ant's non-neutral steering weights, as words. */
+function steeringWords(code: number): string {
+  const s = decodeSteering(code);
+  return STEER_WEIGHTS.filter((w) => s[w] !== 0)
+    .map((w) => STEER_WORDS[w][s[w] < 0 ? 0 : 1])
+    .join(" · ");
 }

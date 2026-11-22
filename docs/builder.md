@@ -86,7 +86,7 @@ The owner decided four things:
 - **Floodplain ants, full text.** Five species built earthen levees 1.5–4 cm high within about 24 h of the first heavy rain. *Ectatomma opaciventre* began repairing breaches within 30 min. Breached colonies recruited more slowly (median 16.8 against 8.0 min) and moved workers from foraging to repair. Source: LeBrun, Moffett & Holway 2011.
 - **Fire ant (*Solenopsis invicta*).** Rain blocks nest exits with soil. Small repairs start during the rain, and large-scale repair finishes within about 12 h. Source: Lu, Hao & Liang 2012. **Unverified**: abstract only.
 
-**In the game:** the dig and dirt brushes change soil to open ground and back, underground and on the mound, with the same `digCell` and `fillCell` the ants use. Dirt never fills a cell that holds an ant or brood: it is placed around them, as the backfill rule's `occupied` check already requires.
+**In the game:** the dig and dirt brushes change soil to open ground and back, underground only (the surface from above has no soil, so the tray hides Dirt there; Rock builds walls on both views), with the same `digCell` and `fillCell` the ants use. Dirt never fills a cell that holds an ant or brood: it is placed around them, as the backfill rule's `occupied` check already requires.
 - This slice adds no repair behaviour. Ants meet filled tunnels and new open space through what they already do: digging at faces, chamber digging and backfill.
 - The colony's response to a cave-in, which the papers above describe as all ages digging until most of the lost area is back, is a later mechanic. Assay B6 reports whether the ants dig back into a filled tunnel today.
 
@@ -104,7 +104,7 @@ The owner decided four things:
 - **Pre-readers follow sound and demonstrations, not symbols.** Children of about 3½ to 5 followed in-app audio and on-screen demonstrations. A button that only changed how it looked did not work as a prompt at any age tested. Abstract symbols, such as a cartoon hand or a progress bar, needed specific design up to age 5. Sources: Hiniker et al. 2015 and 2016. **Unverified**: abstracts only.
 
 **In the game:**
-- **Moving the map with one finger.** A one-finger "move" tool in the tray (a hand) is the main way to move the map. Two-finger pinch and pan still work for an adult. With any tool, tapping places (a stamp, a dish, one cell dug) and dragging paints.
+- **Moving the map with one finger.** A one-finger "move" tool in the tray (a hand) is the main way to move the map. Two-finger pinch and pan work with any tool in hand, and build nothing: a finger (or pen) with a tool waits until it has moved past a click's slop, when the stroke starts from where it landed, or until it lifts as a tap, when it places there. A second finger arriving first makes it a pinch (before this, the first finger had already dropped the brush where it landed). A mouse builds at once. With any tool, tapping places (a stamp, a dish, one cell dug) and dragging paints.
 - **Big tools.** Tray buttons are at least 64 CSS px square (**design**: about 1.5× the 44 px commonly given for adults, since no child figure was found). Their active areas run flush to the screen's bottom edge, with gaps between them.
 - **Forgiving strokes.** A painted stroke is smoothed and has a wide brush, so a wobbly line still makes a trail.
 - **Sound and pictures, not words.** Choosing a tool plays its sound and enlarges its icon. The first time a tool is chosen, a short animated finger shows what it does, with no words. Nothing relies on a glow alone.
@@ -126,7 +126,7 @@ The builder is a set of **player tools that edit the world**. It is not a change
 |---|---|---|---|---|---|
 | Move (hand) | both | the camera | `ui/camera.ts` | — | — |
 | Dig | both | soil or rock → open (the map's own rock too: owner, D1) | `digCell` | digging, backfill and route steering as now | not the world's edge or the curtain's sky |
-| Dirt | below; the mound above | open → soil | `fillCell` | as above | skips cells with an ant or brood, and the hole cell |
+| Dirt | below only (the surface has no soil: there it would be rock, so the tray hides it) | open → soil | `fillCell` | as above | skips cells with an ant or brood, and the hole cell |
 | Rock | both | open → rock | a new `placeRock` beside `fillCell` | trail, vector and route memory get round it (B2) | as dirt; never on a hole |
 | Sugar / crumb | both | food, quality 1.5 / 0.5 | `dropFood` | taste and trail laying by quality (A2b, B4) | open ground only |
 | Trail crayon (one per colony) | both | that colony's `food` channel | `Pheromones.deposit` | antenna sensors, the `foodTrail` field (B1, B5) | at a carrier's mark strength, not the cap |
@@ -220,7 +220,84 @@ Later notes: floods and rafts (real water), cooperative carrying, aphids, labell
   - Zoomed all the way out, one finger's stroke covered hundreds of cells, so the builder now opens zoomed in.
   - B1's first arena, with a pile beyond each line, measured the piles more than the crayon, so it now has no food, as Choe et al.'s line led to none.
 
+## Slice 2: tweezers, the no-entry sign, and what happened (PRD §73.3, `ja-b3us`)
+
+The owner's next step (2026-11-15): tweezers, no-entry paint and "look what happened" notices, as one change.
+
+### A displaced ant runs off its old vector, then searches
+
+- **Desert ants (*Cataglyphis*)** carried from a feeder to unfamiliar ground run off their whole home vector, as if they had not been moved. Where it runs out they search in loops centred there, and find home only if the search reaches it. Source: Wehner & Srinivasan 1981; the searches themselves are in `nest-search.md`. **Unverified** (abstract only).
+- **Near home,** landmarks and the nest's smell correct the vector (`nest-search.md`, `nest-and-home.md` §1).
+
+**In the game:** the tweezers lift one ant off the plane and set it down where a finger lets go, on open ground.
+- The ant's sense of home is not reset. Its belief of where home lies (`believePlane`: the hole plus its own drift) is shifted by exactly the distance it was carried, through two per-ant arrays, `carriedX` and `carriedY`. A carrier then walks to a "home" that is off by that distance, searches there in its loops, and finds home by the search, the mound's smell or the hole in sight, as `nest-search.md` built.
+- Any retrace by route memory is dropped (`routeClear`): the places it stored are not where it now is. An undo puts the ant back but not its places: it has none for the rest of that trip.
+- Nothing about choice changes. The ant decides from what it senses, as before. Only its position and its belief move, the way a real experimenter's forceps move them.
+- **Design:** tweezers work on the plane only, never underground; an ant can't be dropped on rock or in the sky.
+
+### "No entry" turns trail followers away
+
+- **Pharaoh's ants** lay a repellent on unrewarding branches at trail forks. Facing a marked branch, 71 % of foragers took the other one. Source: Robinson, Jackson, Holcombe & Ratnieks 2005, already in `trails.md`. The mark steers trail followers at forks; it is not a barrier to ants that aren't following a trail.
+- **The game** already reads it the same way. A follower's food scent counts for less where "no entry" lies (`steer.ts`, `noEntryAvoid`). It is shipped off (`noEntryAvoid` 0), because the ants' own laying cost assay A2a (PRD §45.4).
+
+**In the game:** the no-entry paint (🚫) lays "no entry" for every colony on the layer painted, kept topped up as a crayon line is (the home trail's half-life).
+- Followers read it with a fixed strength while the colony's own `noEntryAvoid` is 0: `NO_ENTRY_PAINTED`, 4, the value PRD §45 tested. The ants still lay none of their own. So a game with no paint is bit for bit as before, since the field is never awake.
+- Wanderers ignore it, as real ants do (owner, 2026-11-15: "Real-ant stop sign").
+
+### What happened: notices from the game itself
+
+**In the game:** the builder watches what the ants do with a child's build, and says it in the bell's log (`Builder.watch`, read once a second by the page). The notices:
+- An ant found your sugar (or crumbs).
+- Your sugar is all gone: the ants carried it home.
+- Ants are following your crayon line (three or more on it at once).
+- The ant you moved found its way home, after N seconds.
+- The ant you moved didn't make it home (it died).
+
+This is design: no paper. It reads the game, never steers it.
+
+### The mechanic, slice 2
+
+| Tool | View | What it changes | The ants respond by | Guard |
+|---|---|---|---|---|
+| Tweezers 🤏 | above | one ant's position, and its belief of home shifted by the same | walking its old vector, searching, finding home (`nest-search.md`) | open ground only; the plane only |
+| No entry 🚫 | both | every colony's `noEntry` along the stroke, topped up as it fades | followers discount food scent there (`NO_ENTRY_PAINTED`) | none needed |
+
+**Assays** (`builderAssays.ts`):
+
+| Id | Question | Target |
+|---|---|---|
+| B7 `noEntryFork` | A crayon fork with no entry painted near the start of one branch: which branch do ants on the fork take? | ≥ 70 % on the unpainted branch, in ≥ 8 of 10 seeds (Robinson et al. 2005: 71 %); the fork with no paint about even. |
+| B8 `tweezers` | Carriers carried 30–60 cells sideways: do they run their old vector before finding home? | Report: the share that come within 6 cells of where home would be before they reach home, and the share home in 300 s (Wehner & Srinivasan 1981). |
+
+**Cost:** no lane, field, legend or question changes. `noEntry` is already sensed, so Jev cost is unchanged.
+
+### Play, slice 2
+
+- **See:** an ant lifted and set down far off walks away from home, loops, and comes back, and the bell says so with its time. Ants on a crayon fork take the branch without the stop sign. A pop-up when an ant finds the sugar.
+- **Choose:** the child's own experiments: move the same ant twice, paint the sign on one branch then the other.
+- **Risks:**
+  - A moved ant lost for good, dropped far from home. The search finds home in most cases (S1: ≥ 99 % within 600 s). The notice says "didn't make it" only if it dies.
+  - Notices spam. Each kind is said once per build: once per sugar stroke, once per crayon line, once per moved ant.
+
+### Open, slice 2
+
+- How strong the painted sign is (`NO_ENTRY_PAINTED` 4) was to be tuned on B7, but it needed no tuning. B7 passes 9/10 on seeds 1–10 and 10/10 on 11–20 (PRD §73.3).
+
+### Aphids (PRD §78, [aphids.md](aphids.md))
+
+A clump of aphids (🐛) the ants find by smell, milk for honeydew, defend where they stand, and now and then eat; it grows, then fades. Its research and its numbers are in its own note. Aphids live on the surface: the tray offers them from above only (underground they could not be placed; the real root-aphid ants are *L. flavus*, not this ant, aphids.md).
+
+### What slice 2 built (PRD §73.3)
+
+- **The way home, drawn** (ja-cwjp): a moved ant's walk is traced on the top view from where it was set down, the run of its old vector solid and its search loops dotted, so a child sees the experiment happen. It fades once the ant is home or dead.
+
+- **B7:** with the sign on one branch of a crayon fork, a median 75 % of the ants on the fork took the other branch, against 49 % with no sign. Robinson et al. found 71 %.
+- **B8:** of carriers moved 30–60 sideways, 92 % walked to where home would be by their old vector before finding home. All were home within 300 s (median 36.5 s), as Wehner & Srinivasan's displaced ants were. Before the review of #229 dropped their stored route, most walked back by it instead, and got home in 20 s.
+
 ## Sources
+
+- Robinson EJH, Jackson DE, Holcombe M, Ratnieks FLW (2005). 'No entry' signal in ant foraging. *Nature* 438:442. [doi:10.1038/438442a](https://doi.org/10.1038/438442a) (via `trails.md`)
+- Wehner R, Srinivasan MV (1981). Searching behaviour of desert ants, genus *Cataglyphis*. *J Comp Physiol* 142:315–338. [doi:10.1007/BF00605445](https://link.springer.com/article/10.1007/BF00605445) (abstract only)
 
 - Choe D-H, Villafuerte DB, Tsutsui ND (2012). Trail pheromone of the Argentine ant, *Linepithema humile* (Mayr) (Hymenoptera: Formicidae). *PLoS ONE* 7:e45016. [PMC3447822](https://pmc.ncbi.nlm.nih.gov/articles/PMC3447822/)
 - Butterfield T, Bacon J, Hill EM (2025). Identification of trail following and alarm pheromones of *Lasius flavus*. *J Chem Ecol* 51:99. [doi:10.1007/s10886-025-01651-w](https://doi.org/10.1007/s10886-025-01651-w)

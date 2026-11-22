@@ -1,20 +1,8 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { legendOf } from "./schema.ts";
-import { weigh } from "./weighted.ts";
-import {
-  type LaneWords,
-  MODES,
-  SITUATION_SCHEMA,
-  STANCES,
-  STANCE_SCHEMA,
-  type Mode,
-  type Situation,
-  type SpeciesSituation,
-  modeSchema,
-  type Stance,
-  type StanceSituation,
-} from "./vocab.ts";
+import { type AntDraw, pickFor, weigh, weightedValid } from "./weighted.ts";
+import { type LaneWords, MODES, SITUATION_SCHEMA, type Mode, type Situation, type SpeciesSituation, modeSchema } from "./vocab.ts";
 import {
   CARRY,
   type Carry,
@@ -33,15 +21,15 @@ import {
   type TrailKind,
 } from "./responses.ts";
 
-// The colony's Jev brain, pure. Two choices go to Jev, both as packed
-// requests with one question per *situation* (never per ant or per tick):
-//   mode   — what an ant in this situation should do (explore, follow,
-//            return, fight); SITUATIONS of them
-//   stance — what the colony as a whole should do (forage, defend, raid),
-//            from a coarse view of itself, asked by the strategist
+// The colony's Jev brain, pure. The choice that goes to Jev is a packed
+// request with one question per *situation* (never per ant or per tick):
+//   mode — what an ant in this situation should do (explore, follow,
+//          return, fight); SITUATIONS of them
+// (Each ant's stance is its own, from what it senses: nobody chooses one for
+// the colony, so there is no stance lane.)
 // The colony's doctrine — the player's words for how the colony should
 // behave — rides in the shared state, so a new doctrine is a new question
-// and cached answers are kept per doctrine (`policyContext`, `stanceContext`).
+// and cached answers are kept per doctrine (`policyContext`).
 // The ant's small responses (responses.ts: get, carry, drop, trail) each have
 // a lane too: one question per response situation (`Touch`), under the same
 // doctrine (`packResponseRequest`, `responseContext`). They are not asked by
@@ -49,8 +37,6 @@ import {
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
 export const COLONY_BRAIN_VERSION = 7;
-/** The strategist's: its view didn't change with the nest (slice 3), so its cached stances keep (it shared the ants' version before). */
-export const STANCE_BRAIN_VERSION = 4;
 
 export const COLONY_LEGEND = legendOf(SITUATION_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony. ",
@@ -80,25 +66,6 @@ export const COLONY_LEGEND = legendOf(SITUATION_SCHEMA, {
     ],
   ],
   outro: "doctrine is how the colony wants its ants to behave: follow it.",
-});
-
-export const STRATEGY_LEGEND = legendOf(STANCE_SCHEMA, {
-  intro: "`colony` describes an ant colony at war with a rival colony over the same food. ",
-  fields: [
-    [
-      "stance",
-      "stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ",
-    ],
-    ["ants", "ants is how many ants it has against how many it can feed: few, some or many. "],
-    ["losses", "losses is how many ants it lost lately: none, some or heavy. "],
-    ["enemyNearNest", "enemyNearNest says whether rival ants are close to home. "],
-    [
-      "intake",
-      "intake is how much food its foragers have brought home lately for its size: none, some or plenty (the colony never knows how much food is left out there, only how fast it comes in). ",
-    ],
-    ["larder", "larder is food stored at home beyond what new ants need: low or full. "],
-  ],
-  outro: "doctrine is how the colony wants to behave: follow it.",
 });
 
 export interface Doctrine {
@@ -132,15 +99,8 @@ export const MODE_CRITERIA: Record<Mode, string> = {
   fight: "fight: go for enemy ants, follow alarm scent to a fight, or raid the rival nest",
 };
 
-export const STANCE_CRITERIA: Record<Stance, string> = {
-  forage: "forage: gather food, fight only what comes close",
-  defend: "defend: fighters stay near home and answer alarm",
-  raid: "raid: send spare ants to fight at the rival's nest",
-};
-
-/** The generic ant's words for the mode lane and the strategist's lane: what a species that names none asks under (species.ts). */
+/** The generic ant's words for the mode lane: what a species that names none asks under (species.ts). */
 export const MODE_WORDS: LaneWords<Mode> = { legend: COLONY_LEGEND, criteria: MODE_CRITERIA, version: COLONY_BRAIN_VERSION };
-export const STANCE_WORDS: LaneWords<Stance> = { legend: STRATEGY_LEGEND, criteria: STANCE_CRITERIA, version: STANCE_BRAIN_VERSION };
 
 /** The cache key for an ant's situation. */
 export function situationKey(s: Situation): string {
@@ -188,54 +148,16 @@ export function readMode(answers: Record<string, JevAnswer>, id: string, allowed
   return ok.includes(a.choice) ? weigh(a.choice, a.probabilities, ok) : null;
 }
 
-/** The cache key for the strategist's view. */
-export function stanceKey(s: StanceSituation): string {
-  return STANCE_SCHEMA.key(s);
-}
-
-export function stanceQuestion(id: string, criteria: LaneWords<Stance>["criteria"] = STANCE_CRITERIA): JevRequest["questions"] {
-  return {
-    [`${id}_stance`]: {
-      type: "choice",
-      instructions: `Going by the doctrine, what should colony \`${id}\` do now?`,
-      criteria: criteria as Record<string, string>,
-    },
-  };
-}
-
-/** One request for many strategist views (normally one or two). */
-export function packStanceRequest(
-  items: { id: string; situation: StanceSituation }[],
-  doctrine: string,
-  words: LaneWords<Stance> = STANCE_WORDS,
-): JevRequest {
-  const colony: Record<string, StanceSituation> = {};
-  const questions: JevRequest["questions"] = {};
-  for (const it of items) {
-    colony[it.id] = { ...it.situation };
-    Object.assign(questions, stanceQuestion(it.id, words.criteria));
-  }
-  return { state: { legend: words.legend, doctrine, colony }, questions };
-}
-
-export function readStance(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = STANCES): Stance | null {
-  const a = answers[`${id}_stance`];
-  if (!a || a.type !== "choice") return null;
-  return allowed.includes(a.choice) && (STANCES as readonly string[]).includes(a.choice) ? (a.choice as Stance) : null;
-}
-
 /** What a cached mode was asked under: a different doctrine, legend or question wording is a different cache. */
 export function policyContext(doctrine: string, words: LaneWords<Mode> = MODE_WORDS): string {
   return `colony-v${words.version}-${hash(words.legend + JSON.stringify(modeQuestion("s0", words.criteria)) + doctrine.trim())}`;
 }
 
-/** The same for cached stances. */
-export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANCE_WORDS): string {
-  return `stance-v${words.version}-${hash(words.legend + JSON.stringify(stanceQuestion("c0", words.criteria)) + doctrine.trim())}`;
-}
-
-/** Bump when the response situation (Touch), its legend or a response question changes: old cached responses no longer apply. */
-export const RESPONSE_BRAIN_VERSION = 11;
+/**
+ * Bump when the response situation (Touch), its legend, a response question or how an answer is kept changes: old cached
+ * responses no longer apply. 12: kept with Jev's probabilities (readResponse, ja-m7rr), where 11 kept a boolean or a bare choice.
+ */
+export const RESPONSE_BRAIN_VERSION = 12;
 
 // Each passage opens with its own field's name (legendOf's rule), so a sentence that leads into the next field rides at the end of the passage
 // before it: "The colony finds food…" in quality's, "A raider's cue is a raid trail: " in crowd's. The bytes are pinned (touchSchema.test.ts).
@@ -396,31 +318,55 @@ export function responseContext(hook: ResponseHook, doctrine: string): string {
  * Every lane's cache context under one doctrine: what a saved cache of Jev's answers was asked under (legend,
  * question wording, version, doctrine). A replay refuses a cache whose contexts differ from the code's.
  */
-export function cacheContexts(doctrine: string): Record<"mode" | "stance" | ResponseHook, string> {
+export function cacheContexts(doctrine: string): Record<"mode" | ResponseHook, string> {
   return {
     mode: policyContext(doctrine),
-    stance: stanceContext(doctrine),
     ...(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, responseContext(h, doctrine)])) as Record<ResponseHook, string>),
   };
 }
 
 /** What a response hook answers: the same type as the hook in responses.ts. */
 export type ResponseAnswer = boolean | Carry | TrailKind | Contact | Leave;
-const TRAILS_LAID: readonly string[] = ["food", "home", "none"];
+
+/** The answers each response hook's question allows; `get` and `drop` are nouls, kept as "true" and "false". */
+export const RESPONSE_OPTIONS: Record<ResponseHook, readonly string[]> = {
+  get: ["true", "false"],
+  drop: ["true", "false"],
+  carry: CARRY,
+  contact: CONTACT,
+  leave: LEAVE,
+  trail: ["food", "home", "none"],
+};
 
 /**
- * A response from a reply, or null when it is missing or not one of the hook's answers (the local response covers
- * it). `get` and `drop` are nouls: yes strictly above ½, so exactly 0.5 is no.
+ * A response from a reply as the caches keep it, or null when it is missing or not one of the hook's answers (the local
+ * response covers it). Kept with Jev's probabilities (weighted.ts, ja-m7rr), as the mode is: a choice as `weigh` keeps it
+ * (`fight=0.62,flee=0.38`); a noul (`get`, `drop`) is itself the probability of yes, kept as `true=0.9,false=0.1` with the
+ * likelier first (exactly ½ is no, as before), or `true=1` when certain.
  */
-export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): ResponseAnswer | null {
+export function readResponse(hook: ResponseHook, answers: Record<string, JevAnswer>, id: string): string | null {
   const a = answers[`${id}_${hook}`];
   if (!a) return null;
-  if (hook === "get" || hook === "drop") return a.type === "noul" && Number.isFinite(a.noul) ? a.noul > 0.5 : null;
+  if (hook === "get" || hook === "drop") {
+    if (a.type !== "noul" || !Number.isFinite(a.noul) || a.noul < 0 || a.noul > 1) return null;
+    return weigh(String(a.noul > 0.5), { true: a.noul, false: 1 - a.noul }, RESPONSE_OPTIONS[hook]);
+  }
   if (a.type !== "choice") return null;
-  if (hook === "carry") return (CARRY as readonly string[]).includes(a.choice) ? (a.choice as Carry) : null;
-  if (hook === "contact") return (CONTACT as readonly string[]).includes(a.choice) ? (a.choice as Contact) : null;
-  if (hook === "leave") return (LEAVE as readonly string[]).includes(a.choice) ? (a.choice as Leave) : null;
-  return TRAILS_LAID.includes(a.choice) ? (a.choice as TrailKind) : null;
+  return RESPONSE_OPTIONS[hook].includes(a.choice) ? weigh(a.choice, a.probabilities, RESPONSE_OPTIONS[hook]) : null;
+}
+
+/** Whether a kept answer is one a hook's question could have given (every option one it allows). */
+export function validResponse(hook: ResponseHook, answer: string): boolean {
+  return weightedValid(answer, (c) => RESPONSE_OPTIONS[hook].includes(c));
+}
+
+/**
+ * The response a kept answer gives an ant: drawn with its `draw` under this hook and situation `key` (weighted.ts pickFor), or
+ * with no draw Jev's own answer; `get` and `drop` as booleans.
+ */
+export function responseOf(hook: ResponseHook, key: string, answer: string, draw?: AntDraw): ResponseAnswer {
+  const a = pickFor(answer, draw, `${hook}|${key}`);
+  return hook === "get" || hook === "drop" ? a === "true" : (a as ResponseAnswer);
 }
 
 /**
@@ -434,12 +380,13 @@ const CONTACT_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "alarm", "odds"]);
 const RAIDER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "raid"]);
 const FORAGER_KEY = touchSchemaOf([...TOUCH_KEY_FIELDS, "returns", "crowd"]);
 
-/** Cached response answers per hook, keyed by responseKey: what scripts/colony-live.mjs saves and the experiments replay. */
-export type ResponseCache = Partial<Record<ResponseHook, Record<string, ResponseAnswer>>>;
+/** Cached response answers per hook, keyed by responseKey (readResponse's form): what scripts/colony-live.mjs saves and the experiments replay. */
+export type ResponseCache = Partial<Record<ResponseHook, Record<string, string>>>;
 
 /**
- * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. `onLookup`, if
- * given, hears every lookup (hook, and whether the cache had it): the replay's hit rate.
+ * Responses that answer from a cache, and from `base` for any situation (or hook) the cache lacks. An answer with Jev's
+ * probabilities is drawn from with the ant's draw (responseOf). `onLookup`, if given, hears every lookup (hook, and whether
+ * the cache had it): the replay's hit rate.
  */
 export function responsesFromAnswers(
   cache: ResponseCache,
@@ -450,11 +397,12 @@ export function responsesFromAnswers(
   for (const hook of RESPONSE_HOOKS) {
     const table = cache[hook];
     if (!table) continue;
-    const local = base[hook] as (t: Touch) => ResponseAnswer;
-    (over as Record<ResponseHook, (t: Touch) => ResponseAnswer>)[hook] = (t) => {
-      const a = table[responseKey(hook, t)];
+    const local = base[hook] as (t: Touch, draw?: AntDraw) => ResponseAnswer;
+    (over as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
+      const key = responseKey(hook, t);
+      const a = table[key];
       onLookup?.(hook, a !== undefined);
-      return a ?? local(t);
+      return a === undefined ? local(t, draw) : responseOf(hook, key, a, draw);
     };
   }
   return responses({ ...base, ...over });

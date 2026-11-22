@@ -1,0 +1,49 @@
+{
+  "frame": 256,
+  "stride": 258,
+  "cols": 5,
+  "names": [
+    "ground-open",
+    "ground-soil",
+    "ground-rock",
+    "worker-0",
+    "worker-1",
+    "worker-2",
+    "worker-3",
+    "worker-4",
+    "worker-5",
+    "worker-6",
+    "worker-7",
+    "worker-8",
+    "worker-9",
+    "worker-10",
+    "worker-11",
+    "food-plain",
+    "food-sweet",
+    "food-crumb",
+    "aphid-0",
+    "aphid-1",
+    "aphid-2",
+    "aphid-3"
+  ],
+  "anchor": [
+    128.00001525878906,
+    137.79380798339844
+  ],
+  "basis": [
+    [
+      161.90858459472656,
+      30.907196044921875
+    ],
+    [
+      -53.96954345703125,
+      92.7215518951416
+    ],
+    [
+      0.0,
+      -139.90916442871094
+    ]
+  ],
+  "worldFrame": 1.5,
+  "note": "basis vectors: map x, map y (Blender -Y), vertical z; fixed orthographic camera"
+}

@@ -4,15 +4,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Game } from "../../game.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
-import { ticks } from "../builders.ts";
+import { mulberry32 } from "../../world.ts";
+import { smallOne, ticks } from "../builders.ts";
 
 // The policy API on the sim (docs/refactor.md S4.4, ja-fnd.5.4): a lane's policy is bound to a colony or the fungus through `bindPolicy`, not assigned
 // to a field, so a species' local rule, Jev's cached answers and a test's stub all arrive the same way.
 
-const game = () => new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 20, rivalAnts: 20 }, mulberry32(3));
+const game = () => new Game(smallOne(1), { antCount: 20, rivalAnts: 20 }, mulberry32(3));
 
-test("a colony's mode and stance policies are bound through bindPolicy and are what the tick asks", () => {
+test("a colony's mode policy is bound through bindPolicy and are what the tick asks", () => {
   const g = game();
   const c = g.player;
   let asked = 0;
@@ -21,9 +21,6 @@ test("a colony's mode and stance policies are bound through bindPolicy and are w
   assert.equal(c.policy, mode);
   ticks(g, 30);
   assert.ok(asked > 0, "the colony's ants asked the bound mode policy");
-  const stance = () => "defend" as const;
-  c.bindPolicy("stance", stance);
-  assert.equal(c.stancePolicy, stance);
   assert.notEqual(g.rival!.policy, mode, "the other colony keeps its own");
 });
 
@@ -45,7 +42,7 @@ test("no code outside the colony assigns a policy field: the page, the server an
   // An assignment to the field by dot or bracket (plain, `||=`, `??=`, `&&=`, with a line break before the `=`) or `Object.assign(x, { policy })`: read as
   // the whole file, not line by line. `readonly` stops the dotted forms in checked code; the scripts that are not type-checked (scripts/lab, e2e) and
   // Object.assign are what this test is for.
-  const NAME = "(?:policy|stancePolicy|growthPolicy)";
+  const NAME = "(?:policy|growthPolicy)";
   const ASSIGN = new RegExp(
     `(?:\\.|\\[["'])\\s*${NAME}["']?\\]?\\s*(?:\\|\\||\\?\\?|&&)?=(?![=>])|Object\\.assign\\([^)]*\\b${NAME}\\b`,
     "g",
@@ -71,14 +68,14 @@ test("no code outside the colony assigns a policy field: the page, the server an
 });
 
 test("the scan sees every way to assign a policy field", () => {
-  const NAME = "(?:policy|stancePolicy|growthPolicy)";
+  const NAME = "(?:policy|growthPolicy)";
   const ASSIGN = new RegExp(
     `(?:\\.|\\[["'])\\s*${NAME}["']?\\]?\\s*(?:\\|\\||\\?\\?|&&)?=(?![=>])|Object\\.assign\\([^)]*\\b${NAME}\\b`,
     "g",
   );
   for (const bad of [
     "x.policy = f;",
-    "x.stancePolicy ||= f;",
+    "x.growthPolicy ||= f;",
     "x.policy ??= f",
     'x["policy"] = f',
     "x['growthPolicy'] = f",

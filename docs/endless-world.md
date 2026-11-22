@@ -14,7 +14,7 @@
 
 ## 1. Where we are
 
-One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/world.ts`), plus one curtain under one line, which grows only from its ends (`colony/transect.ts`, `canFound` rule 1). The storage was built to grow: 64 × 64 chunks with signed coordinates (`colony/chunks.ts`, PRD §12, "the hook for the endless map"). Some of generation is already pure, and some is whole-map.
+One world is a bounded plane, 512 × 368 cells (`PLANE_WORLD.size`, `colony/world.ts`), plus one curtain under one line, which grows only from its ends (`colony/transect.ts`, `canFound` rule 1). The storage was built to grow: 64 × 64 chunks with signed coordinates (`colony/chunks.ts`, PRD §12, "the hook for the endless map"). Some of generation is already pure, and some is whole-map.
 
 **Already a pure function of position:**
 - Plane rock: `heightAt`, `chamberAt` and `chunkRock(seed, cx, cy, …)` (`world.ts:269`), which builds one chunk alone. Today it is only called for every chunk at once.
@@ -40,7 +40,7 @@ One world is a bounded plane, 512 × 368 cells (`DEFAULT_WORLD.size`, `colony/wo
 - ~~The chunk table is a dense bounding box (`chunks.ts`, `#cover`): two busy spots far apart allocate every slot between them, and `forEach`, saves and the golden hash walk all of them.~~ Done in E1.2: regions of 16 × 16 chunks (PRD §66).
 - A save writes every allocated chunk of every layer, rock included, though the plane's rock never changes.
 
-**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). ~~`cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.~~ E1.3: one `cellKey` (`hex.ts`) for every packed cell, ±2,097,152 on both axes.
+**Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning/homing.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). ~~`cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.~~ E1.3: one `cellKey` (`hex.ts`) for every packed cell, ±2,097,152 on both axes.
 
 **Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
 

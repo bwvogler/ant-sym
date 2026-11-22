@@ -38,9 +38,6 @@ export const COLONY_STATE = [
   "goalX",
   "goalY",
   "holeX",
-  "storedSeen",
-  "returning",
-  "returned",
   "holeIn",
   "holeSeen",
   "s",
@@ -55,6 +52,7 @@ export const COLONY_STATE = [
 export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
   "plumeTurn", // smellsFood's answer, read in the same tick
+  "aphidOdour", // the game's, wired in and rebuilt from its saved clumps (aphids.ts)
   "policyDrew", // set and read within one ask (policyDraw)
   "policyDraw", // code: the draw handed to the mode policy
   "rng",
@@ -66,7 +64,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "line",
   "holeCells",
   "policy",
-  "stancePolicy",
+  "steerPolicy",
   "responses",
   "onBury",
   "onDie",

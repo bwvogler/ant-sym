@@ -3,7 +3,7 @@
 import type { Colony } from "./colony.ts";
 import { NO_CELL } from "./grid.ts";
 import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
-import { outDistAt } from "./homing.ts";
+import { outDistAt, piSpan } from "./homing.ts";
 import { LOOP_AT } from "./params.ts";
 import { EDGE, MILL_WAYS, M_LINE_WIDTH, PI_DRIFT, SEARCH_GROW_2D, SEARCH_START, WAIT_STEPS } from "./tuning.ts";
 import { OPEN, isSky, rockAt } from "./world.ts";
@@ -26,31 +26,31 @@ export function onMLine(c: Colony, i: number, x: number, y: number, width = M_LI
 
 /**
  * One world's plane (ja-lp4.15): ant i has picked up food where it stands. It keeps where it believes that is, relative to its
- * hole: where it stands less where its vector says the hole is (the hole plus odoSurf × (driftSurf, driftSurfY): its home
+ * hole: where it stands less where its vector says the hole is (the hole plus piSpan × (driftSurf, driftSurfY): its home
  * vector, negated). Only its own odometer and drift; no coordinate of the food or the hole's true place. With the plane bound.
  */
 export function rememberSite(c: Colony, i: number): void {
-  const odo = c.odoSurf[i];
-  c.foodX[i] = c.x[i] - (c.nest.x + odo * c.driftSurf[i]);
-  c.foodY[i] = c.y[i] - (c.nest.y + odo * c.driftSurfY[i]);
+  const odo = piSpan(c, i);
+  c.foodX[i] = c.x[i] - (c.nest.x + odo * c.driftSurf[i] + c.carriedX[i]);
+  c.foodY[i] = c.y[i] - (c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i]);
 }
 
 /**
  * One world's plane (ja-lp4.15): the heading an exploring ant i with a remembered spot (foodX, foodY) steers on. Where it
- * believes the spot is: its vector's own hole (the hole plus odoSurf × drift, as believePlane) plus the remembered offset,
+ * believes the spot is: its vector's own hole (the hole plus piSpan × drift, as believePlane) plus the remembered offset,
  * walked straight; within LOOP_AT of it, it searches round it, U3b's spiral (a point a quarter turn on and SEARCH_GROW_2D
  * further out each time one is reached; the first heads the way it faces). Its search state is the homing ant's
  * (search, searchA), zeroed when it turns for home (homeAfresh) or finds food. Never past the plane's edges.
  */
 export function siteAim(c: Colony, i: number): number {
-  const odo = c.odoSurf[i];
+  const odo = piSpan(c, i);
   const x = c.x[i];
   const y = c.y[i];
   const lx = c.map.x0 + EDGE;
   const hx = c.map.x0 + c.map.size.w - EDGE;
   const hy = c.map.size.h * R - EDGE;
-  const tx = Math.max(lx, Math.min(hx, c.nest.x + odo * c.driftSurf[i] + c.foodX[i]));
-  const ty = Math.max(EDGE, Math.min(hy, c.nest.y + odo * c.driftSurfY[i] + c.foodY[i]));
+  const tx = Math.max(lx, Math.min(hx, c.nest.x + odo * c.driftSurf[i] + c.carriedX[i] + c.foodX[i]));
+  const ty = Math.max(EDGE, Math.min(hy, c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i] + c.foodY[i]));
   let s = c.search[i];
   if (s === 0) {
     if (Math.hypot(tx - x, ty - y) >= LOOP_AT) return Math.atan2(ty - y, tx - x);
@@ -66,7 +66,10 @@ export function siteAim(c: Colony, i: number): number {
     const { w, h } = c.map.size;
     s = c.search[i] = Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
     // Widened past what its vector's error covers (a quarter turn each point, so it has been all round at the last): the spot is spent.
-    if (c.params.siteGive > 0 && s > c.params.siteGive * PI_DRIFT * Math.hypot(c.foodX[i], c.foodY[i])) {
+    // With steering weights on (ja-ykmu.3) the memory weight gives a spent spot up as siteGive 1 does: without it, the weight
+    // cost ~14 % of the food against a placebo over seeds 1-20, with it ~4 % (PRD §82).
+    const give = c.params.siteGive > 0 ? c.params.siteGive : c.params.steerLane > 0 ? 1 : 0;
+    if (give > 0 && s > give * PI_DRIFT * Math.hypot(c.foodX[i], c.foodY[i])) {
       c.foodX[i] = c.foodY[i] = NaN;
       c.search[i] = 0;
       c.searchA[i] = 0;
@@ -143,4 +146,16 @@ export function pointDown(c: Colony, i: number, x0: number, y0: number, h: numbe
   }
   c.cellAtX[i] = NaN; // its cell is worked out afresh
   return h;
+}
+
+/**
+ * One world's plane (ja-ykmu.3): whether ant i is within params.findNear of where it believes its last find is (its own
+ * vector and the remembered offset, as siteAim reads them; no true coordinate). False with no find remembered.
+ */
+export function nearFind(c: Colony, i: number): boolean {
+  if (Number.isNaN(c.foodX[i])) return false;
+  const odo = c.odoSurf[i];
+  const tx = c.nest.x + odo * c.driftSurf[i] + c.foodX[i];
+  const ty = c.nest.y + odo * c.driftSurfY[i] + c.foodY[i];
+  return Math.hypot(tx - c.x[i], ty - c.y[i]) < c.params.findNear;
 }

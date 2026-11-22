@@ -1,26 +1,26 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ChunkLayer } from "../chunks.ts";
 import { PLANE } from "../colony.ts";
-import { MUTATION } from "../evolution.ts";
+import { MUTATION, pathTo } from "../evolution.ts";
 import { STRAINS } from "../fungus.ts";
 import { Game, GAME_REGROW, gameRng } from "../game.ts";
 import { generateOneWorld } from "../oneWorld.ts";
-import { generateSideWorld, generateWorld, mulberry32, OPEN_WORLD } from "../world.ts";
+import { mulberry32 } from "../world.ts";
 
-// Golden masters, shared by tests/golden/golden.test.ts (fast) and tests/slow/golden.test.ts: seeded
-// games recorded on main before the behaviour MRs (response hooks), checked every 10 s for the
-// colonies' counts and bit-exact hashes of every ant, each colony's pheromone fields and the map's food. A refactor that should not change behaviour
+// Golden masters, shared by tests/golden/*.test.ts (fast) and tests/slow/golden.test.ts: seeded one-world games (the
+// top-down and side-view scenarios moved onto one world in S2.3a, ja-fnd.3.3.1), checked every 10 s for the colonies'
+// counts and bit-exact hashes of every ant, each colony's pheromone fields and food on both layers. A refactor that should not change behaviour
 // must keep them. A change meant to alter behaviour re-records them (GOLDEN_WRITE=1), says so in
 // its PR, and re-runs the assays (npm run exp).
 
 export interface Scenario {
   name: string;
-  /** "one": one world (docs/one-world.md), its plane 160 × 100, recorded by its own branch of `record` */
-  view: "side" | "top" | "one";
+  /** the full-size world played as the page plays it (regrowth, no auto-founding, hyphae, the page's random stream: `gameRng`); otherwise a small plane of 160 × 100 on Game's defaults */
+  full?: boolean;
   seed: number;
   ants: number;
   seconds: number;
-  /** alarm painted by the player's fungus brush at these times (s): at the player's entrance in the side view (where its ants pass), at the map's centre top-down, on the plane at nest 0's hole in one world */
+  /** alarm painted by the player's fungus brush at these times (s), on the plane at nest 0's hole */
   alarmAt?: number[];
   /**
    * One world only: the fungus landed at colony 0's hole, as the page's game plays it (full-size world, rival, regrowth, evolving,
@@ -32,7 +32,7 @@ export interface Scenario {
 
 /** scripts/lab/progression.mjs's default buy order (the order a player who buys as soon as they can might keep). */
 const UPGRADE_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth".split(
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth".split(
     ",",
   );
 
@@ -64,12 +64,6 @@ function chunked(layer: ChunkLayer<Float32Array>): ArrayBufferView[] {
   return chunks.flatMap(([cx, cy, a]) => [new Int32Array([cx, cy]), a]);
 }
 
-export type Sample = {
-  t: number;
-  food: string;
-  colonies: { stored: number; births: number; losses: number; decisions: number; population: number; ants: string; fields: string }[];
-};
-
 /** One world's sample: per layer ([plane, curtain]) the food and each colony's fields, each ant's layer in its hash, and the crossings. */
 export type OneSample = {
   t: number;
@@ -91,44 +85,16 @@ export type OneSample = {
 
 const DT = 1 / 30;
 
-/** Run a scenario the way the page builds its game, and sample it every 10 s. */
-export function record(s: Scenario): Sample[] | OneSample[] {
-  if (s.view === "one") return recordOne(s);
-  const map = s.view === "side" ? generateSideWorld(s.seed) : generateWorld(s.seed, { ...OPEN_WORLD, size: { w: 160, h: 100 } });
-  const game = new Game(map, { antCount: s.ants, rivalAnts: s.ants }, mulberry32(s.seed * 7919));
-  const out: Sample[] = [];
-  const alarms = (s.alarmAt ?? []).map((t) => Math.round(t / DT));
-  const spot = map.nests[0]?.entrance ?? { x: map.size.w / 2, y: map.size.h / 2 };
-  const every = Math.round(10 / DT);
-  for (let k = 1; k <= Math.round(s.seconds / DT); k++) {
-    if (alarms.includes(k)) game.player.paint("alarm", spot.x, spot.y, 4, 12);
-    game.tick(DT);
-    if (k % every === 0)
-      out.push({
-        t: Math.round(k * DT),
-        food: fnv(chunked(map.food)),
-        colonies: game.colonies.map((c) => ({
-          stored: c.stored,
-          births: c.births,
-          losses: c.losses,
-          decisions: c.decisions,
-          population: c.population,
-          ants: fnv([c.x, c.y, c.heading, c.mode, c.carrying, c.pellet, c.alive]),
-          fields: fnv(Object.values(c.ph.fields).flatMap(chunked)),
-        })),
-      });
-  }
-  return out;
-}
-
 /**
- * record's one-world branch: a small plane (160 × 100) with the curtain under its line, and alarm on the plane at nest 0's hole.
- * With `landed`, the full-size world with the fungus landed (Scenario.landed) and its state in each sample.
+ * Run a scenario and sample it every 10 s: a small plane (160 × 100) with the curtain under its line, or the full-size world
+ * (`full`), and alarm on the plane at nest 0's hole. With `landed`, the full-size world with the fungus landed (Scenario.landed)
+ * and its state in each sample.
  */
-function recordOne(s: Scenario): OneSample[] {
+export function record(s: Scenario): OneSample[] {
   const L = s.landed;
-  const world = L ? generateOneWorld(s.seed) : generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
-  const game = L
+  const world = L || s.full ? generateOneWorld(s.seed) : generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
+  const page = L || s.full; // the page's game: the full-size world, rival, regrowth, no auto-founding, hyphae, the page's random stream
+  const game = page
     ? new Game(
         world,
         { antCount: s.ants, rivalAnts: s.ants, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
@@ -142,10 +108,11 @@ function recordOne(s: Scenario): OneSample[] {
     game.land(0, strain, { evolve: true });
     for (const id of L.grant ?? []) {
       const e = game.fungus.evolution!;
-      const cost = e.cost(id);
-      if (cost === null) throw new Error(`${s.name}: can't grant ${id}`);
-      e.growth += cost / MUTATION;
-      if (!game.fungus.upgrade(id)) throw new Error(`${s.name}: grant ${id} not bought`);
+      if (e.cost(id) === null) throw new Error(`${s.name}: can't grant ${id}`);
+      for (const x of pathTo(e.save().levels, id)) {
+        e.growth += e.cost(x)! / MUTATION;
+        if (!game.fungus.upgrade(x)) throw new Error(`${s.name}: grant ${x} not bought`);
+      }
     }
   }
   const out: OneSample[] = [];
@@ -197,19 +164,19 @@ function fungusSample(game: Game): { state: Record<string, string>; infected: nu
 }
 
 /** The recording for a fixture file. GOLDEN_WRITE=1 writes it afresh and then fails the run, so a stray variable can't pass silently. */
-export function fixture(file: URL, scenarios: Scenario[]): Record<string, Sample[] | OneSample[]> {
+export function fixture(file: URL, scenarios: Scenario[]): Record<string, OneSample[]> {
   if (process.env.GOLDEN_WRITE) {
     writeFileSync(file, JSON.stringify(Object.fromEntries(scenarios.map((s) => [s.name, record(s)])), null, 1) + "\n");
     throw new Error(`GOLDEN_WRITE: re-recorded ${file.pathname}; run again without it to check`);
   }
-  return JSON.parse(readFileSync(file, "utf8")) as Record<string, Sample[] | OneSample[]>;
+  return JSON.parse(readFileSync(file, "utf8")) as Record<string, OneSample[]>;
 }
 
 /** Check a run against its recording: the same number of samples, each equal. */
 export function check(
   s: Scenario,
-  want: Sample[] | OneSample[] | undefined,
-  got: Sample[] | OneSample[],
+  want: OneSample[] | undefined,
+  got: OneSample[],
   deepEqual: (a: unknown, b: unknown, msg: string) => void,
   equal: (a: unknown, b: unknown, msg: string) => void,
 ): void {

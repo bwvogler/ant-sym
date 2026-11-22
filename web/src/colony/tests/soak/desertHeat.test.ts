@@ -100,6 +100,13 @@ test("heat kills an ant past its critical heat, and it is counted", () => {
   const g = desert({ heatNoon: 70, heatFelt: 60, heatCool: 50 }); // a scorching noon, and an ant that feels hot only past its death: it stays out
   run(g, P.heatDay / 2);
   assert.ok(g.player.diedHot > 0, `died of heat: ${g.player.diedHot}`);
+  // Nobody past the critical heat is left alive (heatStep kills it the step it passes): with the kill gone diedHot climbs every tick and
+  // the ants stay (ja-pgdg, review of #190). heatStep.test.ts fixes the step alone; this is the game's.
+  const c = g.player;
+  let alivePast = 0;
+  for (let i = 0; i < c.n; i++) if (c.alive[i] && pastCritical(P, c.bodyHeat[i] as number)) alivePast++;
+  assert.equal(alivePast, 0, "no living ant is past its critical heat");
+  assert.ok(c.diedHot <= c.n, `each ant dies of heat once: ${c.diedHot} of ${c.n}`);
 });
 
 test("the papers' direction: more desert ants out under the high sun than in the low sun of the morning (owner, review of #155 D1)", () => {
@@ -140,8 +147,13 @@ test("at night no ant sets out: on the plane in the dark, only ants on their way
 test("heat paces the desert ant's day and never kills it: noon is under its critical heat, and nobody dies of heat in a day (owner, review of #155 D2)", () => {
   assert.ok(P.heatNoon < P.heatDeath, `noon ${P.heatNoon} °C under the critical ${P.heatDeath} °C: a body can't pass the air around it`);
   const g = desert();
-  run(g, P.heatDay);
+  let hot = 0;
+  run(g, P.heatDay, () => {
+    for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.hot[i] === 1) hot++;
+  });
   assert.equal(g.player.diedHot, 0);
+  // It does feel the heat over a day (ja-pgdg): ants come to feel hot, which is what sends them home. With `hot` stuck at 0 nobody ever did.
+  assert.ok(hot > 0, `ant-ticks spent feeling hot over a day: ${hot}`);
 });
 
 test("on its way home and deep in, where it can't see the sky, it keeps going home; only one setting out goes up to look (review of #155, S5)", () => {

@@ -15,9 +15,14 @@ import {
   game1,
   heldProbe,
   lifecycleOne,
+  marchProbe,
+  MARCH_REACH,
   nestFlowProbe,
   occupancyProbe,
+  defendWalked,
   ONE_ASSAYS,
+  oneAssay,
+  passWalked,
   oneArena,
   onPlane,
   outingProbe,
@@ -42,6 +47,7 @@ import {
 } from "../../experiment.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
+import { piSpanOf } from "../../homing.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { CRUST, generateCurtain, generateOneWorld, type OneWorld } from "../../oneWorld.ts";
 import { cellAt } from "../../transect.ts";
@@ -148,16 +154,22 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
       assert.equal(c.carrying[i], 1);
       assert.equal(c.mode[i], MODES.indexOf("return"));
       assert.equal(c.odoSurf[i], T, "its trip");
-      // Its vector's end (where it stands, give or take a tick's walk) is the hole plus T × its drift.
-      const ex = hx + T * c.driftSurf[i];
-      const ey = hy + T * c.driftSurfY[i];
+      // Its vector's end (where it stands, give or take a tick's walk) is the hole plus the span × its drift: a trip T out
+      // (piErrorLaw 1: the span by the distance out, ~21√T).
+      const span = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, T, T);
+      const ex = hx + span * c.driftSurf[i];
+      const ey = hy + span * c.driftSurfY[i];
       assert.ok(Math.hypot(c.x[i] - ex, c.y[i] - ey) < 1, `ant ${i} stands at its vector's end`);
       sq += (ex - hx) ** 2 + (ey - hy) ** 2;
     }
     const rms = Math.sqrt(sq / S1_PER_TRIP);
-    assert.ok(rms > 0.05 * T && rms < 0.16 * T, `trip ${T}: RMS miss ${rms.toFixed(1)}, against PI_DRIFT × T = ${(0.1 * T).toFixed(0)}`);
+    const span = piSpanOf(c.params.piErrorLaw, c.params.piErrorAt, T, T);
+    assert.ok(
+      rms > 0.05 * span && rms < 0.16 * span,
+      `trip ${T}: RMS miss ${rms.toFixed(1)}, against PI_DRIFT × span = ${(0.1 * span).toFixed(0)}`,
+    );
   });
-  // Scored over 20 s: most 100-cell carriers (a miss of ~10, sight 6) are home, and each share is a share.
+  // Scored over 20 s: most 100-cell carriers (a miss of ~21 by the distance out, sight 6) are home, and each share is a share.
   const r = runAssay(search1, 2, {}, 20);
   assert.ok(r.metrics["t100.home600"] > 0.5, `t100 home in 20 s: ${r.metrics["t100.home600"]}`);
   for (const T of S1_TRIPS) for (const k of ["home120", "home600"]) assert.ok(r.metrics[`t${T}.${k}`] >= 0 && r.metrics[`t${T}.${k}`] <= 1);
@@ -462,10 +474,79 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
     let calls = 0;
     const assay = make((spec: RunSpec) => {
       calls++;
-      return { ...spec, seconds: 1 };
+      return onPlane({ ...spec, seconds: 1 });
     });
     const { game, result } = runGame(assay.spec(1));
     assay.score(result, game);
     assert.equal(calls, runs, `${assay.id}: every run goes through remap`);
   }
+});
+
+test("marchProbe (S2.2c): turns a walked ant on the plane toward the other colony's hole, lets go of one that senses a stranger", () => {
+  const g = oneGame();
+  const c = g.player;
+  const foe = g.colonies[1]!;
+  const probe = marchProbe(0, 1);
+  const hole = at(48, 20);
+  for (let i = 3; i < c.n; i++) c.alive[i] = 0;
+  for (let i = 0; i < foe.n; i++) foe.alive[i] = 0;
+  // Ant 0 at the arena's west end, facing away; ant 1 the same, with a stranger 2.5 cells off (inside enemyRange + 1, outside enemyRange); ant 2 in the curtain.
+  put(c, 0, PLANE, 14, 30);
+  put(c, 1, PLANE, 14, 10);
+  put(c, 2, CURTAIN, 14, 30);
+  for (const i of [0, 1, 2]) c.heading[i] = Math.PI;
+  foe.alive[0] = 1;
+  put(foe, 0, PLANE, 16.5, 10);
+  probe.tick(g, 1);
+  const toward = Math.atan2(hole.y - c.y[0]!, hole.x - c.x[0]!);
+  assert.ok(
+    Math.cos(c.heading[0]! - toward) > 0.7,
+    `walked toward the hole: heading ${c.heading[0]!.toFixed(2)}, the hole at ${toward.toFixed(2)}`,
+  );
+  assert.equal(c.heading[1], Math.fround(Math.PI), "a stranger within reach: let go, its own fight");
+  assert.equal(c.heading[2], Math.fround(Math.PI), "in the curtain: its own rules");
+  put(c, 0, PLANE, hole.x - 2, hole.y);
+  c.heading[0] = Math.PI;
+  probe.tick(g, 1);
+  assert.equal(c.heading[0], Math.fround(Math.PI), `within ${MARCH_REACH} steps of the hole: let go`);
+  assert.equal(probe.summary(g).marched, 1 / c.params.antCount, `one ant within ${MARCH_REACH} steps of the hole`);
+});
+
+test("A6 and A13 on one world (S2.2c): the attackers walked, each ant with its own stance", () => {
+  for (const id of ["pass", "open", "defendHome"]) {
+    const a = ONE_ASSAYS.find((x) => x.id === id);
+    assert.ok(a, `${id} is in ONE_ASSAYS`);
+    const spec = a.spec(1);
+    assert.ok(isOneWorld(specMap(spec)), id);
+    const march = (spec.probes ?? []).filter((p) => "walks" in p) as unknown as { walks: readonly [number, number] }[];
+    assert.deepEqual(
+      march.map((p) => p.walks),
+      [id === "defendHome" ? [1, 0] : [0, 1]],
+      `${id}: the attackers walked at the defenders' hole`,
+    );
+  }
+});
+
+test("oneAssay: each gate id gives its one-world twin, A6 and A13 walked (review of #235, S1)", () => {
+  for (const id of [
+    "bridge",
+    "twin",
+    "richPoor",
+    "deplete",
+    "alarm",
+    "regulate",
+    "regulateStop",
+    "contact",
+    "faintAlarm",
+    "raidFind",
+    "raidStop",
+  ]) {
+    const a = oneAssay(id);
+    assert.ok(ONE_ASSAYS.includes(a), id);
+  }
+  assert.equal(oneAssay("pass"), passWalked);
+  assert.equal(oneAssay("defendHome"), defendWalked);
+  const ids = ONE_ASSAYS.map((a) => a.id);
+  assert.equal(new Set(ids).size, ids.length, "ONE_ASSAYS ids are unique, so oneAssay's find is unambiguous");
+  assert.throws(() => oneAssay("nope"), /no one-world assay nope/);
 });

@@ -1,18 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { keyX, keyY } from "../../hex.ts";
+import { centreX, centreY, keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { BODY, Evolution, MUTATION, UPGRADES, upgrade } from "../../evolution.ts";
+import { BODY, canKeep, checkTree, Evolution, MUTATION, pathTo, price, unmet, UPGRADES, upgrade, type Upgrade } from "../../evolution.ts";
 import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../../fungus.ts";
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
 import { hold, LEVERS } from "../../levers.ts";
-import { generateSideWorld, mulberry32, type WorldMap } from "../../world.ts";
+import { mulberry32, type WorldMap } from "../../world.ts";
 import { put } from "../hexmaps.ts";
 import { readFileSync } from "node:fs";
 import type { FungalSituation } from "../../fungalPolicy.ts";
-import { arena } from "../builders.ts";
+import { arena, oneColony, smallOne } from "../builders.ts";
 
 // The fungus's body and evolution (ja-lo8.12): reach holds levels where they take effect and nowhere else, mutations
 // come with growth, the mycelium pays for its spores, a founded colony can get what the first colony got, and the
@@ -35,6 +35,11 @@ function run(f: Fungus, colonies: Colony[], seconds: number, dt = 1 / 30): void 
 }
 
 const lever = (id: string) => LEVERS.find((v) => v.id === id)!;
+
+/** Keep the next level of `id` through the fungus, keeping first whatever it needs (the tree, ja-52ui). */
+function keep(f: Fungus, id: string): boolean {
+  return pathTo(f.evolution!.save().levels, id).every((x) => f.upgrade(x));
+}
 
 test("hold: a level is pulled back toward as is until it is within reach; levers without a reach keep their range", () => {
   const food = lever("food"); // five levels, as is at 2
@@ -66,8 +71,8 @@ test("reach acts where levels take effect: Jev's question and cache key do not c
   const LOCKPICK = STRAINS.findIndex((x) => x.id === "lockpick");
   assert.deepEqual(f.held({ food: 4 }, LOCKPICK), { food: 4 }, "another strain's host (a lab brush) is not held (PR #43 review, N2)");
   const e = f.evolution!;
-  e.replicate(upgrade("senses").costs[0]! / MUTATION);
-  assert.ok(f.upgrade("senses"), "the mutations for the Senses' full range");
+  e.replicate(1e6);
+  assert.ok(keep(f, "senses"), "the mutations for the Senses' full range, and the first steps it needs");
   f.expressLevels(c, 0, { food: 4 }, 1);
   assert.ok(Math.abs(c.gainFood[0] - 2.5) < 1e-9, `the full range: ${c.gainFood[0]}`);
   // A lab helper runs a preset whatever the menu and the reach say.
@@ -80,8 +85,7 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   for (const v of LEVERS) assert.ok(reach[v.id] !== undefined, `${v.id}: some upgrade names it`);
   assert.equal(reach.weapon, 0, "the odour weapon starts held off");
   assert.equal(reach.crown, 0, "and so does crown");
-  const map = generateSideWorld(1); // crown acts only where there is a nest: the top-down menu drops it
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, nest: 0 }, mulberry32(1));
+  const { map, c } = oneColony(1, { maxAnts: 1 }, undefined, 1); // crown acts only where there is a nest
   c.strain[0] = GARDEN;
   const f = new Fungus(map);
   f.configure({ hide: false, cull: false }, ["weapon", "crown"]); // the player has put both on the menu
@@ -91,12 +95,12 @@ test("every lever has a reach, the lethal ones included: crown and odour weapon 
   assert.equal(c.estrange[0], 0, "so the host smells like itself");
   assert.equal(c.regicide[0], 0, "and spares the queen");
   const e = f.evolution!;
-  e.replicate((upgrade("weapon").costs[0]! + upgrade("crown").costs[0]!) / MUTATION);
-  assert.ok(f.upgrade("weapon"), "the mutations for the odour weapon");
+  e.replicate(1e7);
+  assert.ok(keep(f, "weapon"), "the mutations for the odour weapon, and what it needs");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
   assert.ok(c.estrange[0] > 0, "freed: the host smells like nobody's");
   assert.equal(c.regicide[0], 0, "crown still held");
-  assert.ok(f.upgrade("crown"), "the mutations for crown");
+  assert.ok(keep(f, "crown"), "the mutations for crown, and what it needs");
   f.expressLevels(c, 0, { weapon: 1, crown: 1 }, 1);
   assert.ok(c.regicide[0] > 0, "freed: the host kills the queen it tends");
   // A game that doesn't evolve (the lab, the assays) has no reach: the lethal levers run as the menu says.
@@ -119,31 +123,70 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
   assert.ok(c.load[0] > 0.5, "still a host");
   assert.ok(c.fungal[0] >= 0, "the step read its situation and expressed its policy's answer");
   assert.equal(c.estrange[0], 0, "held off through the step");
-  f.evolution!.replicate(upgrade("weapon").costs[0]! / MUTATION);
-  assert.ok(f.upgrade("weapon"));
+  f.evolution!.replicate(1e7);
+  assert.ok(keep(f, "weapon"));
   run(f, [c], 0.2);
   assert.ok(c.estrange[0] > 0, `freed: ${c.estrange[0]}`);
 });
 
-test("mutations: a fixed share of growth, kept level by level, each level of an upgrade asking more than the last", () => {
-  for (const u of UPGRADES)
-    for (let k = 1; k < u.costs.length; k++) assert.ok(u.costs[k]! > u.costs[k - 1]!, `${u.id}: level ${k + 1} asks more`);
+test("mutations: a fixed share of growth, and every level costs one price, which rises with each level kept (ja-52ui)", () => {
   const e = new Evolution(GARDEN);
   assert.equal(e.mutations, 0);
-  const [a, b, c] = upgrade("infectivity").costs as number[];
-  e.replicate((a! + b!) / MUTATION);
-  assert.ok(Math.abs(e.mutations - (a! + b!)) < 1e-9, "growth × MUTATION");
-  assert.ok(e.buy("infectivity") && e.buy("infectivity"), "levels 1 and 2");
-  assert.equal(e.cost("infectivity"), c);
-  assert.equal(e.buy("infectivity"), false, "level 3: not enough");
-  assert.ok(Math.abs(e.mutations) < 1e-9);
-  assert.equal(e.traits().transmission, upgrade("infectivity").values![2]);
+  assert.equal(e.cost("infectivity"), price(0), "the first level costs the base price");
+  e.replicate((price(0) + price(1)) / MUTATION);
+  assert.ok(Math.abs(e.mutations - (price(0) + price(1))) < 1e-9, "growth × MUTATION");
+  assert.ok(e.buy("infectivity"), "a root: Infectivity fair");
+  assert.equal(e.cost("persistence"), price(1), "one level kept: every next level now costs the second price");
+  assert.equal(e.cost("mycelium"), price(1));
+  assert.ok(price(1) > price(0) && price(10) > price(9), "the price rises");
+  assert.ok(e.buy("persistence"));
+  assert.ok(Math.abs(e.mutations) < 1e-9, "both prices paid");
+  assert.equal(e.buy("mycelium"), false, "too few left");
+  assert.equal(e.traits().transmission, upgrade("infectivity").values![1]);
   e.replicate(1e7);
-  for (const u of UPGRADES) while (e.buy(u.id));
-  for (const u of UPGRADES) assert.equal(e.cost(u.id), null, `${u.id} at its last level`);
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const u of UPGRADES) while (e.buy(u.id)) moved = true;
+  }
+  for (const u of UPGRADES) assert.equal(e.cost(u.id), null, `${u.id} at its last level: every level can be reached`);
   assert.equal(e.buy("infectivity"), false);
   const back = Evolution.load(JSON.parse(JSON.stringify(e.save())));
   assert.deepEqual(back.save(), e.save(), "a save round-trips");
+});
+
+test("the tree: a level that needs another can't be kept before it, and says what it needs (ja-52ui)", () => {
+  const e = new Evolution(GARDEN);
+  e.replicate(1e7);
+  const roots = UPGRADES.filter((u) => e.locked(u.id).length === 0).map((u) => u.id);
+  assert.deepEqual(roots, ["infectivity", "persistence", "mycelium", "fruiting", "stealth", "recognition", "trails"], "seven roots");
+  assert.deepEqual(e.locked("crown"), [
+    { id: "royal", level: 2 },
+    { id: "weapon", level: 1 },
+  ]);
+  assert.equal(e.affordable("crown"), false, "locked: not affordable, however many mutations");
+  assert.equal(e.buy("crown"), false, "and not kept");
+  assert.equal(e.level("crown"), 0);
+  assert.ok(e.buy("infectivity"), "fair: a root");
+  assert.deepEqual(e.locked("infectivity"), [{ id: "persistence", level: 1 }], "strong needs Persistence: clears slowly");
+  assert.equal(e.buy("infectivity"), false);
+  assert.ok(e.buy("persistence") && e.buy("infectivity"), "kept once its need is");
+  assert.deepEqual(e.locked("senses"), [
+    { id: "recognition", level: 1 },
+    { id: "trails", level: 1 },
+  ]);
+  assert.ok(e.buy("recognition"));
+  assert.deepEqual(e.locked("senses"), [{ id: "trails", level: 1 }], "one need met, one still missing");
+  assert.deepEqual(unmet(e.save().levels, "senses"), e.locked("senses"), "the pure form the page uses agrees");
+  assert.equal(canKeep(e.save().levels, e.mutations, "senses"), false);
+  const c = e.cost("trails")!;
+  assert.equal(canKeep(e.save().levels, c, "trails"), true, "exactly the price is enough");
+  assert.equal(canKeep(e.save().levels, c - 1, "trails"), false, "one short is not");
+  assert.ok(e.buy("trails") && e.buy("senses"));
+  assert.deepEqual(
+    pathTo({}, "crown"),
+    ["recognition", "recognition", "royal", "trails", "trails", "royal", "infectivity", "persistence", "infectivity", "weapon", "crown"],
+    "crown's path: what it needs, then it",
+  );
 });
 
 test("mutations come as fast as the fungus grows: the panel's rate settles at MUTATION × growth a second", () => {
@@ -202,7 +245,7 @@ test("the minimum dose is a rate: a clean ant exposed above it is infected at an
 });
 
 test("the game's landing: an evolving fungus roots by the hole, keeps sporulating there, and mutates as it grows", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   assert.ok(f.evolution && f.base.length > 0);
@@ -213,18 +256,20 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
   assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
   // A lab or test landing keeps the strain as listed, with no body.
-  const lab = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
+  const lab = new Game(smallOne(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
   lab.land(0, GARDEN);
   assert.equal(lab.fungus.evolution, null);
   assert.equal(lab.fungus.base.length, 0);
 });
 
 test("a colony the world starts with has nothing a founded one can't get", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
-  const e = g.colonies[1]!.nest.entrance!;
-  const clean = g.colonies[g.addColony({ x: e.x + 40, y: e.y, antCount: 200, odour: 0.5 })]!;
+  // Foundings beyond the line's two ends (one world grows its line from its ends).
+  const holes = g.world!.line.holes;
+  const beyond = (v: { x: number; y: number }, by: number) => ({ x: centreX(v.x, v.y) + by, y: centreY(v.y) });
+  const clean = g.colonies[g.addColony({ ...beyond(holes[0]!, -20), antCount: 200, odour: 0.5 })]!;
   const first = g.colonies[0]!;
   // The same colony: params but identity, a queen, chambers, policies, responses and the game's wiring.
   const own = (c: typeof first) =>
@@ -233,7 +278,6 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   assert.equal(clean.params.maxAnts, first.params.maxAnts);
   assert.ok(clean.queen?.alive && first.queen?.alive);
   assert.equal(clean.policy, first.policy);
-  assert.equal(clean.stancePolicy, first.stancePolicy);
   assert.equal(clean.responses, first.responses);
   for (const wire of ["friends", "enemies", "nestmates", "onBury", "raidMarks"] as const)
     assert.equal(Boolean(clean[wire]), Boolean(first[wire]), wire);
@@ -241,20 +285,25 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
   // The fungus: a clean founding gets no patch; one whose queen carries the evolving fungus gets what the landing gave.
   const patches = g.fungus.base.length;
   assert.equal(g.fungus.evolution!.patches, 1);
-  const carried = g.colonies[g.addColony({ x: e.x + 80, y: e.y, antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
+  const carried =
+    g.colonies[g.addColony({ ...beyond(holes[holes.length - 1]!, 20), antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
   assert.equal(carried.queen!.load, 0.4);
   assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
   assert.ok(g.fungus.base.length > patches);
-  const hole = carried.nest.entrance!;
-  assert.ok(
-    g.fungus.base.slice(patches).every((key) => Math.abs(keyX(key) + 0.5 - hole.x) < 8),
-    "by her hole, as the landing is by the first colony's",
-  );
+  // On the plane by her hole, as the landing is by the first colony's: every cell of her patch nearer her hole than any other.
+  const dist = (key: number, c: typeof first) => {
+    const h = c.holeCells[c.params.nest]!;
+    return Math.hypot(keyX(key) - h.px, keyY(key) - h.py);
+  };
+  for (const key of g.fungus.base.slice(patches))
+    for (const other of g.colonies)
+      if (other !== carried) assert.ok(dist(key, carried) < dist(key, other), `cell ${keyX(key)},${keyY(key)}: nearer her hole`);
+  for (const key of g.fungus.base.slice(0, patches)) assert.ok(dist(key, first) < dist(key, carried), "and the landing's by the first");
 });
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {
   const share = (evolve: boolean) => {
-    const g = new Game(generateSideWorld(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
+    const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
     g.land(0, GARDEN, { evolve });
     let most = 0;
     for (let k = 0; k < 30 * 60; k++) {
@@ -273,7 +322,7 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
 });
 
 test("the queen's levels are held too: Stealth decides how far she can hide (PR #43 review, T1)", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   const q = g.colonies[0]!.queen!;
@@ -287,7 +336,7 @@ test("the queen's levels are held too: Stealth decides how far she can hide (PR 
   settle();
   assert.equal(q.show, 1, "Stealth at none: she shows as she is");
   f.evolution!.replicate(1e6);
-  assert.ok(f.upgrade("stealth") && f.upgrade("stealth"));
+  assert.ok(keep(f, "stealth") && keep(f, "stealth"));
   settle();
   assert.equal(q.show, 0.25, "Stealth at its most: hidden");
 });
@@ -320,7 +369,7 @@ test("mutations from hosts: load passed on by contact counts, spores picked up f
 
 test("spores a full patch can't hold stay mycelium (PR #43 review, N3)", () => {
   // A ground that holds no spores at all: every spore the mycelium puts out is one it can't lay.
-  const g = new Game(generateSideWorld(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
+  const g = new Game(smallOne(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
   g.land(0, GARDEN, { evolve: true });
   const e = g.fungus.evolution!;
   e.mass = 50; // above what one patch holds: it does not grow, so its mass moves only by spores
@@ -381,4 +430,44 @@ test("the fungus's save holds every private field it declares, or the field is d
   const two = new Fungus([arena(), arena()]).saveState();
   assert.deepEqual(Object.keys((two.layers as Record<string, unknown>[])[0]!).sort(), [...SPORE_LAYER_STATE].sort(), "a second map's keys");
   assert.ok(!("layers" in new Fungus(arena()).saveState()), "one map: no layers, the shape as it was");
+});
+
+test("the tree's check refuses a cycle, a level out of reach and a need that names no level (ja-52ui)", () => {
+  const up = (id: string, needs: { id: string; level: number }[][]): Upgrade => ({
+    id,
+    kind: "spread",
+    name: id,
+    blurb: "",
+    steps: ["none", ...needs.map((_, k) => `level ${k + 1}`)],
+    needs,
+  });
+  assert.doesNotThrow(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 1 }]])]), "b after a");
+  assert.throws(() => checkTree([up("a", [[{ id: "b", level: 1 }]]), up("b", [[{ id: "a", level: 1 }]])]), /can't reach/, "a cycle");
+  assert.throws(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 2 }]])]), /no such level/, "a level that isn't there");
+  assert.throws(() => checkTree([up("a", [[], [{ id: "c", level: 1 }]])]), /no such level/, "an upgrade that isn't there");
+  assert.throws(() => checkTree([up("a", [[], [{ id: "a", level: 1 }]])]), /no such level/, "a level that needs its own upgrade");
+  assert.throws(() => checkTree([up("a", [[]]), up("b", [[{ id: "a", level: 0 }]])]), /no such level/, "a need for level 0");
+  assert.doesNotThrow(() => checkTree(UPGRADES), "the game's own table");
+});
+
+test("the tree's edges are the design note's table (docs/mutation-tree.md, ja-52ui)", () => {
+  const edges = UPGRADES.flatMap((u) => u.needs.flatMap((ns, k) => ns.map((n) => `${u.id}${k + 1}<${n.id}${n.level}`)));
+  assert.deepEqual(edges, [
+    "infectivity2<persistence1",
+    "infectivity3<evasion1",
+    "knots1<mycelium1",
+    "knots2<mycelium2",
+    "stalks1<fruiting1",
+    "stalks2<fruiting2",
+    "evasion1<persistence1",
+    "evasion2<persistence2",
+    "stealth2<fruiting1",
+    "senses1<recognition1",
+    "senses1<trails1",
+    "royal1<recognition2",
+    "royal2<trails2",
+    "weapon1<infectivity2",
+    "crown1<royal2",
+    "crown1<weapon1",
+  ]);
 });

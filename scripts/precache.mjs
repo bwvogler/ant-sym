@@ -2,9 +2,9 @@
 // the answers with the page (the fungus game, ja-lo8.3). The page starts with them in its caches, so a first game
 // plays Jev's answers from its first second, and the Pages build, which has no server, plays them too.
 //
-// Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888) and `stance` (every strategist view, 324), packed with
-// the browser's own packers (packModeRequest, packStanceRequest) and keyed with its own keys (situationKey, stanceKey), under its own
-// contexts (policyContext, stanceContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
+// Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888), packed with
+// the browser's own packer (packModeRequest) and keyed with its own key (situationKey), under its own
+// context (policyContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
 // both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view. And
 // `growth` (ja-2bw.5): every hyphal tip's situation (48), per preset aim, under the same aims. It is not in the default
@@ -18,18 +18,22 @@
 // JEV_API_KEY comes from the environment and is never printed.
 //
 // --import: no spend. Ship the answers a live test already got (scripts/colony-live.mjs caches, e.g.
-// experiments/caches/mr52-top-*.json) instead of asking every situation: each file's mode and stance answers go into
+// experiments/caches/mr52-top-*.json) instead of asking every situation: each file's mode answers go into
 // the bundle for its doctrine when they were asked under the context the code asks under now; any other file is
 // refused. The page plays the local rule where nothing ships (a preset's words are never asked: PR #42 review S6).
 // This is the default way to re-ship after a colony legend or version change: the PR's live check has the answers.
 //
-// Usage: node scripts/precache.mjs [--lanes mode,stance] [--doctrines forage,cautious,warlike] [--budget 0.35]
+// Usage: node scripts/precache.mjs [--lanes mode] [--doctrines forage,cautious,warlike] [--budget 0.35]
 //        [--in-flight 4] [--dry]
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --reweigh [--species desert] [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --species desert --lanes fungus [--budget …] [--dry]
+//        node scripts/precache.mjs --species neglectus --met [--doctrines …] [--budget …] [--dry]
 //        node scripts/precache.mjs --lanes fungus --fungus-also <fungus-bundle.json> [...] [--budget …] [--dry]
+//
+// --met (ja-e668.3), with --species: ask only the mode situations a page game of that species meets (one world, seeds 1–3, 300 s), not
+// every one of its schema: for a species on the generic schema (the invasive garden ant: 3,888 situations). Known: desert, neglectus.
 //
 // --species <id> --lanes fungus (ja-rf5.22): the fungus's answers under that species' menu (the desert ant's has rouse on, so its keys differ
 // from the generic answers'), in the situations a page game of it meets; written into the same fungus bundles (the context is the same).
@@ -40,6 +44,9 @@
 // --reweigh (ja-nan3): ask again only the mode situations a bundle already holds whose answer is a bare mode, so
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
 // the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
+//
+// `--lanes steer` (ja-ykmu.3): the steer lane asks only the explore and follow situations a one-world game meets
+// (steerSituationsMet), not all 1,944.
 //
 // --species <id> (ja-rf5.9): ask every situation of that species' own mode lane (its lane words and schema: the desert ant's 16) under each
 // preset doctrine, and ship them as mode-<species>-<doctrine>.json, marked with the species in index.json. Its lanes are small, so the live
@@ -57,22 +64,21 @@ import {
   DEFAULT_MENU,
   STRAINS,
   Game,
-  centreX,
-  centreY,
-  generateSideWorld,
   generateOneWorld,
   gameRng,
   menuFor,
   GAME_REGROW,
-  mulberry32,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
-  STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
   DESERT_ANT,
+  GENERIC_ANT,
+  NEGLECTUS_ANT,
   isWeighted,
   weightsOf,
+  steerKey,
+  NEUTRAL_STEERING,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -82,7 +88,7 @@ const OUT = new URL("../web/public/precache/", import.meta.url);
 
 const args = process.argv.slice(2);
 const opts = {
-  lanes: "mode,stance,fungus",
+  lanes: "mode,fungus",
   doctrines: DOCTRINES.map((d) => d.id).join(","),
   budget: 0.35,
   inFlight: 4,
@@ -91,6 +97,7 @@ const opts = {
   species: null,
   reweigh: false,
   fungusAlso: [],
+  met: false,
 };
 for (let k = 0; k < args.length; k++) {
   const a = args[k];
@@ -102,35 +109,44 @@ for (let k = 0; k < args.length; k++) {
   else if (a === "--import") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.import.push(args[++k]);
   else if (a === "--species") opts.species = args[++k];
   else if (a === "--reweigh") opts.reweigh = true;
+  else if (a === "--met") opts.met = true;
   else if (a === "--fungus-also") while (args[k + 1] && !args[k + 1].startsWith("--")) opts.fungusAlso.push(args[++k]);
   else throw new Error(`unknown argument ${a}`);
 }
 const KEY = process.env.JEV_API_KEY;
 if (!opts.dry && !opts.import.length && !KEY) throw new Error("JEV_API_KEY is not set (or use --dry for an estimate, or --import)");
 
-/** The menu the page asks the fungus under: every non-lethal lever (Fungus.askedFor under the default menu, with a nest in the side view). */
+/** The menu the page asks the fungus under: every non-lethal lever (Fungus.askedFor under the default menu: the nest is always there). */
 const MENU = new Set(DEFAULT_MENU);
 
-/** The fungal situations a side-view game meets: Garden on both royal chambers and Lockpick at both holes, 300 s. */
+/**
+ * The fungal situations a game meets: the page's one world (speciesFungalSituations, the generic ant). Garden landed by each
+ * colony's hole in turn, 300 s, on seeds 1–3. (Until S2.3d this recorded the side view, with Garden on both royal chambers
+ * and Lockpick at both holes, on seed 1: the shipped answers are keyed by situation, so they stand; a fresh recording may
+ * meet others, which `--fungus-also` brings in.)
+ */
 function fungalSituations() {
-  const map = generateSideWorld(1);
-  const g = new Game(map, { antCount: 600, rivalAnts: 600 }, mulberry32(7919));
-  const met = new Set();
-  g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
-  const strain = (id) => STRAINS.findIndex((x) => x.id === id);
-  for (let t = 0, painted = false; t < 300; t += 1 / 30) {
-    g.tick(1 / 30);
-    if (painted || g.time < 30) continue;
-    painted = true;
-    for (const c of g.colonies) {
-      const royal = map.chambers.list.find((k) => k.colony === c.params.nest && k.role === "royal");
-      g.paintSpores(centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow), centreY(royal.floorRow), 3, 2, 0.3, strain("garden"));
-      g.paintSpores(c.nest.entrance.x, c.nest.entrance.y, 3, 2, 0.3, strain("lockpick"));
-    }
-  }
+  const met = new Set(speciesFungalSituations(GENERIC_ANT).map((s) => encodeFungal(s)));
   const also = fungusAlso();
   for (let n = 0; n < FUNGAL_SITUATIONS; n++) if (also.has(FUNGAL_SCHEMA.key(decodeFungal(n)))) met.add(n);
   return [...met].sort((a, b) => a - b).map(decodeFungal);
+}
+
+/**
+ * The steer lane's situations a one-world game meets (ja-ykmu.3): explorers and followers on the local rule, 600 + 600 ants,
+ * 300 s, seeds 1-3, steerLane on. Its full space is half the mode lane's (1,944); a game meets far fewer.
+ */
+function steerSituationsMet() {
+  const met = new Map();
+  for (const seed of [1, 2, 3]) {
+    const g = new Game(generateOneWorld(seed), { antCount: 600, rivalAnts: 600 }, gameRng(seed), {
+      colony: { steerLane: 1 },
+      rival: { steerLane: 1 },
+    });
+    for (const c of g.colonies) c.bindPolicy("steer", (s) => (met.set(steerKey(s), { ...s }), NEUTRAL_STEERING));
+    for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
+  }
+  return [...met.values()];
 }
 
 /**
@@ -152,11 +168,11 @@ const LANES = Object.fromEntries(
   LANE_LIST.map((l) => [
     l.name,
     {
-      situations: l.all ?? fungalSituations,
+      situations: l.name === "steer" ? steerSituationsMet : (l.all ?? fungalSituations),
       key: (s) => l.key(s, MENU),
       pack: (items, words) => l.pack(items, words),
       read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, MENU)),
-      context: (words) => l.contextOf(words, l.variants.includes("side") ? "side" : undefined),
+      context: (words) => l.contextOf(words),
       id: l.kind.idPrefix,
       batch: l.batch ?? BATCH,
       field: l.wordsField,
@@ -188,10 +204,35 @@ function speciesFungalSituations(sp) {
   return [...met].sort((a, b) => a - b).map(decodeFungal);
 }
 
+/**
+ * --met (ja-e668.3): the mode situations a page game of `sp` meets, keyed under its words: one world as the page builds it (600 + 600 ants),
+ * 300 s on seeds 1–3, on its local rule. For a species on the generic schema (3,888 situations), whose every situation would cost far more.
+ */
+function speciesModeSituations(sp, l, lw) {
+  const met = new Map();
+  const local = sp.policy ?? l.local;
+  for (const seed of [1, 2, 3]) {
+    const g = new Game(
+      generateOneWorld(seed),
+      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+      gameRng(seed, 0),
+    );
+    for (const c of g.colonies)
+      c.bindPolicy("mode", (s) => {
+        const k = l.key(s, undefined, lw);
+        if (!met.has(k)) met.set(k, { ...s });
+        return local(s);
+      });
+    for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
+  }
+  return [...met.values()];
+}
+
 // A species' own mode lane (ja-rf5.9): its words bound into the row's key, packing, reading and context, its situations its schema's.
-const SPECIES_KNOWN = { desert: DESERT_ANT };
+const SPECIES_KNOWN = { desert: DESERT_ANT, neglectus: NEGLECTUS_ANT };
 const species = opts.species ? SPECIES_KNOWN[opts.species] : null;
 if (opts.species && !species) throw new Error(`--species: no "${opts.species}" (known: ${Object.keys(SPECIES_KNOWN).join(", ")})`);
+if (opts.met && !species) throw new Error("--met needs --species: it records that species' page game");
 // --import ships colony-live caches, which are the generic ant's: a species' answers come from this script's own run (review of #140).
 if (species && opts.import.length)
   throw new Error("--species and --import do not go together: run --species on its own (it is the live check)");
@@ -212,7 +253,7 @@ if (speciesFungus) {
   const lw = species.lanes.mode;
   LANES.mode = {
     ...LANES.mode,
-    situations: () => l.all(lw),
+    situations: () => (opts.met ? speciesModeSituations(species, l, lw) : l.all(lw)),
     key: (s) => l.key(s, undefined, lw),
     pack: (items, words) => l.pack(items, words, lw),
     read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, undefined, lw), lw),
@@ -241,7 +282,6 @@ const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
 index.versions = {
   colony: COLONY_BRAIN_VERSION,
-  stance: STANCE_BRAIN_VERSION,
   fungus: FUNGUS_BRAIN_VERSION,
   growth: GROWTH_BRAIN_VERSION,
 };
@@ -293,10 +333,7 @@ if (opts.import.length) {
     const c = JSON.parse(readFileSync(path, "utf8"));
     const d = DOCTRINES.find((x) => x.text === c.doctrine?.text);
     if (!d) throw new Error(`${path}: its doctrine is not a preset's`);
-    for (const [lane, field] of [
-      ["mode", "modes"],
-      ["stance", "stances"],
-    ]) {
+    for (const [lane, field] of [["mode", "modes"]]) {
       if (!lanes.includes(lane)) continue;
       const b = bundles.get(`${lane}-${d.id}.json`);
       if (!b) continue;

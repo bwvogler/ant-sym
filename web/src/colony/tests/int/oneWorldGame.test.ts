@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CURTAIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
+import { CURTAIN, MIDDEN_MIN, PLANE, type Colony, type HoleCell, type Layer } from "../../colony.ts";
 import { MODES } from "../../vocab.ts";
+import { fromHomePlane } from "../../homing.ts";
 import { decodeFungal } from "../../fungalPolicy.ts";
 import { NEST_ONLY, STRAINS } from "../../fungus.ts";
 import { Game, gameRng, isOneWorld } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, keyX, keyY } from "../../hex.ts";
-import { AIR, generateSideWorld, rockAt, OPEN } from "../../world.ts";
+import { AIR, rockAt, OPEN } from "../../world.ts";
 import { DT, ageOf, curtainHole, editPrivate, own, planeHole, run, smallOne } from "../builders.ts";
 
 // One world's game (ja-lp4.3, U3a; docs/one-world.md §2, §4): colonies on the plane and the curtain, crossing at their
@@ -198,7 +199,14 @@ test("one world: a corpse carried up goes to the plane's midden, not the hole, a
   const key = [...c.midden.keys()][0]!;
   const mx = keyX(key);
   const my = keyY(key);
-  assert.ok(hexDistance(mx, my, h.px, h.py) >= 6, `the midden is out from the hole (${hexDistance(mx, my, h.px, h.py)} cells)`);
+  // Out by its own vector: MIDDEN_MIN from where it believes its hole is. By the distance out (piErrorLaw 1) the vector is
+  // well off this near the hole (here 4.6 out, drift 0.18: 8 cells off), so the true distance is no longer ~MIDDEN_MIN
+  // (it was ≥ 6 by the odometer law); off the hole is what still holds.
+  c.bind(PLANE);
+  const believed = fromHomePlane(c, i);
+  c.bind(c.home);
+  assert.ok(believed >= MIDDEN_MIN, `the midden is MIDDEN_MIN out by its vector (${believed.toFixed(2)})`);
+  assert.ok(hexDistance(mx, my, h.px, h.py) >= 2, `the midden is out from the hole (${hexDistance(mx, my, h.px, h.py)} cells)`);
   assert.ok(g.fungus.spores.get(mx, my) > 0, "spores on the plane at the midden");
   assert.equal(g.fungus.spores.get(h.px, h.py), 0, "none at the hole");
 });
@@ -576,17 +584,4 @@ test("one world: an ant that dies on the plane leaves no corpse underground; one
   c.putAnt(1, CURTAIN, at.x, at.y + 4);
   c.kill(1, false);
   assert.equal(c.corpses.length, 1, "the control: underground, the dead lie where they fall");
-});
-
-test("a game on one map: each colony has one layer and every ant is on it", () => {
-  const g = new Game(generateSideWorld(1), { antCount: 30, rivalAnts: 30 }, gameRng(1));
-  assert.equal(g.world, null);
-  assert.equal(g.layers.length, 1);
-  run(g, 2);
-  for (const c of g.colonies) {
-    assert.equal(c.layers.length, 1);
-    assert.equal(c.line, null);
-    assert.deepEqual(c.holeCells, []);
-    assert.ok(c.layer.every((l) => l === 0));
-  }
 });

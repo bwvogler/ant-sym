@@ -1,5 +1,5 @@
 // Offline, no key: slow/economy.test's own hour on many seeds, as a guard for nest changes (PRD §71, §77; ja-k4k.15.1).
-// The test's map (256 × 160, ground 40 rows down, one colony of 110, 0.3 of the map's food), the game seeded
+// The test's world (smallOne(world): a 160 × 100 plane over its curtain, one colony of 110, 0.3 of both layers' food), the game seeded
 // world × 7919 + n. Each minute from 300 s on it counts larvae unfed over 120 s while the larder could feed them
 // ("stranded"), and reports per seed the worst stranding at once, where those larvae lay (royal chamber, a brood
 // chamber of two cells or fewer, a bigger one, none), the bands at that moment, and the workers alive at 3,600 s
@@ -21,25 +21,23 @@ const colony = process.argv[5] ? JSON.parse(process.argv[5]) : undefined;
 const M = (p) => import(`${root}/web/src/colony/${p}`);
 const { isFed, LARVA, LARVA_FOOD } = await M("brood.ts");
 const { Game } = await M("game.ts");
-const { generateSideWorld, mulberry32 } = await M("world.ts");
+const { mulberry32 } = await M("world.ts");
+const { smallOne } = await M("tests/builders.ts");
 
-const map = generateSideWorld(w, {
-  size: { w: 256, h: 160 },
-  nestGap: 120,
-  surface: 40,
-  nestCount: 1,
-});
-let total = 0;
-for (let y = 0; y < map.size.h; y++)
-  for (let x = 0; x < map.size.w; x++) {
-    const v = map.food.get(x, y) * 0.3;
-    map.food.set(x, y, v);
-    total += v;
-  }
-map.foodTotal = map.foodLeft = total;
-const g = new Game(map, { antCount: 110, rival: false }, mulberry32(w * 7919 + nudge), colony ? { colony } : undefined);
+const world = smallOne(w);
+for (const map of [world.plane, world.curtain]) {
+  let total = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+      const v = map.food.get(x, y) * 0.3;
+      map.food.set(x, y, v);
+      total += v;
+    }
+  map.foodTotal = map.foodLeft = total;
+}
+const g = new Game(world, { antCount: 110, rival: false }, mulberry32(w * 7919 + nudge), colony ? { colony } : undefined);
 const c = g.player;
-const ch = map.chambers;
+const ch = world.curtain.chambers;
 let stranded = 0;
 let worst = "";
 for (let k = 1; k <= 30 * 3600; k++) {

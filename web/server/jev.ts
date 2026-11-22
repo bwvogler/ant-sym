@@ -8,7 +8,7 @@ import { DEFAULT_IN_FLIGHT, type JevRequest } from "../shared/jev.ts";
 // request behind it — a burst of 8 then stacks 200, 400, 600 … ms and looks
 // exactly like a server-side concurrency cap (measured 2026-10-25, see
 // docs/PRD.md §3). maxSockets here is the in-flight limit, and
-// server/tests/jev.test.ts proves requests overlap.
+// server/tests/int/jev.test.ts proves requests overlap.
 
 /** What the API handler needs from a caller; JevClient is the real one, tests stub it. */
 export interface JevCaller {

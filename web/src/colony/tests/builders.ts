@@ -1,12 +1,12 @@
 // Test builders shared by the colony tests: the small maps and games, the step loop and the hand-placed colonies
 // that used to be copied file to file (S0b, ja-fnd.1.3). A test whose setup differs keeps its own and says why.
-import { LIFESPAN, MIDDLE, Colony, type HoleCell } from "../colony.ts";
+import { LIFESPAN, MIDDLE, Colony, type ColonyParams, type HoleCell } from "../colony.ts";
 import { type Policy } from "../vocab.ts";
 import type { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
 import { generateOneWorld, type OneWorld } from "../oneWorld.ts";
 import { decode, encode } from "../save.ts";
-import { digCell, generateSideWorld, isSky, mulberry32, OPEN, rockAt, worldFromArrays, type WorldMap } from "../world.ts";
+import { digCell, isSky, mulberry32, OPEN, rockAt, worldFromArrays, type WorldMap } from "../world.ts";
 import { put } from "./hexmaps.ts";
 
 /** One simulated step, as the page takes it (30 a second). */
@@ -64,8 +64,8 @@ export function walkway(map: WorldMap, x: number): number {
   return -1;
 }
 
-/** A brood chamber of three cells dug beside the royal one (to its east), for colony 0. */
-export function broodChamber(map: ReturnType<typeof generateSideWorld>) {
+/** A brood chamber of three cells dug beside the royal one (to its east), for colony 0 (a side map, or one world's curtain). */
+export function broodChamber(map: WorldMap) {
   const ch = map.chambers!;
   cellOf(map.nest.x, map.nest.y);
   const [rx, ry] = [CELL[0], CELL[1]];
@@ -84,6 +84,24 @@ export function broodChamber(map: ReturnType<typeof generateSideWorld>) {
 
 /** Seed `seed`'s one world with a 160 × 100 plane. */
 export const smallOne = (seed = 7): OneWorld => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } });
+/**
+ * A bare colony of `n` ants (room for `n + 4`) on seed 2's small one world, bound to its curtain (as a one-world colony is
+ * built), its ants in the nest with the queen: what the side map's bare colonies were for the nest's tests (S2.3c). `map` is the
+ * curtain; `seed` seeds the colony's random numbers, not the world.
+ */
+export function oneColony(
+  n = 1,
+  params: Partial<ColonyParams> = {},
+  policy: Policy = () => "explore",
+  seed = 2,
+): { map: WorldMap; c: Colony } {
+  const w = smallOne(2);
+  const c = new Colony(w.curtain, { antCount: n, maxAnts: n + 4, ...params }, mulberry32(seed), policy, {
+    plane: w.plane,
+    line: w.line,
+  });
+  return { map: w.curtain, c };
+}
 /** An age in band b (0 young, 1 middle-aged, 2 old) that every founder's lifespan outlasts. */
 export const ageOf = (b: 0 | 1 | 2) => [0.05, (0.15 + MIDDLE) / 2, 0.5][b]! * LIFESPAN;
 /** The colony's own hole. */

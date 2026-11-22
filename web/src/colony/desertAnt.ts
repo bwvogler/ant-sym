@@ -10,7 +10,7 @@ import { MODES, type LaneWords, type Mode, type Policy, type SpeciesSituation } 
 // The desert ant, Cataglyphis (docs/desert-ant.md, PRD §60; ja-rf5.3): the first real species on the descriptor (docs/species.md), made only of
 // its pieces. Modelled on C. fortis (Dillier & Wehner 2004, full text): one nest, about 200 workers. Its foragers work alone: no trail pheromone
 // and no recruitment to a place (Razin et al. 2013, full text; Wolf & Wehner 2000, unverified), so it lays and reads no trail and no alarm, and
-// has no follow mode and no stance lane; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Built since: food odour in the air
+// has no follow mode; no corpse removal was found (desert-ant.md §5), so it leaves its dead. Built since: food odour in the air
 // (ja-rf5.4), heat with the sun's height and the night (ja-rf5.5, ja-rf5.12; docs/desert-heat.md). Still to come: the invitation (ja-rf5.6).
 
 /** Its mode lane's fields: what it does, whether it is tired, whether it feels hot (ja-rf5.5), what it sees of the sun (ja-rf5.12), whether strangers are near. No trails, alarm or stance to sense. */
@@ -70,7 +70,7 @@ export const desertPolicy: Policy = (s) => {
   return "explore";
 };
 
-/** desertPolicy in words, for the Learn drawer (ruleTextAgrees holds them equal over every situation of DESERT_SCHEMA). */
+/** desertPolicy in words, for Lab mode's Policy tab (ruleTextAgrees holds them equal over every situation of DESERT_SCHEMA). */
 export const DESERT_RULE_TEXT: ModeRuleText = {
   rows: [
     { when: "it is hot (its body near the heat that kills it)", then: "return", test: (s) => (s as SpeciesSituation).hot === true },
@@ -97,12 +97,15 @@ export const DESERT_ANT: Species = {
     channelSet: MARKS,
     homeTrail: 0,
     raidGate: 0,
-    stanceGate: 0,
     undertakes: false,
     // Food odour in the air (ja-rf5.4, docs/desert-ant.md §3): C. fortis turns in to food odour up to about 6 m (5.9 m the longest;
     // Buehlmann et al. 2014, a pre-publication draft: unverified). One world's nests are 140 cells apart against C. fortis's ~40 m,
     // about 3.5 cells a metre: 6 m is 21 cells. D3 (PRD §60.4): the first find comes sooner on every seed of 1–20.
     foodPlume: 21,
+    // Aphids (docs/aphids.md "Not every ant in the game tends aphids"): Cataglyphis takes no honeydew, so it is deaf to aphid odour.
+    aphidPlume: 0,
+    tendDefend: 0,
+    aphidPrey: 0,
     // Heat and the sun (ja-rf5.5, ja-rf5.12; docs/desert-heat.md, PRD §60.5): all design but the critical heat, 53.6 °C (C. bombycina, Gehring &
     // Wehner 1995, read through later papers: a borrowing, unverified; the params.ts default). A 10-minute day, a third of it night (owner,
     // 2026-11-13). The papers' direction (owner, review of #155 D1): out under the high sun, at the hottest hours, close to their limit; so the

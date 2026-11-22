@@ -1,6 +1,6 @@
-// The local rules (docs/refactor.md S3.3, ja-fnd.4.12): the mode an ant takes and the stance a colony takes when no policy answers (Jev's stand-in, and the rule a lane plays while its words change). Moved out of colony.ts verbatim.
+// The local rules (docs/refactor.md S3.3, ja-fnd.4.12): the mode an ant takes when no policy answers (Jev's stand-in, and the rule a lane plays while its words change). Moved out of colony.ts verbatim.
 
-import { type Policy, type StancePolicy } from "./vocab.ts";
+import { NEUTRAL_STEERING, type Policy, type SteerPolicy } from "./vocab.ts";
 
 /**
  * The local rule. (An enemy close by is the contact response's to answer, behaviour MR 4: before it, this rule sent
@@ -22,10 +22,5 @@ export const localPolicy: Policy = (s) => {
   return s.mode === "return" ? "follow" : s.mode;
 };
 
-/** The local strategist: defend a nest under attack; raid when no food comes in or the colony is full and fed; else forage. */
-export const localStance: StancePolicy = (s) => {
-  if (s.enemyNearNest && s.losses !== "none") return "defend";
-  if (s.intake === "none" && s.ants !== "few") return "raid";
-  if (s.larder === "full" && s.ants === "many") return "raid";
-  return "forage";
-};
+/** The steer policy's local rule (ja-ykmu): every weight neutral, the game's steering as it was. */
+export const localSteer: SteerPolicy = () => NEUTRAL_STEERING;

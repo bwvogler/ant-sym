@@ -39,7 +39,6 @@ import {
   HOLD_MAX,
   LAY_INTERVAL,
   MIDDEN_MARK,
-  MIDDEN_NEAR,
   PICK_BROOD,
   PICK_CORPSE,
   PORT_RATE,
@@ -59,7 +58,7 @@ import { isSky } from "./world.ts";
 import { climbOut } from "./homing.ts";
 import { around, touch } from "./sense.ts";
 import { ageWorkers, dropBrood } from "./body.ts";
-import { clearPellet, markMidden, markMiddenPlane } from "./pellets.ts";
+import { clearPellet, markMiddenPlane } from "./pellets.ts";
 
 export function portView(col: Colony): void {
   if (col.portViewAt === col.time) return;
@@ -203,7 +202,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         return false;
       }
     }
-    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"))) return false;
+    if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) return false;
     col.carrying[i] = 0;
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
@@ -329,7 +328,7 @@ export function nurse(col: Colony, i: number, dt: number, enemy: boolean): void 
     if (b.held < 0 && hexDistance(b.x, b.y, cx, cy) <= 2 && ((inRoyal && b.stage === EGG && to >= 0) || b.chamber < 0)) {
       if (to < 0) to = royal;
       if (to < 0) return;
-      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"))) return;
+      if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "brood"), col.antDraw(i))) return;
       b.held = i;
       if (b.chamber >= 0) ch.list[b.chamber]!.brood--;
       b.chamber = -1;
@@ -356,26 +355,15 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
   col.antCell(i);
   const cx = CELL[0];
   const cy = CELL[1];
-  // Inside, the middle-aged do it; on the ground near the hole (fights fall there too), whoever is out.
-  const outside = isSky(col.map, cx, cy);
-  if (outside ? Math.abs(cx - col.entranceCol) > MIDDEN_NEAR : col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
+  // Underground, the middle-aged do it.
+  if (col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
   for (const k of col.corpses)
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
-      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"))) return;
+      if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"), col.antDraw(i))) return;
       k.held = i;
       clearPellet(col, i);
       col.corpse[i] = 1;
       col.pellet[i] = 1;
-      if (outside) {
-        // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
-        // From past the midden, back toward it: carried out from there, it was put down at once where it lay, off the
-        // midden, and picked up again (review of #26: one corpse nine times).
-        const side = col.middenSide();
-        const past = side * (cx - col.entranceCol) > col.middenAt();
-        col.spoilTo[i] = past ? -col.middenAt() : col.middenAt();
-        col.spoilSide[i] = past ? -side : side;
-        col.spoilT[i] = 0;
-      }
       col.mode[i] = RETURN;
       col.homeAfresh(i);
       col.gx[i] = NO_CELL;
@@ -405,8 +393,7 @@ export function middenSmell(col: Colony, dt: number): void {
     if (left <= 0) break;
     const n = Math.min(left, count);
     left -= n;
-    if (col.line !== null) markMiddenPlane(col, keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
-    else markMidden(col, keyX(key), MIDDEN_MARK * dt * 0.1 * n);
+    markMiddenPlane(col, keyX(key), keyY(key), MIDDEN_MARK * dt * 0.1 * n);
   }
 }
 

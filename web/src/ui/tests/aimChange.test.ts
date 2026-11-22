@@ -5,7 +5,7 @@ import {
   fungalKey,
   fungusContext,
   Game,
-  generateWorld,
+  generateOneWorld,
   growthContext,
   LANES,
   askedLevers,
@@ -94,7 +94,7 @@ const B = host({ task: "forager", place: "outside", carrying: "food" });
  * within a few cycles went without it.
  */
 function make(): ColonyJev {
-  const g = new Game(generateWorld(1, { size: { w: 120, h: 80 } }), { antCount: 10, rival: false }, mulberry32(3));
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 10, rival: false }, mulberry32(3));
   const c = g.colonies[0]!;
   c.fungal.fill(-1);
   [A, B, A].forEach((s, i) => (c.fungal[i] = encodeFungal(s)));
@@ -145,7 +145,7 @@ test("what the new aim has cached is not asked; an aim with everything cached as
   j.setAim("first words");
   const aim = "shipped words";
   const lv = askedLevers(new Set(DEFAULT_MENU), false);
-  assert.equal(j.seed(fungusContext(aim, "top"), [[fungalKey(A, lv), encodeLevels({}, lv)]]), 1, "A's answer under the new aim");
+  assert.equal(j.seed(fungusContext(aim), [[fungalKey(A, lv), encodeLevels({}, lv)]]), 1, "A's answer under the new aim");
   j.seed(
     growthContext(aim),
     LANES.growth.all().map((s) => [LANES.growth.key(s, undefined), "grow"]),
@@ -159,7 +159,7 @@ test("what the new aim has cached is not asked; an aim with everything cached as
   // Everything cached, no run: nothing is wanted.
   const k = make();
   k.setAim("first words");
-  k.seed(fungusContext(aim, "top"), [
+  k.seed(fungusContext(aim), [
     [fungalKey(A, lv), encodeLevels({}, lv)],
     [fungalKey(B, lv), encodeLevels({}, lv)],
   ]);

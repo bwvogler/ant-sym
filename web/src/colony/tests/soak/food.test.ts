@@ -1,18 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LARVA, PUPA } from "../../brood.ts";
-import { Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
+import { Colony, LIFESPAN, MIDDLE, YOUNG, type ColonyParams } from "../../colony.ts";
 import { Game } from "../../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
-import { digCell, generateSideWorld, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
-import { SMALL_SIDE, broodChamber } from "../builders.ts";
+import type { OneWorld } from "../../oneWorld.ts";
+import type { Policy } from "../../vocab.ts";
+import { digCell, mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
+import { broodChamber, smallOne } from "../builders.ts";
 
 // Nest slice 5 (docs/nest-and-home.md §3.6): food lies in chambers. Foragers bring it to reception; porters carry it to
-// where brood and the queen want it, and the rest down to stores; the queen and larvae eat what lies by them.
+// where brood and the queen want it, and the rest down to stores; the queen and larvae eat what lies by them. On the curtain of
+// seed 2's small one world (S2.3c).
+
+/** A bare colony on world w's curtain (bound to it, as a one-world colony is built). */
+const colony = (w: OneWorld, params: Partial<ColonyParams>, seed: number, policy?: Policy): Colony =>
+  new Colony(w.curtain, params, mulberry32(seed), policy, { plane: w.plane, line: w.line });
 
 test("the larder is the food lying in the colony's chambers, porters move it, and the queen's brood is raised from it", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const g = new Game(map, { antCount: 300, rival: false }, mulberry32(4));
+  const w = smallOne(2);
+  const map = w.curtain;
+  const g = new Game(w, { antCount: 300, rival: false }, mulberry32(4));
   const c = g.player;
   for (let k = 0; k < 30 * 300; k++) {
     g.tick(1 / 30);
@@ -44,8 +52,9 @@ function reception(map: WorldMap, cells: number) {
 }
 
 /** A colony of one forager carrying food in at the hole: which chamber its food goes to. */
-function forage(map: WorldMap) {
-  const c = new Colony(map, { antCount: 1, maxAnts: 1, deposit: 0 }, mulberry32(3), () => "explore");
+function forage(w: OneWorld) {
+  const map = w.curtain;
+  const c = colony(w, { antCount: 1, maxAnts: 1, deposit: 0 }, 3, () => "explore");
   c.x[0] = map.nest.entrance!.x;
   c.y[0] = map.nest.entrance!.y + 1;
   c.carrying[0] = 1;
@@ -54,12 +63,13 @@ function forage(map: WorldMap) {
 }
 
 test("a forager with food puts it down in reception when there is one; without one, in the royal chamber", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 4);
   const drop = (withReception: boolean) => {
     if (!withReception) rec.role = "brood";
-    const c = forage(map);
+    const c = forage(w);
     const target = withReception ? rec : royal;
     const before = target.food;
     for (let k = 0; k < 30 * 60 && c.stored === 0; k++) c.tick(1 / 30);
@@ -75,10 +85,11 @@ test("a forager with food puts it down in reception when there is one; without o
 });
 
 test("a reception of a cell or two is no reception yet: foragers take their food to the royal chamber (review of slice 5: a one-cell reception choked the colony)", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 1);
-  const c = forage(map);
+  const c = forage(w);
   for (let k = 0; k < 30 * 60 && c.stored === 0; k++) c.tick(1 / 30);
   assert.equal(c.stored, 1, "home");
   assert.equal(rec.food, 0, "not into the one-cell reception");
@@ -86,10 +97,11 @@ test("a reception of a cell or two is no reception yet: foragers take their food
 });
 
 test("a forager finding food already waiting at reception carries its own on to where it is wanted (a backlog: the porters aren't keeping up)", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const royal = map.chambers!.list[0]!;
   const rec = reception(map, 4);
-  const c = forage(map);
+  const c = forage(w);
   rec.food += 5; // waiting there already
   c.larder += 5;
   // The queen alive and her chamber empty: it wants her stock (QUEEN_STOCK).
@@ -102,9 +114,10 @@ test("a forager finding food already waiting at reception carries its own on to 
 });
 
 test("food beyond the queen's stock in the royal chamber is carried on to hungry larvae (no reception yet: foragers put it there)", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const { b: room, cell } = broodChamber(map);
-  const c = new Colony(map, { antCount: 12, maxAnts: 16, deposit: 0 }, mulberry32(5), () => "explore");
+  const c = colony(w, { antCount: 12, maxAnts: 16, deposit: 0 }, 5, () => "explore");
   // Diggers and carriers.
   for (let i = 0; i < c.n; i++) {
     c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
@@ -121,9 +134,10 @@ test("food beyond the queen's stock in the royal chamber is carried on to hungry
 });
 
 test("porters lay no food trail: food moved between chambers is no food to recruit to (review of slice 5: 4–5× as many ants followed food scent underground)", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const rec = reception(map, 4);
-  const c = new Colony(map, { antCount: 1, maxAnts: 1 }, mulberry32(4), () => "explore");
+  const c = colony(w, { antCount: 1, maxAnts: 1 }, 4, () => "explore");
   c.age[0] = ((YOUNG + MIDDLE) / 2) * LIFESPAN; // a carrier inside
   c.lifespan[0] = Infinity;
   rec.food += 3;
@@ -139,14 +153,15 @@ test("porters lay no food trail: food moved between chambers is no food to recru
   }
   assert.ok(carried && c.portTrips === 1, `it carried a unit and put it down (${c.portTrips} trips)`);
   let food = 0;
-  for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) food += c.ph.fields.food.get(x, y);
+  for (let y = 0; y < map.size.h; y++) for (let x = map.x0; x < map.x0 + map.size.w; x++) food += c.ph.fields.food.get(x, y);
   assert.equal(food, 0, "no food trail anywhere");
 });
 
 test("a larva eats what lies in its own chamber, not the royal chamber's", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
+  const w = smallOne(2);
+  const map = w.curtain;
   const { b: room, cell } = broodChamber(map);
-  const c = new Colony(map, { antCount: 1, maxAnts: 4 }, mulberry32(2), () => "explore");
+  const c = colony(w, { antCount: 1, maxAnts: 4 }, 2, () => "explore");
   c.kill(0); // no porters: only where the food lies counts
   c.killQueen();
   const larva = c.brood.add(cell[0], cell[1], room.id);
@@ -164,8 +179,9 @@ test("a larva eats what lies in its own chamber, not the royal chamber's", () =>
 });
 
 test("a larva lying outside any chamber is taken in and raised (review of slice 5: strays starved)", () => {
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const g = new Game(map, { antCount: 80, rival: false }, mulberry32(3));
+  const w = smallOne(2);
+  const map = w.curtain;
+  const g = new Game(w, { antCount: 80, rival: false }, mulberry32(3));
   const c = g.player;
   // A larva on the shaft just below the hole: in no chamber.
   cellOf(map.nest.entrance!.x, map.nest.entrance!.y + 3);
@@ -179,11 +195,12 @@ test("a larva lying outside any chamber is taken in and raised (review of slice 
 test("a forager long on its way puts its food down in the first store of its colony it stands in; a fresh one, or one in another colony's store, doesn't (ja-3ifx)", () => {
   /** A forager standing in a four-cell store (its colony's, or `owner`'s) with `since` seconds on its trip, for 1 s. */
   const run = (since: number, owner = 0) => {
-    const map = generateSideWorld(2, SMALL_SIDE);
+    const w = smallOne(2);
+    const map = w.curtain;
     const store = reception(map, 4);
     store.role = "store"; // not where its food goes (no reception: the royal chamber)
     store.colony = owner;
-    const c = forage(map);
+    const c = forage(w);
     const [sx, sy] = [store.x0 + 1, store.floorRow];
     c.x[0] = centreX(sx, sy);
     c.y[0] = centreY(sy);

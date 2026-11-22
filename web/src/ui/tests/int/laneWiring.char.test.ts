@@ -6,7 +6,7 @@ import {
   fungalKey,
   fungusContext,
   Game,
-  generateWorld,
+  CURTAIN,
   LEVERS,
   mulberry32,
   PRESETS,
@@ -74,7 +74,7 @@ function scriptAll() {
       if (spec.type === "score") {
         const lever = LEVERS.find((v) => v.id === q.slice(q.indexOf("_") + 1))!;
         answers[q] = { type: "score", score: levels[lever.id] ?? lever.asIs };
-      } else answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+      } else answers[q] = { type: "choice", choice: "explore", confidence: 0.9 };
     }
     const body = {
       status: 200,
@@ -89,20 +89,7 @@ function scriptAll() {
   return reqs;
 }
 
-/** A game on the top-down kind of map (no nest underground), Garden painted on the player's nest. */
-function topGame() {
-  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
-  g.paintSpores(
-    g.player.nest.x,
-    g.player.nest.y,
-    g.player.nest.r + 2,
-    3,
-    0.4,
-    STRAINS.findIndex((s) => s.id === "garden"),
-  );
-  return g;
-}
-/** One world's: a curtain under the plane, so the fungus has a nest (its view is "side"). */
+/** One world's: a curtain under the plane, so the fungus has a nest (its view is "side"); Garden painted round the royal chamber. */
 function nestGame() {
   const g = new Game(smallOne(7), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
   g.paintSpores(
@@ -112,6 +99,7 @@ function nestGame() {
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
+    CURTAIN,
   );
   return g;
 }
@@ -131,28 +119,6 @@ test("the client's defaults: a hundred situations a request, two in flight, a cy
   assert.deepEqual(DEFAULT_COLONY_JEV, { batch: 100, inFlight: 2, intervalMs: 300, gatherMs: 2000, saveMs: 1000 });
 });
 
-test("the fungus lane asks and answers under the view its game has: top without a nest, side with one", () => {
-  for (const [game, view, other] of [
-    [topGame(), "top", "side"],
-    [nestGame(), "side", "top"],
-  ] as const) {
-    const askedFor = (s: FungalSituation) => askedLevers(game.fungus.menu, s.task === "queen");
-    const answer = encodeLevels(PRESETS[0]!.levels, askedFor(WORKER));
-    // Cached under the right view's context: a hit. Under the other view's: not asked there, so not a hit.
-    for (const [ctxView, expected] of [
-      [view, "jev"],
-      [other, "local"],
-    ] as const) {
-      const store = memoryStore();
-      store.data.set(fungusContext(AIM, ctxView), [[fungalKey(WORKER, askedFor(WORKER)), answer]]);
-      const j = make({}, store);
-      j.attachFungus(game.fungus);
-      j.setAim(AIM);
-      assert.equal(j.explainFungus(WORKER).by, expected, `${view} game, an answer cached under the ${ctxView} view`);
-    }
-  }
-});
-
 test("the fungus lane asks a queen host only her levers, and a worker the menu's", () => {
   const g = nestGame();
   const store = memoryStore();
@@ -160,7 +126,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
   const workerAsked = askedLevers(g.fungus.menu, false);
   assert.notDeepEqual(queenAsked, workerAsked);
   // Cached under her own key (her levers): a hit for a queen. Under a worker's levers: not her key, so not a hit.
-  store.data.set(fungusContext(AIM, "side"), [
+  store.data.set(fungusContext(AIM), [
     [fungalKey(QUEEN, queenAsked), encodeLevels(PRESETS[0]!.levels, queenAsked)],
     [fungalKey(WORKER, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)],
   ]);
@@ -170,7 +136,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
   assert.equal(j.explainFungus(QUEEN).by, "jev");
   assert.equal(j.explainFungus(WORKER).by, "jev");
   const wrong = memoryStore();
-  wrong.data.set(fungusContext(AIM, "side"), [[fungalKey(QUEEN, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)]]);
+  wrong.data.set(fungusContext(AIM), [[fungalKey(QUEEN, workerAsked), encodeLevels(PRESETS[0]!.levels, workerAsked)]]);
   const k = make({}, wrong);
   k.attachFungus(g.fungus);
   k.setAim(AIM);
@@ -180,7 +146,7 @@ test("the fungus lane asks a queen host only her levers, and a worker the menu's
 test("the fungus lane's batch is its own, not the client's: hosts go up to fifty a request while ants are held to the client's batch", async () => {
   const sent = scriptAll();
   const j = make({ batch: 2 });
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
@@ -199,7 +165,7 @@ test("the fungus lane's batch is its own, not the client's: hosts go up to fifty
 test("the fungus lane waits to gather a fuller request before it sends; the ants' lanes send at once", async () => {
   const sent = scriptAll();
   const j = make({ gatherMs: 600 });
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
@@ -221,35 +187,27 @@ test("the fungus lane waits to gather a fuller request before it sends; the ants
   );
 });
 
-test("each lane sends its own ids and feeds its own counter: ants s0.., the strategist c0.., the fungus h0..; hits are the ants' modes only (review of #101)", async () => {
+test("each lane sends its own ids and feeds its own counter: ants s0.., the fungus h0..; hits are the ants' modes only (review of #101)", async () => {
   const sent = scriptAll();
   const j = make();
-  const g = topGame();
+  const g = nestGame();
   j.attach(g.player);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
   await j.start();
   const asked = (key: string) => sent.some((x) => x.req.state[key]);
-  // The strategist is asked by the game when it chooses a stance: here by hand, as colonyJev.test.ts does, with a few views.
-  const views = [g.player.stanceSituation(false), g.player.stanceSituation(true)];
-  for (let round = 0; round < 20 && !(asked("ants") && asked("colony") && asked("hosts")); round++) {
+  for (let round = 0; round < 20 && !(asked("ants") && asked("hosts")); round++) {
     for (let k = 0; k < 6; k++) g.tick(1 / 30);
-    for (const v of views) j.stancePolicy(v);
     await tick(25);
   }
   await tick(60);
   const ids = (key: string) => sent.flatMap((s) => Object.keys((s.req.state[key] ?? {}) as object));
   const ants = ids("ants");
-  const strategist = ids("colony");
   const hosts = ids("hosts");
-  assert.ok(ants.length > 0 && strategist.length > 0 && hosts.length > 0, "all three lanes asked");
+  assert.ok(ants.length > 0 && hosts.length > 0, "both lanes asked");
   assert.ok(
     ants.every((id) => /^s\d+$/.test(id)),
     "an ant's situation is s<n>",
-  );
-  assert.ok(
-    strategist.every((id) => /^c\d+$/.test(id)),
-    "the strategist's view is c<n>",
   );
   assert.ok(
     hosts.every((id) => /^h\d+$/.test(id)),
@@ -257,11 +215,7 @@ test("each lane sends its own ids and feeds its own counter: ants s0.., the stra
   );
   // Each counter counts the situations its own lane sent.
   assert.equal(j.state.lanes.mode.asked, ants.length);
-  assert.equal(j.state.lanes.stance.asked, strategist.length);
   assert.equal(j.state.lanes.fungus.asked, hosts.length);
-  // Only the ants' modes are tallied as hits and misses: a strategist lookup moves neither.
+  // The ants' modes are tallied as hits and misses.
   assert.ok(j.state.hits + j.state.misses > 0, "the ants' lookups are tallied");
-  const tally = j.state.hits + j.state.misses;
-  for (const v of views) j.stancePolicy(v);
-  assert.equal(j.state.hits + j.state.misses, tally, "the strategist's lookups are not tallied");
 });

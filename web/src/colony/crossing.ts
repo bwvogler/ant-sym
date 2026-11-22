@@ -55,7 +55,7 @@ export function holdsAt(c: Colony, i: number): boolean {
  * way-out field, outField), where it senses its place as "hole". Leaves the shared CELL as it found it.
  */
 export function atGate(c: Colony, i: number): boolean {
-  if (c.line === null || c.entrance === null) return false;
+  if (c.line === null || c.onPlane) return false;
   // Deeper than WAIT_STEPS rows below the hole, it can't be (most of the nest: no field read).
   if (c.y[i] > centreY(c.entranceRow + WAIT_STEPS) + R) return false;
   const keepX = CELL[0];
@@ -115,8 +115,11 @@ export function crossUp(c: Colony, i: number, cx: number, cy: number): void {
     // Up out of its own hole the vector starts afresh, pointing at it, with this trip's drift in 2D (U3b). Up out of a
     // rival's it runs on, its error standing (the side view's rule, integrate; review of #20).
     c.odoSurf[i] = 0;
+    c.reachSurf[i] = 0;
     c.driftSurf[i] = gauss(c.rng) * PI_DRIFT_2D;
     c.driftSurfY[i] = gauss(c.rng) * PI_DRIFT_2D;
+    c.carriedX[i] = 0; // a fresh trip: nothing carried yet (builder.ts moveAnt)
+    c.carriedY[i] = 0;
     routeClear(c, i); // a fresh trip out: no places of the last
   }
   c.lastRole[i] = 0; // out of the nest: the next chamber it enters starts its marks afresh

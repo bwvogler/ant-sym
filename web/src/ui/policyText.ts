@@ -1,10 +1,10 @@
 import { modeSchema, type Mode, type Situation, type Species } from "../colony/index.ts";
 
-// The local rules in words, for the Learn drawer's Policy tab. Each mode and
-// stance rule is a row the drawer shows ("when …, then …") with the test it
+// The local rules in words, for Lab mode's Policy tab (PolicyTab.tsx). Each mode and
+// stance rule is a row the tab shows ("when …, then …") with the test it
 // stands for; tests/policyText.test.ts walks every situation and checks that
-// the rows, read top to bottom, give exactly what localPolicy and localStance
-// give. So the words can't drift from the code: change a rule there and the
+// the rows, read top to bottom, give exactly what localPolicy
+// gives. So the words can't drift from the code: change a rule there and the
 // test names the row to rewrite here.
 
 export interface RuleRow<S, A extends string> {
@@ -50,7 +50,7 @@ export function byRows<S, A extends string>(rows: readonly RuleRow<S, A>[], othe
 
 /** The fungus's local rule (fungalPolicy.ts localFungusRule) in words. */
 export const LOCAL_FUNGUS_RULES: string[] = [
-  "Groomed, with “groomed hosts hide” on (Details → Lab): hide the fungus (fungus showing: hidden).",
+  "Groomed, with “groomed hosts hide” on (Lab → Levers): hide the fungus (fungus showing: hidden).",
   "With “cull” on, a host fighting a foreigner: the odour weapon (lethal; only if it is on the menu and, in the game, your fungus has kept the Odour weapon upgrade).",
   "Otherwise: what your strain, Garden, does by default: hosts carry the fungus's odour and tolerate strangers a little (blend), as far as your Recognition upgrade reaches. Levers off the menu stay as they are.",
 ];

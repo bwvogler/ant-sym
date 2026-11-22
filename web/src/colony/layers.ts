@@ -180,7 +180,7 @@ export function loadLayer(c: Colony, s: LayerSlots): void {
 }
 
 /**
- * Every nest's hole on the map (side view), whose funnels the colony's mound keeps open (world.heapMound). Again
+ * Every nest's hole on the map (one world: its plane cells), whose rings the colony's mound keeps open (world.heapPlane). Again
  * whenever a colony is founded (Game.addColony), so an older colony's mound never buries the new hole (PR #42
  * review, S3).
  */

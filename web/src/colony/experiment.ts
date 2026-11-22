@@ -8,10 +8,10 @@ import { isFed, LARVA, LARVA_FOOD } from "./brood.ts";
 import { Game } from "./game.ts";
 import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
-import { generateOneWorld } from "./oneWorld.ts";
+import { generateOneWorld, type OneWorld } from "./oneWorld.ts";
 import { holeRaid } from "./sense.ts";
 import { localResponses, responses } from "./responses.ts";
-import { isSky, takeFoodCell, generateSideWorld, generateWorld, OPEN, OPEN_WORLD, rockAt, type WorldMap } from "./world.ts";
+import { isSky, takeFoodCell, OPEN, rockAt, type WorldMap } from "./world.ts";
 
 import {
   type Assay,
@@ -26,6 +26,7 @@ import {
   gateProbe,
   occupancyProbe,
   onLayer,
+  marchProbe,
   onPlane,
   runGame,
   type Probe,
@@ -36,10 +37,12 @@ import {
 export * from "./harness.ts";
 export * from "./oneAssays.ts";
 export * from "./desertAssays.ts";
+export * from "./neglectusAssays.ts";
 export * from "./builderAssays.ts";
 import { BUILDER_ASSAYS } from "./builderAssays.ts";
 import { desertChamber, desertFirstFind, desertHeat, desertInvitation, desertNoTrail, desertTrips } from "./desertAssays.ts";
-import { forage1, game1, route1, search1 } from "./oneAssays.ts";
+import { neglectusImmunisation, neglectusTolerance } from "./neglectusAssays.ts";
+import { forage1, game1, lockstep1, memory1, route1, search1, searchTight1 } from "./oneAssays.ts";
 
 const always =
   <T extends string>(v: T) =>
@@ -478,13 +481,9 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
-    // Both sides keep the colony's stance (stanceGate 0, docs/stance.md): A6 is about who reaches whom at a pass, and with each
-    // ant's own stance the defenders 40 cells from home turned away from the pass instead of holding it (gain 1.64 against 1.95).
     sides: {
       policy: always<Mode>("fight"),
-      stance: always<Stance>("raid"),
-      colony: { raidGate: 0, stanceGate: 0 },
-      rival: { stanceGate: 0 },
+      colony: { raidGate: 0 },
     },
   };
 }
@@ -523,6 +522,21 @@ function passAssay(remap: (spec: RunSpec) => RunSpec): Assay {
   };
 }
 export const pass = passAssay((spec) => spec);
+
+/**
+ * A6 on one world with no colony-wide stance (S2.2c, owner's D2 on #184): the arena made the plane, the attackers (colony 0)
+ * in fight mode with their own stance, walked to the defenders' hole by the harness (marchProbe) instead of marching at its
+ * coordinates; the defenders with their own stance. The same for the open control, so the gain compares like with like.
+ */
+export const passWalked: Assay = {
+  ...passAssay((spec) => walked(onPlane(spec), 0, 1)),
+  title: `${pass.title} (one world, attackers walked)`,
+};
+
+/** A battle spec with side `k` walked at side `to`'s hole. */
+function walked(spec: RunSpec, k: number, to: number): RunSpec {
+  return { ...spec, probes: [...(spec.probes ?? []), marchProbe(k, to)] };
+}
 export const open: Assay = {
   id: "open",
   title: "A6 control: the same battle on open ground",
@@ -658,7 +672,7 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
         { x: 100, y: 30, r: 3 },
       ]),
     game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { stance: always<Stance>("raid"), responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
+    sides: { responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
     probes: [raidProbe(own, rival)],
   };
 }
@@ -704,7 +718,7 @@ export const raidFind = raidFindAssay((spec) => spec);
  * A12 — a raid no one can find doesn't starve the colony (behaviour MR 5.2, docs/raid-recruitment.md). One colony forced onto
  * a raid stance with its rival sealed in rock, and a food pile it could forage. A raid stance is a bias, not an order: ants not
  * recruited by a scout's trail go on foraging, and scouts that find no one tire and come home. (The first version made
- * raiders wait at home for a trail that never came, and the strategist raids when no food comes in, so it never ate: 10 of
+ * raiders wait at home for a trail that never came, and a raid stance told to every ant (since removed) left it no forager, so it never ate: 10 of
  * 7,400.) Score: food stored over 900 s against the same colony on a forage stance. Design mark: at least RAID_STOP_FOOD
  * of it. Reported: the share outside in the last 3 min.
  */
@@ -725,7 +739,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
       ]);
     },
     game: { antCount: 300, rivalAnts: 30 },
-    sides: { stance: always<Stance>(stance), responses: stance === "raid" ? RAIDING : NEVER_RAID },
+    sides: { responses: stance === "raid" ? RAIDING : NEVER_RAID },
     probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
@@ -769,7 +783,7 @@ export const contact: Assay = {
         { x: 108, y: 30, r: 3 },
       ]),
     game: { antCount: 200, rivalAnts: 200 },
-    sides: { stance: always<Stance>("forage"), rivalStance: always<Stance>("forage"), responses: NEVER_RAID, rivalResponses: NEVER_RAID },
+    sides: { responses: NEVER_RAID, rivalResponses: NEVER_RAID },
   }),
   score: (r) => {
     const lost = r.metrics["you.losses"] + r.metrics["rival.losses"];
@@ -786,10 +800,9 @@ export const contact: Assay = {
  * threshold raised by encounters, Hoover et al. 2016; Pheidole: the fight moves closer to the nest as it grows). Score: food
  * stored against the same seed with the war party sealed in rock (`foodShare`), the strangers killed per ant lost
  * (`exchange`), and, sampled each second from 20 s, the colony's fighters within NEAR_HOME of its nest (`fightNear`) and its
- * ants at the pile that are not fighting (`atPile`). `broadcast` is the same battle with the colony's stance chosen by its
- * strategist and told to every ant (stanceGate 0, as before). Design mark: food at least DEFEND_FOOD of the broadcast's
- * share, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an 80-strong
- * war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
+ * ants at the pile that are not fighting (`atPile`). Design mark (defendWalked): food at least DEFEND_FOOD of the same colony's
+ * with nobody defending, and at least half the war party killed. (An absolute mark of 0.8 of the control failed under both: an
+ * 80-strong war party forced to fight costs a 200-ant colony 120-130 ants whoever defends.)
  */
 export const DEFEND_FOOD = 0.9;
 export const NEAR_HOME = 15;
@@ -815,8 +828,7 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     sides: {
       ...(colony ? { colony } : {}),
       rivalPolicy: always<Mode>("fight"),
-      rivalStance: always<Stance>("raid"),
-      rival: { raidGate: 0, stanceGate: 0 },
+      rival: { raidGate: 0 },
     },
     probes: [
       {
@@ -839,30 +851,46 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
     ],
   };
 }
-export const defendHome: Assay = {
+/**
+ * A13 on one world (S2.2c): the arena made the plane, the war party (colony 1) in fight mode with its own stance, walked to the
+ * colony's hole by the harness (marchProbe). `noDefence` is the same battle with nobody defending (defendAt ∞).
+ * Design mark (owner, 2026-11-15, S2.2c): food at least DEFEND_FOOD of the no-defence colony's, and at least half the war
+ * party killed: defending by its senses should cost the colony no more than not defending, and stop the raiders.
+ */
+/** One arm of A13 on one world: the war party (colony 1) walked at the colony's hole. The spec and both controls use it. */
+const defendArm = (seed: number, sealed: boolean, colony?: Partial<ColonyParams>): RunSpec =>
+  walked(onPlane(defendSpec(seed, sealed, colony)), 1, 0);
+
+export const defendWalked: Assay = {
   id: "defendHome",
-  title: "A13 defence from senses: the nest is defended, the far pile still worked",
-  target: `food (against the same colony with no war party) ≥ ${DEFEND_FOOD * 100} % of the broadcast stance's, and ≥ half the war party killed (design marks; docs/stance.md)`,
+  title: "A13 defence from senses (one world, the war party walked)",
+  target: `food ≥ ${DEFEND_FOOD * 100} % of the same colony's with nobody defending, and ≥ half the war party killed (design marks; docs/stance.md)`,
   seconds: 300,
-  spec: (seed) => defendSpec(seed, false),
-  score: (r) => {
+  spec: (seed) => defendArm(seed, false),
+  score: (r, game) => {
+    const run = (sealed: boolean, colony?: Partial<ColonyParams>) => runGame(defendArm(r.seed, sealed, colony)).result.metrics;
     const stored = r.metrics["you.stored"];
-    const control = runGame(defendSpec(r.seed, true)).result.metrics["you.stored"];
-    const foodShare = control > 0 ? stored / control : NaN;
+    const control = run(true)["you.stored"];
+    const none = run(false, { defendAt: Infinity });
     const killed = r.metrics["rival.losses"];
+    const vsNone = control > 0 && none["you.stored"] > 0 ? stored / none["you.stored"] : NaN;
+    const half = game.params.rivalAnts / 2;
     const lost = r.metrics["you.losses"];
-    const broadcast = runGame(defendSpec(r.seed, false, { stanceGate: 0 })).result.metrics["you.stored"] / Math.max(1, control);
     return {
       stored,
       control,
-      foodShare,
-      broadcast,
+      foodShare: control > 0 ? stored / control : NaN,
+      noDefence: none["you.stored"] / Math.max(1, control),
+      vsNone,
+      noDefenceKilled: none["rival.losses"],
+      noDefenceLost: none["you.losses"],
       killed,
       lost,
       exchange: killed / Math.max(1, lost),
       fightNear: r.metrics.fightNear as number,
       atPile: r.metrics.atPile as number,
-      pass: foodShare >= DEFEND_FOOD * broadcast && killed >= 40 ? 1 : 0,
+      marched: r.metrics.marched as number,
+      pass: vsNone >= DEFEND_FOOD && killed >= half ? 1 : 0,
     };
   },
 };
@@ -921,12 +949,13 @@ export const faintAlarm: Assay = {
 /**
  * G — the real game as the page opens it (the side view), 600 + 600 ants, 10 minutes. Also the
  * homing guard (A7): no colony with more than 2 foragers holding food over 120 s at any 10-s sample
- * (slow/side.test's bound).
+ * (the side view's slow/side.test bound, now G1's).
  */
 export const game: Assay = {
   id: "game",
   title: "G the side-view game (with A7: foragers holding food)",
-  target: "≤ 2 foragers holding food over 120 s per colony at any 10-s sample (slow/side.test's bound); food home and outcome reported",
+  target:
+    "≤ 2 foragers holding food over 120 s per colony at any 10-s sample (the side view's slow/side.test bound, now G1's); food home and outcome reported",
   seconds: 600,
   spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rivalAnts: 600 } }),
   score: (r) => {
@@ -938,16 +967,6 @@ export const game: Assay = {
       pass: worst <= 2 ? 1 : 0,
     };
   },
-};
-
-/** The same game on the top-down map (OPEN_WORLD): the bench bed, no queen. */
-export const gameTop: Assay = {
-  id: "gameTop",
-  title: "G' the top-down game (OPEN_WORLD)",
-  target: "report only: food home, held food, outcome",
-  seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, map: (s) => generateWorld(s, OPEN_WORLD), game: { antCount: 600, rivalAnts: 600 } }),
-  score: (r) => ({ maxHeld: Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0) }),
 };
 
 /**
@@ -1155,20 +1174,22 @@ export const pockets: Assay = {
 };
 
 /**
- * slow/economy.test's map: the tests' small side map (256 × 160) with one nest and 0.3 of its food, about the full
- * game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
+ * slow/economy.test's world: the tests' small one world (a 160 × 100 plane over its curtain) with 0.3 of both layers' food, about
+ * the full game's food per ant for a colony of 110. World `((seed - 1) % 4) + 1`, so seeds 1-16 play worlds 1-4 four times each.
  */
-export function economyMap(seed: number): WorldMap {
-  const map = generateSideWorld(((seed - 1) % 4) + 1, { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 });
-  let total = 0;
-  for (let y = 0; y < map.size.h; y++)
-    for (let x = 0; x < map.size.w; x++) {
-      const v = map.food.get(x, y) * 0.3;
-      map.food.set(x, y, v);
-      total += v;
-    }
-  map.foodTotal = map.foodLeft = total;
-  return map;
+export function economyMap(seed: number): OneWorld {
+  const world = generateOneWorld(((seed - 1) % 4) + 1, { plane: { size: { w: 160, h: 100 } } });
+  for (const map of [world.plane, world.curtain]) {
+    let total = 0;
+    for (let y = 0; y < map.size.h; y++)
+      for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+        const v = map.food.get(x, y) * 0.3;
+        map.food.set(x, y, v);
+        total += v;
+      }
+    map.foodTotal = map.foodLeft = total;
+  }
+  return world;
 }
 
 /** Workers and larvae starved by the end, and births, of the first colony. */
@@ -1301,32 +1322,6 @@ export const lifecycleScent = lifecycleAssay("scent");
 /** The three on one world (ONE_ASSAYS, same ids): the alates fly from the plane and their daughters dig in the curtain. */
 export const lifecycleOne = (["none", "signal", "scent"] as const).map((arm) => lifecycleAssay(arm, true));
 
-export const ASSAYS: Assay[] = [
-  bridge,
-  twin,
-  richPoor,
-  deplete,
-  alarm,
-  regulate,
-  regulateStop,
-  pass,
-  open,
-  raidFind,
-  raidStop,
-  contact,
-  defendHome,
-  faintAlarm,
-  game,
-  gameTop,
-  nestFlow,
-  nurseZone,
-  pockets,
-  larvae,
-  lifecycle,
-  lifecycleSignal,
-  lifecycleScent,
-];
-
 /** An arena assay rerun on one world's plane (onPlane), its probes counting the plane's ants, its paint on the plane; `probes` added to its own. */
 function onPlaneAssay(a: Assay, probes: () => Probe[] = () => []): Assay {
   return {
@@ -1364,14 +1359,20 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
 export const ONE_ASSAYS: Assay[] = [
   ...[bridge, twin, richPoor, deplete, alarm].map((a) => onPlaneAssay(a)),
   ...[regulate, regulateStop].map((a) => onPlaneAssay(a, () => [gateProbe()])),
-  { ...passAssay(onPlane), title: `${pass.title} (one world)` },
-  onPlaneAssay(open),
+  passWalked,
+  { ...open, title: `${open.title} (one world, attackers walked)`, spec: (s) => walked(onPlane(open.spec(s)), 0, 1) },
   { ...raidFindAssay(onPlaneGated), title: `${raidFind.title} (one world)` },
   { ...raidStopAssay(onPlaneGated), title: `${raidStop.title} (one world)` },
   onPlaneAssay(contact),
   onPlaneAssay(faintAlarm),
   nestFlowOne,
+  nurseZone,
+  pockets,
+  larvae,
   game1,
+  lockstep1,
+  searchTight1,
+  memory1,
   search1,
   forage1,
   route1,
@@ -1381,9 +1382,19 @@ export const ONE_ASSAYS: Assay[] = [
   desertFirstFind,
   desertTrips,
   desertHeat,
+  neglectusImmunisation,
+  neglectusTolerance,
   ...BUILDER_ASSAYS,
   ...lifecycleOne,
+  defendWalked,
 ];
+
+/** The one-world twin of assay `id` (ONE_ASSAYS): the gate tests run these (S2.2e, ja-fnd.3.2.5). */
+export function oneAssay(id: string): Assay {
+  const a = ONE_ASSAYS.find((x) => x.id === id);
+  if (!a) throw new Error(`no one-world assay ${id}`);
+  return a;
+}
 
 /** Assays not rerun on one world yet, and why (`experiment.mjs --one` reports them so): none since U6b. */
 export const ONE_PENDING: Record<string, string> = {};

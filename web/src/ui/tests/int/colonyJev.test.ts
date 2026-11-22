@@ -2,20 +2,17 @@ import { afterEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   Colony,
+  CURTAIN,
   localPolicy,
-  localStance,
   type Mode,
   type Situation,
   DOCTRINES,
   policyContext,
   situationKey,
-  stanceContext,
-  stanceKey,
   fungalKey,
   fungusContext,
-  generateWorld,
+  generateOneWorld,
   mulberry32,
-  OPEN_WORLD,
   Game,
   LEVERS,
   STRAINS,
@@ -27,6 +24,12 @@ import {
 } from "../../../colony/index.ts";
 import { ColonyJev, type CacheStore } from "../../colonyJev.ts";
 import type { JevRequest, RunSummary } from "../../../../shared/jev.ts";
+
+/** A bare colony of n on the curtain of seed 1's one world (S2.3c: on the open top-down map until then). */
+function oneWorldColony(n: number, seed: number): Colony {
+  const w = generateOneWorld(1);
+  return new Colony(w.curtain, { antCount: n }, mulberry32(seed), undefined, { plane: w.plane, line: w.line });
+}
 
 // The colony's Jev client against a scripted fetch: no server, no key.
 
@@ -63,7 +66,7 @@ function scriptFetch(jev: Script, runReply: (action: string) => { status: number
     if (path.startsWith("/api/run")) r = runReply((JSON.parse(String(init?.body ?? "{}")) as { action?: string }).action ?? "");
     else {
       const req = JSON.parse(String(init?.body)) as JevRequest & { state: { ants?: Record<string, unknown> } };
-      if (req.state.ants) sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a))); // ant situations only, not stances
+      if (req.state.ants) sent.push(Object.values(req.state.ants).map((a) => JSON.stringify(a))); // ant situations only
       r = await jev(req);
     }
     return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body } as Response;
@@ -108,7 +111,7 @@ afterEach(() => {
 });
 
 function colony(n = 60) {
-  return new Colony(generateWorld(1, OPEN_WORLD), { antCount: n }, mulberry32(9));
+  return oneWorldColony(n, 9);
 }
 
 /** Run the colony for k ticks (the policy is asked inside tick). */
@@ -398,40 +401,6 @@ test("answers shipped with the page are seeded under the ones this browser alrea
   assert.equal(j.seed("elsewhere-v1-0", [[situationKey(a), "explore"]]), 0, "a context of no lane is ignored");
 });
 
-test("the strategist's stance goes through its own cached lane", async () => {
-  const stances: string[] = [];
-  scriptFetch((req) => {
-    const answers: Record<string, unknown> = {};
-    for (const q of Object.keys(req.questions)) {
-      if (q.endsWith("_stance")) stances.push(q);
-      answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "defend" : "explore" };
-    }
-    return {
-      status: 200,
-      body: {
-        status: 200,
-        body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
-        ms: 1,
-        attempts: 1,
-        inputTokens: 10,
-        run: RUN,
-      },
-    };
-  });
-  const j = make();
-  const c = colony();
-  j.attach(c);
-  await j.start();
-  const v = c.stanceSituation(false);
-  assert.equal(j.stancePolicy(v), "forage", "first time: the local strategist, and the view is queued");
-  await tick(40);
-  assert.equal(stances.length, 1);
-  assert.equal(j.stancePolicy(v), "defend", "then Jev's cached stance");
-  assert.equal(j.state.lanes.stance.cached, 1);
-  await tick(30);
-  assert.equal(stances.length, 1, "asked once");
-});
-
 /** A promise you resolve by hand, to hold a reply in flight. */
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -601,7 +570,7 @@ function scriptAll(fungal: string) {
       if (spec.type === "score") {
         const lever = LEVERS.find((v) => v.id === q.slice(q.indexOf("_") + 1))!;
         answers[q] = { type: "score", score: levels[lever.id] ?? lever.asIs };
-      } else answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : "explore", confidence: 0.9 };
+      } else answers[q] = { type: "choice", choice: "explore", confidence: 0.9 };
     }
     const body = {
       status: 200,
@@ -616,9 +585,9 @@ function scriptAll(fungal: string) {
   return reqs;
 }
 
-/** A small game with Garden painted on the player's nest. */
+/** A small one-world game with Garden painted round the player's royal chamber. */
 function infectedGame() {
-  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
   g.paintSpores(
     g.player.nest.x,
     g.player.nest.y,
@@ -626,6 +595,7 @@ function infectedGame() {
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
+    CURTAIN,
   );
   return g;
 }
@@ -717,7 +687,7 @@ function scriptByDoctrine(answer: (doctrine: string) => string) {
     if (holding) await new Promise<void>((r) => (held = r));
     const answers: Record<string, unknown> = {};
     for (const q of Object.keys(req.questions))
-      answers[q] = { type: "choice", choice: q.endsWith("_stance") ? "forage" : answer(String(req.state.doctrine)), confidence: 0.9 };
+      answers[q] = { type: "choice", choice: answer(String(req.state.doctrine)), confidence: 0.9 };
     const body = {
       status: 200,
       body: { model: "jev-x", answers, usage: { input_tokens: 10, output_tokens: 0 } },
@@ -732,8 +702,12 @@ function scriptByDoctrine(answer: (doctrine: string) => string) {
 }
 
 function twoColonies(n = 40) {
-  const map = generateWorld(1);
-  return [new Colony(map, { antCount: n, nest: 0 }, mulberry32(9)), new Colony(map, { antCount: n, nest: 1 }, mulberry32(10))];
+  const w = generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } });
+  const at = { plane: w.plane, line: w.line };
+  return [
+    new Colony(w.curtain, { antCount: n, nest: 0 }, mulberry32(9), undefined, at),
+    new Colony(w.curtain, { antCount: n, nest: 1 }, mulberry32(10), undefined, at),
+  ];
 }
 
 const modeRequests = (reqs: (JevRequest & { state: Record<string, unknown> })[]) => reqs.filter((r) => r.state.ants);
@@ -787,22 +761,17 @@ test("each colony its own doctrine: its questions carry its own words, its own c
   assert.deepEqual([...doctrines].sort(), ["Amber's way.", "Ink's way."]);
   assert.equal(j.state.doctrineCached.length, 2);
   assert.ok(j.state.doctrineCached[0]! > 0 && j.state.doctrineCached[1]! > 0);
-  const s: Situation = {
-    mode: "explore",
-    tired: false,
-    foodTrail: "none",
-    homeTrail: "none",
-    alarm: "none",
-    enemy: "none",
-    stance: "forage",
-  };
+  // A situation each colony was asked about (on one world the ants start in the nest: S2.3c picks them from the requests).
+  const askedOf = (doctrine: string) =>
+    Object.values(modeRequests(reqs).find((r) => r.state.doctrine === doctrine)!.state.ants as Record<string, Situation>)[0]!;
   run(a!, 1);
   run(b!, 1);
-  const ea = j.explain(s, 0);
-  const eb = j.explain(s, 1);
-  if (ea.by === "jev") assert.equal(ea.mode, "explore");
-  if (eb.by === "jev") assert.equal(eb.mode, "return", "the second colony is on Jev too, under its own doctrine");
-  assert.ok(ea.by === "jev" || eb.by === "jev", "at least this common situation was met and answered");
+  const ea = j.explain(askedOf("Ink's way."), 0);
+  const eb = j.explain(askedOf("Amber's way."), 1);
+  assert.equal(ea.by, "jev");
+  assert.equal(ea.mode, "explore");
+  assert.equal(eb.by, "jev", "the second colony is on Jev too, under its own doctrine");
+  assert.equal(eb.mode, "return");
 });
 
 test("explain says 'waiting' while the question is in flight", async () => {
@@ -862,20 +831,11 @@ test("stored answers a lane could not have given are dropped on load (ja-ue6)", 
   const j = make(store);
   j.setDoctrine("Stored.");
   const c = colony();
-  const calm = c.stanceSituation(false);
-  const raided = c.stanceSituation(true);
-  store.data.set(stanceContext("Stored."), [
-    [stanceKey(calm), "panic"],
-    [stanceKey(raided), "defend"],
-  ]);
   j.attach(c);
   assert.equal(j.state.lanes.mode.cached, 1, "the mode cache kept only the real mode");
-  assert.equal(j.state.lanes.stance.cached, 1, "the stance cache kept only the real stance");
   await j.start();
   assert.equal(j.policy(good), "follow");
   assert.equal(j.policy(bad), localPolicy(bad), "not 'flee': the local rule while it is asked afresh");
-  assert.equal(j.stancePolicy(calm), localStance(calm));
-  assert.equal(j.stancePolicy(raided), "defend");
 });
 
 test("a stored fungus answer is kept only if it has a level for each lever its key asked, in range (ja-ue6)", () => {
@@ -885,7 +845,7 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   j.attach(g.player);
   const asked = g.fungus.asked;
   const other = { ...GARDEN, groomed: true };
-  store.data.set(fungusContext("Stored aim.", g.map.sky ? "side" : "top"), [
+  store.data.set(fungusContext("Stored aim."), [
     [fungalKey(GARDEN, asked), encodeLevels({}, asked)],
     [fungalKey(other, asked), "9"],
   ]);
@@ -901,7 +861,7 @@ test("a new aim plays the fungus's local rule until Jev answers; the earlier aim
   const g = infectedGame();
   j.attach(g.player);
   const asked = g.fungus.asked;
-  store.data.set(fungusContext("Old aim.", g.map.sky ? "side" : "top"), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
+  store.data.set(fungusContext("Old aim."), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
   j.attachFungus(g.fungus);
   j.setAim("Old aim.");
   assert.equal(j.explainFungus(GARDEN).by, "jev");
@@ -1099,7 +1059,7 @@ test("a lane's asked counts what it sent, less what came back busy; a new run st
   assert.ok(cached > 0);
   await j.stop();
   await j.start();
-  for (const name of ["mode", "stance", "fungus", "growth"] as const)
+  for (const name of ["mode", "fungus", "growth"] as const)
     assert.equal(j.state.lanes[name].asked, 0, `${name}: a new run has asked nothing yet`);
   assert.equal(j.state.lanes.mode.cached, cached, "what is cached outlives the run");
 });
@@ -1137,25 +1097,6 @@ test("the cached count is every colony's, a doctrine two colonies share counted 
   assert.equal(j.state.lanes.mode.cached, 1, "one shared doctrine: its answers once");
 });
 
-test("the stance count is every colony's too, a shared doctrine counted once (PRD §65)", () => {
-  const store = memoryStore();
-  const [a, b] = twoColonies(5);
-  const calm = a!.stanceSituation(false);
-  const raided = a!.stanceSituation(true);
-  store.data.set(stanceContext("Mine."), [[stanceKey(calm), "forage"]]);
-  store.data.set(stanceContext("Theirs."), [
-    [stanceKey(calm), "defend"],
-    [stanceKey(raided), "defend"],
-  ]);
-  const j = make(store);
-  j.setDoctrineFor(0, "Mine.");
-  j.setDoctrineFor(1, "Theirs.");
-  j.attachColonies([a!, b!]);
-  assert.equal(j.state.lanes.stance.cached, 3, "the first colony's 1 and the second's 2");
-  j.setDoctrineFor(1, "Mine.");
-  assert.equal(j.state.lanes.stance.cached, 1, "one shared doctrine: its stances once");
-});
-
 test("lanes take turns at any request latency: a long mode queue does not keep the fungus waiting (ja-ytc)", async () => {
   // Mocked intervals, so the cycle count is exact (a wall-clock version flaked under load). Latency in cycles: the
   // first cut moved its pointer every cycle, so a 3-cycle request found the mode lane first at every free slot.
@@ -1168,7 +1109,7 @@ test("lanes take turns at any request latency: a long mode queue does not keep t
       globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
         if (String(url).startsWith("/api/run")) return { ok: true, status: 200, json: async () => RUN } as Response;
         const req = JSON.parse(String(init?.body)) as JevRequest & { state: Record<string, unknown> };
-        order.push(req.state.hosts ? "fungus" : req.state.ants ? "mode" : "stance");
+        order.push(req.state.hosts ? "fungus" : "mode");
         await new Promise<void>((done) => pending.push({ due: now + latency, done }));
         const r = await answerAll("explore")(req);
         return { ok: true, status: 200, json: async () => r.body } as Response;

@@ -6,12 +6,24 @@ import type { Item } from "./responses.ts";
 import { touch } from "./sense.ts";
 import { MODE_STRIDE, packSituation } from "./situation.ts";
 import type { AntStep } from "./step.ts";
-import { EXPLORE, FIGHT, FOLLOW, type Mode, MODES, RETURN, type SpeciesSituation, type Stance, STANCES, trailLevel } from "./vocab.ts";
+import {
+  encodeSteering,
+  EXPLORE,
+  FIGHT,
+  FOLLOW,
+  type Mode,
+  MODES,
+  RETURN,
+  type SpeciesSituation,
+  type Stance,
+  STANCES,
+  STEER_NEUTRAL,
+  trailLevel,
+} from "./vocab.ts";
 
 export function decide(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
   const dt = s.dt;
-  const gate = s.gate;
   const fl = s.fl;
   const ff = s.ff;
   const fr = s.fr;
@@ -46,7 +58,6 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   let situation0 = -1; // the situation's code with mode 0 (encode), when the mode policy was consulted this step
   let modeStride = MODE_STRIDE; // the mode field's step in that code: the species' own schema's, when it has one
   let waiting = false;
-  let rolled = false; // asked `leave` this step already (behaviour MR 5): one roll a step, at the rate it answers
   if (carrying || pellet || nursing || reporting) {
     // A carrier takes its load where it belongs (the carry response, in stanceStep, said so): home, not a mode choice; the next
     // question comes once the load is down.
@@ -107,9 +118,8 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     // One world (ja-web): nobody waits on the plane (every returner goes down its hole); an ant held at the gate at the
     // top of its shaft waits, and rolls `leave` once a step, asked as a returning forager (as a raider if recruited).
     // A yes is its pass: it climbs out, and its mode policy is asked afresh next step.
-    waiting = held || (gate && mode === RETURN && !enemy && col.atNestTop(i) && !col.inbound(i, mode));
+    waiting = held;
     if (held) {
-      rolled = true;
       if (col.leaves(i, dt, false)) {
         col.leaveOk[i] = 1;
         col.asked[i] = -1;
@@ -123,21 +133,18 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     }
     if (before !== col.asked[i] && !waiting) {
       col.policyDrew = false;
-      mode = MODES.indexOf(
-        col.policy(
-          asks ?? {
-            mode: MODES[mode] as Mode,
-            tired,
-            foodTrail: food,
-            homeTrail: home,
-            alarm,
-            enemy: enemy ? "near" : "none",
-            stance: col.stanceOf(i),
-          },
-          col.policyDraw,
-        ),
-      );
-      col.redraw[i] = col.policyDrew && p.reroll > 0 ? p.reroll : -1;
+      const sit = asks ?? {
+        mode: MODES[mode] as Mode,
+        tired,
+        foodTrail: food,
+        homeTrail: home,
+        alarm,
+        enemy: enemy ? "near" : "none",
+        stance: col.stanceOf(i),
+      };
+      mode = MODES.indexOf(col.policy(sit, col.policyDraw));
+      // How long it holds this draw: `reroll` seconds, or with rerollLaw 1 a time drawn from an exponential law of that mean.
+      col.redraw[i] = col.policyDrew && p.reroll > 0 ? (p.rerollLaw > 0 ? -p.reroll * Math.log(1 - col.rng()) : p.reroll) : -1;
       if (mode < 0) mode = tired ? RETURN : EXPLORE; // a policy answering nonsense falls back to the plain rule
       if (mode === FOLLOW && !p.follows) mode = EXPLORE; // a species with no follow mode can't follow (ja-fnd.5.9)
       // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
@@ -146,6 +153,18 @@ export function decide(col: Colony, i: number, s: AntStep): void {
       if (mode === FIGHT && !enemy && col.stanceOf(i) === "raid" && col.queen && !col.mayGoOut(i)) mode = EXPLORE;
       if (mode === RETURN && col.mode[i] !== RETURN) col.homeAfresh(i);
       col.mode[i] = mode;
+      // Its steering weights (ja-ykmu; docs/steering.md): asked for the situation with the mode it now has, when that
+      // sends it out exploring or following; any other mode steers by its own routine, so its code goes back to none.
+      // Its weights with no find remembered, or, remembering one, away from it and near it: steer.ts takes whichever its memory says.
+      if (p.steerLane > 0) {
+        const out = mode === EXPLORE || mode === FOLLOW;
+        const now = { ...sit, mode: MODES[mode] as Mode };
+        const remembers = !Number.isNaN(col.foodX[i]);
+        col.steerCode[i] = out
+          ? encodeSteering(col.steerPolicy({ ...now, find: remembers ? "far" : "none" }, col.policyDraw))
+          : STEER_NEUTRAL;
+        col.steerNear[i] = out && remembers ? encodeSteering(col.steerPolicy({ ...now, find: "near" }, col.policyDraw)) : col.steerCode[i];
+      }
       col.asked[i] = own ? situation0 + mode * modeStride : packSituation(mode, tired, food, home, alarm, enemy, stance);
       col.seen[before] = 1;
       // The generic code of the situation it was asked in (its mode before the answer), whatever the species asks: the fungus, the journal and the
@@ -159,7 +178,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
-    const answer = resp.contact(touch(col, i, true, mode, item));
+    const answer = resp.contact(touch(col, i, true, mode, item), col.antDraw(i));
     if (answer === "fight" && !reporting) {
       if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
     } else {
@@ -184,7 +203,5 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   s.prevMode = prevMode;
   s.item = item;
   s.resp = resp;
-  s.waiting = waiting;
-  s.rolled = rolled;
   s.fleeFrom = fleeFrom;
 }

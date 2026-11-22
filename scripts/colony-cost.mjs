@@ -1,27 +1,26 @@
 // Offline, no key, no spend: what would Jev cost a game? Runs the game
 // headless for a play session — your colony against the rival's — with a
-// stand-in for Jev (the local rule and the local strategist, so the colony
+// stand-in for Jev (the local rule, so the colony
 // behaves the same) behind the real cache logic: each new (doctrine, ant
-// situation) and each new (doctrine, strategist view) is one question, asked
+// situation) is one question, asked
 // once. You retune the doctrine every couple of minutes, back to one used
 // before at the end, and paint alarm now and then. The rival plays the local
 // rule (free). Tokens per question are estimated from request size
 // (colonyBrain.estimateTokens); the ledger counts the real ones live.
 //
-// --side plays the side view (the nest, its chambers and in-nest situations: PRD §32), as the app sets it up
-// (generateSideWorld(seed), Game with gameRng(seed), as the page builds it); without it, the top-down map (generateWorld) with
-// the rng this script always used, so earlier figures reproduce. --one plays one world (generateOneWorld(seed), gameRng(seed);
-// docs/one-world.md), its alarm painted on the plane: each ant keeps its own stance, and `leave` is asked of the foragers
-// held at the gate at the top of their shafts (ja-web, PRD §48.6), so the leave lane is counted like the others.
+// It plays one world (generateOneWorld(seed), gameRng(seed); docs/one-world.md), its alarm painted on the plane: each ant keeps
+// its own stance, and `leave` is asked of the foragers held at the gate at the top of their shafts (ja-web, PRD §48.6), so the
+// leave lane is counted like the others. --one is accepted and ignored: one world is the only game (S2.3d); the side view and
+// the top-down map this once played are gone, so figures from before are not comparable.
 //
 // The ant's response lanes (get, carry, drop, trail: colonyBrain.RESPONSE_HOOKS)
 // are estimated too, as if each were asked like the modes; they are not asked
 // by the page yet, so they are reported apart and not in the session's total.
 //
-// --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule, and its stance lane only if it has one; the
+// --species <id> plays that species (ja-rf5.3): its lane words, situations and local rule; the
 // generic ant without it. Known here: generic, desert (docs/desert-ant.md).
 //
-// Usage: node scripts/colony-cost.mjs [--side | --one] [--species <id>] [minutes=10] [ants=600] [seed=1]
+// Usage: node scripts/colony-cost.mjs [--species <id>] [minutes=10] [ants=600] [seed=1]
 import {
   LANES,
   PLANE,
@@ -36,8 +35,6 @@ import {
   Game,
   gameRng,
   generateOneWorld,
-  generateSideWorld,
-  generateWorld,
   mulberry32,
   worldExtent,
   GENERIC_ANT,
@@ -47,8 +44,6 @@ import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
-const side = process.argv.includes("--side");
-const one = process.argv.includes("--one");
 const KNOWN = { generic: GENERIC_ANT, desert: DESERT_ANT };
 const sAt = process.argv.indexOf("--species");
 const speciesId = sAt >= 0 ? process.argv[sAt + 1] : "generic";
@@ -56,14 +51,14 @@ const species = KNOWN[speciesId];
 if (!species) throw new Error(`--species: no "${speciesId}" (known: ${Object.keys(KNOWN).join(", ")})`);
 const [minutes = 10, ants = 600, seed = 1] = process.argv
   .slice(2)
-  .filter((a, k, all) => a !== "--side" && a !== "--one" && a !== "--species" && all[k - 1] !== "--species")
+  .filter((a, k, all) => a !== "--one" && a !== "--species" && all[k - 1] !== "--species")
   .map(Number);
 const USD = USD_PER_INPUT_TOKEN;
 const DT = 1 / 30;
 const BATCH_EVERY = 0.3; // s, the client's interval
 
-const world = one ? generateOneWorld(seed) : side ? generateSideWorld(seed) : generateWorld(seed);
-const extent = worldExtent("plane" in world ? world.plane : world);
+const world = generateOneWorld(seed);
+const extent = worldExtent(world.plane);
 let doctrine = DOCTRINES[0].text;
 let tokens = 0;
 let requests = 0;
@@ -123,11 +118,9 @@ const fromRow = (row, lw, local = row.local) =>
     row.kind.idPrefix,
     row.batch ?? 100,
   );
-// The species' own words and local rule (the generic ant's are the rows' defaults); no stance lane where it has none.
+// The species' own words and local rule (the generic ant's are the rows' defaults).
 const modes = fromRow(LANES.mode, species.lanes.mode, species.policy ?? LANES.mode.local);
-const stances = species.lanes.stance ? fromRow(LANES.stance, species.lanes.stance) : null;
 const modeContext = (d) => LANES.mode.contextOf(d, undefined, species.lanes.mode);
-const stanceContext = (d) => LANES.stance.contextOf(d, undefined, species.lanes.stance);
 const hooks = Object.fromEntries(
   RESPONSE_HOOKS.map((h) => [
     h,
@@ -140,15 +133,13 @@ const hooks = Object.fromEntries(
     ),
   ]),
 );
-const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, side || one ? gameRng(seed) : mulberry32(seed + 7), {
+const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, gameRng(seed), {
   policy: modes.policy,
-  ...(stances ? { stance: stances.policy } : {}),
   responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
 });
 const colony = game.player;
 const flush = () => {
   modes.flush();
-  stances?.flush();
   for (const h of RESPONSE_HOOKS) hooks[h].flush();
 };
 
@@ -171,14 +162,12 @@ let t = 0;
 for (const d of plan) {
   doctrine = d.text;
   modes.clear();
-  stances?.clear();
   for (const h of RESPONSE_HOOKS) hooks[h].clear();
   colony.reconsider();
   const before = {
     tokens,
     requests,
     modes: modes.seen(modeContext(doctrine)),
-    stances: stances ? stances.seen(stanceContext(doctrine)) : 0,
   };
   const end = t + slice;
   for (; t < end; t += DT) {
@@ -188,13 +177,12 @@ for (const d of plan) {
       next = t + BATCH_EVERY;
     }
     // The fungus paints a blot of alarm somewhere every ~20 s.
-    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, ...(one ? [PLANE] : [])); // world units: rows are R apart
+    if (rng() < DT / 20) colony.paint("alarm", rng() * extent.w, rng() * extent.h, 3, 12, PLANE); // world units: rows are R apart
   }
   flush();
   phases.push({
     name: d.name,
     newSituations: modes.seen(modeContext(doctrine)) - before.modes,
-    newStances: stances ? stances.seen(stanceContext(doctrine)) - before.stances : 0,
     tokens: tokens - before.tokens,
     requests: requests - before.requests,
   });
@@ -203,17 +191,15 @@ for (const d of plan) {
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
 const r = game.rival;
 console.log(
-  `game cost, offline (${one ? "one world" : side ? "side view" : "top-down"}${species === GENERIC_ANT ? "" : `, ${species.name}`}${stances ? "" : ", no stance lane"}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
+  `game cost, offline (one world${species === GENERIC_ANT ? "" : `, ${species.name}`}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
 );
 console.log(
   `you: ${colony.population} ants, ${colony.stored} food home, ${colony.losses} lost · rival: ${r ? `${r.population} ants, ${r.stored} food home, ${r.losses} lost` : "none"} · ${game.outcome()}`,
 );
-console.log(
-  `${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations; ${game.strategyChoices / game.colonies.length} stance choices each\n`,
-);
+console.log(`${colony.decisions.toLocaleString()} mode choices in ${colony.situationsSeen} distinct situations\n`);
 for (const p of phases)
   console.log(
-    `  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations + ${String(p.newStances).padStart(2)} stance views · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`,
+    `  ${p.name.padEnd(9)} ${String(p.newSituations).padStart(4)} ant situations · ${String(p.requests).padStart(3)} requests · ~${p.tokens.toLocaleString().padStart(7)} tok ≈ ${usd(p.tokens)}`,
   );
 console.log(
   `\ntotal ~${tokens.toLocaleString()} tok ≈ ${usd(tokens)} for the session (~${Math.round(tokens / Math.max(1, questions))} tok per question, ${Math.round(colony.decisions / Math.max(1, questions))} mode choices per question)`,

@@ -10,10 +10,12 @@
 // passing on by contact in its hosts (the source keeps its load). Spores an ant picks up are fungus moved, not made:
 // counted once, when the mycelium grew them. So **mutations** come at a fixed share of its growth (`MUTATION`), and a
 // fungus that grows fast mutates fast. Which mutations it keeps is the player's to choose: they give mutations to the
-// next level of an upgrade, and each level asks more than the one before. That choosing is the game's licence (owner,
-// PRD §50.13): real mutations are random and selection keeps what works, and real adaptation speeds up far less than
-// replication does (docs/fungus-body.md §3). The rising costs stand in for that. The numbers are design, tuned on
-// `node scripts/lab/progression.mjs` (PRD §50.12–13).
+// next level of an upgrade. That choosing is the game's licence (owner, PRD §50.13): real mutations are random and
+// selection keeps what works, and real adaptation speeds up far less than replication does (docs/fungus-body.md §3).
+//
+// **The tree** (ja-52ui, PRD §80, docs/mutation-tree.md; design, owner 2026-11-15): some levels need levels of other
+// upgrades first (`Upgrade.needs`), and every level costs one price, which rises with each level kept (`price`), so the
+// tree's depth carries the pacing. The numbers are design, tuned on `node scripts/lab/progression.mjs`.
 //
 // Upgrades are of two kinds:
 // - **Spread**, its body: infectivity (the strain's transmission), persistence (how little a host clears on its own),
@@ -29,6 +31,12 @@
 
 import { LEVERS, type Reach } from "./levers.ts";
 
+/** A level of another upgrade that must be kept first. */
+export interface Need {
+  id: string;
+  level: number;
+}
+
 /** A spread trait an upgrade sets. */
 export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks";
 
@@ -40,8 +48,8 @@ export interface Upgrade {
   blurb: string;
   /** what each level is, in words: index 0 is where the fungus starts */
   steps: readonly string[];
-  /** mutations for each level after the first: costs[k] takes it to level k + 1 */
-  costs: readonly number[];
+  /** what each level after the first needs of other upgrades: needs[k] for level k + 1 (the level before it in this upgrade comes first anyway) */
+  needs: readonly (readonly Need[])[];
   /** spread: the trait it sets, and its value at each level */
   trait?: Trait;
   values?: readonly number[];
@@ -61,6 +69,51 @@ export const MUTATION = 0.25;
 /** Seconds over which the panel's mutation rate is averaged. */
 const RATE_TAU = 20;
 
+/** Every level costs one price, which rises with each level kept: round(base · ratio^kept) (ja-52ui, PRD §80). Owner (2026-11-15): 1, ×1.5, which held P1 on seeds 1–20; 3, ×1.38 and 2, ×1.3 did not. */
+export const PRICE = { base: 1, ratio: 1.5 };
+
+/** The price of the next level of anything, after `kept` levels have been kept. */
+export function price(kept: number): number {
+  return Math.round(PRICE.base * PRICE.ratio ** kept);
+}
+
+/** Levels kept over all upgrades. */
+export function keptLevels(levels: Readonly<Record<string, number>>): number {
+  let n = 0;
+  for (const u of UPGRADES) n += levels[u.id] ?? 0;
+  return n;
+}
+
+/** What the next level of `id` needs and the fungus has not kept yet (empty when nothing is missing, or at its last level). */
+export function unmet(levels: Readonly<Record<string, number>>, id: string): Need[] {
+  const u = upgrade(id);
+  return (u.needs[levels[id] ?? 0] ?? []).filter((n) => (levels[n.id] ?? 0) < n.level);
+}
+
+/** Mutations the next level of `id` takes at these levels, or null at its last level. */
+export function nextCost(levels: Readonly<Record<string, number>>, id: string): number | null {
+  return (levels[id] ?? 0) < upgrade(id).steps.length - 1 ? price(keptLevels(levels)) : null;
+}
+
+/** The upgrades to keep, in order, so that the next level of `id` is kept with everything it needs first (the last is `id`). */
+export function pathTo(levels: Readonly<Record<string, number>>, id: string): string[] {
+  const at: Record<string, number> = { ...levels };
+  const out: string[] = [];
+  const go = (x: string) => {
+    for (const n of upgrade(x).needs[at[x] ?? 0] ?? []) while ((at[n.id] ?? 0) < n.level) go(n.id);
+    out.push(x);
+    at[x] = (at[x] ?? 0) + 1;
+  };
+  go(id);
+  return out;
+}
+
+/** Whether the next level of `id` can be kept now: there is one, nothing it needs is missing, and there are mutations enough. */
+export function canKeep(levels: Readonly<Record<string, number>>, mutations: number, id: string): boolean {
+  const c = nextCost(levels, id);
+  return c !== null && c <= mutations && unmet(levels, id).length === 0;
+}
+
 export const UPGRADES: readonly Upgrade[] = [
   {
     id: "infectivity",
@@ -68,7 +121,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Infectivity",
     blurb: "how fast it passes from a host to the ants it touches",
     steps: ["weak", "fair", "strong", "virulent"],
-    costs: [3, 6, 3000],
+    needs: [[], [{ id: "persistence", level: 1 }], [{ id: "evasion", level: 1 }]],
     trait: "transmission",
     values: [0.12, 0.15, 0.23, 0.3],
   },
@@ -78,7 +131,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Persistence",
     blurb: "how little of it a host clears on its own",
     steps: ["clears fast", "clears slowly", "never clears"],
-    costs: [4, 800],
+    needs: [[], []],
     trait: "decay",
     values: [0.03, 0.012, 0],
   },
@@ -87,8 +140,8 @@ export const UPGRADES: readonly Upgrade[] = [
     kind: "spread",
     name: "Mycelium",
     blurb: "how much mass its patch by the hole can hold: more mass grows faster and pays for more spores",
-    steps: ["a thread", "a mat", "a web"],
-    costs: [2, 400],
+    steps: ["a thread", "a borer", "a web"],
+    needs: [[], []],
     trait: "capacity",
     values: [30, 60, 120],
   },
@@ -99,7 +152,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Knots",
     blurb: "whether starved hyphae harden into knots that digging can't cut, which fruit from their own store and sprout again",
     steps: ["none", "a few", "many"],
-    costs: [400, 1500],
+    needs: [[{ id: "mycelium", level: 1 }], [{ id: "mycelium", level: 2 }]],
     trait: "knots",
     values: [0, 1, 2],
   },
@@ -110,7 +163,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Stalks",
     blurb: "whether a corpse it has colonised outside grows a stalk that spreads its spores over a ring round it",
     steps: ["none", "a stalk", "a tall stalk"],
-    costs: [600, 2000],
+    needs: [[{ id: "fruiting", level: 1 }], [{ id: "fruiting", level: 2 }]],
     trait: "stalks",
     values: [0, 1, 2],
   },
@@ -121,7 +174,7 @@ export const UPGRADES: readonly Upgrade[] = [
     blurb:
       "how much of its mycelium it turns into spores on its patch each second, for the ants that walk through: more spores, a smaller mycelium",
     steps: ["sparse", "thick", "dense"],
-    costs: [3, 500],
+    needs: [[], []],
     trait: "spores",
     values: [0.006, 0.012, 0.02],
   },
@@ -131,7 +184,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Immune evasion",
     blurb: "how much of the resistance grooming builds in a colony it slips past",
     steps: ["none", "some", "most"],
-    costs: [2000, 6000],
+    needs: [[{ id: "persistence", level: 1 }], [{ id: "persistence", level: 2 }]],
     trait: "evasion",
     values: [0, 0.35, 0.7],
   },
@@ -141,7 +194,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Stealth",
     blurb: "how well a host can hide it from its groomers (fungus showing); your aim decides whether hosts hide",
     steps: ["shows as it is", "dim", "hidden"],
-    costs: [3, 600],
+    needs: [[], [{ id: "fruiting", level: 1 }]],
     levers: ["show"],
     reach: [0, 1, 2],
   },
@@ -151,7 +204,12 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Senses",
     blurb: "how far it bends what a host smells: food, rival trails, home, alarm, floor marks, time out",
     steps: ["one step", "the full range"],
-    costs: [300],
+    needs: [
+      [
+        { id: "recognition", level: 1 },
+        { id: "trails", level: 1 },
+      ],
+    ],
     levers: ["food", "rival", "home", "alarm", "marks", "time"],
     reach: [1, 2],
   },
@@ -161,7 +219,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Recognition",
     blurb: "how far it bends who a host takes for a stranger: stranger scent, a calming cue, its own odour",
     steps: ["none", "one step", "the full range"],
-    costs: [10, 1500],
+    needs: [[], []],
     levers: ["strangers", "calm", "odour"],
     reach: [0, 1, 2],
   },
@@ -171,7 +229,7 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Trails",
     blurb: "how far it bends what a host lays and how it recruits: trail, trail leaked to rivals, alarm in a fight, rouse (desert ants)",
     steps: ["none", "one step", "the full range"],
-    costs: [10, 1500],
+    needs: [[], []],
     levers: ["trail", "leak", "alarmLaid", "rouse"],
     reach: [0, 1, 2],
   },
@@ -182,7 +240,7 @@ export const UPGRADES: readonly Upgrade[] = [
     blurb:
       "how far it bends the queen's royal mark: what she lays (queen signal) and what nurses perceive of it (queen scent): the route to new queens",
     steps: ["none", "one step", "the full range"],
-    costs: [1000, 4000],
+    needs: [[{ id: "recognition", level: 2 }], [{ id: "trails", level: 2 }]],
     levers: ["queenSignal", "queenScent"],
     reach: [0, 1, 2],
     nest: true,
@@ -196,7 +254,7 @@ export const UPGRADES: readonly Upgrade[] = [
     blurb:
       "whether a host can smell like nobody's, so its own colony and the others kill it (odour weapon, lethal): only once it is on the menu",
     steps: ["held off", "free"],
-    costs: [2500],
+    needs: [[{ id: "infectivity", level: 2 }]],
     levers: ["weapon"],
     reach: [0, 1],
   },
@@ -206,7 +264,12 @@ export const UPGRADES: readonly Upgrade[] = [
     name: "Crown",
     blurb: "whether a host can kill the queen and the brood it tends, orphaning the colony (crown, lethal): only once it is on the menu",
     steps: ["held off", "free"],
-    costs: [5000],
+    needs: [
+      [
+        { id: "royal", level: 2 },
+        { id: "weapon", level: 1 },
+      ],
+    ],
     levers: ["crown"],
     reach: [0, 1],
     nest: true,
@@ -289,19 +352,23 @@ export class Evolution {
 
   /** Mutations the next level of `id` takes, or null when it is at its last. */
   cost(id: string): number | null {
-    return upgrade(id).costs[this.level(id)] ?? null;
+    return nextCost(this.#levels, id);
+  }
+
+  /** What the next level of `id` needs and has not been kept (empty: nothing missing). */
+  locked(id: string): Need[] {
+    return unmet(this.#levels, id);
   }
 
   /** Whether the next level of `id` can be chosen now. */
   affordable(id: string): boolean {
-    const c = this.cost(id);
-    return c !== null && c <= this.mutations;
+    return canKeep(this.#levels, this.mutations, id);
   }
 
-  /** Give mutations to the next level of `id`; false (nothing given) when it is at its last or there are too few. */
+  /** Give mutations to the next level of `id`; false (nothing given) when it is at its last, locked, or there are too few. */
   buy(id: string): boolean {
     const c = this.cost(id);
-    if (c === null || c > this.mutations) return false;
+    if (c === null || c > this.mutations || this.locked(id).length > 0) return false;
     this.spent += c;
     this.#levels[id] = this.level(id) + 1;
     return true;
@@ -397,3 +464,37 @@ export class Evolution {
 // Every lever an upgrade names exists: a typo would leave a lever at full range unnoticed.
 for (const u of UPGRADES)
   for (const id of u.levers ?? []) if (!LEVERS.some((v) => v.id === id)) throw new Error(`evolution: no lever "${id}"`);
+
+/**
+ * Check that a table of upgrades holds together as a tree (ja-52ui): each level lists what it needs, every need is a real
+ * level of another upgrade, and keeping whatever can be kept reaches every level, so there is no cycle and no level out
+ * of reach. Throws on the first fault; run on UPGRADES at load.
+ */
+export function checkTree(upgrades: readonly Upgrade[]): void {
+  const levels: Record<string, number> = {};
+  const unmetIn = (id: string) => {
+    const u = upgrades.find((x) => x.id === id)!;
+    return (u.needs[levels[id] ?? 0] ?? []).filter((n) => (levels[n.id] ?? 0) < n.level);
+  };
+  for (const u of upgrades) {
+    levels[u.id] = 0;
+    if (u.needs.length !== u.steps.length - 1)
+      throw new Error(`evolution: ${u.id} lists needs for ${u.needs.length} levels, not ${u.steps.length - 1}`);
+    for (const ns of u.needs)
+      for (const n of ns) {
+        const v = upgrades.find((x) => x.id === n.id);
+        if (!v || n.id === u.id || n.level < 1 || n.level >= v.steps.length)
+          throw new Error(`evolution: ${u.id} needs no such level ${n.id} ${n.level}`);
+      }
+  }
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const u of upgrades)
+      if (levels[u.id]! < u.steps.length - 1 && unmetIn(u.id).length === 0) {
+        levels[u.id]!++;
+        moved = true;
+      }
+  }
+  for (const u of upgrades) if (levels[u.id] !== u.steps.length - 1) throw new Error(`evolution: ${u.id} can't reach its last level`);
+}
+checkTree(UPGRADES);

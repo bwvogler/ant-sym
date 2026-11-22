@@ -10,7 +10,8 @@ export type PageAction =
   | { kind: "play" }
   | { kind: "speed"; speed: number }
   | { kind: "view" }
-  | { kind: "host" };
+  | { kind: "host" }
+  | { kind: "lab" };
 
 /** The page's speeds, by key 1–4 (the HUD's: 1×, 2×, 4× and the fastest). */
 export function speedKeys(speeds: readonly number[]): Record<string, number> {
@@ -47,6 +48,8 @@ export function pageKey(e: KeyPress, speeds: readonly number[]): PageAction | nu
       return { kind: "view" };
     case "f":
       return { kind: "host" };
+    case "l":
+      return { kind: "lab" };
     default:
       return null;
   }
@@ -80,6 +83,7 @@ export const shortcuts = (speeds: readonly number[]): { group: string; rows: Sho
       { keys: ["v"], does: "switch the view: above or below" },
       { keys: ["f"], does: "follow a host of yours" },
       { keys: ["i"], does: "the lens: say what is under the pointer" },
+      { keys: ["l"], does: "Lab mode: the history, the world, Jev, the levers and a step control" },
       { keys: ["Esc"], does: "close what is open: a menu, the followed ant, a drawer" },
     ],
   },

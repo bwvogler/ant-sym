@@ -91,6 +91,86 @@ So the question is: **how does a homing ant search when its vector runs out at n
 - **Off:** sight 6 only, as today.
 - **Wind:** none, as the game has no wind.
 
+## How far the vector is off: the error grows like the square root of the distance out (ja-lp4.19)
+
+*Added 2026-11-15 for `ja-lp4.19` (PRD §79), against code at `5a646196`. Labels: **FT** read in full text, **cit** read in a citing paper's full text, **abs** abstract only (**unverified**). The research is in `ja-lp4.14`'s notes.*
+
+**Today** (`piErrorLaw` 0): the error is the odometer (`odoSurf`, the path walked since the ant came up its own hole) times one drift drawn per trip (`PI_DRIFT_2D` = 0.1/√2 a part: a median miss of 8.3 % of the path). It grows linearly with the path, and every step but the walk home adds, so fighting, defending and winding all enlarge it. In G1 (seeds 1–4, `ja-lp4.14`) ants 5–25 cells from their hole after winding paths missed by a median 97 % of that distance, and 15 defenders died 30–105 cells out believing they were within 10 of home (median 440 cells walked).
+
+**The sources:**
+- ***C. fortis* median miss: 1.27 m after 5 m (25 %), 2.45 m after 10 m (25 %), 2.47 m after 20 m (12 %)**, 50–53 ants each (Merkle, Knaden & Wehner 2006, Fig. 3B, as tabled by Goldschmidt et al. 2017, **cit**: Goldschmidt read in full, Merkle's figure not). From 5 to 20 m the miss grows as distance^0.48; the 10 m point sits above that line.
+- **Between-ant SD about 1.6 m (16 %) after a 10 m channel** (*C. fortis* and *C. bombycina*, Pfeffer, Wahl & Wolf 2020, **FT**, figure read off its plots in `ja-lp4.14`'s research). A one-dimensional channel: distance error only.
+- **A model where uncertainty grows like √distance:** Heinze, Narendra & Cheung 2018 (**FT**) assume a circular Gaussian whose area grows by a constant per unit walked, and fit that constant (> 310 cm² per cm) to Wehner & Srinivasan 1981's search data. The √ is the model's premise, not something it tests.
+- **Search width follows the distance out, not the path's tortuosity** (Merkle & Wehner 2010, search summary only, **unverified**).
+- **Distance is underestimated, more so further out** (Sommer & Wehner 2004, **abs**). Not built (below).
+
+**The law** (`piErrorLaw` 1). The trip's drift is drawn as today, two Gaussian parts per trip up out of the ant's own hole, so the number and order of random draws do not change. What it is multiplied by changes, from the odometer to a span set by the **distance out**:
+
+> miss = span × (driftSurf, driftSurfY), span = `PI_SPAN_GAIN` × √(`piErrorAt` × reach)
+
+- **reach** (`reachSurf`): the farthest the ant has been, straight, from its own hole since it came up it, counted where the odometer is (every mode but the walk home), by its own walking (a child's tweezers don't count). Not the current distance: then the error would vanish as the ant neared home, and the vector would always lead it in. The sources measured ants walked straight out to a feeder, where the farthest point is the feeder's distance. Using the farthest point for a winding path is **design**, read from Merkle & Wehner 2010.
+- **√: design.** Consistent with Merkle 2006's end points (5 → 20 m: ×1.94 for ×4) and Heinze 2018's model, but Merkle's three points do not single it out: 5 → 10 m grows almost linearly (exponent 0.95), 10 → 20 m is almost flat (0.01). At 10 m the law gives 17.7 % where Merkle measured 25 %.
+- **`PI_MISS_AT` = 0.25:** the median miss is 25 % of the distance at `piErrorAt` out (Merkle 2006 at 5 m). `PI_SPAN_GAIN` = 0.25 / (0.1 × √ln 2) ≈ 3.0 converts it to the drift's scale (the median length of a 2D drift with parts of σ 0.1/√2 is 0.1√ln 2).
+- **`piErrorAt` = 50 cells stands for 5 m: design.** The docs give 1 cell ≈ 1 body length but keep ratios, not sizes ([ant-communication](ant-communication.md): the map is a zoomed-in patch). Taken literally (1 cell ≈ 1 cm, `piErrorAt` 500), every game trip would be under 5 m, where no miss was measured, and the √ law would put the miss at 79 % of the distance at 50 cells. At 50 the game's trips (25–200 cells out) map onto 2.5–20 m, the range measured. The setting is there for the owner to change.
+
+**What it gives** (median miss, as a share of the distance out):
+
+| distance out (cells) | 25 | 50 | 100 | 200 |
+|---|---|---|---|---|
+| law 1 | 35 % | 25 % | 17.7 % | 12.5 % |
+| sources (that distance ×10 cm) | none below 5 m | 25 % (Merkle) | 25 % (Merkle), ~19 % (Pfeffer's 16 % SD as a 2D median: the conversion, assuming the same spread across the path as along it, is design) | 12 % (Merkle) |
+| law 0, a straight trip | 8.3 % | 8.3 % | 8.3 % | 8.3 % |
+
+In G1 law 1's misses come out at 33 %, 26 %, 18 % and 14 % at reaches of 25, 50, 100 and 200 cells (law 0: 13–17 %, with a long tail from winding paths). Every figure is in PRD §79.
+
+**Fighting and defending.** Under law 1 they add only as far as they take the ant further out than it has been: a fight or a stretch of guarding near where it already went costs nothing. That is what the sources measure (the vector over an outbound path, the width set by distance out), not a rule for fighters; whether fights blur the vector more than walking was not looked at by any source found (**not found**).
+
+**Not built:**
+- **The shortfall in distance** (Sommer & Wehner 2004): a bias along the vector, growing with distance. One abstract, no number; it would add a draw-free term along the vector.
+- **The direction bias from the path's shape** (Müller & Wehner 1988, **abs**): needs the turns walked.
+- **The food vector's error** (`siteGive`, `siteFidelity`, both off): still `PI_DRIFT` × its length.
+- **The side view** (`integrate`, `believe`) keeps law 0: its vector is one-dimensional and its goldens stay as they are.
+
+**In the game:**
+- **The cue:** the ant's own home vector (sense table: path integration). Nothing new is sensed; the vector it already steers by is off by a different amount.
+- **Who reads it:** every belief of home on the plane (`believePlane`, `fromHomePlane` and so `homeDistPlane`, which gates defence by `homeGround`), the remembered food spot (`rememberSite`, `siteAim`), where spoil goes (`dig.ts`), and the loops' σ (`searchOn`, with `searchLoops`), so the search widens with distance out as Merkle & Wehner 2010 report.
+- **Off:** `piErrorLaw` 0, today's odometer, bit for bit.
+- **Built off** (2026-11-15, PRD §79), **on by default since 2026-11-16** (owner, with the sized search below): law 1 holds G1's guard better and its defenders die nearer home (median 20–25 cells out against 55–59), but the weakest colony carries 8–13 % less food and S1's short-trip searches, now facing 25 % misses, bring fewer home in 600 s. The owner chose law 1 on 2026-11-16, accepting that cost (PRD §79.2).
+
+## Sizing the search to the vector's error (ja-lp4.20)
+
+*Added 2026-11-15 for `ja-lp4.20` (PRD §79.2), against code at `e2b47fd6`. Labels as in the section above. No full text could be fetched this session either (PMC and the Zürich and ANU repositories were refused), so every search-width claim below is from abstracts or search summaries.*
+
+**The problem.** With `piErrorLaw` 1 the vector misses by 35 % of the distance at 25 cells out and 18 % at 100 (above), against today's flat 8.3 % of a straight trip. The search round the vector's end did not change with it: U3b's spiral starts at `SEARCH_START` (3 cells) and grows 1.6× a turn whatever the trip. A geometric spiral's turns are 0.6 × its reach apart, so past about 20 cells out they are further apart than the 12 cells an ant sweeps (sight 6 either side), and a hole beyond that can lie between two turns. S1's short trips (σ ≈ 15 cells at T = 100 under law 1, against 7 under law 0) are where it shows.
+
+**What each source gives:**
+- **Wehner & Srinivasan 1981** (**abs**): loops of ever-increasing size, starting and ending at the origin; the search density depends only on the distance from it and falls quickly. No width per trip.
+- **Müller & Wehner 1994** (**abs**): a spiral search programme underlies the loops. No growth law in what was read.
+- **Merkle, Knaden & Wehner 2006** (**abs**; the medians of the miss **cit**, via Goldschmidt et al. 2017): longer trips give larger errors, and the ants "adapt their systematic search strategy to their increasing uncertainty by extending their search pattern". The miss medians (1.27, 2.45, 2.47 m at 5, 10, 20 m) are the error law above; the search widths are in its figures, not obtained.
+- **Merkle & Wehner 2010** (search summary only, **unverified**): the width of the search density profile depends on the distance out (the vector's length), not on how winding the outbound path was. No numbers obtained.
+- **Vickerstaff & Merkle 2012** (**abs**): a Bayesian model in which the ant searches by its own estimate of its path-integration error produces broader search patterns as that uncertainty grows, as the ants do; it beats Lévy loops, a spiral and an anchored random search on efficiency at error rates below 0.02 m²/s. No width multiple.
+- **Pfeffer, Wahl & Wolf 2020** (**FT**, earlier session): search medians 8.9–11.0 m at a 10 m vector, a 1-D channel: where the search centres, not its width.
+
+So the shape is sourced (the search's size grows with the vector's own error, set by the distance out), and its multiples are not: **design**.
+
+**The rule** (`searchScale`, off = 0). On the plane, round where the vector ran out, U3b's quarter-turn spiral is sized by the vector's own error σ = `PI_DRIFT_2D` × piSpan (per axis: with law 1, `PI_SPAN_GAIN` × √(`piErrorAt` × reach) × 0.1/√2; with law 0, the odometer's):
+
+> point n reaches max(`SEARCH_START`, σ × (`searchScale` + `searchScaleStep` × n/4)), a quarter turn on from the last
+
+- **σ:** sourced in shape (Merkle 2006; Merkle & Wehner 2010; Vickerstaff & Merkle 2012). It is the same σ the loops (`searchLoops`) use.
+- **An even spiral** (each turn `searchScaleStep` σ further, not 1.6× the last): **design**, so the turns do not outrun sight at the reach where the misses are. Müller & Wehner 1994's spiral gives no law.
+- **`searchScale` 1, `searchScaleStep` 0.5:** **design**, chosen on S1 (seeds 1–4, nine pairs of 0.25 / 0.5 / 1, by the worst seed; PRD §79.2). With law 1 at 100 cells out (σ = 15) the first point is 15 cells out and each turn 7.5 further; at 600 out (σ = 37), 37 and 18. The centre is not left unsearched: the ant walks through it to its first point, and its mound's smell (above) pulls it in near the hole.
+- **`SEARCH_START`** stays the floor (an ant with no error still circles at 3 cells).
+- **Not round a stored place:** an ant that retraced its route (`routeEnd`) searches round its first stored place, which it saw; that search keeps U3b's spiral.
+- **Unchanged:** the stall rule (`SEARCH_STALL` moves it to the next point), the cap at the plane's longer side, the side view's and top-down search, `siteAim`'s search round a food spot.
+- **Cost:** none in Jev (no situation, legend or question changes); one `sqrt` a search point.
+
+**Against:**
+- The real search is loops that return to the origin (Wehner & Srinivasan 1981), not a spiral; the loops (`searchLoops`) are built and scale by the same σ, but lost G1 and A1 in `ja-lp4.11` (PRD §56).
+- A searcher whose detection is certain within its sight gains nothing from wider turns: the optimal sweep for a sure detector is turns 2 × sight apart whatever σ, and σ only sets how far out it needs to go. The ants' wider searches fit uncertain detection (Vickerstaff & Merkle 2012's model weighs both). Which matters more in the game is what S1 and G1 measure.
+
+**Built off** (2026-11-15, PRD §79.2); **on by default since 2026-11-16**, with law 1 (owner: the literature-sized error over the weakest colony's food). With law 1 the scaled search wins S1 back: home in 600 s on the worst seed at 100 / 200 / 400 / 600 cells out, 100 / 95 / 90 / 85 % (seeds 1–10) against law 0's 100 / 95 / 72.5 / 77.5 %, and the median time home at 600 cells out falls from 112 s to 45–51 s. G1 does not follow: its guard holds (8–9 of 10 seeds within 2) and defenders still die near home, but the weakest colony carries less than under law 0 (1,445 against 1,754 on seeds 1–10, 1,015 against 1,333 on 11–20), less even than law 1 with today's spiral. A2b's rich-patch choice falls (9 → 6 of 10). So both stayed off until the owner turned them on together, and the weakest colony's loss under law 1 is not the search's to fix.
+
 ## What was not found
 
 - Any full text: blocked by the network policy (see the header).
@@ -100,7 +180,7 @@ So the question is: **how does a homing ant search when its vector runs out at n
 - A still-air test of nest-odour following.
 - Any study of trail-laying ants climbing a gradient of marks to their entrance.
 - Direct work on how trail-laying ants (*Lasius*, *Formica*, *Myrmica*) search for a missed entrance.
-- A primary figure for path-integration error per distance. `nest-and-home.md`'s "~10 %" was not re-confirmed here.
+- A primary figure for path-integration error per distance. `nest-and-home.md`'s "~10 %" was not re-confirmed here. (Since found, 2026-11-15: Merkle 2006's medians via Goldschmidt 2017, and Pfeffer 2020; see "How far the vector is off".)
 
 ## The mechanic
 
@@ -165,6 +245,11 @@ So the question is: **how does a homing ant search when its vector runs out at n
 - Waldner F, Merkle T (2018). A simple mathematical model using centred loops and random perturbations accurately reconstructs search patterns observed in desert ants. *J Comp Physiol A* 204:985–998. [PMC6244989](https://pmc.ncbi.nlm.nih.gov/articles/PMC6244989/) (abstract only)
 - Vickerstaff RJ, Merkle T (2012). Path integration mediated systematic search: a Bayesian model. *J Theor Biol* 307:1–19. [doi:10.1016/j.jtbi.2012.04.034](https://www.sciencedirect.com/science/article/abs/pii/S0022519312002159) (abstract only)
 - Merkle T, Knaden M, Wehner R (2006). Uncertainty about nest position influences systematic search strategies in desert ants. *J Exp Biol* 209:3545–3549. [doi:10.1242/jeb.02395](https://journals.biologists.com/jeb/article/209/18/3545/16103/Uncertainty-about-nest-position-influences) (abstract only)
+- Goldschmidt D, Manoonpong P, Dasgupta S (2017). A neurocomputational model of goal-directed navigation in insect-inspired artificial agents. *Front Neurorobot* 11:20. [PMC5388780](https://pmc.ncbi.nlm.nih.gov/articles/PMC5388780/) (full text: its Table 1 gives Merkle et al. 2006's medians)
+- Pfeffer S, Wahl V, Wolf H (2020). Accuracy and spread of nest search behaviour in the Saharan silver ant, *Cataglyphis bombycina*, and in the salt pan species, *Cataglyphis fortis*. *Anim Cogn* 23:1107–1117. [PMC7700069](https://pmc.ncbi.nlm.nih.gov/articles/PMC7700069/) (full text)
+- Heinze S, Narendra A, Cheung A (2018). Principles of insect path integration. *Curr Biol* 28:R1043–R1058. [PMC6462409](https://pmc.ncbi.nlm.nih.gov/articles/PMC6462409/) (full text, read in `ja-lp4.14`'s research)
+- Müller M, Wehner R (1988). Path integration in desert ants, *Cataglyphis fortis*. *PNAS* 85:5287–5290. [doi:10.1073/pnas.85.14.5287](https://doi.org/10.1073/pnas.85.14.5287) (abstract only)
+- Sommer S, Wehner R (2004). The ant's estimation of distance travelled: experiments with desert ants, *Cataglyphis fortis*. *J Comp Physiol A* 190:1–6. [doi:10.1007/s00359-003-0465-4](https://doi.org/10.1007/s00359-003-0465-4) (abstract only)
 - Merkle T, Wehner R (2010). Desert ants use foraging distance to adapt the nest search to the uncertainty of the path integrator. *Behav Ecol* 21:349–355. [OUP](https://academic.oup.com/beheco/article/21/2/349/321171) (abstract only)
 - Schultheiss P, Cheng K (2011). Finding the nest: inbound searching behaviour in the Australian desert ant, *Melophorus bagoti*. *Anim Behav* 81:1031–1038. [ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S0003347211000613) (abstract only)
 - Reynolds AM, Schultheiss P, Cheng K (2014). Does the Australian desert ant *Melophorus bagoti* approximate a Lévy search by an intrinsic bi-modal walk? *J Theor Biol* 340:17–22. [ResearchGate](https://www.researchgate.net/publication/256482456_Does_the_Australian_desert_ant_Melophorus_bagoti_approximate_a_Levy_search_by_an_intrinsic_bi-modal_walk) (abstract only)

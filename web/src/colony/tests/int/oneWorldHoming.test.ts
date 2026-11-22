@@ -6,6 +6,8 @@ import { Game, gameRng } from "../../game.ts";
 import { CELL, cellOf } from "../../hex.ts";
 import { OPEN, rockAt } from "../../world.ts";
 import { DT, curtainHole, planeHole, smallOne } from "../builders.ts";
+import { believePlane, fromHomePlane, piSpanOf, vectorHomePlane } from "../../homing.ts";
+import { Builder } from "../../builder.ts";
 
 // One world U3b (ja-lp4.3.2; docs/one-world.md §4, docs/nest-and-home.md §3.1): on the plane a homing ant steers by its own
 // drifting home vector, started afresh up out of its own hole, and searches in widening loops where it ran out. A small
@@ -18,8 +20,8 @@ const OLD = 0.5 * LIFESPAN;
 const NEST_SIGHT = 8;
 
 /** A game of few ants, every founder young (they stay in) but the one each test moves. */
-const game = (seed = 7): Game => {
-  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+const game = (seed = 7, colony: Partial<Colony["params"]> = {}): Game => {
+  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed), { colony });
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
   return g;
 };
@@ -51,6 +53,17 @@ function carrier(g: Game, x: number, y: number, odo: number, dx: number, dy: num
   c.odoSurf[0] = odo;
   c.driftSurf[0] = dx;
   c.driftSurfY[0] = dy;
+  return c;
+}
+
+/**
+ * A food carrier (ant 0 of the player) on the plane at (x, y) whose vector, from a trip that took it `out` cells from its hole at
+ * the farthest, puts its hole at (ox, oy) from the true one: by piErrorLaw 1 its drift is that offset over the span √(out) sets.
+ */
+function vectorCarrier(g: Game, x: number, y: number, out: number, ox: number, oy: number): Colony {
+  const span = piSpanOf(g.player.params.piErrorLaw, g.player.params.piErrorAt, out, out);
+  const c = carrier(g, x, y, out, ox / span, oy / span);
+  c.reachSurf[0] = out;
   return c;
 }
 
@@ -93,6 +106,88 @@ test("plane: the vector starts afresh up out of its own hole, with both drifts d
   assert.equal(c.odoSurf[0], out, "not counted on the way home");
 });
 
+test("plane, piErrorLaw 1 (ja-lp4.19): the reach out starts afresh at its own hole, is the farthest it has walked out, and sets the error", () => {
+  const g = game(7, { piErrorLaw: 1 });
+  const c = g.player;
+  const h = c.holeCells[c.params.nest] as HoleCell;
+  const hole = c.layers[PLANE]!.nest; // the plane's nest point, where the reach is measured from
+  c.reachSurf[0] = 80;
+  climbOut(g, c, 0, h);
+  assert.equal(c.reachSurf[0], 0, "afresh");
+  let far = 0;
+  for (let k = 0; k < Math.round(4 / DT); k++) {
+    g.tick(DT);
+    if (c.mode[0] !== RETURN) far = Math.max(far, Math.hypot(c.x[0] - hole.x, c.y[0] - hole.y));
+  }
+  assert.ok(far > 5, `it walked out (${far.toFixed(1)})`);
+  assert.ok(Math.abs(c.reachSurf[0] - far) < 1e-3 * far, `reach ${c.reachSurf[0]} = farthest out ${far.toFixed(2)}`);
+  assert.ok(c.odoSurf[0] > c.reachSurf[0], "the odometer counts the path, more than the reach");
+  // Walking about nearer home than it has been adds nothing: the reach stands while the odometer runs on.
+  c.reachSurf[0] = 60;
+  const odo = c.odoSurf[0];
+  c.mode[0] = EXPLORE;
+  for (let k = 0; k < Math.round(1 / DT); k++) g.tick(DT);
+  assert.ok(Math.hypot(c.x[0] - hole.x, c.y[0] - hole.y) < 60, "still within 60 of its hole");
+  assert.equal(c.reachSurf[0], 60, "the reach stands");
+  assert.ok(c.odoSurf[0] > odo, "the odometer ran on");
+  // Its belief of home is the hole plus the span × its drift: law 1's span is by the reach, not the odometer.
+  const span = piSpanOf(1, c.params.piErrorAt, c.odoSurf[0], c.reachSurf[0]);
+  const bx = c.nest.x + span * c.driftSurf[0];
+  const by = c.nest.y + span * c.driftSurfY[0];
+  assert.ok(Math.abs(fromHomePlane(c, 0) - Math.hypot(c.x[0] - bx, c.y[0] - by)) < 1e-6, "its believed distance home is by the span");
+});
+
+test("plane, piErrorLaw 1: the belief it steers by and the spoil aim's home are by the span, not the odometer (review of #249, S1)", () => {
+  const g = game(7, { piErrorLaw: 1 });
+  const c = carrier(g, 0, 0, 900, 0.05, -0.03);
+  const hole = c.nest;
+  // Far enough out not to see its hole, on the plane: its belief is the vector's (no search, no route).
+  let at: [number, number] | null = null;
+  for (let r = 30; r < 70 && !at; r += 2)
+    for (let k = 0; k < 12 && !at; k++) {
+      const a = (k / 12) * 2 * Math.PI;
+      const x = hole.x + r * Math.cos(a);
+      const y = hole.y + r * Math.sin(a);
+      if (open(g, x, y)) at = [x, y];
+    }
+  assert.ok(at, "an open cell out on the plane");
+  c.putAnt(0, PLANE, at[0], at[1]);
+  c.odoSurf[0] = 900;
+  c.reachSurf[0] = 30;
+  c.search[0] = 0;
+  c.routeState[0] = 0;
+  const span = piSpanOf(1, c.params.piErrorAt, 900, 30);
+  assert.ok(span < 0.2 * 900, "the span is far from the odometer");
+  const bx = hole.x + span * c.driftSurf[0] + c.carriedX[0]; // the drift as stored
+  const by = hole.y + span * c.driftSurfY[0] + c.carriedY[0];
+  const b = believePlane(c, 0, hole);
+  assert.ok(Math.abs(b.x - bx) < 1e-9 && Math.abs(b.y - by) < 1e-9, `belief (${b.x}, ${b.y}) is the hole + span × drift (${bx}, ${by})`);
+  const v = vectorHomePlane(c, 0);
+  assert.ok(Math.abs(v[0] - bx) < 1e-9 && Math.abs(v[1] - by) < 1e-9, "the spoil aim's home (vectorHomePlane) is the same point");
+});
+
+test("plane, piErrorLaw 1: a tweezers move is not walking out (the reach stays as walked; review of #249, S2)", () => {
+  const g = game(7, { piErrorLaw: 1 });
+  const c = g.player;
+  climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
+  for (let k = 0; k < Math.round(2 / DT); k++) g.tick(DT);
+  const r0 = c.reachSurf[0];
+  const hole = c.layers[PLANE]!.nest;
+  assert.ok(new Builder(g).moveAnt(0, 0, c.x[0] + (c.x[0] > hole.x ? 40 : -40), c.y[0]));
+  for (let k = 0; k < Math.round(0.5 / DT); k++) g.tick(DT);
+  assert.ok(c.reachSurf[0] < r0 + 10, `reach ${c.reachSurf[0]} grew by the tweezers' 40`);
+});
+
+test("plane, piErrorLaw 0: the reach is never counted (today's vector, bit for bit)", () => {
+  // The old odometer law on purpose: law 1 is the default now (PRD §79).
+  const g = game(7, { piErrorLaw: 0 });
+  const c = g.player;
+  climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
+  for (let k = 0; k < Math.round(3 / DT); k++) g.tick(DT);
+  assert.ok(c.odoSurf[0] > 5);
+  assert.equal(c.reachSurf[0], 0);
+});
+
 test("plane: coming up a rival's hole leaves the vector as it was", () => {
   const g = game();
   const c = g.player;
@@ -125,14 +220,15 @@ test("plane: a carrier walks to where its vector says the hole is, not to the ho
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 60 out, drifting (0.2, 0.1): it believes the hole 12 east and 6 south of it (13.4 off, out of sight of it).
+  // 30 out at the farthest (span ~116), drifting ~(0.10, 0.05): it believes the hole 12 east and 6 south of it (13.4 off, out of
+  // sight of it).
   const B = { x: H.x + 12, y: H.y + 6 };
   assert.ok(open(g, B.x, B.y), "its belief is on open ground");
   // From south of the belief: the straight way to the hole passes 5 cells from the belief, and never within sight of the hole
   // until it is nearly there.
   const S = { x: B.x + 6, y: B.y + 14 };
   assert.ok(open(g, S.x, S.y));
-  carrier(g, S.x, S.y, 60, 0.2, 0.1);
+  vectorCarrier(g, S.x, S.y, 30, 12, 6);
   let nearB = Infinity; // nearest to its belief before it came within NEST_SIGHT of the hole
   let seen = -1; // the tick it first came within NEST_SIGHT of the hole
   let k = 0;
@@ -154,10 +250,10 @@ test("plane: a carrier whose vector is 12 off finds nothing there, searches in w
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 120 out, drifting (0.1, 0): it believes the hole 12 east, along open row 32.
+  // 32 out at the farthest (span 120), drifting (0.1, 0): it believes the hole 12 east, along open row 32.
   const B = { x: H.x + 12, y: H.y };
   assert.ok(open(g, B.x, B.y));
-  carrier(g, B.x + 20, B.y, 120, 0.1, 0);
+  vectorCarrier(g, B.x + 20, B.y, 32, 12, 0);
   let most = 0;
   const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 3.5, `it searched, and the loops grew (to ${most.toFixed(2)})`);
@@ -169,10 +265,10 @@ test("plane: a carrier whose vector ends in rock gets as near as it can, searche
   const g = game();
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 60, drifting (0.2, −0.1): the spot it believes in, 12 east and 6 north of the hole, is in the rock ridge there.
+  // 32 out at the farthest (span 120), drifting (0.1, −0.05): the spot it believes in, 12 east and 6 north of the hole, is in the rock ridge there.
   const B = { x: H.x + 12, y: H.y - 6 };
   assert.ok(!open(g, B.x, B.y), "its belief is in rock");
-  carrier(g, H.x + 30, H.y + 10, 60, 0.2, -0.1);
+  vectorCarrier(g, H.x + 30, H.y + 10, 32, 12, -6);
   let most = 0;
   const t = home(g, c, 60, () => (most = Math.max(most, c.search[0])));
   assert.ok(most > 0, "it searched");
@@ -184,11 +280,11 @@ test("plane: a belief past the plane's edge is held at the edge, and the carrier
   const g = game(1);
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
-  // Walked 300 north: it believes the hole 60 north of it, 34 past the plane's top edge.
+  // 150 out at the farthest (span ~260), drifting ~(0, −0.23): it believes the hole 60 north of it, 34 past the plane's top edge.
   const top = 0.75;
   assert.ok(H.y - 60 < 0 && H.y - top > NEST_SIGHT + 10, `hole at y ${H.y.toFixed(1)}`);
   assert.ok(open(g, H.x, top));
-  carrier(g, H.x + 6, top + 2, 300, 0, -0.2);
+  vectorCarrier(g, H.x + 6, top + 2, 150, 0, -60);
   let nearEdge = Infinity;
   const t = home(g, c, 90, () => (nearEdge = Math.min(nearEdge, Math.hypot(c.x[0] - H.x, c.y[0] - top))));
   assert.ok(nearEdge < 1.5, `it went to the edge, where its belief is held (within ${nearEdge.toFixed(2)})`);
@@ -213,11 +309,11 @@ test("plane: a searching carrier with the home trail under its antennae follows 
   const c = g.player;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 24 east of the hole along open row 32, facing west, on a home trail that runs from it to the hole; it believes the hole
-  // 40 east (walked 200, drifting (0.2, 0)), behind it, and is searching there (its next point 43 east).
+  // 40 east (90 out at the farthest, span ~201, drifting ~(0.2, 0)), behind it, and is searching there (its next point 43 east).
   const S = { x: H.x + 24, y: H.y };
   for (let x = H.x; x <= S.x + 2; x += 0.5) assert.ok(open(g, x, H.y), `row ${H.y} is open at x ${x}`);
   for (let x = H.x; x <= S.x + 2; x += 0.5) c.paint("home", x, H.y, 1.5, 40, PLANE);
-  carrier(g, S.x, S.y, 200, 0.2, 0);
+  vectorCarrier(g, S.x, S.y, 90, 40, 0);
   const end = searchingRun(g, c, Math.PI, 1.5);
   // At its speed (7) it walks ~10 in 1.5 s: along the trail, it ends well west of where it started, still out of sight of
   // the hole (the snap is not what moved it): 10 west. Steered by its vector it turns round within a second: 6 east.

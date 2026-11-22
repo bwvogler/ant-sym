@@ -195,12 +195,12 @@ test("one world: a tired returner goes down to rest, then comes back up and is h
 });
 
 test("one world: `leave` = raid sends the ant held at the gate up and out as a recruited raid scout, in fight", () => {
-  const raid = (stanceGate: number) => {
+  const raid = (raidGate: number) => {
     const g = game();
     const c = g.player;
     c.responses = responses({ leave: () => "raid" });
     c.params.raidScout = 2;
-    c.params.stanceGate = stanceGate;
+    c.params.raidGate = raidGate;
     const i = 0;
     toGate(c, i);
     let mode = -1;
@@ -220,7 +220,7 @@ test("one world: `leave` = raid sends the ant held at the gate up and out as a r
   assert.equal(c.recruited[i], 1, "recruited: its stance is raid");
   assert.equal(c.layer[i], PLANE, "out");
   assert.equal(mode, FIGHT, "on the plane, in fight");
-  // The control: where the stance is the colony's (stanceGate 0), "raid" is a wait at raidScout, a scout like any other.
+  // The control: where it can't be recruited (raidGate 0), "raid" is a wait at raidScout, a scout like any other.
   const ctl = raid(0);
   assert.equal(ctl.c.recruited[ctl.i], 0, "not recruited");
   assert.equal(ctl.c.raidScouts, 0);
@@ -359,6 +359,24 @@ test("one world: a crowded gate with no returns sends raid scouts out (crowd is 
   for (let i = 0; i < 20; i++) toGate(c, i);
   run(g, 20);
   assert.ok(c.raidScouts > 0, `raid scouts: ${c.raidScouts}`);
+});
+
+test("one world: no rival, no raid (review of #53 S1): with the rival beaten, a crowded gate's raid answer and a raid trail recruit no one", () => {
+  const g = game(20);
+  const [c, r] = g.colonies as [Colony, Colony];
+  c.params.crowdAt = 2;
+  c.params.raidScout = 5;
+  c.params.raidRecruit = 5;
+  for (let i = 0; i < r.n; i++) r.alive[i] = 0;
+  r.larder = 0;
+  for (let i = 0; i < 20; i++) toGate(c, i);
+  const p = planeHole(own(c));
+  run(g, 8, () => c.paint("raid", p.x, p.y, 2, 0.5, PLANE));
+  let recruited = 0;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) recruited += c.recruited[i]!;
+  assert.equal(c.raidable, false, "the game found no rival");
+  assert.equal(recruited, 0, "nobody raids");
+  assert.equal(c.raidScouts, 0, "and no raid scout goes");
 });
 
 test("one world: a recruited raider in fight at the gate is held until `leave` says go", () => {

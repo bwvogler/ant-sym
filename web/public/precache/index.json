@@ -82,36 +82,59 @@
     },
     {
       "lane": "mode",
+      "doctrine": "cautious",
+      "species": "neglectus",
+      "context": "colony-v2-cad6fe01",
+      "file": "mode-neglectus-cautious.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "species": "neglectus",
+      "context": "colony-v2-a5996a5a",
+      "file": "mode-neglectus-forage.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "species": "neglectus",
+      "context": "colony-v2-5653d614",
+      "file": "mode-neglectus-warlike.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
       "doctrine": "warlike",
       "context": "colony-v7-5b5501f8",
       "file": "mode-warlike.json",
       "answers": 151
     },
     {
-      "lane": "stance",
+      "lane": "steer",
       "doctrine": "cautious",
-      "context": "stance-v4-b1ce9ef4",
-      "file": "stance-cautious.json",
-      "answers": 324
+      "context": "steer-v7-2489f87e",
+      "file": "steer-cautious.json",
+      "answers": 203
     },
     {
-      "lane": "stance",
+      "lane": "steer",
       "doctrine": "forage",
-      "context": "stance-v4-657ca221",
-      "file": "stance-forage.json",
-      "answers": 324
+      "context": "steer-v7-2edb31fb",
+      "file": "steer-forage.json",
+      "answers": 203
     },
     {
-      "lane": "stance",
+      "lane": "steer",
       "doctrine": "warlike",
-      "context": "stance-v4-1cc01e21",
-      "file": "stance-warlike.json",
-      "answers": 324
+      "context": "steer-v7-694ce533",
+      "file": "steer-warlike.json",
+      "answers": 203
     }
   ],
   "versions": {
     "colony": 7,
-    "stance": 4,
     "fungus": 8,
     "growth": 4
   }

@@ -1,0 +1,72 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { availableParallelism } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { Worker } from "node:worker_threads";
+import { BOUND, CEILING, WITHIN, judge, seedsFrom, type Held } from "./g1Rule.ts";
+
+// G1 (experiment.ts game1): generateOneWorld(seed), 600 + 600 ants, 600 s, gameRng, the side view's held-food bound (A7):
+// no colony with more than 2 foragers holding food over 120 s at any 10-s sample, counted on both layers. The bound of 2 is
+// not loosened (owner, 2026-11-11).
+//
+// Judged on a share of seeds, not on three fixed ones (ja-ysco, owner 2026-11-14; PRD §59). A seed's figure is the worst of
+// ~60 samples over two colonies in one game, so it swings with any change to one world's play: on seed 4, routeStep 4 gave
+// 2, 3 or 7 as routeSee moved, and #153 then #180 each took seed 4 over the bound with no change to route memory. Three
+// fixed seeds all pass about one time in five for any setting, so the old guard (seeds 4, 5 and 9) was re-rolled by every
+// plane change. The guard now asks that at least WITHIN of seeds 1-10 meet the bound, and that no seed reaches CEILING (a
+// carrier jam like main's 33 before route memory). WITHIN was 4 (#183). routeEnd took seeds 1-10 to 7 within (#198), and
+// #201 (brood only in brood chambers) to 6 (seeds 2 and 4 from 2 to 3); the owner set WITHIN one below that, at 5
+// (2026-11-14), so one seed moving by one carrier doesn't turn the guard red.
+//
+// Each game takes 3-5 minutes; the ten run in worker threads, as many at a time as the machine has cores.
+//
+// The numbers and the judge are g1Rule.ts's, shared with scripts/g1-verdict.mjs. On CI (slow.yml) each seed has a runner:
+// G1_SEEDS (e.g. "4") plays just those seeds and G1_RESULT names the JSON file their figures go to; the `g1 verdict` job merges
+// the files and judges them with the same rule. With G1_SEEDS set this test judges nothing (one seed can't meet WITHIN).
+// That handling of G1_SEEDS and G1_RESULT has no fast test (it takes a game, about 2 minutes); a mistake in it shows as a red
+// `g1 (n)` or `g1 verdict` on a runner, not a green one.
+const SUBSET = process.env.G1_SEEDS?.trim();
+const RESULT = process.env.G1_RESULT;
+
+function game(seed: number): Promise<Held> {
+  return new Promise((resolve, reject) => {
+    const w = new Worker(new URL("./oneWorldG1Game.ts", import.meta.url), { workerData: { seed } });
+    w.once("message", resolve);
+    w.once("error", reject);
+    w.once("exit", (code) => code && reject(new Error(`G1 seed ${seed}: worker exited with ${code}`)));
+  });
+}
+
+async function all(seeds: number[], jobs: number): Promise<Held[]> {
+  const out: Held[] = [];
+  const queue = [...seeds];
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(jobs, queue.length)) }, async () => {
+      for (let s = queue.shift(); s !== undefined; s = queue.shift()) out.push(await game(s));
+    }),
+  );
+  return out.sort((a, b) => a.seed - b.seed);
+}
+
+test(
+  `G1, one world: hardly a forager holds its food over 120 s (seeds 1-10, 600 + 600 ants, 600 s; at most ${BOUND} on at least ${WITHIN} seeds, none at ${CEILING} or more)`,
+  { timeout: 1_200_000 }, // the file limit of test:slow and slow.yml caps it anyway (20 min; on a runner it took 10.6)
+  async (t) => {
+    const seeds = seedsFrom(SUBSET);
+    const held = await all(seeds, availableParallelism());
+    if (RESULT) {
+      mkdirSync(dirname(RESULT), { recursive: true });
+      writeFileSync(RESULT, JSON.stringify(held));
+    }
+    const v = judge(held, seeds);
+    // On record when green too: the margin is what the next change to one world's play is checked against.
+    t.diagnostic(`${v.within} of ${seeds.length} within ${BOUND}: ${v.table}`);
+    if (SUBSET) return; // CI's per-seed runner: the verdict job judges the ten
+    assert.deepEqual(v.failures, [], "G1's rule");
+  },
+);
+
+test.todo(
+  "whole games: hardly a porter holds its food over 120 s either, by its own hold clock (ja-3po: G seeds 1-10 reach 6, Cautious's replay 49; moved here from the side view's slow/side.test in S2.3c)",
+);

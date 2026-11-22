@@ -6,7 +6,7 @@ import { CHANNELS, MARKS, Pheromones, type Channel } from "../../pheromone.ts";
 import { GENERIC_ANT, type Species } from "../../species.ts";
 import type { Policy, Situation } from "../../vocab.ts";
 import { localPolicy } from "../../colony.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
+import { mulberry32, worldFromArrays } from "../../world.ts";
 import { smallOne } from "../builders.ts";
 
 // ja-fnd.5.11: a species' channel set (ColonyParams.channelSet). A channel it lacks is never laid on any layer, so it holds nothing, wakes no chunk
@@ -16,7 +16,7 @@ const NO_ALARM: Channel[] = CHANNELS.filter((ch) => ch !== "alarm");
 const QUIET: Species = { ...GENERIC_ANT, id: "quiet", name: "Quiet", params: { channelSet: NO_ALARM } };
 
 test("a channel the species lacks takes no scent and reads 0; the others work as before", () => {
-  const map = generateWorld(1, { size: { w: 40, h: 30 } });
+  const map = worldFromArrays({ w: 40, h: 30 }, []);
   const ph = new Pheromones(map, undefined, ["food", "home"]);
   ph.deposit("alarm", 10, 10, 5);
   ph.deposit("food", 10, 10, 5);

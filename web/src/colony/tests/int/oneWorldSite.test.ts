@@ -6,8 +6,8 @@ import { Game, gameRng } from "../../game.ts";
 import { centreX, centreY } from "../../hex.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { dropFood } from "../../world.ts";
-import { generateWorld, mulberry32 } from "../../world.ts";
 import { DT } from "../builders.ts";
+import { piSpan } from "../../homing.ts";
 
 // Site fidelity on one world's plane (ja-lp4.15.3, docs/forager-trips.md §3, PRD §58): a forager that picks up food keeps
 // its own vector to the spot (where it stood less where its vector put its hole), walks it straight on its next trip out,
@@ -62,7 +62,8 @@ test("site fidelity: a find is remembered as where the ant stood less where its 
   const fx = hx + 40;
   const fy = hy + 5;
   dropFood(g.world!.plane, fx, fy, 3);
-  // 50 cells walked with a drift of (0.06, -0.04) per cell: the vector's hole is (3, -2) off.
+  // 50 cells walked, about 40 out, with a drift of (0.06, -0.04): by the distance out (piErrorLaw 1, span ~134) the vector's
+  // hole is about (8, -5) off.
   out(c, fx - 2, fy, 0, 50, 0.06, -0.04);
   assert.ok(Number.isNaN(c.foodX[0]), "nothing remembered before a find");
   assert.ok(
@@ -71,11 +72,9 @@ test("site fidelity: a find is remembered as where the ant stood less where its 
   );
   const x = c.x[0];
   const y = c.y[0];
-  assert.ok(
-    Math.abs(c.foodX[0] - (x - (pn(g, c).x + 50 * 0.06))) < 0.1,
-    `x: remembered ${c.foodX[0]}, stood ${x - hx}, odo ${c.odoSurf[0]}`,
-  );
-  assert.ok(Math.abs(c.foodY[0] - (y - (pn(g, c).y - 50 * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
+  const span = piSpan(c, 0);
+  assert.ok(Math.abs(c.foodX[0] - (x - (pn(g, c).x + span * 0.06))) < 0.1, `x: remembered ${c.foodX[0]}, stood ${x - hx}, span ${span}`);
+  assert.ok(Math.abs(c.foodY[0] - (y - (pn(g, c).y - span * 0.04))) < 0.1, `y: remembered ${c.foodY[0]}`);
   assert.ok(Math.abs(c.foodX[0] - (x - hx)) > 2, "not the true offset from the hole: the drift is in it");
 });
 
@@ -106,7 +105,8 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
   const sy = 5;
   c.foodX[0] = sx - 50 * 0.05;
   c.foodY[0] = sy - 50 * 0.05;
-  // This trip's drift is (-0.1, 0.08): it will end up (odo × drift) from the spot's believed place, where it stops to search.
+  // This trip's drift is (-0.1, 0.08): it will end up (span × drift, the span by its distance out) from the spot's believed
+  // place, where it stops to search.
   out(c, hx + 3, hy, Math.PI, 3, -0.1, 0.08);
   const start = { x: c.x[0], y: c.y[0] };
   let path = 0;
@@ -119,9 +119,9 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
     if (c.search[0] !== 0) arrived = k;
   }
   assert.ok(arrived >= 0, "it got there and began to search");
-  const odo = c.odoSurf[0];
-  const bx = pn(g, c).x + odo * -0.1 + c.foodX[0];
-  const by = pn(g, c).y + odo * 0.08 + c.foodY[0];
+  const span = piSpan(c, 0);
+  const bx = pn(g, c).x + span * -0.1 + c.foodX[0];
+  const by = pn(g, c).y + span * 0.08 + c.foodY[0];
   assert.ok(
     Math.hypot(last.x - bx, last.y - by) < 2.5,
     `at the believed spot (${bx.toFixed(1)}, ${by.toFixed(1)}), not ${Math.hypot(last.x - bx, last.y - by).toFixed(1)} off`,
@@ -134,7 +134,7 @@ test("site fidelity: on its next trip it walks the vector straight to where it b
   let far = 0;
   for (let k = 0; k < 8 * 30; k++) {
     g.tick(DT);
-    const o = c.odoSurf[0];
+    const o = piSpan(c, 0);
     far = Math.max(far, Math.hypot(c.x[0] - (pn(g, c).x + o * -0.1 + c.foodX[0]), c.y[0] - (pn(g, c).y + o * 0.08 + c.foodY[0])));
   }
   assert.ok(c.search[0] > reach0, `the search widened: ${reach0} to ${c.search[0]}`);
@@ -266,16 +266,4 @@ test("site fidelity: a newborn in a dead ant's slot remembers nothing", () => {
   c.kill(0);
   assert.ok(c.spawn(), "a slot was free");
   assert.ok(Number.isNaN(c.foodX[0]) && Number.isNaN(c.foodY[0]), "the dead ant's spot is not inherited");
-});
-
-test("site fidelity: not on a top-down map, where a find is not remembered", () => {
-  const world = generateWorld(3, { size: { w: 128, h: 96 }, nestCount: 1 });
-  const flat = new Colony(world, { antCount: 1, maxAnts: 1, siteFidelity: 1, deposit: 0 }, mulberry32(5), () => "explore");
-  flat.age[0] = 0.5 * LIFESPAN;
-  flat.mode[0] = EXPLORE;
-  flat.carrying[0] = 0;
-  dropFood(world, flat.x[0], flat.y[0], 3);
-  for (let t = 0; t < 90 && flat.carrying[0] !== 1; t++) flat.tick(DT);
-  assert.equal(flat.carrying[0], 1, "it picked the food up");
-  assert.ok(Number.isNaN(flat.foodX[0]), "nothing remembered off the plane");
 });

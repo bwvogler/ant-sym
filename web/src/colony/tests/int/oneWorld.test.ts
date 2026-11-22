@@ -9,7 +9,6 @@ import {
   fillCell,
   flat,
   foundNest,
-  heapMound,
   inBounds,
   isSky,
   mulberry32,
@@ -264,10 +263,8 @@ test("digging below never re-derives the sky and the strip: they are the plane's
     // rule keeps them off, tested below), but a direct dig still leaves the strip alone.
     const h = line.sHole[0]!;
     for (const col of [h - 1, h + 1]) if (curtain.rock.get(col, CRUST) === SOIL) digCell(curtain, col, CRUST);
-    // Nothing fills the strip, and no spoil is heaped on it: the mound is the plane's (one-world §4).
+    // Nothing fills the strip (the mound is the plane's, one-world §4: the curtain has no heap function).
     assert.equal(fillCell(curtain, h, STRIP), false);
-    assert.equal(heapMound(curtain, h, 1, 0), null);
-    assert.equal(heapMound(curtain, h, -1, 0), null);
     assert.deepEqual(snap(), before, `seed ${seed}: the sky and the strip are unchanged`);
   }
 });

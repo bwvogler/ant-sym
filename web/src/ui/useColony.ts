@@ -1,31 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  type Colony,
-  type Mode,
-  type Stance,
   DEFAULT_MENU,
   menuFor,
   SPECIES,
   DEFAULT_COLONY,
   STRAINS,
-  type Fungus,
   Game,
   GAME_REGROW,
   gameRng,
-  type Outcome,
-  type Unity,
-  chapterOf,
-  type ChapterView,
-  UPGRADES,
   generateOneWorld,
   GENERIC_ANT,
   speciesById,
 } from "../colony/index.ts";
 import { journalFromUrl } from "./journal.ts";
-import { colonyName } from "./names.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { landingOf } from "./landing.ts";
+import { GameLoop, MAX_STEP } from "./gameLoop.ts";
+import type { ColonyStats, EvolutionStats, SideStats } from "./stats.ts";
+
+// The stats types and situationsOf live in stats.ts; they are re-exported here, where the page and its tests have always read them.
+export type { ColonyStats, EvolutionStats, SideStats };
+export { situationsOf } from "./stats.ts";
 
 // Owns the one Game (its colonies and the fungus, the player) and its animation
 // loop: React state carries only what the
@@ -59,6 +55,8 @@ export interface ColonyControls {
   /** the Lab (ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
   sampleTemp: number;
   reroll: number;
+  /** the Lab (ja-ykmu.3): whether ants out exploring or following ask their steering weights (ColonyParams.steerLane) */
+  steerLane: boolean;
 }
 
 /** One world's two views (docs/one-world.md §5): "above" the plane, "below" the curtain under the line. */
@@ -88,141 +86,9 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   view: "above",
   sampleTemp: DEFAULT_COLONY.sampleTemp,
   reroll: DEFAULT_COLONY.reroll,
+  // Off by default: main's steering, bit for bit. The Lab's switch turns the policy-set weights on (docs/steering.md).
+  steerLane: false,
 };
-
-/** One colony's line in the panel. */
-export interface SideStats {
-  population: number;
-  cap: number;
-  stored: number;
-  losses: number;
-  births: number;
-  /** nest slice 4 (the side view): the queen ("lost": orphaned), and brood as eggs / larvae / pupae; null on the top-down maps */
-  queen: "alive" | "lost" | null;
-  /** the fungus in the queen, 0..1 (ja-lo8.7) */
-  queenLoad: number;
-  brood: [number, number, number];
-  /** brood killed by the fungus's crown (nest slice 8) */
-  broodKilled: number;
-  /** the colony's stance; where each ant's is its own (top-down, docs/stance.md), how many defend and raid */
-  stance: string;
-  /** share of living ants carrying the fungus */
-  infected: number;
-  /** mean resistance (immune priming) over living ants */
-  resist: number;
-  /** soil cells dug */
-  dug: number;
-  /** pellets of it brought out to the mound */
-  mound: number;
-  /** pellets of it put back into unused space underground: dug = mound + filled + pellets in jaws + pellets lost with ants that died */
-  filled: number;
-  /** the side view: loose pellets taken off the mound and put back underground (soil already counted on the mound, moved again) */
-  refilled: number;
-}
-
-export interface ColonyStats {
-  time: number;
-  stored: number;
-  foodTotal: number;
-  foodLeft: number;
-  counts: Record<Mode, number>;
-  /** policy mode choices per second, over the last second */
-  choicesPerSecond: number;
-  situationsSeen: number;
-  /** every situation the colonies' mode lane can be asked in: the species' own schema's size, or SITUATIONS (ja-fnd.5.12) */
-  situations: number;
-  /** every colony's line: Game.colonies order (Ink, then Amber; ui/names.ts) */
-  sides: SideStats[];
-  /** the colony that is gone, by index, or −1 */
-  fallen: number;
-  outcome: Outcome;
-  /** cells of ground holding spores enough to see (Fungus.shownSporeCells) */
-  sporeCells: number;
-  /** how far the fungus has come toward one colony */
-  unity: Unity;
-  /** sim seconds per wall second over the last second: below the speed asked when the machine can't keep up */
-  pace: number;
-  /** where the player stands (chapters.ts) */
-  chapter: ChapterView;
-  /** new queens flown and waiting to found (Game.flights): the game pauses for them (ja-lo8.9) */
-  flights: number;
-  /** the game's fungus's body and evolution (ja-lo8.12); null before it lands (a game built without Game.land's evolve, as tests do, has none) */
-  evolution: EvolutionStats | null;
-}
-
-/** The fungus's body and evolution, for its panel. */
-export interface EvolutionStats {
-  /** its mycelium's mass by the hole */
-  mass: number;
-  /** the load in its hosts, summed over every colony's ants and queens */
-  inHosts: number;
-  /** mutations to give (whole ones), and how many it makes a minute now: it mutates as fast as it grows */
-  mutations: number;
-  perMinute: number;
-  /** the level chosen of each upgrade, by id */
-  levels: Record<string, number>;
-}
-
-/** The game's fungus's body and evolution, read off the game. */
-function evolutionStats(game: Game): EvolutionStats | null {
-  const e = game.fungus.evolution;
-  if (!e) return null;
-  let inHosts = 0;
-  for (const c of game.colonies) {
-    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.strain[i] === e.strain) inHosts += c.load[i];
-    if (c.queen?.alive && c.queen.strain === e.strain) inHosts += c.queen.load;
-  }
-  return {
-    mass: e.mass,
-    inHosts,
-    mutations: Math.floor(e.mutations),
-    perMinute: 60 * e.rate,
-    levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])),
-  };
-}
-
-/** Ants in each mode, over every colony. */
-function sumCounts(colonies: readonly Colony[]): Record<Mode, number> {
-  const out = { explore: 0, follow: 0, return: 0, fight: 0 } as Record<Mode, number>;
-  for (const c of colonies) for (const [m, n] of Object.entries(c.counts()) as [Mode, number][]) out[m] += n;
-  return out;
-}
-
-/** Every situation the colonies' mode lane can be asked in: the species' own schema's size (Colony.seen is sized by it), or SITUATIONS. */
-export function situationsOf(colonies: readonly Colony[]): number {
-  return colonies[0]?.seen.length ?? 0;
-}
-
-/** Situations any colony has been asked in: what one shared doctrine would pay for (the caches are shared by context). */
-function seenTogether(colonies: readonly Colony[]): number {
-  let n = 0;
-  const first = colonies[0];
-  if (!first) return 0;
-  for (let k = 0; k < first.seen.length; k++) if (colonies.some((c) => c.seen[k])) n++;
-  return n;
-}
-
-function side(c: Colony, fungus: Fungus): SideStats {
-  const f = fungus.census(c);
-  return {
-    population: c.population,
-    cap: c.params.maxAnts,
-    stored: c.stored,
-    losses: c.losses,
-    births: c.births,
-    queen: c.queen ? (c.queen.alive ? "alive" : "lost") : null,
-    queenLoad: c.queen?.load ?? 0,
-    brood: c.brood.counts(),
-    broodKilled: c.broodKilled,
-    stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance,
-    infected: f.living ? f.infected / f.living : 0,
-    resist: f.meanResist,
-    dug: c.soilDug,
-    mound: c.soilOut,
-    filled: c.soilFilled,
-    refilled: c.looseFilled,
-  };
-}
 
 /** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
 export function buildGame(s: GameSettings): Game {
@@ -243,9 +109,6 @@ export function buildGame(s: GameSettings): Game {
     gameRng(s.seed, s.generation),
   );
 }
-
-/** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
-const MAX_STEP = 1 / 30;
 
 export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [controls, setControls] = useState<ColonyControls>(initial);
@@ -295,87 +158,33 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   }, [game, controls.hide, controls.cull, controls.menu]);
   // So do the Lab's settings for how ants draw their mode (ja-nan3), on every colony, founded later or not.
   useEffect(() => {
-    game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll });
-  }, [game, controls.sampleTemp, controls.reroll]);
-  const [stats, setStats] = useState<ColonyStats | null>(null);
-  const [fps, setFps] = useState(0);
+    game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll, steerLane: controls.steerLane ? 1 : 0 });
+  }, [game, controls.sampleTemp, controls.reroll, controls.steerLane]);
+  // The frame loop (gameLoop.ts) goes on across pauses and speed changes: playing and speed are set on it, not a reason to rebuild it.
   const frameListeners = useRef(new Set<() => void>());
-
+  const lastLoop = useRef<GameLoop | null>(null);
+  const loop = useMemo(
+    () =>
+      new GameLoop(game, journal, {
+        carry: lastLoop.current ?? undefined,
+        playing: controls.playing,
+        speed: controls.speed,
+        // A new queen has flown (ja-lo8.9): the game waits for the page to found her.
+        onFlight: () => setControls((c) => ({ ...c, playing: false })),
+        frame: frameListeners.current,
+      }),
+    // A new game is a new loop; `controls` reaches an existing one through loop.set, below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [game, journal],
+  );
   useEffect(() => {
-    let raf = 0;
-    let last = performance.now();
-    let lastStats = 0;
-    let frames = 0;
-    let fpsAt = last;
-    // The summary is the whole map's: every colony's (no colony is the player's).
-    const decisions = () => game.colonies.reduce((n, c) => n + c.decisions, 0);
-    let rateAt = { t: game.time, decisions: decisions() };
-    let rate = 0;
-    let paceAt = { wall: performance.now(), sim: game.time };
-    let pace = controls.playing ? controls.speed : 0;
-    const loop = (t: number) => {
-      // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
-      const dt = Math.max(0, Math.min(0.05, (t - last) / 1000));
-      last = t;
-      if (controls.playing) {
-        const total = dt * controls.speed;
-        const steps = Math.max(1, Math.ceil(total / MAX_STEP));
-        for (let k = 0; k < steps; k++) {
-          game.tick(total / steps);
-          journal?.observe(game);
-          // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
-          if (game.flights.length) {
-            setControls((c) => ({ ...c, playing: false }));
-            lastStats = 0;
-            break;
-          }
-        }
-      }
-      if (t - paceAt.wall >= 1000) {
-        pace = ((game.time - paceAt.sim) * 1000) / (t - paceAt.wall);
-        paceAt = { wall: t, sim: game.time };
-      }
-      if (game.time - rateAt.t >= 1) {
-        rate = (decisions() - rateAt.decisions) / (game.time - rateAt.t);
-        rateAt = { t: game.time, decisions: decisions() };
-      }
-      if (t - lastStats > 150) {
-        setStats({
-          time: game.time,
-          stored: game.colonies.reduce((n, c) => n + c.stored, 0),
-          // One world: both layers' food, as Game.foodLeft counts it (the plane's and the curtain's buried food).
-          foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : game.map.foodTotal,
-          foodLeft: game.foodLeft,
-          counts: sumCounts(game.colonies),
-          choicesPerSecond: rate,
-          situationsSeen: seenTogether(game.colonies),
-          situations: situationsOf(game.colonies),
-          sides: game.colonies.map((c) => side(c, game.fungus)),
-          fallen: game.fallen(),
-          outcome: game.outcome(),
-          sporeCells: game.fungus.shownSporeCells,
-          unity: game.unity(),
-          pace,
-          chapter: chapterFor(game),
-          flights: game.flights.length,
-          evolution: evolutionStats(game),
-        });
-        lastStats = t;
-      }
-      frames++;
-      if (t - fpsAt > 1000) {
-        setFps(frames);
-        frames = 0;
-        fpsAt = t;
-      }
-      for (const fn of frameListeners.current) fn();
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [game, controls.playing, controls.speed, journal]);
+    loop.start();
+    lastLoop.current = loop;
+    return () => loop.stop();
+  }, [loop]);
+  useEffect(() => loop.set(controls.playing, controls.speed), [loop, controls.playing, controls.speed]);
 
-  // The dev hook (window.jevAnts, the game and the page's views) is the page's: ColonyApp.
+  // The dev hook (window.jevAnts, the game and the page's views) is dev/hook.ts, installed by ColonyApp.
   // Once the player has pressed Start, every game begins with the fungus landing by the hole of the colony its seed chose.
   useEffect(() => {
     if (controls.started && !game.landed) game.land(landingOf(game), GAME_STRAIN, { evolve: true });
@@ -395,6 +204,19 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     }));
     setLoads((n) => n + 1);
   }, []);
+  /**
+   * Step the game `n` fixed ticks of MAX_STEP (1/30 s: the assays' tick, and the longest the loop takes): Lab mode's step control, used while paused
+   * (PRD §69.7). A flight stops it, as it stops play: the page founds her before the game goes on.
+   */
+  const step = useCallback(
+    (n: number) => {
+      for (let k = 0; k < n && !game.flights.length; k++) {
+        game.tick(MAX_STEP);
+        journal?.observe(game);
+      }
+    },
+    [game, journal],
+  );
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = {
     species: controls.species,
@@ -430,29 +252,5 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
-  return { game, controls, update, stats, fps, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal };
-}
-
-/** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
-function chapterFor(game: Game): ChapterView {
-  const k = landingOf(game);
-  const c = game.colonies[k] ?? game.player;
-  const f = game.fungus.census(c);
-  const line = game.lineage(k);
-  const gynes = line.reduce((n, j) => n + (game.colonies[j]?.gynes ?? 0), 0);
-  const daughters = line.length - 1;
-  return chapterOf({
-    landed: game.landed !== null,
-    colony: colonyName(k),
-    hosts: f.infected,
-    share: f.living ? f.infected / f.living : 0,
-    queenInfected: game.revealed[k] === true,
-    gynes,
-    daughters,
-  });
-}
-
-/** Each ant's own stance, counted (top-down): "3 defend · 12 raid", or "all forage". */
-function stanceText(n: Record<Stance, number>): string {
-  return n.defend || n.raid ? `${n.defend} defend · ${n.raid} raid` : "all forage";
+  return { game, loop, controls, update, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step };
 }

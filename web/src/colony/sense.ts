@@ -2,7 +2,7 @@
 
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
-import { cellKey, inReachShared } from "./grid.ts";
+import { inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
@@ -57,13 +57,7 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
   // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
   if (c.params.invitePace > 0) t.returns = paceReturns(c.params, c.pace[i]);
-  // t.raid is worked out when a response reads it (Colony.raidOf). Reading it here left the shared CELL on its last sensor
-  // tip, where the callers after touch() go on reading CELL (arrive takes food at CELL): kept as it was, bit for bit.
-  if (c.params.raidGate > 0 && c.entrance === null && c.ph.live("raid")) {
-    const h = c.heading[i] + c.params.sensorAngle;
-    const d = c.params.sensorDistance;
-    cellOf(c.x[i] + Math.cos(h) * d, c.y[i] + Math.sin(h) * d);
-  }
+  t.raid = raidSmelt(c, i);
   t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;
 }
@@ -181,13 +175,13 @@ export function touchProbe(c: Colony, x: number, y: number, angle: number, d: nu
 export function raidSmelt(c: Colony, i: number): "none" | "faint" | "strong" {
   if (c.params.raidGate <= 0) return "strong";
   // One world (ja-web): at the gate at the top of its shaft, the plane's trail where it ends, at its hole.
-  if (c.entrance !== null) return c.atGate(i) ? trailLevel(holeRaid(c)) : "strong";
+  if (!c.onPlane) return c.atGate(i) ? trailLevel(holeRaid(c)) : "strong";
   return trailLevel(raidLevel(c, i));
 }
 
 /** The raid trail's level ant i smells: strongest of its cell and its three sensors (one world's curtain: at its hole, holeRaid). */
 export function raidLevel(c: Colony, i: number): number {
-  if (c.entrance !== null) return c.line !== null ? holeRaid(c) : 0;
+  if (!c.onPlane) return c.line !== null ? holeRaid(c) : 0;
   if (!c.ph.live("raid")) return 0;
   const x = c.x[i];
   const y = c.y[i];
@@ -236,16 +230,6 @@ export function nestmatesAround(c: Colony, cx: number, cy: number): number {
     const y = cy + o[k + 1];
     if (inBounds(map, x, y)) s += f.get(x, y);
   }
-  return s;
-}
-
-/** Last tick's returns with food in cell (cx, cy) and the six round it (behaviour MR 5). */
-export function returnsAround(c: Colony, cx: number, cy: number): number {
-  const g = c.returned;
-  if (g.size === 0) return 0;
-  const o = discOffsets(1)[cy & 1] as Int16Array;
-  let s = 0;
-  for (let k = 0; k < o.length; k += 2) s += g.get(cellKey(cx + o[k], cy + o[k + 1])) ?? 0;
   return s;
 }
 

@@ -14,26 +14,19 @@ import {
   laneOfContext,
   LANE_KINDS,
   localPolicy,
-  localStance,
   packFungusRequest,
   packModeRequest,
-  packStanceRequest,
   policyContext,
   readLevels,
   readMode,
-  readStance,
   SITUATIONS,
   situationKey,
-  STANCE_SCHEMA,
-  stanceContext,
-  stanceKey,
   validLevels,
   type FungalSituation,
   type Situation,
-  type StanceSituation,
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
-import { requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, SAMPLE_STANCE, tokensPerQuestion } from "../prompt.ts";
+import { requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion } from "../prompt.ts";
 import type { PrecacheIndex } from "../precache.ts";
 
 // Characterization of every lane (docs/refactor.md S4.2, ja-fnd.5.2.1): what each lane's key, request, context, local answer,
@@ -48,11 +41,6 @@ const MODE_SITUATIONS: Situation[] = [
   SAMPLE_SITUATION,
   { mode: "return", tired: true, foodTrail: "none", homeTrail: "brood", alarm: "strong", enemy: "near", stance: "defend" },
   { mode: "follow", tired: false, foodTrail: "strong", homeTrail: "faint", alarm: "faint", enemy: "none", stance: "raid" },
-];
-const STANCE_SITUATIONS: StanceSituation[] = [
-  SAMPLE_STANCE,
-  { stance: "defend", ants: "few", losses: "heavy", enemyNearNest: true, intake: "none", larder: "full" },
-  { stance: "raid", ants: "many", losses: "some", enemyNearNest: false, intake: "plenty", larder: "low" },
 ];
 const FUNGAL_SITUATIONS: FungalSituation[] = [
   SAMPLE_FUNGAL,
@@ -71,11 +59,6 @@ test("each lane's cache key for fixed situations", () => {
     "return|tired|none|brood|strong|near|defend",
     "follow|fresh|strong|faint|faint|none|raid",
   ]);
-  assert.deepEqual(STANCE_SITUATIONS.map(stanceKey), [
-    "forage|some|none|clear|intake:some|low",
-    "defend|few|heavy|enemy|intake:none|full",
-    "raid|many|some|clear|intake:plenty|low",
-  ]);
   // The fungus's key carries the levers asked (the menu's, a queen's or a worker's), in table order.
   assert.deepEqual(
     FUNGAL_SITUATIONS.map((s, i) => fungalKey(s, askedLevers(new Set(MENUS[i % 2]), s.task === "queen"))),
@@ -93,12 +76,8 @@ test("each lane's cache context, under two doctrines or aims, and the fungus's t
     ["colony-v7-47f9dbc6", "colony-v7-97971313"],
   );
   assert.deepEqual(
-    DOCTRINE_TEXTS.map((d) => stanceContext(d)),
-    ["stance-v4-657ca221", "stance-v4-a2c72d8e"],
-  );
-  assert.deepEqual(
-    AIM_TEXTS.flatMap((a) => (["top", "side"] as const).map((v) => fungusContext(a, v))),
-    ["fungus-v8-bb724482", "fungus-v8-side-bb724482", "fungus-v8-abe11431", "fungus-v8-side-abe11431"],
+    AIM_TEXTS.map((a) => fungusContext(a)),
+    ["fungus-v8-side-bb724482", "fungus-v8-side-abe11431"],
   );
 });
 
@@ -115,20 +94,6 @@ test("each lane's packed request (a hash of its JSON, and its length), under two
     [
       ["dd23f31db6be0146", 3737],
       ["17685becca019aea", 3572],
-    ],
-  );
-  assert.deepEqual(
-    DOCTRINE_TEXTS.map((d) =>
-      idOf(
-        packStanceRequest(
-          STANCE_SITUATIONS.map((situation, i) => ({ id: `c${i}`, situation })),
-          d,
-        ),
-      ),
-    ),
-    [
-      ["6b1b44a5bcf04a3b", 2150],
-      ["f9594868990ccb04", 1985],
     ],
   );
   assert.deepEqual(
@@ -157,18 +122,14 @@ test("each lane's packed request (a hash of its JSON, and its length), under two
 
 test("each local rule over every situation it can be asked in (a hash of all its answers, and how many of each)", () => {
   const modes = Array.from({ length: SITUATIONS }, (_, c) => localPolicy(decodeSituation(c)));
-  const stances = Array.from({ length: STANCE_SCHEMA.size }, (_, c) => localStance(STANCE_SCHEMA.decode(c)));
   const count = (a: string[]) => Object.fromEntries([...new Set(a)].sort().map((k) => [k, a.filter((x) => x === k).length]));
   assert.equal(sha(modes), "62b63730107db786");
   assert.deepEqual(count(modes), { explore: 396, fight: 756, follow: 576, return: 2160 });
-  assert.equal(sha(stances), "7a7f8053a84da201");
-  assert.deepEqual(count(stances), { defend: 108, forage: 144, raid: 72 });
 });
 
 test("a doctrine or aim is trimmed in its context, so stray spaces are not a new cache", () => {
   assert.equal(policyContext(`  ${DOCTRINE_TEXTS[1]}\n`), policyContext(DOCTRINE_TEXTS[1]!));
-  assert.equal(stanceContext(`  ${DOCTRINE_TEXTS[1]}\n`), stanceContext(DOCTRINE_TEXTS[1]!));
-  assert.equal(fungusContext(`  ${AIM_TEXTS[1]}\n`, "top"), fungusContext(AIM_TEXTS[1]!, "top"));
+  assert.equal(fungusContext(`  ${AIM_TEXTS[1]}\n`), fungusContext(AIM_TEXTS[1]!));
 });
 
 test("each lane's local answer, and how each lane reads a reply, a bad one and none", () => {
@@ -176,7 +137,6 @@ test("each lane's local answer, and how each lane reads a reply, a bad one and n
     MODE_SITUATIONS.map((s) => localPolicy(s)),
     ["explore", "return", "follow"],
   );
-  assert.deepEqual(STANCE_SITUATIONS.map(localStance), ["forage", "defend", "forage"]);
   assert.deepEqual(
     [
       readMode({ s0_mode: { type: "choice", choice: "follow" } }, "s0"),
@@ -184,14 +144,6 @@ test("each lane's local answer, and how each lane reads a reply, a bad one and n
       readMode({}, "s0"),
     ],
     ["follow", null, null],
-  );
-  assert.deepEqual(
-    [
-      readStance({ c0_stance: { type: "choice", choice: "raid" } }, "c0"),
-      readStance({ c0_stance: { type: "choice", choice: "flee" } }, "c0"),
-      readStance({}, "c0"),
-    ],
-    ["raid", null, null],
   );
   const asked = ["food", "rival", "trail"];
   assert.deepEqual(
@@ -221,19 +173,17 @@ test("each lane's local answer, and how each lane reads a reply, a bad one and n
 test("what the Learn panel and the cost estimates send: the sample requests and the tokens a question costs", () => {
   const samples = [
     requestFor({ lane: "mode", situation: SAMPLE_SITUATION }, DOCTRINE_TEXTS[0]!, 3),
-    requestFor({ lane: "stance", situation: SAMPLE_STANCE }, DOCTRINE_TEXTS[0]!, 3),
     requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 3),
   ];
   assert.deepEqual(samples.map(idOf), [
     ["d08b5e29ecdab99a", 3741],
-    ["5412af7a49137dcb", 2150],
     ["0901c198dcb08ba0", 6466],
   ]);
   // The sample asks what a host in that situation is asked: a worker's levers, not a queen's.
   const workerLevers = askedLevers(new Set(DEFAULT_MENU), false);
   assert.equal(workerLevers.length, 14);
   assert.deepEqual(
-    Object.keys(samples[2]!.questions).filter((q) => q.startsWith("h0_")),
+    Object.keys(samples[1]!.questions).filter((q) => q.startsWith("h0_")),
     workerLevers.map((id) => `h0_${id}`),
   );
   // The Learn panel shows a followed host's own situation, a queen's too: she is asked her two levers (what the page sends her), not the menu's.
@@ -245,22 +195,15 @@ test("what the Learn panel and the cost estimates send: the sample requests and 
     2969,
   ]);
   assert.deepEqual(idOf(requestFor({ lane: "fungus", situation: SAMPLE_FUNGAL }, AIM_TEXTS[0]!, 2)), ["2db96f666465cfc3", 5041]);
-  assert.deepEqual(
-    [
-      tokensPerQuestion("mode", DOCTRINE_TEXTS[0]!),
-      tokensPerQuestion("stance", DOCTRINE_TEXTS[0]!),
-      tokensPerQuestion("fungus", AIM_TEXTS[0]!),
-    ],
-    [240, 197, 707],
-  );
+  assert.deepEqual([tokensPerQuestion("mode", DOCTRINE_TEXTS[0]!), tokensPerQuestion("fungus", AIM_TEXTS[0]!)], [240, 707]);
 });
 
 test("each lane's flags: id prefix, context prefix, hits, reconsidering, situations a request carries", () => {
   assert.deepEqual(LANE_KINDS, {
     mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
-    stance: { idPrefix: "c", contextPrefix: "stance-", countsHits: false, reconsiders: true, perRequest: 100 },
     fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
     growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    steer: { idPrefix: "w", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
   });
 });
 
@@ -272,16 +215,15 @@ test("the client's state carries these fields, in this order (the page shows and
     "requests",
     "hits",
     "misses",
-    "stanceLane", // whether there is a stance lane at all (ja-fnd.5.12)
     "doctrineCached",
     "failures",
     "lastError",
   ]);
   assert.deepEqual(new ColonyJev().state.lanes, {
     mode: { asked: 0, cached: 0 },
-    stance: { asked: 0, cached: 0 },
     fungus: { asked: 0, cached: 0 },
     growth: { asked: 0, cached: 0 },
+    steer: { asked: 0, cached: 0 },
   });
 });
 

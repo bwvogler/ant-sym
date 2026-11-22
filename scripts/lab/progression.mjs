@@ -1,20 +1,21 @@
-// Offline: how the fungus game paces (ja-lo8.12, PRD §50.12). The app's setup (side world, 600 + 600 ants, regrowth,
+// Offline: how the fungus game paces (ja-lo8.12, PRD §50.12). The app's setup (one world, 600 + 600 ants, regrowth,
 // gameRng(seed)), the landing by colony 0's hole, and the fungus policy from the page's shipped answers under a preset aim
 // (web/public/precache/fungus-<aim>.json; a situation not shipped plays the strain's default, as on the page while Jev
 // is asked). With --evolve the game's fungus starts weak and chooses upgrades as a player might: the first in the
 // order it has the mutations for, as soon as it has them. Reports when each chapter is reached (first host, a quarter of the colony, the
 // queen), each purchase, and the colony's infected share and resistance every minute. Seeds run in parallel.
 //
-// --map one plays one world as the page does (ui/useColony.ts buildGame: generateOneWorld, no auto-founding); the
-// default, side, is the side world the earlier PRD sections (§50.12–14) measured on. --hyphae grows the mycelium as
+// It plays one world as the page does (ui/useColony.ts buildGame: generateOneWorld, no auto-founding); the earlier PRD
+// sections (§50.12–14) measured on the side world, which is gone. --hyphae grows the mycelium as
 // hyphae (docs/hyphal-growth.md, ja-2bw.2). --growth plays the growth lane's shipped answers for the aim (public/precache/
 // growth-<aim>.json, ja-2bw.5); a situation with none plays the tip's own rule, as on the page.
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
-//          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--map side|one] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow]
+//          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
+// --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -28,7 +29,7 @@ const opt = (name, fallback) => {
 };
 const flag = (name) => args.includes(`--${name}`);
 const DEFAULT_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,infectivity,evasion,recognition,trails,royal,fruiting,evasion,royal,stealth";
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
@@ -40,12 +41,12 @@ if (isMainThread) {
     buy: !flag("no-buy"),
     order: opt("order", DEFAULT_ORDER).split(","),
     strain: opt("strain", "garden"),
-    map: opt("map", "side"),
     hyphae: flag("hyphae"),
     growth: flag("growth"),
     grant: opt("grant", "").split(",").filter(Boolean),
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
+    price: opt("price", null),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -68,7 +69,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `${job.map === "one" ? "one world" : "side world"}${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `one world${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -84,25 +85,25 @@ if (isMainThread) {
   const { INFECTED, STRAINS, askedLevers } = await import("../../web/src/colony/fungus.ts");
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
-  const { generateSideWorld } = await import("../../web/src/colony/world.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, map, hyphae, growth, grant, sun, flow } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, hyphae, growth, grant, sun, flow, price } = workerData;
+  if (price) {
+    const { PRICE } = await import("../../web/src/colony/evolution.ts");
+    [PRICE.base, PRICE.ratio] = price.split(",").map(Number);
+  }
   const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
-  const g =
-    map === "one"
-      ? new Game(
-          generateOneWorld(seed),
-          {
-            antCount: 600,
-            rivalAnts: 600,
-            rival: true,
-            regrow: GAME_REGROW,
-            autoFound: false,
-            fungus: { hyphae, flow, ...(sun === null ? {} : { sun }) },
-          },
-          gameRng(seed, 0),
-        )
-      : new Game(generateSideWorld(seed), { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW }, gameRng(seed, 0));
+  const g = new Game(
+    generateOneWorld(seed),
+    {
+      antCount: 600,
+      rivalAnts: 600,
+      rival: true,
+      regrow: GAME_REGROW,
+      autoFound: false,
+      fungus: { hyphae, flow, ...(sun === null ? {} : { sun }) },
+    },
+    gameRng(seed, 0),
+  );
   const menu = g.fungus.menu;
   g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
   if (growth) {
@@ -115,13 +116,15 @@ if (isMainThread) {
     STRAINS.findIndex((s) => s.id === strain),
     { evolve },
   );
-  const { MUTATION } = await import("../../web/src/colony/evolution.ts");
+  const { MUTATION, pathTo } = await import("../../web/src/colony/evolution.ts");
+  // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then.
   for (const id of grant) {
     const e = g.fungus.evolution;
-    const cost = e?.cost(id);
-    if (!e || cost === null || cost === undefined) continue;
-    e.growth += cost / MUTATION;
-    g.fungus.upgrade(id);
+    if (!e || e.cost(id) === null) continue;
+    for (const x of pathTo(e.save().levels, id)) {
+      e.growth += e.cost(x) / MUTATION;
+      g.fungus.upgrade(x);
+    }
   }
   const DT = 1 / 30;
   const r = {

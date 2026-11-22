@@ -63,7 +63,7 @@ export function pastCritical(p: ColonyParams, body: number): boolean {
 }
 
 /**
- * Heat (ja-rf5.5, heat.ts): every ant's body heat moves toward the ground's out on one world's plane (on a map with no plane, anywhere outside
+ * Heat (ja-rf5.5): every ant's body heat moves toward the ground's out on one world's plane (on a map with no plane, anywhere outside
  * its nest's disc) and toward the nest's inside; one past the critical heat dies of it.
  */
 export function heatStep(c: Colony, dt: number): void {

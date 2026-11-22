@@ -11,7 +11,6 @@ import {
   centreY,
   generateOneWorld,
   mainGround,
-  generateSideWorld,
 } from "../../colony/index.ts";
 import { flightCircle, penGate, penGround, penSettle, type Settle, withinFlight } from "../pen.ts";
 
@@ -45,8 +44,6 @@ test("the pen's circle is her flight round her mother's hole on the plane; none 
   // The hole is the line's: the second colony's is V1.
   const v = g.world!.line.holes[1]!;
   assert.deepEqual([h.px, h.py], [v.x, v.y]);
-  const side = new Game(generateSideWorld(1), { antCount: 4, rivalAnts: 4 }, gameRng(1));
-  assert.equal(flightCircle(side, f), null);
 });
 
 test("a click outside the circle is refused, without asking where she would settle; inside, the settling is the game's", () => {

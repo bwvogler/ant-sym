@@ -60,6 +60,7 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
       SET: "",
       SECONDS_IN: "",
       SPECIES: "",
+      POLICY: "",
       ...inputs,
     };
     const r = await exec("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", script], { cwd: dir, env }).then(
@@ -75,19 +76,34 @@ test("assays.yml's plan step refuses inputs that aren't ids, seeds or overrides,
     SET: "colony.routeStep=3,4 game.fight.rate=1",
     SECONDS_IN: "60",
     SPECIES: "desert",
+    POLICY: "experiments/caches/draw-top-forage.json",
   });
   assert.equal(good.code, 0, good.out);
   assert.match(good.out, /^seeds=\[1,2,3,7\]$/m);
-  assert.match(good.out, /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert$/m);
+  assert.match(
+    good.out,
+    /^args=game1 --one --set colony\.routeStep=3,4 --set game\.fight\.rate=1 --seconds 60 --species desert --policy cache:experiments\/caches\/draw-top-forage\.json$/m,
+  );
+  const pre = await plan({ ASSAYS: "t1", POLICY: "precache:forage" });
+  assert.equal(pre.code, 0, pre.out);
+  assert.match(pre.out, /^args=t1 --policy precache:forage$/m);
   const bads: Record<string, string>[] = [
     { ASSAYS: "a; rm -rf /" },
     { ASSAYS: "all merge" },
     { SEEDS: "1-50" },
     { SEEDS: "1\n2" },
+    { SEEDS: "1,x" },
     { SET: "x=$(id)" },
     { SET: "*" },
     { SPECIES: "../x" },
     { SECONDS_IN: "1 2" },
+    { POLICY: "/etc/passwd" },
+    { POLICY: "experiments/caches/../../x.json" },
+    { POLICY: "experiments/caches/a b.json" },
+    { POLICY: "experiments/caches/x.json; id" },
+    { POLICY: "precache:forage; id" },
+    { POLICY: "precache:../x" },
+    { POLICY: "precache:" },
   ];
   for (const bad of bads) {
     const r = await plan(bad);
@@ -113,4 +129,7 @@ test("experiment.mjs merge of per-seed files prints the table of one run over al
     else assert.match(merged, /\*\*colony\.deposit=4\*\* — pass 0\/2 \(failing seeds: 1, 2\)/, "the failing seeds are named");
   }
   await assert.rejects(run("merge", join(dir, "legacy1.json"), join(dir, "legacy1.json")), /seed 1 in more than one file/);
+  // The same assay and setting run for another length is another measurement (review of #224, N10).
+  await run("bridge", "--seconds", "4", "--set", "colony.deposit=2,4", "--jobs", "2", "--seeds", "2", "--json", join(dir, "short2.json"));
+  await assert.rejects(run("merge", join(dir, "legacy1.json"), join(dir, "short2.json")), /ran 5 s in one file and 4 s in another/);
 });

@@ -104,11 +104,12 @@ export function validLevels(key: string, answer: string): boolean {
 
 /**
  * What a cached answer was asked under: a different aim, legend or question wording is a different cache (the levers
- * asked are in each key). So is the view: a chamber in the side view is a nest's disc on a top-down map.
+ * asked are in each key). The "-side" is what the shipped answers were asked under, when a chamber was a place underground and not a
+ * nest's disc on a top-down map; the one world keeps the name so they play without being re-shipped.
  */
-export function fungusContext(aim: string, view: "top" | "side" = "top"): string {
+export function fungusContext(aim: string): string {
   const words = LEVERS.map((v) => `${v.id}:${v.brief}:${scale(v).join("/")}`).join("\n");
-  return `fungus-v${FUNGUS_BRAIN_VERSION}${view === "side" ? "-side" : ""}-${hash(FUNGUS_LEGEND + JSON.stringify(leverQuestions("h0", ["food"])) + words + "\u0000" + aim.trim())}`;
+  return `fungus-v${FUNGUS_BRAIN_VERSION}-side-${hash(FUNGUS_LEGEND + JSON.stringify(leverQuestions("h0", ["food"])) + words + "\u0000" + aim.trim())}`;
 }
 
 /** Aims to start from: the player's words for what the fungus wants. */

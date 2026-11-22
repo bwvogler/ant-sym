@@ -109,23 +109,23 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
   // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7). One world:
   // only underground, the nest's layer; the dead on the plane leave no corpse, as top-down (U3c: only the corpses
   // undertakers carry up go to the plane's midden).
-  if (col.queen && col.layer[i] === col.home)
-    col.corpses.push({
-      x: CELL[0],
-      y: CELL[1],
-      held: -1,
-      died: col.time,
-      load: col.load[i],
-      strain: col.strain[i],
-      layer: col.home,
-    });
+  const bodies = col.queen && col.layer[i] === col.home ? col.corpses : col.remains;
+  bodies.push({
+    x: CELL[0],
+    y: CELL[1],
+    held: -1,
+    died: col.time,
+    heading: col.heading[i],
+    load: col.load[i],
+    strain: col.strain[i],
+    layer: col.layer[i],
+  });
   clearPellet(col, i);
   col.alive[i] = 0;
   col.carrying[i] = 0;
   col.digT[i] = 0;
   if (lost) {
     col.losses++;
-    col.recentLosses++;
   }
 }
 

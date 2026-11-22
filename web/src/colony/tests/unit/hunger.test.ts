@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { LARVA } from "../../brood.ts";
-import { Colony, LIFESPAN } from "../../colony.ts";
+import { LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
 import {
   ADULT_DRAIN,
@@ -17,8 +17,7 @@ import {
   SHARE_ABOVE,
   THETA_OLD,
 } from "../../hunger.ts";
-import { generateSideWorld, mulberry32 } from "../../world.ts";
-import { SMALL_SIDE, broodChamber } from "../builders.ts";
+import { broodChamber, oneColony } from "../builders.ts";
 
 // Energy and hunger (ja-xu6.1, hunger.ts): every adult, larva and the queen has energy, drained with time and refilled by
 // eating; hunger is felt by touch (begging larvae, a queen who can't lay) and passed on; old ants answer it by working
@@ -52,12 +51,8 @@ test("the felt grid keeps the strongest on a cell, reads the strongest within on
   assert.equal(g.near(10, 10), 0);
 });
 
-/** A colony of `n` ants in the small side world, its queen alive, every ant exploring. */
-function colony(n = 1) {
-  const map = generateSideWorld(2, SMALL_SIDE);
-  const c = new Colony(map, { antCount: n, maxAnts: n + 4 }, mulberry32(2), () => "explore");
-  return { map, c };
-}
+/** A colony of `n` ants in one world's curtain (S2.3c: until then the small side world), its queen alive, every ant exploring. */
+const colony = (n = 1) => oneColony(n);
 
 test("an ant uses energy, twice as fast outside, eats from food lying within two cells once hungry (not the queen's stock), and shares by mouth", () => {
   const { c } = colony(2);
@@ -171,8 +166,7 @@ test("an old forager carries food in only when it feels hunger: with none it nev
 
 test("owedBeg (ja-rvli): a well-fed larva still owed the food it grows on begs a little, felt beside it; with owedBeg 0, or once it is fed, nothing", () => {
   const run = (owedBeg: number, fed: boolean) => {
-    const map = generateSideWorld(2, SMALL_SIDE);
-    const c = new Colony(map, { antCount: 1, maxAnts: 5, owedBeg }, mulberry32(2), () => "explore");
+    const { map, c } = oneColony(1, { owedBeg });
     const { b: room, cell } = broodChamber(map);
     const larva = c.brood.add(cell[0] - 1, cell[1], room.id);
     room.brood++;

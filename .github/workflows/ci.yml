@@ -64,7 +64,7 @@ jobs:
         env:
           TEST_REPORT_TITLE: int and golden, shard ${{ matrix.shard }}/${{ strategy.job-total }}
           TEST_DURATIONS_FILE: ${{ runner.temp }}/durations/int-golden-${{ matrix.shard }}.json
-        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
+        run: mkdir -p "$RUNNER_TEMP/durations" && node --test --test-timeout=60000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../scripts/ci-report.mjs --test-reporter-destination=stdout --test-shard=${{ matrix.shard }}/${{ strategy.job-total }} server/tests/int/*.test.ts worker/tests/int/*.test.ts src/ui/tests/int/*.test.ts src/colony/tests/int/*.test.ts src/colony/tests/golden/*.test.ts
         working-directory: web
       - name: soak, shard ${{ matrix.shard }}/${{ strategy.job-total }}
         if: ${{ !cancelled() }}

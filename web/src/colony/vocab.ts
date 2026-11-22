@@ -65,7 +65,7 @@ export interface Situation {
   alarm: Trail;
   /** an ant of another colony within two cells */
   enemy: "none" | "near";
-  /** what the colony as a whole is doing (the strategist's choice) */
+  /** what this ant is doing: its own stance, from what it senses (defend near home under threat, raid once recruited) */
   stance: Stance;
 }
 
@@ -113,38 +113,51 @@ export interface CellCounts {
 /** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */
 export const ENEMY = 0.5;
 
-/** The strategist's coarse view of its own colony: few values, so a stance can be cached per view too. */
-export interface StanceSituation {
-  stance: Stance;
-  /** living ants against the colony's cap */
-  ants: "few" | "some" | "many";
-  /** ants lost lately (a 30 s fading count) */
-  losses: "none" | "some" | "heavy";
-  enemyNearNest: boolean;
-  /**
-   * food brought home lately, per ant (behaviour MR 5, docs/activation.md: a colony knows its food only as the rate
-   * foragers bring it in, never as what is left on the map): none, some or plenty
-   */
-  intake: "none" | "some" | "plenty";
-  /** food stored but not yet turned into ants (the colony is at its cap) */
-  larder: "low" | "full";
-}
-
-/** The strategist's fields: 3 × 3 × 3 × 2 × 3 × 2 = 324 views. */
-export const STANCE_SCHEMA = defineSchema<StanceSituation>([
-  { name: "stance", values: STANCES },
-  { name: "ants", values: ["few", "some", "many"] },
-  { name: "losses", values: ["none", "some", "heavy"] },
-  { name: "enemyNearNest", values: [false, true], key: (v) => (v ? "enemy" : "clear") },
-  { name: "intake", values: ["none", "some", "plenty"], key: (v) => `intake:${v}` },
-  { name: "larder", values: ["low", "full"] },
-]);
-
-export type StancePolicy = (s: StanceSituation) => Stance;
-
 /** How far an odour may sit from an ant's own before it is a stranger. Tied to MAX_MASK, FUNGAL and BINS (above); colonies built alone use it too. */
 export const TOLERANCE = 0.35;
 
 /** One world's layers (docs/one-world.md §2): the plane, the surface, is layer 0; the curtain, underground, layer 1 (a colony's home there). */
 export const PLANE = 0;
 export const CURTAIN = 1;
+
+/**
+ * The steering weights (ja-ykmu; docs/steering.md "The mechanic"): how strongly an ant out searching or following on one
+ * world's plane weighs each cue, set per situation by the steer policy. `search` (its random turning) and `memory` (its last
+ * find against the food trail) are the ones the biology lets a situation set; `trail`, `home`, `vector` and `nestmates` are
+ * design (the Lab switches them on). Alarm keeps its own response (`alarmGain`).
+ */
+export const STEER_WEIGHTS = ["search", "memory", "trail", "home", "vector", "nestmates"] as const;
+export type SteerWeight = (typeof STEER_WEIGHTS)[number];
+/** Each weight's three levels: −1, 0 (as the game steers without weights) and +1. What each means is the weight's own (steer.ts). */
+export type SteerLevel = -1 | 0 | 1;
+export type Steering = Readonly<Record<SteerWeight, SteerLevel>>;
+/** Every weight at 0: the game's steering as it was. */
+export const NEUTRAL_STEERING: Steering = { search: 0, memory: 0, trail: 0, home: 0, vector: 0, nestmates: 0 };
+/** A steering packed into one number for the per-ant store: Σ (level + 1) × 3^k, k the weight's index. */
+export function encodeSteering(s: Steering): number {
+  let code = 0;
+  for (let k = STEER_WEIGHTS.length - 1; k >= 0; k--) code = code * 3 + (s[STEER_WEIGHTS[k] as SteerWeight] + 1);
+  return code;
+}
+/** The packed code of NEUTRAL_STEERING. */
+export const STEER_NEUTRAL = encodeSteering(NEUTRAL_STEERING);
+/** Weight k's level in a packed code. */
+export function steerLevel(code: number, k: number): SteerLevel {
+  return ((Math.floor(code / 3 ** k) % 3) - 1) as SteerLevel;
+}
+export function decodeSteering(code: number): Steering {
+  const out: Record<string, SteerLevel> = {};
+  STEER_WEIGHTS.forEach((w, k) => (out[w] = steerLevel(code, k)));
+  return out as Steering;
+}
+/**
+ * Where an ant out steers relative to its last find, by its own memory (the way to it, kept one trip): `none`, it remembers no find;
+ * `far`, it remembers one elsewhere; `near`, within params.findNear of where it believes the spot is (ja-ykmu.3;
+ * docs/steering.md §3, §7). `far` once also meant "none": Jev answered for that and ignored the memory (PRD §82, round 4).
+ */
+export const FINDS = ["none", "far", "near"] as const;
+export type Find = (typeof FINDS)[number];
+/** The steer lane's situation: the mode lane's, with the mode the ant now has, and where it is relative to its last find. */
+export type SteerSituation = Situation & { readonly find: Find };
+/** The steer policy: the weights for an ant whose mode policy sent it exploring or following, in situation `s`; `draw` draws a weight's level from Jev's probabilities. */
+export type SteerPolicy = (s: SteerSituation, draw?: () => number) => Steering;

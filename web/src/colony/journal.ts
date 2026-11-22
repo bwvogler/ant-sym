@@ -1,11 +1,11 @@
 // The game journal (ja-8tb): what happens in a game, as events, for a developer watching it. Off by default. It is an
 // observer: `observe(game)` after a tick diffs what the game shows (each ant's alive, gen, mode and load; each colony's
-// stance and queen; the colonies; the outcome) against what it saw last time, and writes an event for each change.
+// queen; the colonies; the outcome) against what it saw last time, and writes an event for each change.
 // It reads only: it draws no random numbers and writes no game state, so a game played with a journal is the game
-// played without one (tests/unit/journal.test.ts holds that). Code outside the game (the page's Jev lanes) adds its
+// played without one (tests/int/journal.test.ts holds that). Code outside the game (the page's Jev lanes) adds its
 // own events with `note`.
 //
-// Levels pick categories: "summary" is what happens to colonies (founded, fallen, stance, queen, Jev batches),
+// Levels pick categories: "summary" is what happens to colonies (founded, fallen, queen, Jev batches),
 // "detail" adds what happens to each ant's life (births, deaths, infections), "verbose" adds every mode change and foraging digs (dig), with
 // the situation its policy was asked. A filter can name categories instead, and narrow to one colony or one ant.
 // Mode changes are many: the 1200-ant side game writes ~1500 a second (885k in 600 s, 300 MB of JSONL), so read them
@@ -15,9 +15,9 @@ import type { Colony } from "./colony.ts";
 import { CELL, cellOf } from "./hex.ts";
 import { INFECTED } from "./fungus.ts";
 import { Game, type Outcome } from "./game.ts";
-import { MODES, type Situation, type Stance } from "./vocab.ts";
+import { MODES, type Situation } from "./vocab.ts";
 
-export const JOURNAL_CATEGORIES = ["colony", "queen", "stance", "jev", "birth", "death", "mode", "infection", "dig"] as const;
+export const JOURNAL_CATEGORIES = ["colony", "queen", "jev", "birth", "death", "mode", "infection", "dig"] as const;
 export type JournalCategory = (typeof JOURNAL_CATEGORIES)[number];
 
 export const JOURNAL_LEVELS = ["off", "summary", "detail", "verbose"] as const;
@@ -25,8 +25,8 @@ export type JournalLevel = (typeof JOURNAL_LEVELS)[number];
 
 const LEVEL_CATEGORIES: Record<JournalLevel, readonly JournalCategory[]> = {
   off: [],
-  summary: ["colony", "queen", "stance", "jev"],
-  detail: ["colony", "queen", "stance", "jev", "birth", "death", "infection"],
+  summary: ["colony", "queen", "jev"],
+  detail: ["colony", "queen", "jev", "birth", "death", "infection"],
   verbose: JOURNAL_CATEGORIES,
 };
 
@@ -94,7 +94,6 @@ interface Seen {
   infected: Uint8Array;
   /** 1 while the ant is on a foraging dig (forageDig, ja-16rp) */
   digging: Uint8Array;
-  stance: Stance;
   queen: boolean | null;
   fallen: boolean;
 }
@@ -208,7 +207,6 @@ export class Journal {
       mode: c.mode.slice(),
       infected,
       digging: Uint8Array.from(c.digBout, (b, i) => (c.alive[i] && b > 0 ? 1 : 0)),
-      stance: c.stance,
       queen: c.queen ? c.queen.alive : null,
       fallen: false,
     };
@@ -216,10 +214,6 @@ export class Journal {
 
   #colony(game: Game, c: Colony, k: number, s: Seen): void {
     const t = game.time;
-    if (c.stance !== s.stance) {
-      this.#write({ t, cat: "stance", colony: k, text: `${s.stance} → ${c.stance}`, data: { from: s.stance, to: c.stance } });
-      s.stance = c.stance;
-    }
     const queen = c.queen ? c.queen.alive : null;
     if (queen !== s.queen) {
       if (queen === false)

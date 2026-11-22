@@ -19,5 +19,5 @@
     "noImplicitAny": false
   },
   "include": ["../scripts/*.mjs"],
-  "exclude": ["../scripts/e2e-one-world.mjs"]
+  "exclude": ["../scripts/e2e-one-world.mjs", "../scripts/e2e-devices.mjs", "../scripts/field-shots.mjs"]
 }

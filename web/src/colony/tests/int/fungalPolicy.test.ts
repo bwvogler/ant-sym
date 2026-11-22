@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { Colony } from "../../colony.ts";
+import { Colony, CURTAIN } from "../../colony.ts";
 import { MODES, type Situation } from "../../vocab.ts";
 import {
   AROUSALS,
@@ -32,9 +32,9 @@ import { DEFAULT_MENU, DORMANT_SHOW, Fungus, LETHAL, LEVERS, STRAINS, preset } f
 import { AS_IS, compose, CUSTOM, decodeLevels, encodeLevels, PRESETS, presetOf, pulled } from "../../levers.ts";
 import { Game } from "../../game.ts";
 import { Recognition } from "../../recognition.ts";
-import { generateWorld, mulberry32, type WorldMap } from "../../world.ts";
+import { mulberry32, type WorldMap } from "../../world.ts";
 import { at } from "../hexmaps.ts";
-import { arena, placedAt } from "../builders.ts";
+import { arena, placedAt, smallOne } from "../builders.ts";
 
 // The fungus policy (ja-t4d.5; levers, ja-lo8.4): a level for every lever per host, from what the fungus senses inside
 // that host; levers off the player's menu stay as they are.
@@ -252,9 +252,9 @@ test("groomed: a host among nestmates is groomed whether or not it hides (judged
 
 test("hiding protects a visible strain: Bloom hidden from its groomers keeps more of its load", () => {
   const run = (hide: boolean) => {
-    const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 200, rivalAnts: 200 }, mulberry32(5));
+    const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(5));
     g.fungus.configure({ hide, cull: false }, g.fungus.menu);
-    g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.3, ID("bloom"));
+    g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.3, ID("bloom"), CURTAIN); // round the royal chamber
     for (let k = 0; k < 30 * 40; k++) g.tick(1 / 30);
     return g.fungus.census(g.player);
   };
@@ -362,16 +362,15 @@ test("the fungus lane's request: the aim, a score per lever on the menu for each
   assert.equal(validLevels(key, "3,0"), false, "calm has three levels");
   assert.deepEqual(Object.keys(leverQuestions("h9", ["food"])), ["h9_food"]);
   assert.notEqual(fungusContext("a"), fungusContext("b"), "a new aim, a new cache");
-  assert.notEqual(fungusContext("a", "side"), fungusContext("a"), "the side view, its own cache");
   assert.equal(worthAsking(asked), true);
   assert.equal(worthAsking([]), false, "no lever on: nothing to ask");
   assert.ok(!DEFAULT_MENU.some((id) => LETHAL.has(id)), "lethal levers start off the menu");
 });
 
 test("hiding holds: with hide on, a groomed host stays hidden instead of flipping every step", () => {
-  const g = new Game(generateWorld(1, { size: { w: 160, h: 100 } }), { antCount: 120, rivalAnts: 120 }, mulberry32(4));
+  const g = new Game(smallOne(1), { antCount: 120, rivalAnts: 120 }, mulberry32(4));
   g.fungus.configure({ hide: true, cull: false }, g.fungus.menu);
-  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 3, 3, 0.4, ID("garden"));
+  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 3, 3, 0.4, ID("garden"), CURTAIN);
   const c = g.player;
   const prev = new Int16Array(c.n).fill(-1);
   let flips = 0;

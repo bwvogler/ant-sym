@@ -1,6 +1,6 @@
 // Offline, no key, no spend: which of Jev's cached answers cost what. Takes a cache that
-// scripts/colony-live.mjs wrote, finds every answer that differs from the local rule (modes,
-// stances, responses), groups them (lane, the ant's mode or the colony's stance, local → Jev),
+// scripts/colony-live.mjs wrote, finds every answer that differs from the local rule (modes and
+// responses), groups them (lane, the ant's mode, local → Jev),
 // and replays an assay once with the whole cache and once per group with that group put back to
 // the local rule, through scripts/experiment.mjs --policy cache:. A group whose reversal brings
 // food home up is what cost it.
@@ -37,10 +37,22 @@ const jobs = opt("jobs", undefined);
 const top = Number(opt("top", "0"));
 const match = opt("match", undefined);
 
-const { localPolicy, localStance, topOf } = await import("../web/src/colony/index.ts");
-const { localResponses } = await import("../web/src/colony/index.ts");
+const { localPolicy, topOf } = await import("../web/src/colony/index.ts");
+const { localResponses, responseOf } = await import("../web/src/colony/index.ts");
 
 const cache = JSON.parse(readFileSync(file, "utf8"));
+// A cache asked under other brain versions keeps its answers in another form (review of #223: version-11 responses were
+// booleans): refuse it here, before reading them, as experiment.mjs would.
+{
+  const { COLONY_BRAIN_VERSION, RESPONSE_BRAIN_VERSION } = await import("../web/src/colony/index.ts");
+  const want = { colony: COLONY_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
+  if (JSON.stringify(cache.version) !== JSON.stringify(want)) {
+    console.error(
+      `${file} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`,
+    );
+    process.exit(1);
+  }
+}
 const outDir = join(root, "experiments", "out", "ablate", `${basename(file, ".json")}-${opt("assay", "game")}-${opt("seconds", "300")}`);
 mkdirSync(outDir, { recursive: true });
 
@@ -49,10 +61,6 @@ const local = {
   modes: (k) => {
     const [mode, tired, foodTrail, homeTrail, alarm, enemy, stance] = k.split("|");
     return localPolicy({ mode, tired: tired === "tired", foodTrail, homeTrail, alarm, enemy, stance });
-  },
-  stances: (k) => {
-    const [stance, ants, losses, enemy, intake, larder] = k.split("|");
-    return localStance({ stance, ants, losses, enemyNearNest: enemy === "enemy", intake: intake.replace("intake:", ""), larder });
   },
   response: (hook, k) => {
     const f = k.split("|");
@@ -76,7 +84,7 @@ const local = {
   },
 };
 
-// Every disagreement, grouped: lane, then the ant's mode (modes) or the colony's stance (stances) or the hook and
+// Every disagreement, grouped: lane, then the ant's mode (modes) or the hook and
 // what it holds or is offered (responses), then local → Jev.
 const groups = new Map();
 const add = (g, lane, key) => {
@@ -90,16 +98,14 @@ for (const [k, v] of Object.entries(cache.modes ?? {})) {
   if (l !== top)
     add(`mode: ${k.split("|")[0]}${k.split("|")[1] === "tired" ? " tired" : ""} (stance ${k.split("|")[6]}) ${l} → ${top}`, "modes", k);
 }
-for (const [k, v] of Object.entries(cache.stances ?? {})) {
-  const l = local.stances(k);
-  if (l !== v) add(`stance: ${l} → ${v}`, "stances", k);
-}
 for (const [hook, table] of Object.entries(cache.responses ?? {}))
   for (const [k, v] of Object.entries(table)) {
+    // Kept with Jev's probabilities too (ja-m7rr): its own answer, undrawn, is what differs from the local rule, or not.
     const l = local.response(hook, k);
-    if (l !== v) {
+    const top = responseOf(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (hook), k, v);
+    if (l !== top) {
       const f = k.split("|");
-      add(`${hook}: ${hook === "get" ? `offered ${f[5]}` : `carrying ${f[1]}`} ${l} → ${v}`, `responses.${hook}`, k);
+      add(`${hook}: ${hook === "get" ? `offered ${f[5]}` : `carrying ${f[1]}`} ${l} → ${top}`, `responses.${hook}`, k);
     }
   }
 
@@ -146,7 +152,7 @@ console.log(
   `${file}: ${sum(ordered.map(([, e]) => e.length))} answers differ from the local rule, in ${ordered.length} groups; replaying ${assay} (${seconds} s, seeds ${seeds}) ${chosen.length + 2} times.\n`,
 );
 
-const allLocal = { ...structuredClone(cache), modes: {}, stances: {}, responses: {} };
+const allLocal = { ...structuredClone(cache), modes: {}, responses: {} };
 const base = run("all", cache);
 const loc = run("local", allLocal);
 console.log(`| replay | food home (sum) | per seed | Δ vs all of Jev | held over 120 s, most |\n|---|---|---|---|---|`);

@@ -4,14 +4,11 @@ import {
   Game,
   GENERIC_ANT,
   LANES,
-  generateWorld,
+  generateOneWorld,
   localResponses,
-  localStance,
   mulberry32,
   policyContext,
   situationKey,
-  stanceContext,
-  stanceKey,
   type LaneWords,
   type Mode,
   type Species,
@@ -21,7 +18,7 @@ import {
 } from "../../colony/index.ts";
 import { ColonyJev } from "../colonyJev.ts";
 
-// ja-fnd.5.8: the Jev client asks under the game's species' lane words (Species.lanes), and a species with no stance lane has none in the client.
+// ja-fnd.5.8: the Jev client asks under the game's species' lane words (Species.lanes).
 // Checked through the cache: an answer seeded under a context is used only if a lane of the attached species asks under that context.
 
 const LONE_MODE: LaneWords<Mode> = {
@@ -33,7 +30,6 @@ const LONE: Species = { id: "lone", name: "Lone forager", params: {}, responses:
 
 const DOCTRINE = "forage";
 const sit = LANES.mode.sample;
-const stanceSit = LANES.stance.sample;
 const live = new Set<ColonyJev>();
 afterEach(() => {
   for (const j of live) j.dispose();
@@ -42,7 +38,7 @@ afterEach(() => {
 
 function setup(species: Species | undefined, before?: (g: Game) => void) {
   const g = new Game(
-    generateWorld(1, { size: { w: 60, h: 40 } }),
+    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
     { antCount: 5, rival: false, species: species ?? GENERIC_ANT },
     mulberry32(1),
   );
@@ -67,8 +63,6 @@ test("the generic ant asks under the generic contexts, whether or not the specie
     const answer = notLocal(["explore", "follow", "return", "fight"]);
     assert.equal(jev.seed(policyContext(DOCTRINE), [[situationKey(sit), answer]]), 1);
     assert.equal(g.player.policy(sit), answer, "the colony's mode lane reads the generic context");
-    assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]]), 1, "the generic ant has a stance lane");
-    assert.equal(jev.stancePolicy(stanceSit), "raid");
   }
 });
 
@@ -84,17 +78,6 @@ test("a species asks under its own lane words: its own context, and only its own
   assert.equal(jev.seed(own, [[key, answer]], LONE), 1);
   assert.equal(g.player.policy(sit), answer, "the species' lane reads its own context");
   assert.equal(jev.state.lanes.mode.cached, 1);
-});
-
-test("a species with no stance lane has none in the client: nothing seeded, counted or asked there", () => {
-  let before: Game["player"]["stancePolicy"] | undefined;
-  const { g, jev } = setup(LONE, (game) => (before = game.player.stancePolicy)); // read before the client attaches
-  assert.equal(jev.seed(stanceContext(DOCTRINE), [[stanceKey(stanceSit), "raid"]], LONE), 0);
-  assert.equal(jev.state.lanes.stance.cached, 0);
-  assert.equal(g.player.stancePolicy, before, "the colony keeps the stance policy the Game gave it");
-  assert.equal(jev.stancePolicy(stanceSit), localStance(stanceSit));
-  jev.setDoctrine("raid often"); // a new doctrine re-contexts only the lanes the species has
-  assert.equal(jev.state.lanes.stance.cached, 0);
 });
 
 test("the species' own local rule stands in while a situation is unanswered (ja-fnd.5.9)", () => {
@@ -134,7 +117,7 @@ test("a bundle is checked against its own species' words, not the game's (ja-fnd
   const key = situationKey(sit);
   assert.equal(jev.seed(policyContext(DOCTRINE), [[key, "follow"]]), 1, "a generic bundle, seeded while the lone forager plays");
   assert.equal(jev.seed(policyContext(DOCTRINE, LONE_MODE), [[key, "follow"]], LONE), 0, "the lone forager's own: follow refused");
-  const g2 = new Game(generateWorld(1, { size: { w: 60, h: 40 } }), { antCount: 5, rival: false }, mulberry32(1));
+  const g2 = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 5, rival: false }, mulberry32(1));
   jev.attachColonies(g2.colonies);
   assert.equal(g2.player.policy(sit), "follow", "the later generic game plays the shipped follow answer");
 });

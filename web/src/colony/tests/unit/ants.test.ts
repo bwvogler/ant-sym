@@ -6,9 +6,9 @@ import { ANT_FIELDS, makeAntArrays, NO_KEY } from "../../ants.ts";
 
 const P = { odour: 2, tolerance: 3, routeStep: 4, routeMax: 5 };
 
-test("the table has 132 per-ant arrays, each n long (routePlaces n × 2 × routeMax steps)", () => {
+test("the table has 137 per-ant arrays, each n long (routePlaces n × 2 × routeMax steps)", () => {
   const a = makeAntArrays(3, P);
-  assert.equal(Object.keys(ANT_FIELDS).length, 132);
+  assert.equal(Object.keys(ANT_FIELDS).length, 137);
   for (const [k, v] of Object.entries(a)) {
     if (k !== "routePlaces") assert.equal((v as ArrayLike<number>).length, 3, k);
   }

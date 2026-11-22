@@ -12,6 +12,7 @@ import {
   OUT_FIELD_EVERY,
   PI_DRIFT,
   PI_DRIFT_2D,
+  PI_SPAN_GAIN,
   SEARCH_GROW,
   SEARCH_GROW_2D,
   SEARCH_START,
@@ -232,7 +233,7 @@ export function homeGoal(c: Colony, i: number, pellet: boolean): Nest {
  */
 export function believe(c: Colony, i: number, goal: Nest): Nest {
   if (c.line !== null && c.cur === PLANE) return believePlane(c, i, goal);
-  if (!c.entrance) return goal;
+  if (c.onPlane) return goal;
   const x = c.x[i];
   const y = c.y[i];
   const toHole = goal === c.entrance;
@@ -261,8 +262,24 @@ function seesHole(c: Colony, x: number, y: number, goal: Nest, d: number): boole
 }
 
 /**
+ * One world's plane: what the trip's drift (driftSurf, driftSurfY) is multiplied by to give the home vector's error. Law 0:
+ * the odometer `odo` (the error grows with the path walked). Law 1 (ja-lp4.19, docs/nest-search.md "How far the vector is
+ * off"): PI_SPAN_GAIN × √(at × reach), `reach` the farthest it has been from its hole this trip, so the miss's median is
+ * PI_MISS_AT × √(at × reach) (Merkle, Knaden & Wehner 2006; Heinze, Narendra & Cheung 2018; Merkle & Wehner 2010).
+ */
+export function piSpanOf(law: number, at: number, odo: number, reach: number): number {
+  return law > 0 ? PI_SPAN_GAIN * Math.sqrt(at * reach) : odo;
+}
+
+/** piSpanOf for ant i of c, by its colony's piErrorLaw and piErrorAt, its odometer and its reach out. */
+export function piSpan(c: Colony, i: number): number {
+  const p = c.params;
+  return piSpanOf(p.piErrorLaw, p.piErrorAt, c.odoSurf[i], c.reachSurf[i]);
+}
+
+/**
  * One world's plane (U3b, docs/one-world.md §4): where ant i believes its hole (`goal`, the plane nest) is. Its vector,
- * started afresh up out of that hole (crossUp), puts it odoSurf × (driftSurf, driftSurfY) off, plus the search's point
+ * started afresh up out of that hole (crossUp), puts it piSpan × (driftSurf, driftSurfY) off (piSpan: odoSurf, or by the distance out), plus the search's point
  * (search's reach at angle searchA), never past the plane's edges. Within HOLE_SIGHT of the hole (seen, and the
  * entrance's smell), or within NEST_SIGHT with a clear line to it, the belief is the hole itself.
  */
@@ -276,15 +293,16 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
     const place = routeBelief(c, i, goal);
     if (place) return place;
   }
-  const odo = c.odoSurf[i];
+  const odo = piSpan(c, i);
   let s = c.search[i];
   let a = c.searchA[i];
   const p = c.params;
   // routeEnd (ja-lp4.6.3.1): its retrace over, it searches round its first stored place, not its vector's end.
   const atFirst = p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0;
   const at0 = atFirst ? (i * c.routePlaces.length) / c.n : 0;
-  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i];
-  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i];
+  // carried: how far the builder's tweezers moved it (0 unless a child did): home believed that far off too.
+  const cx = atFirst ? c.routePlaces[at0] : goal.x + odo * c.driftSurf[i] + c.carriedX[i];
+  const cy = atFirst ? c.routePlaces[at0 + 1] : goal.y + odo * c.driftSurfY[i] + c.carriedY[i];
   if (p.searchLoops > 0 && s !== 0) {
     // Loops (ja-lp4.11): loop k heads searchTurn × k on from the first; out to its reach at the heading − half its
     // width, across to + half, then back to where the vector ran out.
@@ -451,14 +469,23 @@ export function searchOn(c: Colony, i: number, stalled = false): void {
     const n = s === 0 ? 0 : stalled && p.searchStall === 0 ? leg - (leg % 3) + 3 : leg + 1;
     if (s === 0) c.searchA[i] = c.heading[i];
     c.searchLeg[i] = n;
-    const sigma = PI_DRIFT_2D * c.odoSurf[i];
+    const sigma = PI_DRIFT_2D * piSpan(c, i);
     const { w, h } = c.map.size;
     c.search[i] = Math.min(Math.max(w, h * R), Math.max(SEARCH_START, sigma * (p.searchLoops + p.searchGrow * Math.floor(n / 3))));
   } else if (c.line !== null && c.cur === PLANE) {
     const { w, h } = c.map.size;
     c.searchA[i] = s === 0 ? c.heading[i] : c.searchA[i] + Math.PI / 2;
-    // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
-    c.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+    if (p.searchScale > 0 && !(p.routeEnd > 0 && c.routeState[i] === 2 && c.routeN[i] > 0)) {
+      // Sized by its own vector's error (ja-lp4.20): point n reaches σ × (searchScale + searchScaleStep × n/4) from where the
+      // vector ran out. A search round its first stored place (routeEnd) is not the vector's: it keeps the spiral below.
+      const n = s === 0 ? 0 : c.searchLeg[i] + 1;
+      c.searchLeg[i] = n;
+      const sigma = PI_DRIFT_2D * piSpan(c, i);
+      c.search[i] = Math.min(Math.max(w, h * R), Math.max(SEARCH_START, sigma * (p.searchScale + (p.searchScaleStep * n) / 4)));
+    } else {
+      // A safety cap at the plane's longer side: games don't reach it (no search passed 100 cells in seeds 1–3, review of #60).
+      c.search[i] = s === 0 ? SEARCH_START : Math.min(Math.max(w, h * R), s * SEARCH_GROW_2D);
+    }
   } else {
     const most = c.map.size.w;
     c.search[i] = s === 0 ? SEARCH_START * (c.rng() < 0.5 ? -1 : 1) : Math.max(-most, Math.min(most, -s * SEARCH_GROW));
@@ -535,15 +562,22 @@ export function targetHole(c: Colony, x: number, y: number, hy: number): boolean
 
 /**
  * One world's plane (U3c): how far ant i believes it is from home, by its own vector (U3b): from where it believes its
- * hole is, the hole plus odoSurf × (driftSurf, driftSurfY). Not its search's point: that is where it looks, not where
+ * hole is, the hole plus piSpan × (driftSurf, driftSurfY). Not its search's point: that is where it looks, not where
  * it believes home is. With the plane bound.
  */
 export function fromHomePlane(c: Colony, i: number): number {
-  const odo = c.odoSurf[i];
-  const bx = c.nest.x + odo * c.driftSurf[i];
-  const by = c.nest.y + odo * c.driftSurfY[i];
-  return Math.hypot(c.x[i] - bx, c.y[i] - by);
+  const b = vectorHomePlane(c, i);
+  return Math.hypot(c.x[i] - b[0], c.y[i] - b[1]);
 }
+
+/** Where ant i's vector puts its hole on the plane bound: the nest + piSpan × its drift + the tweezers' carry. One answer for every reader (fromHomePlane, the spoil aim), written into a shared pair. */
+export function vectorHomePlane(c: Colony, i: number): readonly [number, number] {
+  const odo = piSpan(c, i);
+  VEC_HOME[0] = c.nest.x + odo * c.driftSurf[i] + c.carriedX[i];
+  VEC_HOME[1] = c.nest.y + odo * c.driftSurfY[i] + c.carriedY[i];
+  return VEC_HOME;
+}
+const VEC_HOME: [number, number] = [0, 0];
 
 /**
  * How far ant i is from home as it knows it, on the plane bound: by sight where it sees its hole (as believePlane), else

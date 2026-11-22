@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy, resolveFights } from "../../battle.ts";
-import { choose, Colony, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
+import { choose, Colony, CURTAIN, LIFESPAN, MIDDLE, YOUNG } from "../../colony.ts";
+import { broodChamber, curtainHole, oneColony, own, smallOne } from "../builders.ts";
 import { Game } from "../../game.ts";
 import {
   packResponseRequest,
@@ -12,7 +13,7 @@ import {
   responsesFromAnswers,
 } from "../../colonyBrain.ts";
 import { type Item, localResponses, responses, touchKey, type Touch } from "../../responses.ts";
-import { dropFood, foodAt, generateSideWorld, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
+import { dropFood, foodAt, mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at, nestAt, put } from "../hexmaps.ts";
 import { touch as senseTouch } from "../../sense.ts";
 
@@ -187,11 +188,18 @@ test("response lanes: one question per situation, cached per hook and doctrine",
   assert.notEqual(responseContext("get", "x"), responseContext("drop", "x"), "each hook its own cache");
 });
 
-test("readResponse: nouls are yes strictly above ½; choices must be one of the hook's answers", () => {
-  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), true);
-  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), false);
+test("readResponse: kept with Jev's probabilities; nouls are the probability of yes (yes strictly above ½); choices must be one of the hook's", () => {
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.9 } }, "s0"), "true=0.9,false=0.1");
+  assert.equal(readResponse("get", { s0_get: { type: "noul", noul: 0.5 } }, "s0"), "false=0.5,true=0.5");
+  assert.equal(readResponse("drop", { s0_drop: { type: "noul", noul: 1 } }, "s0"), "true=1", "certain: never drawn");
+  assert.equal(readResponse("drop", { s0_drop: { type: "noul", noul: 1.5 } }, "s0"), null);
   assert.equal(readResponse("drop", { s0_drop: { type: "choice", choice: "yes" } }, "s0"), null);
-  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down");
+  assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "put down" } }, "s0"), "put down", "no probabilities: bare");
+  assert.equal(
+    readResponse("contact", { s0_contact: { type: "choice", choice: "flee", probabilities: { fight: 0.3, flee: 0.6, home: 0.1 } } }, "s0"),
+    "flee=0.667,fight=0.333",
+    "options the hook doesn't have are left out",
+  );
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "return" } }, "s0"), null, "a mode is no carry answer any more");
   assert.equal(readResponse("carry", { s0_carry: { type: "choice", choice: "dance" } }, "s0"), null);
   assert.equal(readResponse("trail", { s0_trail: { type: "choice", choice: "none" } }, "s0"), "none");
@@ -203,7 +211,7 @@ test("readResponse: nouls are yes strictly above ½; choices must be one of the 
 test("responsesFromAnswers: cached answers win, the local responses cover the rest, and every lookup is heard", () => {
   const t = touch({ mode: "follow" });
   const heard: string[] = [];
-  const r = responsesFromAnswers({ get: { [touchKey(t)]: false }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) =>
+  const r = responsesFromAnswers({ get: { [touchKey(t)]: "false=1" }, trail: { [touchKey(t)]: "none" } }, localResponses, (h, hit) =>
     heard.push(`${h}:${hit}`),
   );
   assert.equal(r.get(t), false);
@@ -215,16 +223,16 @@ test("responsesFromAnswers: cached answers win, the local responses cover the re
 });
 
 test("get is asked for loose soil, corpses and brood too, and refusing one leaves it lying", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
   /** Ticks a run may take at most: brood is first offered anywhere from ~20 s to over 240 s, by map seed (ja-u16k). */
   const CAP = 30 * 300;
   /**
-   * A side-view game with dead to bury: what get was offered, the most ants holding each item at once, and the ticks run.
+   * A game on a small one world with dead to bury: what get was offered, the most ants holding each item at once, and the ticks run.
    * It runs `ticks`, or (null) until every item has been offered and corpse, brood and a loose pellet have each been taken up.
    */
   const run = (refuse: Item | null, ticks: number | null) => {
-    const map = generateSideWorld(2, SMALL);
-    const g = new Game(map, { antCount: 200, rival: false }, mulberry32(4));
+    const w = smallOne(2);
+    broodChamber(w.curtain); // nurses take brood only to a brood chamber (ja-xu6.2): one beside the royal one
+    const g = new Game(w, { antCount: 200, rival: false }, mulberry32(4));
     const c = g.player;
     const offered = new Set<Item>();
     c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
@@ -235,7 +243,7 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
     for (; k < (ticks ?? CAP) && (ticks !== null || !all()); k++) {
       if (k === 30 * 20)
         for (let i = 0, n = 0; i < c.n && n < 20; i++)
-          if (c.alive[i] && c.item(i) === "none" && c.y[i]! > map.nest.entrance!.y + 3) {
+          if (c.alive[i] && c.item(i) === "none" && c.layer[i] === CURTAIN && c.y[i]! > curtainHole(own(c)).y + 3) {
             c.kill(i);
             n++;
           }
@@ -304,13 +312,11 @@ test("arrive: putting a load down ends the trip, wherever it was put down", () =
   assert.equal(c.mode[0], 0, "load down: exploring, not returning");
 });
 
-test("arrive in the side view: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
+test("arrive in the nest: a fresh forager returning to the royal chamber is no longer returning; a tired one, or a young one, stays in", () => {
   const at = (age: number, since: number) => {
-    const c = new Colony(generateSideWorld(2, SMALL), { antCount: 1, maxAnts: 1 }, mulberry32(1));
+    const { c } = oneColony(1, { maxAnts: 1 }, undefined, 1);
     c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : "explore")); // Jev's answer to returners: keep returning
-    c.x[0] = c.queen!.x;
-    c.y[0] = c.queen!.y;
+    c.putAnt(0, CURTAIN, c.queen!.x, c.queen!.y);
     c.age[0] = age * LIFESPAN;
     c.lifespan[0] = Infinity;
     c.mode[0] = 2;
@@ -341,8 +347,7 @@ test("rest on a top-down map: a tired returner rests in the nest for restTime be
 });
 
 test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither tires nor rests outside; rest comes a little at a time", () => {
-  const SMALL = { size: { w: 256, h: 160 }, nestGap: 120, surface: 40, nestCount: 1 };
-  const g = new Game(generateSideWorld(2, SMALL), { antCount: 200, rival: false }, mulberry32(4));
+  const g = new Game(smallOne(2), { antCount: 200, rival: false }, mulberry32(4));
   const c = g.player;
   const step = c.params.patience / c.params.restTime / 30; // a tick's rest
   let maxYoung = 0;
@@ -647,29 +652,4 @@ test("leave (behaviour MR 5): out now on many returns, soon on few, wait on none
   assert.equal(g.s0?.returns, undefined);
   assert.equal(g.s0?.raid, undefined, "only the leave lane is sent either");
   assert.equal(g.s0?.crowd, undefined);
-});
-
-test("leave (behaviour MR 5): a rested forager home waits until nestmates come home with food; a scout goes anyway", () => {
-  // Ant 0 is home, rested, in "return". Ant 1, if there, comes home beside it with food once a second and puts it down.
-  const run = (returns: boolean, scoutRate: number) => {
-    const c = new Colony(corridor(0), { antCount: 2, maxAnts: 2, leaveGate: 1, scoutRate }, mulberry32(3));
-    put(c, 0, 6, 6);
-    c.mode[0] = 2; // return
-    if (!returns) c.alive[1] = 0;
-    for (let k = 0; k < 30 * 20; k++) {
-      if (returns && k % 30 === 0) {
-        c.x[1] = c.x[0]!;
-        c.y[1] = c.y[0]!;
-        c.carrying[1] = 1;
-        c.mode[1] = 2;
-      }
-      c.tick(1 / 30);
-      if (c.mode[0] !== 2) return k / 30;
-    }
-    return Infinity;
-  };
-  assert.equal(run(false, 0), Infinity, "with nobody coming home with food and no scouting, it waits, and stays in the nest");
-  const met = run(true, 0);
-  assert.ok(met < 10, `nestmates coming home with food send it out (${met.toFixed(1)} s)`);
-  assert.ok(run(false, 5) < 2, "a high scout rate sends it out with no returns");
 });

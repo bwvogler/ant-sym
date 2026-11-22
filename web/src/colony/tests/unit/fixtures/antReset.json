@@ -522,6 +522,21 @@
   ],
   "broodMet": [
    0
+  ],
+  "carriedX": [
+   0
+  ],
+  "carriedY": [
+   0
+  ],
+  "reachSurf": [
+   0
+  ],
+  "steerCode": [
+   364
+  ],
+  "steerNear": [
+   364
   ]
  },
  "asIs": {
@@ -1047,6 +1062,21 @@
   ],
   "broodMet": [
    39.75
+  ],
+  "carriedX": [
+   40
+  ],
+  "carriedY": [
+   40.25
+  ],
+  "reachSurf": [
+   40.5
+  ],
+  "steerCode": [
+   40
+  ],
+  "steerNear": [
+   41
   ]
  }
 }

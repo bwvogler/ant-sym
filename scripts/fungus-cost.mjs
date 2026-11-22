@@ -1,13 +1,14 @@
-// Offline, no key, no spend: what would the fungus's Jev lane cost a game? Runs the side view as the app sets it up
-// (generateSideWorld(seed), Game with mulberry32(seed * 7919)) with a stand-in for Jev behind the lane's own cache
+// Offline, no key, no spend: what would the fungus's Jev lane cost a game? Runs one world as the app sets it up
+// (generateOneWorld(seed), Game with mulberry32(seed * 7919); the side view this once played is gone, S2.3d, so its figures are
+// not comparable) with a stand-in for Jev behind the lane's own cache
 // logic (ui/colonyJev.ts): each new fungal situation, keyed with the levers asked (the menu's), is one question (a score
 // per lever), asked once and only with a lever on (worthAsking); questions go out in requests of at most
 // FUNGUS_BATCH (fungusBrain.ts), a part-full one only after FUNGUS_GATHER_MS. The
 // stand-in answers with the local rule, so the fungus does what it does without Jev. Tokens per request are estimated
 // from its size (colonyBrain.estimateTokens), as colony-cost does; the ledger counts the real ones live.
 //
-// Plays: lockpick (painted on both holes), bloom (on colony 1's hole), bloom-crown (the same, crown on the menu, and
-// crowning wherever a host is by the queen or in a chamber: crown.mjs's policy), garden (on both royal chambers). Each paint is the app's old
+// Plays: lockpick (painted on both holes, on the plane), bloom (on colony 1's hole), bloom-crown (the same, crown on the menu, and
+// crowning wherever a host is by the queen or in a chamber: the deleted crown lab's policy), garden (on both royal chambers, in the curtain). Each paint is the app's old
 // spore brush (radius 3, spores 2, dose 0.15), STROKES events in a short drag, at 30 s.
 //
 // Usage: node scripts/fungus-cost.mjs [play=lockpick] [minutes=5] [ants=600] [seed=1] [strokes=6]
@@ -24,8 +25,10 @@ import {
   Game,
   centreX,
   centreY,
-  generateSideWorld,
+  CURTAIN,
+  generateOneWorld,
   mulberry32,
+  PLANE,
 } from "../web/src/colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
 import { helpAndExit } from "./lib/usage.mjs";
@@ -36,8 +39,8 @@ const [minutes = 5, ants = 600, seed = 1, strokes = 6] = process.argv.slice(3).m
 const DT = 1 / 30;
 const BATCH_EVERY = FUNGUS_GATHER_MS / 1000; // the lane lets a part-full request gather this long (colonyJev gatherMs)
 const aim = AIMS[0].text;
-const map = generateSideWorld(seed);
-const g = new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
+const world = generateOneWorld(seed);
+const g = new Game(world, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
 const strain = STRAINS.findIndex((s) => s.id === (play.startsWith("bloom") ? "bloom" : play));
 if (play === "bloom-crown") g.fungus.menu = new Set([...g.fungus.menu, "crown"]);
 const menu = g.fungus.menu;
@@ -68,8 +71,8 @@ const flush = () => {
     for (const [k] of chunk) asked.add(k);
   }
 };
-const paint = (x, y) => {
-  for (let s = 0; s < strokes; s++) g.paintSpores(x - 3 + s, y, SPORES.radius, SPORES.spores, SPORES.dose, strain);
+const paint = (x, y, layer) => {
+  for (let s = 0; s < strokes; s++) g.paintSpores(x - 3 + s, y, SPORES.radius, SPORES.spores, SPORES.dose, strain, layer);
 };
 let next = 0;
 let painted = false;
@@ -79,10 +82,14 @@ for (let t = 0; t < minutes * 60; t += DT) {
     painted = true;
     if (play === "garden")
       for (const c of g.colonies) {
-        const royal = map.chambers.list.find((k) => k.colony === c.params.nest && k.role === "royal");
-        paint(centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow), centreY(royal.floorRow));
+        const royal = world.curtain.chambers.list.find((k) => k.colony === c.params.nest && k.role === "royal");
+        paint(centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow), centreY(royal.floorRow), CURTAIN);
       }
-    else for (const c of play === "lockpick" ? g.colonies : [g.colonies[1]]) paint(c.nest.entrance.x, c.nest.entrance.y);
+    else
+      for (const c of play === "lockpick" ? g.colonies : [g.colonies[1]]) {
+        const h = c.holeCells[c.params.nest];
+        paint(centreX(h.px, h.py), centreY(h.py), PLANE);
+      }
   }
   if (t >= next || queue.size >= FUNGUS_BATCH) {
     flush();

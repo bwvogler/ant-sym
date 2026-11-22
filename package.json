@@ -20,6 +20,8 @@
     "colony-bench": "node scripts/colony-bench.mjs",
     "colony-cost": "node scripts/colony-cost.mjs",
     "exp": "node scripts/experiment.mjs",
-    "e2e": "node scripts/e2e-one-world.mjs"
+    "e2e": "node scripts/e2e-one-world.mjs",
+    "e2e:devices": "node scripts/e2e-devices.mjs",
+    "field-shots": "node scripts/field-shots.mjs"
   }
 }

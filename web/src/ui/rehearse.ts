@@ -27,7 +27,6 @@ export function copyOf(game: Game, fresh: Game): Game {
     const d = fresh.colonies[k];
     if (!d) throw new Error(`copyOf: the copy has no colony ${k}`);
     d.bindPolicy("mode", c.policy);
-    d.bindPolicy("stance", c.stancePolicy);
     d.responses = c.responses;
   });
   fresh.fungus.bindPolicy("fungus", game.fungus.policy);

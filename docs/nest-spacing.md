@@ -20,7 +20,7 @@
 - **Fire ant** (*Solenopsis invicta*): monogyne mounds run at about 50–150 per hectare, polygyne at several hundred (Vinson 1997 as cited, **unverified**). The random-placement expectation at 50–150/ha is 4–7 m. Incipient nests are clumped; mature colonies are often regularly spaced (Adams & Tschinkel 1995, *Oecologia*, as summarised; **unverified**).
 - **Black garden ant** (*Lasius niger*): 4–16 nests per 100 m² in one Ukrainian grassland, 18 on average and up to 108 in a Central European survey (**unverified**). That is about 1–2.5 m between nests by random expectation: a smaller ant, closer packed.
 
-**In the game:** the starting nests are 140 cells apart (`DEFAULT_WORLD.nestGap`). Read that as one neighbour gap, U ≈ 9–14 m, so 1 m ≈ 10–15 cells. The side view's 340 columns do not carry over: in one world a curtain column is one hex step along the line.
+**In the game:** the starting nests are 140 cells apart (`PLANE_WORLD.nestGap`). Read that as one neighbour gap, U ≈ 9–14 m, so 1 m ≈ 10–15 cells. The side view's 340 columns do not carry over: in one world a curtain column is one hex step along the line.
 
 ## 2. Where new colonies survive
 

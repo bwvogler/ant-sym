@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FLOAT, IconButton } from "./kit.tsx";
-import { ago, clearNotices, clearToasts, markNoticesRead, noticeLog, setNoticesOpen, subscribeToasts, unreadNotices } from "./toasts.ts";
+import {
+  ago,
+  clearNotices,
+  clearToasts,
+  markNoticesRead,
+  NOTICE_LEVEL_LABEL,
+  NOTICE_LEVELS,
+  noticeLog,
+  setNoticeLevel,
+  setNoticesOpen,
+  subscribeToasts,
+  unreadNotices,
+  useNoticeLevel,
+} from "./toasts.ts";
+import { seg } from "./styles.ts";
 
 // The bell at the top right (owner, 2026-11-15; ja-mvo9.5's notification stack): every notice raised this visit, newest
 // first, so a toast swiped away can be read later. A badge counts those not yet seen; opening the list marks them seen.
@@ -10,6 +24,7 @@ const DOT = { info: "bg-fg-3", warn: "bg-warn", good: "bg-accent" } as const;
 export default function Notices() {
   const log = useSyncExternalStore(subscribeToasts, noticeLog, noticeLog);
   const unread = useSyncExternalStore(subscribeToasts, unreadNotices, unreadNotices);
+  const level = useNoticeLevel();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   // Re-read "how long ago" now and then while the list is open.
@@ -74,6 +89,28 @@ export default function Notices() {
               </button>
             )}
           </div>
+          <div className="border-b border-line px-3 py-2">
+            <div className="flex overflow-hidden rounded-md border border-line text-xs" role="group" aria-label="notices over the map">
+              {NOTICE_LEVELS.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  className={`flex-1 ${seg(level === l)}`}
+                  aria-pressed={level === l}
+                  onClick={() => setNoticeLevel(l)}
+                >
+                  {NOTICE_LEVEL_LABEL[l]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-fg-3">
+              {level === "all"
+                ? "Every notice floats over the map for a few seconds."
+                : level === "important"
+                  ? "Only warnings and the game's end float over the map. The rest wait here."
+                  : "Nothing floats over the map. Notices wait here, and the bell counts them."}
+            </p>
+          </div>
           {log.length === 0 ? (
             <p className="px-3 py-4 text-sm text-fg-3">Nothing yet. Notices you swipe away wait here.</p>
           ) : (
@@ -83,6 +120,9 @@ export default function Notices() {
                   <span aria-hidden className={`mt-1.5 size-2 shrink-0 rounded-full ${DOT[n.tone]}`} />
                   <span className="min-w-0 flex-1">
                     {n.text}
+                    {n.count > 1 && (
+                      <span className="ml-1.5 rounded-full bg-fg/10 px-1.5 text-xs font-medium tabular-nums">×{n.count}</span>
+                    )}
                     <span className="block text-[11px] text-fg-3">{ago(n.at)}</span>
                   </span>
                 </li>

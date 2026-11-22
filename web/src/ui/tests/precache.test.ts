@@ -5,12 +5,9 @@ import { fileURLToPath } from "node:url";
 import {
   SITUATIONS,
   MODES,
-  STANCES,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   policyContext,
-  STANCE_BRAIN_VERSION,
-  stanceContext,
   AIMS,
   LANE_LIST,
   FUNGUS_BRAIN_VERSION,
@@ -22,10 +19,19 @@ import {
   growthContext,
 } from "../../colony/index.ts";
 import { loadPrecache, precacheUrl, type PrecacheIndex } from "../precache.ts";
-import { DESERT_ANT, weightedValid, type Species } from "../../colony/index.ts";
+import {
+  DESERT_ANT,
+  NEGLECTUS_ANT,
+  STEER_ASKED,
+  decodeSituation,
+  steerContext,
+  validSteer,
+  weightedValid,
+  type Species,
+} from "../../colony/index.ts";
 
 /** The species whose own bundles ship (ja-rf5.9), by id: their bundles are checked against their own words. */
-const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT };
+const SHIPPED_SPECIES: Record<string, Species> = { desert: DESERT_ANT, neglectus: NEGLECTUS_ANT };
 
 // The answers shipped with the page (scripts/precache.mjs → public/precache/) are only worth their bytes if the code
 // still asks under the contexts they were asked under. A legend, question or version change moves the context: then
@@ -35,12 +41,25 @@ const DIR = fileURLToPath(new URL("../../../public/precache/", import.meta.url))
 const index = JSON.parse(readFileSync(`${DIR}index.json`, "utf8")) as PrecacheIndex;
 const CONTEXT: Record<string, (words: string) => string> = {
   mode: policyContext,
-  stance: stanceContext,
-  fungus: (aim) => fungusContext(aim, "side"),
+  fungus: (aim) => fungusContext(aim),
   growth: growthContext,
+  steer: steerContext,
 };
-const VALID: Record<string, readonly string[]> = { mode: MODES, stance: STANCES, growth: GROWTH_CHOICES };
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48 };
+// The steer lane's answers under its default weights (search, memory: ja-ykmu.3): a level each, −1, 0 or 1.
+const LEVELS = ["-1", "0", "1"];
+const VALID: Record<string, readonly string[]> = {
+  mode: MODES,
+  growth: GROWTH_CHOICES,
+  // The steer lane's answers are probabilities (checked by validSteer below): its certain answers stand for the row.
+  steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)).map((x) =>
+    x
+      .split(",")
+      .map((l) => ["1/0/0", "0/1/0", "0/0/1"][Number(l) + 1])
+      .join(","),
+  ),
+};
+// The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), with no find, far from one and near it.
+const SIZE: Record<string, number> = { mode: SITUATIONS, growth: 48, steer: (SITUATIONS / 2) * 3 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.
@@ -63,7 +82,6 @@ test("each table above has a row for every lane of the registry that needs one",
 
 test("every shipped bundle is under the context the code asks under, for a preset doctrine", () => {
   assert.equal(index.versions.colony, COLONY_BRAIN_VERSION, "re-run scripts/precache.mjs: the colony brain's version moved");
-  assert.equal(index.versions.stance, STANCE_BRAIN_VERSION, "re-run scripts/precache.mjs: the stance brain's version moved");
   assert.equal(index.versions.fungus, FUNGUS_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes fungus: the fungus brain's version moved");
   assert.equal(index.versions.growth, GROWTH_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes growth: the growth brain's version moved");
   // A lane asked under the fungus's aim (the fungus, its tips' growth) ships a bundle per preset aim; the ants' lanes one per doctrine.
@@ -80,8 +98,8 @@ test("every shipped bundle is under the context the code asks under, for a prese
 
 // A bundle holds what a live test got (scripts/precache.mjs --import), not necessarily every situation: the page plays
 // the local rule where nothing ships (PR #42: cache what the tests produce rather than asking every situation).
-test("every preset doctrine ships mode and stance answers, each situation once, and only answers the question allows", () => {
-  for (const lane of ["mode", "stance"])
+test("every preset doctrine ships mode answers, each situation once, and only answers the question allows", () => {
+  for (const lane of ["mode"])
     for (const d of DOCTRINES) {
       const b = index.bundles.find((x) => x.lane === lane && x.doctrine === d.id && !x.species);
       assert.ok(b, `no ${lane} bundle for ${d.id}`);
@@ -161,12 +179,13 @@ test("every preset aim ships fungus answers for the side view, each a level for 
   }
 });
 
-test("a species' own bundles: under its own context, every situation of its schema once, only the choices its words allow (ja-rf5.9)", () => {
+test("a species' own bundles: under its own context, each situation once (every one of its own schema), only the choices its words allow (ja-rf5.9)", () => {
   const own = index.bundles.filter((b) => b.species);
-  assert.ok(
-    own.some((b) => b.species === "desert"),
-    "the desert ant ships its answers",
-  );
+  for (const id of Object.keys(SHIPPED_SPECIES))
+    assert.ok(
+      own.some((b) => b.species === id),
+      `${id} ships its answers`,
+    );
   for (const b of own) {
     const sp = SHIPPED_SPECIES[b.species!];
     assert.ok(sp, `${b.file}: no species ${b.species} here`);
@@ -181,15 +200,30 @@ test("a species' own bundles: under its own context, every situation of its sche
     );
     const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
     assert.equal(pairs.length, b.answers);
-    const keys = new Set(Array.from({ length: words.schema!.size }, (_, c) => words.schema!.key(words.schema!.decode(c))));
+    // A species with its own schema ships every situation of it; one on the generic schema (the invasive garden ant, ja-e668.3) ships the ones
+    // its page game meets (precache.mjs --met): its 3,888 would cost far more than the game asks.
+    const keys = words.schema
+      ? new Set(Array.from({ length: words.schema.size }, (_, c) => words.schema!.key(words.schema!.decode(c))))
+      : new Set(Array.from({ length: SITUATIONS }, (_, c) => LANES.mode.key(decodeSituation(c), undefined, words)));
     assert.equal(new Set(pairs.map(([k]) => k)).size, pairs.length, `${b.file}: a situation twice`);
-    assert.equal(pairs.length, words.schema!.size, `${b.file}: every situation of its schema (review of #140, S1)`);
+    if (words.schema) assert.equal(pairs.length, words.schema.size, `${b.file}: every situation of its schema (review of #140, S1)`);
+    else assert.ok(pairs.length >= 50, `${b.file}: only ${pairs.length} situations (precache.mjs --species ${b.species} --met)`);
     for (const [k, a] of pairs) {
       assert.ok(keys.has(k), `${b.file}: ${k} is none of its situations`);
       assert.ok(
         weightedValid(a, (m) => Object.keys(words.criteria).includes(m)),
         `${b.file}: ${a} is not one of its choices`,
       );
+    }
+  }
+});
+
+test("the steer lane's bundles ask the lane's own weights (ja-ykmu.3: not the fungus's lever menu)", () => {
+  for (const b of index.bundles.filter((x) => x.lane === "steer")) {
+    const pairs = JSON.parse(readFileSync(`${DIR}${b.file}`, "utf8")) as [string, string][];
+    for (const [k, a] of pairs) {
+      assert.ok(k.endsWith(`|${STEER_ASKED.join(",")}`), `${b.file}: ${k}`);
+      assert.ok(validSteer(k, a), `${b.file}: ${a}`);
     }
   }
 });

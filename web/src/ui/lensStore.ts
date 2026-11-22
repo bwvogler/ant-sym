@@ -9,7 +9,7 @@ export interface FieldProbe {
   /** the pointer, in the page's (client) pixels */
   sx: number;
   sy: number;
-  /** the layer shown (PLANE or CURTAIN; −1 on a game of one map) and the world point */
+  /** the layer shown (PLANE or CURTAIN) and the world point */
   lv: number;
   x: number;
   y: number;
@@ -51,7 +51,7 @@ function set(s: LensState): void {
 export const offerProbe = (p: FieldProbe | null): void => set(nextLens(current, p));
 /** Close the pinned card (its ×, Escape): the lens goes back to the pointer. */
 export const unpin = (): void => set({ pinned: null, hover: current.hover });
-/** Close everything: the lens turned off or on, a command run, Details opened. */
+/** Close everything: the lens turned off or on, a command run, the Lab opened. */
 export const clearProbe = (): void => set(EMPTY);
 export const lensNow = (): LensState => current;
 
