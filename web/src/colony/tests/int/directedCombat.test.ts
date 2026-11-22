@@ -159,7 +159,10 @@ test("a recycled ant slot cannot inherit an attack", () => {
 
 test("directed combat games resume deterministically from JSON saves", () => {
   const make = () =>
-    new Game(smallOne(7), { antCount: 20, rivalAnts: 20, fight: { rate: 1.5, alarm: 8, intent: true, counterattack: true } }, gameRng(7));
+    new Game(smallOne(7), { fight: { rate: 1.5, alarm: 8, intent: true, counterattack: true } }, gameRng(7), [
+      { antCount: 20 },
+      { antCount: 20 },
+    ]);
   const g = make();
   run(g, 2);
   const copy = make();
@@ -170,7 +173,7 @@ test("directed combat games resume deterministically from JSON saves", () => {
 });
 
 test("ants at matching coordinates on different layers cannot attack each other", () => {
-  const g = new Game(smallOne(7), { antCount: 1, rivalAnts: 1 }, gameRng(7));
+  const g = new Game(smallOne(7), {}, gameRng(7), [{ antCount: 1 }, { antCount: 1 }]);
   g.colonies.forEach((c, k) => {
     c.layer[0] = k;
     c.attackLayer[0] = k;

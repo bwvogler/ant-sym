@@ -15,10 +15,8 @@ import { smallOne } from "../builders.ts";
 import { put } from "../hexmaps.ts";
 
 function loopGame(seed = 1) {
-  const g = new Game(smallOne(7), { antCount: 1, rival: false }, gameRng(seed), {
-    colony: { deliveryLane: 1, deliveryReconsider: 1 },
-  });
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, gameRng(seed), [{ antCount: 1, colony: { deliveryLane: 1, deliveryReconsider: 1 } }]);
+  const c = g.colonies[0]!;
   c.bind(CURTAIN);
   c.layer[0] = CURTAIN;
   c.under[0] = 1;
@@ -48,7 +46,7 @@ function loopGame(seed = 1) {
 }
 
 function loop(seed = 1) {
-  return loopGame(seed).player;
+  return loopGame(seed).colonies[0]!;
 }
 
 function steps(c: ReturnType<typeof loop>, count = 12) {
@@ -139,12 +137,12 @@ test("retained movement targets and erased cues do not draw route randomness", (
 
 test("sampled cue choices continue exactly after a JSON save", () => {
   const a = loopGame(12);
-  steps(a.player, 3);
+  steps(a.colonies[0]!, 3);
   const b = loopGame(99);
   b.load(JSON.parse(JSON.stringify(a.save())));
-  a.player.bind(CURTAIN);
-  b.player.bind(CURTAIN);
-  assert.deepEqual(steps(a.player, 30), steps(b.player, 30));
+  a.colonies[0]!.bind(CURTAIN);
+  b.colonies[0]!.bind(CURTAIN);
+  assert.deepEqual(steps(a.colonies[0]!, 30), steps(b.colonies[0]!, 30));
   assert.deepEqual(a.save(), b.save());
 });
 

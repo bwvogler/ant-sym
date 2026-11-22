@@ -16,8 +16,8 @@ import { smallOne } from "../builders.ts";
 import { put } from "../hexmaps.ts";
 
 function setup(seed = 1, n = 1) {
-  const g = new Game(smallOne(7), { antCount: n, rival: false }, gameRng(seed), { colony: { deliveryLane: 1 } });
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, gameRng(seed), [{ antCount: n, colony: { deliveryLane: 1 } }]);
+  const c = g.colonies[0]!;
   c.bind(CURTAIN);
   const ch = c.map.chambers!;
   const y = ch.list[0].floorRow + 8;
@@ -158,7 +158,7 @@ test("mid-attempt JSON continuation preserves the effort clock and policy outcom
   a.c.responses = policy;
   for (let k = 0; k < 15; k++) a.g.tick(1 / 30);
   b.g.load(JSON.parse(JSON.stringify(a.g.save())));
-  b.g.player.responses = policy;
+  b.g.colonies[0]!.responses = policy;
   for (let k = 0; k < 100; k++) {
     a.g.tick(1 / 30);
     b.g.tick(1 / 30);

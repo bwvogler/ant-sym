@@ -168,8 +168,8 @@ test("in a run, an explorer's situation is asked under the doctrine, and the ans
 test("a live cached drop answer keeps food in an ant's jaws and is visible in its trace", () => {
   const j = new ColonyJev();
   live.add(j);
-  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 1, rival: false }, mulberry32(3));
-  const c = g.player;
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(3), [{ antCount: 1 }]);
+  const c = g.colonies[0]!;
   const doctrine = DOCTRINES[0]!.text;
   j.setDoctrine(doctrine);
   j.attachColonies([c], GENERIC_ANT, true);

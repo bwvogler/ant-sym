@@ -16,8 +16,8 @@ import { smallOne } from "../builders.ts";
 import { put } from "../hexmaps.ts";
 
 function setup(seed = 1, n = 1) {
-  const g = new Game(smallOne(7), { antCount: n, rival: false }, gameRng(seed), { colony: { deliveryLane: 1 } });
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, gameRng(seed), [{ antCount: n, colony: { deliveryLane: 1 } }]);
+  const c = g.colonies[0]!;
   c.bind(CURTAIN);
   const ch = c.map.chambers!;
   const y = ch.list[0].floorRow + 8;
@@ -104,7 +104,7 @@ test("save continuation through a blocked destination and policy replacement is 
   const b = setup(11);
   b.g.load(saved);
   for (const g of [a.g, b.g]) {
-    g.player.responses = responses({ carry: () => "to store" });
+    g.colonies[0]!.responses = responses({ carry: () => "to store" });
     for (let tick = 0; tick < 150; tick++) g.tick(1 / 30);
   }
   assert.deepEqual(b.g.save(), a.g.save());

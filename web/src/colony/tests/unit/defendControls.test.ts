@@ -61,9 +61,9 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
 
 test("approach defense requires both a currently sensed entrance and alarm", () => {
   const spec = oneAssay("defendAlarmApproach").spec(1);
-  const game = new Game(smallOne(1), { antCount: 1 }, mulberry32(1));
+  const game = new Game(smallOne(1), {}, mulberry32(1), [{ antCount: 1 }, { antCount: 800 }]);
   for (const event of spec.events ?? []) if (event.kind === "call" && event.at === 0) event.run(game);
-  const colony = game.player;
+  const colony = game.colonies[0]!;
   colony.bind(PLANE);
   const contact = firstResponses(spec)!.contact;
   const draw = colony.antDraw(0);
