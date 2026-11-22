@@ -102,6 +102,15 @@ async function until(fn, what, ms = 10_000, every = 100) {
   }
 }
 
+/**
+ * Waits until no notice is on the page. A running game raises its own ("New in the field guide: ...", the sugar found), each
+ * for 7 s, and the field keeps only the last three: a check that raises notices of its own must pause the game and let those
+ * go first, or they push its own out (ja-cila: steps 14 and 17 failed on slow runners, the trace showing the test's notice
+ * gone from the field under two of the game's).
+ */
+const noNotices = (page, what) =>
+  until(async () => (await page.evaluate(() => document.querySelectorAll('[role="status"] button').length)) === 0, what, 12_000, 100);
+
 /** The step running and the last check that passed: named with a failure. */
 let step = "starting";
 let lastOk = null;
@@ -1961,6 +1970,7 @@ try {
   await np2.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => np2.evaluate(() => !!window.jevAnts?.game.world), "the notices page's game");
   await np2.getByRole("button", { name: "Pause", exact: true }).tap();
+  await noNotices(np2, "the game's own notices to go before the checks raise theirs");
   const cdp = await nctx2.newCDPSession(np2);
   /** One finger down at the first point, held `holdMs`, moved through the rest, lifted. */
   const finger = async (pts, holdMs = 0) => {
@@ -2289,6 +2299,8 @@ try {
   await fp.getByLabel("world seed").fill(String(SEED));
   await fp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(() => fp.evaluate(() => !!window.jevAnts?.game.world), "a game for the notices checks", 20_000, 100);
+  await fp.getByRole("button", { name: "Pause", exact: true }).click();
+  await noNotices(fp, "the game's own notices to go before the checks raise theirs");
   const raiseF = (text, tone = "info") => fp.evaluate(([t, o]) => window.jevAnts.notify(t, o), [text, tone]);
   const floats = async (text) => {
     const b = await fp.getByRole("button", { name: new RegExp(text.replace(/[.]/g, "\\.")) }).boundingBox();
