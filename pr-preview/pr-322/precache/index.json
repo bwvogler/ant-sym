@@ -1,0 +1,267 @@
+{
+  "bundles": [
+    {
+      "lane": "carry",
+      "doctrine": "cautious",
+      "context": "carry-v16-35b74e71",
+      "file": "carry-cautious.json",
+      "answers": 53
+    },
+    {
+      "lane": "carry",
+      "doctrine": "forage",
+      "context": "carry-v16-33bae78a",
+      "file": "carry-forage.json",
+      "answers": 53
+    },
+    {
+      "lane": "carry",
+      "doctrine": "warlike",
+      "context": "carry-v16-943738c4",
+      "file": "carry-warlike.json",
+      "answers": 53
+    },
+    {
+      "lane": "contact",
+      "doctrine": "cautious",
+      "context": "contact-v16-768ea06e",
+      "file": "contact-cautious.json",
+      "answers": 59
+    },
+    {
+      "lane": "contact",
+      "doctrine": "forage",
+      "context": "contact-v16-0b7fa16b",
+      "file": "contact-forage.json",
+      "answers": 59
+    },
+    {
+      "lane": "contact",
+      "doctrine": "warlike",
+      "context": "contact-v16-a19d24a3",
+      "file": "contact-warlike.json",
+      "answers": 59
+    },
+    {
+      "lane": "drop",
+      "doctrine": "cautious",
+      "context": "drop-v16-3000bf41",
+      "file": "drop-cautious.json",
+      "answers": 16
+    },
+    {
+      "lane": "drop",
+      "doctrine": "forage",
+      "context": "drop-v16-2d75161a",
+      "file": "drop-forage.json",
+      "answers": 16
+    },
+    {
+      "lane": "drop",
+      "doctrine": "warlike",
+      "context": "drop-v16-dbd38754",
+      "file": "drop-warlike.json",
+      "answers": 16
+    },
+    {
+      "lane": "fungus",
+      "aim": "peace",
+      "context": "fungus-v8-side-153cd1a5",
+      "file": "fungus-peace.json",
+      "answers": 193
+    },
+    {
+      "lane": "fungus",
+      "aim": "spread",
+      "context": "fungus-v8-side-80d1e59a",
+      "file": "fungus-spread.json",
+      "answers": 193
+    },
+    {
+      "lane": "fungus",
+      "aim": "unite",
+      "context": "fungus-v8-side-bb724482",
+      "file": "fungus-unite.json",
+      "answers": 193
+    },
+    {
+      "lane": "get",
+      "doctrine": "cautious",
+      "context": "get-v16-3ad4dc3f",
+      "file": "get-cautious.json",
+      "answers": 25
+    },
+    {
+      "lane": "get",
+      "doctrine": "forage",
+      "context": "get-v16-84929d20",
+      "file": "get-forage.json",
+      "answers": 25
+    },
+    {
+      "lane": "get",
+      "doctrine": "warlike",
+      "context": "get-v16-6407259a",
+      "file": "get-warlike.json",
+      "answers": 25
+    },
+    {
+      "lane": "growth",
+      "aim": "peace",
+      "context": "growth-v4-0e171926",
+      "file": "growth-peace.json",
+      "answers": 48
+    },
+    {
+      "lane": "growth",
+      "aim": "spread",
+      "context": "growth-v4-1918cb6b",
+      "file": "growth-spread.json",
+      "answers": 48
+    },
+    {
+      "lane": "growth",
+      "aim": "unite",
+      "context": "growth-v4-12d896ff",
+      "file": "growth-unite.json",
+      "answers": 48
+    },
+    {
+      "lane": "leave",
+      "doctrine": "cautious",
+      "context": "leave-v16-6dd04dfd",
+      "file": "leave-cautious.json",
+      "answers": 8
+    },
+    {
+      "lane": "leave",
+      "doctrine": "forage",
+      "context": "leave-v16-a9f0ab76",
+      "file": "leave-forage.json",
+      "answers": 8
+    },
+    {
+      "lane": "leave",
+      "doctrine": "warlike",
+      "context": "leave-v16-3e2e4be8",
+      "file": "leave-warlike.json",
+      "answers": 8
+    },
+    {
+      "lane": "mode",
+      "doctrine": "cautious",
+      "context": "colony-v7-9c64e74d",
+      "file": "mode-cautious.json",
+      "answers": 151
+    },
+    {
+      "lane": "mode",
+      "doctrine": "cautious",
+      "species": "desert",
+      "context": "colony-v8-d5da92b3",
+      "file": "mode-desert-cautious.json",
+      "answers": 128
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "species": "desert",
+      "context": "colony-v8-11470d94",
+      "file": "mode-desert-forage.json",
+      "answers": 128
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "species": "desert",
+      "context": "colony-v8-24c27036",
+      "file": "mode-desert-warlike.json",
+      "answers": 128
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "context": "colony-v7-47f9dbc6",
+      "file": "mode-forage.json",
+      "answers": 151
+    },
+    {
+      "lane": "mode",
+      "doctrine": "cautious",
+      "species": "neglectus",
+      "context": "colony-v2-cad6fe01",
+      "file": "mode-neglectus-cautious.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "forage",
+      "species": "neglectus",
+      "context": "colony-v2-a5996a5a",
+      "file": "mode-neglectus-forage.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "species": "neglectus",
+      "context": "colony-v2-5653d614",
+      "file": "mode-neglectus-warlike.json",
+      "answers": 81
+    },
+    {
+      "lane": "mode",
+      "doctrine": "warlike",
+      "context": "colony-v7-5b5501f8",
+      "file": "mode-warlike.json",
+      "answers": 151
+    },
+    {
+      "lane": "steer",
+      "doctrine": "cautious",
+      "context": "steer-v7-2489f87e",
+      "file": "steer-cautious.json",
+      "answers": 203
+    },
+    {
+      "lane": "steer",
+      "doctrine": "forage",
+      "context": "steer-v7-2edb31fb",
+      "file": "steer-forage.json",
+      "answers": 203
+    },
+    {
+      "lane": "steer",
+      "doctrine": "warlike",
+      "context": "steer-v7-694ce533",
+      "file": "steer-warlike.json",
+      "answers": 203
+    },
+    {
+      "lane": "trail",
+      "doctrine": "cautious",
+      "context": "trail-v16-8618d93a",
+      "file": "trail-cautious.json",
+      "answers": 77
+    },
+    {
+      "lane": "trail",
+      "doctrine": "forage",
+      "context": "trail-v16-b60a3b07",
+      "file": "trail-forage.json",
+      "answers": 77
+    },
+    {
+      "lane": "trail",
+      "doctrine": "warlike",
+      "context": "trail-v16-57b444b7",
+      "file": "trail-warlike.json",
+      "answers": 77
+    }
+  ],
+  "versions": {
+    "colony": 7,
+    "fungus": 8,
+    "growth": 4
+  }
+}
