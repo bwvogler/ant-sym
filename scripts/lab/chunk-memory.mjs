@@ -20,7 +20,7 @@ const [ants = 800, seconds = 600, seed = 1, every = 60] = process.argv.slice(2).
 const DT = 1 / 30;
 
 const world = generateOneWorld(seed);
-const game = new Game(world, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed));
+const game = new Game(world, { regrow: GAME_REGROW, autoFound: false }, gameRng(seed), [{ antCount: ants }, { antCount: ants }]);
 game.land(
   0,
   STRAINS.findIndex((s) => s.id === "garden"),

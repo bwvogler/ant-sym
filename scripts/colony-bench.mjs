@@ -29,9 +29,10 @@ for (const ground of [page ? "one world, two, as the page plays it" : "one world
   const map = generateOneWorld(seed);
   const gen = performance.now() - t0;
   const size = map.plane.size;
+  const pair = [{ antCount: ants }, { antCount: ants }];
   const game = page
-    ? new Game(map, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW, autoFound: false }, gameRng(seed))
-    : new Game(map, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 31 + 7));
+    ? new Game(map, { regrow: GAME_REGROW, autoFound: false }, gameRng(seed), pair)
+    : new Game(map, {}, mulberry32(seed * 31 + 7), pair);
   if (page)
     game.land(
       0,

@@ -219,7 +219,7 @@ async function tool(page, name) {
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
 const dayAt = (page, phase) =>
   page.evaluate((phase) => {
-    const p = window.jevAnts.game.player.params;
+    const p = window.jevAnts.game.colonies[0].params;
     const t = phase * p.heatDay - p.heatStart;
     return t < 0 ? t + p.heatDay : t;
   }, phase);
