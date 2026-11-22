@@ -7392,7 +7392,8 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 - The first piece smaller, in separate PRs: **M1** the landing patch is the 7-cell flower (a hex and its six neighbours); **M2** hyphae thicken into mats and a filled flower becomes a new patch; **M3** two budgets; **M4** the lichen partner. Order: patch, budgets, lichen.
 - **Hyphae must fill the 7 tiles** (not a built-on-demand patch): the growth lane gains a **thicken** answer (a re-ask of about $0.002 an aim, owner chose it knowing this).
 - Different unlocks from different budgets: ant-specific from mass in ants, free-fungus from mass outside; senses and abilities of a downstream algae or plant partner (a special lichen: use rock, break it down, spread across it) unlocked by contact with plant or alga.
-- Proposed (needs the owner, M2): the cue that says a resource is here (a colonised corpse beside the tip), and that the local rule never thickens (off = today).
+- **The thicken cue is a resource** (owner, 2026-11-22, shown the literature: new foci at a resource are supported, a mat wherever it is rich only partly): the tip senses a colonised corpse beside it (a new situation field, 48 situations become 96: tokens to be measured), and the policy may thicken only there. Proposed: the local rule never thickens (off = today).
+- **Start with the M1 assay, then the M1 build** (owner, 2026-11-22).
 
 **The mechanic.**
 - **M1:** `LANDING.radius` 2 becomes 1 (landing and a queen's founding), behind a parameter whose off is today bit for bit; whether the first spores still paint radius 2 is chosen by the assay (`ja-vlla.2`).
@@ -7407,5 +7408,5 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Beads.** `ja-vlla` (this); `ja-vlla.1` research follow-ups; `.2` M1 assay; `.3` M1 build; `.4` M2 thicken answer; `.5` M2 flower becomes a patch; `.6` M2 assays; `.7` M3 budgets; `.8` M4 lichen partner.
 
-**Still open.** The cue for "rich"; whether budgets are a stock or earnings, and one price or two; what the partner is and what contact means on the map; the sources the first search could not read.
+**Still open.** Whether budgets are a stock or earnings, and one price or two; what the partner is and what contact means on the map; the sources the first search could not read.
 

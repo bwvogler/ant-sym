@@ -69,7 +69,7 @@
 Four milestones, each its own PR, the first the smallest (owner: "the first patch should be smaller"):
 
 1. **M1: the landing patch is the 7-cell flower** (`ja-vlla.2` the assay, `ja-vlla.3` the build). `LANDING.radius` 2 becomes 1: a hex and its six neighbours, for the landing and for a queen's founding. A parameter whose off is today. It shrinks the spore ground (7 cells hold at most `7 × maxSpores`, against 19) and the first patch's capacity use, so P1 is re-tuned by the worst seed; no Jev change. Whether `Fungus.paint` keeps radius 2 is chosen by the assay (`ja-vlla.2`).
-2. **M2: mats and new patches** (`ja-vlla.4`–`.6`; owner: "hyphae must fill them"). A growth-lane answer, **thicken**: the tip fills the open, enterable neighbours of its cell, HYPHA_MASS each from its supply. A cell whose six neighbours are all hyphae and itself a hypha is a flower and becomes a patch: layer 0 only (as every root today), mass conserved, three tips out of the rim. The answer changes the lane's legend (`GROWTH_BRAIN_VERSION` 5): a re-ask of about $0.002 an aim and a free `--import`. The cue for "a resource is here" is open (a colonised corpse beside the tip, a fifth situation field: 48 situations become 96).
+2. **M2: mats and new patches** (`ja-vlla.4`–`.6`; owner: "hyphae must fill them"). A growth-lane answer, **thicken**: the tip fills the open, enterable neighbours of its cell, HYPHA_MASS each from its supply. A cell whose six neighbours are all hyphae and itself a hypha is a flower and becomes a patch: layer 0 only (as every root today), mass conserved, three tips out of the rim. The answer changes the lane's legend (`GROWTH_BRAIN_VERSION` 5): a re-ask of about $0.002 an aim and a free `--import`. The cue for "a resource is here" is a colonised corpse beside the tip (owner, 2026-11-22): a fifth situation field, so 48 situations become 96.
 3. **M3: two budgets** (`ja-vlla.7`; design with the owner first). Ant abilities (infectivity, persistence, evasion and the reach upgrades) from fungus made in hosts; free-fungus abilities (mycelium, knots, fruiting, stalks) from mass outside. Open: stock or earnings; one price or two; which is which.
 4. **M4: the lichen partner** (`ja-vlla.8`; design with the owner first): something to touch, the partner's own senses and abilities, using rock.
 
@@ -85,7 +85,7 @@ For every milestone, off is today bit for bit and the goldens stay exact until a
 
 ## Open questions
 
-- **Owner (M2):** the cue for "rich": a colonised corpse (best supported: a new focus at a resource), anywhere well supplied (design only), or only when the aim asks (policy only).
+- ~~**Owner (M2):** the cue for "rich"~~ Decided (owner, 2026-11-22): a colonised corpse beside the tip, the best supported (a new focus at a resource); anywhere well supplied and only-when-the-aim-asks were not taken.
 - **Owner (M3):** are the budgets a *stock* (unlock when mass in ants or outside passes a level) or *earnings* spent like mutations? One rising price or one per budget?
 - **Owner (M4):** what the partner is (algae on rock, a plant with roots, a lichen), what contact means on the map, what senses it brings.
 - **To measure:** P1 with radius 1 (`ja-vlla.2`); flowers per game with a thicken answer (`ja-vlla.6`); the cost of a fifth situation field.
