@@ -21,7 +21,10 @@ test("the queen's larger grooming cap is the evolving game's: a lab or test game
       g.fungus.strains[GARDEN]!.transmission = 0.3;
       g.fungus.strains[GARDEN]!.decay = 0;
     }
-    for (let k = 0; k < 30 * 45; k++) g.tick(1 / 30);
+    // 90 s, not 45: with the brood odour on by default (the young no longer turn to the queen's x,y) the fungus reaches her
+    // later on this seed (seed 7919: load 0.000 at 45 s, 0.650 vs 0.632 at 90 s; seeds 1-4 also differ at 90 s). The cap is
+    // still read, same assertion.
+    for (let k = 0; k < 30 * 90; k++) g.tick(1 / 30);
     return g.colonies[0]!.queen!.load;
   };
   assert.equal(queenAt(8, false), queenAt(4, false), "not evolving: the cap is not read");
