@@ -629,6 +629,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "The fungus's mutations as a tech tree: levels that need others first, at one price that rises with each level kept. Game design.",
   },
   {
+    note: "fungus-unlocks",
+    title: "The fungus's unlocks",
+    covers:
+      "A plan for the fungus: a smaller landing patch, hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. Not built yet.",
+  },
+  {
     note: "builder",
     title: "Builder mode",
     covers:
