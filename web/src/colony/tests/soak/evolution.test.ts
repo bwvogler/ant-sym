@@ -306,7 +306,8 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
     const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
     g.land(0, GARDEN, { evolve });
     let most = 0;
-    for (let k = 0; k < 30 * 60; k++) {
+    // 120 s: the seven-cell landing (PRD §85) takes listed Garden to a quarter at ~75 s and 0.93 of the colony at 100 s.
+    for (let k = 0; k < 30 * 120; k++) {
       g.tick(1 / 30);
       if (k % 30) continue;
       const f = g.fungus.census(g.colonies[0]!);

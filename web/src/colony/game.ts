@@ -288,8 +288,8 @@ export const QUIET = 60;
  */
 export const MET = 0.01;
 
-/** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
-export const LANDING = { offset: 3, radius: 2, spores: 3 };
+/** The fungus's landing (Game.land) and a queen's founding: this far past the hole (cells, along the ground), a flower of a hex and its six neighbours (radius 1; it was 2, PRD §85), spores over it. */
+export const LANDING = { offset: 3, radius: 1, spores: 3 };
 
 /** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
 export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;

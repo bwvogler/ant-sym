@@ -3445,7 +3445,7 @@ Before (§39): 44–81 situations and about 560 tokens per situation as asked, $
 
 **Built:**
 - **The start screen** (`ui/StartScreen.tsx`) explains what the player is and has a world seed and Start. The field waits behind it, paused.
-- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2, 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
+- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2 (radius 1 since §85, 2026-11-22), 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
 - **Every later game lands too.** Once started, New world and Restart also begin with the landing.
 - **Speed.** The page defaults to **4×**, the top bar offers 1–8×, and Details has a slider to 8×. No sim constant changed (owner, §50).
 - **"Running at N×".** The top bar shows it when the measured sim-seconds per wall-second fall below 85 % of the speed asked (`ColonyStats.pace`).
@@ -7418,9 +7418,14 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 - **A flower patch's mass comes from the hyphae** (owner, 2026-11-22, on the review of #299): today every patch adds a start of 4 from nothing; a flower does not, so it adds capacity and spores only.
 
 **The mechanic.**
-- **M1:** `LANDING.radius` 2 becomes 1 (landing and a queen's founding), behind a parameter whose off is today bit for bit; whether the first spores still paint radius 2 is chosen by the assay (`ja-vlla.2`).
+- **M1 (built, `ja-vlla.3`):** `LANDING.radius` 2 becomes 1 (landing, the first spores and a queen's founding: the assay measured the whole change). The parameter is `LANDING.radius`; `progression.mjs --landing 2` gives today's landing back. The fungus golden is re-recorded.
 - **M2:** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply; a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, three tips out of the rim, the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **M3, M4:** design with the owner first (open questions in the note).
+
+**M1 assay result (`ja-vlla.2`, 2026-11-22).** `progression.mjs --evolve --hyphae --growth --flow --seconds 600` (the bead's command; `--landing R` sets `LANDING.radius`; the without-hyphae rows drop `--hyphae --growth --flow`), time to a quarter of hosts, seconds, seeds 1–10 then 11–20, radius 1 against today's 2. Re-run on the head (`8ffc5711`) the radius-1 with-hyphae rows reproduce on all 20 seeds. Without `--growth --flow` the with-hyphae times differ (seed 1: 237 s at radius 1, 282 s at radius 2; the PR review's reading). P1 (§63.4): no seed more than 10 % slower with hyphae than without.
+- Radius 1, seeds 1–10, with hyphae: 260 179 155 205 141 222 212 212 201 159; without: 361 268 233 235 237 426 277 533 327 197. Every seed is as fast or faster with hyphae.
+- Radius 1, seeds 11–20, with hyphae: 223 192 149 144 212 205 215 204 209 197; without: 297 211 141 139 354 313 226 246 279 351. Worst: seed 13, 149 against 141 s (5.7 % slower); seed 14 3.6 %; the rest faster. **P1 holds** by the worst seed.
+- Radius 2 (today), seeds 1–10: with hyphae 286 207 154 49 105 237 224 431 249 142; without 336 362 162 55 146 544 313 never 247 142. The small patch costs the early game (seed 4: 49 s becomes 205 s with hyphae) but no seed regresses against its own no-hyphae run. A founding root at radius 1 alone (the spores still at 2) was not run to completion: the two-part change is the one shipped.
 
 **Play.** A smaller start; thickening at resources and a second base that appears where hyphae close a flower; later two meters and a partner that creeps over rock. The risks are an early cliff (smaller spore ground and capacity use: P1), a runaway (capacity grows with patches: a flower patch takes its seven cells' mass from the hyphae and forms only outside every patch), an invisible rule (a patch with no mark), and a mat rule that is design, not measured biology.
 

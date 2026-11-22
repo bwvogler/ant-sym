@@ -15,6 +15,7 @@
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
+// --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
@@ -47,6 +48,8 @@ if (isMainThread) {
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
     price: opt("price", null),
+    landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
+    rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -69,7 +72,7 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `one world${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `one world${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}${job.landing !== null ? `, landing radius ${job.landing}` : ""}${job.rootRadius !== null ? `, patch radius ${job.rootRadius}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
@@ -86,7 +89,8 @@ if (isMainThread) {
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, hyphae, growth, grant, sun, flow, price } = workerData;
+  const { seed, seconds, aim, evolve, buy, order, strain, hyphae, growth, grant, sun, flow, price, landing, rootRadius } = workerData;
+  if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
     const { PRICE } = await import("../../web/src/colony/evolution.ts");
     [PRICE.base, PRICE.ratio] = price.split(",").map(Number);
@@ -108,6 +112,10 @@ if (isMainThread) {
     const { growthKey } = await import("../../web/src/colony/growthBrain.ts");
     const grows = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/growth-${aim}.json`, import.meta.url), "utf8")));
     g.fungus.bindPolicy("growth", (s) => grows.get(growthKey(s)) ?? null);
+  }
+  if (rootRadius !== null) {
+    const root = g.fungus.root.bind(g.fungus);
+    g.fungus.root = (x, y, _r, ...rest) => root(x, y, rootRadius, ...rest);
   }
   g.land(
     0,
