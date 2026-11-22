@@ -297,7 +297,7 @@ export default function ColonyField({
   // A new game starts zoomed out, in both views.
   useEffect(() => {
     rig.clear();
-  }, [colonies]);
+  }, [colonies, rig]);
   useEffect(() => {
     shown.current = view;
   }, [view]);
