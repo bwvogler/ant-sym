@@ -188,9 +188,10 @@ test("the game's save holds every private field it declares, or the field is bui
   const inGrids = ["grids", "recs"];
   const derived = ["piles"]; // the food piles as the world began: from the fresh world
   const fromPage = ["choice"]; // the Lab's setChoice (ja-nan3): not saved, the page sets it again on every game, a load included
+  const fromSpecs = ["firstAnts"]; // colony 0's start count: from the specs the game was built with, as the page rebuilds it (docs/game-colonies.md)
   assert.deepEqual(
     [...declared].sort(),
-    [...inPrivate, ...inGrids, ...derived, ...fromPage].sort(),
+    [...inPrivate, ...inGrids, ...derived, ...fromPage, ...fromSpecs].sort(),
     "every declared #field is accounted for",
   );
   const s = build(2).save();
