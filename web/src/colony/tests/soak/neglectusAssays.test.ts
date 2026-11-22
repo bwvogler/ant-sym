@@ -67,8 +67,8 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   // Retune (brood-odour climb on by default, which moved every game's stream): meetings are a trajectory, and seed 1's fell from 12.5 to
   // 3.0 (below N3_MIN_MEET, so that trial would not even count); across the alike seeds they run 0-100 ant-seconds either way. Seed 27 (world 4,
   // distance 0.2, under the tolerance, so alike: no fight) now meets 14.3, and the band below is this one's 12.5 band (10.9-13.8) scaled by
-  // 14.3/12.5, the same share of its width (the move the comment below records for the law). Alike never fight (seeds 1-5, 9-12, 17-23, 25-29, 33-36: 0
-  // deaths) and far apart do (seeds 6-8, 13-16, 24, 30-32, 37-40: all fought) still hold; the bounds on `fought` are untouched.
+  // 14.3/12.5, the same share of its width (the move the comment below records for the law). Alike never fight (distances up to 0.3 on seeds 1-4, 9-12, 17-20, 25-28, 33-36: 0
+  // deaths) and far apart do whenever the colonies meet (seeds 6-8, 13-16, 24, 30-32, 37-40 all fought; 21-23 never met) still hold; the bounds on `fought` are untouched.
   // Meetings on seed 1 were 12.5 ant-seconds with piErrorLaw 1 (PRD §79; 14.9 by the odometer law, 17.8 then if ants on
   // different layers counted as meeting): a band catches a miscount. The band moved with the law, its width the same share
   // (13–16.5 round 14.9 then, 10.9–13.8 round 12.5 now).
