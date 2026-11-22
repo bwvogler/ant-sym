@@ -131,7 +131,8 @@ export const callsOf = (log: readonly string[], name: string): string[] =>
 
 /**
  * The value of property `prop` just before line `index` of the log, the way a real context would hold it (save and restore applied): the colour a
- * fill() is about to use is `stateAt(log, i, "fillStyle")` for the fill's index i.
+ * fill() is about to use is `stateAt(log, i, "fillStyle")` for the fill's index i. It reads the values back from the log's text, so numbers are
+ * the log's rounded ones (a 0.0225 reads back 0.023) and `true` and `false` are booleans.
  */
 export function stateAt(log: readonly string[], index: number, prop: string): unknown {
   const state: Record<string, unknown> = { ...DEFAULTS };
@@ -142,7 +143,7 @@ export function stateAt(log: readonly string[], index: number, prop: string): un
     else if (l === "restore()") Object.assign(state, stack.pop() ?? {});
     else {
       const m = /^(\w+) = (.*)$/.exec(l);
-      if (m) state[m[1]!] = /^-?[\d.]+$/.test(m[2]!) ? Number(m[2]) : m[2];
+      if (m) state[m[1]!] = /^-?[\d.]+$/.test(m[2]!) ? Number(m[2]) : m[2] === "true" ? true : m[2] === "false" ? false : m[2];
     }
   }
   return state[prop];

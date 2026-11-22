@@ -200,7 +200,6 @@ function rgb(hex: string): [number, number, number] {
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
-/** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
