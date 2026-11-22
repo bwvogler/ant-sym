@@ -100,7 +100,7 @@ export function inspectCell(
     cx = centreX(gx, gy),
     cy = centreY(gy);
   const place = probe(g, sensed, layer, cx, cy, trails);
-  const map = g.world ? (layer === PLANE ? g.world.plane : g.world.curtain) : g.colonies[0]!.map;
+  const map = layer === PLANE ? g.world.plane : g.world.curtain;
   const out: CellInspectionState = {
     cell: [gx, gy],
     place,

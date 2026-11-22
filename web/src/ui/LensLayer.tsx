@@ -29,9 +29,9 @@ export default function LensLayer({
   on: boolean;
   colonies: readonly Colony[];
   fungus: Fungus;
-  world: { plane: WorldMap; curtain: WorldMap } | null;
+  world: { plane: WorldMap; curtain: WorldMap };
   sensed: SensedMap;
-  /** the layer shown: PLANE or CURTAIN, or −1 on a game of one map */
+  /** the layer shown: PLANE or CURTAIN */
   layer: number;
   trails: { food: boolean; home: boolean };
   onFollow: (f: Followed) => void;

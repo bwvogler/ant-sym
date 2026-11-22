@@ -489,6 +489,7 @@ export default function ColonyField({
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
+    // placeholders: bind() sets all of these before the first frame draws
     let lv = -1;
     let m: WorldMap = anyColony.map;
     let alarms: ChunkLayer<Float32Array>[] = [];
@@ -1589,7 +1590,7 @@ export default function ColonyField({
         // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
         const home = lv === col.home;
         const [nx, ny] = toScreen(c, v, nest.x, nest.y);
-        // The side view's and the open map's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
+        // The side view's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
         if (col.soilOut > 0 && !nest.entrance && !m.spoil) {
           // The mound is on the surface, above this slice: every pellet brought out, heaped round the
           // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the

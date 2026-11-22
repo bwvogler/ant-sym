@@ -29,7 +29,7 @@ export function sightOf(t: number, now: number): number {
 }
 
 /**
- * The sim time each cell was last sensed by a host, per layer (0: the plane or the one map; 1: one world's curtain). A
+ * The sim time each cell was last sensed by a host, per layer (0: the plane; 1: the curtain). A
  * chunk no host has sensed for SENSED_FADE shows nothing, so it is dropped and leaves one bit: revealed (the fog of
  * war's, endless-world §8). What it holds then grows with the ground hosts sense now, not all they ever sensed (§7).
  */
