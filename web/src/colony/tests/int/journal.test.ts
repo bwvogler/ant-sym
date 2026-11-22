@@ -9,7 +9,7 @@ import { smallOne, ticks } from "../builders.ts";
 
 // The game journal (ja-8tb): a read-only observer that writes an event for each change it sees between ticks.
 
-const small = (seed = 3) => new Game(smallOne(seed), { antCount: 12, rival: false }, mulberry32(seed));
+const small = (seed = 3) => new Game(smallOne(seed), {}, mulberry32(seed), [{ antCount: 12 }]);
 
 /** A game already observed once (the journal's baseline), and the journal. */
 function watched(spec: string) {
@@ -139,7 +139,7 @@ test("birth: a slot reused with a new gen is the old ant's death and a birth, wi
 });
 
 test("colony=<k>: only that colony's events, and the game's own", () => {
-  const g = new Game(smallOne(3), { antCount: 8 }, mulberry32(3));
+  const g = new Game(smallOne(3), {}, mulberry32(3), [{ antCount: 8 }, { antCount: 800 }]);
   assert.equal(g.colonies.length, 2);
   const j = new Journal("queen,colony=1");
   j.observe(g);
@@ -158,7 +158,7 @@ test("colony=<k>: only that colony's events, and the game's own", () => {
 });
 
 test("fallen, and the outcome: a colony with no ants and no brood to come is beaten; the outcome follows within a second", () => {
-  const g = new Game(smallOne(3), { antCount: 8 }, mulberry32(3));
+  const g = new Game(smallOne(3), {}, mulberry32(3), [{ antCount: 8 }, { antCount: 800 }]);
   const j = new Journal("colony");
   j.observe(g);
   j.events.length = 0;
@@ -184,7 +184,7 @@ test("fallen, and the outcome: a colony with no ants and no brood to come is bea
 
 test("founded: a colony that appears mid-game is written as founded, once", () => {
   // The whole one world: the small one has no room beyond its ends for a founding.
-  const g = new Game(generateOneWorld(2), { antCount: 8, rivalAnts: 8, regrow: 0 }, gameRng(2));
+  const g = new Game(generateOneWorld(2), { regrow: 0 }, gameRng(2), [{ antCount: 8 }, { antCount: 8 }]);
   const j = new Journal("colony");
   j.observe(g);
   assert.deepEqual(

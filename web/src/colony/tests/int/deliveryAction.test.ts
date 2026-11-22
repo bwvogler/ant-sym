@@ -20,8 +20,8 @@ import { smallOne, run } from "../builders.ts";
 import { put } from "../hexmaps.ts";
 
 function setup(seed = 7) {
-  const g = new Game(smallOne(7), { antCount: 1, rival: false }, gameRng(seed), { colony: { deliveryLane: 1 } });
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, gameRng(seed), [{ antCount: 1, colony: { deliveryLane: 1 } }]);
+  const c = g.colonies[0]!;
   c.bind(CURTAIN);
   c.layer[0] = CURTAIN;
   c.under[0] = 1;
@@ -240,7 +240,7 @@ test("inspection is read-only and a JSON save preserves the delivery commitment"
   const saved = JSON.parse(JSON.stringify(g.save()));
   const fresh = setup().g;
   fresh.load(saved);
-  assert.equal(fresh.player.deliveryRole[0], c.deliveryRole[0]);
+  assert.equal(fresh.colonies[0]!.deliveryRole[0], c.deliveryRole[0]);
   run(g, 1);
   run(fresh, 1);
   const hash = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");

@@ -13,12 +13,11 @@ import { smallOne } from "../builders.ts";
 // hand-made top-down field, where ants waited at the nest).
 
 test("the crowd a waiting ant feels at the top of its shaft builds up over CROWD_HALF, not at once", () => {
-  const g = new Game(smallOne(), { antCount: 20, rivalAnts: 1 }, mulberry32(16), {
-    policy: () => "explore",
-    responses: responses({ leave: () => "wait" }),
-    colony: { scoutRate: 0, crowdAt: 6 },
-  });
-  const c = g.player;
+  const g = new Game(smallOne(), {}, mulberry32(16), [
+    { antCount: 20, colony: { scoutRate: 0, crowdAt: 6 }, policy: () => "explore", responses: responses({ leave: () => "wait" }) },
+    { antCount: 1 },
+  ]);
+  const c = g.colonies[0]!;
   const col = c.layers[CURTAIN]!.entranceCol;
   const row = c.layers[CURTAIN]!.entranceRow + 1;
   for (let i = 0; i < 20; i++) {

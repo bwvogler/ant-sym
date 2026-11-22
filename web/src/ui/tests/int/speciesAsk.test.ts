@@ -73,11 +73,7 @@ async function play(choice: string) {
   const reqs = proxy(choice);
   const j = new ColonyJev({ intervalMs: 10, gatherMs: 0, saveMs: 0 });
   live.add(j);
-  const g = new Game(
-    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
-    { antCount: 30, rival: false, species: LONE },
-    mulberry32(4),
-  );
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { species: LONE }, mulberry32(4), [{ antCount: 30 }]);
   j.setDoctrine("forage");
   j.attachColonies(g.colonies, LONE);
   await j.start();

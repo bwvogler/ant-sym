@@ -99,7 +99,7 @@ test("pick draws once by probability, and not at all without a draw, from a bare
 });
 
 const game = (params: { reroll?: number; rerollLaw?: number; sampleTemp?: number } = {}) =>
-  new Game(smallOne(1), { antCount: 40, rivalAnts: 10 }, mulberry32(3), { colony: params });
+  new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 40, colony: params }, { antCount: 10 }]);
 
 /** A policy that answers every situation with the same distribution, drawn from as the page's does. */
 const drawing =
@@ -109,7 +109,7 @@ const drawing =
 
 test("ants of one colony asked the same weighted answer draw different modes, and draw again after `reroll` seconds", () => {
   const g = game({ reroll: 2 });
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.bindPolicy("mode", drawing("explore=0.5,follow=0.5"));
   ticks(g, 3);
   const empty = [...Array(c.params.antCount).keys()].filter((i) => c.alive[i] && !c.carrying[i] && !c.pellet[i]);
@@ -127,7 +127,7 @@ test("an ant draws again on the clock: the same game asks its policy more often 
   const asked = (reroll: number) => {
     const g = game({ reroll });
     let n = 0;
-    g.player.bindPolicy("mode", (_s, draw) => (n++, pick("explore=0.5,follow=0.5", draw) as Mode));
+    g.colonies[0]!.bindPolicy("mode", (_s, draw) => (n++, pick("explore=0.5,follow=0.5", draw) as Mode));
     ticks(g, 5 * 30);
     return n;
   };
@@ -145,7 +145,7 @@ test("the defaults: temperature 0.5 (PRD §68.2), a fixed 10 s hold", () => {
 test("rerollLaw 1: the clocks differ ant to ant and average `reroll`; rerollLaw 0: every clock is `reroll`", () => {
   const clocks = (rerollLaw: number): number[] => {
     const g = game({ reroll: 8, rerollLaw });
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.bindPolicy("mode", drawing("explore=0.5,follow=0.5"));
     g.tick(1 / 30);
     return [...Array(c.params.antCount).keys()].filter((i) => c.redraw[i] > 0).map((i) => c.redraw[i]!);
@@ -162,7 +162,7 @@ test("rerollLaw 1: the clocks differ ant to ant and average `reroll`; rerollLaw 
 
 test("a policy that never draws leaves every ant without a clock (the local rule's game is unchanged)", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.bindPolicy("mode", (s) => localPolicy(s));
   ticks(g, 30);
   for (let i = 0; i < c.params.antCount; i++) assert.equal(c.redraw[i], -1);

@@ -47,27 +47,27 @@ const LONE: Species = {
 
 /** A game of the species on a small one world: its colony alone, with its queen. */
 const play = (species: Species, seconds: number) => {
-  const g = new Game(smallOne(3), { antCount: 30, rival: false, species }, mulberry32(3));
+  const g = new Game(smallOne(3), { species }, mulberry32(3), [{ antCount: 30 }]);
   for (let k = 0; k < 30 * seconds; k++) g.tick(1 / 30);
   return g;
 };
 
 /** What the colony laid of a channel, on both its layers. */
-const laid = (g: Game, channel: "home" | "food") => g.player.layers.reduce((sum, l) => sum + l.ph.total(channel), 0);
+const laid = (g: Game, channel: "home" | "food") => g.colonies[0]!.layers.reduce((sum, l) => sum + l.ph.total(channel), 0);
 
 test("a species of the descriptor's pieces alone plays a game: no trails laid, a short life that ends, its own Jev words", () => {
-  const born = new Game(smallOne(3), { antCount: 30, rival: false, species: LONE }, mulberry32(3)).player;
+  const born = new Game(smallOne(3), { species: LONE }, mulberry32(3), [{ antCount: 30 }]).colonies[0]!;
   for (let i = 0; i < born.n; i++)
     if (born.alive[i]) assert.ok(Number.isFinite(born.lifespan[i]!) && born.lifespan[i]! <= 117, `lifespan ${born.lifespan[i]}`);
   // 90 s: with youngShare 0 nothing nurses, so none is born, and the colony falls at about 120 s (S2.3c).
   const g = play(LONE, 90);
   assert.equal(g.outcome(), "playing", "still playing at 90 s");
-  const c = g.player;
+  const c = g.colonies[0]!;
   assert.equal(g.params.species, LONE);
   // The Game hands each parameter down (the ones this game does not exercise by behaviour: undertakes, the bands and the raid gates are pinned in undertakes.test.ts and ageStructure.test.ts).
   for (const [k, v] of Object.entries(LONE.params))
-    assert.equal((g.player.params as unknown as Record<string, unknown>)[k], v, `${k} reaches the colony`);
-  assert.equal(g.player.responses, LONE.responses);
+    assert.equal((g.colonies[0]!.params as unknown as Record<string, unknown>)[k], v, `${k} reaches the colony`);
+  assert.equal(g.colonies[0]!.responses, LONE.responses);
   // The responses lay nothing and the colony follows no home trail: no pheromone of its own on either layer.
   assert.equal(laid(g, "food"), 0, "no food trail");
   assert.equal(laid(g, "home"), 0, "no home trail");

@@ -33,11 +33,10 @@ const LOOPS: Partial<Colony["params"]> = {
 };
 
 const game = (params: Partial<Colony["params"]> = LOOPS): Game => {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10 },
+    { antCount: 10 },
+  ]);
   for (const c of g.colonies) {
     for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
     Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
@@ -47,7 +46,7 @@ const game = (params: Partial<Colony["params"]> = LOOPS): Game => {
 
 /** Ant 0 of the player, a carrier at its vector's end (`odo` walked, the end 60 east of its hole), facing east. Its origin. */
 function lost(g: Game, odo: number): { c: Colony; ox: number; oy: number } {
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const ox = centreX(hc.px, hc.py) + 60;
   const oy = centreY(hc.py);

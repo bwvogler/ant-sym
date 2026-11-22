@@ -10,10 +10,11 @@ import type { Mode, Policy } from "../../vocab.ts";
 // The lockstep probe (ja-0kys): ants that answer a situation alike agree; ants that draw from even odds don't.
 
 const run = (policy: Policy) => {
-  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 40, rivalAnts: 10 }, mulberry32(3), {
-    colony: { reroll: 1 },
-  });
-  g.player.bindPolicy("mode", policy);
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(3), [
+    { antCount: 40, colony: { reroll: 1 } },
+    { antCount: 10 },
+  ]);
+  g.colonies[0]!.bindPolicy("mode", policy);
   const probe = lockstepProbe(1);
   for (let k = 0; k < 12 * 30; k++) {
     g.tick(1 / 30);

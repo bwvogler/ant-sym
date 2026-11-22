@@ -33,7 +33,10 @@ function spies(): { r: Responses; asks: Record<ResponseHook, { drawn: number; ba
 test("one world: every response the colonies ask carries the ant's draw", () => {
   // A minute of seed 7's small one world, 120 ants a side, asks every hook (measured, S2.3c: contact 221 times, leave 27,613).
   const { r, asks } = spies();
-  const g = new Game(smallOne(7), { antCount: 120, rivalAnts: 120 }, mulberry32(3), { responses: r, rivalResponses: r });
+  const g = new Game(smallOne(7), {}, mulberry32(3), [
+    { antCount: 120, responses: r },
+    { antCount: 120, responses: r },
+  ]);
   ticks(g, 60 * 30);
   for (const h of RESPONSE_HOOKS) assert.equal(asks[h].bare, 0, `${h} asked ${asks[h].bare} times without a draw`);
   for (const h of RESPONSE_HOOKS) assert.ok(asks[h].drawn > 0, `${h} never asked: ${JSON.stringify(asks)}`);
@@ -42,7 +45,7 @@ test("one world: every response the colonies ask carries the ant's draw", () => 
 // The gate at the top of a shaft asks `leave`; asked directly here too.
 test("the leave response at the gate carries the ant's draw", () => {
   const { r, asks } = spies();
-  const c = new Game(smallOne(7), { antCount: 10, rival: false }, mulberry32(3)).player;
+  const c = new Game(smallOne(7), {}, mulberry32(3), [{ antCount: 10 }]).colonies[0]!;
   c.responses = r;
   c.leaves(0, 1 / 30, false);
   assert.deepEqual(asks.leave, { drawn: 1, bare: 0 });

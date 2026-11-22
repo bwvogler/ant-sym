@@ -32,12 +32,10 @@ const dampAim = "Dampen the host's sense of chamber floor marks.";
 
 function deliveryWithAim(aim: string, hook: "carry" | "trail" = "carry", fork = false) {
   const words = hook === "carry" ? doctrine : "Lay a food trail in recognized chambers and leave no trail in tunnels.";
-  const game = new Game(
-    generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }),
-    { antCount: hook === "trail" ? 2 : 1, rival: false },
-    mulberry32(3),
-  );
-  const colony = game.player;
+  const game = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(3), [
+    { antCount: hook === "trail" ? 2 : 1 },
+  ]);
+  const colony = game.colonies[0]!;
   const fungus = game.fungus;
   const queen = colony.queen!;
   const map = game.world!.curtain;

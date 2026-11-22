@@ -19,17 +19,15 @@ const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 
 function plane(params: Partial<Colony["params"]>): { g: Game; c: Colony; hx: number; hy: number } {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-    { colony: { routeMemory: 1, ...params } },
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10, colony: { routeMemory: 1, ...params } },
+    { antCount: 10 },
+  ]);
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-  const c = g.player;
+  const c = g.colonies[0]!;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0 });
   c.age[0] = 0.5 * LIFESPAN;
   const hc = c.holeCells[c.params.nest] as HoleCell;

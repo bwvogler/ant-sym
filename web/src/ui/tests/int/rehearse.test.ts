@@ -7,7 +7,8 @@ import { nextCrossing, REHEARSE_DT } from "../../rehearse.ts";
 // is stepped the same way; the game is untouched by the rehearsal.
 
 const SEED = 4;
-const build = (): Game => new Game(generateOneWorld(SEED), { antCount: 60, rivalAnts: 60, regrow: 0, autoFound: false }, gameRng(SEED));
+const build = (): Game =>
+  new Game(generateOneWorld(SEED), { regrow: 0, autoFound: false }, gameRng(SEED), [{ antCount: 60 }, { antCount: 60 }]);
 
 for (const below of [60, 600])
   test(`the ant a rehearsal finds comes up on the tick it said, in the game stepped the same way (${below} steps below first)`, () => {

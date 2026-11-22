@@ -33,7 +33,8 @@ test("the pen opens only for a queen with you in her, from a colony whose queen 
 
 // One world (U5.2): the player clicks the top view where her queen flies, within FLIGHT_2D of her mother's hole.
 
-const oneWorldGame = (seed: number): Game => new Game(generateOneWorld(seed), { antCount: 4, rivalAnts: 4, regrow: 0 }, gameRng(seed));
+const oneWorldGame = (seed: number): Game =>
+  new Game(generateOneWorld(seed), { regrow: 0 }, gameRng(seed), [{ antCount: 4 }, { antCount: 4 }]);
 
 test("the pen's circle is her flight round her mother's hole on the plane; none off one world", () => {
   const g = oneWorldGame(1);

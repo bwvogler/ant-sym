@@ -71,14 +71,15 @@ test("the plume is rebuilt only in a new period of PLUME_EVERY, and only if the 
 const desert = (plume = PLUME): Game =>
   new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 60, rival: false, species: { ...DESERT_ANT, params: { ...DESERT_ANT.params, foodPlume: plume } } },
+    { species: { ...DESERT_ANT, params: { ...DESERT_ANT.params, foodPlume: plume } } },
     gameRng(7),
+    [{ antCount: 60 }],
   );
 
 test("a desert game's plume is saved: a save made between rebuilds runs on exactly as the unbroken game", () => {
   const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
   const whole = desert();
-  const c = whole.player;
+  const c = whole.colonies[0]!;
   // To the first tick in the third period with a plume built in it and food taken since (the next build differs).
   run(whole, 3 * PLUME_EVERY, undefined, () => c.plumeEpoch === 2 && c.plumeFood !== whole.map.foodLeft);
   assert.ok(c.plume !== null && c.plumeEpoch === 2, `built in the period now (${c.plumeEpoch})`);
@@ -91,16 +92,16 @@ test("a desert game's plume is saved: a save made between rebuilds runs on exact
   const unbroken = hashGame(whole);
   const again = desert();
   again.load(copy(saved));
-  assert.deepEqual(again.player.plume, kept, "the plume as built, not rebuilt from the food at the save");
-  assert.equal(again.player.plumeEpoch, keptEpoch, "and the period it was built in");
-  assert.equal(again.player.plumeFood, keptFood);
+  assert.deepEqual(again.colonies[0]!.plume, kept, "the plume as built, not rebuilt from the food at the save");
+  assert.equal(again.colonies[0]!.plumeEpoch, keptEpoch, "and the period it was built in");
+  assert.equal(again.colonies[0]!.plumeFood, keptFood);
   run(again, 10);
   assert.equal(hashGame(again), unbroken, "run on: as if never saved");
 });
 
 test("the plume is the plane's: an ant in the nest (the curtain) never smells it, and it is only ever built over the plane (review of #143, S2)", () => {
   const g = desert();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = c.layers[PLANE]!.map;
   const at: number[] = [];
   const smells = c.smellsFood.bind(c);
@@ -120,10 +121,10 @@ test("the plume is the plane's: an ant in the nest (the curtain) never smells it
 
 test("the generic ant has no plume: none is built", () => {
   assert.ok(PLUME > 0, "the desert ant has one (the test's own check)");
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 60, rival: false }, gameRng(7));
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(7), [{ antCount: 60 }]);
   run(g, 10);
-  assert.equal(g.player.plume, null);
-  assert.equal(g.player.params.foodPlume, 0);
+  assert.equal(g.colonies[0]!.plume, null);
+  assert.equal(g.colonies[0]!.params.foodPlume, 0);
 });
 
 /**
@@ -133,7 +134,7 @@ test("the generic ant has no plume: none is built", () => {
 function approach(plume: number, fx: number, fy: number, theta: number, d = 8): number | null {
   const g = desert(plume);
   run(g, 15);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const map = c.layers[PLANE]!.map;
   const px = centreX(fx, fy) + d * Math.cos(theta);
   const py = centreY(fy) + d * Math.sin(theta);
@@ -158,7 +159,7 @@ function approach(plume: number, fx: number, fy: number, theta: number, d = 8): 
 
 test("with empty jaws, out of sight of food, a desert ant turns up the plume toward it (and without one does not)", () => {
   const g = desert();
-  const map = g.player.layers[PLANE]!.map;
+  const map = g.colonies[0]!.layers[PLANE]!.map;
   const food: [number, number][] = [];
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) if (map.food.get(x, y) > 0) food.push([x, y]);
   const withPlume: number[] = [];
@@ -185,8 +186,8 @@ test("over a minute, the plume brings more food home than none", () => {
   const stored = (plume: number) => {
     const g = desert(plume);
     run(g, 60);
-    assert.ok(g.player.layers[PLANE] !== undefined);
-    return g.player.stored;
+    assert.ok(g.colonies[0]!.layers[PLANE] !== undefined);
+    return g.colonies[0]!.stored;
   };
   const without = stored(0);
   const withPlume = stored(PLUME);
