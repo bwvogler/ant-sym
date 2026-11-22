@@ -56,6 +56,8 @@ Each is a PR, goldens bit-exact, reviewed by a fresh reviewer.
 
 - **Stage B3 (`ja-fnd.5.4.2.2`, the scripts and labs).** `colony-live`, `colony-cost`, `colony-bench`, `precache`, `fungus-cost`, `unity` and the labs `progression`, `dig-spread`, `economy-strand`, `one-world-spike` and `chunk-memory` build their games with a colony list (a pair of equal size, or the lab's one colony) and read `game.colonies[k]` where they read `game.player` and `game.rival`; `field-shots` reads `colonies[0]`; `progression`'s own `rival` field is `rivalFirst`. `experiment.mjs` and `pi-error.mjs` still pass `rivalPolicy` and `rival` as `Overrides` keys: those are the harness's words, which stage C renames with `Overrides`. Checked: `colony-bench --hash` (a hash of the whole game, plain and `--page`) and `colony-cost`'s figures are identical before and after.
 
+- **Stage B4 (`ja-fnd.5.4.2.2`, the unit, ui and int tests).** Every `new Game(...)` in those tiers names its colonies with a list (a codemod over the call's literal `antCount`, `rival`, `rivalAnts` and `Sides` words; `tests/int/gameColonies.test.ts` keeps the pair on purpose, as it is the adapter's test) and reads `game.colonies[k]` where it read `game.player` and `game.rival`. The soak, slow and golden tiers follow.
+
 ## Not in this
 
 - **A species per colony.** One species per game stays ([species.md](species.md): tier 1 first). Mixed species need per-colony channels, recognition tolerance, lane words and the fungus's menu. It belongs to a later stage; `ColonySpec` does not reserve a field for it.
