@@ -6901,6 +6901,27 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
 
 
+### 77.3 The climb's crowd limit (design, not built, ja-k4k.15.6, 2026-11-22)
+
+**Research basis:** [nurse-crowding.md](nurse-crowding.md). Epic `ja-k4k.15`.
+
+**The problem (measured).** The 20-seed sweep of the climb (`assays.yml` run 45043316089, main `2b1c0ab5`, channel 0.03/0.5; climb 0 = the queen's x,y):
+
+| `broodClimb` | larvae pass | nurse zone pass / median margin | game1 pass | game1 worst seed |
+|---|---|---|---|---|
+| 0 | 17/20 | 8/20 / −0.38 | 17/20 | 5 held |
+| 0.3 | 17/20 | 9/20 / −0.21 | 14/20 | 42 porting; larvae: 28 waiting, 77 died hungry |
+| 1 | 17/20 | 13/20 / +0.85 | 17/20 | **194 held** (seed 1) |
+| 2 | 17/20 | 10/20 / +0.16 | 12/20 | 5 held, 1 porting |
+
+At rate 1, seed 1, a crowd builds at the foot of a small brood chamber (65 ants within 6 units at 300 s, 198 at 400 s, 337 at 500 s), about 210 of them foragers holding food. Brood falls to 2 (main 11), the larder to 448 (main 865). Making carriers skip the climb changed nothing (reverted).
+
+**The decision (owner, 2026-11-22: research a crowd limit first).** No primary source shows nurses sensing a crowd at the brood and leaving it; the nearest are zone fidelity (Richardson et al. 2022) and encounter-rate cues for other tasks (Pinter-Wollman et al. 2013). The limit is **design**, read from the existing contact count `col.friends` (sense row "Encounter rate: local crowding"), so it adds no sense.
+
+**The plan.** `broodCrowd` (0 = off, bit for bit): above that many nestmates in and round its cell a young ant's climb gain falls linearly to 0; it wanders instead. Assays: `nurseZone`, `game1` (`maxHeld`, `maxPorting`), `larvae`, seeds 1–10 then 11–20, chosen by the worst seed; rate chosen after it. Targets: seed 1 below 3 held; nurse zone not worse than rate 1's 13/20; larvae 17/20.
+
+**Open:** whether to accept a design limit with no source (owner); the threshold; whether to bound the heap physically instead.
+
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 
 **Research basis:** [aphids.md](aphids.md):
