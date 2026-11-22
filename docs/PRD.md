@@ -6814,7 +6814,7 @@ The gate tests now run the one-world twins (`oneAssay(id)`, `experiment.ts`), on
 
 Each moves to its real mark when its bead is fixed. The arena versions of these gates are gone; the arena assays themselves stay in `ASSAYS` until step 4 deletes them.
 
-## 77. Young ants keep to the brood by its odour, not the queen's position (built, off, ja-k4k.15, 2026-11-15)
+## 77. Young ants keep to the brood by its odour, not the queen's position (built, on, ja-k4k.15, 2026-11-15)
 
 **Research basis:** [brood-odour.md](brood-odour.md).
 - **Ant queen pheromones are mostly non-volatile contact signals,** fertility signals that suppress workers' laying (Holman et al. 2010, *Lasius niger*). A queen volatile attracts workers only in the fire ant, with no measured range (Lofgren et al. 1983, **unverified**); the pharaoh ant's is weak (Oliveira et al. 2020).
@@ -6935,6 +6935,14 @@ By the worst seed, 3. Its game1 misses hold 3–4 against a limit of 2; main's w
 **Decided (owner, 2026-11-22):** the knobs sit under the existing reach groups. The physics step is its own bead, `ja-k4k.15.7`'s first child, not blocked by `ja-k4k.3.1`.
 
 **Open:** whether to turn the climb on now with `broodCrowd` 3 or hold for the physics step (owner); a second set of seeds for the threshold; full texts of Stroeymeyt 2018, Gravish 2015 and Aguilar 2018 before building on them.
+
+### 77.4 Turned on (ja-k4k.15.5, 2026-11-22)
+
+`broodOdour` 1, `broodClimb` 1, `broodCrowd` 3, channel 0.03/0.5 are the defaults; the queen-position branch is removed (`ja-k4k.2.1`, vision.md row struck); the desert ant gets the channel. Measured on seeds 1–20 against main (§77.2–77.3): nurse zone 13/20 (main 8/20), larvae 19/20 (main 17/20), `game1` 13/20 (main 17/20) with no seed over 4 held or 2 porting (main's worst holds 5).
+
+**Behaviour changes on purpose:** the golden masters are re-recorded (one-world, one-world war, fungus, and `slow/golden.json`). Eight soak tests failed on the new random stream and none was a regression: five were retuned to another seed or run length, F2's hypha check now starts at 25 s (a narrower window: its early over-count is a hypha being a tenth of a small body, and seeds 3 and 5 failed on main too), the food-conservation test counts every curtain growth (the second growth, 285 to 360 columns, was its bookkeeping, not food from nowhere), and N3's near seed moved to 27 with its band scaled to its meetings (12.4–15.8). No bound was loosened and none skipped.
+
+**Cost:** no Jev change: no legend, question or brain-version change. The wider odour field costs tick time: `colony-bench 600 120 1` median 8.71 ms before, 9.41 ms after (+8%; mean 9.55 to 10.28); the assays' `ms/tick` rose 10–18% on the nurse-zone run.
 
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 
