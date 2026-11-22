@@ -66,7 +66,7 @@ test("the patch lands on the hole's inner side, and its hyphae reach the curtain
     }
     return onLine;
   };
-  margin(plane.parent.keys());
+  assert.equal(margin(plane.parent.keys()), 0, "the seven-cell flower lies beside the line, not over it");
   assert.equal(g.fungus.hyphaeOn(CURTAIN), null, "hyphae in the curtain before any tip reached the hole");
   const t = crossDown(g);
   // The seven-cell flower (PRD §85) lies beside the line, not over it: the tips that crossed down the hole grew onto it.

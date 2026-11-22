@@ -15,7 +15,7 @@
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38]
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
-// --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 2 today: 19 cells; 1: a hex and its six neighbours, ja-vlla.2); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
+// --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";

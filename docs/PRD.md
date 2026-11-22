@@ -3445,7 +3445,7 @@ Before (§39): 44–81 situations and about 560 tokens per situation as asked, $
 
 **Built:**
 - **The start screen** (`ui/StartScreen.tsx`) explains what the player is and has a world seed and Start. The field waits behind it, paused.
-- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2, 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
+- **Start lands the fungus.** `Game.land(k, strain)` drops spores on the ground just past colony k's hole: 3 cells along, radius 2 (radius 1 since §85, 2026-11-22), 3 spores, and no ant dosed directly. The first hosts are ants that walk through it. The game's fungus is Garden.
 - **Every later game lands too.** Once started, New world and Restart also begin with the landing.
 - **Speed.** The page defaults to **4×**, the top bar offers 1–8×, and Details has a slider to 8×. No sim constant changed (owner, §50).
 - **"Running at N×".** The top bar shows it when the measured sim-seconds per wall-second fall below 85 % of the speed asked (`ColonyStats.pace`).
