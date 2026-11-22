@@ -7418,9 +7418,14 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 - **A flower patch's mass comes from the hyphae** (owner, 2026-11-22, on the review of #299): today every patch adds a start of 4 from nothing; a flower does not, so it adds capacity and spores only.
 
 **The mechanic.**
-- **M1:** `LANDING.radius` 2 becomes 1 (landing and a queen's founding), behind a parameter whose off is today bit for bit; whether the first spores still paint radius 2 is chosen by the assay (`ja-vlla.2`).
+- **M1 (built, `ja-vlla.3`):** `LANDING.radius` 2 becomes 1 (landing, the first spores and a queen's founding: the assay measured the whole change). The parameter is `LANDING.radius`; `progression.mjs --landing 2` gives today's landing back. The fungus golden is re-recorded.
 - **M2:** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply; a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, three tips out of the rim, the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **M3, M4:** design with the owner first (open questions in the note).
+
+**M1 assay result (`ja-vlla.2`, 2026-11-22).** `progression.mjs --evolve --seconds 600` (`--landing R` sets `LANDING.radius`), time to a quarter of hosts with hyphae, seconds, seeds 1–10 then 11–20, radius 1 against today's 2. P1 (§63.4): no seed more than 10 % slower with hyphae than without.
+- Radius 1, seeds 1–10, with hyphae: 260 179 155 205 141 222 212 212 201 159; without: 361 268 233 235 237 426 277 533 327 197. Every seed is as fast or faster with hyphae.
+- Radius 1, seeds 11–20, with hyphae: 223 192 149 144 212 205 215 204 209 197; without: 297 211 141 139 354 313 226 246 279 351. Worst: seed 13, 149 against 141 s (5.7 % slower); seed 14 3.6 %; the rest faster. **P1 holds** by the worst seed.
+- Radius 2 (today), seeds 1–10: with hyphae 286 207 154 49 105 237 224 431 249 142; without 336 362 162 55 146 544 313 never 247 142. The small patch costs the early game (seed 4: 49 s becomes 205 s with hyphae) but no seed regresses against its own no-hyphae run. A founding root at radius 1 alone (the spores still at 2) was not run to completion: the two-part change is the one shipped.
 
 **Play.** A smaller start; thickening at resources and a second base that appears where hyphae close a flower; later two meters and a partner that creeps over rock. The risks are an early cliff (smaller spore ground and capacity use: P1), a runaway (capacity grows with patches: a flower patch takes its seven cells' mass from the hyphae and forms only outside every patch), an invisible rule (a patch with no mark), and a mat rule that is design, not measured biology.
 
