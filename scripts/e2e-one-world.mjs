@@ -888,6 +888,15 @@ try {
   });
   const tu = await tctx.newPage();
   await tu.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
+  // Draw frames so far (ja-jheh): the field reads a crossing in a draw frame, so the follow check counts the frames it was owed.
+  await tu.addInitScript(() => {
+    window.__frames = 0;
+    const tick = () => {
+      window.__frames++;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   tu.on("pageerror", (e) => errors.push(String(e)));
   await tu.goto(url);
   await tu.getByLabel("world seed").fill(String(SEED));
@@ -998,8 +1007,29 @@ try {
     100,
   ).then(() => tu.evaluate((i) => window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0, hostNo));
   if (wentBelow) {
-    await until(async () => (await tu.evaluate(() => window.jevAnts.view())) === "below", "the view follows the host below", 3000, 50);
-    check(true, "the host went below, and the view followed it");
+    // The field judges a crossing from the layer in each draw frame (ui/field/prelude.ts), so a host below for less than a frame
+    // leaves the view where it was, and on a loaded runner a frame can take more than a second: in the failing run (ja-jheh) each
+    // 50 ms poll took 0.4 s, the host was below at two reads 0.4 s apart and no frame saw it. The view owes the follow only once
+    // three frames were drawn with the host below; a dip shorter than that proves nothing and is said so, not failed.
+    const FRAMES_OWED = 3;
+    const sample = () =>
+      tu.evaluate(
+        (i) => [window.jevAnts.view(), window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0, window.__frames],
+        hostNo,
+      );
+    let [view, below, frames] = await sample();
+    let framesBelow = 0;
+    const end = Date.now() + 8000;
+    while (view !== "below" && framesBelow < FRAMES_OWED && Date.now() < end) {
+      await sleep(50);
+      const [v2, b2, f2] = await sample();
+      if (below && b2) framesBelow += f2 - frames; // the frames of an interval that began and ended with the host below
+      [view, below, frames] = [v2, b2, f2];
+    }
+    if (view === "below") check(true, "the host went below, and the view followed it");
+    else if (framesBelow >= FRAMES_OWED)
+      check(false, `the host was below for ${framesBelow} drawn frames and the view did not follow it (still ${view})`);
+    else console.log(`  --  the host was below for ${framesBelow} drawn frames only: the view-follows-below check was not exercised`);
   } else console.log("  --  the host did not go below before the watch ended: the view-follows-below check was not exercised");
   await tcard.getByRole("button", { name: "Skip tutorial", exact: true }).click();
   await until(async () => (await tcard.count()) === 0, "Skip ends the tutorial");
