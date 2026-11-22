@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CURTAIN, PLANE, STRIP, centreX, centreY, turnAt, type Fungus, type Game } from "../../colony/index.ts";
+import { CELL, CURTAIN, PLANE, STRIP, cellAt, centreX, centreY, turnAt, type Fungus, type Game } from "../../colony/index.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
 import type { Camera, Viewport } from "../camera.ts";
 import { toScreen } from "../camera.ts";
@@ -233,50 +233,75 @@ test("drawBends: a faint rule at each interior hole of the line, labelled with i
   assert.deepEqual(left.log, [], "and one off the other side");
 });
 
-test("drawStripAnts: the plane's ants over the line are drawn level on the strip in their colony's colour, a crumb on a carrier", () => {
+test("drawStripAnts: the plane's live ants over the line are drawn level on the strip in their colony's colour, a crumb at the head of a carrier", () => {
   const g = world(false);
+  const line = g.world.line;
   g.colonies[1]!.nestOdour = 0.5; // two colonies of different tones
-  for (const col of g.colonies) for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === PLANE) col.carrying[i] = 1; // all carry
-  const s = g.world.line.sHole[0]!;
-  const c: Camera = { x: centreX(s + 40, STRIP), y: centreY(STRIP), zoom: 6 };
+  // Ants put on known cells over the line: s1, s2, s3 are columns of the line, and each is one cell of the plane.
+  const [s1, s2, s3] = [line.sHole[0]! + 3, line.sHole[0]! + 5, line.sHole[0]! + 7] as [number, number, number];
+  const put = (col: (typeof g.colonies)[number], i: number, s: number, o: { alive?: boolean; layer?: number; carry?: boolean }) => {
+    cellAt(line, s);
+    col.x[i] = centreX(CELL[0], CELL[1]);
+    col.y[i] = centreY(CELL[1]);
+    col.alive[i] = o.alive === false ? 0 : 1;
+    col.layer[i] = o.layer ?? PLANE;
+    col.carrying[i] = o.carry ? 1 : 0;
+  };
+  const [c0, c1] = g.colonies as [(typeof g.colonies)[number], (typeof g.colonies)[number]];
+  for (const col of g.colonies) col.alive.fill(0);
+  put(c0, 0, s1, { carry: true }); // drawn, with a crumb
+  put(c0, 1, s2, {}); // drawn, no crumb
+  put(c0, 2, s2, { alive: false, carry: true }); // dead, on a column of a live one: not drawn, no crumb
+  put(c0, 3, s1, { layer: CURTAIN, carry: true }); // underground: not on the strip
+  put(c1, 0, s2, { carry: true }); // the other colony's
+  put(c1, 1, s3, { carry: true }); // the view rejects this column
+  const c: Camera = { x: centreX(s2, STRIP), y: centreY(STRIP), zoom: 20 };
+  const x = (s: number) => toScreen(c, V, centreX(s, STRIP), centreY(STRIP))[0];
+  const y = toScreen(c, V, 0, centreY(STRIP))[1];
+  const tone = (col: typeof c0) => odourColour(THEME.inkRgb, THEME.warnRgb, col.nestOdour);
+  const rejects3 = (wx: number) => wx !== centreX(s3, STRIP);
   const { k, log, state } = field(g, CURTAIN, c);
-  drawStripAnts(k, 8, 3, () => true);
-  const wy = toScreen(c, V, 0, centreY(STRIP))[1];
-  const moves = callsOf(log, "moveTo").map((a) => a.split(", ").map(Number));
-  const lines = callsOf(log, "lineTo").map((a) => a.split(", ").map(Number));
-  assert.ok(moves.length > 0, "ants are drawn");
-  assert.equal(moves.length, lines.length);
-  for (const [i, m] of moves.entries()) {
-    assert.ok(Math.abs(m[1]! - wy) < 1e-6 && Math.abs(lines[i]![1]! - wy) < 1e-6, "level on the strip's row");
-    assert.ok(Math.abs(lines[i]![0]! - m[0]! - 8) < 1e-6, "as long as asked");
-  }
-  for (const col of g.colonies) {
-    assert.ok(log.includes(`strokeStyle = ${odourColour(THEME.inkRgb, THEME.warnRgb, col.nestOdour)}`), "in each colony's tone");
-  }
-  assert.ok(log.includes("globalAlpha = 0.85"), "a little translucent");
-  assert.ok(log.includes("lineCap = round") && log.includes("lineWidth = 2.4"));
+  drawStripAnts(k, 8, 3, rejects3);
+  const r = (n: number) => Math.round(n * 1000) / 1000;
+  assert.deepEqual(log, [
+    "lineCap = round",
+    "lineWidth = 2.4",
+    // colony 0: ants 0 (s1) and 1 (s2)
+    "beginPath()",
+    `moveTo(${r(x(s1) - 4)}, ${r(y)})`,
+    `lineTo(${r(x(s1) + 4)}, ${r(y)})`,
+    `moveTo(${r(x(s2) - 4)}, ${r(y)})`,
+    `lineTo(${r(x(s2) + 4)}, ${r(y)})`,
+    `strokeStyle = ${tone(c0)}`,
+    "globalAlpha = 0.85",
+    "stroke()",
+    "globalAlpha = 1",
+    "fillStyle = #accent",
+    `fillRect(${r(x(s1) + 4 - 1.5)}, ${r(y - 1.5)}, 3, 3)`,
+    // colony 1: ant 0 (s2); ant 1 (s3) is out of the view's sight
+    "beginPath()",
+    `moveTo(${r(x(s2) - 4)}, ${r(y)})`,
+    `lineTo(${r(x(s2) + 4)}, ${r(y)})`,
+    `strokeStyle = ${tone(c1)}`,
+    "globalAlpha = 0.85",
+    "stroke()",
+    "globalAlpha = 1",
+    "fillStyle = #accent",
+    `fillRect(${r(x(s2) + 4 - 1.5)}, ${r(y - 1.5)}, 3, 3)`,
+  ]);
   assert.equal(state.lineCap, "round", "the canvas-state leak: the cap stays set");
-  const carriers = callsOf(log, "fillRect").length;
-  assert.ok(carriers > 0, "carriers are drawn");
-  assert.equal(log.includes("fillStyle = #accent"), carriers > 0, "the crumb's colour only when something is carried");
-  const ends = lines.map((l) => Math.round(l[0]! * 1000) / 1000);
-  for (const a of callsOf(log, "fillRect")) {
-    assert.ok(a.endsWith(", 3, 3"), "crumb-sized");
-    // at the head of the ant: its right end, the crumb centred on it
-    assert.ok(ends.includes(Math.round((Number(a.split(", ")[0]) + 1.5) * 1000) / 1000), "at the ant's head");
-  }
+  assert.notEqual(tone(c0), tone(c1));
   // nobody carries: the ants are drawn and no crumb is
   for (const col of g.colonies) col.carrying.fill(0);
   const empty = field(g, CURTAIN, c);
-  drawStripAnts(empty.k, 8, 3, () => true);
-  assert.ok(callsOf(empty.log, "moveTo").length > 0);
+  drawStripAnts(empty.k, 8, 3, rejects3);
+  assert.equal(callsOf(empty.log, "moveTo").length, 3);
   assert.equal(callsOf(empty.log, "fillRect").length, 0);
   assert.ok(!empty.log.includes("fillStyle = #accent"));
-  // out of view: nothing is stroked into the path
-  const none = field(g, CURTAIN, c);
-  drawStripAnts(none.k, 8, 3, () => false);
-  assert.equal(callsOf(none.log, "moveTo").length, 0);
-  assert.equal(callsOf(none.log, "fillRect").length, 0);
+  // at the bend two columns lie over one cell: both are drawn (columnsOver)
+  const wide = field(g, CURTAIN, c, { d: 2 });
+  drawStripAnts(wide.k, 8, 3, () => false);
+  assert.deepEqual(callsOf(wide.log, "moveTo"), [], "nothing is stroked into the path when nothing is in view");
 });
 
 test("drawPen: the flight's circle, and under the pointer the settle preview or why not; the preview is asked once a cell", () => {
@@ -348,4 +373,81 @@ test("drawPen: the flight's circle, and under the pointer the settle preview or 
   );
   assert.ok(no.log.includes("fillStyle = #warn"));
   assert.equal(callsOf(no.log, "arc").length, 1, "no ring for a refusal");
+});
+
+test("sizes follow the device ratio and the text size: lines, dashes, dots and clamps (a second pass of each helper at d = 2)", () => {
+  const g = world(false);
+  const two: Partial<FieldCtx> = { d: 2, v: { w: 800, h: 600, dpr: 2 } };
+  // pill at 24 px: the line is px / 12 thick
+  const p = field(g, PLANE, { x: 0, y: 0, zoom: 1 });
+  pill(p.k, [{ text: "A", fill: "#a" }], 100, 50, 24);
+  assert.ok(p.log.includes("lineWidth = 2"), "px / 12 once it is over 12 px");
+  // drawLine at d = 1 and 2: the dot is the larger of 2.5 d and 0.36 a cell
+  const c = here(g);
+  const one = field(g, PLANE, c);
+  drawLine(one.k);
+  assert.ok(
+    callsOf(one.log, "arc").every((a) => a.split(", ")[2] === "4.32"),
+    "0.36 of a 12 px cell",
+  );
+  assert.ok(one.log.includes("globalAlpha = 0.9") && one.log.includes("lineWidth = 1.2"));
+  const d2 = field(g, PLANE, c, two);
+  drawLine(d2.k);
+  assert.deepEqual(callsOf(d2.log, "setLineDash"), ["[12, 10]", "[]"]);
+  assert.ok(d2.log.includes("lineWidth = 2.4"));
+  assert.ok(
+    callsOf(d2.log, "arc").every((a) => a.split(", ")[2] === "5"),
+    "2.5 d once it is the larger",
+  );
+  // drawBends: the label is a little faint, sits no higher than its size from the top; the rule is clamped to the view; a bend a few labels
+  // outside the view is still drawn (its label may reach in), and one further is not
+  const three = world(true);
+  const s = three.world.line.sHole[1]!;
+  const high: Camera = { x: centreX(s, STRIP), y: 100, zoom: 4 };
+  const b = field(three, CURTAIN, high);
+  drawBends(b.k);
+  assert.ok(
+    b.log.includes("globalAlpha = 0.68") && b.log.includes("globalAlpha = 0.8"),
+    "the label is 0.8 of opaque, its halo 0.85 of that",
+  );
+  assert.equal(callsOf(b.log, "moveTo")[0]!.split(", ")[1], "0", "the rule starts at the top of the view, not above it");
+  const bottom = toScreen(high, V, 0, b.k.ext.h)[1];
+  assert.equal(
+    Number(callsOf(b.log, "lineTo")[0]!.split(", ")[1]),
+    Math.min(V.h, Math.round(bottom * 1000) / 1000),
+    "and ends at the bottom of the view or the map",
+  );
+  assert.ok(callsOf(b.log, "fillText")[0]!.split(", ")[2] === "12", "the label no higher than its size");
+  const edge = (offset: number) => field(three, CURTAIN, { x: centreX(s, STRIP) - (V.w / 2 + offset) / 4, y: 20, zoom: 4 });
+  const inside = edge(40);
+  drawBends(inside.k);
+  assert.ok(callsOf(inside.log, "moveTo").length === 1, "40 px outside: its label reaches in");
+  const outside = edge(60);
+  drawBends(outside.k);
+  assert.equal(callsOf(outside.log, "moveTo").length, 0, "60 px outside: skipped");
+  const bd = field(three, CURTAIN, { x: centreX(s, STRIP), y: 20, zoom: 4 }, two);
+  drawBends(bd.k);
+  assert.ok(bd.log.includes("lineWidth = 2") && bd.log.some((l) => l.startsWith("font = 600 24px")), "twice the line and the text at 2x");
+  // drawPen at d = 2: the pen's lines are thicker and their dashes longer
+  const h = g.world.line.holes[0]!;
+  const pen: FieldPen = {
+    x: centreX(h.x, h.y),
+    y: centreY(h.y),
+    r: 5,
+    preview: () => ({ ok: true, cell: { x: h.x + 3, y: h.y }, end: "end" }),
+    onPick: () => {},
+  };
+  const pd = field(g, PLANE, c, two);
+  drawPen(pd.k, { hover: [420, 310], pen, penSeen: { current: null } });
+  assert.deepEqual(callsOf(pd.log, "setLineDash"), ["[16, 12]", "[]", "[12, 10]", "[]"]);
+  assert.ok(
+    pd.log.includes("lineWidth = 4") && pd.log.includes("lineWidth = 3") && pd.log.includes("lineWidth = 2"),
+    "the circle, the segment, the walk",
+  );
+  assert.ok(callsOf(pd.log, "arc")[2]!.split(", ")[2] === "7.2", "the dot is 0.6 of a cell");
+  assert.equal(
+    pd.log.find((l) => l.startsWith("lineWidth")),
+    "lineWidth = 4",
+    "the circle's own line is the first",
+  );
 });
