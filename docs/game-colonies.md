@@ -13,47 +13,48 @@ Design note, 2026-11-22. Stage S4 item 4 of [refactor.md](refactor.md): `Game` t
 ## The shape
 
 ```ts
-/** One colony the game starts with: data only, saved with the game's params. */
+/** One colony the game starts with. Runtime only: a game is rebuilt from its settings (Game.load pours state into a game built afresh), so nothing here is saved. */
 interface ColonySpec {
-  antCount: number;
-  /** which of the world's start nests (default: its position in the list) */
-  nest?: number;
-  /** its nest odour (default: spread from 0 to 1 over the list, as 0 and 1 are for two) */
-  odour?: number;
-  /** its own colony params over the species' */
-  colony?: Partial<ColonyParams>;
+  antCount: number; // 0 stays buildable (rivalAnts: 0 is used by a soak test)
+  nest?: number; // which of the world's start nests (default: its position in the list)
+  odour?: number; // its nest odour (default below)
+  colony?: Partial<ColonyParams>; // today's Sides.colony / Sides.rival
+  policy?: Policy; // today's Sides.policy / rivalPolicy
+  responses?: Responses; // today's Sides.responses / rivalResponses
 }
-/** How one colony plays: code, so never saved. Keyed by colony index. */
-interface Brain { policy?: Policy; responses?: Responses }
 
-GameParams.colonies?: ColonySpec[];            // replaces antCount, rivalAnts, rival
-new Game(world, params, rng, brains?: Brain[]) // replaces Sides
+new Game(world, params, rng, colonies?: ColonySpec[]) // replaces the Sides argument
 ```
 
-- A game with no `colonies` is one colony of `antCount`; the pair is `[{antCount}, {antCount: rivalAnts}]`. After the migration `antCount`, `rivalAnts` and `rival` are gone from `GameParams`, and `Game` keeps the one number the founders need (`maxAnts`, now `max` over the specs' `antCount`).
-- The constructor loops over the specs in order. Each `new Colony(...)` draws from `rng` as today, in the same order, so a two-colony game is bit-exact.
-- More specs than the world has start nests is an error (a founding makes the third colony).
-- `Game.player` and `Game.rival` go: `game.colonies[k]`. `player` stays as a thin alias for `colonies[0]` only if a caller still wants "the first colony" (the page's "Ink"), named for that (`Game.first`).
-- Doctrines are already keyed by colony index; "keyed by colony and species" waits on a per-colony species (below).
+- **The default is a pair, as today.** `DEFAULT_GAME` has `rival: true, rivalAnts: 800`, and the page's default is a pair too. With `colonies` omitted the constructor builds `DEFAULT_COLONIES`, the pair `[{antCount: params.antCount}, {antCount: 800}]`. Solo is an explicit one-spec list (about 25 assay and fixture sites say `rival: false` today).
+- **The clamp, for the adapter; the error, for an explicit list.** Today `rival: true` on a one-nest world silently builds one colony (`game.ts:376`, `home.nests.length > 1`), and `oneWorld.test.ts` and `SMALL_SIDE` rely on it. The adapter and `DEFAULT_COLONIES` keep that clamp. An explicit list with more specs than the world has start nests is an error (a founding makes any further colony).
+- **Precedence**, lowest first: the constructor's defaults (`nest` = position, `odour` below, `tolerance`, the species' params), the spec's `nest` and `odour`, then `colony` overrides. Today colony 0 lets `Sides.colony` override its `nest` and `odour`, while colony 1's `nest` is forced to 1 after its override and its odour can still be overridden (`neglectusAssays.ts:244` sets both colonies' odours that way). The adapter keeps colony 1's forced nest; an explicit list has no such rule.
+- **Odour default:** one colony 0; two colonies 0 and 1 exactly; N ≥ 2 colonies `k / (N − 1)`.
+- **The founders' cap** stays `1.5 × max(f.antCount, colony 0's antCount)` (`game.ts:625`). `Game` keeps `specs[0].antCount` for it. Changing it to the largest spec is a behaviour change (it would raise a founder's cap whenever the rival is larger), not part of this migration.
+- The constructor loops over the specs in order, building each `Colony`, then the per-colony `#ownSituation` check (it draws nothing), so a two-colony game draws the same stream as today.
+- `Game.player` and `Game.rival` go: `game.colonies[k]`.
+
+## What is saved
+
+Nothing new. `Game.load` does not rebuild colonies: it expects a game built afresh from the same world and settings, checks `saved.colonies.length === this.colonies.length`, pours state into the existing colonies, then overwrites `this.params` from the save. So the spec list is not saved, and the page keeps rebuilding from its own settings (`GameSettings.antCount` and `rival`, `ui/saves.ts`), from which `buildGame` derives the specs. Stages A and B change nothing `save()` writes. Stage C removes `antCount`, `rivalAnts` and `rival` from `GameParams`, which changes the saved `params`, so it bumps `SAVE_VERSION` (14 today) and says so. Colony overrides are never saved, as `Sides.colony` is not today (`encode` drops functions silently, so saving a spec's overrides would lose them without an error).
 
 ## Stages
 
-Each is a PR, goldens bit-exact, reviewed by a fresh reviewer, and the order keeps the tree green.
+Each is a PR, goldens bit-exact, reviewed by a fresh reviewer.
 
-1. **A. The spec list, beside the pair.** `GameParams.colonies?` and `Game(world, params, rng, brains?)` are added; the constructor builds from the list, and an adapter derives the list from the legacy fields (`antCount`, `rivalAnts`, `rival`, `Sides`) when `colonies` is absent. No caller changes. A unit test builds the same game both ways and compares `save()`.
-2. **B. Callers move, by area**, each a PR: the page and its saves (`useColony.ts`, `LabCards.tsx`, `ColonyApp.tsx`), the assay harness and the assays, the scripts, then the tests by tier (unit, int, soak, slow, golden). The golden scenarios keep their games; only their construction changes.
-3. **C. The pair goes.** `Sides`, `rivalAnts`, `rival`, the adapter and the `rival` getter are deleted, `SAVE_VERSION` is bumped for the changed `params` (said in the PR), and the doc line in `refactor.md` is struck.
+1. **A. The spec list, beside the pair.** `Game` gets the `colonies` argument next to `Sides`; the constructor builds from a list, deriving it from `Sides`, `rival`, `rivalAnts` and the nest count (with the clamp) when none is given. No caller changes. `params` is written the same either way (the spec list is not in it), so a unit test builds the same game by the pair and by the explicit list and compares `save()` and a few hundred ticks.
+2. **B. Callers move, by area**, each a PR, the page keeping its `GameSettings`: the page (`useColony.ts`, `LabCards.tsx`, `ColonyApp.tsx`, `useCodex.ts`, `stats.ts`, `LearnDrawer.tsx`, `ui/saves.ts` reads), the harness and every assay file (`experiment.ts`, `oneAssays.ts`, `builderAssays.ts`, `desertAssays.ts`, `neglectusAssays.ts`, with `experiment.ts:634` and `:877` reading the colonies' counts instead of `params`), `species.ts`, the scripts (`colony-cost`, `precache`, `colony-live`, `colony-bench`, `colony-cost.mjs:192`, the labs), then the tests by tier (unit, int, soak, slow, golden). The golden scenarios keep their games; only their construction changes.
+3. **C. The pair goes.** `Sides`, `rivalAnts`, `rival`, the adapter and the getters are deleted; `DEFAULT_COLONIES` is the default; `SAVE_VERSION` is bumped; the line in `refactor.md` is struck. A source-scan test holds that no caller names the old words. The pattern, over `web/src`, `web/server`, `web/worker`, `web/shared` and `scripts`: `\.rival\b|\.player\b|rivalAnts|rivalPolicy|rivalResponses|\bSides\b` (119 hits outside tests and 382 in them on 2026-11-22).
 
 ## Not in this
 
-- **A species per colony.** One species per game stays ([species.md](species.md): tier 1 first). Mixed species need per-colony channels, recognition tolerance, lane words and the fungus's menu. It belongs to a later stage, and `ColonySpec` leaves a field's worth of room for it rather than a field.
+- **A species per colony.** One species per game stays ([species.md](species.md): tier 1 first). Mixed species need per-colony channels, recognition tolerance, lane words and the fungus's menu. It belongs to a later stage; `ColonySpec` does not reserve a field for it.
 - **Colonies beyond the start nests.** Founding stays the way a game gets more, and the endless world (`ja-qpv`) is where that changes.
 
 ## Decided, and open
 
-- **Open (recommend: as above):** `Game.player`/`Game.rival` go in stage C, with `Game.first` kept only if the page needs a name for colony 0; the alternative keeps both getters for good.
-- **Open (recommend: the list):** whether the spec list is saved. The data fields are saved with `params` (so a load rebuilds the same game); the brains are not.
-- **Open (recommend: later):** a species per colony.
+- **Decided by the design (no objection from the review):** the getters go in stage C (`game.colonies[k]`; no `Game.first` unless the page asks for one); a species per colony is later.
+- **Open (recommend: save nothing):** whether any of the spec is saved. Saving `{antCount, nest, odour}` would be a small `params` change under stage C's bump and buys nothing while `load` pours into a built game; saving the whole spec risks dropping function values silently.
 
 ## Cost and guards
 
