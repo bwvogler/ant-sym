@@ -1,0 +1,148 @@
+# The fungus's progression (P1, PRD §63.4; scripts/lab/progression.mjs) on GitHub's runners: one runner per seed, so 10-20
+# seeds take about as long as the slowest one, and a container restart loses nothing (the same reason as assays.yml,
+# ja-w7ef.12). Played offline on the local rule with the page's shipped fungus answers, one world, 600 + 600 ants:
+# no Jev, no spend.
+#
+# Started by hand only (the Actions tab, or mcp__github__actions_run_trigger with method run_workflow, workflow_id
+# progression.yml, ref the branch that has this file, and the inputs below). The CODE measured is the `ref` input (a
+# branch, tag or commit; empty: the branch it was started on), so one run per arm compares two commits, e.g. main and a PR
+# head, with the same workflow file and the same seeds. Compare by the worst seed, then confirm on seeds 11-20 (CLAUDE.md,
+# PRD §42; P1's target is in docs/hyphal-growth.md §8: no seed more than 10 % slower to a quarter of the colony).
+#
+# The result is each seed's times to the first host, a quarter, a half and the queen, as a table in the `report` job's
+# log and the run's summary (read it with get_job_logs); the per-seed text is the `progression-seed-<n>` artifact.
+name: Progression
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "The commit, branch or tag to measure (empty: the branch this was started on)"
+        default: ""
+      seeds:
+        description: "Seeds: a range or list, e.g. 1-10 or 1-5,11 (at most 40: one runner each)"
+        default: "1-10"
+      seconds:
+        description: "Game length in seconds"
+        default: "600"
+      aim:
+        description: "The fungus's aim: unite, spread or peace"
+        type: choice
+        options: [unite, spread, peace]
+        default: unite
+      hyphae:
+        description: "Grow the mycelium as hyphae (--hyphae)"
+        type: boolean
+        default: true
+      growth:
+        description: "Play the growth lane's shipped answers (--growth)"
+        type: boolean
+        default: false
+      flow:
+        description: "Mass flows along the hyphae (--flow)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      seeds: ${{ steps.plan.outputs.seeds }}
+      args: ${{ steps.plan.outputs.args }}
+    steps:
+      # The inputs reach the shell as environment variables, never spliced into the script, and each is checked
+      # against a narrow pattern before it becomes an argument.
+      - id: plan
+        env:
+          REF: ${{ inputs.ref }}
+          SEEDS: ${{ inputs.seeds }}
+          SECONDS_IN: ${{ inputs.seconds }}
+          AIM: ${{ inputs.aim }}
+          HYPHAE: ${{ inputs.hyphae }}
+          GROWTH: ${{ inputs.growth }}
+          FLOW: ${{ inputs.flow }}
+        run: |
+          set -f # no glob expansion of the inputs
+          bad() { echo "::error title=progression input::$1"; exit 1; }
+          [[ -z "$REF" || "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || bad "ref: a branch, tag or commit"
+          [[ "$REF" == *..* ]] && bad "ref: no .."
+          [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
+          [[ "$SECONDS_IN" =~ ^[0-9]+$ ]] || bad "seconds: a whole number"
+          [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
+          args="--map one --evolve --seconds $SECONDS_IN --aim $AIM"
+          [ "$HYPHAE" = "true" ] && args="$args --hyphae"
+          [ "$GROWTH" = "true" ] && args="$args --growth"
+          [ "$FLOW" = "true" ] && args="$args --flow"
+          seeds=$(node -e '
+            const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
+            const u = [...new Set(s)];
+            if (u.length === 0 || u.length > 40) { console.error(`${u.length} seeds: 1 to 40`); process.exit(1); }
+            console.log(JSON.stringify(u));' "$SEEDS") || bad "seeds: 1 to 40 of them"
+          echo "seeds=$seeds" >> "$GITHUB_OUTPUT"
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+          echo "progression.mjs $args, seeds $seeds, ref '${REF:-the started branch}'" >> "$GITHUB_STEP_SUMMARY"
+
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: ${{ fromJSON(needs.plan.outputs.seeds) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      # Checked in plan; word splitting turns them back into arguments.
+      - name: seed ${{ matrix.seed }}
+        env:
+          ARGS: ${{ needs.plan.outputs.args }}
+          SEED: ${{ matrix.seed }}
+        run: |
+          mkdir -p out
+          echo "commit $(git rev-parse HEAD)" | tee "out/seed-$SEED.txt"
+          # shellcheck disable=SC2086
+          node scripts/lab/progression.mjs $ARGS --seeds "$SEED" | tee -a "out/seed-$SEED.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: progression-seed-${{ matrix.seed }}
+          path: out/seed-${{ matrix.seed }}.txt
+          retention-days: 7
+          overwrite: true
+
+  report:
+    needs: [plan, run]
+    # Not after a refused input: plan's ::error is the one to read.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: progression-seed-*
+          path: out
+          merge-multiple: true
+      # The table: in this step's log (get_job_logs) and on the run's summary page. "never" counts as slower than any time.
+      # A seed whose runner failed is missing from it, and the step says which.
+      - name: table
+        env:
+          SEEDS: ${{ needs.plan.outputs.seeds }}
+        run: |
+          node scripts/progression-table.mjs out | tee -a "$GITHUB_STEP_SUMMARY"
+          missing=$(node -e 'const fs = require("fs"); console.log(JSON.parse(process.argv[1]).filter((s) => !fs.existsSync(`out/seed-${s}.txt`)).join(" "))' "$SEEDS")
+          if [ -n "$missing" ]; then echo "::error title=progression::no result for seeds $missing (their runners failed)"; exit 1; fi
