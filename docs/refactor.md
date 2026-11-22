@@ -79,7 +79,7 @@ The goal: a sense, a channel, a lane, a species, a nest kind and a renderer laye
 
 ## Stage 2: one world only (owner, 2026-11-11)
 
-The top-down and side maps are retired.
+The top-down and side maps are retired. **Done 2026-11-22** (`ja-fnd.3`): stages S2.3a–g and the closeout are merged; per-stage notes are in [one-world-only.md](one-world-only.md). The inventory below is the plan as written.
 
 **Blocked by:**
 - ~~`ja-d6c`: trail choice, the faint-alarm draw and the raid trail must run on one world's surface.~~ Closed 2026-11-14: all four of the bead's mechanics (these three and activation) run on the plane and are measured there by their assays (`one-world.md`, U6a and `ja-web` as built); A5 0/10 and A10 0/10 are tracked by ja-lp4.6.8 and ja-je8.
