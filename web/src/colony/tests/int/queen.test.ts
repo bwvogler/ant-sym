@@ -183,7 +183,7 @@ test("orphaned: the queen dies, no egg is laid after, brood in progress still ha
 });
 
 test("strangers at her side kill the queen; a colony with no workers and no pupae is beaten", () => {
-  const g = new Game(smallOne(2), { antCount: 40, rivalAnts: 40 }, mulberry32(5));
+  const g = new Game(smallOne(2), {}, mulberry32(5), [{ antCount: 40 }, { antCount: 40 }]);
   const [a, b] = g.colonies as [Colony, Colony];
   // Ten of b's ants on a's queen, in the curtain.
   for (let k = 0; k < 30 * 2 && a.queen!.alive; k++) {

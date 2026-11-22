@@ -133,11 +133,15 @@ const hooks = Object.fromEntries(
     ),
   ]),
 );
-const game = new Game(world, { antCount: ants, rivalAnts: ants, species }, gameRng(seed), {
-  policy: modes.policy,
-  responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
-});
-const colony = game.player;
+const game = new Game(world, { species }, gameRng(seed), [
+  {
+    antCount: ants,
+    policy: modes.policy,
+    responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, hooks[h].policy]))),
+  },
+  { antCount: ants },
+]);
+const colony = game.colonies[0];
 const flush = () => {
   modes.flush();
   for (const h of RESPONSE_HOOKS) hooks[h].flush();
@@ -189,7 +193,7 @@ for (const d of plan) {
 }
 
 const usd = (n) => `$${(n * USD).toFixed(5)}`;
-const r = game.rival;
+const r = game.colonies[1];
 console.log(
   `game cost, offline (one world${species === GENERIC_ANT ? "" : `, ${species.name}`}): seed ${seed}, ${ants} + ${ants} ants, ${minutes} sim-minutes, ${plan.length} doctrines (the first again at the end), alarm painted every ~20 s`,
 );

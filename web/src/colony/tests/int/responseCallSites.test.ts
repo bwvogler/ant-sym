@@ -33,7 +33,10 @@ function spies(): { r: Responses; asks: Record<ResponseHook, { drawn: number; ba
 test("one world: every response the colonies ask carries the ant's draw", () => {
   // A minute of seed 7's small one world, 120 ants a side, asks every hook (measured, S2.3c: contact 221 times, leave 27,613).
   const { r, asks } = spies();
-  const g = new Game(smallOne(7), { antCount: 120, rivalAnts: 120 }, mulberry32(3), { responses: r, rivalResponses: r });
+  const g = new Game(smallOne(7), {}, mulberry32(3), [
+    { antCount: 120, responses: r },
+    { antCount: 120, responses: r },
+  ]);
   ticks(g, 60 * 30);
   for (const h of RESPONSE_HOOKS) assert.equal(asks[h].bare, 0, `${h} asked ${asks[h].bare} times without a draw`);
   for (const h of RESPONSE_HOOKS) assert.ok(asks[h].drawn > 0, `${h} never asked: ${JSON.stringify(asks)}`);
@@ -42,7 +45,7 @@ test("one world: every response the colonies ask carries the ant's draw", () => 
 // The gate at the top of a shaft asks `leave`; asked directly here too.
 test("the leave response at the gate carries the ant's draw", () => {
   const { r, asks } = spies();
-  const c = new Game(smallOne(7), { antCount: 10, rival: false }, mulberry32(3)).player;
+  const c = new Game(smallOne(7), {}, mulberry32(3), [{ antCount: 10 }]).colonies[0]!;
   c.responses = r;
   c.leaves(0, 1 / 30, false);
   assert.deepEqual(asks.leave, { drawn: 1, bare: 0 });
@@ -63,7 +66,9 @@ test("every response hook called in colony/ is handed antDraw", () => {
       const call = text.slice(m.index, end);
       const line = text.slice(0, m.index).split("\n").length;
       calls.push(`${f}:${line}`);
-      assert.match(call, /antDraw\(/, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
+      // the draw is `antDraw(i)` itself, or a variable the file set from it (`const draw = col.antDraw(i)`)
+      const arg = /\bdraw\b/.test(call) && /const draw = col\.antDraw\(/.test(text);
+      assert.ok(/antDraw\(/.test(call) || arg, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
     }
   }
   assert.ok(calls.length >= 10, `found only ${calls.join(", ")}`);

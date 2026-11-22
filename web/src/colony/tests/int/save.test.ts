@@ -18,7 +18,7 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** A game on a small one world. That a save runs on exactly as the unbroken game, and on a fight death's tick, is int/oneWorldSave's. */
 function build(seed: number): Game {
-  return new Game(smallOne(seed), { antCount: 200, rivalAnts: 200, regrow: 600 }, mulberry32(seed * 7919));
+  return new Game(smallOne(seed), { regrow: 600 }, mulberry32(seed * 7919), [{ antCount: 200 }, { antCount: 200 }]);
 }
 
 test("a save of another version is refused", () => {
@@ -148,11 +148,11 @@ test("every Layer key is saved per layer (LAYER_STATE) or built again: by the co
 
 test("a one-world colony's save holds every layer's own state, and the fungus's every map's spores: loaded into a fresh game, each reads as it was", () => {
   const world = () => generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } });
-  const g = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
-  const h = g.player.holeCells[g.player.params.nest]!;
+  const g = new Game(world(), {}, gameRng(7), [{ antCount: 40 }, { antCount: 40 }]);
+  const h = g.colonies[0]!.holeCells[g.colonies[0]!.params.nest]!;
   g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, GARDEN, CURTAIN);
   run(g, 20);
-  const fresh = new Game(world(), { antCount: 40, rivalAnts: 40 }, gameRng(7));
+  const fresh = new Game(world(), {}, gameRng(7), [{ antCount: 40 }, { antCount: 40 }]);
   const layerState = (L: Layer) => JSON.stringify(Object.fromEntries(LAYER_STATE.map((k) => [k, encode(L[k])])));
   g.colonies.forEach((c, k) => {
     const s = JSON.parse(JSON.stringify(c.saveState())) as { layers?: unknown[] };
@@ -171,8 +171,8 @@ test("a one-world colony's save holds every layer's own state, and the fungus's 
   assert.deepEqual(JSON.parse(JSON.stringify(fresh.fungus.saveState())), spores);
   assert.equal(fresh.fungus.sporeCells, g.fungus.sporeCells);
   // A colony saved with another layer bound is another game's: refused, not poured over the wrong layer.
-  const s = g.player.saveState();
-  assert.throws(() => fresh.player.loadState({ ...s, private: { ...(s.private as object), cur: PLANE } }), /layer 0 bound/);
+  const s = g.colonies[0]!.saveState();
+  assert.throws(() => fresh.colonies[0]!.loadState({ ...s, private: { ...(s.private as object), cur: PLANE } }), /layer 0 bound/);
 });
 
 test("the game's save holds every private field it declares, or the field is built again on load", () => {
@@ -188,9 +188,10 @@ test("the game's save holds every private field it declares, or the field is bui
   const inGrids = ["grids", "recs"];
   const derived = ["piles"]; // the food piles as the world began: from the fresh world
   const fromPage = ["choice"]; // the Lab's setChoice (ja-nan3): not saved, the page sets it again on every game, a load included
+  const fromSpecs = ["firstAnts"]; // colony 0's start count: from the specs the game was built with, as the page rebuilds it (docs/game-colonies.md)
   assert.deepEqual(
     [...declared].sort(),
-    [...inPrivate, ...inGrids, ...derived, ...fromPage].sort(),
+    [...inPrivate, ...inGrids, ...derived, ...fromPage, ...fromSpecs].sort(),
     "every declared #field is accounted for",
   );
   const s = build(2).save();

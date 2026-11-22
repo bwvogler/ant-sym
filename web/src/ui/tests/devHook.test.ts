@@ -14,7 +14,7 @@ import { AntTraces } from "../trace.ts";
 
 const ROOT = new URL("../../../../", import.meta.url).pathname;
 
-const game = (): Game => new Game(generateOneWorld(1), { antCount: 8, rivalAnts: 8, regrow: 0 }, gameRng(1));
+const game = (): Game => new Game(generateOneWorld(1), { regrow: 0 }, gameRng(1), [{ antCount: 8 }, { antCount: 8 }]);
 
 /** The hook over a real game and recording handles. */
 function make(over: Partial<DevDeps> = {}) {

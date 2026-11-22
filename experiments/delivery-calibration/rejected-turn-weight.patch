@@ -1,0 +1,14 @@
+--- a/web/src/colony/tunnel.ts
++++ b/web/src/colony/tunnel.ts
+@@ -287,8 +287,9 @@
+       const v = byVector
+         ? Math.cos(DIR_ANGLE[d]) * hx + Math.sin(DIR_ANGLE[d]) * hy
+         : (signs ? signs.get(tx, ty) * signGain : 0) + (delivering ? 0 : field.get(tx, ty));
+-      if (v > bestV) {
+-        bestV = v;
++      const score = delivering && !fresh ? v * (1 + Math.cos(turn * Math.PI / 3)) / 2 : v;
++      if (score > bestV) {
++        bestV = score;
+         best = d;
+       }
+     }

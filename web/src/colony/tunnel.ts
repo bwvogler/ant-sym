@@ -1,5 +1,6 @@
 // Walking a tunnel (docs/refactor.md S3.3): an ant underground steers along the walls, widens a crowded chamber, and goes for food, brood or the way out. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { localDelivery, DELIVERY_SEARCH, DELIVERY_TRAVEL } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { type Chamber } from "./chambers.ts";
@@ -42,6 +43,9 @@ import { EXPLORE, FAINT, FIGHT, FOLLOW, RETURN } from "./vocab.ts";
 import { AIR, OPEN, SOIL, isSky, markFork, rockAt, takeFork, tunnelHeading, type Nest } from "./world.ts";
 import { believe, climbOut, destMark, holeMetric, searchOn, targetHole, towardHole } from "./homing.ts";
 import { around } from "./sense.ts";
+
+// Scratch for one synchronous local route decision; never persisted per ant.
+const deliveryWeights = new Float64Array(6);
 
 /**
  * The chance a raider about to step onto a cell of the raided colony's midden (mark v there) turns back. A lone scout
@@ -146,6 +150,7 @@ export function upOut(col: Colony, cx: number, cy: number): number {
  * that touched soil a moment ago keeps its hand on a chamber's wall too (see hug).
  */
 export function walkTunnel(col: Colony, i: number, mode: number, step: number): boolean {
+  const delivering = mode === RETURN && localDelivery(col, i);
   const { map } = col;
   const x = col.x[i];
   const y = col.y[i];
@@ -175,13 +180,13 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && !col.onPlane && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
   const groundHome = climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);
-  if (fresh && !hugging && !groundHome && col.noTunnel[i] === packed) {
+  if (fresh && !hugging && !groundHome && !delivering && col.noTunnel[i] === packed) {
     col.gx[i] = NO_CELL; // looked here already: open ground
     return false;
   }
   const cx = fresh ? hx : col.gx[i];
   const cy = fresh ? hy : col.gy[i];
-  if (!groundHome && !tunnel(map, cx, cy)) {
+  if (!groundHome && !delivering && !tunnel(map, cx, cy)) {
     if (hugging) return hug(col, i, cx, cy, fresh);
     col.gx[i] = NO_CELL;
     if (fresh) col.noTunnel[i] = packed;
@@ -261,24 +266,50 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     // trail only where there are none.
     const signs = mode === RETURN && col.entrance && !isSky(map, cx, cy) ? col.ph.fields[destMark(col, i)] : null;
     const signGain = SIGN_WEIGHT * col.gainHome[i] * col.gainMarks[i]; // the fungus's home and marks levers bend road signs
-    const byVector = mode === RETURN && col.stallT[i] > TUNNEL_STALL;
+    const byVector = mode === RETURN && !delivering && col.stallT[i] > TUNNEL_STALL;
     const hx = col.goalX - centreX(cx, cy);
     const hy = col.goalY - centreY(cy);
     let best = -1;
     let bestV = byVector ? -Infinity : 0;
-    for (const turn of [0, 1, -1, 2, -2]) {
+    let total = 0;
+    if (delivering && !fresh) deliveryWeights.fill(0);
+    // A chosen role can lie behind after redirection. The ordinary homing
+    // rule avoids retracing. Reconsider the reverse cue on a fresh step (a new
+    // goal or invalidated target), not after every cell: that can bounce forever.
+    for (const turn of delivering && fresh ? [0, 1, -1, 2, -2, 3] : [0, 1, -1, 2, -2]) {
       const d = (dir + turn + 6) % 6;
       const tx = stepX(cx, cy, d);
       const ty = stepY(cy, d);
       if (!walkable(map, tx, ty)) continue;
       const v = byVector
         ? Math.cos(DIR_ANGLE[d]) * hx + Math.sin(DIR_ANGLE[d]) * hy
-        : (signs ? signs.get(tx, ty) * signGain : 0) + field.get(tx, ty);
-      if (v > bestV) {
-        bestV = v;
+        : (signs ? signs.get(tx, ty) * signGain : 0) + (delivering ? 0 : field.get(tx, ty));
+      // A continuing route samples local cues rather than locking into a
+      // deterministic three-cell maximum. Turn weighting favours continuing
+      // forward but still permits sharp bends (design; docs/delivery-actions.md).
+      const score = delivering && !fresh ? (v * (1 + Math.cos((turn * Math.PI) / 3))) / 2 : v;
+      if (delivering && !fresh) {
+        deliveryWeights[d] = score > 0 ? score * score : 0;
+        total += deliveryWeights[d];
+      }
+      if (score > bestV) {
+        bestV = score;
         best = d;
       }
     }
+    // One draw at a new continuing cell choice; never on a retained target,
+    // a fresh goal, an unmarked search or the default route.
+    if (delivering && !fresh && total > 0) {
+      let draw = col.rng() * total;
+      for (let d = 0; d < 6; d++) {
+        draw -= deliveryWeights[d];
+        if (deliveryWeights[d] > 0 && draw < 0) {
+          best = d;
+          break;
+        }
+      }
+    }
+    if (delivering) col.deliveryState[i] = best < 0 ? DELIVERY_SEARCH : DELIVERY_TRAVEL;
     dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
   } else if (mode === EXPLORE && ent && isSky(map, cx, cy)) {
     // On the ground line (side view) an explorer walks on along the ground the way it is going, turning back only

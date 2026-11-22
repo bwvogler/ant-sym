@@ -33,8 +33,8 @@ test("forageDig: alone at a tunnel's dead end in a roomy nest, an ant on a bout 
     while (rockAt(map, sx - 1, sy) === OPEN) sx--;
     for (let k = 1; k <= 6; k++) digCell(map, sx - k, sy);
     // In a Game, so the colony counts its ants round each cell (friends) and digChance applies to an ant without a bout.
-    const g = new Game(w, { antCount: 1, rival: false }, mulberry32(seed), { colony: { forageDig: 120 } });
-    const c = g.player;
+    const g = new Game(w, {}, mulberry32(seed), [{ antCount: 1, colony: { forageDig: 120 } }]);
+    const c = g.colonies[0]!;
     c.putAnt(0, CURTAIN, centreX(sx - 4, sy), centreY(sy));
     c.heading[0] = Math.PI;
     c.mode[0] = EXPLORE;

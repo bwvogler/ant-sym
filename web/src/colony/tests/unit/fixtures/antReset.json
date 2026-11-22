@@ -537,6 +537,24 @@
   ],
   "steerNear": [
    364
+  ],
+  "attackLayer": [
+   -1
+  ],
+  "deliveryRole": [
+   0
+  ],
+  "deliveryState": [
+   0
+  ],
+  "deliveryTime": [
+   0
+  ],
+  "dropRefusalTime": [
+   0
+  ],
+  "routeStalls": [
+   0
   ]
  },
  "asIs": {
@@ -1077,6 +1095,24 @@
   ],
   "steerNear": [
    41
+  ],
+  "attackLayer": [
+   41
+  ],
+  "deliveryRole": [
+   41
+  ],
+  "deliveryState": [
+   41
+  ],
+  "deliveryTime": [
+   42
+  ],
+  "dropRefusalTime": [
+   42.25
+  ],
+  "routeStalls": [
+   42
   ]
  }
 }

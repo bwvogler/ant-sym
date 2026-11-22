@@ -11,8 +11,8 @@ import { curtainHole, own, smallOne } from "../builders.ts";
 
 /** One game of the species on one world: twenty of the middle-aged ants deep in the curtain killed, then 30 s of the colony's life. */
 function buryFor(species: Species): { corpses: number; buried: number } {
-  const g = new Game(smallOne(2), { antCount: 200, rival: false, species }, mulberry32(4));
-  const c = g.player;
+  const g = new Game(smallOne(2), { species }, mulberry32(4), [{ antCount: 200 }]);
+  const c = g.colonies[0]!;
   const hole = curtainHole(own(c));
   for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);

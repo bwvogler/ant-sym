@@ -45,6 +45,9 @@
 // it keeps Jev's probabilities over the modes too (colony/weighted.ts: the ants draw from them). The other situations of
 // the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
 //
+// `--lanes get,carry,drop,trail,contact,leave` (review of #281): the ant's response lanes ask only the situations a page game meets
+// (responseSituationsMet: one world, 600 + 600 ants, seeds 1-6, 300 s), under each preset doctrine. They are not in the default `--lanes`.
+//
 // `--lanes steer` (ja-ykmu.3): the steer lane asks only the explore and follow situations a one-world game meets
 // (steerSituationsMet), not all 1,944.
 //
@@ -79,6 +82,10 @@ import {
   weightsOf,
   steerKey,
   NEUTRAL_STEERING,
+  RESPONSE_HOOKS,
+  DEFAULT_FIGHT,
+  localResponses,
+  responses,
 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -139,14 +146,61 @@ function fungalSituations() {
 function steerSituationsMet() {
   const met = new Map();
   for (const seed of [1, 2, 3]) {
-    const g = new Game(generateOneWorld(seed), { antCount: 600, rivalAnts: 600 }, gameRng(seed), {
-      colony: { steerLane: 1 },
-      rival: { steerLane: 1 },
-    });
+    const g = new Game(generateOneWorld(seed), {}, gameRng(seed), [
+      { antCount: 600, colony: { steerLane: 1 } },
+      { antCount: 600, colony: { steerLane: 1 } },
+    ]);
     for (const c of g.colonies) c.bindPolicy("steer", (s) => (met.set(steerKey(s), { ...s }), NEUTRAL_STEERING));
     for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
   }
   return [...met.values()];
+}
+
+/**
+ * The response lanes' situations a page game meets (get, carry, drop, trail, contact, leave: PRD §87, review of #281): one world as the
+ * page builds it (600 + 600 ants, hyphae, directed combat), 300 s, seeds 1-6 (1-3 first; 4-6 added after a review found a few hole-side combat situations of seeds 8 and 9 missing), every hook answering as the local rule does while each
+ * distinct Touch is recorded under the lane's own key. One recording serves the six lanes. Their full spaces are far larger than a
+ * game meets (the page asks only what its ants meet), so a lane ships what these games met.
+ */
+/** @type {readonly string[]} */
+const HOOKS = RESPONSE_HOOKS;
+let metResponses = null;
+function responseSituationsMet(hook) {
+  if (!metResponses) {
+    metResponses = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, new Map()]));
+    const rows = Object.fromEntries(LANE_LIST.filter((l) => HOOKS.includes(l.name)).map((l) => [l.name, l]));
+    const spy = responses(
+      Object.fromEntries(
+        RESPONSE_HOOKS.map((h) => [
+          h,
+          (touch, draw) => {
+            const k = rows[h].key(touch, undefined);
+            // a copy: the colonies share one Touch object
+            if (!metResponses[h].has(k)) metResponses[h].set(k, { ...touch });
+            return localResponses[h](touch, draw);
+          },
+        ]),
+      ),
+    );
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const g = new Game(
+        generateOneWorld(seed),
+        {
+          antCount: 600,
+          rivalAnts: 600,
+          rival: true,
+          regrow: GAME_REGROW,
+          autoFound: false,
+          fungus: { hyphae: true },
+          fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true },
+        },
+        gameRng(seed, 0),
+        { responses: spy, rivalResponses: spy },
+      );
+      for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
+    }
+  }
+  return [...metResponses[hook].values()];
 }
 
 /**
@@ -165,10 +219,16 @@ function fungusAlso() {
 // its key, packing, reading and context (the fungus's in the side view, the one the shipped answers are for), the id its items carry, its
 // request size, and whether it asks under a doctrine or an aim (and which presets).
 const LANES = Object.fromEntries(
-  LANE_LIST.map((l) => [
+  // the response lanes ask under the doctrines too (their rows hold no presets of their own: the doctrines are the colony's)
+  LANE_LIST.filter((l) => l.presets.length > 0 || HOOKS.includes(l.name)).map((l) => [
     l.name,
     {
-      situations: l.name === "steer" ? steerSituationsMet : (l.all ?? fungalSituations),
+      situations:
+        l.name === "steer"
+          ? steerSituationsMet
+          : HOOKS.includes(l.name)
+            ? () => responseSituationsMet(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (l.name))
+            : (l.all ?? fungalSituations),
       key: (s) => l.key(s, MENU),
       pack: (items, words) => l.pack(items, words),
       read: (answers, id, situation) => l.read(answers, id, situation, l.key(situation, MENU)),
@@ -192,8 +252,9 @@ function speciesFungalSituations(sp) {
     for (const k of [0, 1]) {
       const g = new Game(
         generateOneWorld(seed),
-        { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+        { regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
         gameRng(seed, 0),
+        [{ antCount: 600 }, { antCount: 600 }],
       );
       g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
       for (let t = 0; t < 300; t += 1 / 30) {
@@ -214,8 +275,9 @@ function speciesModeSituations(sp, l, lw) {
   for (const seed of [1, 2, 3]) {
     const g = new Game(
       generateOneWorld(seed),
-      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+      { regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
       gameRng(seed, 0),
+      [{ antCount: 600 }, { antCount: 600 }],
     );
     for (const c of g.colonies)
       c.bindPolicy("mode", (s) => {

@@ -1,6 +1,21 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { decodeSituation, localPolicy, SITUATIONS } from "./colony.ts";
-import { DOCTRINES, MODE_CRITERIA, packModeRequest, policyContext, readMode, situationKey } from "./colonyBrain.ts";
+import {
+  DOCTRINES,
+  RESPONSE_HOOKS,
+  type ResponseHook,
+  packResponseRequest,
+  readResponse,
+  responseContext,
+  responseKey,
+  validResponse,
+  MODE_CRITERIA,
+  packModeRequest,
+  policyContext,
+  readMode,
+  situationKey,
+} from "./colonyBrain.ts";
+import { TOUCH_SCHEMA, type Touch } from "./responses.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
 import { askedLevers } from "./fungus.ts";
 import { weightedValid } from "./weighted.ts";
@@ -47,10 +62,10 @@ import { type LaneWords, type Situation, type SpeciesSituation, type SteerSituat
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
 // colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
-export type LaneName = "mode" | "fungus" | "growth" | "steer";
+export type LaneName = "mode" | "fungus" | "growth" | "steer" | ResponseHook;
 
 export interface LaneKind {
-  /** the first character of the ids its situations carry in a request (s0, s1, …) */
+  /** the prefix of the ids its situations carry in a request (s0, s1, …) */
   readonly idPrefix: string;
   /** the start of every cache context of this lane (policyContext, fungusContext) */
   readonly contextPrefix: string;
@@ -65,7 +80,15 @@ export interface LaneKind {
 /** Situations a request carries when costing a question (as the page's estimates always have). */
 export const PER_REQUEST = 100;
 
+const RESPONSE_KINDS = Object.fromEntries(
+  RESPONSE_HOOKS.map((hook) => [
+    hook,
+    { idPrefix: `a${hook}`, contextPrefix: `${hook}-`, countsHits: false, reconsiders: false, perRequest: PER_REQUEST },
+  ]),
+) as Record<ResponseHook, LaneKind>;
+
 export const LANE_KINDS: Record<LaneName, LaneKind> = {
+  ...RESPONSE_KINDS,
   mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: PER_REQUEST },
   fungus: {
     idPrefix: "h",
@@ -254,8 +277,38 @@ const steerLane: Has<LaneSpec<SteerSituation, string, ReadonlySet<string> | unde
   all: () => steerSituations(),
 };
 
+const responseLanes = Object.fromEntries(
+  RESPONSE_HOOKS.map((hook) => [
+    hook,
+    {
+      name: hook,
+      kind: LANE_KINDS[hook],
+      variants: [""],
+      sample: {
+        ...TOUCH_SCHEMA.decode(0),
+        ...(hook === "get" ? { offered: "food" } : hook === "carry" || hook === "drop" ? { carrying: "food" } : {}),
+      },
+      wordsField: "doctrine",
+      presets: [],
+      gather: true,
+      batch: null,
+      key: (t: Touch) => responseKey(hook, t),
+      pack: (items, words) => packResponseRequest(hook, items, words),
+      read: (answers, id) => readResponse(hook, answers, id),
+      valid: (_, answer) => validResponse(hook, answer),
+      contextOf: (words) => responseContext(hook, words),
+    } satisfies LaneSpec<Touch, string, undefined>,
+  ]),
+) as unknown as Record<ResponseHook, LaneSpec<Touch, string, undefined>>;
+
 /** Every lane, by name, typed. */
-export const LANES = { mode: modeLane, fungus: fungusLane, growth: growthLane, steer: steerLane } as const;
+export const LANES = {
+  mode: modeLane,
+  fungus: fungusLane,
+  growth: growthLane,
+  steer: steerLane,
+  ...responseLanes,
+} as const;
 
 /**
  * A lane with its situation type forgotten, for code that loops over the lanes (the scripts' tables, the Learn panel): the one place the
@@ -280,4 +333,10 @@ export interface ErasedLane {
   all?(lane?: LaneWords): unknown[];
 }
 /** Every lane, in the order the page asks them. */
-export const LANE_LIST: readonly ErasedLane[] = [LANES.mode, LANES.fungus, LANES.growth, LANES.steer];
+export const LANE_LIST: readonly ErasedLane[] = [
+  LANES.mode,
+  LANES.fungus,
+  LANES.growth,
+  LANES.steer,
+  ...RESPONSE_HOOKS.map((hook) => LANES[hook]),
+];

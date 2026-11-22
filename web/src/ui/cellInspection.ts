@@ -143,7 +143,7 @@ export function inspectCell(
       });
     }
     const carriers = new Map(out.ants.filter((a) => a.k === k).map((a) => [a.i, a]));
-    const home = layer < 0 || layer === c.home;
+    const home = layer === c.home;
     if (home && map.chambers)
       for (const ch of map.chambers.list) {
         if (ch.colony !== c.params.nest) continue;
@@ -176,27 +176,24 @@ export function inspectCell(
           ...(dead.heading === undefined ? {} : { heading: dead.heading }),
         });
     for (const dead of c.remains)
-      if (c.time - dead.died <= CORPSE_ROT && (layer < 0 || (dead.layer ?? c.home) === layer) && dead.x === gx && dead.y === gy)
-        out.recentRemains!++;
+      if (c.time - dead.died <= CORPSE_ROT && (dead.layer ?? c.home) === layer && dead.x === gx && dead.y === gy) out.recentRemains!++;
     for (const dead of c.corpses)
       if (dead.held >= 0) {
         const a = carriers.get(dead.held);
         if (a) a.corpseStage = decayStage(c.time, dead.died);
       }
-    for (const dead of c.corpses)
-      if (dead.held < 0 && (layer < 0 || (dead.layer ?? c.home) === layer) && dead.x === gx && dead.y === gy) out.fallen++;
-    if (layer < 0 || layer === PLANE) out.buried += c.midden.get(cellKey(gx, gy)) ?? 0;
+    for (const dead of c.corpses) if (dead.held < 0 && (dead.layer ?? c.home) === layer && dead.x === gx && dead.y === gy) out.fallen++;
+    if (layer === PLANE) out.buried += c.midden.get(cellKey(gx, gy)) ?? 0;
   }
-  const lv = layer < 0 ? 0 : layer;
   for (const c of clumps) {
-    if (c.layer !== lv || !c.cells.length) continue;
+    if (c.layer !== layer || !c.cells.length) continue;
     for (let j = 0; j < c.cells.length; j += 2)
       if (c.cells[j] === gx && c.cells[j + 1] === gy) {
         out.aphidDensity += aphidCount(c) / (c.cells.length / 2);
         break;
       }
   }
-  const h = g.fungus.hyphaeOn(lv),
+  const h = g.fungus.hyphaeOn(layer),
     key = cellKey(gx, gy);
   if (h?.has(gx, gy)) {
     const linked = new Set<number>();
@@ -222,8 +219,8 @@ export function inspectCell(
       .filter((t) => t.x === gx && t.y === gy)
       .map((t) => [centreX(nx(gx, gy, t.heading), ny(gy, t.heading)) - cx, centreY(ny(gy, t.heading)) - cy]);
   }
-  out.stalk = g.fungus.stalksOn(lv).includes(key);
-  const left = g.fungus.corpsesOn(lv).get(key);
+  out.stalk = g.fungus.stalksOn(layer).includes(key);
+  const left = g.fungus.corpsesOn(layer).get(key);
   out.colonised = left !== undefined;
   out.sporulating = (left ?? 0) > 0;
   out.stalkLevel = out.stalk ? Math.max(1, g.fungus.evolution?.level("stalks") ?? 1) : 0;

@@ -1,3 +1,4 @@
+import { responses } from "../../responses.ts";
 import { test } from "node:test";
 import { CountGrid } from "../../battle.ts";
 import { Game } from "../../game.ts";
@@ -137,8 +138,8 @@ test("a policy answering nonsense falls back to the plain rule instead of breaki
 
 test("the colony forages on the local rule alone: food comes home within a minute", () => {
   // On one world (S2.3c); that food is conserved is int/oneWorldGame's "food and ants are conserved over 90 s".
-  const g = new Game(smallOne(7), { antCount: 600, rival: false }, mulberry32(101));
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, mulberry32(101), [{ antCount: 600 }]);
+  const c = g.colonies[0]!;
   for (let k = 0; k < 30 * 60; k++) g.tick(1 / 30);
   assert.ok(c.stored > 200, `stored ${c.stored}`);
   const laid = (ch: "food" | "home") => c.layers.reduce((sum, l) => sum + l.ph.total(ch), 0);
@@ -849,6 +850,20 @@ test("backfill: a pellet carrier fills an unused dead end beside its way home, a
   const x0 = c.x[0];
   for (let t = 0; t < 30; t++) c.tick(1 / 30);
   assert.ok(c.x[0] > x0 + 0.5, `it went back out: x ${x0.toFixed(2)} → ${c.x[0].toFixed(2)}`);
+  let offered = false;
+  const refused = run((_, worker) => {
+    worker.responses = responses({
+      drop(t) {
+        assert.equal(t.carrying, "soil");
+        offered = true;
+        return false;
+      },
+    });
+  });
+  assert.equal(offered, true);
+  assert.equal(rockAt(refused.m, 12, 5), OPEN);
+  assert.equal(refused.c.pellet[0], 1);
+  assert.equal(refused.c.soilFilled, 0);
   // Left alone: home scent in it (being dug, or walked), food in it, an ant in it.
   const scented = run((_, k) => k.ph.deposit("home", at(12, 5).x, at(12, 5).y, 1));
   assert.equal(rockAt(scented.m, 12, 5), OPEN, "home scent: in use");

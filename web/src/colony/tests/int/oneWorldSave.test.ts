@@ -18,9 +18,12 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100): two nests well inside it, quick to run. */
 const small = (ants = 60, autoFound = true): Game =>
-  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rivalAnts: ants, autoFound }, gameRng(7));
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { autoFound }, gameRng(7), [
+    { antCount: ants },
+    { antCount: ants },
+  ]);
 /** Seed 1's default plane, where a founding beyond V₀ fits (the line grows at V₀: the curtain's x0 falls). */
-const big = (autoFound = true): Game => new Game(generateOneWorld(1), { antCount: 40, rivalAnts: 40, autoFound }, gameRng(1));
+const big = (autoFound = true): Game => new Game(generateOneWorld(1), { autoFound }, gameRng(1), [{ antCount: 40 }, { antCount: 40 }]);
 
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
@@ -69,10 +72,10 @@ test("one world: a save runs on exactly as the unbroken game: the plane with its
   const make = () => small();
   const whole = make();
   whole.land(0, GARDEN, { evolve: true });
-  sporesBelow(whole, whole.player);
+  sporesBelow(whole, whole.colonies[0]!);
   run(whole, 30);
   // The midden doesn't fill in a short run: a pile and a corpse on the plane by hand, as the undertakers leave them.
-  const c = whole.player;
+  const c = whole.colonies[0]!;
   const h = c.holeCells[c.params.nest]!;
   c.midden.set(cellKey(h.px + 9, h.py), 2);
   c.corpses.push({ x: centreX(h.px + 7, h.py), y: centreY(h.py), held: -1, died: whole.time, load: 0, strain: 0, layer: PLANE });
@@ -138,8 +141,8 @@ for (const layer of [PLANE, CURTAIN])
     if (layer === CURTAIN) {
       // Fights underground are rare in a short run: Amber's ants put into Ink's royal chamber, by the queen.
       run(whole, 2);
-      const q = whole.player.queen!;
-      const r = whole.rival!;
+      const q = whole.colonies[0]!.queen!;
+      const r = whole.colonies[1]!;
       let moved = 0;
       for (let i = 0; i < r.n && moved < 8; i++)
         if (r.alive[i] && r.layer[i] === CURTAIN) {

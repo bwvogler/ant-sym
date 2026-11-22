@@ -12,7 +12,7 @@ import { smallOne } from "../builders.ts";
 
 // The builder (docs/builder.md, PRD §73, ja-kjj8.2): a child's tools over the world, guarded, undoable.
 
-const game = (ants = 20) => new Game(smallOne(7), { antCount: ants, rivalAnts: ants, regrow: 0 }, mulberry32(3));
+const game = (ants = 20) => new Game(smallOne(7), { regrow: 0 }, mulberry32(3), [{ antCount: ants }, { antCount: ants }]);
 const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
 const pt = (x: number, y: number) => ({ x: centreX(x, y), y: centreY(y) });
 

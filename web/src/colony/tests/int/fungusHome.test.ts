@@ -20,8 +20,8 @@ const BLOOM = STRAINS.findIndex((s) => s.id === "bloom");
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 test("what the fungus feels underfoot in one world: the plane's open ground, a tunnel, a chamber's floor, the queen's mark", () => {
-  const g = new Game(smallOne(2), { antCount: 5, rivalAnts: 1 }, mulberry32(1));
-  const a = g.player;
+  const g = new Game(smallOne(2), {}, mulberry32(1), [{ antCount: 5 }, { antCount: 1 }]);
+  const a = g.colonies[0]!;
   const curtain = g.world!.curtain;
   const hole = curtain.nests[0]!.entrance!;
   const p = planeHole(own(a));
@@ -122,8 +122,8 @@ test("crown below a high load: a lightly loaded host by the queen kills her too,
 test("on the midden a Bloom host's corpse sporulates; a Garden host's doesn't", () => {
   // On one world's plane, by the hole, where an undertaker puts it (int/oneWorldGame covers the carrying up).
   const spores = (strain: number) => {
-    const g = new Game(smallOne(2), { antCount: 60, rival: false }, mulberry32(5));
-    const c = g.player;
+    const g = new Game(smallOne(2), {}, mulberry32(5), [{ antCount: 60 }]);
+    const c = g.colonies[0]!;
     const p = planeHole(own(c));
     const k = { x: 0, y: 0, held: -1, died: 0, load: 0.8, strain };
     cellOf(p.x + 12, p.y);

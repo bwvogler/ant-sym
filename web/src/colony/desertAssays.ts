@@ -26,7 +26,7 @@ export const D_SECONDS = 120;
 
 /** One world's default plane, a player colony alone, `probe` watching. */
 function desertSpec(seed: number, probe: Probe): RunSpec {
-  return { seed, seconds: D_SECONDS, map: (s) => generateOneWorld(s), game: { antCount: 60, rival: false }, probes: [probe] };
+  return { seed, seconds: D_SECONDS, map: (s) => generateOneWorld(s), colonies: [{ antCount: 60 }], probes: [probe] };
 }
 
 /** Cells of the plane at or above a faint trail on `channel`. */

@@ -21,7 +21,7 @@ const SOIL_FILL = 2;
 
 /** A game of few ants, every founder young (they stay in) but those a test moves. */
 function quiet(seed = 7, ants = 10): Game {
-  const g = new Game(smallOne(seed), { antCount: ants, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+  const g = new Game(smallOne(seed), { regrow: 0 }, gameRng(seed), [{ antCount: ants }, { antCount: 10 }]);
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
   return g;
 }
@@ -56,7 +56,7 @@ function undertaken(g: Game, c: Colony, dead: number, u: number): void {
 test("one world: nobody picks spoil off the mound within ENTRANCE_ZONE of a hole (#pickPlane)", () => {
   // A mound of 400 pellets round the player's hole; 16 old explorers put on its spoil within the zone every half second.
   const g = quiet(7, 20);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = g.world!.plane;
   const h = own(c);
   for (let k = 0; k < 400; k++) heapPlane(plane, h.px, h.py, holesOf(c));
@@ -101,7 +101,7 @@ test("one world: a loose pellet taken home to backfill homes on the plane by the
   // 15 east of its hole, its vector off by 30 east (20 out at the farthest, span ~95, × drift ~0.32): it believes its hole
   // lies 15 farther east.
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hole = planeHole(own(c));
   const i = 0;
   withPellet(c, i, hole.x + 15, hole.y, SOIL_FILL);
@@ -125,7 +125,7 @@ test("one world: a loose pellet taken home to backfill homes on the plane by the
 
 test("one world: a loose pellet taken down to backfill that comes back up the hole is spoil (looseBack), heaped on the plane, not taken back down", () => {
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = g.world!.plane;
   const at = curtainHole(own(c));
   const i = 0;
@@ -165,7 +165,7 @@ test("one world: a loose pellet taken down to backfill that comes back up the ho
 
 test("one world: a corpse carrier killed on the plane leaves the corpse on the plane (layer PLANE, held by nobody), where no undertaker in the curtain takes it", () => {
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const at = curtainHole(own(c));
   const undertake = (dead: number, u: number) => undertaken(g, c, dead, u);
   const carriedBy = (u: number) => c.corpses.find((k) => k.held === u)!;
@@ -212,7 +212,7 @@ test("one world: a spoil or corpse carrier on the plane that never gets far enou
   // Both set a walk out no plane allows (spoilTo 10⁶): the spoil carrier gives up after SPOIL_GIVE_UP (15 s), the
   // undertaker after CORPSE_GIVE_UP (60 s), and each puts its load down where it stands (the corpse on the midden there).
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hole = planeHole(own(c));
   undertaken(g, c, 5, 4);
   for (let k = 0; k < Math.round(10 / DT) && c.layer[4] !== PLANE; k++) g.tick(DT);
@@ -248,7 +248,7 @@ test("one world: an explorer spreads spoil only from a flank; off a flat mound t
   // tick; 16 old explorers put within two cells of its middle every half second walk at most a few cells before that.
   const PLATEAU = 10;
   const g = quiet(7, 20);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = g.world!.plane;
   const h = own(c);
   const disc = (x: number, y: number, r: number): [number, number][] => {
@@ -322,7 +322,7 @@ test("one world: a corpse the ant puts down at will (carry 'put down') goes on t
   // midden only where its walk out would have (at least MIDDEN_MIN from home by its own vector, off the mound); anywhere
   // else the corpse lies on the plane, unmarked, as one whose carrier died there.
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hole = planeHole(own(c));
   const putDown: Responses = { ...localResponses, carry: () => "put down" };
   const upWith = (dead: number, u: number): Corpse => {

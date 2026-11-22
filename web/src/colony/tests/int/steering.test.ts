@@ -29,10 +29,11 @@ test("a steering packs into one number and back; neutral is every weight at 0", 
 
 /** A small one world; `out` ants of the player set down on the plane round its hole, in `mode`, with a remembered spot 12 east. */
 function world(steerLane: number, mode: Mode = "explore", siteFidelity = 0) {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 40, rivalAnts: 10 }, gameRng(7), {
-    colony: { steerLane, siteFidelity },
-  });
-  const c = g.player;
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(7), [
+    { antCount: 40, colony: { steerLane, siteFidelity } },
+    { antCount: 10 },
+  ]);
+  const c = g.colonies[0]!;
   const hole = g.world!.plane.nests[c.params.nest]!;
   for (let i = 0; i < 30; i++) {
     c.putAnt(i, PLANE, hole.x + 3 * Math.cos(i), hole.y + 3 * Math.sin(i));
@@ -45,7 +46,7 @@ function world(steerLane: number, mode: Mode = "explore", siteFidelity = 0) {
 }
 
 const trace = (g: Game, seconds: number): string => {
-  const c = g.player;
+  const c = g.colonies[0]!;
   for (let k = 0; k < seconds * 30; k++) g.tick(1 / 30);
   return Array.from({ length: c.n }, (_, i) => `${c.x[i]},${c.y[i]},${c.heading[i]}`).join(";");
 };
@@ -54,7 +55,7 @@ test("steering on with every answer neutral steers exactly as steering off, and 
   const off = trace(world(0), 4);
   const g = world(1);
   const asked: Mode[] = [];
-  g.player.bindPolicy("steer", (s) => (asked.push(s.mode), NEUTRAL_STEERING));
+  g.colonies[0]!.bindPolicy("steer", (s) => (asked.push(s.mode), NEUTRAL_STEERING));
   assert.equal(trace(g, 4), off, "neutral weights: the same game, bit for bit");
   assert.ok(asked.length > 0, "the steer policy was asked");
   assert.ok(
@@ -67,14 +68,14 @@ test("each weight off neutral bends the steering", () => {
   const bend = (w: SteerWeight, level: -1 | 1, mode: Mode = "explore", siteFidelity = 0) => {
     const g = world(1, mode, siteFidelity);
     // Every ant keeps the mode it was set down in, so the weight is what differs.
-    g.player.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
-    g.player.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, [w]: level }));
-    for (let i = 0; i < 30; i++) g.player.steerCode[i] = encodeSteering({ ...NEUTRAL_STEERING, [w]: level });
+    g.colonies[0]!.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    g.colonies[0]!.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, [w]: level }));
+    for (let i = 0; i < 30; i++) g.colonies[0]!.steerCode[i] = encodeSteering({ ...NEUTRAL_STEERING, [w]: level });
     return trace(g, 4);
   };
   const base = (mode: Mode, siteFidelity = 0) => {
     const g = world(1, mode, siteFidelity);
-    g.player.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    g.colonies[0]!.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
     return trace(g, 4);
   };
   const explore = base("explore");
@@ -90,12 +91,12 @@ test("each weight off neutral bends the steering", () => {
   // so the food trail is laid by hand.
   const follow = (w: -1 | 0 | 1) => {
     const g = world(1, "follow");
-    g.player.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
-    const L = g.player.layers[PLANE]!;
-    const hole = g.world!.plane.nests[g.player.params.nest]!;
+    g.colonies[0]!.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    const L = g.colonies[0]!.layers[PLANE]!;
+    const hole = g.world!.plane.nests[g.colonies[0]!.params.nest]!;
     for (let dx = -8; dx <= 8; dx++) L.ph.deposit("food", hole.x + dx, hole.y + dx / 2, 3);
-    if (w !== 0) g.player.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, trail: w }));
-    for (let i = 0; i < 30; i++) g.player.steerCode[i] = encodeSteering({ ...NEUTRAL_STEERING, trail: w });
+    if (w !== 0) g.colonies[0]!.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, trail: w }));
+    for (let i = 0; i < 30; i++) g.colonies[0]!.steerCode[i] = encodeSteering({ ...NEUTRAL_STEERING, trail: w });
     return trace(g, 4);
   };
   assert.notEqual(follow(-1), follow(0), "trail −1 changes how followers steer");
@@ -106,7 +107,7 @@ test("near its last find an ant steers by its near weights, elsewhere by its far
   // Every ant gets wide search near its find and neutral weights away from it: only ants at their spot steer differently.
   const run = (nearSpot: boolean) => {
     const g = world(1);
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
     c.bindPolicy("steer", (s) => (s.find === "near" ? { ...NEUTRAL_STEERING, search: 1 } : NEUTRAL_STEERING));
     // The remembered spot: under the ant (near) or far off; its vector is fresh (odoSurf 0), so it believes the hole is where it is.
@@ -122,12 +123,12 @@ test("near its last find an ant steers by its near weights, elsewhere by its far
   };
   const plain = (() => {
     const g = world(1);
-    g.player.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
-    const hole = g.world!.plane.nests[g.player.params.nest]!;
+    g.colonies[0]!.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
+    const hole = g.world!.plane.nests[g.colonies[0]!.params.nest]!;
     for (let i = 0; i < 30; i++) {
-      g.player.odoSurf[i] = 0;
-      g.player.foodX[i] = 60;
-      g.player.foodY[i] = 0;
+      g.colonies[0]!.odoSurf[i] = 0;
+      g.colonies[0]!.foodX[i] = 60;
+      g.colonies[0]!.foodY[i] = 0;
       void hole;
     }
     return trace(g, 1);
@@ -139,7 +140,7 @@ test("near its last find an ant steers by its near weights, elsewhere by its far
 test("search −1 is tight (explorers turn more per step), +1 is wide (they turn less): the direction the questions say (PRD §82 round 6)", () => {
   const turned = (level: -1 | 0 | 1): number => {
     const g = world(1);
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.bindPolicy("mode", (s) => (s.mode === "return" || s.mode === "fight" ? localPolicy(s) : s.mode));
     c.bindPolicy("steer", () => ({ ...NEUTRAL_STEERING, search: level }));
     let total = 0;

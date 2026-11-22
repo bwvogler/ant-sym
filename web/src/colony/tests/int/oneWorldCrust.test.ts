@@ -14,7 +14,7 @@ import { own, smallOne } from "../builders.ts";
 // under the crust and nobody needs unburying (review of #247, N2), so it holds what the world ends as, not the mechanisms.
 
 test("one world, the curtain over 120 s: nobody is buried, the way in stays open, the crust holds, the sky stays empty", () => {
-  const g = new Game(smallOne(2), { antCount: 200, rivalAnts: 200 }, mulberry32(7));
+  const g = new Game(smallOne(2), {}, mulberry32(7), [{ antCount: 200 }, { antCount: 200 }]);
   const curtain = g.world!.curtain;
   const solidT = g.colonies.map((c) => new Float32Array(c.n));
   let maxSolid = 0;

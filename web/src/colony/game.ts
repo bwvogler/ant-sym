@@ -1,3 +1,4 @@
+import { snapshotAttackCue } from "./attackCue.ts";
 import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
@@ -208,6 +209,39 @@ export interface Sides {
 }
 
 /**
+ * One colony the game starts with (docs/game-colonies.md): how many ants, which of the world's start nests, its nest odour, its
+ * own params, and how it plays. Runtime only, never saved: a game is rebuilt from its settings (`Game.load` pours state into a
+ * game built afresh). The colonies are built in list order, so the random stream is the list's.
+ */
+export interface ColonySpec {
+  /** 0 is buildable */
+  antCount: number;
+  /** which of the world's start nests (default: its position in the list) */
+  nest?: number;
+  /** its nest odour (default: 0 for one colony, else k / (N - 1): 0 and 1 for two) */
+  odour?: number;
+  /** its colony params over the species', and over `nest` and `odour` */
+  colony?: Partial<ColonyParams>;
+  policy?: Policy;
+  responses?: Responses;
+}
+
+/**
+ * The colonies the pair's words name, until the callers move onto a list (docs/game-colonies.md, stage A): the first at nest 0
+ * from `antCount` and `Sides.colony`/`policy`/`responses`, and with `rival` and a second start nest, the second at nest 1 from
+ * `rivalAnts` and `Sides.rival`/`rivalPolicy`/`rivalResponses`. A rival with no second nest is silently not built.
+ */
+function pairSpecs(params: GameParams, sides: Sides, nests: number): ColonySpec[] {
+  const specs: ColonySpec[] = [{ antCount: params.antCount, colony: sides.colony, policy: sides.policy, responses: sides.responses }];
+  if (params.rival && nests > 1) {
+    // The second colony's nest is forced to 1 after its overrides (a `nest` in Sides.rival never counted).
+    const { nest: _ignored, ...colony } = sides.rival ?? {};
+    specs.push({ antCount: params.rivalAnts, nest: 1, colony, policy: sides.rivalPolicy, responses: sides.rivalResponses });
+  }
+  return specs;
+}
+
+/**
  * The game's random numbers for a seed: one scheme for the page, the experiments and the side-view scripts, so a
  * number measured offline reproduces on the page with the same seed. `generation` is the page's Restart count.
  */
@@ -254,8 +288,8 @@ export const QUIET = 60;
  */
 export const MET = 0.01;
 
-/** The fungus's landing (Game.land): this far past the hole (cells, along the ground), spores over this radius. */
-export const LANDING = { offset: 3, radius: 2, spores: 3 };
+/** The fungus's landing (Game.land) and a queen's founding: this far past the hole (cells, along the ground), a flower of a hex and its six neighbours (radius 1; it was 2, PRD §85), spores over it. */
+export const LANDING = { offset: 3, radius: 1, spores: 3 };
 
 /** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
 export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
@@ -318,6 +352,11 @@ export class Game {
    * the colonies are one; without the latch the outcome would flap and toast each time it came back.
    */
   #haveMet = false;
+  /**
+   * colony 0's start count: a founder's cap is 1.5 times the larger of it and her own (addColony). From the specs the game was built
+   * with, not the saved `params` (a load pours state into a game built afresh, so the two agree for every caller).
+   */
+  #firstAnts = 0;
   #nextRivalCheck = 0;
   #rng: () => number;
   /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
@@ -344,7 +383,7 @@ export class Game {
    * the curtain, its nest, queen and brood, where every ant starts; it forages on the plane, and its ants cross between
    * the two at the holes.
    */
-  constructor(world: OneWorld, params: Partial<GameParams> = {}, rng: () => number = Math.random, player: Sides = {}) {
+  constructor(world: OneWorld, params: Partial<GameParams> = {}, rng: () => number = Math.random, how: Sides | ColonySpec[] = {}) {
     const map = world.plane;
     // The colonies' home map: the curtain, where their nests are.
     const home = world.curtain;
@@ -362,31 +401,31 @@ export class Game {
     // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
     const tolerance = this.recognition.params.tolerance;
-    // Each colony starts at its own odour, as far apart as odours go: 0 and 1.
-    const mine = new Colony(
-      home,
-      { antCount: this.params.antCount, nest: 0, odour: 0, tolerance, ...this.#speciesParams(), ...player.colony },
-      rng,
-      player.policy ?? this.params.species.policy ?? localPolicy,
-      layered,
-    );
-    mine.responses = player.responses ?? this.params.species.responses;
-    this.#ownSituation(mine);
-    this.colonies = [mine];
-    if (this.params.rival && home.nests.length > 1)
-      this.colonies.push(
-        new Colony(
-          home,
-          { antCount: this.params.rivalAnts, odour: 1, tolerance, ...this.#speciesParams(), ...player.rival, nest: 1 },
-          rng,
-          player.rivalPolicy ?? this.params.species.policy ?? localPolicy,
-          layered,
-        ),
+    // Each colony starts at its own odour, as far apart as odours go (0 and 1 for two). The pair's words name the list unless a list is given.
+    const specs = Array.isArray(how) ? how : pairSpecs(this.params, how, home.nests.length);
+    if (specs.length === 0) throw new Error("a game starts with at least one colony");
+    if (specs.length > home.nests.length)
+      throw new Error(`${specs.length} colonies, and the world has ${home.nests.length} start nests (a founding makes any more)`);
+    this.#firstAnts = specs[0]?.antCount ?? this.params.antCount;
+    this.colonies = specs.map((spec, k) => {
+      const c = new Colony(
+        home,
+        {
+          antCount: spec.antCount,
+          nest: spec.nest ?? k,
+          odour: spec.odour ?? (specs.length > 1 ? k / (specs.length - 1) : 0),
+          tolerance,
+          ...this.#speciesParams(),
+          ...spec.colony,
+        },
+        rng,
+        spec.policy ?? this.params.species.policy ?? localPolicy,
+        layered,
       );
-    if (this.colonies[1]) {
-      this.colonies[1].responses = player.rivalResponses ?? this.params.species.responses;
-      this.#ownSituation(this.colonies[1]);
-    }
+      c.responses = spec.responses ?? this.params.species.responses;
+      this.#ownSituation(c);
+      return c;
+    });
     this.#grids = this.layers.map(() => this.colonies.map(() => new CountGrid()));
     // Spores on both maps (the plane, layer 0, holds the fungus's public `map` and `spores`).
     this.fungus = new Fungus(this.layers, this.params.fungus);
@@ -622,7 +661,7 @@ export class Game {
       {
         ...this.#speciesParams(),
         antCount: f.antCount,
-        maxAnts: f.maxAnts ?? this.params.species.params.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.params.antCount)),
+        maxAnts: f.maxAnts ?? this.params.species.params.maxAnts ?? Math.round(1.5 * Math.max(f.antCount, this.#firstAnts)),
         nest: at,
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
@@ -903,7 +942,8 @@ export class Game {
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
-    for (const c of this.colonies) c.tick(dt);
+    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(this.colonies) : undefined;
+    for (const c of this.colonies) c.tick(dt, attackCue);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;

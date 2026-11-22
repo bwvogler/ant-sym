@@ -1,0 +1,283 @@
+{
+  "harnessSha256": "83cfa136eb6e611b3f1d1e62631ab032c3a6d5df9e012e2189cb35305f1a2532",
+  "commit": "4aa11ef72e2bb1e65d2a5ec63ba3ee013aa70721",
+  "seed": 1,
+  "seconds": 600,
+  "ants": 60,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "name": "baseline",
+      "lane": 0,
+      "limit": 0,
+      "doctrine": "local",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 322.38700574294677
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 444,
+      "portTrips": 0,
+      "finalLarder": 322.38700574294677,
+      "carriedDown": 446,
+      "held": 9,
+      "maxHeld": 23,
+      "maxActive": 0,
+      "maxHeldOver120": 1,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 0,
+      "switches": 0,
+      "deliveries": 0,
+      "activeSeconds": 0,
+      "longSeconds": 0,
+      "carryCalls": 0,
+      "longCalls": 0,
+      "wallSeconds": 10.612119832000001
+    },
+    {
+      "name": "retain",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "retain",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 322.38700574294677
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 444,
+      "portTrips": 0,
+      "finalLarder": 322.38700574294677,
+      "carriedDown": 446,
+      "held": 9,
+      "maxHeld": 23,
+      "maxActive": 0,
+      "maxHeldOver120": 1,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 0,
+      "switches": 0,
+      "deliveries": 0,
+      "activeSeconds": 0,
+      "longSeconds": 0,
+      "carryCalls": 219163,
+      "longCalls": 0,
+      "wallSeconds": 10.062121081999997
+    },
+    {
+      "name": "royal",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "royal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 232.62648310679933
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 354,
+      "portTrips": 0,
+      "finalLarder": 232.62648310679933,
+      "carriedDown": 354,
+      "held": 14,
+      "maxHeld": 19,
+      "maxActive": 19,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 368,
+      "switches": 0,
+      "deliveries": 354,
+      "activeSeconds": 5397.433333333647,
+      "longSeconds": 0,
+      "carryCalls": 182061,
+      "longCalls": 0,
+      "wallSeconds": 9.560108420999997
+    },
+    {
+      "name": "royal5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "redirectRoyal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 60,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 0
+        }
+      ],
+      "queenAlive": true,
+      "births": 0,
+      "diedHungry": 0,
+      "stored": 0,
+      "portTrips": 0,
+      "finalLarder": 0,
+      "carriedDown": 59,
+      "held": 59,
+      "maxHeld": 59,
+      "maxActive": 59,
+      "maxHeldOver120": 59,
+      "broodStarved": 0,
+      "unresolved": [
+        {
+          "i": 0,
+          "role": 1,
+          "layer": 1,
+          "x": -32.6476936340332,
+          "y": 59.55743408203125,
+          "heldSeconds": 516.0666666668546,
+          "state": 1
+        },
+        {
+          "i": 1,
+          "role": 1,
+          "layer": 1,
+          "x": -32.6476936340332,
+          "y": 59.55743408203125,
+          "heldSeconds": 568.466666666807,
+          "state": 1
+        },
+        {
+          "i": 2,
+          "role": 1,
+          "layer": 1,
+          "x": -32.771968841552734,
+          "y": 59.75491714477539,
+          "heldSeconds": 572.0666666668037,
+          "state": 1
+        },
+        {
+          "i": 3,
+          "role": 1,
+          "layer": 1,
+          "x": -15.562785148620605,
+          "y": 54.310543060302734,
+          "heldSeconds": 279.53333333334007,
+          "state": 1
+        },
+        {
+          "i": 4,
+          "role": 1,
+          "layer": 1,
+          "x": -33.45608139038086,
+          "y": 59.32441329956055,
+          "heldSeconds": 542.1000000001643,
+          "state": 1
+        },
+        {
+          "i": 5,
+          "role": 1,
+          "layer": 1,
+          "x": -33.12940979003906,
+          "y": 59.94351577758789,
+          "heldSeconds": 545.0666666668283,
+          "state": 1
+        },
+        {
+          "i": 6,
+          "role": 1,
+          "layer": 1,
+          "x": -32.52341842651367,
+          "y": 59.35995101928711,
+          "heldSeconds": 583.4666666667933,
+          "state": 1
+        },
+        {
+          "i": 7,
+          "role": 1,
+          "layer": 1,
+          "x": -16.87523078918457,
+          "y": 54.18257522583008,
+          "heldSeconds": 247.7999999999885,
+          "state": 1
+        },
+        {
+          "i": 8,
+          "role": 1,
+          "layer": 1,
+          "x": -33.45608139038086,
+          "y": 59.32441329956055,
+          "heldSeconds": 194.06666666665822,
+          "state": 1
+        },
+        {
+          "i": 9,
+          "role": 1,
+          "layer": 1,
+          "x": -32.989749908447266,
+          "y": 59.34218215942383,
+          "heldSeconds": 541.9333333334978,
+          "state": 1
+        }
+      ],
+      "starts": 59,
+      "switches": 59,
+      "deliveries": 0,
+      "activeSeconds": 27194.166666670582,
+      "longSeconds": 25679.399999794612,
+      "carryCalls": 818846,
+      "longCalls": 770441,
+      "wallSeconds": 7.948124742
+    },
+    {
+      "name": "royal20",
+      "lane": 1,
+      "limit": 20,
+      "doctrine": "redirectRoyal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 29.458967265247416
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 150,
+      "portTrips": 0,
+      "finalLarder": 29.458967265247416,
+      "carriedDown": 163,
+      "held": 16,
+      "maxHeld": 33,
+      "maxActive": 33,
+      "maxHeldOver120": 8,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 166,
+      "switches": 155,
+      "deliveries": 150,
+      "activeSeconds": 11070.566666666638,
+      "longSeconds": 3538.133333330773,
+      "carryCalls": 341648,
+      "longCalls": 106379,
+      "wallSeconds": 9.740499789000001
+    }
+  ],
+  "harnessSnapshot": "harness-source.txt",
+  "routingVariant": "original"
+}

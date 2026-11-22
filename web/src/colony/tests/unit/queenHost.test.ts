@@ -66,7 +66,7 @@ test("the queen is asked only her own levers, and her signal lever scales the ro
 });
 
 test("reaching a queen opens her colony's doctrine for good, and a save keeps it", () => {
-  const g = new Game(smallOne(2), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
+  const g = new Game(smallOne(2), {}, mulberry32(9), [{ antCount: 60 }, { antCount: 60 }]);
   g.tick(1 / 30);
   assert.deepEqual(g.revealed, []);
   g.colonies[0]!.queen!.load = 0.3;
@@ -79,7 +79,7 @@ test("reaching a queen opens her colony's doctrine for good, and a save keeps it
   g.tick(1 / 30);
   assert.equal(g.revealed[0], true, "it stays open");
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
-  const again = new Game(smallOne(2), { antCount: 60, rivalAnts: 60 }, mulberry32(9));
+  const again = new Game(smallOne(2), {}, mulberry32(9), [{ antCount: 60 }, { antCount: 60 }]);
   again.load(saved);
   assert.equal(again.revealed[0], true);
   assert.equal(again.colonies[0]!.queen!.strain, GARDEN, "and the queen's fungus with it");

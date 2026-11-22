@@ -11,7 +11,7 @@ import { smallOne } from "../builders.ts";
 // The builder's aphid clump (docs/aphids.md "The mechanic", PRD §78, ja-nzkg.2): the aphids' body. Honeydew made on its cells
 // at a rate by its aphids, up to a cap; a life that grows, then crashes; put down, grown by a drag, undone, saved.
 
-const game = () => new Game(smallOne(7), { antCount: 20, rivalAnts: 20, regrow: 0 }, mulberry32(3));
+const game = () => new Game(smallOne(7), { regrow: 0 }, mulberry32(3), [{ antCount: 20 }, { antCount: 20 }]);
 const pt = (x: number, y: number) => ({ x: centreX(x, y), y: centreY(y) });
 
 /** An open cell on the plane well away from the holes, with open cells round it. */

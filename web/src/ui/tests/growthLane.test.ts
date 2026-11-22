@@ -100,8 +100,7 @@ test("attaching the fungus wires its tips to the growth lane (review of #115, S2
   const j = new ColonyJev({ intervalMs: 10, gatherMs: 0 });
   live.add(j);
   // A real fungus: attachFungus binds its policies through bindPolicy (ja-fnd.5.4.1).
-  const fungus = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 10, rival: false }, mulberry32(3))
-    .fungus;
+  const fungus = new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(3), [{ antCount: 10 }]).fungus;
   j.attachFungus(fungus);
   assert.equal(fungus.growthPolicy, j.growthPolicy);
 });

@@ -17,7 +17,7 @@ const FOOD = 2;
 
 /** A one-world game of few ants (the geometry is what is tested; the colonies only need to live). */
 const game = (seed: number, ants = 8): Game =>
-  new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(seed));
+  new Game(generateOneWorld(seed), { regrow: 0 }, gameRng(seed), [{ antCount: ants }, { antCount: ants }]);
 
 /** A flight from colony `mother` (as Colony.flown gives one), pending: found() and lose() take only pending flights. */
 function fly(g: Game, mother: number): Flight {
@@ -273,7 +273,7 @@ test("growth at V₀ and at V_k keeps every existing s in place, and the new col
 test("a flight with no room within her radius is lost: the game says why, and her body is booked to her mother", () => {
   const g = game(1);
   const before = g.world!.line;
-  const m = g.player;
+  const m = g.colonies[0]!;
   const eaten = m.eaten;
   const f = fly(g, 0);
   // Far off the plane: nowhere within FOUND_RADIUS is open ground.
@@ -308,7 +308,7 @@ test("a colony founded beyond an end starts its ants in the curtain, with its qu
 
 test("the fungus's spores in the curtain stay on their cells when the curtain grows at V₀ (cellKey is absolute)", () => {
   const g = game(1);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const h = c.holeCells[c.params.nest]!;
   // Spores a few rows down the player's shaft, in the curtain.
   g.fungus.paint(

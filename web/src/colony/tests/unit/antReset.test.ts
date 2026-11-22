@@ -14,15 +14,15 @@ type Slot = Record<string, (number | string)[]>;
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/antReset.json", import.meta.url), "utf8")) as { spawn: Slot; asIs: Slot };
 
 const make = () =>
-  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 10, rivalAnts: 10, rival: false }, gameRng(7), {
-    colony: { routeStep: 8 }, // the fixture was recorded at routeStep 8; a newborn's routeGap is the colony's routeStep
-  }).player;
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(7), [{ antCount: 10, colony: { routeStep: 8 } }])
+    .colonies[0]!;
 const names = Object.keys(ANT_FIELDS);
 type Arrays = Record<string, { length: number; [i: number]: number }>;
 const arrays = (c: Colony) => c as unknown as Arrays;
 
 const scribble = (c: Colony, i: number) => {
-  names.forEach((k, j) => {
+  // Keep fixture sentinels stable when a field moves in the implementation table.
+  Object.keys(fixture.asIs).forEach((k, j) => {
     const a = arrays(c)[k]!;
     const per = a.length / c.n;
     for (let q = 0; q < per; q++) a[i * per + q] = 7 + j * 0.25; // a value no reset produces
@@ -79,13 +79,10 @@ test("the table says what asIs and spawn reset: asIs by hand (it runs for every 
 });
 
 test("a newborn's resets follow the colony's parameters: routeGap and tolerance away from the defaults", () => {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 10, rivalAnts: 10, rival: false },
-    gameRng(7),
-    { colony: { routeStep: 5, tolerance: 0.2 } },
-  );
-  const c = g.player;
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(7), [
+    { antCount: 10, colony: { routeStep: 5, tolerance: 0.2 } },
+  ]);
+  const c = g.colonies[0]!;
   const i = c.alive.indexOf(0);
   scribble(c, i);
   c.alive[i] = 0; // (the scribble made it alive)

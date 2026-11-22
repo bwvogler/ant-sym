@@ -21,7 +21,7 @@ const NEST_SIGHT = 8;
 
 /** A game of few ants, every founder young (they stay in) but the one each test moves. */
 const game = (seed = 7, colony: Partial<Colony["params"]> = {}): Game => {
-  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed), { colony });
+  const g = new Game(smallOne(seed), { regrow: 0 }, gameRng(seed), [{ antCount: 10, colony }, { antCount: 10 }]);
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
   return g;
 };
@@ -45,7 +45,7 @@ function climbOut(g: Game, c: Colony, i: number, h: HoleCell): void {
 
 /** Put a food carrier (ant 0 of the player) on the plane at (x, y), with its vector: walked `odo`, drifting (dx, dy). */
 function carrier(g: Game, x: number, y: number, odo: number, dx: number, dy: number): Colony {
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.age[0] = OLD;
   c.putAnt(0, PLANE, x, y);
   c.carrying[0] = 1;
@@ -61,7 +61,7 @@ function carrier(g: Game, x: number, y: number, odo: number, dx: number, dy: num
  * the farthest, puts its hole at (ox, oy) from the true one: by piErrorLaw 1 its drift is that offset over the span √(out) sets.
  */
 function vectorCarrier(g: Game, x: number, y: number, out: number, ox: number, oy: number): Colony {
-  const span = piSpanOf(g.player.params.piErrorLaw, g.player.params.piErrorAt, out, out);
+  const span = piSpanOf(g.colonies[0]!.params.piErrorLaw, g.colonies[0]!.params.piErrorAt, out, out);
   const c = carrier(g, x, y, out, ox / span, oy / span);
   c.reachSurf[0] = out;
   return c;
@@ -79,7 +79,7 @@ function home(g: Game, c: Colony, seconds: number, each: () => void): number {
 
 test("plane: the vector starts afresh up out of its own hole, with both drifts drawn; it counts the way out, not the way home", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const h = c.holeCells[c.params.nest] as HoleCell;
   c.odoSurf[0] = 50;
   c.driftSurf[0] = c.driftSurfY[0] = 0;
@@ -108,7 +108,7 @@ test("plane: the vector starts afresh up out of its own hole, with both drifts d
 
 test("plane, piErrorLaw 1 (ja-lp4.19): the reach out starts afresh at its own hole, is the farthest it has walked out, and sets the error", () => {
   const g = game(7, { piErrorLaw: 1 });
-  const c = g.player;
+  const c = g.colonies[0]!;
   const h = c.holeCells[c.params.nest] as HoleCell;
   const hole = c.layers[PLANE]!.nest; // the plane's nest point, where the reach is measured from
   c.reachSurf[0] = 80;
@@ -168,7 +168,7 @@ test("plane, piErrorLaw 1: the belief it steers by and the spoil aim's home are 
 
 test("plane, piErrorLaw 1: a tweezers move is not walking out (the reach stays as walked; review of #249, S2)", () => {
   const g = game(7, { piErrorLaw: 1 });
-  const c = g.player;
+  const c = g.colonies[0]!;
   climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
   for (let k = 0; k < Math.round(2 / DT); k++) g.tick(DT);
   const r0 = c.reachSurf[0];
@@ -181,7 +181,7 @@ test("plane, piErrorLaw 1: a tweezers move is not walking out (the reach stays a
 test("plane, piErrorLaw 0: the reach is never counted (today's vector, bit for bit)", () => {
   // The old odometer law on purpose: law 1 is the default now (PRD §79).
   const g = game(7, { piErrorLaw: 0 });
-  const c = g.player;
+  const c = g.colonies[0]!;
   climbOut(g, c, 0, c.holeCells[c.params.nest] as HoleCell);
   for (let k = 0; k < Math.round(3 / DT); k++) g.tick(DT);
   assert.ok(c.odoSurf[0] > 5);
@@ -190,7 +190,7 @@ test("plane, piErrorLaw 0: the reach is never counted (today's vector, bit for b
 
 test("plane: coming up a rival's hole leaves the vector as it was", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const rival = c.holeCells[1] as HoleCell;
   c.odoSurf[0] = 50;
   c.driftSurf[0] = 0.3;
@@ -204,7 +204,7 @@ test("plane: coming up a rival's hole leaves the vector as it was", () => {
 
 test("plane: the drift's size over many trips out of its own hole is PI_DRIFT (RMS)", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const h = c.holeCells[c.params.nest] as HoleCell;
   let sq = 0;
   const N = 150;
@@ -218,7 +218,7 @@ test("plane: the drift's size over many trips out of its own hole is PI_DRIFT (R
 
 test("plane: a carrier walks to where its vector says the hole is, not to the hole; in sight of the hole it goes straight down", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 30 out at the farthest (span ~116), drifting ~(0.10, 0.05): it believes the hole 12 east and 6 south of it (13.4 off, out of
   // sight of it).
@@ -248,7 +248,7 @@ test("plane: a carrier walks to where its vector says the hole is, not to the ho
 
 test("plane: a carrier whose vector is 12 off finds nothing there, searches in widening loops, and finds its hole", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 32 out at the farthest (span 120), drifting (0.1, 0): it believes the hole 12 east, along open row 32.
   const B = { x: H.x + 12, y: H.y };
@@ -263,7 +263,7 @@ test("plane: a carrier whose vector is 12 off finds nothing there, searches in w
 
 test("plane: a carrier whose vector ends in rock gets as near as it can, searches on, and gets home", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 32 out at the farthest (span 120), drifting (0.1, −0.05): the spot it believes in, 12 east and 6 north of the hole, is in the rock ridge there.
   const B = { x: H.x + 12, y: H.y - 6 };
@@ -278,7 +278,7 @@ test("plane: a carrier whose vector ends in rock gets as near as it can, searche
 test("plane: a belief past the plane's edge is held at the edge, and the carrier still gets home", () => {
   // Seed 1's player's hole is 26 below the plane's top edge, with open ground between.
   const g = game(1);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 150 out at the farthest (span ~260), drifting ~(0, −0.23): it believes the hole 60 north of it, 34 past the plane's top edge.
   const top = 0.75;
@@ -306,7 +306,7 @@ function searchingRun(g: Game, c: Colony, heading: number, seconds: number): { x
 test("plane: a searching carrier with the home trail under its antennae follows the trail, not its vector (review of #60)", () => {
   // Led by its loops alone, colonies delivered up to 44 % less in the spike (one-world §4, U3b as built).
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   // 24 east of the hole along open row 32, facing west, on a home trail that runs from it to the hole; it believes the hole
   // 40 east (90 out at the farthest, span ~201, drifting ~(0.2, 0)), behind it, and is searching there (its next point 43 east).

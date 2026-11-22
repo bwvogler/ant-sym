@@ -128,7 +128,7 @@ export const neglectusImmunisation: Assay = {
       seed,
       seconds: N1_EXPOSE_AT + N1_READ_AFTER,
       map: (s) => generateOneWorld(s),
-      game: { antCount: 60, rival: false },
+      colonies: [{ antCount: 60 }],
       events: [
         {
           at: N1_EXPOSE_AT,
@@ -240,8 +240,10 @@ export const neglectusTolerance: Assay = {
       seconds: N3_SECONDS,
       // A trial's distances share one world, so they are compared on the same ground; each trial is another world.
       map: () => generateOneWorld(1 + trial),
-      game: { antCount: 60, rivalAnts: 60 },
-      sides: { colony: { odour: N3_BASE }, rival: { odour: N3_BASE + d } },
+      colonies: [
+        { antCount: 60, colony: { odour: N3_BASE } },
+        { antCount: 60, colony: { odour: N3_BASE + d } },
+      ],
       probes: [probe],
     };
   },
