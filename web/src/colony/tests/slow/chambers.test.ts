@@ -14,7 +14,6 @@ import { smallOne } from "../builders.ts";
 /** The ground's top in column x as dug: under the mound's loose soil (what a chamber's depth is measured from). */
 function soilTop(map: WorldMap, x: number): number {
   let y = groundTop(map, x);
-  while (y < map.size.h && map.loose?.get(x, y) === 1) y++;
   return y;
 }
 

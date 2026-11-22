@@ -43,7 +43,6 @@ import {
   ENTRANCE_ZONE,
   FLOOR_PER_ANT,
   HOLE_SIGHT,
-  MIDDEN_AT,
   RECEPTION_MIN,
   REVERT_BELOW,
 } from "./tuning.ts";
@@ -85,7 +84,6 @@ export {
   LEAVE_NOW,
   LEAVE_SOON,
   MET_HALF,
-  MIDDEN_AT,
   MIDDEN_MIN,
   NANITIC_AGE,
   NO_FACE,
@@ -875,20 +873,6 @@ export class Colony {
     return best;
   }
 
-  /** Which side of its hole the colony's midden lies: toward its nearest neighbour (a boundary between them), east if alone. */
-  middenSide(): -1 | 1 {
-    const t = this.neighbour();
-    return t && this.entrance && t.x < this.entrance.x ? -1 : 1;
-  }
-
-  /** How far out the midden lies: past the mound's largest reach, fixed, so the mound never grows over it (review of
-   *  slice 7: placed past the mound's current edge, it was buried as the mound spread, and moved with it). */
-  middenAt(): number {
-    // Never past 40 % of the way to the nearest neighbour on that side: each midden on its own colony's ground (nests close together).
-    const t = this.neighbour();
-    return t && this.entrance ? Math.min(MIDDEN_AT, Math.round(0.4 * Math.abs(t.x - this.entrance.x))) : MIDDEN_AT;
-  }
-
   /** The aphids' odour in the air (aphids.ts, ja-nzkg.3): the game's, shared by its colonies; null until a clump is put down. */
   aphidOdour: AphidOdour | null = null;
   /**
@@ -1218,12 +1202,9 @@ export class Colony {
     return !this.joinsChamber(x, y, c ? c.id : -1);
   }
 
-  /** The curtain: the ground's top in column x as dug, under any mound heaped on it (the first row that is neither sky nor loose soil). */
+  /** The curtain: the ground's top in column x as dug, under any mound heaped on it (the first row that is not sky). */
   soilTop(x: number): number {
-    let y = groundTop(this.map, x);
-    const loose = this.map.loose;
-    if (loose) while (y < this.map.size.h && loose.get(x, y) === 1) y++;
-    return y;
+    return groundTop(this.map, x);
   }
 
   /**
