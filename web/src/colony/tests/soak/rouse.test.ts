@@ -35,23 +35,23 @@ test("rouse: none, some, strong set the host's share of a finder; off the defaul
 });
 
 test("rouse: a desert game's fungus starts with rouse on its menu; a generic game's does not (owner D2; review of #202, S6)", () => {
-  const desert = new Game(generateOneWorld(1), { antCount: 10, rival: false, species: DESERT_ANT }, gameRng(1));
+  const desert = new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 10 }]);
   assert.ok(desert.fungus.menu.has("rouse"));
-  const generic = new Game(generateOneWorld(1), { antCount: 10, rival: false }, gameRng(1));
+  const generic = new Game(generateOneWorld(1), {}, gameRng(1), [{ antCount: 10 }]);
   assert.ok(!generic.fungus.menu.has("rouse"));
   assert.deepEqual(menuFor([...DEFAULT_MENU, "rouse"], false), DEFAULT_MENU, "menuFor takes rouse off where finders don't invite");
 });
 
 /** A one-world game of `species` with the fungus landed in the player's colony, its hosts pulling rouse at `level`; passes the waiting ants met. */
 function passes(species: Species, level: number, seconds = 240): number {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species }, gameRng(1));
+  const g = new Game(generateOneWorld(1), { species }, gameRng(1), [{ antCount: 60 }]);
   g.fungus.configure({ hide: false, cull: false }, [...DEFAULT_MENU, "rouse"]);
   g.land(0, GARDEN);
   g.fungus.bindPolicy("fungus", (s) => encodeLevels({ rouse: s.task === "queen" ? 0 : level }, g.fungus.asked));
   let met = 0;
   for (let k = 0; k < seconds * 30; k++) {
     g.tick(1 / 30);
-    met += g.player.holeSeen;
+    met += g.colonies[0]!.holeSeen;
   }
   return met;
 }
@@ -68,8 +68,8 @@ test("on the generic ant (no invitation) rouse does nothing", () => {
 });
 
 test("at its hole a roused host adds its share only with nothing found; a carrier is one finder, rouse or not (review of #202, S2)", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
-  const c = g.player;
+  const g = new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 60 }]);
+  const c = g.colonies[0]!;
   const i = c.alive.indexOf(1); // set on the plane at its hole below, as one coming home is
   const down = (carrying: number) => {
     const was = c.cur;

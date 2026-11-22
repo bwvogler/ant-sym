@@ -22,12 +22,12 @@ const OLD_LAW = { piErrorLaw: 0, searchScale: 0 };
 function game(hyphae: boolean, flow = false): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae, flow } },
+    { autoFound: false, fungus: { hyphae, flow } },
     gameRng(7),
-    // routeMemory off: these tests follow one seed's digging, and route memory moves the ants (it is not what they test).
-    // The odometer law and U3b's spiral (piErrorLaw 0, searchScale 0) for the same reason: the default law 1 (PRD §79) moves
-    // the ants too, and on this seed F2's body is then smaller early, so a hypha's mass is 7 % of it at 21 s (bound 6 %).
-    { colony: { routeMemory: 0, ...OLD_LAW }, rival: { routeMemory: 0, ...OLD_LAW } },
+    [
+      { antCount: 40, colony: { routeMemory: 0, ...OLD_LAW } },
+      { antCount: 40, colony: { routeMemory: 0, ...OLD_LAW } },
+    ],
   );
   g.land(0, GARDEN, { evolve: true });
   return g;
@@ -347,7 +347,10 @@ test("a daughter founded with the fungus in her queen gets a patch by her own ho
 
 test("the patch's tip aimed at the hole never starts with its own patch ahead (ja-2bw.17: seed 9's fused at once and no hypha reached the hole)", () => {
   for (const seed of [7, 9, 12]) {
-    const g = new Game(generateOneWorld(seed), { antCount: 8, rivalAnts: 8, autoFound: false, fungus: { hyphae: true } }, gameRng(seed));
+    const g = new Game(generateOneWorld(seed), { autoFound: false, fungus: { hyphae: true } }, gameRng(seed), [
+      { antCount: 8 },
+      { antCount: 8 },
+    ]);
     g.land(0, GARDEN, { evolve: true });
     const plane = g.fungus.hyphaeOn(PLANE)!;
     const t = plane.tips[0]!;

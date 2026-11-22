@@ -55,7 +55,7 @@ function crowdedGames() {
   for (const seed of [4, 5, 6]) {
     const w = smallOne(2);
     const map = w.curtain;
-    const g = new Game(w, { antCount: 400, rival: false }, mulberry32(seed));
+    const g = new Game(w, {}, mulberry32(seed), [{ antCount: 400 }]);
     const ch = map.chambers!;
     const floor0 = ch.floorOf[0]!;
     // A filled chamber cell leaves its chamber as it is filled (fillCell releases it), so count the releases (review of #248, S1).
@@ -63,9 +63,9 @@ function crowdedGames() {
     const release = ch.release.bind(ch);
     ch.release = (x, y) => (ch.at(x, y) >= 0 && released++, release(x, y)); // fillCell releases every cell it fills
     // Every ant middle-aged, a digger: this is about how chambers are dug, not who digs (slice 6 zones digging by age).
-    for (let i = 0; i < g.player.n; i++) {
-      g.player.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
-      g.player.lifespan[i] = Infinity;
+    for (let i = 0; i < g.colonies[0]!.n; i++) {
+      g.colonies[0]!.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;
+      g.colonies[0]!.lifespan[i] = Infinity;
     }
     for (let k = 0; k < 30 * 240; k++) g.tick(1 / 30);
     const mine = ch.list.filter((c) => c.colony === 0 && c.cells > 0);
@@ -147,7 +147,7 @@ test("two crowded colonies on several maps: no chamber touches another, of eithe
   for (const world of [1, 2]) {
     const w = smallOne(world);
     const map = w.curtain;
-    const g = new Game(w, { antCount: 200, rivalAnts: 200 }, mulberry32(world + 10));
+    const g = new Game(w, {}, mulberry32(world + 10), [{ antCount: 200 }, { antCount: 200 }]);
     for (const c of g.colonies)
       for (let i = 0; i < c.n; i++) {
         c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN;

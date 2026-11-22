@@ -235,8 +235,8 @@ test("get is asked for loose soil, corpses and brood too, and refusing one leave
   const run = (refuse: Item | null, ticks: number | null) => {
     const w = smallOne(2);
     broodChamber(w.curtain); // nurses take brood only to a brood chamber (ja-xu6.2): one beside the royal one
-    const g = new Game(w, { antCount: 200, rival: false }, mulberry32(4));
-    const c = g.player;
+    const g = new Game(w, {}, mulberry32(4), [{ antCount: 200 }]);
+    const c = g.colonies[0]!;
     const offered = new Set<Item>();
     c.responses = responses({ get: (t) => (offered.add(t.offered), t.offered !== refuse && localResponses.get(t)) });
     for (let i = 0; i < c.n; i++) c.age[i] = ((YOUNG + MIDDLE) / 2) * LIFESPAN * (i % 2); // half young (nurses), half middle-aged (undertakers)
@@ -350,8 +350,8 @@ test("rest on a top-down map: a tired returner rests in the nest for restTime be
 });
 
 test("fatigue (ja-q47): the young (inside workers) never tire; carrying neither tires nor rests outside; rest comes a little at a time", () => {
-  const g = new Game(smallOne(2), { antCount: 200, rival: false }, mulberry32(4));
-  const c = g.player;
+  const g = new Game(smallOne(2), {}, mulberry32(4), [{ antCount: 200 }]);
+  const c = g.colonies[0]!;
   const step = c.params.patience / c.params.restTime / 30; // a tick's rest
   let maxYoung = 0;
   let partialRests = 0;

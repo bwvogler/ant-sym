@@ -38,8 +38,8 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   // sent ants 50–80 cells off. An ant whose vector is within 3 cells reaches its believed hole in sight of the real one.
   // (On the plane a returner stalled SEARCH_STALL seconds searches wherever it is, by design, steer.ts: none of these
   // samples stalls, 157 measured on S2.3c's review, so this reads the belief's search only.)
-  const g = new Game(smallOne(5), { antCount: 100 }, mulberry32(5));
-  const c = g.player;
+  const g = new Game(smallOne(5), {}, mulberry32(5), [{ antCount: 100 }, { antCount: 800 }]);
+  const c = g.colonies[0]!;
   let samples = 0;
   let searching = 0;
   const trips = new Set<string>(); // distinct trips sampled: each trip draws its own drift (review of #264, S2)

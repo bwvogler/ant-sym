@@ -20,7 +20,7 @@ test("a species that re-declares the generic fields plays exactly as the generic
   const words: LaneWords<Mode> = { ...WORDS, schema: same };
   const mirror: Species = { id: "mirror", name: "Mirror", params: {}, responses: localResponses, lanes: { mode: words } };
   const play = (species?: Species) => {
-    const g = new Game(smallOne(7), species ? { antCount: 40, species } : { antCount: 40 }, mulberry32(2));
+    const g = new Game(smallOne(7), species ? { species } : {}, mulberry32(2), [{ antCount: 40 }, { antCount: 800 }]);
     for (let k = 0; k < 30 * 35; k++) g.tick(1 / 30);
     return g;
   };
@@ -35,7 +35,7 @@ test("a species that re-declares the generic fields plays exactly as the generic
     );
   for (const g of [play(mirror), play(shuffled)]) {
     assert.equal(behaviour(g), behaviour(generic));
-    assert.equal(g.player.decisions, generic.player.decisions, "as many questions");
+    assert.equal(g.colonies[0]!.decisions, generic.colonies[0]!.decisions, "as many questions");
   }
-  assert.ok(generic.player.decisions > 0);
+  assert.ok(generic.colonies[0]!.decisions > 0);
 });
