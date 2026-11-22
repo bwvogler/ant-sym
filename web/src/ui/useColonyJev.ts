@@ -13,7 +13,7 @@ import {
 } from "../colony/index.ts";
 import { COLONY_NAMES } from "./names.ts";
 import { browserCache } from "./cacheStore.ts";
-import { ColonyJev, type ColonyJevState } from "./colonyJev.ts";
+import { ColonyJev, PAGE_ASKS_RESPONSE_LANES, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import type { Backend } from "./backend.ts";
 import { canResume, policyLock, shouldStart } from "./policyLock.ts";
@@ -94,7 +94,7 @@ export function useColonyJev(
   // A colony founded mid-game is pushed onto the same array (Game.addColony): its length drives a re-attach too.
   const count = colonies.length;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => jev.attachColonies(colonies, species, true), [jev, colonies, count, species]);
+  useEffect(() => jev.attachColonies(colonies, species, PAGE_ASKS_RESPONSE_LANES), [jev, colonies, count, species]);
   // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
 

@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { centreX, centreY, DESERT_ANT, GENERIC_ANT, NEGLECTUS_ANT, OPEN, PLANE, rockAt } from "../../colony/index.ts";
 import { combatObservers } from "../../colony/index.ts";
+import { readFileSync } from "node:fs";
+import { PAGE_ASKS_RESPONSE_LANES } from "../colonyJev.ts";
 import { buildGame } from "../useColony.ts";
 
 test("the page builds one world, whatever the settings (PRD §55)", () => {
@@ -59,4 +61,12 @@ test("directed combat follows species recognition and contact decisions when wor
       assert.equal(exposures, 0);
     }
   }
+});
+
+// The page binds the ant's six response lanes through one flag (review of #281, S1/S3/D1): pinned here with the hook that passes it,
+// so a change of either is a decision, not a drift.
+test("the page asks the response lanes, and the hook that attaches the colonies passes the flag", () => {
+  assert.equal(PAGE_ASKS_RESPONSE_LANES, true);
+  const hook = readFileSync(new URL("../useColonyJev.ts", import.meta.url), "utf8");
+  assert.match(hook, /attachColonies\(colonies, species, PAGE_ASKS_RESPONSE_LANES\)/);
 });

@@ -284,6 +284,9 @@ function colonyLanes(words: string, species: Species, actions: boolean): Omit<Dr
   };
 }
 
+/** Whether the page asks the ant's six response lanes (get, carry, drop, trail, contact, leave) of the colonies it attaches (review of #281, D1). */
+export const PAGE_ASKS_RESPONSE_LANES = true;
+
 export class ColonyJev {
   opts: ColonyJevOptions;
   /** the page's game journal (?log=, ui/journal.ts): each batch asked, answered or failed is a "jev" event */

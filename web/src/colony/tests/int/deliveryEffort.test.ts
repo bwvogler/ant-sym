@@ -319,6 +319,20 @@ test("lane-off and local carry preserve immediate legacy pickup delivery", () =>
   }
 });
 
+// The default (params.dropRefusalLimit, 2 s) is what the page plays when a drop answer refuses (review of #281, S2): nothing else
+// reads it, so every other recovery test sets its own limit.
+test("with default params, two seconds of refusal at an eligible chamber release the food", () => {
+  const { c, store, y } = setup();
+  assert.equal(c.params.dropRefusalLimit, 2, "the default under test");
+  c.responses = responses({ drop: () => false });
+  c.foodTo = () => store.id;
+  put(c, 0, 22, y);
+  assert.equal(port(c, 0, 1.5), false, "still holding it before the limit");
+  assert.equal(c.carrying[0], 1);
+  assert.equal(port(c, 0, 0.5), true, "released at 2 s");
+  assert.equal(c.carrying[0], 0);
+});
+
 test("repeated refusal at an eligible chamber releases food for another worker", () => {
   const { c, store, y } = setup();
   c.params.dropRefusalLimit = 0.5;
