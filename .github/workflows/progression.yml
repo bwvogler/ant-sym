@@ -71,8 +71,10 @@ jobs:
           [[ -z "$REF" || "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || bad "ref: a branch, tag or commit"
           [[ "$REF" == *..* ]] && bad "ref: no .."
           [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
-          [[ "$SECONDS_IN" =~ ^[0-9]+$ ]] || bad "seconds: a whole number"
+          [[ "$SECONDS_IN" =~ ^[0-9]{1,4}$ ]] || bad "seconds: a whole number up to 9999 (a runner stops after 60 minutes)"
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
+          # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
+          # later one ignores it.
           args="--map one --evolve --seconds $SECONDS_IN --aim $AIM"
           [ "$HYPHAE" = "true" ] && args="$args --hyphae"
           [ "$GROWTH" = "true" ] && args="$args --growth"
@@ -110,6 +112,8 @@ jobs:
           ARGS: ${{ needs.plan.outputs.args }}
           SEED: ${{ matrix.seed }}
         run: |
+          # No pipefail by default: without it a crashed progression.mjs would leave tee's exit status, and a green runner.
+          set -o pipefail
           mkdir -p out
           echo "commit $(git rev-parse HEAD)" | tee "out/seed-$SEED.txt"
           # shellcheck disable=SC2086
@@ -143,6 +147,9 @@ jobs:
         env:
           SEEDS: ${{ needs.plan.outputs.seeds }}
         run: |
-          node scripts/progression-table.mjs out | tee -a "$GITHUB_STEP_SUMMARY"
+          set -o pipefail # the table script's exit 1 (a seed with no result line) must not be tee's 0
+          status=0
+          node scripts/progression-table.mjs out | tee -a "$GITHUB_STEP_SUMMARY" || status=$?
           missing=$(node -e 'const fs = require("fs"); console.log(JSON.parse(process.argv[1]).filter((s) => !fs.existsSync(`out/seed-${s}.txt`)).join(" "))' "$SEEDS")
           if [ -n "$missing" ]; then echo "::error title=progression::no result for seeds $missing (their runners failed)"; exit 1; fi
+          exit $status

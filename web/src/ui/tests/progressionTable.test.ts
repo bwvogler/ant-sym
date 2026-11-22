@@ -49,6 +49,22 @@ test("a row a seed, in seed order, with the worst seed and the median of the qua
   );
 });
 
+test("an even number of seeds takes the middle pair's mean, and a tie for worst names every seed in it", () => {
+  const { out } = run({
+    "seed-1.txt": seedText(1, "100 s", "100 s"),
+    "seed-2.txt": seedText(2, "200 s", "100 s"),
+    "seed-3.txt": seedText(3, "400 s", "100 s"),
+    "seed-4.txt": seedText(4, "400 s", "100 s"),
+  });
+  assert.match(out, /quarter: worst 400 s \(seeds 3, 4\), median 300 s, reached on 4 of 4 seeds/);
+});
+
+test("a file whose result line is for another seed fails the table (a misnamed or overwritten file)", () => {
+  const { out, status } = run({ "seed-1.txt": seedText(2, "100 s", "200 s") });
+  assert.equal(status, 1);
+  assert.match(out, /::error title=progression::seed-1\.txt has no result line for seed 1/);
+});
+
 test("two commits are both named, so a table that mixes arms shows it", () => {
   const { out } = run({
     "seed-1.txt": seedText(1, "100 s", "200 s", "aaaaaaa000000000000000000000000000000000"),
