@@ -121,9 +121,16 @@ test("the notices steps pause the game and wait for an empty field before raisin
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(
     script,
-    /const noNotices = \(page, what\) =>\s+until\(async \(\) => \(await page\.evaluate\(\(\) => document\.querySelectorAll\('\[role="status"\] button'\)\.length\)\) === 0,/,
+    /const noNotices = async \(page, what\) => \{\s+const none = \(\) => page\.evaluate\(\(\) => document\.querySelectorAll\('\[role="status"\] button'\)\.length === 0\);/,
     "the helper waits for no notice button",
   );
+  assert.match(
+    script,
+    /if \(!\(await none\(\)\)\) return false;\s+await sleep\(700\);\s+return none\(\);/,
+    "and for it to stay empty 700 ms (review of #296, N1)",
+  );
+  const waitMs = Number(/return none\(\);\s+\},\s+what,\s+([\d_]+),/.exec(script)?.[1]?.replaceAll("_", ""));
+  assert.ok(waitMs > 7000 + 700, `the wait outlasts a notice's 7 s and the 0.7 s settle, not ${waitMs} ms (review of #296, N2)`);
   const stepOf = (n: number): string => {
     const from = script.indexOf(`section("${n}. `);
     assert.ok(from > 0, `step ${n} is in the script`);
@@ -138,6 +145,15 @@ test("the notices steps pause the game and wait for an empty field before raisin
     stepOf(17),
     /fp\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.click\(\);\n\s+await noNotices\(fp, /,
     "step 17 pauses, then waits for a quiet field",
+  );
+  assert.match(
+    stepOf(16),
+    /hp\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.tap\(\);\n\s+await noNotices\(hp, /,
+    "step 16's phone page pauses, then waits for a quiet field (review of #296, N3)",
+  );
+  assert.ok(
+    stepOf(16).indexOf("await noNotices(hp") < stepOf(16).indexOf('notify("A notice behind a sheet."'),
+    "step 16 raises its notice only after",
   );
   assert.ok(stepOf(17).indexOf("await noNotices(fp") < stepOf(17).indexOf("raiseF("), "step 17 raises its notices only after");
   assert.ok(stepOf(14).indexOf("await noNotices(np2") < stepOf(14).indexOf("const raise = "), "step 14 raises its notices only after");

@@ -59,7 +59,7 @@ web/src/ui/field/
   env.ts          FieldEnv: what a frame needs from the outside world (below)
   ctx.ts          FieldCtx and FieldInputs: what a frame's layers share and read
   overlays.ts     drawLine, drawHoleNames, drawBends, drawStripAnts, drawPen, pill, label (+ traceColumns)
-  fungus.ts       drawHyphae, stalks and knots, the spore wash
+  fungus.ts       drawHyphae (hyphae, cords, twigs, tips, mass in transit, knots, fruits), the colonised corpses, the raised stalks (the spore wash is painted into the ground's chunks and moves with paintChunk)
   ground.ts       paintChunk, paintMini, drawHexes, stripAt, the sprite ground, the chunk cache, the minimap
   nests.ts, ants.ts, marks.ts   the stages of draw(): nests, ants, and the specimens, ring, traces, aphids, inspection
   renderer.ts     FieldRenderer: frame(inputs) calls the stages in order and returns the result
@@ -143,3 +143,4 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-22 | `ja-fnd.6.3.4`, `.20`: seven and five scenes (30 in all) | #298, #302 |
 | 2026-11-22 | `ja-fnd.6.3.13`: `FieldEnv`, the frame's result, the prelude as `prepareFrame` (the first three files of `ui/field/`) | #303 |
 | 2026-11-22 | `ja-fnd.6.3.5`: `FieldCtx`, `FieldInputs`, the overlay layers (`overlays.ts`), the recording fake context; four scenes for what the field reads from the page (34 in all) | #304 |
+| 2026-11-22 | `ja-fnd.6.3.6`: the fungus layer (`fungus.ts`), `FieldEnv.newPath`, `zoom.ts` | (this PR) |
