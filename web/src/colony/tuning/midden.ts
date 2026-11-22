@@ -1,17 +1,9 @@
 // The midden: corpses carried out, its mark, where it lies. Part of the colony's tuning constants (docs/refactor.md S3.5, ja-fnd.4.5),
 // re-exported by ../tuning.ts; moved verbatim from it, comments and values unchanged.
 
-import { MOUND_REACH } from "./dig.ts";
-
 // The midden (nest slice 7): see undertake, dropPlane, middenSmell.
 /** Chance per second an idle middle-aged ant underground picks up a corpse within two cells of it. */
 export const PICK_CORPSE = 1;
-
-/** The midden lies at least this many cells past the mound's reach. */
-const MIDDEN_PAST = 3;
-
-/** Corpses on the ground are taken to the midden from within this many columns of the hole (out to the midden). */
-export const MIDDEN_NEAR = 100;
 
 /** Seconds an undertaker walks a corpse out before it puts it down short of the midden (a pellet's 15 s fell short of it on hilly ground). */
 export const CORPSE_GIVE_UP = 60;
@@ -37,9 +29,6 @@ export const MIDDEN_AVOID = 1.5;
 export const MIDDEN_SCALE = 5;
 
 export const MIDDEN_CROWD = 3;
-
-/** The midden lies this many columns from the hole, toward the nearest other colony (see middenSide): just past the mound's largest reach. */
-export const MIDDEN_AT = MOUND_REACH + MIDDEN_PAST;
 
 /**
  * One world's plane (U3c): a corpse is put on the midden no nearer home than this by the undertaker's own vector, and off
