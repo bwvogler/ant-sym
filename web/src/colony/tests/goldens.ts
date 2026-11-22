@@ -15,7 +15,7 @@ import { mulberry32 } from "../world.ts";
 
 export interface Scenario {
   name: string;
-  /** the full-size world: generateOneWorld's own plane, played with Game's defaults (not the page's regrow, autoFound or hyphae); otherwise a small plane of 160 × 100 */
+  /** the full-size world played as the page plays it (regrowth, no auto-founding, hyphae, the page's random stream: `gameRng`); otherwise a small plane of 160 × 100 on Game's defaults */
   full?: boolean;
   seed: number;
   ants: number;
@@ -93,7 +93,8 @@ const DT = 1 / 30;
 export function record(s: Scenario): OneSample[] {
   const L = s.landed;
   const world = L || s.full ? generateOneWorld(s.seed) : generateOneWorld(s.seed, { plane: { size: { w: 160, h: 100 } } });
-  const game = L
+  const page = L || s.full; // the page's game: the full-size world, rival, regrowth, no auto-founding, hyphae, the page's random stream
+  const game = page
     ? new Game(
         world,
         { antCount: s.ants, rivalAnts: s.ants, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true } },
