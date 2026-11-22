@@ -3,6 +3,8 @@
 import { DEFAULT_FIGHT, STRAINS } from "../web/src/colony/index.ts";
 import { combatObservers } from "../web/src/colony/index.ts";
 import { buildGame } from "../web/src/ui/useColony.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const [species, seedArg, arm, secondsArg = "600"] = process.argv.slice(2);
 const seed = Number(seedArg);

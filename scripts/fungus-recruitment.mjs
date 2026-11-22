@@ -1,7 +1,9 @@
-// Paired colony assay. Run from the repository root: node scripts/fungus-recruitment.mjs
+// Paired colony assay. Usage, from the repository root: node scripts/fungus-recruitment.mjs
 import assert from "node:assert/strict";
 import { Arena, at, oneArena } from "../web/src/colony/experiment.ts";
 import { CELL, CountGrid, CURTAIN, Game, PLANE, STRAINS, cellOf, encodeLevels, gameRng, occupancy } from "../web/src/colony/index.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const workers = 96;
 const pioneers = 8;

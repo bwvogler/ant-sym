@@ -1,3 +1,4 @@
+// Usage: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate | --counterattack] [seed ...]
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate | --counterattack] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match. Add --trace-combat to record casualty time and position.
 // Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack|simulation-counterattack]
@@ -14,6 +15,8 @@ import {
   localResponses,
 } from "../web/src/colony/index.ts";
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const dt = 1 / 30;
 const seconds = Number(process.env.ANT_ASSAY_SECONDS ?? 120);

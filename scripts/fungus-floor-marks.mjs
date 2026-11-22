@@ -1,5 +1,5 @@
 // Matched generated nests with a fixed chamber-sensitive trail doctrine and a legacy control.
-// Run from the repository root: node scripts/fungus-floor-marks.mjs [--recovery] [seed ...]
+// Usage, from the repository root: node scripts/fungus-floor-marks.mjs [--recovery] [seed ...]
 import assert from "node:assert/strict";
 import {
   CELL,
@@ -18,6 +18,8 @@ import {
   rockAt,
   OPEN,
 } from "../web/src/colony/index.ts";
+import { helpAndExit } from "./lib/usage.mjs";
+helpAndExit(import.meta.url);
 
 const dt = 1 / 30;
 const workers = 96;
