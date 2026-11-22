@@ -24,7 +24,7 @@ test(
     skip: process.env.UNITY ? false : "doesn't unify since ja-web's gate (ja-lp4.6.6); UNITY=1 npm run test:slow runs it",
   },
   () => {
-    const g = new Game(generateOneWorld(3), { antCount: 600, rivalAnts: 600, regrow: GAME_REGROW, autoFound: false }, gameRng(3));
+    const g = new Game(generateOneWorld(3), { regrow: GAME_REGROW, autoFound: false }, gameRng(3), [{ antCount: 600 }, { antCount: 600 }]);
     const garden = STRAINS.findIndex((s) => s.id === "garden");
     for (const c of g.colonies) {
       const nest = (c.layers[CURTAIN] as Layer).nest;

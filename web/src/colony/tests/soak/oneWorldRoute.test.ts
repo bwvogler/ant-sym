@@ -27,18 +27,16 @@ interface World {
 
 /** Seed 7's small plane, no food, no rock unless `band` carves it (rock cells given), no scouts; the player's ants young but ant 0, which is old. */
 function plane(params: Partial<Colony["params"]> = { routeMemory: 1 }, rock: [number, number, number, number][] = []): World {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-    { colony: params },
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10, colony: params },
+    { antCount: 10 },
+  ]);
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
   for (const [x0, y0, x1, y1] of rock) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) map.rock.set(x, y, ROCK);
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-  const c = g.player;
+  const c = g.colonies[0]!;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
   c.age[0] = 0.5 * LIFESPAN;
   const hc = c.holeCells[c.params.nest] as HoleCell;
@@ -512,14 +510,12 @@ test("route memory: the hole's sight takes over at any moment of a retrace", () 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
   assert.equal(SAVE_VERSION, 14);
   const make = (): Game =>
-    new Game(
-      generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-      { antCount: 10, rivalAnts: 10, regrow: 0 },
-      gameRng(7),
-      { colony: { routeMemory: 2 } },
-    );
+    new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+      { antCount: 10, colony: { routeMemory: 2 } },
+      { antCount: 10 },
+    ]);
   const g = make();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
   const hy = centreY(hc.py);
@@ -540,7 +536,7 @@ test("route memory: a save carries the places and the retrace, and the game runs
   const saved = JSON.parse(JSON.stringify(g.save()));
   const fresh = make();
   fresh.load(saved);
-  const f = fresh.player;
+  const f = fresh.colonies[0]!;
   for (const k of ["routePlaces", "routeN", "routeGap", "routeAt", "routeState", "routeGoal"] as const)
     assert.deepEqual(Array.from(f[k]), Array.from(c[k]), k);
   for (let k = 0; k < 60; k++) {
@@ -548,7 +544,7 @@ test("route memory: a save carries the places and the retrace, and the game runs
     fresh.tick(DT);
   }
   for (const k of ["x", "y", "routeN", "routeState", "routeGoal"] as const)
-    assert.deepEqual(Array.from(fresh.player[k]), Array.from(c[k]), `after running on: ${k}`);
+    assert.deepEqual(Array.from(fresh.colonies[0]![k]), Array.from(c[k]), `after running on: ${k}`);
 });
 
 test("route memory records in FOLLOW mode too, and not with food in the jaws", () => {

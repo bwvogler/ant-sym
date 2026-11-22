@@ -17,7 +17,10 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 /** Seed 7's small plane (160 × 100): two nests well inside it, quick to run. */
 const small = (ants = 60, autoFound = true): Game =>
-  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rivalAnts: ants, autoFound }, gameRng(7));
+  new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { autoFound }, gameRng(7), [
+    { antCount: ants },
+    { antCount: ants },
+  ]);
 
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
