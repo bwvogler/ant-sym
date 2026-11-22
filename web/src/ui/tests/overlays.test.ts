@@ -39,6 +39,7 @@ const THEME: FieldTheme = {
 };
 
 const V: Viewport = { w: 800, h: 600, dpr: 1 };
+const SHOW = { food: true, home: true };
 
 /** The overlays use neither the clock, a path nor a sprite; a layer that does gets a fake from its own test. */
 const NO_ENV = {} as FieldEnv;
@@ -69,6 +70,13 @@ function field(g: Game, lv: number, c: Camera, over: Partial<FieldCtx> = {}) {
     fungus: g.fungus,
     env: NO_ENV,
     sprites: NO_SPRITES,
+    smellAll: false,
+    strip: false,
+    trails: [],
+    alarms: [],
+    spores: {} as FieldCtx["spores"],
+    sensedLayer: null,
+    sensedNow: 0,
     ...over,
   };
   return { k, ...rec };
@@ -328,7 +336,7 @@ test("drawPen: the flight's circle, and under the pointer the settle preview or 
   };
   const [ax, ay] = toScreen(c, V, pen.x + 5 - 0.02, pen.y);
   const [bx] = toScreen(c, V, pen.x + 5 + 0.02, pen.y);
-  const inputs = (hover: [number, number] | null): FieldInputs => ({ hover, pen, penSeen: { current: null } });
+  const inputs = (hover: [number, number] | null): FieldInputs => ({ hover, pen, penSeen: { current: null }, show: SHOW });
   // no pointer: the circle only
   const bare = field(g, PLANE, c);
   drawPen(bare.k, inputs(null));
@@ -445,7 +453,7 @@ test("sizes follow the device ratio and the text size: lines, dashes, dots and c
     onPick: () => {},
   };
   const pd = field(g, PLANE, c, two);
-  drawPen(pd.k, { hover: [420, 310], pen, penSeen: { current: null } });
+  drawPen(pd.k, { hover: [420, 310], pen, penSeen: { current: null }, show: SHOW });
   assert.deepEqual(callsOf(pd.log, "setLineDash"), ["[16, 12]", "[]", "[12, 10]", "[]"]);
   assert.ok(
     pd.log.includes("lineWidth = 4") && pd.log.includes("lineWidth = 3") && pd.log.includes("lineWidth = 2"),

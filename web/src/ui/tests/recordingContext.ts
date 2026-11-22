@@ -66,6 +66,21 @@ export class RecordedPath {
   }
 }
 
+/** An ImageData: a colour buffer of width x height pixels, four bytes each; it prints as `ImageData(64x64)`. */
+export class RecordedImage {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+    this.data = new Uint8ClampedArray(width * height * 4);
+  }
+  toString(): string {
+    return `ImageData(${this.width}x${this.height})`;
+  }
+}
+
 export interface Recording {
   ctx: CanvasRenderingContext2D;
   /** every call and property set, in order, one line each */
@@ -107,6 +122,7 @@ export function recordingContext(): Recording {
             return undefined;
           }
           if (n === "getLineDash") return [...dash];
+          if (n === "createImageData") return new RecordedImage(args[0] as number, args[1] as number);
           if (n === "measureText") {
             const px = Number(/(\d+(?:\.\d+)?)px/.exec(String(state.font))?.[1] ?? 10);
             return { width: String(args[0]).length * px * 0.5 };
@@ -152,3 +168,22 @@ export function stateAt(log: readonly string[], index: number, prop: string): un
 /** A log with each path argument shortened to its size, `path#12`: the calls' order and the paths' sizes, without a hundred curve coordinates. */
 export const shape = (log: readonly string[]): string[] =>
   log.map((l) => l.replace(/path\{[^}]*\}/g, (p) => `path#${p === "path{}" ? 0 : p.split("; ").length}`));
+
+/** A canvas whose 2D context records (one context a canvas); it prints as `canvas#n`, so a drawImage names which canvas it drew. */
+export class RecordedCanvas {
+  static count = 0;
+  readonly id = RecordedCanvas.count++;
+  readonly rec = recordingContext();
+  width: number;
+  height: number;
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+  }
+  getContext(): CanvasRenderingContext2D {
+    return this.rec.ctx;
+  }
+  toString(): string {
+    return `canvas#${this.id}`;
+  }
+}
