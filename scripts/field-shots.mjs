@@ -14,9 +14,12 @@
 // Chromium it was recorded on (hashes.json says which; `check` refuses another one); keep <dir> outside the repo and never commit one.
 //
 // What a scene shows is in SCENES below: the generic ant's world above and below (each nest zoomed, so the minimap shows; a followed ant on each
-// layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night) and the dark scheme. Not covered yet, to add with the slice that
-// moves that layer: the builder's marks (sugar, walls, the aphids clump, a moved ant's trace), a pinned specimen, the lens card's canvas marks, a
-// phone-sized page, stalks and knots, pheromone trails, the hole bends, a fungus well grown (hyphae and cords), ants of every stance.
+// layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
+// on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
+// page). The last two are set up through the dev hook and the game itself. Not covered yet, to add with the slice that moves that layer: the
+// builder's marks (sugar, walls, a moved ant's trace), a pinned specimen, a phone-sized page, ants of every stance. (The lens card is DOM, and
+// draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
+// stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes).
 
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
@@ -80,6 +83,65 @@ async function followOn(page, k, layer) {
   if (!ok) throw new Error(`no ant of colony ${k} on layer ${layer} to follow`);
 }
 
+/**
+ * A fungus that has had time to grow (the game itself, through the dev hook): Mycelium bought twice at once, then 120 s on, so the hyphae have
+ * cords; then Stalks and Knots at level 2, six corpses buried along the hyphae, and 30 s more, so stalks stand on them and starved tips have
+ * hardened into knots. The modules come from the dev server (the page's own, so the same instances).
+ */
+const growFungus = (page) =>
+  page.evaluate(async () => {
+    const { pathTo } = await import("/src/colony/evolution.ts");
+    const { keyCell } = await import("/src/colony/hyphae.ts");
+    const J = window.jevAnts;
+    const f = J.game.fungus;
+    const e = f.evolution;
+    e.growth = 1e7;
+    const keep = (id) => pathTo(e.save().levels, id).every((x) => f.upgrade(x));
+    keep("mycelium");
+    keep("mycelium");
+    J.step(6000);
+    keep("stalks");
+    keep("stalks");
+    keep("knots");
+    keep("knots");
+    const keys = [...f.hyphaeOn(0).parent.keys()].filter((k) => !f.hyphaeOn(0).cords.has(k));
+    const stride = Math.floor(keys.length / 6);
+    for (let i = 0, n = 0; i < keys.length && n < 6; i += stride, n++) {
+      const [x, y] = keyCell(keys[i]);
+      J.game.colonies[0].onBury({ x, y, held: -1, died: J.game.time, load: 0.5, strain: e.strain }, 0);
+    }
+    J.step(900);
+    // spores on the curtain, round the second nest's hole (the game puts them there only once an ant has walked through)
+    const sp = f.sporesOn(1).spores;
+    const e1 = J.game.colonies[1].layers[1].nest;
+    const [ex, ey] = [Math.round(e1.entrance?.x ?? e1.x), Math.round(e1.entrance?.y ?? e1.y)];
+    for (let dy = 1; dy <= 6; dy++) for (let dx = -8; dx <= 8; dx++) sp.set(ex + dx, ey + dy, 2);
+    const h = f.hyphaeOn(0);
+    if (!f.stalksOn(0).length || !h.knots.size || !h.cords.size)
+      throw new Error(
+        `the fungus has no stalks, knots or cords to draw (${f.stalksOn(0).length}, ${h.knots.size}, ${h.cords.size}; mycelium ${e.level("mycelium")}, ${h.parent.size} cells)`,
+      );
+  });
+
+/**
+ * A third colony beyond the line's far end (so the line has a bend, which the side view marks and labels), the builder's aphid clump on the
+ * plane near the first nest, and time for ants to find it. The game itself, through the dev hook.
+ */
+const buildWorld = (page) =>
+  page.evaluate(() => {
+    const J = window.jevAnts;
+    const g = J.game;
+    J.step(1200);
+    const r = g.tryFoundBeyond("end");
+    if (!r.ok) throw new Error(`no third colony: ${r.reason}`);
+    const h = g.colonies[0].holeCells[g.colonies[0].params.nest];
+    const cells = [];
+    for (let dy = 3; dy <= 5; dy++) for (let dx = 2; dx <= 4; dx++) cells.push(h.px + dx, h.py + dy);
+    g.aphids.push({ layer: 0, cells, start: 3 * (cells.length / 2), eaten: 0, age: 100, owed: 0 });
+    J.step(300);
+    if (g.colonies.length < 3 || !g.aphids.length) throw new Error("the world was not built");
+  });
+
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
 const dayAt = (page, phase) =>
   page.evaluate((phase) => {
@@ -128,6 +190,30 @@ const SCENES = [
   { name: "dark-above-nest0", page: "dark", run: (p) => p.evaluate(() => window.jevAnts.goNest(0)) },
   { name: "dark-below", page: "dark", run: (p) => view(p, "below") },
   { name: "dark-below-nest1", page: "dark", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
+  // A grown fungus (cords, stalks, knots, spores below): the dark of neither page, a fresh light game
+  {
+    name: "grown-above",
+    page: "grown",
+    run: async (p) => {
+      await growFungus(p);
+      await p.evaluate(() => window.jevAnts.goNest(1));
+    },
+  },
+  // the whole curtain first (a stalk or a plane cell read on the wrong layer would land somewhere on it), then the second nest zoomed
+  { name: "grown-below-wide", page: "grown", run: (p) => view(p, "below") },
+  { name: "grown-below", page: "grown", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
+  // Trails, the aphid clump and the line's third hole (a bend, and ants on the strip)
+  { name: "built-trails", page: "built", run: (p) => ticks(p, 1500).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
+  {
+    name: "built-aphids",
+    page: "built",
+    run: async (p) => {
+      await buildWorld(p);
+      await p.evaluate(() => window.jevAnts.goNest(0));
+    },
+  },
+  { name: "built-bend", page: "built", run: (p) => view(p, "below") },
+  { name: "built-strip", page: "built", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
   { name: "desert-noon", page: "desert", run: async (p) => toTime(p, await dayAt(p, 1 / 3)) },
   { name: "desert-dusk", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.62)) },
   { name: "desert-night", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.84)) },
@@ -138,6 +224,8 @@ const PAGES = {
   light: { scheme: "light", species: null },
   dark: { scheme: "dark", species: null },
   desert: { scheme: "light", species: "desert" },
+  grown: { scheme: "light", species: null },
+  built: { scheme: "light", species: null },
 };
 
 // ——— The command line, checked before anything starts ———
