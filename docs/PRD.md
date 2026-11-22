@@ -7440,6 +7440,17 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 
 **Built, experimental.** Attack intent is recorded per ant/layer, resolved through reusable odour-band pressure grids, and cleared on the next decision or slot reuse. Ignore continues work without attack or load release. Response cache version 13 when built; the response brain is at 16 now (PRD §87). The 20-seed 120 s contact sweep reduced median losses from 33.5 to 0 and raised median food from 532.5 to 593.5; worst paired food fell to 0.898 (seed 5). Defaults remain legacy until ja-g7nz.4's full-duration defense/survival/throughput guards. See the [note and paired results](contact-actions.md#implemented-and-measured-2026-11-18).
 
+**Directed-combat validation on stanceless main (2026-11-22, `contact-validation.yml`, `workflow_dispatch` on #281 head c29dd92, GitHub, seeds 1-20, standard length; no Jev).** `game.fight.intent` off against on:
+
+| Assay | intent off | intent on | What moves |
+|---|---|---|---|
+| A9 strangers meet at food (neutral contact) | pass 8/20 | **pass 20/20** | peaceful meetings no longer end in fights |
+| G1 the one-world game, held food | pass 17/20 (failing 3, 4, 20) | pass 15/20 (failing 3, 12, 14, 19, 20) | median losses a colony 74 → 1; stored food 2746 → 2559 (you), 2807 → 2731 (rival) |
+| A13 defence from senses, the war party walked at the hole | pass 9/20 | **pass 4/20** | the defended colony: median losses 35.5 → 144, stored 265 → 117, ants alive 222 → 94; raiders' losses 40.5 → 36 |
+
+So directed combat makes neutral play much calmer and makes defending against a raid much worse: the defenders lose four times the ants and store less food, while the raiders lose no more. The entrance-defence variants of §86 (`defendEntrance`, `defendAlarmEntrance`, `defendThreatEntrance`) are the answer being tried and are not on by default. Whether the page's new games should start with `intent` on is the owner's call (D2, review of 91fd83c); on this evidence the page's A13 behaviour is worse with it on, and its A9 and G1 behaviour better.
+
+
 ## 87. Local delivery actions (ja-g7nz)
 
 [Research and contract](delivery-actions.md). The owner approved continuing the delivery workplan. The carry response gains explicit reception/store/brood/royal destinations, implemented as locally followed roles and a separate arrival/drop decision. `deliveryLane` defaults off. Commitment persists across retain-load and retreat decisions, changes on a new explicit destination, and ends on actual release. Tests cover competing destinations, missing and swapped cues, physical reach, accounting, interruption and deterministic saves. Inspection explains the current choice without policy calls. Bounded replanning, meals and congestion remain follow-ups under ja-g7nz.3.
