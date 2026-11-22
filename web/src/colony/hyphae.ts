@@ -117,15 +117,22 @@ export type Supply = (typeof SUPPLIES)[number];
 /** How far a tip has grown since it set out or last branched: long from BRANCH_RUN cells (the growth unit, Trinci 1974; ja-2bw.18). */
 export const RUNS = ["short", "long"] as const;
 export type Run = (typeof RUNS)[number];
-/** What a tip senses at its step (the growth lane's situation, ja-2bw.5, ja-2bw.18): 4 × 3 × 2 × 2 = 48. */
+/** Whether a corpse the fungus has colonised lies on the tip's cell or beside it: the cue to thicken (PRD §85, ja-vlla.4). */
+export const RESOURCES = ["none", "corpse"] as const;
+export type Resource = (typeof RESOURCES)[number];
+/** What a tip senses at its step (the growth lane's situation, ja-2bw.5, ja-2bw.18, ja-vlla.4): 4 × 3 × 2 × 2 × 2 = 96. */
 export interface GrowthSituation {
   ahead: Ahead;
   exposed: Exposure;
   supply: Supply;
   run: Run;
+  resource: Resource;
 }
-/** What a tip does: `turn` is a turn to whichever side the tip finds free (the growth lane's, ja-2bw.5: only the tip knows its sides). */
-export const GROWTH_ANSWERS = ["grow", "left", "right", "turn", "branch", "rest", "fuse", "fruit"] as const;
+/**
+ * What a tip does: `turn` is a turn to whichever side the tip finds free (the growth lane's, ja-2bw.5: only the tip
+ * knows its sides); `thicken` fills the open, enterable cells round the tip's own cell, only at a colonised corpse (PRD §85).
+ */
+export const GROWTH_ANSWERS = ["grow", "left", "right", "turn", "branch", "rest", "fuse", "fruit", "thicken"] as const;
 export type GrowthAnswer = (typeof GROWTH_ANSWERS)[number];
 
 /**
@@ -175,6 +182,8 @@ export class Hyphae {
   loads = new Map<number, number>();
   /** cells where the body's free mass enters (a landing's patch, ja-tgw9) */
   sources = new Set<number>();
+  /** cells a tip thickened (PRD §85): a mat does not fade as an unused dead end does, until a cut takes it */
+  mat = new Set<number>();
   /** load lost with cut cells since the caller last took it (takeLost) */
   #lost = 0;
 
@@ -213,6 +222,21 @@ export class Hyphae {
     tip.y = y;
     tip.heading = d;
     tip.run++;
+    this.spent += price;
+    return true;
+  }
+
+  /**
+   * `tip` thickens into the cell along `d` (PRD §85): a hypha cell grown from the tip's own cell, the tip staying where
+   * it is. Nothing where the cell is held already. Returns whether it grew.
+   */
+  fill(tip: Tip, d: number, price: number): boolean {
+    const x = nx(tip.x, tip.y, d);
+    const y = ny(tip.y, d);
+    const k = cellKey(x, y);
+    if (this.parent.has(k)) return false;
+    this.parent.set(k, cellKey(tip.x, tip.y));
+    this.mat.add(k);
     this.spent += price;
     return true;
   }
@@ -648,6 +672,7 @@ export class Hyphae {
         this.cords.has(k) ||
         fused.has(k) ||
         this.knots.has(k) ||
+        this.mat.has(k) ||
         nearSpot(k) ||
         keep(k)
       )
@@ -681,6 +706,8 @@ export class Hyphae {
       clock: this.clock,
       loads: [...this.loads],
       sources: [...this.sources],
+      // Only when a tip has thickened: a mycelium that never did saves as it always has (the goldens hash the save).
+      ...(this.mat.size ? { mat: [...this.mat].filter((k) => this.parent.has(k)) } : {}),
     };
   }
 
@@ -705,6 +732,7 @@ export class Hyphae {
     h.clock = r.clock;
     h.loads = new Map(r.loads ?? []);
     for (const k of r.sources ?? []) h.sources.add(k);
+    for (const k of r.mat ?? []) h.mat.add(k);
     return h;
   }
 }
@@ -731,6 +759,7 @@ export interface HyphaeSave {
   clock: number;
   loads?: [number, number][];
   sources?: number[];
+  mat?: number[];
 }
 
 /** The cell `d` from (x, y). */
@@ -763,7 +792,15 @@ export function enterable(h: Hyphae, g: Ground, x: number, y: number, level: num
 }
 
 /** What `tip` senses: the cell ahead, its exposure, and its supply (`free` mass shared among `tips`). */
-export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free: number, tips: number): GrowthSituation {
+export function situationOf(
+  h: Hyphae,
+  g: Ground,
+  tip: Tip,
+  level: number,
+  free: number,
+  tips: number,
+  resources?: ReadonlyMap<number, unknown>,
+): GrowthSituation {
   const [ax, ay] = ahead(tip.x, tip.y, tip.heading);
   const k = g.kind(ax, ay);
   const what: Ahead = h.has(ax, ay) ? "own" : k === "rock" || !enterable(h, g, ax, ay, level) ? "rock" : g.topsoil ? "soil" : k;
@@ -772,7 +809,15 @@ export function situationOf(h: Hyphae, g: Ground, tip: Tip, level: number, free:
     exposed: exposureAt(g, tip.x, tip.y),
     supply: free >= HYPHA_MASS * AMPLE_STEPS * Math.max(1, tips) ? "ample" : "short",
     run: tip.run >= BRANCH_RUN ? "long" : "short",
+    resource: resources && nearCell(tip.x, tip.y, (k) => resources.has(k)) ? "corpse" : "none",
   };
+}
+
+/** Whether `is` holds the cell (x, y) or one of its six neighbours. */
+function nearCell(x: number, y: number, is: (k: number) => boolean): boolean {
+  if (is(cellKey(x, y))) return true;
+  for (let d = 0; d < 6; d++) if (is(cellKey(nx(x, y, d), ny(y, d)))) return true;
+  return false;
 }
 
 /**
@@ -891,7 +936,7 @@ export interface StepOut {
  * `budget.tips` every map's tips; both are kept up to date. Returns what was grown.
  */
 export function stepRound(
-  maps: readonly { h: Hyphae; g: Ground; sinks?: ReadonlyMap<number, number> }[],
+  maps: readonly { h: Hyphae; g: Ground; sinks?: ReadonlyMap<number, number>; resources?: ReadonlyMap<number, unknown> }[],
   level: number,
   budget: { free: number; tips: number; flow?: boolean },
   policy: ((s: GrowthSituation) => GrowthAnswer | null) | null = null,
@@ -904,11 +949,11 @@ export function stepRound(
   const lists = maps.map(({ h }) => h.tips.slice());
   const most = Math.max(0, ...lists.map((l) => l.length));
   for (let i = 0; i < most; i++)
-    maps.forEach(({ h, g }, m) => {
+    maps.forEach(({ h, g, resources }, m) => {
       const tip = lists[m]![i];
       if (!tip) return;
       if (!budget.flow) {
-        grown += stepTip(h, g, tip, level, budget, start, policy);
+        grown += stepTip(h, g, tip, level, budget, start, policy, resources);
         return;
       }
       if (!h.tips.includes(tip)) return;
@@ -916,7 +961,7 @@ export function stepRound(
       const purse = { free: h.loads.get(k) ?? 0, tips: 1 };
       const ample = purse.free >= HYPHA_MASS * FLOW_AMPLE_STEPS;
       // situationOf judges ample at AMPLE_STEPS steps a tip: scale the tip's own load so it judges at FLOW_AMPLE_STEPS.
-      const did = stepTip(h, g, tip, level, purse, { free: (purse.free * AMPLE_STEPS) / FLOW_AMPLE_STEPS, tips: 1 }, policy);
+      const did = stepTip(h, g, tip, level, purse, { free: (purse.free * AMPLE_STEPS) / FLOW_AMPLE_STEPS, tips: 1 }, policy, resources);
       tip.idle = ample && did === 0 ? (tip.idle ?? 0) + 1 : 0;
       grown += did;
       if (purse.free > 0) h.loads.set(k, purse.free);
@@ -946,6 +991,7 @@ function stepTip(
   budget: { free: number; tips: number },
   start: { free: number; tips: number },
   policy: ((s: GrowthSituation) => GrowthAnswer | null) | null,
+  resources?: ReadonlyMap<number, unknown>,
 ): number {
   let grown = 0;
   // A veer the ground blocks turns the tip where it stands, so a wall it slides along is followed over a few steps.
@@ -967,11 +1013,13 @@ function stepTip(
     grown++;
     return true;
   };
-  const s = situationOf(h, g, tip, level, start.free, start.tips);
+  const s = situationOf(h, g, tip, level, start.free, start.tips, resources);
   let a = policy?.(s) ?? localGrowth(h, g, tip, s, level);
   // The body spaces fruiting whoever chose it (ja-2bw.16, owner 2026-11-13): an answer to fruit too soon or too near a
   // spot plays the tip's own rule instead, so wall tips under an aim that fruits on every wall still grow down it.
   if (a === "fruit" && !mayFruit(h, tip)) a = localGrowth(h, g, tip, s, level);
+  // A mat forms only at a colonised corpse (PRD §85, owner 2026-11-22): a thicken answer anywhere else plays the tip's own rule.
+  if (a === "thicken" && s.resource !== "corpse") a = localGrowth(h, g, tip, s, level);
   const d = tip.heading;
   switch (a) {
     case "grow":
@@ -1016,6 +1064,17 @@ function stepTip(
       break;
     case "fruit":
       if (s.exposed !== "buried" && h.fruit(tip, g)) budget.tips--;
+      break;
+    case "thicken":
+      // Fill the open, enterable cells round the tip's own cell, a hypha's mass each from what has reached it; the tip stays.
+      for (let k = 0; k < 6; k++) {
+        if (budget.free < HYPHA_MASS) break;
+        const [x, y] = ahead(tip.x, tip.y, k);
+        if (!enterable(h, g, x, y, level) || !h.fill(tip, k, HYPHA_MASS)) continue;
+        if (!g.topsoil && g.kind(x, y) === "soil") h.soil.add(cellKey(x, y));
+        budget.free -= HYPHA_MASS;
+        grown++;
+      }
       break;
     case "rest":
       break;

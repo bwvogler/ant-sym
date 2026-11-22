@@ -29,6 +29,7 @@ import {
   ROOT,
   selfHitShare,
   situationOf,
+  stepRound,
   stepTips,
   turn,
   tipsAt,
@@ -549,8 +550,8 @@ test("a tip senses its run: short below BRANCH_RUN, long from it; the preset bra
   assert.equal(situationOf(h, g, tip, 0, 1e9, 1).run, "short");
   tip.run = BRANCH_RUN;
   assert.equal(situationOf(h, g, tip, 0, 1e9, 1).run, "long");
-  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "long" }), "branch");
-  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "short" }), "grow");
+  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "long", resource: "none" }), "branch");
+  assert.equal(localGrowthChoice({ ahead: "soil", exposed: "buried", supply: "ample", run: "short", resource: "none" }), "grow");
 });
 
 /** A dug tunnel: `legs` of [heading, cells] from (x, y); everything else soil. Returns the ground and its cells in order. */
@@ -1100,4 +1101,85 @@ test("flow (ja-tgw9): a faded or hardened cell hands its load to the cell it gre
   assert.ok(k.h.harden(1) > 0);
   assert.ok(Math.abs(k.h.loaded - was) < 1e-9, `loaded ${k.h.loaded}, was ${was}`);
   assert.equal(k.h.takeLost(), 0);
+});
+
+// Thicken (PRD §85, ja-vlla.4): a tip at a colonised corpse fills the open cells round its own cell.
+
+const CORPSE_AT = (x: number, y: number) => new Map([[cellKey(x, y), 1]]);
+
+test("a tip's resource is corpse when a colonised corpse lies on its cell or beside it, else none", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  const tip = h.tips[0]!;
+  const g = plane();
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1).resource, "none", "no corpses known");
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1, new Map()).resource, "none");
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1, CORPSE_AT(10, 20)).resource, "corpse", "on its cell");
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1, CORPSE_AT(nx(10, 20, NE), ny(20, NE))).resource, "corpse", "beside it");
+  assert.equal(situationOf(h, g, tip, 0, 1e9, 1, CORPSE_AT(14, 20)).resource, "none", "four cells off");
+});
+
+test("the local rule never thickens, whatever the situation", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  for (const resource of ["none", "corpse"] as const)
+    for (const ahead of ["soil", "open", "rock", "own"] as const)
+      for (const exposed of ["buried", "wall", "open"] as const)
+        for (const supply of ["short", "ample"] as const)
+          for (const run of ["short", "long"] as const) {
+            const s = { ahead, exposed, supply, run, resource };
+            assert.notEqual(localGrowthChoice(s), "thicken");
+            assert.notEqual(localGrowth(h, plane(), h.tips[0]!, s, 0), "thicken");
+          }
+});
+
+test("thicken at a corpse fills every open cell round the tip's cell, a hypha's mass each, and the tip stays", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  const tip = h.tips[0]!;
+  const budget = { free: 100, tips: 1 };
+  stepRound([{ h, g: plane(), resources: CORPSE_AT(10, 20) }], 0, budget, () => "thicken");
+  assert.equal(h.length, 7, "the cell and its six neighbours");
+  for (let d = 0; d < 6; d++) assert.ok(h.has(nx(10, 20, d), ny(20, d)), `neighbour ${d}`);
+  assert.equal([tip.x, tip.y].join(), "10,20", "the tip stays where it was");
+  assert.equal(h.tips.length, 1);
+  assert.equal(h.spent, 6 * HYPHA_MASS);
+  assert.equal(budget.free, 100 - 6 * HYPHA_MASS, "paid from the supply");
+  assert.equal(h.parent.get(cellKey(nx(10, 20, E), ny(20, E))), cellKey(10, 20), "grown from the tip's cell");
+});
+
+test("thicken skips rock and cells the mycelium holds, and stops when the supply runs out", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  h.addCell(nx(10, 20, W), ny(20, W));
+  const rock = cellKey(nx(10, 20, NE), ny(20, NE));
+  const g = plane((x, y) => cellKey(x, y) === rock);
+  stepRound([{ h, g, resources: CORPSE_AT(10, 20) }], 0, { free: 100, tips: 1 }, () => "thicken");
+  assert.equal(h.length, 2 + 4, "four of six: one is rock, one was held");
+  const poor = new Hyphae();
+  poor.root(10, 20, E);
+  stepRound([{ h: poor, g: plane(), resources: CORPSE_AT(10, 20) }], 0, { free: HYPHA_MASS * 2, tips: 1 }, () => "thicken");
+  assert.equal(poor.length, 1 + 2, "two cells' mass, two cells");
+});
+
+test("a thicken answer away from a corpse plays the tip's own rule, and grows no mat", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  stepRound([{ h, g: plane(), resources: CORPSE_AT(30, 20) }], 0, { free: 100, tips: 1 }, () => "thicken");
+  assert.equal(h.mat.size, 0);
+  assert.equal(h.length, 2, "the tip grew one cell on, as its own rule has it");
+});
+
+test("a mat does not fade as an unused dead end does, and it saves and loads", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  stepRound([{ h, g: plane(), resources: CORPSE_AT(10, 20) }], 0, { free: 100, tips: 1 }, () => "thicken");
+  assert.equal(h.regress(), 0, "none of the six leaves fades");
+  assert.equal(h.length, 7);
+  const back = Hyphae.load(JSON.parse(JSON.stringify(h.save())));
+  assert.deepEqual([...back.mat].sort(), [...h.mat].sort());
+  assert.equal(back.regress(), 0);
+  const plain = new Hyphae();
+  plain.root(1, 1, E);
+  assert.equal("mat" in plain.save(), false, "a mycelium that never thickened saves as it always has");
 });
