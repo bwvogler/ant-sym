@@ -57,7 +57,7 @@ function spread(map) {
 }
 
 for (let seed = lo; seed <= hi; seed++) {
-  const game = new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  const game = new Game(generateOneWorld(seed), { regrow: GAME_REGROW }, gameRng(seed), [{ antCount: ants }, { antCount: ants }]);
   game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   // The curtain is where the digging is (game.map is the plane).
   const dug = game.world.curtain;

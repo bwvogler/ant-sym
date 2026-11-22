@@ -15,6 +15,19 @@ test("the page builds one world, whatever the settings (PRD §55)", () => {
   assert.equal(g.params.fight.counterattack, true);
 });
 
+test("the page's ant count and rival box name the colonies: a pair of the same size, or one", () => {
+  const settings = { species: "generic", seed: 3, antCount: 50, generation: 0 };
+  const pair = buildGame({ ...settings, rival: true });
+  assert.deepEqual(
+    pair.colonies.map((c) => c.params.antCount),
+    [50, 50],
+  );
+  assert.deepEqual(
+    buildGame({ ...settings, rival: false }).colonies.map((c) => c.params.antCount),
+    [50],
+  );
+});
+
 test("the page builds the game with the species its settings name, and refuses one it does not know", () => {
   const settings = { seed: 3, antCount: 20, rival: true, generation: 0 };
   assert.equal(buildGame({ ...settings, species: "generic" }).params.species, GENERIC_ANT);

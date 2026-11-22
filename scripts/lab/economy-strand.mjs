@@ -35,8 +35,8 @@ for (const map of [world.plane, world.curtain]) {
     }
   map.foodTotal = map.foodLeft = total;
 }
-const g = new Game(world, { antCount: 110, rival: false }, mulberry32(w * 7919 + nudge), colony ? { colony } : undefined);
-const c = g.player;
+const g = new Game(world, {}, mulberry32(w * 7919 + nudge), [{ antCount: 110, colony }]);
+const c = g.colonies[0];
 const ch = world.curtain.chambers;
 let stranded = 0;
 let worst = "";
