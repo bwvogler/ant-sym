@@ -29,7 +29,7 @@ export function sightOf(t: number, now: number): number {
 }
 
 /**
- * The sim time each cell was last sensed by a host, per layer (0: the plane or the one map; 1: one world's curtain). A
+ * The sim time each cell was last sensed by a host, per layer (0: the plane; 1: the curtain). A
  * chunk no host has sensed for SENSED_FADE shows nothing, so it is dropped and leaves one bit: revealed (the fog of
  * war's, endless-world §8). What it holds then grows with the ground hosts sense now, not all they ever sensed (§7).
  */
@@ -108,16 +108,29 @@ export class SensedMap {
     for (let gy = gy0 - rows; gy <= gy0 + rows; gy++) {
       if (gy < 0) continue;
       const dy = centreY(gy) - y;
-      for (let gx = gx0 - cols; gx <= gx0 + cols; gx++) {
+      const inside = (gx: number) => {
         const dx = centreX(gx, gy) - x;
-        if (dx * dx + dy * dy > r2) continue;
-        const a = grid.ensure(gx >> CHUNK_BITS, gy >> CHUNK_BITS);
-        a[((gy & (CHUNK - 1)) << CHUNK_BITS) | (gx & (CHUNK - 1))] = this.now;
-        const key = chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS);
+        return dx * dx + dy * dy <= r2;
+      };
+      // A disc intersects each row in one interval. Keep the exact circle test
+      // at its edges, then update a contiguous range within each touched chunk.
+      let left = gx0 - cols;
+      let right = gx0 + cols;
+      while (left <= right && !inside(left)) left++;
+      while (right > left && !inside(right)) right--;
+      const cy = gy >> CHUNK_BITS;
+      const row = (gy & (CHUNK - 1)) << CHUNK_BITS;
+      for (let gx = left; gx <= right;) {
+        const cx = gx >> CHUNK_BITS;
+        const end = Math.min(right + 1, (cx + 1) * CHUNK);
+        const start = row + (gx & (CHUNK - 1));
+        grid.ensure(cx, cy).fill(this.now, start, start + end - gx);
+        const key = chunkKey(cx, cy);
         if (fresh.get(key) !== this.now) {
           fresh.set(key, this.now);
           revealed.add(key);
         }
+        gx = end;
       }
     }
   }

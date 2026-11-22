@@ -2,9 +2,9 @@
 // the answers with the page (the fungus game, ja-lo8.3). The page starts with them in its caches, so a first game
 // plays Jev's answers from its first second, and the Pages build, which has no server, plays them too.
 //
-// Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888) and `stance` (every strategist view, 324), packed with
-// the browser's own packers (packModeRequest, packStanceRequest) and keyed with its own keys (situationKey, stanceKey), under its own
-// contexts (policyContext, stanceContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
+// Lanes: `mode` (every ant situation, colony.SITUATIONS, 3,888), packed with
+// the browser's own packer (packModeRequest) and keyed with its own key (situationKey), under its own
+// context (policyContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
 // both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view. And
 // `growth` (ja-2bw.5): every hyphal tip's situation (48), per preset aim, under the same aims. It is not in the default
@@ -18,12 +18,12 @@
 // JEV_API_KEY comes from the environment and is never printed.
 //
 // --import: no spend. Ship the answers a live test already got (scripts/colony-live.mjs caches, e.g.
-// experiments/caches/mr52-top-*.json) instead of asking every situation: each file's mode and stance answers go into
+// experiments/caches/mr52-top-*.json) instead of asking every situation: each file's mode answers go into
 // the bundle for its doctrine when they were asked under the context the code asks under now; any other file is
 // refused. The page plays the local rule where nothing ships (a preset's words are never asked: PR #42 review S6).
 // This is the default way to re-ship after a colony legend or version change: the PR's live check has the answers.
 //
-// Usage: node scripts/precache.mjs [--lanes mode,stance] [--doctrines forage,cautious,warlike] [--budget 0.35]
+// Usage: node scripts/precache.mjs [--lanes mode] [--doctrines forage,cautious,warlike] [--budget 0.35]
 //        [--in-flight 4] [--dry]
 //        node scripts/precache.mjs --import <cache.json> [<cache.json> ...]
 //        node scripts/precache.mjs --species desert [--doctrines …] [--budget …] [--dry]
@@ -71,7 +71,6 @@ import {
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   estimateTokens,
-  STANCE_BRAIN_VERSION,
   GROWTH_BRAIN_VERSION,
   DESERT_ANT,
   GENERIC_ANT,
@@ -89,7 +88,7 @@ const OUT = new URL("../web/public/precache/", import.meta.url);
 
 const args = process.argv.slice(2);
 const opts = {
-  lanes: "mode,stance,fungus",
+  lanes: "mode,fungus",
   doctrines: DOCTRINES.map((d) => d.id).join(","),
   budget: 0.35,
   inFlight: 4,
@@ -283,7 +282,6 @@ const indexUrl = new URL("index.json", OUT);
 const index = existsSync(indexUrl) ? JSON.parse(readFileSync(indexUrl, "utf8")) : { bundles: [] };
 index.versions = {
   colony: COLONY_BRAIN_VERSION,
-  stance: STANCE_BRAIN_VERSION,
   fungus: FUNGUS_BRAIN_VERSION,
   growth: GROWTH_BRAIN_VERSION,
 };
@@ -335,10 +333,7 @@ if (opts.import.length) {
     const c = JSON.parse(readFileSync(path, "utf8"));
     const d = DOCTRINES.find((x) => x.text === c.doctrine?.text);
     if (!d) throw new Error(`${path}: its doctrine is not a preset's`);
-    for (const [lane, field] of [
-      ["mode", "modes"],
-      ["stance", "stances"],
-    ]) {
+    for (const [lane, field] of [["mode", "modes"]]) {
       if (!lanes.includes(lane)) continue;
       const b = bundles.get(`${lane}-${d.id}.json`);
       if (!b) continue;

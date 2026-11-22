@@ -19,18 +19,21 @@
     "preview": "vite preview",
     "test:slow": "node --test --test-timeout=1200000 src/colony/tests/slow/*.test.ts src/colony/tests/slow/g1/*.test.ts",
     "e2e": "node ../scripts/e2e-one-world.mjs",
-    "e2e:devices": "node ../scripts/e2e-devices.mjs"
+    "e2e:devices": "node ../scripts/e2e-devices.mjs",
+    "field-shots": "node ../scripts/field-shots.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
     "prettier": "^3.10.0",

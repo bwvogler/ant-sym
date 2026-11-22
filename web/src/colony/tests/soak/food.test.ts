@@ -15,7 +15,7 @@ import { broodChamber, smallOne } from "../builders.ts";
 
 /** A bare colony on world w's curtain (bound to it, as a one-world colony is built). */
 const colony = (w: OneWorld, params: Partial<ColonyParams>, seed: number, policy?: Policy): Colony =>
-  new Colony(w.curtain, params, mulberry32(seed), policy, undefined, { plane: w.plane, line: w.line });
+  new Colony(w.curtain, params, mulberry32(seed), policy, { plane: w.plane, line: w.line });
 
 test("the larder is the food lying in the colony's chambers, porters move it, and the queen's brood is raised from it", () => {
   const w = smallOne(2);

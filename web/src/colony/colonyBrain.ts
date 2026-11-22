@@ -2,19 +2,7 @@ import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { legendOf } from "./schema.ts";
 import { type AntDraw, pickFor, weigh, weightedValid } from "./weighted.ts";
-import {
-  type LaneWords,
-  MODES,
-  SITUATION_SCHEMA,
-  STANCES,
-  STANCE_SCHEMA,
-  type Mode,
-  type Situation,
-  type SpeciesSituation,
-  modeSchema,
-  type Stance,
-  type StanceSituation,
-} from "./vocab.ts";
+import { type LaneWords, MODES, SITUATION_SCHEMA, type Mode, type Situation, type SpeciesSituation, modeSchema } from "./vocab.ts";
 import {
   CARRY,
   type Carry,
@@ -33,15 +21,15 @@ import {
   type TrailKind,
 } from "./responses.ts";
 
-// The colony's Jev brain, pure. Two choices go to Jev, both as packed
-// requests with one question per *situation* (never per ant or per tick):
-//   mode   — what an ant in this situation should do (explore, follow,
-//            return, fight); SITUATIONS of them
-//   stance — what the colony as a whole should do (forage, defend, raid),
-//            from a coarse view of itself, asked by the strategist
+// The colony's Jev brain, pure. The choice that goes to Jev is a packed
+// request with one question per *situation* (never per ant or per tick):
+//   mode — what an ant in this situation should do (explore, follow,
+//          return, fight); SITUATIONS of them
+// (Each ant's stance is its own, from what it senses: nobody chooses one for
+// the colony, so there is no stance lane.)
 // The colony's doctrine — the player's words for how the colony should
 // behave — rides in the shared state, so a new doctrine is a new question
-// and cached answers are kept per doctrine (`policyContext`, `stanceContext`).
+// and cached answers are kept per doctrine (`policyContext`).
 // The ant's small responses (responses.ts: get, carry, drop, trail) each have
 // a lane too: one question per response situation (`Touch`), under the same
 // doctrine (`packResponseRequest`, `responseContext`). They are not asked by
@@ -49,8 +37,6 @@ import {
 
 /** Bump when the situation fields or their meaning change: old cached answers no longer apply. */
 export const COLONY_BRAIN_VERSION = 7;
-/** The strategist's: its view didn't change with the nest (slice 3), so its cached stances keep (it shared the ants' version before). */
-export const STANCE_BRAIN_VERSION = 4;
 
 export const COLONY_LEGEND = legendOf(SITUATION_SCHEMA, {
   intro: "Each key in `ants` is the situation of one worker ant of a colony. ",
@@ -80,25 +66,6 @@ export const COLONY_LEGEND = legendOf(SITUATION_SCHEMA, {
     ],
   ],
   outro: "doctrine is how the colony wants its ants to behave: follow it.",
-});
-
-export const STRATEGY_LEGEND = legendOf(STANCE_SCHEMA, {
-  intro: "`colony` describes an ant colony at war with a rival colony over the same food. ",
-  fields: [
-    [
-      "stance",
-      "stance is what it is doing now: forage (gather food), defend (fight near home) or raid (send fighters to the rival's nest). ",
-    ],
-    ["ants", "ants is how many ants it has against how many it can feed: few, some or many. "],
-    ["losses", "losses is how many ants it lost lately: none, some or heavy. "],
-    ["enemyNearNest", "enemyNearNest says whether rival ants are close to home. "],
-    [
-      "intake",
-      "intake is how much food its foragers have brought home lately for its size: none, some or plenty (the colony never knows how much food is left out there, only how fast it comes in). ",
-    ],
-    ["larder", "larder is food stored at home beyond what new ants need: low or full. "],
-  ],
-  outro: "doctrine is how the colony wants to behave: follow it.",
 });
 
 export interface Doctrine {
@@ -132,15 +99,8 @@ export const MODE_CRITERIA: Record<Mode, string> = {
   fight: "fight: go for enemy ants, follow alarm scent to a fight, or raid the rival nest",
 };
 
-export const STANCE_CRITERIA: Record<Stance, string> = {
-  forage: "forage: gather food, fight only what comes close",
-  defend: "defend: fighters stay near home and answer alarm",
-  raid: "raid: send spare ants to fight at the rival's nest",
-};
-
-/** The generic ant's words for the mode lane and the strategist's lane: what a species that names none asks under (species.ts). */
+/** The generic ant's words for the mode lane: what a species that names none asks under (species.ts). */
 export const MODE_WORDS: LaneWords<Mode> = { legend: COLONY_LEGEND, criteria: MODE_CRITERIA, version: COLONY_BRAIN_VERSION };
-export const STANCE_WORDS: LaneWords<Stance> = { legend: STRATEGY_LEGEND, criteria: STANCE_CRITERIA, version: STANCE_BRAIN_VERSION };
 
 /** The cache key for an ant's situation. */
 export function situationKey(s: Situation): string {
@@ -188,50 +148,9 @@ export function readMode(answers: Record<string, JevAnswer>, id: string, allowed
   return ok.includes(a.choice) ? weigh(a.choice, a.probabilities, ok) : null;
 }
 
-/** The cache key for the strategist's view. */
-export function stanceKey(s: StanceSituation): string {
-  return STANCE_SCHEMA.key(s);
-}
-
-export function stanceQuestion(id: string, criteria: LaneWords<Stance>["criteria"] = STANCE_CRITERIA): JevRequest["questions"] {
-  return {
-    [`${id}_stance`]: {
-      type: "choice",
-      instructions: `Going by the doctrine, what should colony \`${id}\` do now?`,
-      criteria: criteria as Record<string, string>,
-    },
-  };
-}
-
-/** One request for many strategist views (normally one or two). */
-export function packStanceRequest(
-  items: { id: string; situation: StanceSituation }[],
-  doctrine: string,
-  words: LaneWords<Stance> = STANCE_WORDS,
-): JevRequest {
-  const colony: Record<string, StanceSituation> = {};
-  const questions: JevRequest["questions"] = {};
-  for (const it of items) {
-    colony[it.id] = { ...it.situation };
-    Object.assign(questions, stanceQuestion(it.id, words.criteria));
-  }
-  return { state: { legend: words.legend, doctrine, colony }, questions };
-}
-
-export function readStance(answers: Record<string, JevAnswer>, id: string, allowed: readonly string[] = STANCES): Stance | null {
-  const a = answers[`${id}_stance`];
-  if (!a || a.type !== "choice") return null;
-  return allowed.includes(a.choice) && (STANCES as readonly string[]).includes(a.choice) ? (a.choice as Stance) : null;
-}
-
 /** What a cached mode was asked under: a different doctrine, legend or question wording is a different cache. */
 export function policyContext(doctrine: string, words: LaneWords<Mode> = MODE_WORDS): string {
   return `colony-v${words.version}-${hash(words.legend + JSON.stringify(modeQuestion("s0", words.criteria)) + doctrine.trim())}`;
-}
-
-/** The same for cached stances. */
-export function stanceContext(doctrine: string, words: LaneWords<Stance> = STANCE_WORDS): string {
-  return `stance-v${words.version}-${hash(words.legend + JSON.stringify(stanceQuestion("c0", words.criteria)) + doctrine.trim())}`;
 }
 
 /**
@@ -399,10 +318,9 @@ export function responseContext(hook: ResponseHook, doctrine: string): string {
  * Every lane's cache context under one doctrine: what a saved cache of Jev's answers was asked under (legend,
  * question wording, version, doctrine). A replay refuses a cache whose contexts differ from the code's.
  */
-export function cacheContexts(doctrine: string): Record<"mode" | "stance" | ResponseHook, string> {
+export function cacheContexts(doctrine: string): Record<"mode" | ResponseHook, string> {
   return {
     mode: policyContext(doctrine),
-    stance: stanceContext(doctrine),
     ...(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, responseContext(h, doctrine)])) as Record<ResponseHook, string>),
   };
 }

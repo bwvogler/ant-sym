@@ -27,7 +27,6 @@ const LONE: Species = {
     speed: 9,
     homeTrail: 0,
     raidGate: 0,
-    stanceGate: 0,
     undertakes: false,
     lifespan: 90,
     youngShare: 0,
@@ -83,12 +82,11 @@ test("the generic ant on the same world lays trails: the species is what differs
   assert.ok(laid(g, "food") > 0, "and a food trail");
 });
 
-test("its Jev words: its own context under the same lane prefix, one mode fewer, no stance lane", () => {
+test("its Jev words: its own context under the same lane prefix, one mode fewer", () => {
   const words = LONE.lanes.mode!;
   const own = LANES.mode.contextOf(DOCTRINES[0]!.text, undefined, words);
   assert.notEqual(own, policyContext(DOCTRINES[0]!.text, MODE_WORDS), "not the generic ant's cache");
   assert.equal(laneOfContext(own), "mode");
   assert.equal(LANES.mode.valid("k", "follow", words), false, "it has no follow");
   assert.equal(LANES.mode.valid("k", "explore", words), true);
-  assert.equal(LONE.lanes.stance, undefined, "no raids, no stance lane");
 });

@@ -195,12 +195,12 @@ test("one world: a tired returner goes down to rest, then comes back up and is h
 });
 
 test("one world: `leave` = raid sends the ant held at the gate up and out as a recruited raid scout, in fight", () => {
-  const raid = (stanceGate: number) => {
+  const raid = (raidGate: number) => {
     const g = game();
     const c = g.player;
     c.responses = responses({ leave: () => "raid" });
     c.params.raidScout = 2;
-    c.params.stanceGate = stanceGate;
+    c.params.raidGate = raidGate;
     const i = 0;
     toGate(c, i);
     let mode = -1;
@@ -220,7 +220,7 @@ test("one world: `leave` = raid sends the ant held at the gate up and out as a r
   assert.equal(c.recruited[i], 1, "recruited: its stance is raid");
   assert.equal(c.layer[i], PLANE, "out");
   assert.equal(mode, FIGHT, "on the plane, in fight");
-  // The control: where the stance is the colony's (stanceGate 0), "raid" is a wait at raidScout, a scout like any other.
+  // The control: where it can't be recruited (raidGate 0), "raid" is a wait at raidScout, a scout like any other.
   const ctl = raid(0);
   assert.equal(ctl.c.recruited[ctl.i], 0, "not recruited");
   assert.equal(ctl.c.raidScouts, 0);

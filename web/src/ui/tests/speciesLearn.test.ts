@@ -23,8 +23,7 @@ import { ruleTextAgrees } from "../policyText.ts";
 import { requestFor, tokensPerQuestion } from "../prompt.ts";
 import { situationsOf } from "../useColony.ts";
 
-// ja-fnd.5.12 and .13: the page says what a species has and does. The client reports whether there is a stance lane at all (Lab mode's Jev tab shows
-// "no stance lane", not "0 stances"); a species' rule text is checked against its own rule over every situation of its schema; the request
+// ja-fnd.5.12 and .13: the page says what a species has and does. A species' rule text is checked against its own rule over every situation of its schema; the request
 // Lab mode's Policy tab shows is the species' own.
 
 const SCHEMA = defineSchema<SpeciesSituation>([
@@ -62,19 +61,6 @@ const live = new Set<ColonyJev>();
 afterEach(() => {
   for (const j of live) j.dispose();
   live.clear();
-});
-
-test("the client says whether the colonies have a stance lane at all", () => {
-  for (const [species, has] of [
-    [GENERIC_ANT, true],
-    [LONE, false],
-  ] as const) {
-    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
-    const jev = new ColonyJev({});
-    live.add(jev);
-    jev.attachColonies(g.colonies, species);
-    assert.equal(jev.state.stanceLane, has, species.id);
-  }
 });
 
 test("a species' rule text agrees with its rule over every situation it has, and a wrong row is named", () => {

@@ -74,7 +74,6 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "handedOn",
     "inNest",
     "incipient",
-    "intakeRate",
     "larder",
     "looseBack",
     "looseDown",
@@ -98,14 +97,13 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "queen",
     "raidScouts",
     "raidable",
-    "recentLosses",
     "recruits",
+    "remains",
     "seen",
     "soilDug",
     "soilFilled",
     "soilLost",
     "soilOut",
-    "stance",
     "stored",
     "time",
   ];
@@ -185,7 +183,7 @@ test("the game's save holds every private field it declares, or the field is bui
   const body = src.slice(src.indexOf("export class Game "));
   const declared = new Set<string>();
   for (const m of body.matchAll(/^ {2}(?:readonly )?#(\w+)(?!\w|\()/gm)) declared.add(m[1]!);
-  const inPrivate = ["fightDeaths", "lastFightDeath", "metBy", "haveMet", "nextStrategy", "regrowClock", "rng", "regrowRng"];
+  const inPrivate = ["fightDeaths", "lastFightDeath", "metBy", "haveMet", "nextRivalCheck", "regrowClock", "rng", "regrowRng"];
   // The occupancy grids and every layer's recognition bands are GameSave.grids (layer 0's recognition is `recognition` too).
   const inGrids = ["grids", "recs"];
   const derived = ["piles"]; // the food piles as the world began: from the fresh world

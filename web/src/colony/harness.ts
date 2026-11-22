@@ -3,7 +3,7 @@
 
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
-import { type Policy, type StancePolicy, type SteerPolicy } from "./vocab.ts";
+import { type Policy, type SteerPolicy } from "./vocab.ts";
 import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
@@ -419,7 +419,6 @@ export interface Overrides {
   rivalPolicy?: Policy;
   /** every colony's steer policy (ja-ykmu.3: `--policy precache:<doctrine>` with the doctrine's steer bundle), bound at the start */
   steer?: SteerPolicy;
-  stance?: StancePolicy;
   /** the player's responses, hook by hook: they replace the assay's own (or the local ones) only for the hooks they define */
   responses?: Partial<Responses>;
 }
@@ -455,7 +454,6 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const events = steer
     ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
     : spec.events;
-  if (o.stance && !sides.stance) sides.stance = o.stance;
   if (o.responses) sides.responses = { ...(sides.responses ?? localResponses), ...o.responses };
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };

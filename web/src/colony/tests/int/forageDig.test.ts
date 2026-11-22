@@ -58,17 +58,10 @@ test("forageDig: in a crowded nest, ants on a bout build and widen no chamber; m
   // 200 ants crowd the founding nest (crowded()); 30 s. Measured (S2.3c): the middle-aged add 6-7 chamber cells (seeds 1-4), ants on a bout none.
   const run = (bout: boolean, seed: number) => {
     const w = smallOne(2);
-    const c = new Colony(
-      w.curtain,
-      { antCount: 200, maxAnts: 200, forageDig: 120 },
-      mulberry32(seed),
-      (() => "explore") as never,
-      undefined,
-      {
-        plane: w.plane,
-        line: w.line,
-      },
-    );
+    const c = new Colony(w.curtain, { antCount: 200, maxAnts: 200, forageDig: 120 }, mulberry32(seed), (() => "explore") as never, {
+      plane: w.plane,
+      line: w.line,
+    });
     const before = chamberCells(c);
     for (let t = 0; t < 30 * 30; t++) {
       for (let i = 0; i < c.n; i++) {

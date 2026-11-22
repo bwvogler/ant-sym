@@ -5,12 +5,9 @@ import { fileURLToPath } from "node:url";
 import {
   SITUATIONS,
   MODES,
-  STANCES,
   COLONY_BRAIN_VERSION,
   DOCTRINES,
   policyContext,
-  STANCE_BRAIN_VERSION,
-  stanceContext,
   AIMS,
   LANE_LIST,
   FUNGUS_BRAIN_VERSION,
@@ -44,7 +41,6 @@ const DIR = fileURLToPath(new URL("../../../public/precache/", import.meta.url))
 const index = JSON.parse(readFileSync(`${DIR}index.json`, "utf8")) as PrecacheIndex;
 const CONTEXT: Record<string, (words: string) => string> = {
   mode: policyContext,
-  stance: stanceContext,
   fungus: (aim) => fungusContext(aim),
   growth: growthContext,
   steer: steerContext,
@@ -53,7 +49,6 @@ const CONTEXT: Record<string, (words: string) => string> = {
 const LEVELS = ["-1", "0", "1"];
 const VALID: Record<string, readonly string[]> = {
   mode: MODES,
-  stance: STANCES,
   growth: GROWTH_CHOICES,
   // The steer lane's answers are probabilities (checked by validSteer below): its certain answers stand for the row.
   steer: LEVELS.flatMap((a) => LEVELS.map((b) => `${a},${b}`)).map((x) =>
@@ -64,7 +59,7 @@ const VALID: Record<string, readonly string[]> = {
   ),
 };
 // The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), with no find, far from one and near it.
-const SIZE: Record<string, number> = { mode: SITUATIONS, stance: 324, growth: 48, steer: (SITUATIONS / 2) * 3 };
+const SIZE: Record<string, number> = { mode: SITUATIONS, growth: 48, steer: (SITUATIONS / 2) * 3 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.
@@ -87,7 +82,6 @@ test("each table above has a row for every lane of the registry that needs one",
 
 test("every shipped bundle is under the context the code asks under, for a preset doctrine", () => {
   assert.equal(index.versions.colony, COLONY_BRAIN_VERSION, "re-run scripts/precache.mjs: the colony brain's version moved");
-  assert.equal(index.versions.stance, STANCE_BRAIN_VERSION, "re-run scripts/precache.mjs: the stance brain's version moved");
   assert.equal(index.versions.fungus, FUNGUS_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes fungus: the fungus brain's version moved");
   assert.equal(index.versions.growth, GROWTH_BRAIN_VERSION, "re-run scripts/precache.mjs --lanes growth: the growth brain's version moved");
   // A lane asked under the fungus's aim (the fungus, its tips' growth) ships a bundle per preset aim; the ants' lanes one per doctrine.
@@ -104,8 +98,8 @@ test("every shipped bundle is under the context the code asks under, for a prese
 
 // A bundle holds what a live test got (scripts/precache.mjs --import), not necessarily every situation: the page plays
 // the local rule where nothing ships (PR #42: cache what the tests produce rather than asking every situation).
-test("every preset doctrine ships mode and stance answers, each situation once, and only answers the question allows", () => {
-  for (const lane of ["mode", "stance"])
+test("every preset doctrine ships mode answers, each situation once, and only answers the question allows", () => {
+  for (const lane of ["mode"])
     for (const d of DOCTRINES) {
       const b = index.bundles.find((x) => x.lane === lane && x.doctrine === d.id && !x.species);
       assert.ok(b, `no ${lane} bundle for ${d.id}`);

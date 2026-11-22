@@ -132,6 +132,49 @@ try {
         }
         await shot("play");
 
+        // The voxel inspector is non-modal: a right panel at tablet/desktop widths and a sheet on a narrow phone.
+        const lens = page.getByRole("button", { name: "Lens: say what is under the pointer (i)", exact: true });
+        await press(lens);
+        for (const view of ["above", "below"]) {
+          await press(page.getByRole("button", { name: view, exact: true }));
+          const x = vp.width * 0.3,
+            y = Math.max(150, vp.height * 0.3);
+          if (f.touch) await page.touchscreen.tap(x, y);
+          else await page.mouse.click(x, y);
+          await press(page.getByRole("button", { name: "Inspect cell", exact: true }));
+          const inspection = page.locator('aside[aria-label="Cell inspection"]');
+          await until(
+            () =>
+              inspection
+                .locator("canvas")
+                .getAttribute("data-assets-ready")
+                .then((v) => v === "true"),
+            `${view} inspection assets`,
+          );
+          const panel = await rect('aside[aria-label="Cell inspection"]');
+          check(within(panel), `${view} inspection fits inside the viewport`);
+          check(
+            vp.width < 640 ? panel.width > vp.width * 0.9 && panel.top > vp.height * 0.2 : panel.left > vp.width * 0.45,
+            `${view} inspection uses ${vp.width < 640 ? "a bottom sheet" : "a side panel"}`,
+          );
+          check((await inspection.getAttribute("aria-modal")) === null, `${view} inspection leaves the map available`);
+          check(
+            await inspection
+              .getByRole("button", { name: "Close inspection", exact: true })
+              .evaluate((e) => e.getBoundingClientRect().height >= 44),
+            `${view} inspection close target is at least 44 px`,
+          );
+          check(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+            `${view} inspection adds no horizontal page overflow`,
+          );
+          await shot(`inspection-${view}`);
+          await press(inspection.getByRole("button", { name: "Close inspection", exact: true }));
+          await press(page.getByRole("button", { name: "Close the lens card", exact: true }));
+        }
+        await press(lens);
+        await press(page.getByRole("button", { name: "above", exact: true }));
+
         // Every drawer, one at a time, inside the screen.
         const count = await nav.getByRole("button").count();
         for (let i = 0; i < count; i++) {

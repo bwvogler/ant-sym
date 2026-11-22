@@ -30,7 +30,7 @@ export interface SideStats {
   brood: [number, number, number];
   /** brood killed by the fungus's crown (nest slice 8) */
   broodKilled: number;
-  /** the colony's stance; where each ant's is its own (top-down, docs/stance.md), how many defend and raid */
+  /** each ant's stance is its own (docs/stance.md): how many defend and raid */
   stance: string;
   /** share of living ants carrying the fungus */
   infected: number;
@@ -140,7 +140,7 @@ function side(c: Colony, fungus: Fungus): SideStats {
     queenLoad: c.queen?.load ?? 0,
     brood: c.brood.counts(),
     broodKilled: c.broodKilled,
-    stance: c.ownStances ? stanceText(c.stanceCounts()) : c.stance,
+    stance: stanceText(c.stanceCounts()),
     infected: f.living ? f.infected / f.living : 0,
     resist: f.meanResist,
     dug: c.soilDug,
@@ -169,7 +169,7 @@ function chapterFor(game: Game): ChapterView {
   });
 }
 
-/** Each ant's own stance, counted (top-down): "3 defend · 12 raid", or "all forage". */
+/** Each ant's own stance, counted: "3 defend · 12 raid", or "all forage". */
 function stanceText(n: Record<Stance, number>): string {
   return n.defend || n.raid ? `${n.defend} defend · ${n.raid} raid` : "all forage";
 }
@@ -180,7 +180,7 @@ export function statsOf(game: Game, rate: number, pace: number): ColonyStats {
     time: game.time,
     stored: game.colonies.reduce((n, c) => n + c.stored, 0),
     // One world: both layers' food, as Game.foodLeft counts it (the plane's and the curtain's buried food).
-    foodTotal: game.world ? game.world.plane.foodTotal + game.world.curtain.foodTotal : game.map.foodTotal,
+    foodTotal: game.world.plane.foodTotal + game.world.curtain.foodTotal,
     foodLeft: game.foodLeft,
     counts: sumCounts(game.colonies),
     choicesPerSecond: rate,

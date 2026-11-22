@@ -512,17 +512,12 @@ test("marchProbe (S2.2c): turns a walked ant on the plane toward the other colon
   assert.equal(probe.summary(g).marched, 1 / c.params.antCount, `one ant within ${MARCH_REACH} steps of the hole`);
 });
 
-test("A6 and A13 on one world (S2.2c): no colony-wide stance (no stance policy, no stanceGate 0), the attackers walked", () => {
+test("A6 and A13 on one world (S2.2c): the attackers walked, each ant with its own stance", () => {
   for (const id of ["pass", "open", "defendHome"]) {
     const a = ONE_ASSAYS.find((x) => x.id === id);
     assert.ok(a, `${id} is in ONE_ASSAYS`);
     const spec = a.spec(1);
     assert.ok(isOneWorld(specMap(spec)), id);
-    const sides = spec.sides ?? {};
-    assert.equal(sides.stance, undefined, `${id}: no stance policy`);
-    assert.equal(sides.rivalStance, undefined, `${id}: no rival stance policy`);
-    assert.notEqual(sides.colony?.stanceGate, 0, `${id}: the colony's stance is each ant's own`);
-    assert.notEqual(sides.rival?.stanceGate, 0, `${id}: the rival's stance is each ant's own`);
     const march = (spec.probes ?? []).filter((p) => "walks" in p) as unknown as { walks: readonly [number, number] }[];
     assert.deepEqual(
       march.map((p) => p.walks),

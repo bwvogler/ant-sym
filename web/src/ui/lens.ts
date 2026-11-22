@@ -14,6 +14,7 @@ import {
   SOIL,
   SPORE_SHOWN,
   type WorldMap,
+  type Transect,
 } from "../colony/index.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { colonyName } from "./names.ts";
@@ -34,8 +35,8 @@ export const TRAIL_SHOWN = 0.02;
 
 /** What is at one point of the shown view, as the field shows it. */
 export interface LensProbe {
-  /** the view: one world's above (the plane) or below (the curtain); "map" on a game of one map */
-  view: "above" | "below" | "map";
+  /** the view: one world's above (the plane) or below (the curtain) */
+  view: "above" | "below";
   ground: "rock" | "soil" | "air" | "open";
   /** food lying here */
   food: number;
@@ -84,34 +85,34 @@ export function lensAnt(colonies: readonly Colony[], k: number, i: number): Lens
 export interface LensWorld {
   colonies: readonly Colony[];
   fungus: Fungus;
-  /** one world's plane and curtain, or null on a game of one map */
-  world: { plane: WorldMap; curtain: WorldMap } | null;
+  /** one world's plane and curtain */
+  world: { plane: WorldMap; curtain: WorldMap; line?: Transect };
 }
 
 /**
- * What the field shows at world (x, y) of layer `lv` (one world's PLANE or CURTAIN; −1: a game of one map). `trails`:
+ * What the field shows at world (x, y) of layer `lv` (one world's PLANE or CURTAIN). `trails`:
  * which trails the field draws now (Settings).
  */
 export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y: number, trails = { food: true, home: true }): LensProbe {
-  const map = g.world ? (lv === CURTAIN ? g.world.curtain : g.world.plane) : (g.colonies[0]!.map as WorldMap);
+  const map = lv === CURTAIN ? g.world.curtain : g.world.plane;
   cellOf(x, y);
   const gx = CELL[0];
   const gy = CELL[1];
   const r = rockAt(map, gx, gy);
-  const sight = sensed.sight(lv < 0 ? 0 : lv, gx, gy);
+  const sight = sensed.sight(lv, gx, gy);
   let alarm = 0;
   let foodTrail = 0;
   let homeTrail = 0;
   if (sight > 0)
     for (const c of g.colonies) {
-      const ph = lv < 0 ? c.ph : c.layers[lv]?.ph;
+      const ph = c.layers[lv]?.ph;
       if (!ph) continue;
       alarm = Math.max(alarm, sight * Math.min(1, ph.fields.alarm.get(gx, gy) / ALARM_FULL));
       if (trails.food) foodTrail = Math.max(foodTrail, sight * Math.min(1, ph.fields.food.get(gx, gy) / FOOD_FULL));
       if (trails.home) homeTrail = Math.max(homeTrail, sight * Math.min(1, ph.fields.home.get(gx, gy) / HOME_FULL));
     }
-  const spores = lv < 0 ? g.fungus.spores : (g.fungus.sporesOn(lv)?.spores ?? g.fungus.spores);
-  const holeOwner = g.world ? (g.colonies[0]?.holeCells ?? []) : [];
+  const spores = g.fungus.sporesOn(lv)?.spores ?? g.fungus.spores;
+  const holeOwner = g.colonies[0]?.holeCells ?? [];
   let hole = -1;
   for (let k = 0; k < holeOwner.length && hole < 0; k++) {
     const h = holeOwner[k]!;
@@ -125,12 +126,12 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
     if (k >= 0) chamber = { k, role: ch.role, brood: ch.brood, food: ch.food };
   }
   return {
-    view: g.world ? (lv === CURTAIN ? "below" : "above") : "map",
+    view: lv === CURTAIN ? "below" : "above",
     ground: r === OPEN ? "open" : r === SOIL ? "soil" : r === AIR ? "air" : "rock",
     food: map.food.get(gx, gy),
     mound: map.spoil?.get(gx, gy) ?? 0,
     spores: spores.get(gx, gy) >= SPORE_SHOWN,
-    hypha: g.fungus.hyphaeOn(lv < 0 ? 0 : lv)?.has(gx, gy) ?? false,
+    hypha: g.fungus.hyphaeOn(lv)?.has(gx, gy) ?? false,
     sight,
     alarm,
     foodTrail,

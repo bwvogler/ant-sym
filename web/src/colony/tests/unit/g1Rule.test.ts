@@ -38,6 +38,14 @@ test("judge: a seed with no result fails and is named, though the others pass", 
   const v = judge(ten(10).filter((h) => h.seed !== 7 && h.seed !== 3));
   assert.equal(v.ok, false);
   assert.deepEqual(v.failures, ["no result for seeds 3 7 (their runners failed)"]);
+  assert.deepEqual(
+    judge(
+      ten(10).filter((h) => h.seed !== 7 && h.seed !== 3),
+      undefined,
+      [3],
+    ).failures,
+    ["no result for seeds 7 (their runners failed)"],
+  );
 });
 
 test("seedsFrom: unset is all ten, a list is those seeds, anything else throws", () => {
@@ -101,6 +109,8 @@ test("seedResult: one entry for the seed with finite figures is a result; anythi
   assert.match(problem([{ ...seed(3, 1), you: "2" }]), /you is "2"/);
   assert.match(problem([{ ...seed(3, 1), rival: Infinity }]), /rival is null/); // JSON.stringify writes null for Infinity
   assert.match(problem([null]), /holds seed null/);
+  assert.match(problem([{ ...seed(3, 1), worst: -5 }]), /worst is -5, not a count/); // review of #272, N4
+  assert.match(problem([{ ...seed(3, 1), you: -1 }]), /you is -1, not a count/);
 });
 
 test("g1-verdict.mjs: a file that is not one seed's finite figures fails the verdict with an ::error naming the seed", () => {
@@ -124,6 +134,18 @@ test("g1-verdict.mjs: a file that is not one seed's finite figures fails the ver
   const other = bad("g1-seed-4.json", JSON.stringify([seed(9, 0)]));
   assert.equal(other.code, 1, "a file holding another seed's result is not this seed's");
   assert.match(other.out, /::error title=G1::seed 4: it holds seed 9/);
+
+  // Review of #272, N2: the cause is named once. A bad file is not also "no result ... runners failed".
+  for (const out of [junk.out, other.out, dup.out, nul.out])
+    assert.doesNotMatch(out, /runners failed/, "a bad file is not a failed runner");
+  const gone = verdictOf(
+    Object.fromEntries(
+      ten(10)
+        .filter((h) => h.seed !== 6)
+        .map((h) => [`g1-seed-${h.seed}.json`, JSON.stringify([h])]),
+    ),
+  );
+  assert.match(gone.out, /no result for seeds 6 \(their runners failed\)/, "a seed with no file still is");
 
   assert.equal(verdictOf({ ...files(), "g1-seed-1.json": one }).code, 0, "the good set still passes");
 });

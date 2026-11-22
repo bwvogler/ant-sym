@@ -21,12 +21,12 @@
 // colony.channels.<food|home|alarm|noEntry>.<evaporation|diffusion>.
 //
 // --policy cache:<file> replays Jev's cached answers for the first colony
-// (scripts/colony-live.mjs writes them: modes, stances and responses, with
+// (scripts/colony-live.mjs writes them: modes and responses, with
 // the brain versions they were asked under). A cache asked under other
 // versions is refused (its keys would match nothing, or the wrong
 // situations). Anything the cache lacks falls back to the local rule, so each
 // result says how much of it was Jev: cache hits per lane. An assay that sets
-// its own policy or stance (A6's raiders) keeps it.
+// its own policy keeps it.
 //
 // --policy precache:<doctrine> (ja-0kys) plays the mode answers the page ships for a preset doctrine
 // (web/public/precache/mode-<doctrine>.json: forage, cautious, warlike) for both colonies, drawn from as the page does
@@ -36,7 +36,7 @@
 // --set both.<param>=… sets a colony parameter on both colonies at once.
 //
 // --log <spec> keeps a game journal of each run (colony/journal.ts, ja-8tb): what happened, as events. The spec is
-// a level (summary; detail adds births, deaths, infections; verbose adds every mode change and foraging digs), categories (colony, queen, stance, jev, birth, death, mode, infection, dig) and filters
+// a level (summary; detail adds births, deaths, infections; verbose adds every mode change and foraging digs), categories (colony, queen, jev, birth, death, mode, infection, dig) and filters
 // (colony=<k>, ant=<i>), comma-separated: --log summary, --log death,mode,colony=0, --log verbose,ant=42. Each run
 // writes experiments/out/journal/<assay>-<n>-seed<s>.jsonl (one event a line) and a .txt beside it to read; n is the
 // --set combination's index. Watching changes nothing in the run. Verbose on a whole game is ~1500 events a second
@@ -169,9 +169,8 @@ async function main() {
   } else if (policy) {
     if (!policy.startsWith("cache:")) fail(`--policy ${policy}: cache:<file> or precache:<doctrine>`);
     const cache = loadCache(policy.slice(6));
-    const { cacheContexts, COLONY_BRAIN_VERSION, STANCE_BRAIN_VERSION, RESPONSE_BRAIN_VERSION, validResponse } =
-      await import("../web/src/colony/index.ts");
-    const want = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
+    const { cacheContexts, COLONY_BRAIN_VERSION, RESPONSE_BRAIN_VERSION, validResponse } = await import("../web/src/colony/index.ts");
+    const want = { colony: COLONY_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
     if (JSON.stringify(cache.version) !== JSON.stringify(want))
       fail(
         `${policy.slice(6)} was asked under brain versions ${JSON.stringify(cache.version)}; the code is at ${JSON.stringify(want)}. Ask afresh (scripts/colony-live.mjs).`,
@@ -187,7 +186,7 @@ async function main() {
           fail(`${policy.slice(6)}: ${hook} answer ${JSON.stringify(a)} for ${k} is not one its question allows.`);
     const n = (t) => Object.keys(t ?? {}).length;
     console.log(
-      `Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${n(cache.stances)} stances, ${Object.entries(
+      `Replaying Jev's answers under the doctrine "${cache.doctrine?.name ?? "?"}" (${cache.view ?? "?"} view, seed ${cache.seed}): ${n(cache.modes)} modes, ${Object.entries(
         cache.responses ?? {},
       )
         .map(([h, t]) => `${n(t)} ${h}`)
@@ -392,8 +391,8 @@ async function work() {
       };
     }
   } else if (policy) {
-    const { localPolicy, localStance } = await import("../web/src/colony/index.ts");
-    const { responsesFromAnswers, situationKey, stanceKey } = await import("../web/src/colony/index.ts");
+    const { localPolicy } = await import("../web/src/colony/index.ts");
+    const { responsesFromAnswers, situationKey } = await import("../web/src/colony/index.ts");
     const cache = loadCache(policy.slice(6));
     const lane = (table, key, local, name) => (s) => {
       const a = table?.[key(s)];
@@ -404,7 +403,6 @@ async function work() {
     const { pick } = await import("../web/src/colony/index.ts");
     const modes = lane(cache.modes, situationKey, localPolicy, "mode");
     brains.policy = (s, draw) => pick(modes(s), draw);
-    brains.stance = lane(cache.stances, stanceKey, localStance, "stance");
     brains.responses = responsesFromAnswers(cache.responses ?? {}, undefined, count);
   }
   // Each event goes to the files as it is written (the journal keeps none): a verbose whole game is hundreds of MB.

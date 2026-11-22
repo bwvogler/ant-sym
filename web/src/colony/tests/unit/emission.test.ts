@@ -62,7 +62,7 @@ test("cross-laying: a carrier leaks its food trail into the other colony's field
 
 test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer defenders", () => {
   const map = arena(6.5);
-  // A skirmish at (20, 6); idle nestmates around it, defending: the local rule sends an ant that smells alarm to fight.
+  // A skirmish at (20, 6); idle nestmates around it, each defending by its own stance: the local rule sends an ant that smells alarm to fight.
   const skirmish = (quiet: number) => {
     const cells: [number, number][] = [
       [20, 6],
@@ -72,7 +72,7 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
     for (let x = 14; x <= 26; x += 2) cells.push([x, 3], [x, 9]);
     const mine = new Colony(
       map,
-      { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0, stanceGate: 0 },
+      { antCount: cells.length, maxAnts: cells.length, nest: 0, odour: 0, wander: 0, homeGround: 1e9 }, // the whole field is home ground
       mulberry32(8),
       localPolicy,
     );
@@ -82,7 +82,7 @@ test("silent fights: a quiet host lays no alarm, so a skirmish recruits fewer de
       mine.heading[i] = Math.PI / 2;
     });
     for (let i = 0; i < 3; i++) mine.quiet[i] = quiet;
-    mine.stance = "defend";
+    for (let i = 3; i < mine.n; i++) mine.threat[i] = 5 * mine.params.defendAt; // the idle nestmates have felt a threat: each defends by its own stance
     const them = new Colony(map, { antCount: 3, maxAnts: 3, nest: 1, odour: 1 }, mulberry32(9));
     for (let i = 0; i < 3; i++) {
       them.x[i] = 20.5;
