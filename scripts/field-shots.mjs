@@ -142,6 +142,47 @@ const buildWorld = (page) =>
     if (g.colonies.length < 3 || !g.aphids.length) throw new Error("the world was not built");
   });
 
+/** The canvas pixel (CSS px, as the mouse takes it) of colony `k`'s ant nearest the middle of the canvas on layer `layer`, or a thrown error. */
+async function antScreen(page, k, layer) {
+  const at = await page.evaluate(
+    async ([k, layer]) => {
+      const { centreX, centreY } = await import("/src/colony/index.ts");
+      const J = window.jevAnts;
+      const c = J.game.colonies[k];
+      const cam = J.camera(layer === 0 ? "above" : "below");
+      const r = document.querySelector("canvas").getBoundingClientRect();
+      let best = null;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.layer[i] !== layer) continue;
+        const sx = (centreX(c.x[i], c.y[i]) - cam.x) * cam.zoom + r.width / 2;
+        const sy = (centreY(c.y[i]) - cam.y) * cam.zoom + r.height / 2;
+        const d = Math.hypot(sx - r.width / 2, sy - r.height / 2);
+        if (sx > 120 && sx < r.width - 120 && sy > 140 && sy < r.height - 140 && (!best || d < best.d)) best = { i, sx, sy, d };
+      }
+      return best;
+    },
+    [k, layer],
+  );
+  if (!at) throw new Error(`no ant of colony ${k} on layer ${layer} in view`);
+  return at;
+}
+
+/** A stroke with the mouse, in canvas pixels, in a few steps (a tool of the builder's tray acts along it). */
+async function stroke(page, from, to) {
+  await page.mouse.move(from[0], from[1]);
+  await page.mouse.down();
+  for (let t = 1; t <= 6; t++) await page.mouse.move(from[0] + ((to[0] - from[0]) * t) / 6, from[1] + ((to[1] - from[1]) * t) / 6);
+  await page.mouse.up();
+  await sleep(200); // the stroke reaches the game before the next tool is taken
+}
+
+/** Take a tray tool (its exact accessible name) and wait until the tray says it is the one in hand: a stroke before that would not be the tool's. */
+async function tool(page, name) {
+  const button = page.getByRole("button", { name, exact: true });
+  await button.click();
+  await page.waitForFunction((el) => el.getAttribute("aria-pressed") === "true", await button.elementHandle());
+}
+
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
 const dayAt = (page, phase) =>
   page.evaluate((phase) => {
@@ -215,6 +256,57 @@ const SCENES = [
   },
   { name: "built-bend", page: "built", run: (p) => view(p, "below") },
   { name: "built-strip", page: "built", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
+  // The marks of a player: a pinned specimen (a dashed ring and its label), the builder's strokes and clump, and an ant the tweezers moved
+  // (its trace home). The builder works by the real pointer on the real canvas, the page paused.
+  {
+    name: "marks-specimen",
+    page: "marks",
+    run: async (p) => {
+      await ticks(p, 900);
+      await p.evaluate(() => window.jevAnts.goNest(0));
+      await sleep(1500);
+      const { i } = await antScreen(p, 0, 0);
+      await p.evaluate((i) => window.jevAnts.follow(0, i), i);
+      await p.getByRole("button", { name: "Pin as a specimen" }).click();
+      await p.getByRole("button", { name: "Stop following" }).click();
+    },
+  },
+  {
+    name: "marks-builder",
+    page: "marks",
+    run: async (p) => {
+      await p.getByRole("button", { name: "Builder", exact: true }).click();
+      const c = [640, 450];
+      await tool(p, "Sugar");
+      await stroke(p, [c[0] - 200, c[1] - 120], [c[0] - 120, c[1] - 160]);
+      await tool(p, "Crumbs");
+      await stroke(p, [c[0] + 20, c[1] - 200], [c[0] + 90, c[1] - 220]);
+      await tool(p, "Rock");
+      await stroke(p, [c[0] + 100, c[1] - 140], [c[0] + 220, c[1] - 100]);
+      await tool(p, "Trail crayon, Ink");
+      await stroke(p, [c[0] - 220, c[1] + 120], [c[0] + 60, c[1] + 160]);
+      await tool(p, "Aphids");
+      await p.mouse.click(c[0] + 160, c[1] + 120);
+      await tool(p, "No entry sign");
+      await p.mouse.click(c[0] - 40, c[1] + 70);
+      await tool(p, "Move");
+    },
+  },
+  {
+    name: "marks-trace",
+    page: "marks",
+    run: async (p) => {
+      await tool(p, "Tweezers: pick up an ant");
+      const { sx, sy } = await antScreen(p, 0, 0);
+      await stroke(p, [sx, sy], [sx + 140, sy - 110]);
+      await tool(p, "Move");
+    },
+  },
+  // the same game from below: the moved ant's trace and the specimen's ring are of the top view and the plane's layer only
+  { name: "marks-below", page: "marks", run: (p) => view(p, "below") },
+  // A phone-sized page (390 x 844, touch): the field's size and the page's narrow layout
+  { name: "phone-above", page: "phone", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
+  { name: "phone-below", page: "phone", run: (p) => view(p, "below") },
   { name: "desert-noon", page: "desert", run: async (p) => toTime(p, await dayAt(p, 1 / 3)) },
   { name: "desert-dusk", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.62)) },
   { name: "desert-night", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.84)) },
@@ -227,6 +319,9 @@ const PAGES = {
   desert: { scheme: "light", species: "desert" },
   grown: { scheme: "light", species: null },
   built: { scheme: "light", species: null },
+  marks: { scheme: "light", species: null },
+  // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
+  phone: { scheme: "light", species: null, phone: true },
 };
 
 // ——— The command line, checked before anything starts ———
@@ -314,9 +409,13 @@ try {
     );
   }
   const pages = {};
-  for (const [key, { scheme, species }] of Object.entries(PAGES)) {
+  for (const [key, { scheme, species, phone }] of Object.entries(PAGES)) {
     if (only && !SCENES.some((s) => s.page === key && only.has(s.name))) continue; // a page no wanted scene is on is not opened
-    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, colorScheme: scheme });
+    const ctx = await browser.newContext({
+      ...(phone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 900 } }),
+      deviceScaleFactor: 1,
+      colorScheme: scheme,
+    });
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
@@ -363,8 +462,10 @@ if (mode === "record") {
   const missing = [];
   for (const [name, r] of Object.entries(results)) {
     const now = join(DIR, `${name}.now.png`);
-    if (!(name in base.scenes)) missing.push(name);
-    else if (base.scenes[name] !== r.hash) {
+    if (!(name in base.scenes)) {
+      missing.push(name);
+      writeFileSync(now, r.png); // a new scene's picture, to look at before it is recorded
+    } else if (base.scenes[name] !== r.hash) {
       differ.push(name);
       writeFileSync(now, r.png);
     } else rmSync(now, { force: true }); // a picture of an earlier failure is not this check's
