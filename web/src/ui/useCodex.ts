@@ -76,7 +76,7 @@ export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => voi
   useEffect(() => {
     if (state.held) set({ ...state, held: false }); // a new game: the watch reads again
     let last = -Infinity;
-    const ids = guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => e.id);
+    const ids = guideFor((c) => game.colonies[0]!.ph.has(c), game.params.species.id).map((e) => e.id);
     const titles = new Map(guideFor(() => true).map((e) => [e.id, e.title]));
     return onFrame(() => {
       const t = performance.now();
