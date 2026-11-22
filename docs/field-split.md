@@ -77,7 +77,7 @@ web/src/ui/ColonyField.tsx   the shell
 
 A move of drawing code must change no pixel. Two proofs:
 
-1. **The pixel guard** (`scripts/field-shots.mjs`, `npm run field-shots`, by hand in Chromium, about 85 s a run). `record <dir>` renders 18 fixed scenes of the one world's canvas and hashes each; `check <dir>` renders again and names the scenes that differ. Deterministic by construction (a fresh paused game of seed 3, stepped a fixed number of ticks through the dev hook, the canvas read once it has held still); a change to one draw call fails the scenes that draw it and only those.
+1. **The pixel guard** (`scripts/field-shots.mjs`, `npm run field-shots`, by hand in Chromium, about 4 minutes a run with its 30 scenes). `record <dir>` renders 30 fixed scenes of the one world's canvas and hashes each; `check <dir>` renders again and names the scenes that differ. Deterministic by construction (a fresh paused game of seed 3, stepped a fixed number of ticks through the dev hook, the canvas read once it has held still); a change to one draw call fails the scenes that draw it and only those.
    - **The protocol for a moving slice:** `record` on **current main** before the edit (a baseline is of that code), make the move, `check` after it; all scenes must match. The baseline belongs to the machine and its Chromium (`check` refuses another one) and is never committed.
    - **A layer with no scene gets one first or with its bead** (below). A move of a layer no scene draws is not proved.
 2. **The recording fake context** (starts with the first layer that moves, `ja-fnd.6.3.5`; its sprites are ready). `FieldRenderer`'s layers run in the unit tier against a fake `CanvasRenderingContext2D` and a fake `FieldEnv` that record every call and its arguments; each layer gets a log test as it moves (the first log is of the post-move behaviour, and the Chromium guard is what shows it equals the old pixels), and `ja-fnd.6.3.9` composes the scenes. It runs in seconds with no browser.
@@ -87,9 +87,9 @@ The input handlers are not drawing, so neither proof covers them: `npm run e2e` 
 
 ### What the scenes cover, and do not
 
-The 18 scenes (seed 3 unless said): the generic ant's world above (10 s and 100 s of game time) and below; each nest zoomed above and below (the minimap shows); a followed ant on each layer; the queen's pen; the chamber labels; the dark scheme (above, a nest, below, a nest); the desert ant's noon, dusk and night (the heat and night washes).
+The 18 scenes (seed 3 unless said): the generic ant's world above (10 s and 100 s of game time) and below; each nest zoomed above and below (the minimap shows); a followed ant on each layer; the queen's pen; the chamber labels; the dark scheme (above, a nest, below, a nest); the desert ant's noon, dusk and night (the heat and night washes). `ja-fnd.6.3.4` added seven (25 in all): a grown fungus above and below (cords, knots, stalks, spores on the curtain) and a world with a third colony and an aphid clump (trails, the aphid marks, the bend, ants on the strip).
 
-Not seen yet, each added with or just before the slice that moves its layer and shown to fail on a mutant of that layer: aphid clumps, stalks and knots, the curtain's spores, hole bends and the strip's ants, pheromone trails, hyphae and cords on a well-grown fungus (the cheap ones, in `ja-fnd.6.3.4`); ants by stance (with `ja-fnd.6.3.15`); a pinned specimen's ring, the builder's marks (sugar, walls, the clump, a moved ant's trace) and a phone-sized page (`ja-fnd.6.3.20`, before `ja-fnd.6.3.16` moves them). Mutants confirmed not caught today: spores read from the wrong layer, aphids drawn on both views, stalks read at layer 0. (The lens card is DOM; nothing in `draw()` paints lens marks, so it is not a canvas layer.)
+Not seen yet, added with the slice that moves its layer and shown to fail on a mutant of that layer: ants by stance (with `ja-fnd.6.3.15`). `ja-fnd.6.3.20` then added five more (30 in all): the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, aphids), a pinned specimen, a moved ant's trace (its start ring: the page is paused) and a phone-sized page above and below; every stroke is proved to have landed or the run stops. Still unseen: a specimen on an underground ant, the no-entry paint (drawn only with smell vision on), the trace's run and loops. Two classes of mutant no scene can see: a corpse's stalk level on its ground sprite (ignored there), and the plane's marks (stalks, a specimen's ring, a trace) drawn on the curtain (off screen at the scenes' zoom). (The lens card is DOM; nothing in `draw()` paints lens marks, so it is not a canvas layer.)
 
 ## The slices
 
@@ -97,7 +97,7 @@ Each is its own small PR that **merges the day it opens**, with a fresh review, 
 
 | sequence | bead | what | proof |
 |---|---|---|---|
-| a | `ja-fnd.6.3.1` | **done (#282)**: the pixel guard, 18 scenes | records and checks agree; mutants caught |
+| a | `ja-fnd.6.3.1` | **done (#282)**: the pixel guard, 18 scenes (25 from `ja-fnd.6.3.4`) | records and checks agree; mutants caught |
 | b | `ja-fnd.6.3.2` | **done (#285)**: the null-world path deleted | 18 scenes match |
 | c | `ja-fnd.6.3.3` | the one-map fallbacks outside the field: `lens.ts`, `LensLayer.tsx`, `lens.test.ts`, `inspectionPatch.ts` (76, 115, 127), `cellInspection.ts` (103), `stats.ts` (183), `LabCards.tsx` (456), a comment in `fungusSight.ts`; and the comment nits carried from #282 and #285 | unit tier; grep `\.world \?` and `!!.*\.world` under `web/src/ui`; 18 scenes match |
 | d | `ja-fnd.6.3.4` | the cheap scenes: aphids, stalks and knots, curtain spores, hole bends and strip ants, trails, a grown fungus's hyphae and cords (script only, no app code; parallel with the next) | each fails on a mutant of its layer |
