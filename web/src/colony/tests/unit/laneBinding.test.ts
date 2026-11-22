@@ -46,7 +46,7 @@ test("the registry lists the ten lanes (mode, fungus, growth, steer and the six 
   // Only the fungus's lanes have a batch of their own (the ants' lanes take the client's); the fungus's and the response hooks gather a fuller request.
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
-    [[false, null], [true, 50], [true, 48], [false, null], ...RESPONSE_HOOKS.map((): [boolean, null] => [true, null])],
+    [[false, null], [true, 50], [true, 96], [false, null], ...RESPONSE_HOOKS.map((): [boolean, null] => [true, null])],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
   assert.equal(LANES.fungus.sample, SAMPLE_FUNGAL);
@@ -204,11 +204,11 @@ test("the fungus row takes no species words yet: a lane argument changes nothing
   assert.equal(l.contextOf(A[0]!, "top", other), l.contextOf(A[0]!, "top"));
 });
 
-test("the growth lane is the growth brain (ja-2bw.5): its 48 situations, its local rule, asked under the fungus's aim", () => {
+test("the growth lane is the growth brain (ja-2bw.5): its 96 situations, its local rule, asked under the fungus's aim", () => {
   const l = LANES.growth;
   const all = l.all();
-  assert.equal(all.length, 48);
-  assert.equal(new Set(all.map((s) => l.key(s, undefined))).size, 48, "every situation has its own key");
+  assert.equal(all.length, 96);
+  assert.equal(new Set(all.map((s) => l.key(s, undefined))).size, 96, "every situation has its own key");
   const items = all.slice(0, 5).map((situation, i) => ({ id: `g${i}`, key: growthKey(situation), situation }));
   for (const aim of AIMS.map((a) => a.text)) {
     assert.deepEqual(l.pack(items, aim), packGrowthRequest(items, aim));

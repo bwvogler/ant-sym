@@ -109,7 +109,7 @@ function make(): ColonyJev {
 const counts = (reqs: { lane: string; items: Set<string> }[], lane: string) =>
   reqs.filter((r) => r.lane === lane).reduce((n, r) => n + r.items.size, 0);
 
-test("a player's new aim, with a run on: the hosts' situations and all 48 growth situations go at once, without the gather wait", async () => {
+test("a player's new aim, with a run on: the hosts' situations and all 96 growth situations go at once, without the gather wait", async () => {
   const { reqs } = proxy();
   const j = make();
   j.setAim("first words");
@@ -120,9 +120,9 @@ test("a player's new aim, with a run on: the hosts' situations and all 48 growth
   await tick(80);
   assert.equal(counts(reqs, "fungus"), 2, "the two situations the living hosts are in, once each");
   assert.equal(counts(reqs, "growth"), LANES.growth.all().length);
-  assert.equal(LANES.growth.all().length, 48);
+  assert.equal(LANES.growth.all().length, 96);
   assert.equal(j.state.lanes.fungus.cached, 2);
-  assert.equal(j.state.lanes.growth.cached, 48);
+  assert.equal(j.state.lanes.growth.cached, 96);
 });
 
 test("with no run on, a player's new aim wants one, and its questions go when it starts", async () => {
@@ -136,7 +136,7 @@ test("with no run on, a player's new aim wants one, and its questions go when it
   await j.start();
   await tick(80);
   assert.equal(counts(reqs, "fungus"), 2);
-  assert.equal(counts(reqs, "growth"), 48);
+  assert.equal(counts(reqs, "growth"), 96);
 });
 
 test("what the new aim has cached is not asked; an aim with everything cached asks nothing and wants no run", async () => {
@@ -214,5 +214,5 @@ test("with no worker lever on the menu, a new aim asks no fungal situation (as #
   j.setAim("new words", { askNow: true });
   await tick(80);
   assert.equal(reqs.filter((r) => r.lane === "fungus").length, 0, "no fungus request at all");
-  assert.equal(counts(reqs, "growth"), 48);
+  assert.equal(counts(reqs, "growth"), 96);
 });

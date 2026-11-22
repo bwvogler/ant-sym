@@ -1,29 +1,30 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
 import { hash } from "./policyCache.ts";
 import { defineSchema, legendOf } from "./schema.ts";
-import { AHEADS, EXPOSURES, RUNS, SUPPLIES, type GrowthSituation } from "./hyphae.ts";
+import { AHEADS, EXPOSURES, RESOURCES, RUNS, SUPPLIES, type GrowthSituation } from "./hyphae.ts";
 
 // The fungus's growth lane, pure (ja-2bw.5, docs/hyphal-growth.md, PRD §63): what a hyphal tip does at its step, from
 // what it senses at its point (what is ahead, how exposed it is, its supply), asked under the player's aim for the
-// fungus. One choice question per situation; 48 situations, so one request asks them all. The tip carries the answer
+// fungus. One choice question per situation; 96 situations, so one request asks them all. The tip carries the answer
 // out where the ground and the mass allow, and turns to whichever side it can (only the tip knows which side is free);
 // a situation with no answer yet plays the tip's own local rule (hyphae.ts localGrowth), which also reads its body
 // (its run since branching, its first heading, the spots near it).
 
 /** Bump when the growth situation, the legend or the question changes: old cached answers no longer apply. */
-export const GROWTH_BRAIN_VERSION = 4;
+export const GROWTH_BRAIN_VERSION = 5;
 
-/** The growth situation's fields in the order a code and a cache key read them: 4 × 3 × 2 × 2 = 48 (run since ja-2bw.18). */
+/** The growth situation's fields in the order a code and a cache key read them: 4 × 3 × 2 × 2 × 2 = 96 (run since ja-2bw.18, resource since ja-vlla.4). */
 export const GROWTH_SCHEMA = defineSchema<GrowthSituation>([
   { name: "ahead", values: AHEADS },
   { name: "exposed", values: EXPOSURES },
   { name: "supply", values: SUPPLIES },
   { name: "run", values: RUNS },
+  { name: "resource", values: RESOURCES },
 ]);
 export const GROWTH_SITUATIONS = GROWTH_SCHEMA.size;
 
 /** What Jev may answer for a tip: the tip's own choices, a turn's side left to the tip. */
-export const GROWTH_CHOICES = ["grow", "turn", "branch", "rest", "fuse", "fruit"] as const;
+export const GROWTH_CHOICES = ["grow", "turn", "branch", "rest", "fuse", "fruit", "thicken"] as const;
 export type GrowthChoice = (typeof GROWTH_CHOICES)[number];
 
 export const GROWTH_CRITERIA: Record<GrowthChoice, string> = {
@@ -35,9 +36,11 @@ export const GROWTH_CRITERIA: Record<GrowthChoice, string> = {
   fuse: "fuse: join its own hypha ahead, closing a loop (only when ahead is own), and end this tip: a loop is a second, often shorter way for mass to reach the tips beyond it",
   fruit:
     "fruit: end this tip for good as a spore spot on the dug cell it touches (only on a wall or in a dug cell): ants walking there pick up spores, but the tip grows no more",
+  thicken:
+    "thicken: fill every open cell round this tip with hypha, a cell's mass each, and stay put (only where resource is corpse): a dense mat at a food source, the base of a new patch where seven cells close; it costs the mass that growing on would",
 };
 
-/** Requests carry every situation at once: the legend is most of a request, and there are only 48. */
+/** Requests carry every situation at once: the legend is most of a request, and there are only 96. */
 export const GROWTH_BATCH = GROWTH_SITUATIONS;
 
 export const GROWTH_LEGEND = legendOf(GROWTH_SCHEMA, {
@@ -59,6 +62,10 @@ export const GROWTH_LEGEND = legendOf(GROWTH_SCHEMA, {
     [
       "run",
       "run is how far the tip has grown since it set out or last branched: short, or long (the length after which a real hypha branches). A mycelium spreads by branching: tips that never branch stay a few threads, reach few tunnels and few ants. ",
+    ],
+    [
+      "resource",
+      "resource is corpse when a corpse the fungus has colonised lies on the tip's cell or beside it, else none. A fungus that reaches a food source can put out a dense mat there (thicken) instead of one thread: seven cells filled close round a cell make a new patch, a second place where mass enters; thicken is allowed only where resource is corpse. ",
     ],
   ],
   outro: "Choose what the tip does. aim is what you want: follow it.",

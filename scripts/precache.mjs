@@ -7,7 +7,7 @@
 // context (policyContext), per preset doctrine: each reached through the lane registry (colony/lanes.ts), which holds them. And `fungus`
 // (ja-lo8.4): the fungal situations a recorded side-view game meets (Garden painted on both royal chambers, Lockpick at
 // both holes, 300 s; not all 648), asked with every non-lethal lever, per preset aim (fungusBrain.AIMS), side view. And
-// `growth` (ja-2bw.5): every hyphal tip's situation (48), per preset aim, under the same aims. It is not in the default
+// `growth` (ja-2bw.5): every hyphal tip's situation (96), per preset aim, under the same aims. It is not in the default
 // `--lanes` (a plain re-run asks nothing new for it); after a GROWTH_BRAIN_VERSION bump, re-ship it with `--lanes growth`
 // (≈ $0.002 for the three aims): colony-live.mjs doesn't run this lane, so `--import` can't ship it for free.
 //
