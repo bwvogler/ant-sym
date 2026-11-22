@@ -14,7 +14,7 @@ import { leafTiles, LEAF_STEP, LEAF_BOTTOM, LEAF_TOP, LEAF_VEIN_TOP } from "./su
 import { inspectionScents, inspectionMarkers, SCENT_STYLES, type InspectionOverlays } from "./inspectionOverlays.ts";
 import { hyphaShape, HYPHA_COLOURS } from "./hyphaVisual.ts";
 import { fungalPrimitives, STALK_HEIGHT } from "./fungalStructures.ts";
-import { mapOrbit, orbitCamera, inspectionFrameScale, type InspectionOrbit } from "./inspectionOrbit.ts";
+import { mapOrbit, orbitCamera, inspectionFrameScale, mapTiltTarget, BELOW_WALK_PLANE, type InspectionOrbit } from "./inspectionOrbit.ts";
 type V = [number, number, number];
 interface Part {
   positions: number[];
@@ -262,7 +262,7 @@ export class InspectionScene {
   }
   private floor: ReturnType<typeof inspectionMoundFloor>;
   private point(x: number, y: number, z = 0): V {
-    return this.mode === "surface" ? [x, -y, z + (this.floor?.(x, y) ?? 0)] : [x, 1.08 - z, -y];
+    return this.mode === "surface" ? [x, -y, z + (this.floor?.(x, y) ?? 0)] : [x, BELOW_WALK_PLANE - z, -y];
   }
   private actor(name: string, x: number, y: number, z = 0, heading = 0, odour?: number, pitch = 0): void {
     if (this.mode === "below" && (name === "worker" || name === "queen")) name += "-below";
@@ -631,7 +631,7 @@ export class InspectionScene {
     }
     const view = this.viewport,
       orbit = orbitCamera(mode, view?.orbit ?? this.orbit),
-      target = new T.Vector3(view?.x ?? 0, mode === "below" ? 0.6 : -(view?.y ?? 0), mode === "surface" ? 0.15 : -(view?.y ?? 0));
+      target = new T.Vector3(...(view ? mapTiltTarget(mode, view.x, view.y) : mode === "surface" ? [0, 0, 0.15] : [0, 0.6, 0]));
     this.camera.position.copy(target).add(new T.Vector3(...orbit.position));
     this.camera.up.set(...orbit.up);
     this.camera.lookAt(target);
@@ -649,11 +649,8 @@ export class InspectionScene {
       halfHeight = view ? view.height / view.pixelsPerWorld / 2 : 1.792 * frame;
     this.camera.left = -halfWidth;
     this.camera.right = halfWidth;
-    // Keep the far ground edge at the top as the near edge comes toward the camera.
-    const tilt = view?.orbit?.tilt ?? 0;
-    const hinge = tilt > 0 ? halfHeight * (Math.cos(tilt) - 1) - target.z * Math.sin(tilt) : 0;
-    this.camera.top = halfHeight + hinge;
-    this.camera.bottom = -halfHeight + hinge;
+    this.camera.top = halfHeight;
+    this.camera.bottom = -halfHeight;
     this.camera.updateProjectionMatrix();
     this.camera.updateMatrixWorld();
     this.renderer.render(this.scene, this.camera);

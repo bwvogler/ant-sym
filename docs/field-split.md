@@ -77,7 +77,7 @@ web/src/ui/ColonyField.tsx   the shell
 
 A move of drawing code must change no pixel. Two proofs:
 
-1. **The pixel guard** (`scripts/field-shots.mjs`, `npm run field-shots`, by hand in Chromium, about 4 minutes a run with its 30 scenes). `record <dir>` renders 30 fixed scenes of the one world's canvas and hashes each; `check <dir>` renders again and names the scenes that differ. Deterministic by construction (a fresh paused game of seed 3, stepped a fixed number of ticks through the dev hook, the canvas read once it has held still); a change to one draw call fails the scenes that draw it and only those.
+1. **The pixel guard** (`scripts/field-shots.mjs`, `npm run field-shots`, by hand in Chromium, about 5 minutes a run with its 34 scenes). `record <dir>` renders 30 fixed scenes of the one world's canvas and hashes each; `check <dir>` renders again and names the scenes that differ. Deterministic by construction (a fresh paused game of seed 3, stepped a fixed number of ticks through the dev hook, the canvas read once it has held still); a change to one draw call fails the scenes that draw it and only those.
    - **The protocol for a moving slice:** `record` on **current main** before the edit (a baseline is of that code), make the move, `check` after it; all scenes must match. The baseline belongs to the machine and its Chromium (`check` refuses another one) and is never committed.
    - **A layer with no scene gets one first or with its bead** (below). A move of a layer no scene draws is not proved.
 2. **The recording fake context** (starts with the first layer that moves, `ja-fnd.6.3.5`; its sprites are ready). `FieldRenderer`'s layers run in the unit tier against a fake `CanvasRenderingContext2D` and a fake `FieldEnv` that record every call and its arguments; each layer gets a log test as it moves (the first log is of the post-move behaviour, and the Chromium guard is what shows it equals the old pixels), and `ja-fnd.6.3.9` composes the scenes. It runs in seconds with no browser.
@@ -139,3 +139,7 @@ These were open in the review of #291; I took them so work can start, and each i
 |---|---|---|
 | 2026-11-18 | `ja-fnd.6.3.1`: the pixel guard | #282 |
 | 2026-11-18 | `ja-fnd.6.3.2`: the null-world path deleted | #285 |
+| 2026-11-22 | `ja-fnd.6.3.3`: the one-map fallbacks outside the field | #293 |
+| 2026-11-22 | `ja-fnd.6.3.4`, `.20`: seven and five scenes (30 in all) | #298, #302 |
+| 2026-11-22 | `ja-fnd.6.3.13`: `FieldEnv`, the frame's result, the prelude as `prepareFrame` (the first three files of `ui/field/`) | #303 |
+| 2026-11-22 | `ja-fnd.6.3.5`: `FieldCtx`, `FieldInputs`, the overlay layers (`overlays.ts`), the recording fake context; four scenes for what the field reads from the page (34 in all) | #304 |

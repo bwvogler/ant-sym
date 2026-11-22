@@ -157,7 +157,7 @@ function steerSituationsMet() {
 }
 
 /**
- * The response lanes' situations a page game meets (get, carry, drop, trail, contact, leave: PRD §86, review of #281): one world as the
+ * The response lanes' situations a page game meets (get, carry, drop, trail, contact, leave: PRD §87, review of #281): one world as the
  * page builds it (600 + 600 ants, hyphae, directed combat), 300 s, seeds 1-3, every hook answering as the local rule does while each
  * distinct Touch is recorded under the lane's own key. One recording serves the six lanes. Their full spaces are far larger than a
  * game meets (the page asks only what its ants meet), so a lane ships what these games met.
