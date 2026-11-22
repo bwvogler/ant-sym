@@ -16,10 +16,11 @@
 // What a scene shows is in SCENES below: the generic ant's world above and below (each nest zoomed, so the minimap shows; a followed ant on each
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
 // on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
-// page). The last two are set up through the dev hook and the game itself. Not covered yet, to add with the slice that moves that layer: the
-// builder's marks (sugar, walls, a moved ant's trace), a pinned specimen, a phone-sized page, ants of every stance. (The lens card is DOM, and
+// page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap, a no-entry sign), a pinned specimen
+// and a moved ant's trace; the `phone` page: 390 px wide, touch. Not covered yet, to add with the slice that moves that layer: ants of every stance. (The lens card is DOM, and
 // draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
-// stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes).
+// stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes), and the same for the plane's other marks (a specimen's
+// ring, a moved ant's trace) drawn on the curtain.
 
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
@@ -302,8 +303,6 @@ const SCENES = [
       await tool(p, "Move");
     },
   },
-  // the same game from below: the moved ant's trace and the specimen's ring are of the top view and the plane's layer only
-  { name: "marks-below", page: "marks", run: (p) => view(p, "below") },
   // A phone-sized page (390 x 844, touch): the field's size and the page's narrow layout
   { name: "phone-above", page: "phone", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "phone-below", page: "phone", run: (p) => view(p, "below") },
