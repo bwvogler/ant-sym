@@ -112,7 +112,8 @@ test("heldProbe: a carrier that won't put its food down at home counts as carryi
       map: smallOne,
       seconds: 200,
       game: { antCount: 60, rivalAnts: 0 },
-      sides: { responses: { ...localResponses, drop } },
+      // the recovery after refused unloading (dropRefusalLimit, ja-g7nz) is off here: this test is about the probe's count of a carrier that never puts down
+      sides: { responses: { ...localResponses, drop }, colony: { dropRefusalLimit: 0 } },
     }).result.metrics;
   const keeps = run(() => false);
   assert.ok(keeps["you.maxCarrying"] > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);
