@@ -1,5 +1,9 @@
 # Delivery actions: choose a destination without a chamber address
 
+> **Status (2026-11-22):** this note records an experiment built in PR #281 (`fungus-action-foundation`, draft). That code is **not on `main`**: the settings, hooks and `--set` flags named below (`fight.intent`, `attackDistance`, `deliveryReconsider`, the carry and contact response keys) exist only on that branch, which was written before the stance lane was deleted (#284) and is being redone on stanceless `main` (PRD §84). Where the text says `stanceStep`, read the per-ant step in `stance.ts`; there is no stance lane any more. Measured numbers are from the stance-era base and are to be re-run, not relied on.
+>
+> The files this note cites that are not in `docs/` or `scripts/lab/loose-food-ledger.mjs` (the calibration zip under `experiments/delivery-calibration/`, `scripts/lab/delivery-calibration.mjs`, the `delivery*` and `contactAction` tests, the workflows) are on PR #281 only.
+
 Question: how does a carrier find and recognise a place to leave food?
 
 ## Evidence

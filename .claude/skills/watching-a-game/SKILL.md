@@ -1,6 +1,6 @@
 ---
 name: watching-a-game
-description: "Shows what happens in a jev-ants game as events: births, deaths and their cause, mode and stance changes with the situation the policy was asked, the queen, infections, Jev batches. Use whenever you or the user need to know why an ant, colony or the fungus did something, what a game or an assay run actually did, to debug or inspect behaviour, to add logging, or when someone says logs, trace, journal, 'what happened' or 'why did it'. Offline and free. Not for tuning a number over seeds (running-assays) or live Jev checks (colony-live)."
+description: "Shows what happens in a jev-ants game as events: births, deaths and their cause, mode changes with the situation the policy was asked, the queen, infections, Jev batches. Use whenever you or the user need to know why an ant, colony or the fungus did something, what a game or an assay run actually did, to debug or inspect behaviour, to add logging, or when someone says logs, trace, journal, 'what happened' or 'why did it'. Offline and free. Not for tuning a number over seeds (running-assays) or live Jev checks (colony-live)."
 ---
 
 # Watching a game
@@ -21,15 +21,15 @@ The game journal (`web/src/colony/journal.ts`, ja-8tb) is a read-only observer: 
 
 Comma-separated words, in any order. A word it doesn't know throws and lists the valid ones.
 
-- **Levels** (each includes the one before): `summary` = colony, queen, stance, jev; `detail` = summary + birth, death, infection; `verbose` = detail + `mode` (every mode change, with the situation) and `dig` (a few a second in a whole game, so name it to watch digs alone).
-- **Categories** (name them instead, or add to a level): `colony queen stance jev birth death mode infection dig` (`dig`: an old forager's foraging dig, begun and ended with food or time up, with its depth; forageDig, ja-16rp).
+- **Levels** (each includes the one before): `summary` = colony, queen, jev; `detail` = summary + birth, death, infection; `verbose` = detail + `mode` (every mode change, with the situation) and `dig` (a few a second in a whole game, so name it to watch digs alone).
+- **Categories** (name them instead, or add to a level): `colony queen jev birth death mode infection dig` (`dig`: an old forager's foraging dig, begun and ended with food or time up, with its depth; forageDig, ja-16rp).
 - **Filters:** `colony=<k>`, `ant=<i>` (the ant's slot; an event also carries its `gen`, since a slot is reused). Either alone means everything about it.
 
 ## Recipe: why did ant #i do that?
 
 1. `--log detail` to see who died, of what (`killed`, `died of old age`, `starved`) and who was infected, with their slots and times.
 2. `--log verbose,colony=<k>,ant=<i>` for that ant: each `mode` event reads `explore → return  (tired, food faint, …)` and its `data.situation` is the exact `Situation` its policy was asked, so a surprising choice can be replayed against the policy (`localPolicy`, or a cache with `--policy cache:<file>`).
-3. Check the timing against `summary`'s stance and queen events for its colony.
+3. Check the timing against `summary`'s queen events for its colony.
 
 ## Volume
 

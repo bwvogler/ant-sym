@@ -9,7 +9,7 @@ import { homeDistPlane } from "./homing.ts";
 import { localResponses } from "./responses.ts";
 import { raidLevel, raidSmelt, touch } from "./sense.ts";
 import type { AntStep } from "./step.ts";
-import { FIGHT, PLANE, STRONG } from "./vocab.ts";
+import { PLANE, STRONG } from "./vocab.ts";
 
 export function stanceStep(col: Colony, i: number, s: AntStep): void {
   const p = s.p;
@@ -47,9 +47,9 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
     col.defending[i] = th >= p.defendAt && (homeDistPlane(col, i) <= p.homeGround || (p.tendDefend > 0 && col.atAphids(i))) ? 1 : 0;
   }
   // Raid stance (behaviour MR 5.2): a raid is a bias, not an order. An ant is recruited by smelling a scout's raid trail, or goes out
-  // as a scout at raidScout when it is home with empty jaws; the others forage. A recruited ant's raid ends when it comes home
+  // as a scout when its `leave` answer is raid (Colony.leaves); the others forage. A recruited ant's raid ends when it comes home
   // with no trail under it: no trail was laid for it, or the trail has faded.
-  if (rgate && (sgate || col.stance === "raid")) {
+  if (rgate) {
     const homeNow = col.atNestTop(i);
     if (!homeNow) col.gone[i] = 1;
     if (col.recruited[i] === 0) {
@@ -60,27 +60,14 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
       // and every raid was a war (G′ seeds 1-4: 880 lost against no raids' 170).
       if (
         raidSmelt(col, i) !== "none" &&
-        (!sgate ||
-          (col.raidable &&
-            homeNow &&
-            !col.carrying[i] &&
-            col.rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(col, i) / STRONG) * dt)))
+        col.raidable &&
+        homeNow &&
+        !col.carrying[i] &&
+        col.rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(col, i) / STRONG) * dt)
       ) {
         col.recruited[i] = 1;
         col.gone[i] = 0;
         col.recruits++;
-      } else if (
-        !sgate &&
-        homeNow &&
-        !col.carrying[i] &&
-        !col.pellet[i] &&
-        !col.broodHeld[i] &&
-        col.rng() < 1 - Math.exp(-p.raidScout * dt)
-      ) {
-        col.recruited[i] = 1;
-        col.gone[i] = 0;
-        col.mode[i] = FIGHT; // out it goes
-        col.raidScouts++;
       }
     } else if (homeNow && col.gone[i] === 1 && raidSmelt(col, i) === "none") {
       col.recruited[i] = 0;
@@ -99,7 +86,6 @@ export function stanceStep(col: Colony, i: number, s: AntStep): void {
     held &&
     col.recruited[i] === 0 &&
     p.raidGate > 0 &&
-    p.stanceGate > 0 &&
     col.raidable &&
     raidSmelt(col, i) !== "none" &&
     rng() < 1 - Math.exp(-p.raidRecruit * Math.min(1, raidLevel(col, i) / STRONG) * dt)

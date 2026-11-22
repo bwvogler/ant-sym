@@ -1,5 +1,5 @@
 import type { JevAnswer, JevRequest } from "../../shared/jev.ts";
-import { decodeSituation, localPolicy, localStance, SITUATIONS } from "./colony.ts";
+import { decodeSituation, localPolicy, SITUATIONS } from "./colony.ts";
 import {
   DOCTRINES,
   RESPONSE_HOOKS,
@@ -11,14 +11,9 @@ import {
   validResponse,
   MODE_CRITERIA,
   packModeRequest,
-  packStanceRequest,
   policyContext,
   readMode,
-  readStance,
   situationKey,
-  stanceContext,
-  stanceKey,
-  STANCE_CRITERIA,
 } from "./colonyBrain.ts";
 import { TOUCH_SCHEMA, type Touch } from "./responses.ts";
 import type { FungalSituation } from "./fungalPolicy.ts";
@@ -59,15 +54,7 @@ import {
   validSteer,
 } from "./steerBrain.ts";
 import type { GrowthSituation } from "./hyphae.ts";
-import {
-  type LaneWords,
-  STANCE_SCHEMA,
-  type Situation,
-  type SpeciesSituation,
-  type Stance,
-  type StanceSituation,
-  type SteerSituation,
-} from "./vocab.ts";
+import { type LaneWords, type Situation, type SpeciesSituation, type SteerSituation } from "./vocab.ts";
 
 // What is known about each kind of question (lane) beyond its brain (colonyBrain.ts, fungusBrain.ts): the id its items carry, the
 // prefix of its cache contexts, whether its answers are counted as hits and misses, whether a reply makes the ants reconsider, and how
@@ -75,12 +62,12 @@ import {
 // (docs/refactor.md S4). A new lane adds its row here and its lane object in ui/colonyJev.ts. Never imported from
 // colony.ts or fungus.ts: it sits above the brains (a cycle otherwise).
 
-export type LaneName = "mode" | "stance" | "fungus" | "growth" | "steer" | ResponseHook;
+export type LaneName = "mode" | "fungus" | "growth" | "steer" | ResponseHook;
 
 export interface LaneKind {
   /** the prefix of the ids its situations carry in a request (s0, s1, …) */
   readonly idPrefix: string;
-  /** the start of every cache context of this lane (policyContext, stanceContext, fungusContext) */
+  /** the start of every cache context of this lane (policyContext, fungusContext) */
   readonly contextPrefix: string;
   /** whether a lookup counts as a hit or a miss in the run's tally (the ants' mode choices only) */
   readonly countsHits: boolean;
@@ -103,13 +90,6 @@ const RESPONSE_KINDS = Object.fromEntries(
 export const LANE_KINDS: Record<LaneName, LaneKind> = {
   ...RESPONSE_KINDS,
   mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: PER_REQUEST },
-  stance: {
-    idPrefix: "c",
-    contextPrefix: "stance-",
-    countsHits: false,
-    reconsiders: true,
-    perRequest: PER_REQUEST,
-  },
   fungus: {
     idPrefix: "h",
     contextPrefix: "fungus-",
@@ -195,14 +175,6 @@ export const SAMPLE_SITUATION: Situation = {
   enemy: "none",
   stance: "forage",
 };
-export const SAMPLE_STANCE: StanceSituation = {
-  stance: "forage",
-  ants: "some",
-  losses: "none",
-  enemyNearNest: false,
-  intake: "some",
-  larder: "low",
-};
 export const SAMPLE_FUNGAL: FungalSituation = {
   arousal: "calm",
   touch: "nestmate",
@@ -233,24 +205,6 @@ const modeLane: Has<LaneSpec<Situation, string, undefined>, "local" | "all"> = {
     lane?.schema
       ? Array.from({ length: lane.schema.size }, (_, c) => lane.schema!.decode(c))
       : Array.from({ length: SITUATIONS }, (_, c) => decodeSituation(c)),
-};
-
-const stanceLane: Has<LaneSpec<StanceSituation, Stance, undefined>, "local" | "all"> = {
-  name: "stance",
-  kind: LANE_KINDS.stance,
-  variants: [""],
-  sample: SAMPLE_STANCE,
-  wordsField: "doctrine",
-  presets: DOCTRINES,
-  gather: false,
-  batch: null,
-  key: (s) => stanceKey(s),
-  pack: (items, words, lane) => packStanceRequest(items, words, lane),
-  read: (answers, id, _situation, _key, lane) => readStance(answers, id, lane ? Object.keys(lane.criteria) : undefined),
-  valid: (_key, answer, lane) => Object.keys(lane?.criteria ?? STANCE_CRITERIA).includes(answer),
-  contextOf: (words, _variant, lane) => stanceContext(words, lane),
-  local: localStance,
-  all: () => Array.from({ length: STANCE_SCHEMA.size }, (_, c) => STANCE_SCHEMA.decode(c)),
 };
 
 // The levers asked (the menu's, a queen's or a worker's, in table order) are in each key, so a question is packed and its answer read and kept
@@ -350,7 +304,6 @@ const responseLanes = Object.fromEntries(
 /** Every lane, by name, typed. */
 export const LANES = {
   mode: modeLane,
-  stance: stanceLane,
   fungus: fungusLane,
   growth: growthLane,
   steer: steerLane,
@@ -382,7 +335,6 @@ export interface ErasedLane {
 /** Every lane, in the order the page asks them. */
 export const LANE_LIST: readonly ErasedLane[] = [
   LANES.mode,
-  LANES.stance,
   LANES.fungus,
   LANES.growth,
   LANES.steer,

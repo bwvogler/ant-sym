@@ -174,13 +174,12 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   const packed = cellKey(hx, hy);
   // Homing on the ground line (side view) goes cell by cell to the hole wherever the walkway is, one cell
   // thick or two (on the mound's slopes, where it is no tunnel and steering freely wandered off round them).
-  const carryingOut = mode === RETURN && col.pellet[i] === 1 && !col.onPlane && !Number.isNaN(col.spoilTo[i]);
   // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
   const raiding = mode === FIGHT && !col.onPlane && col.stanceOf(i) === "raid" && col.raidTarget !== null;
   const onSky = isSky(map, fresh ? hx : col.gx[i], fresh ? hy : col.gy[i]);
   // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && !col.onPlane && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
-  const groundHome = carryingOut || climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);
+  const groundHome = climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);
   if (fresh && !hugging && !groundHome && !delivering && col.noTunnel[i] === packed) {
     col.gx[i] = NO_CELL; // looked here already: open ground
     return false;
@@ -196,14 +195,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   col.noTunnel[i] = NO_KEY;
   let dir = fresh ? dirOf(col.heading[i]) : col.gdir[i];
   const ent = col.entrance;
-  if (carryingOut) {
-    // Carrying a pellet out (side view): up to the hole if it is still in the shaft, then on along the ground away
-    // from it to where it drops it (away from the hole from inside the shaft is down it).
-    const inShaft = !isSky(map, cx, cy) && !(cx === col.entranceCol && cy === col.entranceRow);
-    const best = inShaft ? towardHole(col, cx, cy, false) : awayFromHole(col, cx, cy, col.spoilSide[i]);
-    if (best < 0) col.spoilTo[i] = Math.min(0, col.spoilTo[i]); // the map's edge, or nowhere farther: it drops it here (one carried back to the midden walks on: undertake)
-    dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
-  } else if (raiding) {
+  if (raiding) {
     const t = col.raidTarget as Nest;
     let best: number;
     if (isSky(map, cx, cy)) {
@@ -544,13 +536,11 @@ export function widenWay(col: Colony, cx: number, cy: number, prefer: number): n
 }
 
 /**
- * Whether soil cell (x, y) is a face an explorer may dig for chamber `c` (null: a new chamber): soil, not the mound's
- * loose soil nor the crust, not put back lately (refilled: dug at, it glances off), and a place a chamber cell may be (chamberSpot).
+ * Whether soil cell (x, y) is a face an explorer may dig for chamber `c` (null: a new chamber): soil, not the crust, not put back lately (refilled: dug at, it glances off), and a place a chamber cell may be (chamberSpot).
  */
 export function chamberFace(col: Colony, x: number, y: number, c: Chamber | null): boolean {
   return (
     rockAt(col.map, x, y) === SOIL &&
-    col.map.loose?.get(x, y) !== 1 &&
     !crust(col, x, y) &&
     !refilled(col.map, x, y, col.time, col.params.backfill.hold) &&
     col.chamberSpot(c, x, y)
@@ -603,22 +593,4 @@ export function groundHand(col: Colony, cx: number, cy: number, dir: number, sid
     if (ok(d)) return d;
   }
   return dir;
-}
-
-/** The side view: the way from cell (cx, cy) to an open neighbour farther from the hole on `side`, on the ground if it can, or −1. */
-export function awayFromHole(col: Colony, cx: number, cy: number, side: number): number {
-  const ex = (col.entrance as Nest).x;
-  let best = -1;
-  let bestV = side * (centreX(cx, cy) - ex) + 1e-6;
-  for (let d = 0; d < 6; d++) {
-    const tx = stepX(cx, cy, d);
-    const ty = stepY(cy, d);
-    if (rockAt(col.map, tx, ty) !== OPEN) continue;
-    const v = side * (centreX(tx, ty) - ex) + (isSky(col.map, tx, ty) ? 0.25 : 0); // up out of the hole onto the ground first
-    if (v > bestV) {
-      bestV = v;
-      best = d;
-    }
-  }
-  return best;
 }

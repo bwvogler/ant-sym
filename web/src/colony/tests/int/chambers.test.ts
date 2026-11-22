@@ -97,7 +97,7 @@ test("a roomy nest digs less (ja-wii): the same few ants dig less when their cha
     for (const seed of [6, 7, 8, 9]) {
       const w = smallOne(2);
       if (!chambers) w.curtain.chambers = undefined; // no chambers: never roomy (as before slice 2)
-      const c = new Colony(w.curtain, { antCount: 30, maxAnts: 30 }, mulberry32(seed), undefined, undefined, {
+      const c = new Colony(w.curtain, { antCount: 30, maxAnts: 30 }, mulberry32(seed), undefined, {
         plane: w.plane,
         line: w.line,
       });

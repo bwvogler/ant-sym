@@ -461,20 +461,6 @@ export function steer(col: Colony, i: number, s: AntStep): void {
         const read = (b: number) => m.read("midden", x + Math.cos(b) * d, y + Math.sin(b) * d);
         h += avoid(read(h - a), read(h), read(h + a), p.turnRate * dt * MIDDEN_AVOID);
       }
-    } else if (!rgate && col.stance === "raid" && col.raidTarget && !detouring) {
-      // At the rival hole's coordinates: the side view, or raidGate 0 (review of #41: an ant not recruited, put in FIGHT by Jev's
-      // mode lane or a contact, walked here on a top-down map).
-      const t = col.raidTarget;
-      h = turnToward(h, Math.atan2(t.y - col.y[i], t.x - col.x[i]), p.turnRate * dt * 0.5) + noise * p.wander * 0.25;
-      // The rival's midden marks its ground: raiders shy from it (Pogonomyrmex badius; slice 7).
-      const m = col.raidMarks;
-      if (m) {
-        const x = col.x[i];
-        const y = col.y[i];
-        const d = p.sensorDistance;
-        const read = (a: number) => m.read("midden", x + Math.cos(a) * d, y + Math.sin(a) * d);
-        h += avoid(read(h - p.sensorAngle), read(h), read(h + p.sensorAngle), p.turnRate * dt * MIDDEN_AVOID);
-      }
     } else h += noise * p.wander;
   } else if (!digging) {
     const seen = Math.max(fl, ff, fr) >= SEEN;

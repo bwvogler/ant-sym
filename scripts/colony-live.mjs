@@ -2,7 +2,7 @@
 // situation an offline game meets, and compare its answers with the local
 // rule. One headless game (experiment.runGame: the page's one world, generateOneWorld(seed); the local rule and local responses,
 // alarm painted about every 20 s) collects the distinct situations of each
-// lane: ant modes, stances, and the get/carry/drop/trail responses
+// lane: ant modes, and the get/carry/drop/trail responses
 // (colonyBrain.RESPONSE_HOOKS, keyed by colonyBrain.responseKey). Then, per
 // doctrine, each lane's situations are packed with the real packers and sent
 // through the server's JevClient (pooled connection, per-attempt timeout,
@@ -22,7 +22,7 @@
 //
 // JEV_API_KEY comes from the environment and is never printed.
 //
-// Usage: node scripts/colony-live.mjs <all|mode|stance|get,carry,drop,trail> [--budget 0.10] [--seconds 300]
+// Usage: node scripts/colony-live.mjs <all|mode|get,carry,drop,trail> [--budget 0.10] [--seconds 300]
 //        [--seed 1] [--ants 600] [--doctrines forage,cautious,warlike] [--from <cache>] [--dry]
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_JEV_MODEL, USD_PER_INPUT_TOKEN } from "../web/shared/jev.ts";
@@ -39,7 +39,6 @@ import {
   RESPONSE_BRAIN_VERSION,
   RESPONSE_HOOKS,
   responseKey,
-  STANCE_BRAIN_VERSION,
   localResponses,
   responses,
   generateOneWorld,
@@ -54,7 +53,7 @@ helpAndExit(import.meta.url);
 
 const BATCH = 100;
 const DT = 1 / 30;
-const VERSIONS = { colony: COLONY_BRAIN_VERSION, stance: STANCE_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
+const VERSIONS = { colony: COLONY_BRAIN_VERSION, response: RESPONSE_BRAIN_VERSION };
 
 const args = process.argv.slice(2);
 const opts = {
@@ -100,7 +99,6 @@ if (!(opts.budget > 0 && opts.budget <= 1)) throw new Error("--budget must be in
 const antLane = (row) => ({ key: (s) => row.key(s, undefined), pack: row.pack, read: row.read, local: row.local });
 const LANES = {
   mode: antLane(ROWS.mode),
-  stance: antLane(ROWS.stance),
   ...Object.fromEntries(
     RESPONSE_HOOKS.map((h) => [
       h,
@@ -154,14 +152,14 @@ const note = (lane, s) => {
 };
 const answered = (lane, s) => {
   if (!base) return undefined;
-  const table = lane === "mode" ? base.modes : lane === "stance" ? base.stances : base.responses?.[lane];
+  const table = lane === "mode" ? base.modes : base.responses?.[lane];
   return table?.[LANES[lane].key(s)];
 };
 // Mode and response answers are weighted (Jev's probabilities, colony/weighted.ts): the replayed colony draws from them as the
 // page's does (a response with the ant's own draw, ja-m7rr).
 const brain = (lane) => (s, draw) => {
   const a = answered(lane, s);
-  if (a !== undefined) return lane === "mode" ? pick(a, draw) : lane === "stance" ? a : responseOf(lane, LANES[lane].key(s), a, draw);
+  if (a !== undefined) return lane === "mode" ? pick(a, draw) : responseOf(lane, LANES[lane].key(s), a, draw);
   note(lane, s);
   return LANES[lane].local(s);
 };
@@ -179,7 +177,6 @@ const { game } = runGame({
   game: { antCount: opts.ants, rivalAnts: opts.ants },
   sides: {
     policy: brain("mode"),
-    stance: brain("stance"),
     responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, brain(h)]))),
   },
   seconds: opts.seconds,
@@ -215,7 +212,6 @@ const caches = Object.fromEntries(
           seconds: opts.seconds,
           doctrine: d,
           modes: {},
-          stances: {},
           responses: {},
         },
   ]),
@@ -267,17 +263,13 @@ try {
           row.answered++;
           const local = L.local(s);
           if (
-            (lane === "mode"
-              ? topOf(a)
-              : lane === "stance"
-                ? a
-                : responseOf(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (lane), k, a)) === local
+            (lane === "mode" ? topOf(a) : responseOf(/** @type {import("../web/src/colony/index.ts").ResponseHook} */ (lane), k, a)) ===
+            local
           )
             row.agree++;
           else row.disagreements.push({ situation: k, jev: a, local });
           const c = caches[d.id];
           if (lane === "mode") c.modes[k] = a;
-          else if (lane === "stance") c.stances[k] = a;
           else (c.responses[lane] ??= {})[k] = a;
         });
       }

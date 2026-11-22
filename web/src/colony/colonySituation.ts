@@ -1,10 +1,9 @@
-// What a colony asks its policies about (docs/refactor.md S3.3, ja-fnd.4.12): a species' own situation for the mode lane (its schema and senses), and the strategist's view of the colony for the stance lane. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`; setSituation and stanceSituation stay the colony's methods and call these.
+// What a colony asks its policies about (docs/refactor.md S3.3, ja-fnd.4.12): a species' own situation for the mode lane (its schema and senses). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`; setSituation stays the colony's methods and call these.
 
 import type { Colony } from "./colony.ts";
 import { type Schema } from "./schema.ts";
 import { SITUATIONS } from "./situation.ts";
-import { INTAKE_NONE, INTAKE_PLENTY, INTAKE_WINDOW } from "./tuning.ts";
-import { MODES, type SpeciesSituation, type StanceSituation } from "./vocab.ts";
+import { MODES, type SpeciesSituation } from "./vocab.ts";
 
 /**
  * Ask the mode policy about the species' own situation (ja-fnd.5.10): `schema` names the fields its key and its question hold, `sense` adds the
@@ -28,19 +27,4 @@ export function speciesSituation(
   const allowed = new Map(own.schema.fields.map((f) => [String(f.name), f.values as readonly unknown[]] as const));
   col.own = { schema: own.schema, sense: own.sense ?? null, modeStride: own.schema.strides[at]!, allowed };
   col.seen = new Uint8Array(own.schema.size);
-}
-
-/** The strategist's view of this colony. `enemyNearNest` comes from the game, which sees both colonies. */
-export function stanceView(col: Colony, enemyNearNest: boolean): StanceSituation {
-  const pop = col.population / col.params.maxAnts;
-  const intake = col.intakeRate / Math.max(1, col.population);
-  return {
-    stance: col.stance,
-    ants: pop < 0.4 ? "few" : pop < 0.8 ? "some" : "many",
-    losses: col.recentLosses < 1 ? "none" : col.recentLosses < 10 ? "some" : "heavy",
-    enemyNearNest,
-    // Until it has watched a whole window the colony can't tell: "some".
-    intake: col.time < INTAKE_WINDOW ? "some" : intake < INTAKE_NONE ? "none" : intake >= INTAKE_PLENTY ? "plenty" : "some",
-    larder: col.spare() >= 2 * col.params.foodPerAnt ? "full" : "low",
-  };
 }

@@ -1,0 +1,25 @@
+{
+  "names": [
+    "queen",
+    "queen-dead",
+    "corpse",
+    "brood-0",
+    "brood-1",
+    "brood-2",
+    "alate-body",
+    "alate-wings"
+  ],
+  "worldFrame": 2.25,
+  "tiny": {
+    "frame": 27,
+    "stride": 29,
+    "width": 232,
+    "height": 29
+  },
+  "walk": {
+    "frame": 64,
+    "stride": 66,
+    "width": 528,
+    "height": 66
+  }
+}

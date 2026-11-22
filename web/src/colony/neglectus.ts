@@ -2,7 +2,7 @@
 // responses, with one supercolony's tolerance and its own words for the mode lane. Its grooming, brood disinfection, queens and budding
 // come later (ja-e668.4–.6); its graded aggression between populations is ja-e668.10.
 
-import { COLONY_LEGEND, MODE_CRITERIA, STANCE_WORDS } from "./colonyBrain.ts";
+import { COLONY_LEGEND, MODE_CRITERIA } from "./colonyBrain.ts";
 import { localPolicy } from "./localRules.ts";
 import { localResponses } from "./responses.ts";
 import { SPECIES, type Species } from "./species.ts";
@@ -37,7 +37,7 @@ export const NEGLECTUS_ANT: Species = {
   name: "Invasive garden ant",
   params: { tolerance: NEGLECTUS_TOLERANCE },
   responses: localResponses,
-  lanes: { mode: NEGLECTUS_MODE_WORDS, stance: STANCE_WORDS },
+  lanes: { mode: NEGLECTUS_MODE_WORDS },
   policy: neglectusPolicy,
 };
 

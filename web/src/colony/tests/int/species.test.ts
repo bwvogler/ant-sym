@@ -3,7 +3,7 @@ import test from "node:test";
 import { DEFAULT_GAME, Game } from "../../game.ts";
 import { mulberry32 } from "../../world.ts";
 import { smallOne } from "../builders.ts";
-import { MODE_WORDS, STANCE_WORDS } from "../../colonyBrain.ts";
+import { MODE_WORDS } from "../../colonyBrain.ts";
 import { localResponses } from "../../responses.ts";
 import { GENERIC_ANT, SPECIES, speciesById, type Species } from "../../species.ts";
 
@@ -13,7 +13,6 @@ test("the generic ant overrides no parameter and reuses the local responses them
   assert.deepEqual(GENERIC_ANT.params, {});
   assert.equal(GENERIC_ANT.responses, localResponses, "Colony compares its response functions by identity");
   assert.equal(GENERIC_ANT.lanes.mode, MODE_WORDS, "the generic ant asks under the words the brains have always had");
-  assert.equal(GENERIC_ANT.lanes.stance, STANCE_WORDS);
   assert.equal(DEFAULT_GAME.species, GENERIC_ANT, "a game plays the generic ant unless it names another");
 });
 

@@ -1,35 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_MENU, askedLevers } from "../../fungus.ts";
-import {
-  DOCTRINES,
-  MODE_WORDS,
-  packModeRequest,
-  packStanceRequest,
-  policyContext,
-  readMode,
-  readStance,
-  situationKey,
-  stanceContext,
-  stanceKey,
-  STANCE_WORDS,
-} from "../../colonyBrain.ts";
+import { DOCTRINES, MODE_WORDS, RESPONSE_HOOKS, packModeRequest, policyContext, readMode, situationKey } from "../../colonyBrain.ts";
 import { AIMS, askedIn, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
-import { decodeSituation, localPolicy, localStance, SITUATIONS } from "../../colony.ts";
+import { decodeSituation, localPolicy, SITUATIONS } from "../../colony.ts";
 import { growthContext, growthKey, localGrowthChoice, packGrowthRequest } from "../../growthBrain.ts";
-import {
-  LANE_KINDS,
-  LANE_LIST,
-  LANES,
-  laneOfContext,
-  SAMPLE_FUNGAL,
-  SAMPLE_GROWTH,
-  SAMPLE_STEER,
-  SAMPLE_SITUATION,
-  SAMPLE_STANCE,
-} from "../../lanes.ts";
+import { LANE_KINDS, LANE_LIST, LANES, laneOfContext, SAMPLE_FUNGAL, SAMPLE_GROWTH, SAMPLE_STEER, SAMPLE_SITUATION } from "../../lanes.ts";
 import type { FungalSituation } from "../../fungalPolicy.ts";
-import { STANCE_SCHEMA, type LaneWords, type Mode, type Situation, type Stance, type StanceSituation } from "../../vocab.ts";
+import type { LaneWords, Mode, Situation } from "../../vocab.ts";
 
 // The registry's lanes (docs/refactor.md S4.2, ja-fnd.5.2.3) do what the brains do: each function of a row gives the brain's own answer for
 // the same inputs. The brains' bytes are pinned elsewhere (ui/tests/laneRegistry.char.test.ts); this pins that the registry adds nothing and
@@ -41,48 +19,36 @@ const MODES_SEEN: Situation[] = [
   SAMPLE_SITUATION,
   { mode: "return", tired: true, foodTrail: "none", homeTrail: "brood", alarm: "strong", enemy: "near", stance: "defend" },
 ];
-const STANCES_SEEN: StanceSituation[] = [
-  SAMPLE_STANCE,
-  { stance: "defend", ants: "few", losses: "heavy", enemyNearNest: true, intake: "none", larder: "full" },
-];
 const FUNGAL_SEEN: FungalSituation[] = [
   SAMPLE_FUNGAL,
   { arousal: "calm", touch: "none", place: "queen", task: "queen", carrying: "nothing", groomed: false },
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the five lanes, each with its flags, variants, words and batching", () => {
+test("the registry lists the ten lanes (mode, fungus, growth, steer and the six response hooks), each with its flags, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
-    ["mode", "stance", "fungus", "growth", "steer"],
+    ["mode", "fungus", "growth", "steer", "get", "carry", "drop", "trail", "contact", "leave"],
   );
   for (const l of LANE_LIST) assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], [""], [""], [""]],
+    [[""], [""], [""], [""], [""], [""], [""], [""], [""], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
-    ["doctrine", "doctrine", "aim", "aim", "doctrine"],
+    ["doctrine", "aim", "aim", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine"],
   );
   assert.equal(LANES.mode.presets, DOCTRINES);
-  assert.equal(LANES.stance.presets, DOCTRINES);
   assert.equal(LANES.fungus.presets, AIMS);
   assert.equal(LANES.growth.presets, AIMS, "the growth lane asks under the fungus's aim");
   assert.equal(LANES.steer.presets, DOCTRINES, "the steer lane asks under the colony's doctrine (ja-ykmu.3)");
-  // Only the fungus's lanes gather a fuller request and have a batch of their own (the ants' lanes take the client's).
+  // Only the fungus's lanes have a batch of their own (the ants' lanes take the client's); the fungus's and the response hooks gather a fuller request.
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
-    [
-      [false, null],
-      [false, null],
-      [true, 50],
-      [true, 48],
-      [false, null],
-    ],
+    [[false, null], [true, 50], [true, 48], [false, null], ...RESPONSE_HOOKS.map((): [boolean, null] => [true, null])],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
-  assert.equal(LANES.stance.sample, SAMPLE_STANCE);
   assert.equal(LANES.fungus.sample, SAMPLE_FUNGAL);
   assert.equal(LANES.growth.sample, SAMPLE_GROWTH);
   assert.equal(LANES.steer.sample, SAMPLE_STEER);
@@ -118,27 +84,6 @@ test("the mode lane is the mode brain", () => {
   assert.equal(all.length, SITUATIONS);
   assert.deepEqual(all[0], decodeSituation(0));
   assert.deepEqual(all[SITUATIONS - 1], decodeSituation(SITUATIONS - 1));
-});
-
-test("the stance lane is the stance brain", () => {
-  const l = LANES.stance;
-  for (const words of D) {
-    const items = STANCES_SEEN.map((situation, i) => ({ id: `c${i}`, key: stanceKey(situation), situation }));
-    assert.deepEqual(l.pack(items, words), packStanceRequest(items, words));
-    assert.equal(l.contextOf(words), stanceContext(words));
-  }
-  for (const s of STANCES_SEEN) {
-    assert.equal(l.key(s, undefined), stanceKey(s));
-    assert.equal(l.local(s), localStance(s));
-  }
-  for (const choice of ["raid", "flee"]) {
-    const a = { c0_stance: { type: "choice" as const, choice } };
-    assert.equal(l.read(a, "c0", SAMPLE_STANCE, "k"), readStance(a, "c0"));
-    assert.equal(l.valid("k", choice), choice === "raid");
-  }
-  const all = l.all();
-  assert.equal(all.length, STANCE_SCHEMA.size);
-  assert.deepEqual(all[5], STANCE_SCHEMA.decode(5));
 });
 
 test("the fungus lane is the fungus brain: only its key and asks read the menu, and it has no local rule of its own", () => {
@@ -196,20 +141,12 @@ const SPECIES_MODE: LaneWords<Mode> = {
   criteria: { explore: "explore: search alone", return: "return: walk home", fight: "fight: attack a stranger" },
   version: 1,
 };
-const SPECIES_STANCE: LaneWords<Stance> = {
-  legend: "Each key in `colony` is the view one small nest has of itself. ",
-  criteria: { forage: "forage: gather food", defend: "defend: stay near home" },
-  version: 9,
-};
 // A species cannot offer a choice the lane does not have: this fails to compile if LaneWords stops checking its keys.
 // @ts-expect-error "rest" is not a Mode
 const NOT_A_MODE: LaneWords<Mode> = { legend: "", criteria: { rest: "rest: sit still" }, version: 1 };
 
 test("a lane asked with the generic ant's own words is the lane asked with none", () => {
-  for (const [l, words, sits] of [
-    [LANES.mode, MODE_WORDS, MODES_SEEN],
-    [LANES.stance, STANCE_WORDS, STANCES_SEEN],
-  ] as const) {
+  for (const [l, words, sits] of [[LANES.mode, MODE_WORDS, MODES_SEEN]] as const) {
     const items = (sits as readonly unknown[]).map((situation, i) => ({ id: `s${i}`, key: `k${i}`, situation }));
     for (const d of D) {
       assert.deepEqual(l.pack(items as never, d, words), l.pack(items as never, d));
@@ -252,44 +189,10 @@ test("the mode lane with a species' words: its legend, its criteria, its own con
   assert.equal(l.read(follow, "s0", SAMPLE_SITUATION, "k"), "follow", "the generic ant still has it");
 });
 
-test("the stance lane with a species' words: its legend, its criteria, its own context under the stance- prefix, only its choices", () => {
-  const l = LANES.stance;
-  const items = STANCES_SEEN.map((situation, i) => ({ id: `c${i}`, key: stanceKey(situation), situation }));
-  const req = l.pack(items, D[0]!, SPECIES_STANCE);
-  assert.equal((req.state as { legend: string }).legend, SPECIES_STANCE.legend);
-  assert.equal((req.state as { doctrine: string }).doctrine, D[0]);
-  for (const q of Object.values(req.questions)) assert.deepEqual((q as { criteria: unknown }).criteria, SPECIES_STANCE.criteria);
-  const own = l.contextOf(D[0]!, undefined, SPECIES_STANCE);
-  assert.match(own, /^stance-v9-[0-9a-f]+$/);
-  assert.equal(laneOfContext(own), "stance");
-  assert.notEqual(own, l.contextOf(D[0]!));
-  assert.match(l.contextOf(D[0]!, undefined, { ...SPECIES_STANCE, version: 2 }), /^stance-v2-/, "its version is in the context");
-  assert.notEqual(
-    own,
-    l.contextOf(D[0]!, undefined, { ...SPECIES_STANCE, legend: SPECIES_STANCE.legend + "x" }),
-    "the legend is in the context",
-  );
-  assert.notEqual(
-    own,
-    l.contextOf(D[0]!, undefined, { ...SPECIES_STANCE, criteria: { ...SPECIES_STANCE.criteria, defend: "defend: other" } }),
-    "the criteria are",
-  );
-  assert.notEqual(own, l.contextOf(D[1]!, undefined, SPECIES_STANCE), "the doctrine is too");
-  const raid = { c0_stance: { type: "choice" as const, choice: "raid" } };
-  const defend = { c0_stance: { type: "choice" as const, choice: "defend" } };
-  assert.equal(l.read(raid, "c0", SAMPLE_STANCE, "k", SPECIES_STANCE), null, "it has no raid");
-  assert.equal(l.read(defend, "c0", SAMPLE_STANCE, "k", SPECIES_STANCE), "defend");
-  assert.equal(l.read(raid, "c0", SAMPLE_STANCE, "k"), "raid", "the generic ant still has it");
-  assert.equal(l.valid("k", "raid", SPECIES_STANCE), false);
-  assert.equal(l.valid("k", "defend", SPECIES_STANCE), true);
-});
-
 test("a choice that is not the lane's is refused even when a species' criteria name it (a runtime guard behind the type)", () => {
   assert.ok(NOT_A_MODE, "the typed form of this refusal is the @ts-expect-error above");
   const rogue = { legend: "x", criteria: { rest: "rest: sit still" }, version: 1 } as unknown as LaneWords<Mode>;
   assert.equal(LANES.mode.read({ s0_mode: { type: "choice", choice: "rest" } }, "s0", SAMPLE_SITUATION, "k", rogue), null);
-  const rogueStance = { legend: "x", criteria: { rest: "rest: x" }, version: 1 } as unknown as LaneWords<Stance>;
-  assert.equal(LANES.stance.read({ c0_stance: { type: "choice", choice: "rest" } }, "c0", SAMPLE_STANCE, "k", rogueStance), null);
 });
 
 test("the fungus row takes no species words yet: a lane argument changes nothing", () => {

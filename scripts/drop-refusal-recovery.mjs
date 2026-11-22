@@ -1,17 +1,25 @@
 // Default-size comparisons: node scripts/drop-refusal-recovery.mjs [--isolate | --split | --candidate | --counterattack] [seed ...]
 // Use ANT_ASSAY_SECONDS=600 for a ten-minute match. Add --trace-combat to record casualty time and position.
 // Existing guards: node scripts/drop-refusal-recovery.mjs --guard <contact|defendHome|game1> <seed> [attackDistance] [counterattack|alarm-counterattack|attack-counterattack|visible-counterattack|visible-even-counterattack|simulation-counterattack]
-import { CELL, CURTAIN, STRAINS, Game, encodeLevels, gameRng, generateOneWorld, localResponses } from "../web/src/colony/index.ts";
-
-import { combatObservers } from "../web/src/colony/combatObservation.ts";
-import { blocked } from "../web/src/colony/world.ts";
+import {
+  CELL,
+  CURTAIN,
+  STRAINS,
+  Game,
+  blocked,
+  combatObservers,
+  encodeLevels,
+  gameRng,
+  generateOneWorld,
+  localResponses,
+} from "../web/src/colony/index.ts";
 import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
 
 const dt = 1 / 30;
 const seconds = Number(process.env.ANT_ASSAY_SECONDS ?? 120);
 const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 const damp = encodeLevels({ marks: 0 }, ["marks"]);
-/** @satisfies {Partial<import("../web/src/colony/battle.ts").FightParams>} */
+/** @satisfies {Partial<import("../web/src/colony/index.ts").FightParams>} */
 const directedFight = { intent: true, attackReach: 1, attackDistance: 0.65 };
 const refuseTunnelDrop = (t) => t.carrying === "food" && !t.porter && t.place === "tunnel";
 

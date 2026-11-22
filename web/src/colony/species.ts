@@ -1,7 +1,7 @@
 import type { Colony, ColonyParams } from "./colony.ts";
-import { MODE_WORDS, STANCE_WORDS } from "./colonyBrain.ts";
+import { MODE_WORDS } from "./colonyBrain.ts";
 import { localResponses, type Responses } from "./responses.ts";
-import type { LaneWords, Mode, Policy, Situation, Stance } from "./vocab.ts";
+import type { LaneWords, Mode, Policy, Situation } from "./vocab.ts";
 
 // A species (docs/species.md, ja-fnd.5.3): what one kind of ant is, as data the Game hands its colonies. Step 1 of the order of work holds
 // the physiology (parameter overrides) and the local rule set; the lane words, undertaking and the names came with the next beads (.2-.4). The Game hands a species' params and responses to its colonies (Colony stays free of the idea). GameParams.species is code, so the save leaves it out until step 3 saves its id. A game has one species (owner, 2026-11-12); mixed worlds are ja-fnd.5.4.
@@ -16,9 +16,9 @@ export interface Species {
   /**
    * The words the species asks Jev under, by lane (vocab.ts LaneWords: legend, criteria, version), so its answers are cached under its own
    * contexts (the lane rows take them as their `lane` argument). The fungus's lane has none yet (its words by host come with the fungus levers,
-   * ja-rf5.7). A lane absent here is one the species does not have. The rows' `lane` argument is not that: absent there it means the generic ant's words, so a caller checks `lanes.stance` before it asks (nothing reads absence yet; the desert ant, ja-rf5.3, is the first without a stance lane, and its wiring does the check).
+   * ja-rf5.7). A lane absent here is one the species does not have. The rows' `lane` argument is not that: absent there it means the generic ant's words, so a caller checks `lanes.mode` before it asks.
    */
-  lanes: { mode?: LaneWords<Mode>; stance?: LaneWords<Stance> };
+  lanes: { mode?: LaneWords<Mode> };
   /**
    * Its local mode rule (ja-fnd.5.9): what its ants do while Jev has no answer, and the rule the client's mode lane stands in with. Absent means
    * the generic `localPolicy`. It should offer only the modes its words allow; a `follow` from a species with none is read as explore anyway
@@ -70,6 +70,6 @@ export const GENERIC_ANT: Species = {
   name: "Ant",
   params: {},
   responses: localResponses,
-  lanes: { mode: MODE_WORDS, stance: STANCE_WORDS },
+  lanes: { mode: MODE_WORDS },
 };
 (SPECIES as Record<string, Species>)[GENERIC_ANT.id] = GENERIC_ANT;

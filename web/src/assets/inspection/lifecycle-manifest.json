@@ -1,0 +1,21 @@
+{
+  "names": [
+    "queen",
+    "corpse",
+    "brood-0",
+    "brood-1",
+    "brood-2",
+    "queen-dead"
+  ],
+  "frame": 384,
+  "stride": 386,
+  "cols": 3,
+  "width": 1158,
+  "height": 772,
+  "worldFrame": 2.25,
+  "anchor": [
+    192.0,
+    201.79380798339844
+  ],
+  "scaleNote": "Queen is a visual caste treatment, worker-based at 1.18 scale with enlarged gaster; body lengths of brood 0.15 / 0.30 / 0.42 world units. Same inspection camera and lights. Wider frames preserve physical scale and source pixels per world unit."
+}

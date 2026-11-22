@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { centreX, centreY, DESERT_ANT, GENERIC_ANT, NEGLECTUS_ANT, OPEN, PLANE, rockAt } from "../../colony/index.ts";
-import { combatObservers } from "../../colony/combatObservation.ts";
+import { combatObservers } from "../../colony/index.ts";
 import { buildGame } from "../useColony.ts";
 
 test("the page builds one world, whatever the settings (PRD §55)", () => {

@@ -60,8 +60,8 @@ function colony(restFetch: number, n: number, where: "shaft" | "far" | "side", p
   const { store, cell, mouth } = stocked(map, where);
   const layered = { plane: w.plane, line: w.line };
   const c = policy
-    ? new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), policy as never, undefined, layered)
-    : new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), undefined, undefined, layered);
+    ? new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), policy as never, layered)
+    : new Colony(map, { antCount: n, maxAnts: n, restFetch }, mulberry32(7), undefined, layered);
   c.bind(CURTAIN);
   c.larder += store.food; // the larder is the food in the chambers
   const seen = new Map<number, number>([[cell[0] * 4096 + cell[1], 0]]);

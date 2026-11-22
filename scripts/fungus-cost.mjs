@@ -8,7 +8,7 @@
 // from its size (colonyBrain.estimateTokens), as colony-cost does; the ledger counts the real ones live.
 //
 // Plays: lockpick (painted on both holes, on the plane), bloom (on colony 1's hole), bloom-crown (the same, crown on the menu, and
-// crowning wherever a host is by the queen or in a chamber: crown.mjs's policy), garden (on both royal chambers, in the curtain). Each paint is the app's old
+// crowning wherever a host is by the queen or in a chamber: the deleted crown lab's policy), garden (on both royal chambers, in the curtain). Each paint is the app's old
 // spore brush (radius 3, spores 2, dose 0.15), STROKES events in a short drag, at 30 s.
 //
 // Usage: node scripts/fungus-cost.mjs [play=lockpick] [minutes=5] [ants=600] [seed=1] [strokes=6]

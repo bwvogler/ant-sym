@@ -8,8 +8,8 @@ test("the nest: its own chambers only, the royal one with the queen in it, below
   const w = generateOneWorld(2, { plane: { size: { w: 160, h: 100 } } });
   const map = w.curtain;
   const at = { plane: w.plane, line: w.line };
-  const a = new Colony(map, { antCount: 40, nest: 0 }, mulberry32(1), undefined, undefined, at);
-  const b = new Colony(map, { antCount: 40, nest: 1 }, mulberry32(2), undefined, undefined, at);
+  const a = new Colony(map, { antCount: 40, nest: 0 }, mulberry32(1), undefined, at);
+  const b = new Colony(map, { antCount: 40, nest: 1 }, mulberry32(2), undefined, at);
   for (let t = 0; t < 300; t++) {
     a.tick(1 / 10);
     b.tick(1 / 10);

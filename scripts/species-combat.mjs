@@ -1,7 +1,7 @@
 // Compare both combat rules through the normal game constructor.
 // Usage: node scripts/species-combat.mjs <desert|neglectus> <seed> <existing|directed> [seconds]
 import { DEFAULT_FIGHT, STRAINS } from "../web/src/colony/index.ts";
-import { combatObservers } from "../web/src/colony/combatObservation.ts";
+import { combatObservers } from "../web/src/colony/index.ts";
 import { buildGame } from "../web/src/ui/useColony.ts";
 
 const [species, seedArg, arm, secondsArg = "600"] = process.argv.slice(2);

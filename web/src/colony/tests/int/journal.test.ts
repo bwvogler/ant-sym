@@ -27,10 +27,10 @@ const firstAlive = (c: Game["colonies"][number]) => {
 };
 
 test("spec: levels expand to categories, categories add, colony= and ant= narrow, a typo throws", () => {
-  assert.deepEqual([...parseJournalSpec("summary").categories], ["colony", "queen", "stance", "jev"]);
-  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "stance", "jev", "birth", "death", "infection"]);
+  assert.deepEqual([...parseJournalSpec("summary").categories], ["colony", "queen", "jev"]);
+  assert.deepEqual([...parseJournalSpec("detail").categories], ["colony", "queen", "jev", "birth", "death", "infection"]);
   assert.deepEqual([...parseJournalSpec("verbose").categories], [...JOURNAL_CATEGORIES]);
-  assert.deepEqual([...parseJournalSpec("summary,death").categories], ["colony", "queen", "stance", "jev", "death"]);
+  assert.deepEqual([...parseJournalSpec("summary,death").categories], ["colony", "queen", "jev", "death"]);
   assert.equal(parseJournalSpec("").categories.size, 0);
   assert.equal(parseJournalSpec("off").categories.size, 0);
   const f = parseJournalSpec("mode,colony=1,ant=42");
@@ -141,18 +141,18 @@ test("birth: a slot reused with a new gen is the old ant's death and a birth, wi
 test("colony=<k>: only that colony's events, and the game's own", () => {
   const g = new Game(smallOne(3), { antCount: 8 }, mulberry32(3));
   assert.equal(g.colonies.length, 2);
-  const j = new Journal("stance,colony=1");
+  const j = new Journal("queen,colony=1");
   j.observe(g);
   j.events.length = 0;
-  g.colonies[0]!.stance = "raid";
-  g.colonies[1]!.stance = "defend";
-  j.note("stance", -1, "the game's own");
+  g.colonies[0]!.killQueen();
+  g.colonies[1]!.killQueen();
+  j.note("queen", -1, "the game's own");
   j.observe(g);
   assert.deepEqual(
     j.events.map((e) => [e.colony, e.text]),
     [
       [-1, "the game's own"],
-      [1, "forage → defend"],
+      [1, "the queen died: the colony is orphaned"],
     ],
   );
 });
@@ -200,9 +200,8 @@ test("founded: a colony that appears mid-game is written as founded, once", () =
   );
 });
 
-test("stance, queen and infection", () => {
+test("queen and infection", () => {
   const { g, j, c } = watched("summary,infection");
-  c.stance = "raid";
   c.killQueen();
   const i = firstAlive(c);
   c.load[i] = 0.5;
@@ -210,7 +209,6 @@ test("stance, queen and infection", () => {
   assert.deepEqual(
     j.events.map((e) => [e.cat, e.text]),
     [
-      ["stance", "forage → raid"],
       ["queen", "the queen died: the colony is orphaned"],
       ["infection", "infected (load 0.50)"],
     ],
@@ -237,7 +235,7 @@ test("filters: ant= keeps only that ant's events; categories not asked for are n
     throw new Error("no second ant");
   })();
   c.kill(other);
-  c.stance = "defend";
+  c.killQueen();
   j.observe(g);
   assert.equal(j.events.length, 0);
   if (c.alive[0]) {
