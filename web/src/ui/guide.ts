@@ -591,6 +591,11 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     covers: "The young keep to the brood by its smell, not to the queen: queen pheromones are mostly contact signals.",
   },
   {
+    note: "nurse-crowding",
+    title: "Nurse crowding",
+    covers: "What limits how many young workers pile onto the brood: bodies, not a sensed crowd (a design limit, not built yet).",
+  },
+  {
     note: "activation",
     title: "Activation",
     covers: "Foragers go out because foragers come back: contacts with returners, scouts, the colony's intake.",

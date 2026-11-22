@@ -383,6 +383,12 @@ export interface ColonyParams {
    * turns toward the queen's position instead (the scripted rule it replaces, main bit for bit).
    */
   broodClimb: number;
+  /**
+   * A young ant climbing the brood odour stops when this many nestmates or more share its cell (ja-k4k.15.6,
+   * docs/nurse-crowding.md): it wanders to the next cell instead, so the climb can't heap hundreds on a small brood
+   * chamber. Bodies limit it (1 cell ≈ 1 body length); the soft form of a per-cell cap. **Design.** 0: no limit.
+   */
+  broodCrowd: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -529,6 +535,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   homeGround: 10,
   broodOdour: 0,
   broodClimb: 0,
+  broodCrowd: 0,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,

@@ -476,7 +476,11 @@ export function steer(col: Colony, i: number, s: AntStep): void {
         const l = marksAt(col, i, h - a, BROOD_ODOUR);
         const f = marksAt(col, i, h, BROOD_ODOUR);
         const r = marksAt(col, i, h + a, BROOD_ODOUR);
-        h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * p.broodClimb) + noise * p.wander * 0.5 : noise * p.wander;
+        // Not where the cell is already full of nestmates (ja-k4k.15.6): bodies limit the heap; it wanders on instead.
+        cellOf(col.x[i], col.y[i]);
+        const full = p.broodCrowd > 0 && col.friends !== null && col.friends.get(CELL[0], CELL[1]) - 1 >= p.broodCrowd;
+        h +=
+          !full && Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * p.broodClimb) + noise * p.wander * 0.5 : noise * p.wander;
       } else {
         // Off (broodClimb 0): to the queen's position, the scripted rule this replaces (ja-k4k.2.1).
         const q = col.queen!;
