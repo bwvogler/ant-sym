@@ -630,9 +630,18 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
     assert.equal(r.state.hosts, undefined);
   }
   assert.ok(j.state.lanes.fungus.cached > 0 && j.state.lanes.fungus.asked > 0);
-  // Jev's levels were dormant's: every host runs dormant now.
+  // Jev's levels were dormant's: every host whose situation Jev has answered runs dormant now. (A host infected or put in a
+  // new situation since the last round has no answer yet, and runs the local rule: which one depends on the game's random
+  // stream, so the test does not name it.)
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.load[i] > 0) assert.equal(g.player.expr[i], 0, `host ${i}`);
+  let answered = 0;
+  for (let i = 0; i < g.player.n; i++) {
+    if (!g.player.alive[i] || !(g.player.load[i] > 0) || g.player.fungal[i]! < 0) continue;
+    if (j.explainFungus(decodeFungal(g.player.fungal[i]!)).by !== "jev") continue;
+    answered++;
+    assert.equal(g.player.expr[i], 0, `host ${i}`);
+  }
+  assert.ok(answered > 0, "some hosts have Jev's answer (the test's own check)");
   const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "jev");
   assert.equal(j.explainFungus(s).answer, encodeLevels(PRESETS[0]!.levels, g.fungus.asked), "Jev's levels: dormant's");

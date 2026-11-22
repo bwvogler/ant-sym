@@ -5,8 +5,8 @@ import { FAINT } from "../../vocab.ts";
 import { OPEN, rockAt } from "../../world.ts";
 import { oneColony } from "../builders.ts";
 
-// Brood odour (ja-k4k.15.2, docs/brood-odour.md): the brood gives off its own scent where it lies, reaching two or three
-// cells, strongest on the pile. Off (broodOdour 0) the channel stays empty.
+// Brood odour (ja-k4k.15.2, docs/brood-odour.md): the brood gives off its own scent where it lies, reaching across a
+// chamber (slow to fade, 0.03 and 0.5: PRD §77.2), strongest on the pile. Off (broodOdour 0) the channel stays empty.
 
 /** A colony of one ant with `items` brood items on one cell of the royal chamber, run `seconds`; the cell and the row's open cells east. */
 function pile(items: number, broodOdour: number, seconds = 30, held = false) {
@@ -26,15 +26,20 @@ function pile(items: number, broodOdour: number, seconds = 30, held = false) {
   return { c, at };
 }
 
-test("brood odour: strongest on the brood, falling off with distance, below FAINT three cells out even from a pile of 20", () => {
+test("brood odour: strongest on the brood, falling off with distance, smelt three cells out even from a single egg", () => {
   const one = pile(1, 1);
-  assert.ok(one.at(0) > one.at(1) && one.at(1) > one.at(2), `falls off: ${[0, 1, 2].map((d) => one.at(d).toFixed(3)).join(", ")}`);
-  assert.ok(one.at(1) >= FAINT, `a single egg is smelt a cell away: ${one.at(1).toFixed(3)}`);
-  // Laid a second, not a tick: after 30 s a single egg's own cell holds about 1.8 (30 × as much a tick would reach the cap, 20).
-  assert.ok(one.at(0) > 1 && one.at(0) < 3, `a single egg's own cell: ${one.at(0).toFixed(3)}`);
+  assert.ok(
+    one.at(0) > one.at(1) && one.at(1) > one.at(2) && one.at(2) > one.at(3),
+    `falls off: ${[0, 1, 2, 3].map((d) => one.at(d).toFixed(3)).join(", ")}`,
+  );
+  assert.ok(one.at(3) >= FAINT, `a single egg is smelt three cells away: ${one.at(3).toFixed(3)}`);
+  // Laid a second, not a tick: after 30 s a single egg's own cell holds about 3 (30 × as much a tick would reach the cap, 20).
+  assert.ok(one.at(0) > 1 && one.at(0) < 6, `a single egg's own cell: ${one.at(0).toFixed(3)}`);
   const many = pile(20, 1);
-  assert.ok(many.at(2) >= FAINT, `a pile is smelt two cells away: ${many.at(2).toFixed(3)}`);
-  assert.ok(many.at(3) < FAINT, `and not three: ${many.at(3).toFixed(3)}`);
+  assert.ok(
+    many.at(3) > one.at(3) * 3,
+    `a pile is smelt much stronger three cells away: ${many.at(3).toFixed(3)} against ${one.at(3).toFixed(3)}`,
+  );
 });
 
 test("brood odour comes from brood lying in the nest: an egg in a nurse's jaws lays none", () => {

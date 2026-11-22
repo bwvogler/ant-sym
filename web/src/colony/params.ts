@@ -375,12 +375,12 @@ export interface ColonyParams {
   homeGround: number;
   /**
    * Brood odour each brood item lying in the nest gives off, a second (ja-k4k.15, docs/brood-odour.md): the young climb it
-   * in a chamber (broodClimb). 0: none laid, the channel stays empty (main bit for bit).
+   * in a chamber (broodClimb). 0: none laid, the channel stays empty.
    */
   broodOdour: number;
   /**
    * A young ant in a chamber climbs brood odour (ja-k4k.15.3, docs/brood-odour.md), turning at turnRate × this; 0: it
-   * turns toward the queen's position instead (the scripted rule it replaces, main bit for bit).
+   * only searches. (It once turned toward the queen's position: a read no ant can make, removed with ja-k4k.2.1.)
    */
   broodClimb: number;
   /**
@@ -533,9 +533,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidOnward: 1,
   defendAt: 1,
   homeGround: 10,
-  broodOdour: 0,
-  broodClimb: 0,
-  broodCrowd: 0,
+  broodOdour: 1,
+  broodClimb: 1,
+  broodCrowd: 3,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,

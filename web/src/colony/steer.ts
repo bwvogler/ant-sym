@@ -468,24 +468,18 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       const f = marksAt(col, i, h, STORE_MARKS);
       const r = marksAt(col, i, h + a, STORE_MARKS);
       h += Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt) : noise * p.wander;
-    } else if ((col.band(i) === 0 || col.reverts(i)) && col.under[i] && (p.broodClimb > 0 || col.queen?.alive)) {
-      if (p.broodClimb > 0) {
-        // A young ant in a chamber keeps to the brood by its odour (ja-k4k.15, docs/brood-odour.md): it climbs it at its
-        // antennae through open ground, and searches where it smells none. Not the queen's position, nor the royal and
-        // brood floor marks every ant lays (#192: they led the young off the brood).
-        const l = marksAt(col, i, h - a, BROOD_ODOUR);
-        const f = marksAt(col, i, h, BROOD_ODOUR);
-        const r = marksAt(col, i, h + a, BROOD_ODOUR);
-        // Not where the cell is already full of nestmates (ja-k4k.15.6): bodies limit the heap; it wanders on instead.
-        cellOf(col.x[i], col.y[i]);
-        const full = p.broodCrowd > 0 && col.friends !== null && col.friends.get(CELL[0], CELL[1]) - 1 >= p.broodCrowd;
-        h +=
-          !full && Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * p.broodClimb) + noise * p.wander * 0.5 : noise * p.wander;
-      } else {
-        // Off (broodClimb 0): to the queen's position, the scripted rule this replaces (ja-k4k.2.1).
-        const q = col.queen!;
-        h = turnToward(h, Math.atan2(q.y - col.y[i], q.x - col.x[i]), p.turnRate * dt * 0.3) + noise * p.wander * 0.5;
-      }
+    } else if ((col.band(i) === 0 || col.reverts(i)) && col.under[i]) {
+      // A young ant in a chamber keeps to the brood by its odour (ja-k4k.15, docs/brood-odour.md): it climbs it at its
+      // antennae through open ground, and searches where it smells none. Not the queen's position (ja-k4k.2.1: no ant can
+      // read it), nor the royal and brood floor marks every ant lays (#192: they led the young off the brood).
+      const l = marksAt(col, i, h - a, BROOD_ODOUR);
+      const f = marksAt(col, i, h, BROOD_ODOUR);
+      const r = marksAt(col, i, h + a, BROOD_ODOUR);
+      // Not where the cell is already full of nestmates (ja-k4k.15.6, docs/nurse-crowding.md): bodies limit the heap; it
+      // wanders on instead.
+      cellOf(col.x[i], col.y[i]);
+      const full = p.broodCrowd > 0 && col.friends !== null && col.friends.get(CELL[0], CELL[1]) - 1 >= p.broodCrowd;
+      h += !full && Math.max(l, f, r) >= FAINT ? climb(l, f, r, p.turnRate * dt * p.broodClimb) + noise * p.wander * 0.5 : noise * p.wander;
     } else if (col.entrance && col.outbound(i) && col.under[i])
       // An old forager in a chamber: at the hole's position (ja-k4k.2.2). Aimed where its drifting nest vector puts the
       // hole instead, a few units off, it pressed on the wall beside the chamber's way out (#192: economy.test collapsed).

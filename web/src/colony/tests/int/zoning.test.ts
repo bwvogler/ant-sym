@@ -116,8 +116,8 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
 
 test("a young ant in a chamber turns toward the brood's odour, not the queen's position (ja-k4k.15)", () => {
   // One young ant mid-chamber facing up, brood odour under its left antenna, the queen moved to its right: over 100 single ticks
-  // it turns left, up the odour. By the queen's position (broodClimb 0, the rule before) it would turn right; with the climb on
-  // and no odour it would turn either way alike.
+  // it turns left, up the odour. By the queen's position (the rule before, removed with ja-k4k.2.1) it would turn right; with the
+  // climb off (broodClimb 0) or no odour it turns either way alike.
   const w = smallOne(2);
   const royal = w.curtain.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   const x = centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow - 5);
@@ -162,7 +162,7 @@ test("a young ant in a chamber turns toward the brood's odour, not the queen's p
   const blind = turn(1, 0);
   // Left is a smaller angle (−a from straight ahead).
   assert.ok(toward < -0.005, `toward the odour: ${toward.toFixed(4)} rad a tick`);
-  assert.ok(queen > 0.005, `broodClimb 0 turns to the queen instead: ${queen.toFixed(4)}`);
+  assert.ok(Math.abs(queen) < 0.005, `broodClimb 0 does not turn to the queen any more: ${queen.toFixed(4)}`);
   assert.ok(Math.abs(blind) < 0.005, `no odour, no bias: ${blind.toFixed(4)}`);
   // ja-k4k.15.6: with 6 nestmates already in its cell (7 counting itself) and the limit at 6, it stops climbing; with 5, it still does;
   // the limit off (0) it climbs however many stand there.

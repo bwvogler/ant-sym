@@ -59,9 +59,10 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   store: { evaporation: 0.01, diffusion: 0 },
   reception: { evaporation: 0.01, diffusion: 0 },
   midden: { evaporation: 0.01, diffusion: 0 },
-  // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Fast to
-  // fade and spreading a little, it reaches two or three cells: strongest on the pile (design; no range is measured).
-  broodOdour: { evaporation: 0.3, diffusion: 0.3 },
+  // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Slow to
+  // fade and spreading well, it reaches across a chamber: strongest on the pile (design; no range is measured). 0.03 and
+  // 0.5 took the nurse-zone assay from 8/20 to 13/20 (PRD §77.2); 0.3 and 0.3 left the young finding it 10% of the time.
+  broodOdour: { evaporation: 0.03, diffusion: 0.5 },
 };
 
 /** A record with one entry per channel. */
