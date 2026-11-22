@@ -114,6 +114,28 @@ test("zoomAround: the wheel's zoom in its own box, about the pointer, ending an 
   assert.equal(st.unfollowed, 0, "the wheel does not touch a follow");
 });
 
+test("camera leaves the flags and the aim alone", () => {
+  const { rig } = setup();
+  rig.vc().aim = { x: 1, y: 2 };
+  rig.camera();
+  assert.deepEqual([rig.vc().fitted, rig.vc().zoomedIn, rig.vc().aim], [true, false, { x: 1, y: 2 }]);
+});
+
+test("the minimap takes a point by zoomedIn, not fitted: not in the band between the fit and a twentieth over it, nor after a centreOn at the fit", () => {
+  const { rig, st } = setup();
+  const e = ext(PLANE_MAP);
+  const r = minimapRect(e, vp(st), st.dpr);
+  const fz = fitZoom(e, vp(st));
+  rig.set({ x: 60, y: 45, zoom: fz * 1.02 });
+  assert.deepEqual([rig.vc().fitted, rig.vc().zoomedIn], [false, false]);
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), false, "past the fit's tolerance but not yet zoomed in");
+  rig.set({ x: 60, y: 45, zoom: fz * 1.06 });
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), true);
+  rig.centreOn(PLANE, 60, 45);
+  rig.vc().zoomedIn = false;
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), false, "the flag decides, whatever the zoom");
+});
+
 test("zoomAround: exactly a twentieth over the fit is not yet zoomed in, exactly a ten-thousandth over is still fitted", () => {
   const box: Viewport = { w: 400, h: 300, dpr: 2 };
   const fz = fitZoom(ext(PLANE_MAP), box);
@@ -162,6 +184,11 @@ test("centreOn: close, span, and nothing shown yet", () => {
   // nothing shown yet: the shown view's zoom is the whole map's; close lifts it to LINK_ZOOM device-ratio cells
   rig.centreOn(CURTAIN, 0, 0);
   assert.equal(rig.cams.get(CURTAIN)!.cam!.zoom, fitZoom(ext(CURTAIN_MAP), vp(st)));
+  assert.deepEqual(
+    [rig.cams.get(CURTAIN)!.fitted, rig.cams.get(CURTAIN)!.zoomedIn],
+    [false, false],
+    "asked to centre: never fitted, even at the fit",
+  );
   rig.centreOn(CURTAIN, 1, 2, { close: true });
   assert.equal(rig.cams.get(CURTAIN)!.cam!.zoom, Math.max(fz, LINK_ZOOM * 2));
   assert.equal(LINK_ZOOM, 8);
