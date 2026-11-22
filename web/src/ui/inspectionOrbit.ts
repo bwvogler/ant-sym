@@ -18,6 +18,13 @@ export function orbitCamera(
     ? { position: [s * st * 8, -c * st * 8, ct * 8], up: [-s * ct, c * ct, st] }
     : { position: [s * ct * 8, -c * ct * 8, st * 8], up: [-s * st, c * st, ct] };
 }
+export const BELOW_WALK_PLANE = 1.08;
+
+/** The close map rotates about the walking plane under the center control. */
+export function mapTiltTarget(mode: "surface" | "below", x: number, y: number): [number, number, number] {
+  return mode === "surface" ? [x, -y, 0] : [x, BELOW_WALK_PLANE, -y];
+}
+
 export function inspectionFrameScale(
   points: readonly (readonly [number, number, number])[],
   mode: "surface" | "below",

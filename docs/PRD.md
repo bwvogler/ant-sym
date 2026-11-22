@@ -7379,7 +7379,28 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Checked.** Unit tests for the helpers (`ui/tests/hyphaeLook.test.ts`: same place, same bend, bounded; the spline passes through every point; runs cover every edge once and cut at cord changes; twigs fixed by the key). Before and after screenshots at the same moment of the same game.
 
-## 84. The fungus's unlocks: a small landing patch, mats and new patches, two budgets, a lichen partner (design, ja-vlla, 2026-11-22)
+## 84. Directed contact and local food delivery: measured, not promoted (experiment in draft PR #281, ja-g7nz, 2026-11-22)
+
+**Where it stands.** PR #281 adds experimental ant actions below the mode lane: directed contact (`fight.intent`), sensed food-delivery roles, a separate drop consent, and carry context (effort, current target, recognised room). Every setting is off, so nothing changes for play. Its code is **not on `main`**: it was written on the stance-era base, and `main` has since deleted the stance lane (#284). It is being redone on stanceless `main` (the plan: land what does not depend on stances first, then re-seat the actions and re-measure). This section lands with the notes (`docs/delivery-actions.md`, `docs/contact-actions.md`) and the loose-food ledger (`scripts/lab/loose-food-ledger.mjs`), which depend on no colony code.
+
+**What was measured** (stance-era base, c632fc9a; 80 games; four frozen policies; 60 ants, 600 s; mark-gain suppression from 120 to 300 s, then restored; GitHub, seeds 1-10 training and 11-20 confirmation): neither timeout-release policy is promoted. Release after 20 s beats persistence on 9 of 10 training seeds but loses on 6 of 10 confirmation seeds; release after 5 s also loses on 6 of 10. Both have a median paired stored-food difference of −7 against persistence on confirmation; the worst are −45 (20 s, seed 13) and −56 (5 s, seed 11).
+
+| Confirmation 11-20 | Median stored [min, max] | Median releases | Median held + deposited food at restoration |
+|---|---:|---:|---:|
+| Scripted default | 409 [37, 826] | 0 | 9.5 |
+| Persistence | 274.5 [51, 425] | 0 | 45 |
+| Release 5 s | 257.5 [32, 419] | 1,033 | 70 |
+| Release 20 s | 256.5 [35, 414] | 267 | 61 |
+
+Releasing after 20 s cuts repeated dropping but does not reliably improve delivery. The scripted default still reads chamber targets directly, so it is not a sensory-equivalent control. No queen or hunger deaths and no starved brood in any game; 600 s does not show long-term survival.
+
+**Decisions to keep.**
+- The confirmation seeds (11-20) have been used once for this question: **do not retune on them**. A new design is chosen on seeds 1-10 and confirmed once, on seeds 11-20 or fresh ones.
+- Choose by the worst seed, not the median (CLAUDE.md, PRD §42).
+- The loose-food ledger tracks quantities and pick-up sites, not the identity of a food unit; it separates food dropped on the ground from the initial underground supply and checks conservation.
+- The numbers above are to be re-run on stanceless `main` before anything is promoted.
+
+## 85. The fungus's unlocks: a small landing patch, mats and new patches, two budgets, a lichen partner (design, ja-vlla, 2026-11-22)
 
 **Research basis:** [fungus-unlocks.md](fungus-unlocks.md):
 - Dense, slow foragers and sparse, fast ones are a difference between species; no paper read measures one species branching more on rich than on poor substrate, and one sugar fungus (*Mortierella*) is dense in a rich habitat (Fricker et al. 2017; Aguilar-Trigueros et al. 2022, 2025): a thickening rule is **design**.
@@ -7410,4 +7431,3 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 **Beads.** `ja-vlla` (this); `ja-vlla.1` research follow-ups; `.2` M1 assay; `.3` M1 build; `.4` M2 thicken answer; `.5` M2 flower becomes a patch; `.6` M2 assays; `.7` M3 budgets; `.8` M4 lichen partner.
 
 **Still open.** Whether budgets are a stock or earnings, and one price or two; what the partner is and what contact means on the map; the sources the first search could not read.
-

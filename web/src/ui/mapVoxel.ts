@@ -1,4 +1,4 @@
-import type { InspectionOrbit } from "./inspectionOrbit.ts";
+import { BELOW_WALK_PLANE, type InspectionOrbit } from "./inspectionOrbit.ts";
 import type { InspectionScene } from "./InspectionScene.ts";
 import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
@@ -111,21 +111,29 @@ export class MapVoxelPass {
       alpha = mapVoxelAlpha(cssZoom, scene.accelerated);
     if (!alpha) return { alpha: 0, renderer: "sprites" };
     try {
-      const angled = alpha === 1 && orbit && (orbit.yaw !== 0 || orbit.tilt !== 0);
-      const span = Math.hypot(view.w, view.h) / camera.zoom;
-      const range = Math.min(16, span / Math.cos(orbit?.tilt ?? 0) + 2);
+      const worldWidth = view.w / camera.zoom;
+      const worldHeight = view.h / camera.zoom;
+      const tilt = orbit?.tilt ?? 0;
+      const projectedTop = (worldHeight / 2 + BELOW_WALK_PLANE * Math.abs(Math.sin(tilt))) / Math.cos(tilt);
+      const stripInView = !!g.world && layer === CURTAIN && camera.y - projectedTop <= centreY(STRIP) + SIDE;
+      // The surface strip only has navigation hit targets in the flat projection.
+      if (stripInView && tilt !== 0) return { alpha: 0, renderer: "sprites" };
+      const angled = alpha === 1 && orbit && (orbit.yaw !== 0 || tilt !== 0);
+      const span = Math.hypot(worldWidth, worldHeight);
+      const range = Math.min(16, span / Math.cos(tilt) + 2);
       const patch = inspectViewport(
           g,
           sensed,
           layer,
           camera.x,
           camera.y,
-          angled ? range : view.w / camera.zoom,
-          angled ? range : view.h / camera.zoom,
+          // Pitch changes the sampled depth. Only yaw can enlarge its width.
+          angled && orbit.yaw !== 0 ? range : worldWidth,
+          angled ? range : worldHeight,
           trails,
           clumps,
         ),
-        scale = 1 / (dpr * 2),
+        scale = 1 / (dpr * (angled && !scene.accelerated ? 3 : 2)),
         width = Math.max(1, Math.round(view.w * scale)),
         height = Math.max(1, Math.round(view.h * scale));
       scene.setPalette(palette.ink, palette.warn);

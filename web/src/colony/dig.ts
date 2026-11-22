@@ -25,11 +25,6 @@ import { touch } from "./sense.ts";
 import { dropBrood } from "./body.ts";
 import { clearPellet, markMiddenPlane } from "./pellets.ts";
 
-/** The middle of the midden: its column (side view). */
-export function middenCol(self: Colony): number {
-  return self.entranceCol + self.middenSide() * self.middenAt();
-}
-
 /**
  * Ant i dug its chamber face (x, y): it joins that chamber, or founds one. The face was chosen a while ago, and chambers
  * round it may have grown since, so it is judged again now it is open (review of slice 2: two chambers joined at 73 s
@@ -262,21 +257,17 @@ export function roleFor(self: Colony, y: number): Role {
 
 /**
  * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky). Ants leave it: digging
- * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance. Loose soil
- * (the mound) is no crust.
+ * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance.
  */
 export function crust(self: Colony, x: number, y: number): boolean {
   const ent = self.entrance;
   if (!ent) return false;
-  if (self.map.loose?.get(x, y) === 1) return false; // the mound: loose pellets, never dug (picked up off the plane's mound by pickPlane)
   // Round the hole too: it is their way in already, and digging round it once hollowed the ground under the walkway
   // above the hole, which fell to sky and left the hole with no way out onto the ground.
   for (let d = 0; d < 6; d++) {
     const tx = stepX(x, y, d);
     const ty = stepY(y, d);
-    // The ground under the mound is crust too: dug out under a blanket of spoil, the next pellet picked off the
-    // top opened a new hole into the tunnels, away from every entrance (agent review of MR 15).
-    if (isSky(self.map, tx, ty) || self.map.loose?.get(tx, ty) === 1) return true;
+    if (isSky(self.map, tx, ty)) return true;
   }
   return false;
 }

@@ -1,15 +1,12 @@
 import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { moundBalls, type DirtBall } from "./inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "./inspectionGround.ts";
-import { CadaverSprites } from "./cadaverSprites.ts";
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
 import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
-import { FungalMapSprites } from "./fungalStructures.ts";
 import { HYPHA_COLOURS } from "./hyphaVisual.ts";
 import { chamberFoodSpots } from "./chamberFood.ts";
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
-import { MapLeafSprites, SurfaceLeaves } from "./surfaceFood.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   CHUNK,
@@ -57,8 +54,6 @@ import {
   type AphidClump,
 } from "../colony/index.ts";
 import {
-  aimed,
-  type Aim,
   type Camera,
   clamp,
   type Extent,
@@ -74,6 +69,9 @@ import {
   zoomBy,
 } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
+import { prepareFrame, type ViewCam } from "./field/prelude.ts";
+import { browserEnv } from "./field/env.ts";
+import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
@@ -86,11 +84,11 @@ import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import { type AntTraces, traceAlpha } from "./trace.ts";
 import { type Chain, chainsOf, hash, smoothThrough, twigsOf, wander } from "./hyphaeLook.ts";
 import type { FieldProbe } from "./lensStore.ts";
-import { WorkerGait, WorkerSprites, drawWorkerSprite, workerLod } from "./workerSprites.ts";
-import { NestSprites, drawNestSprite, type NestSprite } from "./nestSprites.ts";
+import { drawWorkerSprite, workerLod } from "./workerSprites.ts";
+import { drawNestSprite, type NestSprite } from "./nestSprites.ts";
 import { drawMapTerrainGrain } from "./mapTerrain.ts";
 import { carriedBroodOn } from "./mapCargo.ts";
-import { APHID_SPOTS, FOOD_SPOTS, ResourceSprites, aphidDensity, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
+import { APHID_SPOTS, FOOD_SPOTS, aphidDensity, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
 
 export type { FieldProbe };
 
@@ -193,22 +191,6 @@ export interface FieldPen extends PenCircle {
   preview: (p: { x: number; y: number }) => Settle;
   /** a click on the plane at p */
   onPick: (p: { x: number; y: number }) => void;
-}
-
-/** One view's camera: kept per view, so switching between above and below resets neither. */
-interface ViewCam {
-  cam: Camera | null;
-  /** the view shows the whole map: it stays fitted when the canvas is resized (a phone turned, the layout reflowing) */
-  fitted: boolean;
-  /** whether the view is zoomed in past the whole map (the minimap shows, and takes clicks) */
-  zoomedIn: boolean;
-  /**
-   * Where the page asked the view to centre (FieldApi.centreOn; `span`: world units across the box's shorter side): kept,
-   * and the camera clamped round it in whatever box the view is drawn in (the box takes the view's shape a frame or two
-   * after a switch), until the player moves the camera or a follow takes it. Without it a frame drawn in the passing box
-   * clamped the place away for good.
-   */
-  aim: Aim | null;
 }
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
@@ -474,19 +456,23 @@ export default function ColonyField({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d")!;
-    const cadaverSprites = new CadaverSprites();
-    const fungalSprites = new FungalMapSprites();
-    const workerSprites = new WorkerSprites();
-    const nestSprites = new NestSprites();
-    const resourceSprites = new ResourceSprites();
-    const surfaceLeaves = new SurfaceLeaves();
-    const mapLeaves = new MapLeafSprites();
-    const workerGait = new WorkerGait();
+    // What the frame takes from the outside world: the clock, the pixel ratio, the dev flag, reduced motion and the sprite sets (field/env.ts).
+    const env = browserEnv(import.meta.env.DEV);
+    const {
+      cadaver: cadaverSprites,
+      fungal: fungalSprites,
+      worker: workerSprites,
+      nest: nestSprites,
+      resource: resourceSprites,
+      surfaceLeaves,
+      mapLeaves,
+      gait: workerGait,
+    } = env.sprites();
     const voxelMap = new MapVoxelPass(() => draw());
     const tilePaint = new MapChunkPaintCache();
+    const sinks: FrameSinks = { dataset: canvas.dataset, orbit, orbitAxes, angled, flatOrbit: mapOrbit, dev: env.dev };
     let framePaints = 0,
       frameHits = 0;
-    const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
     // placeholders: bind() sets all of these before the first frame draws
@@ -619,7 +605,7 @@ export default function ColonyField({
     themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const fitCanvas = () => {
-      const d = Math.min(2, window.devicePixelRatio || 1);
+      const d = env.dpr();
       const rect = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.round(rect.width * d));
       const h = Math.max(1, Math.round(rect.height * d));
@@ -658,7 +644,6 @@ export default function ColonyField({
         soil = groundSoil(),
         spoil = groundSpoil();
       const fc = m.food.chunk(cx, cy);
-      const lc = m.loose?.chunk(cx, cy);
       // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
       const sensedC = sensedLayer?.chunk(cx, cy);
       const now = sensed.now;
@@ -710,7 +695,6 @@ export default function ColonyField({
           !tilePaint.needsPaint(c, tag, [
             rc,
             fc,
-            lc,
             qc,
             sensedC,
             sporeC,
@@ -734,7 +718,7 @@ export default function ColonyField({
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? (lc && lc[i] ? spoil : soil) : rc[i] === AIR ? theme.sky : rock;
+            const solid = rc[i] === SOIL ? soil : rc[i] === AIR ? theme.sky : rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -875,19 +859,7 @@ export default function ColonyField({
           const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
           const c =
             cut ??
-            (fv > 0
-              ? food
-              : t === SOIL
-                ? !off && m.loose?.get(x, y)
-                  ? theme.spoil
-                  : theme.soil
-                : t === AIR
-                  ? theme.sky
-                  : t
-                    ? theme.rock
-                    : heap > 0
-                      ? theme.spoil
-                      : theme.paperRgb);
+            (fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
           // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
           const sv = off || cut ? 0 : spores.get(x, y);
           const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
@@ -1407,42 +1379,17 @@ export default function ColonyField({
     };
 
     const draw = () => {
-      const started = import.meta.env.DEV ? performance.now() : 0;
+      const started = env.dev ? env.now() : 0;
       bind();
-      const d = Math.min(2, window.devicePixelRatio || 1);
+      const d = env.dpr();
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
       framePaints = frameHits = 0;
-      const s = vc();
-      // Follow an ant: the camera centres on it; an ant that is gone (dead, or its slot reborn) ends the follow. In one
-      // world, an ant on the other layer than the view's holds the camera where it was (carrying it across: U5.2).
+      // The followed ant as it stood when the frame began (the prelude below ends the follow of an ant that is gone).
       const f = follow.current;
       const fcol = f ? followedColony(colonies, f) : null;
       const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
-      if (f && !fcol) {
-        follow.current = null;
-        followCb.current(null);
-      } else if (f && fcol && fHere && s.cam) {
-        s.cam = { ...s.cam, x: fcol.x[f.i], y: fcol.y[f.i] };
-        s.aim = null;
-      }
-      // One world: the followed ant went through a hole, out of the view (its layer changed, not the view): the page is
-      // told, and carries the camera across (U5.2).
-      if (f && fcol) {
-        const layer = fcol.layer[f.i];
-        const was = antLayer.current;
-        if (carryTo.current === lv || !was || was.f !== f) carryTo.current = null;
-        if (was && was.f === f && was.layer !== layer && layer !== (carryTo.current ?? lv)) {
-          carryTo.current = layer;
-          crossCb.current?.(layer, fcol.x[f.i], fcol.y[f.i]);
-        }
-        antLayer.current = { f, layer };
-      } else {
-        antLayer.current = null;
-        carryTo.current = null;
-      }
-      const c = s.fitted || !s.cam ? clamp(fit(ext, v), ext, v) : aimed(s.cam, s.aim, ext, v);
-      s.cam = c;
-      s.zoomedIn = c.zoom > fitZoom(ext, v) * 1.05;
+      // The follow, the crossing through a hole and the camera's ease (field/prelude.ts), then the frame draws with the camera it gives.
+      const c = prepareFrame(colonies, lv, ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
       ctx.fillStyle = theme.paper;
       ctx.fillRect(0, 0, v.w, v.h);
       ctx.imageSmoothingEnabled = false;
@@ -1467,8 +1414,6 @@ export default function ColonyField({
       // Read-only browser diagnostics: actual CSS scale and the available worker representation.
       const cssHex = (c.zoom / d).toFixed(2),
         workerStyle = hexes && workerSprites.ready(resourceLod) ? "voxel" : "ink";
-      if (canvas.dataset.hexCssPx !== cssHex) canvas.dataset.hexCssPx = cssHex;
-      if (canvas.dataset.workerStyle !== workerStyle) canvas.dataset.workerStyle = workerStyle;
       // Both maps face the ants' walking plane: aerial above, straight onto the back wall below.
       const resourceImage = hexes ? resourceSprites.get(resourceLod) : null;
       for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
@@ -1513,7 +1458,6 @@ export default function ColonyField({
       }
       const nestImage = hexes ? nestSprites.get(resourceLod) : null;
       const nestStyle = nestImage ? "voxel" : "symbols";
-      if (canvas.dataset.nestStyle !== nestStyle) canvas.dataset.nestStyle = nestStyle;
       // Surface plain-food cells join into tissue; carried food and other qualities stay separate morsels.
       if (resourceImage) {
         for (let y = ry0; y <= ry1; y++)
@@ -1764,7 +1708,7 @@ export default function ColonyField({
             const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
             if (sprite && spriteMix > 0) {
               ctx.globalAlpha = spriteMix;
-              const pose = lod === "walk" && !motion.matches ? workerGait.pose(col, i) : 0;
+              const pose = lod === "walk" && !env.reducedMotion() ? workerGait.pose(col, i) : 0;
               drawWorkerSprite(ctx, sprite, lod, col.heading[i], pose, x, y, c.zoom);
             }
             if (spriteMix < 1) {
@@ -1780,7 +1724,7 @@ export default function ColonyField({
           if (spriteMix < 1) {
             ctx.beginPath();
             for (let i = 0; i < col.n; i++) {
-              if (!col.alive[i] || (lv >= 0 && col.layer[i] !== lv) || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+              if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
               const [x, y] = toScreen(c, v, col.x[i], col.y[i]),
                 co = Math.cos(col.heading[i]),
                 si = Math.sin(col.heading[i]),
@@ -1893,22 +1837,30 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
-        orbit.current,
+        // Above and Below face different planes, so their camera pitch signs differ.
+        lv === PLANE ? { ...orbit.current, tilt: -orbit.current.tilt } : orbit.current,
       );
       const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
-      if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
-      if (!canRotate) orbit.current = mapOrbit();
-      angled.current = "angled" in voxel && voxel.angled === true;
-      canvas.dataset.mapRenderer = voxel.renderer;
-      canvas.dataset.voxelAlpha = voxel.alpha.toFixed(3);
-      if (import.meta.env.DEV) {
-        canvas.dataset.chunkPaints = String(framePaints);
-        canvas.dataset.chunkCacheHits = String(frameHits);
-      }
+      const frameAngled = "angled" in voxel && voxel.angled === true;
+      // What the frame found out about itself goes to the shell's refs and the canvas's data attributes (field/result.ts).
+      publishFrame(
+        {
+          hexCssPx: cssHex,
+          workerStyle,
+          nestStyle,
+          renderer: voxel.renderer,
+          voxelAlpha: voxel.alpha,
+          angled: frameAngled,
+          canRotate,
+          chunkPaints: framePaints,
+          chunkCacheHits: frameHits,
+        },
+        sinks,
+      );
       const drawMinimap = () => {
         // Zoomed in: the minimap, with the view's rectangle.
         if (c.zoom > fitZoom(ext, v) * 1.05) {
-          const now = performance.now();
+          const now = env.now();
           if (now - miniAt > 500) {
             paintMini();
             miniAt = now;
@@ -1928,7 +1880,7 @@ export default function ColonyField({
           ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
         }
       };
-      if (angled.current) {
+      if (frameAngled) {
         drawMinimap();
         return; // Map labels and hit targets use the overhead projection.
       }
@@ -2013,7 +1965,7 @@ export default function ColonyField({
       // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
       const tr = tracesRef.current;
       if (tr) {
-        const now = performance.now();
+        const now = env.now();
         tr.update(now);
         if (lv === PLANE)
           for (const t of tr.traces) {
@@ -2090,10 +2042,10 @@ export default function ColonyField({
       const pn = penRef.current;
       if (lv === PLANE && pn) drawPen(world, pn, c, v, d);
 
-      drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, motion.matches ? 0 : performance.now() / 1000);
+      drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
 
       drawMinimap();
-      if (import.meta.env.DEV) canvas.dataset.fieldDrawMs = (performance.now() - started).toFixed(2);
+      publishDrawMs(env.now() - started, sinks);
     };
     cadaverSprites.load(draw);
     workerSprites.load(draw);
@@ -2163,7 +2115,7 @@ export default function ColonyField({
     s.fitted = cam.zoom <= fz * 1.0001;
   };
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.max(0, dragOrbit(start, 0, -dy).tilt);
+    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
@@ -2522,7 +2474,7 @@ export default function ColonyField({
         hidden
         type="button"
         aria-label="Tilt close map. Up and down arrow keys tilt. Home resets."
-        title="Drag up to lift the near edge · Home or double-click resets"
+        title="Drag up to tilt · drag down to flatten · Home or double-click resets"
         className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel px-2 py-1 text-xs text-fg-2 shadow-md active:cursor-grabbing"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);

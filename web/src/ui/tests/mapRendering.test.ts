@@ -171,6 +171,9 @@ test("the underground camera tilts at close zoom while the projected strip stays
   assert.equal(h.calls.at(-1)?.patch.mode, "below");
   assert.deepEqual(h.sizes.at(-1)?.orbit, orbit);
   assert.equal(h.draw(180, CURTAIN, strip.y, true, orbit).renderer, "sprites");
+  const nearStrip = centreY(STRIP) + 2.82;
+  assert.equal(canTiltMap(CURTAIN, true, { ...underground, y: nearStrip }, view, 1, true), true);
+  assert.equal(h.draw(180, CURTAIN, nearStrip, true, { yaw: 0, tilt: -1.15 }).renderer, "sprites");
   h.pass.dispose();
 });
 
@@ -208,5 +211,8 @@ test("a lost tilted map context falls back and rebuilds on a fresh software canv
   await loaded();
   assert.equal(h.stats().canvases, 2);
   assert.deepEqual(h.draw(180, PLANE, camera.y, true, orbit), { alpha: 1, angled: true, renderer: "voxel-software" });
+  assert.equal(h.sizes.at(-1)?.width, Math.round(view.w / 3));
+  const bounds = h.calls.at(-1)?.patch.bounds;
+  assert.ok(bounds && bounds.right - bounds.left < bounds.bottom - bounds.top, "pitch only expands the vertical sample");
   h.pass.dispose();
 });
