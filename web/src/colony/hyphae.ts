@@ -443,6 +443,7 @@ export class Hyphae {
     this.#dropLoad(k, true);
     this.parent.delete(k);
     this.soil.delete(k);
+    this.mat.delete(k);
     for (const [c, p] of this.parent) if (p === k) this.parent.set(c, ROOT);
     const [kx, ky] = keyCell(k);
     this.tips = this.tips.filter((t) => t.x !== kx || t.y !== ky);
@@ -629,6 +630,7 @@ export class Hyphae {
   /**
    * Cords (ja-2bw.8): count the tips each cell feeds (every cell from a tip back to its root carries it) and make every
    * cell feeding CORD_FLOW or more a cord; one that no longer does thins back to a hypha. Returns how many are cords.
+   * (Not the growth lane's `thicken` answer, a tip filling the cells round it into a mat: that is `fill` and `mat`, PRD §85.)
    */
   thicken(): number {
     const flow = new Map<number, number>();
@@ -686,6 +688,11 @@ export class Hyphae {
     return faded;
   }
 
+  /** The mat cells still held (a cut or a regrowth by another route can leave a stale key). */
+  #liveMat(): number[] {
+    return [...this.mat].filter((k) => this.parent.has(k));
+  }
+
   /** The hyphae for a save (save.ts): plain arrays. */
   save(): HyphaeSave {
     return {
@@ -707,7 +714,7 @@ export class Hyphae {
       loads: [...this.loads],
       sources: [...this.sources],
       // Only when a tip has thickened: a mycelium that never did saves as it always has (the goldens hash the save).
-      ...(this.mat.size ? { mat: [...this.mat].filter((k) => this.parent.has(k)) } : {}),
+      ...(this.#liveMat().length ? { mat: this.#liveMat() } : {}),
     };
   }
 

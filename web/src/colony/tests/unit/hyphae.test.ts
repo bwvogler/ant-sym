@@ -1183,3 +1183,24 @@ test("a mat does not fade as an unused dead end does, and it saves and loads", (
   plain.root(1, 1, E);
   assert.equal("mat" in plain.save(), false, "a mycelium that never thickened saves as it always has");
 });
+
+test("a cut takes a mat cell out of the mat, and a mat cut away saves without one", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  stepRound([{ h, g: plane(), resources: CORPSE_AT(10, 20) }], 0, { free: 100, tips: 1 }, () => "thicken");
+  const cells = [...h.mat];
+  assert.equal(cells.length, 6);
+  for (const k of cells) h.cut(k);
+  assert.equal(h.mat.size, 0, "cut cells leave the mat at once");
+  assert.equal("mat" in h.save(), false, "nothing left to save");
+});
+
+test("thicken in flow mode pays from the tip's own load, and keeps what is left", () => {
+  const h = new Hyphae();
+  h.root(10, 20, E);
+  const k = cellKey(10, 20);
+  h.loads.set(k, HYPHA_MASS * 2.5);
+  stepRound([{ h, g: plane(), resources: CORPSE_AT(10, 20) }], 0, { free: 0, tips: 1, flow: true }, () => "thicken");
+  assert.equal(h.mat.size, 2, "two cells' mass in the load, two cells");
+  assert.ok(Math.abs((h.loads.get(k) ?? 0) - HYPHA_MASS * 0.5) < 1e-9, "the half cell's mass stays in the load");
+});
