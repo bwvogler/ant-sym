@@ -14,7 +14,7 @@
 // 140, 0%/6% at 210; flight 210, 76%/69% and 44%/45%. With rule 4 as the main open ground (D1, below; 2026-11-10):
 // flight 140 fails 49%/56% at radius 70, 8%/28% at 140, 0%/7% at 210; flight 210, 77%/69% and 43%/45%.
 // --rock: the founding-radius assay one-world §8 item 5 asks for (U4a): each seed's own plane, generateWorld(seed,
-// OPEN_WORLD) as one world's is, with its rock, and the line through its two nests' holes, as generateOneWorld makes it.
+// PLANE_WORLD) as one world's is, with its rock, and the line through its two nests' holes, as generateOneWorld makes it.
 // Rule 4's open ground is the game's (oneWorld.ts mainGround; owner, 2026-11-10, PR #62 review D1): open cells joined to
 // the open region the nests' holes share, not a pocket sealed off by rock (the plane's edge included). Found once a
 // seed from its two holes: every founding joins that region, so it is the same from any later line. --any-open: any
@@ -24,7 +24,7 @@
 import { CELL, cellOf, centreX, centreY } from "../../web/src/colony/hex.ts";
 import { grow, makeTransect, nearestValid } from "../../web/src/colony/transect.ts";
 import { mainGround } from "../../web/src/colony/oneWorld.ts";
-import { generateWorld, mulberry32, OPEN_WORLD, openCell } from "../../web/src/colony/world.ts";
+import { generateWorld, mulberry32, PLANE_WORLD, openCell } from "../../web/src/colony/world.ts";
 
 const rock = process.argv.includes("--rock");
 const anyOpen = process.argv.includes("--any-open");
@@ -43,7 +43,7 @@ function start(seed) {
       { x: mid.x - 70, y: mid.y },
       { x: mid.x + 70, y: mid.y },
     ]);
-  const plane = generateWorld(seed, { ...OPEN_WORLD, size: { w: W, h: H } });
+  const plane = generateWorld(seed, { ...PLANE_WORLD, size: { w: W, h: H } });
   const line = makeTransect(
     plane.nests.map((n) => {
       cellOf(n.x, n.y);
