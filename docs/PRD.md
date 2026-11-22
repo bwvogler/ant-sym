@@ -6901,7 +6901,7 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
 
 
-### 77.3 The climb's crowd limit (design, not built, ja-k4k.15.6, 2026-11-22)
+### 77.3 The climb's crowd limit, and the fuller crowding rule (limit built off; rule design, ja-k4k.15.6, ja-k4k.15.7, 2026-11-22)
 
 **Research basis:** [nurse-crowding.md](nurse-crowding.md). Epic `ja-k4k.15`.
 
@@ -6916,11 +6916,23 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 
 At rate 1, seed 1, a crowd builds at the foot of a small brood chamber (65 ants within 6 units at 300 s, 198 at 400 s, 337 at 500 s), about 210 of them foragers holding food. Brood falls to 2 (main 11), the larder to 448 (main 865). Making carriers skip the climb changed nothing (reverted).
 
-**The decision (owner, 2026-11-22: research a crowd limit first).** No primary source shows nurses sensing a crowd at the brood and leaving it; the nearest are zone fidelity (Richardson et al. 2022) and encounter-rate cues for other tasks (Pinter-Wollman et al. 2013). The limit is **design**, read from the existing contact count `col.friends` (sense row "Encounter rate: local crowding"), so it adds no sense.
+**The limit (built, off: `ja-k4k.15.6`).** `broodCrowd` (0 = off, bit for bit; goldens hold): a young ant climbing the brood odour stops and wanders when that many other nestmates share its cell (`col.friends`, the existing contact count: sense row "Encounter rate: local crowding"). A design limit: no source shows nurses leaving a crowd (the note's research: zone fidelity and encounter-rate cues are the nearest). Owner, 2026-11-22: built as the *soft* form of a per-cell cap of about six; a hard cap was set aside because the nest is sized for about 10 ants a floor cell (`FLOOR_PER_ANT` 0.1, so about 1.7 times the floor for a cap of 6) and a refused step needs somewhere to go.
 
-**The plan.** `broodCrowd` (0 = off, bit for bit): above that many nestmates in and round its cell a young ant's climb gain falls linearly to 0; it wanders instead. Assays: `nurseZone`, `game1` (`maxHeld`, `maxPorting`), `larvae`, seeds 1–10 then 11–20, chosen by the worst seed; rate chosen after it. Targets: seed 1 below 3 held; nurse zone not worse than rate 1's 13/20; larvae 17/20.
+Sweep of the limit (assays run 45059781592, branch `dc6d23d5`, seeds 1–20, climb 1, channel 0.03/0.5):
 
-**Open:** whether to accept a design limit with no source (owner); the threshold; whether to bound the heap physically instead.
+| `broodCrowd` | larvae pass | nurse zone pass / median margin | game1 pass | game1 worst seed |
+|---|---|---|---|---|
+| none | 17/20 | 13/20 / +0.85 | 17/20 | 194 held |
+| 3 | **19/20** (≤ 2 waiting) | 13/20 / +0.52 | 13/20 | 4 held, 2 porting |
+| 6 | 17/20 | 10/20 / −0.04 | 16/20 | **52 porting** |
+
+By the worst seed, 3. Its game1 misses hold 3–4 against a limit of 2; main's worst seed holds 5. Not yet confirmed on a second set of seeds.
+
+**The fuller rule and the fungus knobs (design, `ja-k4k.15.7`).** The owner asked for the fungus to have knobs here, as PR #281's ant actions (a draft) give it cues, not commands. Four layers: physics fixed (bodies limit a cell, speed falls as it fills with a floor), decisions the ant's (press on, wait, yield, sidestep, idle as response-lane answers, after #281's foundation is on `main`), knobs the fungus's (crowd-feel gain, yield threshold, contact pause, idle fraction, a gather scent, mycelium CO₂, hyphal narrowing; see the note's table), colony counters (retreat, idling; digging once `ja-k4k.3.1` is done). Order: physics behind a setting, then crowd-feel gain, then the policy answers, then the emission and world knobs. Test any rule at 10 times the colony on a fixed map. Crowding is where a knob meets spread: S1 is contact transmission, so a crowd is where the fungus spreads fastest.
+
+**A correction (owner, 2026-11-22).** The plan first listed "the nest widens chambers when crowded" as a colony counter. That is `Colony.crowded()`: the colony's head count underground against its total chamber floor, a prohibited read already on the gap list (vision.md "Digging gate", `ja-k4k.3.1`). It decides when a brood chamber grows, so `ja-k4k.15.7` is blocked by `ja-k4k.3.1`; the limit (`ja-k4k.15.6`) is not, because it reads the ant's own cell.
+
+**Open:** whether the knobs sit under the existing reach groups (owner); a second set of seeds for the threshold; full texts of Stroeymeyt 2018, Gravish 2015 and Aguilar 2018 before building on them.
 
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 

@@ -593,7 +593,8 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
   {
     note: "nurse-crowding",
     title: "Nurse crowding",
-    covers: "What limits how many young workers pile onto the brood: bodies, not a sensed crowd (a design limit, not built yet).",
+    covers:
+      "What limits how many young workers pile onto the brood, and how crowding could carry fungus knobs: bodies and slowing, not a sensed crowd (a design limit, built off).",
   },
   {
     note: "activation",
