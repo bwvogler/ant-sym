@@ -145,6 +145,8 @@ test("the canvas is two world units a pixel, rounded up, and made by the env", (
   assert.deepEqual([s.canvases[0]!.width, s.canvases[0]!.height], [5, 3]);
   s.minimap.resize({ x0: 0, w: 20, h: 8 });
   assert.deepEqual([s.canvases[0]!.width, s.canvases[0]!.height], [10, 4]);
+  const img = (s.minimap as unknown as { img: ImageData }).img;
+  assert.deepEqual([img.width, img.height], [10, 4], "the colour buffer is the canvas's size, width first");
 });
 
 test("paint: each pixel is the cell under its centre: food, rock, soil, sky, the mound, else the paper; off the map is rock; spores wash it", () => {
@@ -158,6 +160,11 @@ test("paint: each pixel is the cell under its centre: food, rock, soil, sky, the
   rock.set(at(2, 0), SOIL);
   rock.set(at(3, 0), AIR);
   spoil.set(at(0, 1), 2);
+  // a heap on food, soil and sky changes none of them: they are chosen first
+  spoil.set(at(0, 0), 2);
+  spoil.set(at(2, 0), 2);
+  spoil.set(at(3, 0), 2);
+  spores.set(at(3, 2), 2 * SPORE_FULL); // past full: the wash stops at full
   spores.set(at(2, 1), SPORE_FULL); // over the paper
   spores.set(at(3, 1), SPORE_SHOWN / 2); // under the threshold
   spores.set(at(1, 2), SPORE_SHOWN * 2); // a little
@@ -183,7 +190,7 @@ test("paint: each pixel is the cell under its centre: food, rock, soil, sky, the
   assert.deepEqual(px(3, 1), [...THEME.paperRgb, 255], "under the threshold: none");
   assert.deepEqual(px(1, 2), [...wash(THEME.paperRgb, SPORE_SHOWN * 2), 255], "a little: 0.35 and a bit");
   assert.deepEqual(px(2, 2), [...wash(THEME.accentRgb, SPORE_FULL), 255], "spores over food");
-  // a pixel whose centre is past the map's last column reads as rock
+  assert.deepEqual(px(3, 2), [...wash(THEME.paperRgb, SPORE_FULL), 255], "spores past full wash no more than full");
   // the last row's centre is at y = 7, past the map's 7 rows: rock whatever the tables say
   assert.deepEqual(px(0, 3), [...THEME.rock, 255], "off the map: rock");
   assert.deepEqual(px(2, 3), [...THEME.rock, 255]);
@@ -193,6 +200,15 @@ test("paint: each pixel is the cell under its centre: food, rock, soil, sky, the
     "exactly the spore threshold: shown (the row above is inside the map)",
   );
   assert.deepEqual(px(1, 3), [...THEME.rock, 255], "off the map: no food, no spores");
+});
+
+test("paint: a pixel whose centre falls in the cell just past the map's last column is rock (a hex row's edge: an odd width)", () => {
+  // w = 9, h = 12: pixel (4, 4)'s centre (9, 9) lies in cell (9, 10), one past the last column; the stub's tables read 0 (the paper) there
+  const s = setup({ w: 9, h: 12 });
+  s.minimap.paint(s.k);
+  assert.equal(cellOfPixel(0, 4, 4), "9,10");
+  assert.deepEqual(paintedPixel(s, 4, 4), [...THEME.rock, 255], "past the last column: rock");
+  assert.deepEqual(paintedPixel(s, 3, 4), [...THEME.paperRgb, 255], "the column before is inside the map");
 });
 
 test("paint: the ants are dots in their colony's tone, the infected over the healthy in the spore colour halfway to ink; dead ants, other layers and ants off the map are not drawn", () => {
@@ -232,6 +248,11 @@ test("paint: the ants are dots in their colony's tone, the infected over the hea
   assert.deepEqual(px(3, 0).length, 3);
   assert.deepEqual(px(3, 1), [...THEME.paperRgb], "an ant left of the map writes nowhere: not on the row above's end");
   assert.equal(paintedPixel(s, 0, 0)[3], 255);
+  // an ant at x = 3.5 is in the second pixel (3.5 / 2 rounded down), not the third
+  const odd = setup({ w: 8, h: 6, colonies: [ants([3.5], [4.5], [0], 0, [1], [PLANE])] });
+  odd.minimap.paint(odd.k);
+  assert.deepEqual(paintedPixel(odd, 1, 2).slice(0, 3), tone(0), "x = 3.5: pixel 1");
+  assert.deepEqual(paintedPixel(odd, 2, 2).slice(0, 3), [...THEME.paperRgb], "not pixel 2");
   // a map that starts at x = 10: an ant is placed by its distance from the first column
   const shifted = setup({ w: 8, h: 6, x0: 10, colonies: [ants([10.5, 12.5], [0.5, 0.5], [0, 0], 0, [1, 1], [PLANE, PLANE])] });
   shifted.minimap.paint(shifted.k);
