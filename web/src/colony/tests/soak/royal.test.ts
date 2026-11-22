@@ -324,7 +324,9 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
   const start = total(g);
   // A daughter founded past the line's end grows the curtain (one world): the new columns come with their own buried food.
   const curtain = g.world!.curtain;
-  const [x0, w0] = [curtain.x0, curtain.size.w];
+  // Retuned (broodClimb on by default shifts the stream): a daughter can grow the curtain again after she founds (seed 2: 190 s,
+  // then 331 s), so the new columns' food is counted at every growth, not only at the founding tick. The bound is unchanged.
+  let [x0, w0] = [curtain.x0, curtain.size.w];
   let grown = 0;
   let founded = -1;
   let atFounding = -1;
@@ -336,8 +338,11 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
     if (founded < 0 && g.colonies.length > 1) {
       founded = g.time;
       atFounding = g.colonies[1]!.larder;
+    }
+    if (curtain.x0 !== x0 || curtain.size.w !== w0) {
       for (let y = 0; y < curtain.size.h; y++)
         for (let x = curtain.x0; x < curtain.x0 + curtain.size.w; x++) if (x < x0 || x >= x0 + w0) grown += curtain.food.get(x, y);
+      [x0, w0] = [curtain.x0, curtain.size.w];
     }
     if (k % 30 === 0) worst = Math.max(worst, drift());
   }

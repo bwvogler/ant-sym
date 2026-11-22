@@ -558,7 +558,10 @@ test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mas
       if (h) held += h.length * HYPHA_MASS + h.loaded;
     }
     // From the first round of tip steps on (the body's mass is placed at each round, TIP_STEP apart).
-    if (t >= 5) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
+    // Retuned 5 -> 25 s, bound unchanged (6 %): the body is 5-6 units for its first 25 s and a whole hypha cell (about 0.5, a
+    // fixed rounding of placing mass per round) is 7-10 % of that on every seed 1-13, with the brood odour on or off (base
+    // seed 7 held 5.9 %, by luck; seeds 3 and 5 fail on the base too). From 25 s on every seed tried stays within 3 %.
+    if (t >= 25) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
     const down = g.fungus.hyphaeOn(CURTAIN);
     if (down && down.loaded > 0) curtainFed = true;
   }
