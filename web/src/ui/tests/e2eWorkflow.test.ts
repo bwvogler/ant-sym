@@ -113,6 +113,36 @@ test("the 360 px HUD check also runs in a wide fallback font (ja-9xc1)", () => {
   );
 });
 
+// A running game raises notices of its own (a goal line, "New in the field guide: ...") and the field keeps the last three for 7 s each:
+// a check that raises its own while the game runs has them pushed out, or counts the game's. Steps 14 and 17 failed on slow runners
+// that way (ja-cila; the trace showed the test's notice gone from the field under two of the game's). Both pause the game and wait
+// for the field to empty before they raise theirs.
+test("the notices steps pause the game and wait for an empty field before raising their own (ja-cila)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(
+    script,
+    /const noNotices = \(page, what\) =>\s+until\(async \(\) => \(await page\.evaluate\(\(\) => document\.querySelectorAll\('\[role="status"\] button'\)\.length\)\) === 0,/,
+    "the helper waits for no notice button",
+  );
+  const stepOf = (n: number): string => {
+    const from = script.indexOf(`section("${n}. `);
+    assert.ok(from > 0, `step ${n} is in the script`);
+    return script.slice(from, script.indexOf("section(", from + 10));
+  };
+  assert.match(
+    stepOf(14),
+    /np2\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.tap\(\);\n\s+await noNotices\(np2, /,
+    "step 14 pauses, then waits for a quiet field",
+  );
+  assert.match(
+    stepOf(17),
+    /fp\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.click\(\);\n\s+await noNotices\(fp, /,
+    "step 17 pauses, then waits for a quiet field",
+  );
+  assert.ok(stepOf(17).indexOf("await noNotices(fp") < stepOf(17).indexOf("raiseF("), "step 17 raises its notices only after");
+  assert.ok(stepOf(14).indexOf("await noNotices(np2") < stepOf(14).indexOf("const raise = "), "step 14 raises its notices only after");
+});
+
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(script, /let off = null;\s*await until\(/, "the value the check reads is declared before the poll");
