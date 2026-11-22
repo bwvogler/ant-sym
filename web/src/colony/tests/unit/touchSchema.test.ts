@@ -12,11 +12,13 @@ import { MODES, STANCES } from "../../vocab.ts";
 const touchKeyByHand = (t: Touch) =>
   `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}${t.quality === "fair" ? "" : `|${t.quality}`}`;
 const responseKeyByHand = (hook: string, t: Touch) =>
-  hook === "contact"
-    ? `${touchKeyByHand(t)}|alarm:${t.alarm}|odds:${t.odds}`
-    : hook === "leave"
-      ? `${touchKeyByHand(t)}|${t.mode === "fight" ? `raid:${t.raid}` : `returns:${t.returns}|crowd:${t.crowd}`}`
-      : touchKeyByHand(t);
+  hook === "carry"
+    ? `deliveryTarget:${t.deliveryTarget}|deliveryPlace:${t.deliveryPlace}|deliveryAttempt:${t.deliveryAttempt}|${touchKeyByHand(t)}`
+    : hook === "contact"
+      ? `${touchKeyByHand(t)}|alarm:${t.alarm}|odds:${t.odds}`
+      : hook === "leave"
+        ? `${touchKeyByHand(t)}|${t.mode === "fight" ? `raid:${t.raid}` : `returns:${t.returns}|crowd:${t.crowd}`}`
+        : touchKeyByHand(t);
 
 const LEVELS = ["none", "faint", "strong"] as const;
 const ODDS = ["none", "outnumbered", "even", "outnumbering"] as const;
@@ -51,6 +53,9 @@ function* touches(): Generator<Touch> {
                       returns: RETURNS[(k >> 2) % 3]!,
                       raid: LEVELS[(k >> 3) % 3]!,
                       crowd: CROWD[(k >> 1) % 2]!,
+                      deliveryAttempt: "none",
+                      deliveryTarget: "none",
+                      deliveryPlace: "none",
                     };
                   }
 }
@@ -83,10 +88,10 @@ test("contact's and leave's keys read every value of the fields only they are se
 
 // As schema.test.ts pins the other legends: a change to a byte is a change to every cached response's context.
 test("the response legend is byte for byte the one written whole", () => {
-  assert.equal(RESPONSE_LEGEND.length, 3793);
+  assert.equal(RESPONSE_LEGEND.length, 4401);
   assert.equal(
     createHash("sha256").update(RESPONSE_LEGEND).digest("hex"),
-    "be493b05e04ffc784421b91d1d47b1aeaa4d2defe8b86c518242168ef3bb0430",
+    "51019120fcd9c8a9318dae28edcca08f8ef7df7d18a47968dfdf948f50043a2d",
   );
 });
 

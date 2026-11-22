@@ -1,0 +1,329 @@
+{
+  "harnessSha256": "2530f467b938c8e3a31986829ebe8f05d9fee4ddf9a094fc888343f41d7668ff",
+  "commit": "2a0225a814a82f4f704caa1c99595d21833615b1",
+  "seed": 4,
+  "seconds": 600,
+  "ants": 60,
+  "royalCap": 20,
+  "cueLoss": {
+    "from": 120,
+    "to": 300,
+    "gain": 0,
+    "restoredGain": 1
+  },
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads or locations. Optional timed mark-gain loss is an experimental intervention, not simulated fungal infection. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "royalField": {
+        "markedCells": 116,
+        "nearCapCells": 113,
+        "max": 20
+      },
+      "name": "baseline",
+      "lane": 0,
+      "limit": 0,
+      "doctrine": "local",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 171.447501532095
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 293,
+      "portTrips": 0,
+      "finalLarder": 171.447501532095,
+      "carriedDown": 293,
+      "held": 9,
+      "maxHeld": 14,
+      "maxActive": 0,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 0,
+      "switches": 0,
+      "deliveries": 0,
+      "releases": 0,
+      "releaseCalls": 0,
+      "cueLossCarryCalls": 0,
+      "cueLossRecognisedCalls": 0,
+      "cueLossUncommittedDrops": 0,
+      "checkpoints": [
+        {
+          "at": 120,
+          "stored": 46,
+          "deliveries": 0,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 8,
+          "alive": 66
+        },
+        {
+          "at": 300,
+          "stored": 132,
+          "deliveries": 0,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 6,
+          "alive": 87
+        },
+        {
+          "at": 600,
+          "stored": 293,
+          "deliveries": 0,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 9,
+          "alive": 90
+        }
+      ],
+      "activeSeconds": 0,
+      "longSeconds": 0,
+      "carryCalls": 0,
+      "longCalls": 0,
+      "wallSeconds": 19.549502359999998
+    },
+    {
+      "royalField": {
+        "markedCells": 161,
+        "nearCapCells": 141,
+        "max": 20
+      },
+      "name": "contextPersist5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "contextPersist",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 88.88965139804236
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 210,
+      "portTrips": 0,
+      "finalLarder": 88.88965139804236,
+      "carriedDown": 211,
+      "held": 5,
+      "maxHeld": 40,
+      "maxActive": 40,
+      "maxHeldOver120": 22,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 215,
+      "switches": 33,
+      "deliveries": 210,
+      "releases": 0,
+      "releaseCalls": 0,
+      "cueLossCarryCalls": 129436,
+      "cueLossRecognisedCalls": 0,
+      "cueLossUncommittedDrops": 0,
+      "checkpoints": [
+        {
+          "at": 120,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 2,
+          "alive": 64
+        },
+        {
+          "at": 300,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 108239,
+          "held": 40,
+          "alive": 70
+        },
+        {
+          "at": 600,
+          "stored": 210,
+          "deliveries": 210,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 109038,
+          "held": 5,
+          "alive": 90
+        }
+      ],
+      "activeSeconds": 6619.066666667109,
+      "longSeconds": 3633.3333333306864,
+      "carryCalls": 212708,
+      "longCalls": 109038,
+      "wallSeconds": 19.200191741
+    },
+    {
+      "royalField": {
+        "markedCells": 162,
+        "nearCapCells": 149,
+        "max": 20
+      },
+      "name": "context5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "context",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 88.75932666930177
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 210,
+      "portTrips": 0,
+      "finalLarder": 88.75932666930177,
+      "carriedDown": 211,
+      "held": 6,
+      "maxHeld": 40,
+      "maxActive": 40,
+      "maxHeldOver120": 22,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 216,
+      "switches": 62,
+      "deliveries": 210,
+      "releases": 0,
+      "releaseCalls": 0,
+      "cueLossCarryCalls": 129436,
+      "cueLossRecognisedCalls": 0,
+      "cueLossUncommittedDrops": 0,
+      "checkpoints": [
+        {
+          "at": 120,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 2,
+          "alive": 64
+        },
+        {
+          "at": 300,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 102539,
+          "held": 40,
+          "alive": 70
+        },
+        {
+          "at": 600,
+          "stored": 210,
+          "deliveries": 210,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 103263,
+          "held": 6,
+          "alive": 90
+        }
+      ],
+      "activeSeconds": 6639.933333333644,
+      "longSeconds": 3439.566666664196,
+      "carryCalls": 214866,
+      "longCalls": 103263,
+      "wallSeconds": 18.648657583
+    },
+    {
+      "royalField": {
+        "markedCells": 159,
+        "nearCapCells": 145,
+        "max": 20
+      },
+      "name": "contextRelease5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "contextRelease",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 106.87539337230409
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 228,
+      "portTrips": 0,
+      "finalLarder": 106.87539337230409,
+      "carriedDown": 228,
+      "held": 7,
+      "maxHeld": 50,
+      "maxActive": 50,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 986,
+      "switches": 40,
+      "deliveries": 226,
+      "releases": 753,
+      "releaseCalls": 753,
+      "cueLossCarryCalls": 135750,
+      "cueLossRecognisedCalls": 0,
+      "cueLossUncommittedDrops": 0,
+      "checkpoints": [
+        {
+          "at": 120,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 0,
+          "releaseCalls": 0,
+          "longCalls": 0,
+          "held": 2,
+          "alive": 64
+        },
+        {
+          "at": 300,
+          "stored": 42,
+          "deliveries": 42,
+          "releases": 748,
+          "releaseCalls": 748,
+          "longCalls": 748,
+          "held": 45,
+          "alive": 70
+        },
+        {
+          "at": 600,
+          "stored": 228,
+          "deliveries": 226,
+          "releases": 753,
+          "releaseCalls": 753,
+          "longCalls": 753,
+          "held": 7,
+          "alive": 90
+        }
+      ],
+      "activeSeconds": 7030.0000000004175,
+      "longSeconds": 0,
+      "carryCalls": 225072,
+      "longCalls": 753,
+      "wallSeconds": 14.878187842000006
+    }
+  ]
+}

@@ -66,7 +66,9 @@ test("every response hook called in colony/ is handed antDraw", () => {
       const call = text.slice(m.index, end);
       const line = text.slice(0, m.index).split("\n").length;
       calls.push(`${f}:${line}`);
-      assert.match(call, /antDraw\(/, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
+      // the draw is `antDraw(i)` itself, or a variable the file set from it (`const draw = col.antDraw(i)`)
+      const arg = /\bdraw\b/.test(call) && /const draw = col\.antDraw\(/.test(text);
+      assert.ok(/antDraw\(/.test(call) || arg, `${f}:${line} asks ${m[1]} without the ant's draw: ${call}`);
     }
   }
   assert.ok(calls.length >= 10, `found only ${calls.join(", ")}`);

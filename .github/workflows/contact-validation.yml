@@ -1,0 +1,102 @@
+# Bounded offline comparison for the experimental action branch; no live policy calls.
+name: Directed combat validation
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/contact-validation.yml"
+      - "web/src/colony/experiment.ts"
+permissions:
+  contents: read
+concurrency:
+  group: contact-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  changes:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'fungus-action-foundation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run: ${{ steps.changed.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+      - id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = workflow_dispatch ] || ! git diff --quiet HEAD^ HEAD -- web/src/colony/experiment.ts web/src/colony/battle.ts .github/workflows/contact-validation.yml; then
+            echo 'run=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'run=false' >> "$GITHUB_OUTPUT"
+          fi
+  seed:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        seed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - run: npm --prefix web ci
+      - name: Paired standard-duration assays
+        env:
+          SEED: ${{ matrix.seed }}
+        run: |
+          node scripts/experiment.mjs contact defendHome game1 --seeds "$SEED" --set game.fight.intent=false,true --jobs 1 --json "seed-$SEED.json"
+          git rev-parse HEAD > "source-$SEED.txt"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: contact-seed-${{ matrix.seed }}
+          path: |
+            seed-${{ matrix.seed }}.json
+            source-${{ matrix.seed }}.txt
+          retention-days: 30
+  report:
+    needs: seed
+    if: ${{ !cancelled() && needs.seed.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - run: npm --prefix web ci
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: contact-seed-*
+          path: out
+          merge-multiple: true
+      - name: Verify complete paired results
+        run: |
+          python - <<'PYTHON'
+          import json, pathlib, subprocess
+          expected = {(assay, intent, seconds) for assay, seconds in [('contact', 300), ('defendHome', 300), ('game1', 600)] for intent in [False, True]}
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          for seed in range(1, 21):
+              assert pathlib.Path(f'out/source-{seed}.txt').read_text().strip() == head
+              rows = json.loads(pathlib.Path(f'out/seed-{seed}.json').read_text())
+              assert len(rows) == 6
+              assert {(r['assay'], r['overrides']['game']['fight']['intent'], r['seconds']) for r in rows} == expected
+              assert all(len(r['runs']) == 1 and r['runs'][0]['seed'] == seed for r in rows)
+          PYTHON
+          node scripts/experiment.mjs merge out/seed-*.json --json out/assays.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: contact-validation
+          path: out/*
+          retention-days: 30

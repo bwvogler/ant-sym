@@ -1,0 +1,11 @@
+--- a/web/src/colony/tunnel.ts
++++ b/web/src/colony/tunnel.ts
+@@ -275,7 +275,7 @@
+     const hx = col.goalX - centreX(cx, cy);
+     const hy = col.goalY - centreY(cy);
+     let best = -1;
+-    let bestV = byVector ? -Infinity : 0;
++    let bestV = byVector ? -Infinity : delivering && signs ? signs.get(cx, cy) * signGain : 0;
+     // A chosen role can lie behind after redirection. The ordinary homing
+     // rule avoids retracing. Reconsider the reverse cue on a fresh step (a new
+     // goal or invalidated target), not after every cell: that can bounce forever.

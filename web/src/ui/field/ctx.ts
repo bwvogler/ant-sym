@@ -3,7 +3,7 @@
 // FieldInputs is the read-only snapshot of what the shell's refs and props hold that a layer reads. A layer is a plain function over them, so a
 // Node test can run it on a recording fake context. Each layer that moves brings the inputs it reads; the rest join as their layers move.
 
-import type { Colony, Fungus, OneWorld, WorldMap } from "../../colony/index.ts";
+import type { ChunkLayer, Colony, Fungus, OneWorld, WorldMap } from "../../colony/index.ts";
 import type { Camera, Extent, Viewport } from "../camera.ts";
 import type { PenCircle, Settle } from "../pen.ts";
 import type { Rgb } from "./colour.ts";
@@ -34,6 +34,13 @@ export interface FieldTheme {
   chamber: Rgb;
 }
 
+/** One colony's trails on the shown layer, and its nest's odour (the tone of its food trail in smell vision). */
+export interface TrailLayers {
+  food: ChunkLayer<Float32Array>;
+  home: ChunkLayer<Float32Array>;
+  odour: number;
+}
+
 /** The queen's pen as the field draws it: her flight's circle, the settle preview under the pointer, and the click (pen.ts). */
 export interface FieldPen extends PenCircle {
   /** where she would settle from plane point p, or why not (pen.ts penSettle) */
@@ -60,7 +67,17 @@ export interface FieldCtx {
   world: OneWorld;
   colonies: readonly Colony[];
   fungus: Fungus;
-  /** what the frame takes from the outside world: the clock, a new path (field/env.ts) */
+  /** the scent the shell binds each frame (ColonyField's bind): every colony's trails and alarm on the shown layer, the spores, what hosts sensed */
+  smellAll: boolean;
+  /** the side view: its strip is painted from the plane */
+  strip: boolean;
+  trails: TrailLayers[];
+  alarms: ChunkLayer<Float32Array>[];
+  spores: ChunkLayer<Float32Array>;
+  sensedLayer: ChunkLayer<Float32Array> | null;
+  /** the sensed map's clock: a cell sensed this long ago shows its scent this faintly */
+  sensedNow: number;
+  /** what the frame takes from the outside world: the clock, a new path, a new canvas (field/env.ts) */
   env: FieldEnv;
   /** the sprite sets this field draws with (built once per field: env.sprites()) */
   sprites: SpriteSets;
@@ -77,6 +94,8 @@ export interface PenSeen {
 export interface FieldInputs {
   /** the pointer over the canvas in device pixels, for the pen's preview; null when it left */
   hover: readonly [number, number] | null;
+  /** which scent washes the Settings show */
+  show: { food: boolean; home: boolean };
   /** the queen's pen, or null */
   pen: FieldPen | null;
   /** the pen's last preview (a cache; the layer fills it) */
