@@ -7390,21 +7390,22 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Decisions** (owner, 2026-11-22, unless marked proposed):
 - The first piece smaller, in separate PRs: **M1** the landing patch is the 7-cell flower (a hex and its six neighbours); **M2** hyphae thicken into mats and a filled flower becomes a new patch; **M3** two budgets; **M4** the lichen partner. Order: patch, budgets, lichen.
-- **Hyphae must fill the 7 tiles** (not a built-on-demand patch): the growth lane gains a **thicken** answer (a re-ask of about $0.002 an aim, owner chose it knowing this).
+- **Hyphae must fill the 7 tiles** (not a built-on-demand patch): the growth lane gains a **thicken** answer (a re-ask of about $0.002–0.004 an aim today, more with a fifth field; the owner chose it).
 - Different unlocks from different budgets: ant-specific from mass in ants, free-fungus from mass outside; senses and abilities of a downstream algae or plant partner (a special lichen: use rock, break it down, spread across it) unlocked by contact with plant or alga.
 - **The thicken cue is a resource** (owner, 2026-11-22, shown the literature: new foci at a resource are supported, a mat wherever it is rich only partly): the tip senses a colonised corpse beside it (a new situation field, 48 situations become 96: tokens to be measured), and the policy may thicken only there. Proposed: the local rule never thickens (off = today).
 - **Start with the M1 assay, then the M1 build** (owner, 2026-11-22).
+- **A flower patch's mass comes from the hyphae** (owner, 2026-11-22, on the review of #299): today every patch adds a start of 4 from nothing; a flower does not, so it adds capacity and spores only.
 
 **The mechanic.**
 - **M1:** `LANDING.radius` 2 becomes 1 (landing and a queen's founding), behind a parameter whose off is today bit for bit; whether the first spores still paint radius 2 is chosen by the assay (`ja-vlla.2`).
-- **M2:** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply; a hypha cell with all six neighbours hyphal becomes a patch (layer 0, mass conserved, `patches` + 1, three tips out of the rim); `GROWTH_BRAIN_VERSION` 5, precache imported free.
+- **M2:** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply; a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, three tips out of the rim, the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **M3, M4:** design with the owner first (open questions in the note).
 
-**Play.** A smaller start; thickening at resources and a second base that appears where hyphae close a flower; later two meters and a partner that creeps over rock. The risks are an early cliff (smaller spore ground and capacity use: P1), a runaway (capacity grows with patches: mass-neutral, seven cells' mass), an invisible rule (a patch with no mark), and a mat rule that is design, not measured biology.
+**Play.** A smaller start; thickening at resources and a second base that appears where hyphae close a flower; later two meters and a partner that creeps over rock. The risks are an early cliff (smaller spore ground and capacity use: P1), a runaway (capacity grows with patches: a flower patch takes its seven cells' mass from the hyphae and forms only outside every patch), an invisible rule (a patch with no mark), and a mat rule that is design, not measured biology.
 
 **Assays and targets.** M1: P1 (§63.4) with radius 1 against radius 2 on seeds 1–20, by the worst seed (`ja-vlla.2`, no behaviour change first). M2: flowers and new patches per game on seeds 1–20 with the shipped answers; P1; `colony-cost` for the growth lane (`ja-vlla.6`).
 
-**Cost (estimated).** M1: none. M2: a re-ask of the growth lane, about $0.002 an aim, once (cached games spend nothing); a fifth situation field would take the lane's 48 situations to 96 (tokens to be measured). M3, M4: none unless a lane is added.
+**Cost (estimated).** M1: none. M2: a re-ask of the growth lane, about $0.002–0.004 an aim today (§54.4), once (cached games spend nothing), more with a fifth field; a fifth situation field would take the lane's 48 situations to 96 (tokens to be measured). M3, M4: none unless a lane is added.
 
 **Beads.** `ja-vlla` (this); `ja-vlla.1` research follow-ups; `.2` M1 assay; `.3` M1 build; `.4` M2 thicken answer; `.5` M2 flower becomes a patch; `.6` M2 assays; `.7` M3 budgets; `.8` M4 lichen partner.
 
