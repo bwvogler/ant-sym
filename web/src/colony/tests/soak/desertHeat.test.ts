@@ -47,16 +47,12 @@ test("a body heats toward its surroundings and cools back; hot from heatFelt unt
 });
 
 const desert = (over: Partial<ColonyParams> = {}): Game =>
-  new Game(
-    generateOneWorld(1),
-    { antCount: 60, rival: false, species: { ...DESERT_ANT, params: { ...DESERT_ANT.params, ...over } } },
-    gameRng(1),
-  );
+  new Game(generateOneWorld(1), { species: { ...DESERT_ANT, params: { ...DESERT_ANT.params, ...over } } }, gameRng(1), [{ antCount: 60 }]);
 
 test("a desert ant sees the sun high only where the sky is in view: out on the plane or at the top of its own shaft", () => {
   const g = desert();
   run(g, 80); // the high sun of the morning: ants out on the plane (by noon they come in to cool)
-  const c = g.player;
+  const c = g.colonies[0]!;
   (c.params as { heatSunHigh: number }).heatSunHigh = 0.1; // the sun counts as high from here, for the sense alone
   assert.ok(sunHigh(c.params, c.time), "the test's own check");
   let plane = 0;
@@ -99,10 +95,10 @@ test("the local rule sends a hot ant home, whatever else it senses (review of #1
 test("heat kills an ant past its critical heat, and it is counted", () => {
   const g = desert({ heatNoon: 70, heatFelt: 60, heatCool: 50 }); // a scorching noon, and an ant that feels hot only past its death: it stays out
   run(g, P.heatDay / 2);
-  assert.ok(g.player.diedHot > 0, `died of heat: ${g.player.diedHot}`);
+  assert.ok(g.colonies[0]!.diedHot > 0, `died of heat: ${g.colonies[0]!.diedHot}`);
   // Nobody past the critical heat is left alive (heatStep kills it the step it passes): with the kill gone diedHot climbs every tick and
   // the ants stay (ja-pgdg, review of #190). heatStep.test.ts fixes the step alone; this is the game's.
-  const c = g.player;
+  const c = g.colonies[0]!;
   let alivePast = 0;
   for (let i = 0; i < c.n; i++) if (c.alive[i] && pastCritical(P, c.bodyHeat[i] as number)) alivePast++;
   assert.equal(alivePast, 0, "no living ant is past its critical heat");
@@ -112,7 +108,7 @@ test("heat kills an ant past its critical heat, and it is counted", () => {
 test("the papers' direction: more desert ants out under the high sun than in the low sun of the morning (owner, review of #155 D1)", () => {
   const g = desert();
   const light = (1 - P.heatNight) * P.heatDay;
-  const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
+  const onPlane = () => g.colonies[0]!.layer.filter((l, i) => g.colonies[0]!.alive[i] === 1 && l === PLANE).length;
   let low = 0;
   let noon = 0;
   for (let t = 0; t < P.heatDay; t += 5) {
@@ -134,12 +130,14 @@ test("the sun read as unseen deeper in sends the ant up to look; seen low or dow
 test("at night no ant sets out: on the plane in the dark, only ants on their way home (lost carriers searching for the hole)", () => {
   const g = desert();
   const light = (1 - P.heatNight) * P.heatDay;
-  const onPlane = () => g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE).length;
+  const onPlane = () => g.colonies[0]!.layer.filter((l, i) => g.colonies[0]!.alive[i] === 1 && l === PLANE).length;
   run(g, 80); // the morning's high sun: out (at noon itself they come in to cool, the midday dip)
   const morning = onPlane();
   run(g, light + (P.heatNight * P.heatDay) / 2 - P.heatStart - 80); // midnight
   const midnight = onPlane();
-  const away = g.player.layer.filter((l, i) => g.player.alive[i] === 1 && l === PLANE && g.player.mode[i] !== RETURN).length;
+  const away = g.colonies[0]!.layer.filter(
+    (l, i) => g.colonies[0]!.alive[i] === 1 && l === PLANE && g.colonies[0]!.mode[i] !== RETURN,
+  ).length;
   assert.ok(morning > 10, `on the plane in the morning's high sun: ${morning}`);
   assert.equal(away, 0, `at midnight ${midnight} on the plane, ${away} of them not on their way home`);
 });
@@ -149,9 +147,9 @@ test("heat paces the desert ant's day and never kills it: noon is under its crit
   const g = desert();
   let hot = 0;
   run(g, P.heatDay, () => {
-    for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.hot[i] === 1) hot++;
+    for (let i = 0; i < g.colonies[0]!.n; i++) if (g.colonies[0]!.alive[i] && g.colonies[0]!.hot[i] === 1) hot++;
   });
-  assert.equal(g.player.diedHot, 0);
+  assert.equal(g.colonies[0]!.diedHot, 0);
   // It does feel the heat over a day (ja-pgdg): ants come to feel hot, which is what sends them home. With `hot` stuck at 0 nobody ever did.
   assert.ok(hot > 0, `ant-ticks spent feeling hot over a day: ${hot}`);
 });
@@ -163,9 +161,9 @@ test("on its way home and deep in, where it can't see the sky, it keeps going ho
 });
 
 test("the generic ant has no heat: no body heat, no deaths of heat", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false }, gameRng(1));
+  const g = new Game(generateOneWorld(1), {}, gameRng(1), [{ antCount: 60 }]);
   run(g, 30);
-  assert.equal(g.player.params.heatDay, 0);
-  assert.ok(g.player.bodyHeat.every((b) => b === 0));
-  assert.equal(g.player.diedHot, 0);
+  assert.equal(g.colonies[0]!.params.heatDay, 0);
+  assert.ok(g.colonies[0]!.bodyHeat.every((b) => b === 0));
+  assert.equal(g.colonies[0]!.diedHot, 0);
 });

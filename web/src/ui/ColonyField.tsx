@@ -18,16 +18,12 @@ import {
   centreY,
   R,
   INFECTED,
-  SPORE_FULL,
-  SPORE_SHOWN,
   type Fungus,
   type OneWorld,
   BINS,
   binOf,
-  AIR,
   OPEN,
   rockAt,
-  SOIL,
   type WorldMap,
   worldExtent,
   type BuildTool,
@@ -55,7 +51,8 @@ import { odourColour, odourRgb } from "./field/colour.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
 import { drawFungusGround, drawStalksRaised } from "./field/fungus.ts";
-import { Ground, groundPaper, stripAt } from "./field/ground.ts";
+import { Ground, groundPaper } from "./field/ground.ts";
+import { Minimap } from "./field/minimap.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "./field/zoom.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, pill } from "./field/overlays.ts";
 import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
@@ -393,11 +390,8 @@ export default function ColonyField({
     let gh = m.size.h;
     let ext = extentOf(m);
     let geoMap: WorldMap | null = null;
-    // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants.
-    const mini = document.createElement("canvas");
-    const miniCtx = mini.getContext("2d")!;
-    let miniImg = miniCtx.createImageData(1, 1);
-    let miniAt = -Infinity;
+    // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants (field/minimap.ts).
+    const minimap = new Minimap(env);
     /** The shown map is another, or has grown (a founding widens one world's curtain): its size, extent, chunks and minimap afresh. */
     const rebuild = (map: WorldMap) => {
       geoMap = map;
@@ -406,10 +400,7 @@ export default function ColonyField({
       gh = map.size.h;
       ext = extentOf(map);
       ground.clear();
-      mini.width = Math.ceil(ext.w / 2);
-      mini.height = Math.ceil(ext.h / 2);
-      miniImg = miniCtx.createImageData(mini.width, mini.height);
-      miniAt = -Infinity;
+      minimap.resize(ext);
     };
     /** Read the shown view: its layer, map, scent and spores (each frame). */
     const bind = () => {
@@ -481,7 +472,7 @@ export default function ColonyField({
         sporeRgb: rgb(cssVar("--spore")),
         chamber: rgb(cssVar("--mound")),
       };
-      miniAt = -Infinity;
+      minimap.invalidate();
     };
     retheme();
     // What the layers share and read (field/ctx.ts): filled each frame below, once the camera is known.
@@ -527,59 +518,6 @@ export default function ColonyField({
     const ro = new ResizeObserver(fitCanvas);
     ro.observe(canvas);
     fitCanvas();
-
-    /**
-     * The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground), washed with the
-     * fungus's colour where it has spores the field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
-     */
-    const paintMini = () => {
-      const px = miniImg.data;
-      const food = theme.accentRgb;
-      const spore = theme.sporeRgb;
-      // Infected ants: the spore colour halfway to ink, so a host stands out on the spore wash as on bare ground, in
-      // either theme (ink is light in dark mode) (ja-25sb).
-      const host = [0, 1, 2].map((j) => Math.round((spore[j]! + theme.inkRgb[j]!) / 2)) as [number, number, number];
-      for (let my = 0; my < mini.height; my++)
-        for (let mx = 0; mx < mini.width; mx++) {
-          cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
-          const x = CELL[0];
-          const y = CELL[1];
-          const off = x < gx0 || y < 0 || x >= gx0 + gw || y >= gh;
-          const t = off ? 1 : m.rock.get(x, y);
-          const fv = off ? 0 : m.food.get(x, y);
-          const o = (my * mini.width + mx) * 4;
-          const cut = strip && !off ? stripAt(fctx, x, y) : null;
-          const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
-          const c =
-            cut ??
-            (fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
-          // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
-          const sv = off || cut ? 0 : spores.get(x, y);
-          const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
-          px[o] = Math.round(c[0] + (spore[0] - c[0]) * a);
-          px[o + 1] = Math.round(c[1] + (spore[1] - c[1]) * a);
-          px[o + 2] = Math.round(c[2] + (spore[2] - c[2]) * a);
-          px[o + 3] = 255;
-        }
-      // Every colony's ants, then the infected over them, so a healthy nestmate on the same pixel doesn't hide one.
-      for (const sick of [false, true])
-        for (let k = colonies.length - 1; k >= 0; k--) {
-          const col = colonies[k] as Colony;
-          // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-          const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
-          for (let i = 0; i < col.n; i++) {
-            if (!col.alive[i] || col.layer[i] !== lv || col.load[i] >= INFECTED !== sick) continue;
-            const mx = Math.floor((col.x[i] - gx0) / 2);
-            const my = Math.floor(col.y[i] / 2);
-            if (mx < 0 || my < 0 || mx >= mini.width || my >= mini.height) continue;
-            const o = (my * mini.width + mx) * 4;
-            px[o] = tone[0];
-            px[o + 1] = tone[1];
-            px[o + 2] = tone[2];
-          }
-        }
-      miniCtx.putImageData(miniImg, 0, 0);
-    };
 
     const draw = () => {
       const started = env.dev ? env.now() : 0;
@@ -1018,31 +956,8 @@ export default function ColonyField({
         },
         sinks,
       );
-      const drawMinimap = () => {
-        // Zoomed in: the minimap, with the view's rectangle.
-        if (c.zoom > fitZoom(ext, v) * 1.05) {
-          const now = env.now();
-          if (now - miniAt > 500) {
-            paintMini();
-            miniAt = now;
-          }
-          const r = minimapRect(ext, v, d);
-          ctx.globalAlpha = 0.92;
-          ctx.drawImage(mini, r.x, r.y, r.w, r.h);
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = theme.line;
-          ctx.lineWidth = d;
-          ctx.strokeRect(r.x, r.y, r.w, r.h);
-          const k = r.w / ext.w;
-          ctx.strokeStyle = theme.accent;
-          ctx.lineWidth = 1.5 * d;
-          const x0 = Math.max(gx0, vis.x0);
-          const y0 = Math.max(0, vis.y0);
-          ctx.strokeRect(r.x + (x0 - gx0) * k, r.y + y0 * k, (Math.min(gx0 + ext.w, vis.x1) - x0) * k, (Math.min(ext.h, vis.y1) - y0) * k);
-        }
-      };
       if (frameAngled) {
-        drawMinimap();
+        minimap.draw(fctx, vis);
         return; // Map labels and hit targets use the overhead projection.
       }
       if (voxel.alpha > 0) {
@@ -1205,7 +1120,7 @@ export default function ColonyField({
 
       drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
 
-      drawMinimap();
+      minimap.draw(fctx, vis);
       publishDrawMs(env.now() - started, sinks);
     };
     cadaverSprites.load(draw);

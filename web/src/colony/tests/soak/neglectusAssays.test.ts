@@ -72,6 +72,7 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   // Meetings on seed 1 were 12.5 ant-seconds with piErrorLaw 1 (PRD §79; 14.9 by the odometer law, 17.8 then if ants on
   // different layers counted as meeting): a band catches a miscount. The band moved with the law, its width the same share
   // (13–16.5 round 14.9 then, 10.9–13.8 round 12.5 now).
+  // The band is a fingerprint of this one run (a miscount catches it; a change of stream moves it), not what N3 is for: that is the two asserts below.
   assert.ok(near.meetings > 12.4 && near.meetings < 15.8, `meetings ${near.meetings}`);
   assert.equal(near.fought, 0, `alike: ${near.deaths} deaths`);
   assert.ok(far.deaths > 0 && far.fought === 1, `far apart: ${far.deaths} deaths`);

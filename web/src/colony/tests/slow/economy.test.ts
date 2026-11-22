@@ -36,8 +36,8 @@ function hour(w: number, nudge: number) {
       }
     map.foodTotal = map.foodLeft = total;
   }
-  const g = new Game(world, { antCount: ants, rival: false }, mulberry32(w * 7919 + nudge));
-  const c = g.player;
+  const g = new Game(world, {}, mulberry32(w * 7919 + nudge), [{ antCount: ants }]);
+  const c = g.colonies[0]!;
   // Food idle in the nest while larvae starve: larvae unfed for over two minutes (a larva is fed in about 6 s once food
   // lies by it), while the chambers hold enough to feed them.
   let stranded = 0;

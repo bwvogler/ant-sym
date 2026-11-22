@@ -6871,7 +6871,7 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 - **Reading:** the young sit about as near the queen as the brood, and barely nearer the brood than the middle-aged. Since #201 the brood lies in brood chambers away from the queen, while the young still steer to her position. That is the gap the climb is meant to close. The build's target: the margin above main's at the worst seed, on seeds 1–10 and 11–20.
 - **The economy guard:** `scripts/lab/economy-strand.mjs` runs `economy.test`'s own hour on any seed. It reports the worst stranding, where those larvae lay and the bands at that moment, and flags a collapse. Main's figures on its 20 seeds are in §71: no collapse, worst 10, 2 seeds over 5.
 
-### 77.2 The field and the climb, built off (ja-k4k.15.2, ja-k4k.15.3)
+### 77.2 The field and the climb, built off, on since §77.4 (ja-k4k.15.2, ja-k4k.15.3)
 
 - **The field** (`broodOdour`, ja-k4k.15.2): each lying brood item lays `broodOdour` a second on its cell. The channel evaporates 0.3 and spreads 0.3, and doesn't cross rock.
   - Off (0) lays nothing; the goldens hold bit for bit.
@@ -6901,7 +6901,7 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 - #192's floor-mark climbs fell into the same deadlock. The climb stays off until `ja-rvli` is fixed (owner, 2026-11-15: other work is on it). Then the guard is re-run with these settings.
 
 
-### 77.3 The climb's crowd limit, and the fuller crowding rule (limit built off; rule design, ja-k4k.15.6, ja-k4k.15.7, 2026-11-22)
+### 77.3 The climb's crowd limit, and the fuller crowding rule (limit built, on since §77.4; rule design, ja-k4k.15.6, ja-k4k.15.7, 2026-11-22)
 
 **Research basis:** [nurse-crowding.md](nurse-crowding.md). Epic `ja-k4k.15`.
 
@@ -6916,7 +6916,7 @@ Each moves to its real mark when its bead is fixed. The arena versions of these 
 
 At rate 1, seed 1, a crowd builds at the foot of a small brood chamber (65 ants within 6 units at 300 s, 198 at 400 s, 337 at 500 s), about 210 of them foragers holding food. Brood falls to 2 (main 11), the larder to 448 (main 865). Making carriers skip the climb changed nothing (reverted).
 
-**The limit (built, off: `ja-k4k.15.6`).** `broodCrowd` (0 = off, bit for bit; goldens hold): a young ant climbing the brood odour stops and wanders when that many other nestmates share its cell (`col.friends`, the existing contact count: sense row "Encounter rate: local crowding"). A design limit: no source shows nurses leaving a crowd (the note's research: zone fidelity and encounter-rate cues are the nearest). Owner, 2026-11-22: built as the *soft* form of a per-cell cap of about six; a hard cap was set aside because the nest is sized for about 10 ants a floor cell (`FLOOR_PER_ANT` 0.1, so about 1.7 times the floor for a cap of 6) and a refused step needs somewhere to go.
+**The limit (built, on at 3 since §77.4: `ja-k4k.15.6`).** `broodCrowd` (0 = off, as before it was built): a young ant climbing the brood odour stops and wanders when that many other nestmates share its cell (`col.friends`, the existing contact count: sense row "Encounter rate: local crowding"). A design limit: no source shows nurses leaving a crowd (the note's research: zone fidelity and encounter-rate cues are the nearest). Owner, 2026-11-22: built as the *soft* form of a per-cell cap of about six; a hard cap was set aside because the nest is sized for about 10 ants a floor cell (`FLOOR_PER_ANT` 0.1, so about 1.7 times the floor for a cap of 6) and a refused step needs somewhere to go.
 
 Sweep of the limit (assays run 45059781592, branch `dc6d23d5`, seeds 1–20, climb 1, channel 0.03/0.5):
 

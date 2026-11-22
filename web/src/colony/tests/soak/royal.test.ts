@@ -160,8 +160,8 @@ test("a gyne larva is fed three times a worker's food; nurses who perceive the s
 
 /** A small solo game on one world; colony 0's queen has an alate ready to walk out. */
 function flying(paint = false, species?: Species) {
-  const g = new Game(smallOne(2), { antCount: 60, rival: false, ...(species ? { species } : {}) }, mulberry32(2 * 7919));
-  const c = g.player;
+  const g = new Game(smallOne(2), { ...(species ? { species } : {}) }, mulberry32(2 * 7919), [{ antCount: 60 }]);
+  const c = g.colonies[0]!;
   if (paint) {
     const garden = STRAINS.findIndex((s) => s.id === "garden");
     // Every ant dosed: the alate picks it up from the nestmates around her.
@@ -245,9 +245,9 @@ test("an alate picks up the fungus from infected nestmates as she walks out, and
 });
 
 test("with autoFound off a flight waits for the page: found() at a chosen site, or lose(); a save keeps flights, alates and daughters", () => {
-  const make = () => new Game(smallOne(2), { antCount: 60, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  const make = () => new Game(smallOne(2), { autoFound: false }, mulberry32(2 * 7919), [{ antCount: 60 }]);
   const g = make();
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: ALATE_WAIT, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   c.alates.push({ x: c.queen!.x, y: c.queen!.y, t: 0, step: 0, load: 0, strain: 0, resist: 0, food: ALATE_RESERVE });
   g.world!.plane.foodTotal += 2 * ALATE_RESERVE; // the two alates' bodies, put in by hand, on the books
@@ -273,14 +273,14 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
   assert.ok(h.flights[0]!.food > 0);
   assert.ok(Math.abs(books(h) - total(h)) < 1e-6, `books with a flight pending: ${books(h)} vs ${total(h)}`);
   assert.equal(h.flights.length, 1);
-  assert.equal(h.player.alates.length, 1);
+  assert.equal(h.colonies[0]!.alates.length, 1);
   const lost = h.flights[0]!;
-  const eaten = h.player.eaten;
+  const eaten = h.colonies[0]!.eaten;
   h.lose(lost);
   assert.equal(h.flights.length, 0);
-  assert.equal(h.player.eaten, eaten + lost.food, "a lost queen's body leaves the world with her");
+  assert.equal(h.colonies[0]!.eaten, eaten + lost.food, "a lost queen's body leaves the world with her");
   h.lose(lost);
-  assert.equal(h.player.eaten, eaten + lost.food, "once");
+  assert.equal(h.colonies[0]!.eaten, eaten + lost.food, "once");
   assert.equal(h.colonies.length, 1);
   // A save with a daughter founds her again on load, as she was.
   for (let j = 0; j < 30 * 5; j++) g.tick(DT);
@@ -297,7 +297,7 @@ test("with autoFound off a flight waits for the page: found() at a chosen site, 
     [a.founding, a.incipient, a.population, a.nestOdour, a.odourAim, a.brood.items.length],
   );
   assert.equal(b.incipient, true, "a young daughter stays young across a save (PR #54 review, N7)");
-  assert.deepEqual(again.player.alates, g.player.alates);
+  assert.deepEqual(again.colonies[0]!.alates, g.colonies[0]!.alates);
 });
 
 /** A pending flight from colony 0, already as fat as an alate gets (Game.found takes only pending flights). */
@@ -308,7 +308,7 @@ function fly(g: Game): Flight {
 }
 
 test("a daughter raises her first brood on her own reserve, beside her sisters", () => {
-  const g = new Game(smallOne(2), { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  const g = new Game(smallOne(2), { autoFound: false }, mulberry32(2 * 7919), [{ antCount: 30 }]);
   for (let k = 0; k < 3; k++) assert.ok(g.found(fly(g)) > 0, `daughter ${k} founded`);
   for (let k = 0; k < 30 * 150; k++) g.tick(DT);
   for (const d of g.colonies.slice(1)) assert.equal(d.founding, false, `nest ${d.params.nest}: a first worker`);
@@ -316,8 +316,8 @@ test("a daughter raises her first brood on her own reserve, beside her sisters",
 
 test("food is conserved through gynes, flights and foundings: an alate's body (her egg, her larval food, what she is fed waiting) is her daughter's reserve", () => {
   // PR #47 review, S1: the reserve was 24 food from nowhere. Nurses that perceive no scent rear gynes; they fatten, fly and found.
-  const g = new Game(smallOne(2), { antCount: 60, rival: false }, mulberry32(2 * 7919));
-  const c = g.player;
+  const g = new Game(smallOne(2), {}, mulberry32(2 * 7919), [{ antCount: 60 }]);
+  const c = g.colonies[0]!;
   let worst = 0;
   // New queens' bodies are food too, until they found (into a larder) or are lost (eaten). Founding raises nothing.
   const drift = () => Math.abs(books(g) - total(g));
@@ -359,7 +359,7 @@ test("food is conserved through gynes, flights and foundings: an alate's body (h
 
 /** A daughter colony past founding (her first nanitic out); her workers held far off on the plane each tick. */
 function youngColony() {
-  const g = new Game(smallOne(2), { antCount: 30, rival: false, autoFound: false }, mulberry32(2 * 7919));
+  const g = new Game(smallOne(2), { autoFound: false }, mulberry32(2 * 7919), [{ antCount: 30 }]);
   const map = g.world!.curtain;
   g.found(fly(g));
   const d = g.colonies[1]!;
@@ -448,7 +448,7 @@ test("a nanitic eclosing leaves the colony young", () => {
 });
 
 test("a queen founding alone doesn't hold unity at nothing: a colony with no ants has nobody to meet (ja-i0f, PR #47 review)", () => {
-  const g = new Game(smallOne(1), { antCount: 20, rivalAnts: 20, autoFound: false }, mulberry32(7));
+  const g = new Game(smallOne(1), { autoFound: false }, mulberry32(7), [{ antCount: 20 }, { antCount: 20 }]);
   const [a, b] = g.colonies as [Colony, Colony];
   const e = planeHole(own(a)); // they meet on the plane at a's hole
   const meet = (seconds: number) => {

@@ -27,18 +27,16 @@ interface World {
 
 /** Seed 7's small plane, no food, no rock unless `band` carves it (rock cells given), no scouts; the player's ants young but ant 0, which is old. */
 function plane(params: Partial<Colony["params"]> = { routeMemory: 1 }, rock: [number, number, number, number][] = [], rngSeed = 7): World {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(rngSeed),
-    { colony: params },
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(rngSeed), [
+    { antCount: 10, colony: params },
+    { antCount: 10 },
+  ]);
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
   for (const [x0, y0, x1, y1] of rock) for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) map.rock.set(x, y, ROCK);
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-  const c = g.player;
+  const c = g.colonies[0]!;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
   c.age[0] = 0.5 * LIFESPAN;
   const hc = c.holeCells[c.params.nest] as HoleCell;
@@ -108,33 +106,39 @@ const POCKET: [number, number, number, number][] = [
 ];
 
 test("route memory records a place every routeStep cells on the way out, from the hole, and only a forager walking out", () => {
-  // Retune (brood-odour climb on by default): the game's stream is seed ROUTE_RNG, not 7. The |dy| < 12 bound is the ant's random wander
-  // over a 4 s walk, which is a draw of the stream: at rng 7 it is 10.4 before the change and 14.5 after (rng 5: 20.2 before), so the seed
-  // decided it, not the property. Rngs 1, 3 and 4 hold it by 6, 2 and 6 cells before and after; the bound is the same.
-  const ROUTE_RNG = 1;
-  const w = plane({ routeMemory: 1, routeStep: 8 }, [], ROUTE_RNG);
+  // Retune (brood-odour climb on by default): the walk is played on three game streams (1, 3 and 4), not 7. The |dy| < 12 bound is the
+  // ant's random wander over a 4 s walk, which is a draw of the stream: at rng 7 it is 10.4 before the change and 14.5 after (rng 5: 20.2
+  // before), so one seed decided it, not the property. Rngs 1, 3 and 4 hold it by 6, 2 and 6 cells before and after; the bound is the
+  // same and each stream must hold it.
+  const walkOut = (rngSeed: number) => {
+    const w = plane({ routeMemory: 1, routeStep: 8 }, [], rngSeed);
+    const { g, c, hx, hy } = w;
+    c.bindPolicy("mode", () => "explore");
+    c.putAnt(0, PLANE, hx + 3, hy);
+    c.mode[0] = EXPLORE;
+    c.carrying[0] = 0;
+    c.heading[0] = 0;
+    c.odoSurf[0] = 0;
+    for (let k = 0; k < 4 * 30; k++) g.tick(DT);
+    const n = c.routeN[0];
+    const walked = c.odoSurf[0];
+    assert.ok(walked > 20, `it walked ${walked.toFixed(0)} cells`);
+    assert.equal(n, Math.floor(walked / 8), `${n} places for ${walked.toFixed(1)} cells at 8 a place`);
+    // Each place is where it stood: on the line it walked (east, at the hole's row, give or take its wander), spaced about 8 apart.
+    for (let k = 0; k < n; k++)
+      assert.ok(
+        Math.abs(c.routePlaces[2 * k + 1] - hy) < 12 && c.routePlaces[2 * k] > hx,
+        `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`,
+      );
+    for (let k = 1; k < n; k++) {
+      const d = Math.hypot(c.routePlaces[2 * k] - c.routePlaces[2 * k - 2], c.routePlaces[2 * k + 1] - c.routePlaces[2 * k - 1]);
+      assert.ok(d > 5 && d < 11, `places ${k - 1} and ${k} are ${d.toFixed(1)} apart`);
+    }
+    return w;
+  };
+  for (const extra of [3, 4]) walkOut(extra);
+  const w = walkOut(1);
   const { g, c, hx, hy } = w;
-  c.bindPolicy("mode", () => "explore");
-  c.putAnt(0, PLANE, hx + 3, hy);
-  c.mode[0] = EXPLORE;
-  c.carrying[0] = 0;
-  c.heading[0] = 0;
-  c.odoSurf[0] = 0;
-  for (let k = 0; k < 4 * 30; k++) g.tick(DT);
-  const n = c.routeN[0];
-  const walked = c.odoSurf[0];
-  assert.ok(walked > 20, `it walked ${walked.toFixed(0)} cells`);
-  assert.equal(n, Math.floor(walked / 8), `${n} places for ${walked.toFixed(1)} cells at 8 a place`);
-  // Each place is where it stood: on the line it walked (east, at the hole's row, give or take its wander), spaced about 8 apart.
-  for (let k = 0; k < n; k++)
-    assert.ok(
-      Math.abs(c.routePlaces[2 * k + 1] - hy) < 12 && c.routePlaces[2 * k] > hx,
-      `place ${k}: (${c.routePlaces[2 * k]}, ${c.routePlaces[2 * k + 1]}) from (${hx}, ${hy})`,
-    );
-  for (let k = 1; k < n; k++) {
-    const d = Math.hypot(c.routePlaces[2 * k] - c.routePlaces[2 * k - 2], c.routePlaces[2 * k + 1] - c.routePlaces[2 * k - 1]);
-    assert.ok(d > 5 && d < 11, `places ${k - 1} and ${k} are ${d.toFixed(1)} apart`);
-  }
   // Homing (a carrier, or on its way back), it stores nothing more.
   carrier(w, hx + 40, hy, 40);
   const before = c.routeN[0];
@@ -516,14 +520,12 @@ test("route memory: the hole's sight takes over at any moment of a retrace", () 
 test("route memory: a save carries the places and the retrace, and the game runs on to the same", () => {
   assert.equal(SAVE_VERSION, 14);
   const make = (): Game =>
-    new Game(
-      generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-      { antCount: 10, rivalAnts: 10, regrow: 0 },
-      gameRng(7),
-      { colony: { routeMemory: 2 } },
-    );
+    new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+      { antCount: 10, colony: { routeMemory: 2 } },
+      { antCount: 10 },
+    ]);
   const g = make();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
   const hy = centreY(hc.py);
@@ -544,7 +546,7 @@ test("route memory: a save carries the places and the retrace, and the game runs
   const saved = JSON.parse(JSON.stringify(g.save()));
   const fresh = make();
   fresh.load(saved);
-  const f = fresh.player;
+  const f = fresh.colonies[0]!;
   for (const k of ["routePlaces", "routeN", "routeGap", "routeAt", "routeState", "routeGoal"] as const)
     assert.deepEqual(Array.from(f[k]), Array.from(c[k]), k);
   for (let k = 0; k < 60; k++) {
@@ -552,7 +554,7 @@ test("route memory: a save carries the places and the retrace, and the game runs
     fresh.tick(DT);
   }
   for (const k of ["x", "y", "routeN", "routeState", "routeGoal"] as const)
-    assert.deepEqual(Array.from(fresh.player[k]), Array.from(c[k]), `after running on: ${k}`);
+    assert.deepEqual(Array.from(fresh.colonies[0]![k]), Array.from(c[k]), `after running on: ${k}`);
 });
 
 test("route memory records in FOLLOW mode too, and not with food in the jaws", () => {

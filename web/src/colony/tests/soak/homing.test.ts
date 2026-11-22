@@ -40,8 +40,8 @@ test("a homing ant whose vector is nearly right never searches: blocked anywhere
   // samples stalls, 157 measured on S2.3c's review, so this reads the belief's search only.)
   // Seed 1, not 5: with the brood odour on by default seed 5 samples only 32 distinct trips in 90 s (227 samples, 0
   // searching); seeds 1-4 sample 66, 42, 49, 50 trips with 0 searching, so the floor (> 40) and the property are unchanged.
-  const g = new Game(smallOne(5), { antCount: 100 }, mulberry32(1));
-  const c = g.player;
+  const g = new Game(smallOne(5), {}, mulberry32(1), [{ antCount: 100 }, { antCount: 800 }]);
+  const c = g.colonies[0]!;
   let samples = 0;
   let searching = 0;
   const trips = new Set<string>(); // distinct trips sampled: each trip draws its own drift (review of #264, S2)

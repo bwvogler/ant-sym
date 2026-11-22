@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadColony, saveColony } from "../../colonySave.ts";
+import { DEFAULT_CHANNELS } from "../../pheromone.ts";
 import { FAINT } from "../../vocab.ts";
 import { OPEN, rockAt } from "../../world.ts";
 import { oneColony } from "../builders.ts";
@@ -61,4 +62,10 @@ test("brood odour is saved with the colony's fields and loads back as it was", (
   loadColony(back, saved);
   const royal = map.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   for (let d = 0; d <= 3; d++) assert.equal(back.ph.fields.broodOdour.get(royal.x0 + 1 + d, royal.floorRow - 3), at(d), `${d} cells east`);
+});
+
+test("the brood-odour climb is on by default (PRD §77.4): the odour, the climb at gain 1, the crowd limit at 3, the slow wide channel", () => {
+  const { c } = oneColony(1, { maxAnts: 1 }, () => "explore", 1);
+  assert.deepEqual([c.params.broodOdour, c.params.broodClimb, c.params.broodCrowd], [1, 1, 3]);
+  assert.deepEqual(DEFAULT_CHANNELS.broodOdour, { evaporation: 0.03, diffusion: 0.5 });
 });

@@ -122,8 +122,10 @@ test("a young ant in a chamber turns toward the brood's odour, not the queen's p
   const royal = w.curtain.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   const x = centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow - 5);
   const y = centreY(royal.floorRow - 5);
+  let lastRms = 0;
   const turn = (broodClimb: number, odour: number, broodCrowd = 0, here = 1) => {
     let sum = 0;
+    let sq = 0;
     const trials = 100;
     for (let t = 0; t < trials; t++) {
       const c = new Colony(
@@ -154,7 +156,9 @@ test("a young ant in a chamber turns toward the brood's odour, not the queen's p
       cellOf(x + Math.cos(-Math.PI / 2 - a) * d, y + Math.sin(-Math.PI / 2 - a) * d);
       c.tick(1 / 30);
       sum += c.heading[0]! + Math.PI / 2;
+      sq += (c.heading[0]! + Math.PI / 2) ** 2;
     }
+    lastRms = Math.sqrt(sq / trials);
     return sum / trials;
   };
   const toward = turn(1, 50);
@@ -170,6 +174,8 @@ test("a young ant in a chamber turns toward the brood's odour, not the queen's p
   const room = turn(1, 50, 6, 6);
   const off = turn(1, 50, 0, 40);
   assert.ok(Math.abs(full) < 0.005, `a full cell: no climb ${full.toFixed(4)}`);
+  // It wanders on (noise only) instead of standing still, so it spreads out and does not queue in the cell.
+  assert.ok(lastRms > 0.005, `a full cell: it still wanders (turn spread ${lastRms.toFixed(4)})`);
   assert.ok(room < -0.005, `one short of full: still climbs ${room.toFixed(4)}`);
   assert.ok(off < -0.005, `no limit: climbs ${off.toFixed(4)}`);
 });

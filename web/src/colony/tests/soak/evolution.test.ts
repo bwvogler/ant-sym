@@ -245,7 +245,7 @@ test("the minimum dose is a rate: a clean ant exposed above it is infected at an
 });
 
 test("the game's landing: an evolving fungus roots by the hole, keeps sporulating there, and mutates as it grows", () => {
-  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), {}, mulberry32(7919), [{ antCount: 200 }, { antCount: 200 }]);
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   assert.ok(f.evolution && f.base.length > 0);
@@ -256,14 +256,14 @@ test("the game's landing: an evolving fungus roots by the hole, keeps sporulatin
   assert.ok(onBase() > 0, "two minutes on, its patch still holds spores (the landing's alone fade at 3 % a second)");
   assert.ok(f.evolution.mutations >= 1, `mutations from its growth: ${f.evolution.mutations}`);
   // A lab or test landing keeps the strain as listed, with no body.
-  const lab = new Game(smallOne(1), { antCount: 50, rivalAnts: 50 }, mulberry32(1));
+  const lab = new Game(smallOne(1), {}, mulberry32(1), [{ antCount: 50 }, { antCount: 50 }]);
   lab.land(0, GARDEN);
   assert.equal(lab.fungus.evolution, null);
   assert.equal(lab.fungus.base.length, 0);
 });
 
 test("a colony the world starts with has nothing a founded one can't get", () => {
-  const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(7919));
+  const g = new Game(smallOne(1), {}, mulberry32(7919), [{ antCount: 200 }, { antCount: 200 }]);
   g.land(0, GARDEN, { evolve: true });
   for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
   // Foundings beyond the line's two ends (one world grows its line from its ends).
@@ -303,7 +303,7 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {
   const share = (evolve: boolean) => {
-    const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
+    const g = new Game(smallOne(1), {}, mulberry32(7919), [{ antCount: 300 }, { antCount: 300 }]);
     g.land(0, GARDEN, { evolve });
     let most = 0;
     // 120 s: the seven-cell landing (PRD §85) takes listed Garden to a quarter at ~75 s and 0.93 of the colony at 100 s.
@@ -323,7 +323,7 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
 });
 
 test("the queen's levels are held too: Stealth decides how far she can hide (PR #43 review, T1)", () => {
-  const g = new Game(smallOne(1), { antCount: 100, rivalAnts: 100 }, mulberry32(7919));
+  const g = new Game(smallOne(1), {}, mulberry32(7919), [{ antCount: 100 }, { antCount: 100 }]);
   g.land(0, GARDEN, { evolve: true });
   const f = g.fungus;
   const q = g.colonies[0]!.queen!;
@@ -370,7 +370,7 @@ test("mutations from hosts: load passed on by contact counts, spores picked up f
 
 test("spores a full patch can't hold stay mycelium (PR #43 review, N3)", () => {
   // A ground that holds no spores at all: every spore the mycelium puts out is one it can't lay.
-  const g = new Game(smallOne(1), { antCount: 50, rivalAnts: 50, fungus: { maxSpores: 0 } }, mulberry32(7919));
+  const g = new Game(smallOne(1), { fungus: { maxSpores: 0 } }, mulberry32(7919), [{ antCount: 50 }, { antCount: 50 }]);
   g.land(0, GARDEN, { evolve: true });
   const e = g.fungus.evolution!;
   e.mass = 50; // above what one patch holds: it does not grow, so its mass moves only by spores

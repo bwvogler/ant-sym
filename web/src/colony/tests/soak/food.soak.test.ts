@@ -15,7 +15,7 @@ import { smallOne } from "../builders.ts";
  */
 function drift(over?: Partial<Responses>, seconds = 300): { worst: number; g: Game } {
   const w = smallOne(1);
-  const g = new Game(w, { antCount: 200, rivalAnts: 200 }, mulberry32(7));
+  const g = new Game(w, {}, mulberry32(7), [{ antCount: 200 }, { antCount: 200 }]);
   if (over) for (const c of g.colonies) c.responses = responses(over);
   let worst = 0;
   for (let k = 0; k < 30 * seconds; k++) {
@@ -42,7 +42,7 @@ test("food is conserved over a game: map + jaws + larder + brood (1 + fed each) 
     g.colonies.every((c) => c.births > 0),
     "brood raised",
   );
-  assert.ok(g.player.portTrips > 0, "food moved");
+  assert.ok(g.colonies[0]!.portTrips > 0, "food moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
 });
 
@@ -65,6 +65,6 @@ test("food is conserved when carriers put it down anywhere (behaviour MR 2: on t
   ); // 210 s of the 300 (review of #35: the file stays inside its limit). With piErrorLaw 1 the player's first porter trip
   // came at ~165 s here, not ~105 s (food home by 150 s: 380, against 462 by the odometer law), so 150 s saw none.
   assert.ok(where.has("forager out") && where.has("forager tunnel") && where.has("porter chamber"), [...where].join(", "));
-  assert.ok(g.player.portTrips > 0, "food still moved");
+  assert.ok(g.colonies[0]!.portTrips > 0, "food still moved");
   assert.ok(worst < 1e-6, `food drifted by ${worst}`);
 });

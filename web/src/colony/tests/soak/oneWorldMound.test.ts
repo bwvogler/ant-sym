@@ -123,7 +123,7 @@ test("heapPlane: null once no cell within reach has room, every pellet before it
 
 /** A game of few ants, every founder young (they stay in) but those a test moves. */
 function quiet(seed = 7, rng = seed): Game {
-  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(rng));
+  const g = new Game(smallOne(seed), { regrow: 0 }, gameRng(rng), [{ antCount: 10 }, { antCount: 10 }]);
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
   return g;
 }
@@ -151,7 +151,7 @@ function upWith(c: Colony, i: number): void {
 
 test("one world: spoil carried up keeps going, out on the plane, and is heaped where its vector says it is far enough, not at the hole", () => {
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = g.world!.plane;
   const i = 0;
   upWith(c, i);
@@ -182,7 +182,7 @@ test("one world: spoil carried up keeps going, out on the plane, and is heaped w
 
 test("one world: a spoil or corpse carrier on its own hole cell on the plane doesn't go back down", () => {
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const p = planeHole(own(c));
   // A corpse: carried up from below, it comes out on the hole's cell.
   const at = curtainHole(own(c));
@@ -235,7 +235,7 @@ test("one world: a spoil or corpse carrier on its own hole cell on the plane doe
 
 test("one world: a corpse carried up goes on the midden, off the mound and at least MIDDEN_MIN from home by the undertaker's vector; its mark and a Bloom host's spores are there", () => {
   const g = quiet();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = g.world!.plane;
   const h = own(c);
   // A mound round the hole first, past MIDDEN_MIN: the midden must lie past it, not on it at MIDDEN_MIN.
@@ -301,15 +301,14 @@ test("one world: a corpse carried up goes on the midden, off the mound and at le
 
 test("one world: a rival raider on the plane shies from the colony's midden", () => {
   // The player's midden mark painted on the plane 20 cells east of its hole; the rival's raiders walk at it from the west.
-  // Retune (brood-odour climb on by default): world 7 as before, the game's stream seed 3, not 7. How long unscared raiders
-  // stand within 2 cells of the spot is their random wander: the "without" count is 33 (rng 7) before the change and 27 after, against the
-  // bound of 30, and 22 before / 17 after at rng 5, so the seed decided it. Rng 3 gives 39 before and 36 after (rngs 2 and 1: 101 / 50 and 34 /
-  // 72), with the midden 0 in each; both bounds are the same.
-  const RNG = 3;
-  const reach = (painted: boolean): number => {
+  // Retune (brood-odour climb on by default): world 7 as before, played on three game streams (3, 2 and 1), not 7. How long unscared
+  // raiders stand within 2 cells of the spot is their random wander: the "without" count is 33 (rng 7) before the change and 27 after,
+  // against the bound of 30, and 22 before / 17 after at rng 5, so one seed decided it. Rngs 3, 2 and 1 give 39 / 101 / 34 before and
+  // 36 / 50 / 72 after, with the midden 0, 0 and 17; both bounds are the same and each stream must hold them.
+  const reach = (painted: boolean, RNG: number): number => {
     const g = quiet(7, RNG);
-    const c = g.player;
-    const r = g.rival!;
+    const c = g.colonies[0]!;
+    const r = g.colonies[1]!;
     const h = own(c);
     const mx = centreX(h.px + 20, h.py);
     const my = centreY(h.py);
@@ -329,14 +328,16 @@ test("one world: a rival raider on the plane shies from the colony's midden", ()
     }
     return inside;
   };
-  const without = reach(false);
-  const withIt = reach(true);
-  assert.ok(without > 30, `with no midden, raiders walk over the spot (${without} ant-ticks)`);
-  assert.ok(withIt < without / 3, `with the midden there, they keep off it (${withIt} against ${without})`);
+  for (const rng of [3, 2, 1]) {
+    const without = reach(false, rng);
+    const withIt = reach(true, rng);
+    assert.ok(without > 30, `rng ${rng}: with no midden, raiders walk over the spot (${without} ant-ticks)`);
+    assert.ok(withIt < without / 3, `rng ${rng}: with the midden there, they keep off it (${withIt} against ${without})`);
+  }
 });
 
 test("one world over 200 s: the mound's books balance, it stays round the hole with every hole open, spreaders carry spoil outward and backfillers take it down", () => {
-  const g = new Game(smallOne(), { antCount: 150, rivalAnts: 150, regrow: 0 }, gameRng(7));
+  const g = new Game(smallOne(), { regrow: 0 }, gameRng(7), [{ antCount: 150 }, { antCount: 150 }]);
   const plane = g.world!.plane;
   // Per ant: the distance from its hole where it picked a pellet off the mound (NaN none), and whether it went down with it.
   const picked = g.colonies.map((c) => new Float32Array(c.n).fill(NaN));
@@ -386,7 +387,7 @@ test("one world over 200 s: the mound's books balance, it stays round the hole w
     );
     assert.equal(plane.moundCells, mound, "both colonies' soil out × SWELL, less what was taken off, plus what was put back");
   }
-  const holes = holesOf(g.player);
+  const holes = holesOf(g.colonies[0]!);
   const cells = spoilCells(plane);
   for (const s of cells) assert.ok(s.h <= capOf(s.x, s.y, holes), `(${s.x}, ${s.y}): within its ring's cap`);
   for (const c of g.colonies) {
