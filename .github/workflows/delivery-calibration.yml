@@ -73,6 +73,7 @@ jobs:
           merge-multiple: true
       - name: Complete seed table
         run: |
+          set -o pipefail # a failing check must fail the job, not vanish into tee
           python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
           import json, pathlib
           rows = []

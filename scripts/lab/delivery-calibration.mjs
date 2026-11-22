@@ -126,7 +126,8 @@ for (const name of requested.split(",")) {
     c.responses = responses({
       // Observational wrapper of local drop=true; no new decision or draw.
       drop: (t) => {
-        if (cueLossActive && t.deliveryTarget === "none") cueLossUncommittedDrops++;
+        // only a food drop is a delivery: spoil, corpses and brood are asked `drop` too (ja-g7nz), and have no delivery target
+        if (cueLossActive && t.carrying === "food" && t.deliveryTarget === "none") cueLossUncommittedDrops++;
         return true;
       },
       carry: (t) => {
