@@ -33,7 +33,7 @@ Hooks enforce some of these once the skill is invoked in a session, and stay on 
 - `env -u JEV_API_KEY` on every command that runs the game, tests or scripts. No live Jev calls; spend is real and the owner decides it.
 - Worktrees at **absolute** paths under the scratchpad, with the variable guarded: `W="${S:?}/pr57"`. An empty `$S` once put a worktree at `/r53m`.
 - `npm --prefix "$W/web" ci` in each worktree. Never symlink `node_modules`.
-- **Slow runs are off unless the owner asks**: `npm run test:slow`, 12-minute game runs, G′ over 20 seeds, `side-bench`, `colony-cost --side`, anything multi-minute (`bd memories slow`). List them under "Not re-measured" instead. When the owner does ask for assays over many seeds, `assays.yml` runs them on GitHub (the `running-assays` skill).
+- **Slow runs are off unless the owner asks**: `npm run test:slow`, 12-minute game runs, G′ over 20 seeds, `colony-cost`, anything multi-minute (`bd memories slow`). List them under "Not re-measured" instead. When the owner does ask for assays over many seeds, `assays.yml` runs them on GitHub (the `running-assays` skill).
 - **One CPU-heavy job at a time.** Never run `npm test` beside a helper's runs or a trial merge's tests; parallel load made test files hit the 60 s timeout on #47 and looked like failures.
 - The reviewer commits nothing, pushes nothing, opens no PR, never force-pushes, and never merges unless the owner asks in this session. Never touch the `beads-dolt` or `__dolt_remote_info__` branches.
 - Beads change only through `bd`; `.beads/issues.jsonl` is a local export, not in git. An author may have started you in their own checkout (the `steward` skill): what was already changed there is theirs.

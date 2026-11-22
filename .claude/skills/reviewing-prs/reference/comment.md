@@ -66,7 +66,7 @@ Suggested fix: <…>
 - <Each focus-list item you checked and found right, briefly.>
 
 ### Not re-measured (slow)
-- <test:slow, G′ 20 seeds, 12-minute game runs, side-bench … — what each would tell, if the owner wants it.>
+- <test:slow, G′ 20 seeds, 12-minute game runs … — what each would tell, if the owner wants it.>
 
 <details>
 <summary>Helper's report (deep pass on <head sha7>; the verdict above is the lead's)</summary>

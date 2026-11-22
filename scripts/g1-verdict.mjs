@@ -18,6 +18,7 @@ if (!dir) {
 }
 const held = [];
 const problems = [];
+const broken = []; // seeds with a file that is left out: the ::error says why, so judge() doesn't also say their runner failed
 for (const s of SEEDS) {
   const file = join(dir, `g1-seed-${s}.json`);
   if (!existsSync(file)) continue; // judge() names a seed with no result
@@ -26,13 +27,17 @@ for (const s of SEEDS) {
     parsed = JSON.parse(readFileSync(file, "utf8"));
   } catch (e) {
     problems.push(`seed ${s}: ${file} is not JSON (${e.message})`);
+    broken.push(s);
     continue;
   }
   const r = seedResult(s, parsed);
   if ("held" in r) held.push(r.held);
-  else problems.push(`seed ${s}: ${r.problem}`);
+  else {
+    problems.push(`seed ${s}: ${r.problem}`);
+    broken.push(s);
+  }
 }
-const v = judge(held);
+const v = judge(held, SEEDS, broken);
 console.log(`G1: ${v.within} of ${SEEDS.length} seeds within ${BOUND} (need ${WITHIN}, none at ${CEILING}): ${v.table}`);
 for (const p of problems) console.log(`::error title=G1::${p}`);
 for (const f of v.failures) console.log(`::error title=G1::${f}`);

@@ -32,6 +32,10 @@ Several GitHub runs can go at once (one per setting or commit): each is its own 
 4. **Read it**: `list_workflow_jobs` on the run, then `get_job_logs` on the `report` job (whole, not `tail_lines`: the table sits before the upload and clean-up lines). The table is markdown: `## <assay>`, then per setting `pass n/N (failing seeds: …)` and median, min and max per metric. A seed whose runner failed is named in an `::error` there, and its own `seed <n>` job has the cause.
 5. **Per-seed figures**: the `assays` artifact (`assays.json`, every run's metrics), via `list_workflow_run_artifacts` and `download_workflow_run_artifact`, then `curl` the URL it gives (the session's network allows `*.blob.core.windows.net`) and `unzip`.
 
+## The fungus's progression (P1)
+
+No assay lands an evolved, hyphae-growing fungus, so a change to the landing, the hyphae or the fungus's pace is measured with `scripts/lab/progression.mjs --map one --evolve --hyphae` (time to a quarter of the colony infected; PRD §63.4, docs/hyphal-growth.md §8), on GitHub with `progression.yml` (one runner per seed). One run is one arm: start it with `ref` the commit to measure (a PR's head, then its base) and `seeds` 1-10, then 11-20; each run's `report` job prints the table (`get_job_logs`). Compare the two tables by the worst seed. A local run of 10 seeds takes about an hour and dies with the container.
+
 ## Judging the result
 
 - Tune by the worst seed, confirm on seeds 11-20, and compare with `main` measured the same way the same day (CLAUDE.md; PRD §42). Measure the baseline in the same run: put the current value in the `set` list beside the candidates.

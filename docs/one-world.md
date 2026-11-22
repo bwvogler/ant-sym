@@ -1,5 +1,7 @@
 # One world: the surface and a curtain under the line between the holes
 
+**Status (2026-11-22):** the top-down and side maps this note starts from are gone (stage S2, [one-world-only.md](one-world-only.md)). One world is the only game, and the sections below that say "today's side view", "the open map" or "today's top-down code" describe the maps as they were when each stage was designed: read them as history. The curtain still uses the side view's code (digging, chambers, brood), now in `oneWorld.ts`'s curtain.
+
 Design note. U1, the line's geometry, U2, the world's generation, U3, colonies on both layers with their homing, mound and midden (U3a–c), U4a, founding on the line, U4b, one-world saves, U5.1, the page playing one world in two views, U6a, guards and assays on one world (§5, "U6a as built"), `ja-web`, activation at the top of the shaft (§5, "ja-web as built"), and U6b, the raid assays on one world and the final baselines (§5, "U6b as built"), are built (`web/src/colony/transect.ts`, `oneWorld.ts`, the layers in `colony.ts` and `game.ts`, `ui/ColonyField.tsx`; on the page as its only game since 2026-11-10, PRD §55); the rest is not. It answers the owner's request (2026-11-08) to make the top-down view and the side view two views of **one** game, and records the model chosen, the geometry rule that keeps it consistent, what changes in the code, and the order to build it in. Beads: epic `ja-lp4`; stages U1–U6 are `ja-lp4.1`–`ja-lp4.6`, and the research bead is `ja-lp4.7`. Decisions: PRD §51.
 
 ## 1. Where we are

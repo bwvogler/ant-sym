@@ -489,6 +489,7 @@ export default function ColonyField({
     const motion = matchMedia("(prefers-reduced-motion: reduce)");
     // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
+    // placeholders: bind() sets all of these before the first frame draws
     let lv = -1;
     let m: WorldMap = anyColony.map;
     let alarms: ChunkLayer<Float32Array>[] = [];
@@ -657,7 +658,6 @@ export default function ColonyField({
         soil = groundSoil(),
         spoil = groundSpoil();
       const fc = m.food.chunk(cx, cy);
-      const lc = m.loose?.chunk(cx, cy);
       // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
       const sensedC = sensedLayer?.chunk(cx, cy);
       const now = sensed.now;
@@ -709,7 +709,6 @@ export default function ColonyField({
           !tilePaint.needsPaint(c, tag, [
             rc,
             fc,
-            lc,
             qc,
             sensedC,
             sporeC,
@@ -733,7 +732,7 @@ export default function ColonyField({
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? (lc && lc[i] ? spoil : soil) : rc[i] === AIR ? theme.sky : rock;
+            const solid = rc[i] === SOIL ? soil : rc[i] === AIR ? theme.sky : rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -874,19 +873,7 @@ export default function ColonyField({
           const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
           const c =
             cut ??
-            (fv > 0
-              ? food
-              : t === SOIL
-                ? !off && m.loose?.get(x, y)
-                  ? theme.spoil
-                  : theme.soil
-                : t === AIR
-                  ? theme.sky
-                  : t
-                    ? theme.rock
-                    : heap > 0
-                      ? theme.spoil
-                      : theme.paperRgb);
+            (fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
           // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
           const sv = off || cut ? 0 : spores.get(x, y);
           const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
@@ -1589,7 +1576,7 @@ export default function ColonyField({
         // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
         const home = lv === col.home;
         const [nx, ny] = toScreen(c, v, nest.x, nest.y);
-        // The side view's and the open map's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
+        // The side view's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
         if (col.soilOut > 0 && !nest.entrance && !m.spoil) {
           // The mound is on the surface, above this slice: every pellet brought out, heaped round the
           // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the

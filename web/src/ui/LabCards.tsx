@@ -270,14 +270,12 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
           Restart
         </button>
       </div>
-      {game.world && (
-        <p className="mt-2 text-xs text-fg-3">
-          One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of
-          food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled
-          below it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae
-          fed by nurses become new ants.
-        </p>
-      )}
+      <p className="mt-2 text-xs text-fg-3">
+        One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of
+        food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled below
+        it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae fed by
+        nurses become new ants.
+      </p>
       <label className="mt-2 flex items-center justify-between">
         <span>Two colonies</span>
         <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />
@@ -453,31 +451,20 @@ export function Lab({ game, controls, update, jev }: Props) {
         </label>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-        {game.world ? (
-          // One world (U4a): a colony may be founded only beyond an end of the line (docs/one-world.md §3).
-          (["start", "end"] as const).map((end) => (
-            <button
-              key={end}
-              type="button"
-              className="rounded-md border border-line px-2 py-1 hover:bg-raised"
-              onClick={() => setFoundNote(foundBeyondEnd(game, end))}
-              title="A new colony of 30 ants, kin of the first (its odour), a flight past this end of the line, where the founding rule allows"
-            >
-              Found beyond {endNest(game, end)}
-            </button>
-          ))
-        ) : (
+        {/* A colony may be founded only beyond an end of the line (docs/one-world.md §3). */}
+        {(["start", "end"] as const).map((end) => (
           <button
+            key={end}
             type="button"
             className="rounded-md border border-line px-2 py-1 hover:bg-raised"
-            onClick={() => foundBetween(game)}
-            title="A new colony of 30 ants, kin of the first (its odour), on the ground a third of the way between the first two nests"
+            onClick={() => setFoundNote(foundBeyondEnd(game, end))}
+            title="A new colony of 30 ants, kin of the first (its odour), a flight past this end of the line, where the founding rule allows"
           >
-            Found a colony between the nests
+            Found beyond {endNest(game, end)}
           </button>
-        )}
+        ))}
         <span className="text-fg-3">{game.colonies.length} colonies. In the game a colony is founded by a new queen (ja-lo8.9).</span>
-        {game.world && foundNote && <span className="text-warn">{foundNote}</span>}
+        {foundNote && <span className="text-warn">{foundNote}</span>}
       </div>
       {locked && <p className="mt-3 text-xs text-warn">{jev.lock}</p>}
     </Card>
@@ -693,14 +680,4 @@ function foundBeyondEnd(game: Game, end: "start" | "end"): string | null {
   const name = endNest(game, end);
   const r = game.tryFoundBeyond(end);
   return r.ok ? null : `Nothing founded beyond ${name}: ${r.reason}.`;
-}
-
-/** The lab's founding (Game.addColony): 30 ants at the first colony's odour, a third of the way from the first nest to the second. */
-function foundBetween(game: Game): void {
-  const a = game.colonies[0]?.nest;
-  const b = game.colonies[1]?.nest ?? a;
-  if (!a || !b) return;
-  const ea = a.entrance ?? a;
-  const eb = b.entrance ?? b;
-  game.addColony({ x: ea.x + (eb.x - ea.x) / 3, y: ea.y, antCount: 30, odour: game.colonies[0]!.nestOdour });
 }

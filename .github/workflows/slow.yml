@@ -71,7 +71,7 @@ jobs:
           overwrite: true
 
   # G1 (slow/g1/oneWorldG1.test.ts) with a runner per seed, as assays.yml does: ten games on one runner took 16.6 minutes
-  # against the 20-minute file limit, one game takes about 5 (ja-w7ef.20). The same test file plays the seed (G1_SEEDS) and
+  # against the 20-minute file limit, one game takes 2 to 4 (ja-w7ef.20). The same test file plays the seed (G1_SEEDS) and
   # writes its figures to G1_RESULT; judging the ten is the `g1 verdict` job's, with the rule the local test uses
   # (web/src/colony/tests/slow/g1/g1Rule.ts). Runs when the shards do. Checks: `g1 (n)` per seed and `g1 verdict`.
   g1:
