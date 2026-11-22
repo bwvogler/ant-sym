@@ -141,4 +141,5 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-18 | `ja-fnd.6.3.2`: the null-world path deleted | #285 |
 | 2026-11-22 | `ja-fnd.6.3.3`: the one-map fallbacks outside the field | #293 |
 | 2026-11-22 | `ja-fnd.6.3.4`, `.20`: seven and five scenes (30 in all) | #298, #302 |
-| 2026-11-22 | `ja-fnd.6.3.13`: `FieldEnv`, the frame's result, the prelude as `prepareFrame` (the first three files of `ui/field/`) | (this PR) |
+| 2026-11-22 | `ja-fnd.6.3.13`: `FieldEnv`, the frame's result, the prelude as `prepareFrame` (the first three files of `ui/field/`) | #303 |
+| 2026-11-22 | `ja-fnd.6.3.5`: `FieldCtx`, `FieldInputs`, the overlay layers (`overlays.ts`), the recording fake context | (this PR) |

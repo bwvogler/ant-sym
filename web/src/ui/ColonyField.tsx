@@ -39,10 +39,6 @@ import {
   BINS,
   binOf,
   cellAt,
-  columnsOver,
-  turnAt,
-  segmentCells,
-  type Transect,
   AIR,
   OPEN,
   rockAt,
@@ -70,14 +66,16 @@ import {
 } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame, type ViewCam } from "./field/prelude.ts";
+import { odourColour, odourRgb } from "./field/colour.ts";
+import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
+import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, pill } from "./field/overlays.ts";
 import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
-import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
 import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
 import { sightOf, type SensedMap } from "./fungusSight.ts";
-import { antTag, badgeParts, nestBadge } from "./badges.ts";
+import { antTag } from "./badges.ts";
 import { isPalm } from "./build.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
@@ -186,12 +184,7 @@ export interface FieldApi {
 }
 
 /** The pen on the field (one world's top view). */
-export interface FieldPen extends PenCircle {
-  /** where she would settle from plane point p, or why not (pen.ts penSettle) */
-  preview: (p: { x: number; y: number }) => Settle;
-  /** a click on the plane at p */
-  onPick: (p: { x: number; y: number }) => void;
-}
+export type { FieldPen };
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
@@ -211,16 +204,6 @@ function cssVar(name: string): string {
 function rgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
-}
-
-/** A colony's tone by its odour t (0…1): ink at 0, the warn tone at 1, mixed between. */
-function odourRgb(ink: [number, number, number], warn: [number, number, number], t: number): [number, number, number] {
-  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * Math.min(1, Math.max(0, t)));
-  return [m(0), m(1), m(2)];
-}
-function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
-  const [r, g, b] = odourRgb(ink, warn, t);
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
@@ -545,7 +528,7 @@ export default function ColonyField({
     };
     bind();
 
-    let theme = {
+    let theme: FieldTheme = {
       paper: "",
       ink: "",
       accent: "",
@@ -598,6 +581,9 @@ export default function ColonyField({
       miniAt = -Infinity;
     };
     retheme();
+    // What the layers share and read (field/ctx.ts): filled each frame below, once the camera is known.
+    const fctx: FieldCtx = { ctx, theme, d: 1, v: { w: 0, h: 0 }, c: { x: 0, y: 0, zoom: 1 }, lv, m, ext, world, colonies, fungus };
+    const inputs: FieldInputs = { hover: null, pen: null, penSeen: { current: null } };
     const mq = matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", retheme);
     // The player's own choice (Settings → Appearance) is data-theme on <html>.
@@ -1120,264 +1106,6 @@ export default function ColonyField({
       ctx.restore();
     };
 
-    /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
-    const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
-      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-      const gap = px * 0.45;
-      const widths = parts.map((p) => ctx.measureText(p.text).width);
-      const w = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1) + px;
-      const h = px * 1.6;
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = theme.paper;
-      ctx.strokeStyle = theme.line;
-      ctx.lineWidth = Math.max(1, px / 12);
-      ctx.beginPath();
-      ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "start";
-      let at = x - w / 2 + px / 2;
-      parts.forEach((p, n) => {
-        ctx.fillStyle = p.fill;
-        ctx.fillText(p.text, at, y);
-        at += widths[n]! + gap;
-      });
-      ctx.textBaseline = "alphabetic";
-    };
-    /** Text with a paper halo, centred at screen (x, y). */
-    const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
-      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = Math.max(2, px / 4);
-      ctx.strokeStyle = theme.paper;
-      ctx.globalAlpha = 0.85 * alpha;
-      ctx.strokeText(text, x, y);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = fill;
-      ctx.fillText(text, x, y);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = "start";
-      ctx.textBaseline = "alphabetic";
-    };
-
-    /**
-     * Columns lo … hi of the line as one dashed stretch through the centres of the plane cells they lie under (P(s)), so it
-     * turns where its tiles turn (ja-lp4.17).
-     */
-    const traceColumns = (line: Transect, lo: number, hi: number, c: Camera, v: Viewport) => {
-      for (let s = lo; s <= hi; s++) {
-        cellAt(line, s);
-        const [x, y] = toScreen(c, v, centreX(CELL[0], CELL[1]), centreY(CELL[1]));
-        if (s === lo) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-    };
-
-    /** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
-    const drawLine = (w: OneWorld, c: Camera, v: Viewport, d: number, holes = true) => {
-      const line = w.line;
-      const k = line.holes.length - 1;
-      ctx.strokeStyle = theme.ink;
-      ctx.lineWidth = Math.max(1, d * 1.2);
-      ctx.setLineDash([6 * d, 5 * d]);
-      // The margins: from each end hole to the line's end, P(sMin) and P(sMax).
-      ctx.globalAlpha = 0.25;
-      ctx.beginPath();
-      traceColumns(line, line.sMin, line.sHole[0]!, c, v);
-      traceColumns(line, line.sHole[k]!, line.sMax, c, v);
-      ctx.stroke();
-      ctx.globalAlpha = 0.6;
-      ctx.beginPath();
-      traceColumns(line, line.sHole[0]!, line.sHole[k]!, c, v);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = theme.ink;
-      if (holes)
-        for (const h of line.holes) {
-          const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
-          ctx.beginPath();
-          ctx.arc(x, y, Math.max(2.5 * d, 0.36 * c.zoom), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      ctx.globalAlpha = 1;
-    };
-
-    /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
-    const drawHoleNames = (w: OneWorld, c: Camera, v: Viewport, d: number, inView: (x: number, y: number) => boolean) => {
-      const holes = anyColony.holeCells;
-      const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
-      for (const h of w.line.holes) {
-        const wx = centreX(h.x, h.y);
-        const wy = centreY(h.y);
-        if (!inView(wx, wy)) continue;
-        let k = -1;
-        for (let n = 0; n < holes.length && k < 0; n++) if (holes[n]!.px === h.x && holes[n]!.py === h.y) k = n;
-        const [x, y] = toScreen(c, v, wx, wy);
-        const above = y - Math.max(12 * d, 4.5 * c.zoom);
-        const col = k >= 0 ? colonies[k] : undefined;
-        if (!col) {
-          label("empty hole", x, above, px);
-          continue;
-        }
-        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
-        pill(
-          badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
-          x,
-          above - px * 0.2,
-          px,
-        );
-      }
-    };
-
-    /** One world's side view: a faint rule down the curtain at each bend (an interior hole's s), labelled with its turn. */
-    const drawBends = (w: OneWorld, c: Camera, v: Viewport, d: number) => {
-      const line = w.line;
-      const px = Math.round(12 * d);
-      for (let j = 1; j < line.holes.length - 1; j++) {
-        const s = line.sHole[j]!;
-        const [x, top] = toScreen(c, v, centreX(s, STRIP), 0);
-        const [, bottom] = toScreen(c, v, 0, ext.h);
-        if (x < -px * 4 || x > v.w + px * 4) continue;
-        ctx.strokeStyle = theme.ink;
-        ctx.globalAlpha = 0.18;
-        ctx.lineWidth = Math.max(1, d);
-        ctx.beginPath();
-        ctx.moveTo(x, Math.max(0, top));
-        ctx.lineTo(x, Math.min(v.h, bottom));
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        const turn = turnAt(line, j);
-        label(`${turn >= 0 ? "↱" : "↰"} ${Math.round(Math.abs(turn))}°`, x, Math.max(px, top + px), px, 0.8);
-      }
-    };
-
-    /**
-     * One world's side view: the ants on the plane standing on a cell under the line, drawn on the strip at its column(s)
-     * (columnsOver: two at a bend), level, in their colony's colour, a crumb on a carrier. Ants elsewhere on the plane
-     * aren't in this view (one-world §5).
-     */
-    const drawStripAnts = (w: OneWorld, c: Camera, v: Viewport, len: number, crumb: number, inView: (x: number, y: number) => boolean) => {
-      const half = len / 2;
-      const wy = centreY(STRIP);
-      ctx.lineCap = "round";
-      ctx.lineWidth = Math.max(1, len * 0.3);
-      for (const col of colonies) {
-        ctx.beginPath();
-        let carriers = 0;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || col.layer[i] !== PLANE) continue;
-          cellOf(col.x[i], col.y[i]);
-          const over = columnsOver(w.line, CELL[0], CELL[1]);
-          for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j], STRIP);
-            if (!inView(wx, wy)) continue;
-            const [x, y] = toScreen(c, v, wx, wy);
-            ctx.moveTo(x - half, y);
-            ctx.lineTo(x + half, y);
-            if (col.carrying[i]) carriers++;
-          }
-        }
-        ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-        ctx.globalAlpha = 0.85;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        if (carriers === 0) continue;
-        ctx.fillStyle = theme.accent;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
-          cellOf(col.x[i], col.y[i]);
-          const over = columnsOver(w.line, CELL[0], CELL[1]);
-          for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j], STRIP);
-            if (!inView(wx, wy)) continue;
-            const [x, y] = toScreen(c, v, wx, wy);
-            ctx.fillRect(x + half - crumb / 2, y - crumb / 2, crumb, crumb);
-          }
-        }
-      }
-    };
-
-    /** The last preview under the pointer: the pen asked once per cell (and side of the circle's edge), not every frame. */
-    let penSeen: { pen: FieldPen; key: string; at: Settle } | null = null;
-    /**
-     * One world's queen's pen, on the top view: her flight's circle round her mother's hole and, under the pointer,
-     * the cell she would settle on (the new segment of the line dashed to it from the end it grows) or why she can't.
-     */
-    const drawPen = (w: OneWorld, pn: FieldPen, c: Camera, v: Viewport, d: number) => {
-      const [cx, cy] = toScreen(c, v, pn.x, pn.y);
-      ctx.beginPath();
-      ctx.arc(cx, cy, pn.r * c.zoom, 0, Math.PI * 2);
-      ctx.fillStyle = theme.accent;
-      ctx.globalAlpha = 0.06;
-      ctx.fill();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = 2 * d;
-      ctx.setLineDash([8 * d, 6 * d]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      const hp = hover.current;
-      if (!hp) return;
-      const [wx, wy] = toWorld(c, v, hp[0], hp[1]);
-      cellOf(wx, wy);
-      const key = `${CELL[0]},${CELL[1]},${Math.hypot(wx - pn.x, wy - pn.y) <= pn.r}`;
-      if (!penSeen || penSeen.pen !== pn || penSeen.key !== key) penSeen = { pen: pn, key, at: pn.preview({ x: wx, y: wy }) };
-      const at = penSeen.at;
-      const px = Math.round(12 * d);
-      if (!at.ok) {
-        // Kept inside the field: the reason is read near the pointer, whichever edge it is at.
-        ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-        const half = ctx.measureText(at.reason).width / 2 + 6 * d;
-        const lx = half * 2 >= v.w ? v.w / 2 : Math.max(half, Math.min(v.w - half, hp[0]));
-        label(at.reason, lx, Math.max(px, hp[1] - 18 * d), px, 1, theme.warn);
-        return;
-      }
-      const tx = centreX(at.cell.x, at.cell.y);
-      const ty = centreY(at.cell.y);
-      const [sx, sy] = toScreen(c, v, tx, ty);
-      const holes = w.line.holes;
-      const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = Math.max(1.5, d * 1.5);
-      ctx.setLineDash([6 * d, 5 * d]);
-      // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
-      const seg = segmentCells(e, at.cell);
-      ctx.beginPath();
-      for (let i = 0; i < seg.length; i += 2) {
-        const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // From where she lands to where she settles, when she walks on.
-      if (Math.hypot(sx - hp[0], sy - hp[1]) > 4 * d) {
-        ctx.globalAlpha = 0.5;
-        ctx.lineWidth = d;
-        ctx.beginPath();
-        ctx.moveTo(hp[0], hp[1]);
-        ctx.lineTo(sx, sy);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-      const rr = Math.max(6 * d, c.zoom * 1.2);
-      ctx.beginPath();
-      ctx.arc(sx, sy, rr, 0, Math.PI * 2);
-      ctx.lineWidth = 2 * d;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(2.5 * d, 0.6 * c.zoom), 0, Math.PI * 2);
-      ctx.fillStyle = theme.accent;
-      ctx.fill();
-      label("her hole", sx, sy - rr - px, px);
-    };
-
     const draw = () => {
       const started = env.dev ? env.now() : 0;
       bind();
@@ -1390,6 +1118,9 @@ export default function ColonyField({
       const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
       // The follow, the crossing through a hole and the camera's ease (field/prelude.ts), then the frame draws with the camera it gives.
       const c = prepareFrame(colonies, lv, ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
+      Object.assign(fctx, { theme, d, v, c, lv, m, ext });
+      inputs.hover = hover.current;
+      inputs.pen = penRef.current;
       ctx.fillStyle = theme.paper;
       ctx.fillRect(0, 0, v.w, v.h);
       ctx.imageSmoothingEnabled = false;
@@ -1525,8 +1256,8 @@ export default function ColonyField({
       const half = len / 2;
       const crumb = Math.max(1.5, len * 0.35);
       const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
-      if (lv === PLANE) drawLine(world, c, v, d);
-      if (lv === CURTAIN) drawBends(world, c, v, d);
+      if (lv === PLANE) drawLine(fctx);
+      if (lv === CURTAIN) drawBends(fctx);
       const alateOverlays: (() => void)[] = [];
       for (const col of [...colonies].reverse()) {
         // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
@@ -1814,7 +1545,7 @@ export default function ColonyField({
           }
         }
       }
-      if (strip) drawStripAnts(world, c, v, len, crumb, inView);
+      if (strip) drawStripAnts(fctx, len, crumb, inView);
 
       // Tall structures occlude bodies in the aerial view, just as they do in 3D inspection.
       for (const k of stalks) {
@@ -1899,8 +1630,8 @@ export default function ColonyField({
           }
           ctx.globalAlpha = 1;
         }
-        if (world && lv === PLANE) drawLine(world, c, v, d, false);
-        if (world && lv === CURTAIN) drawBends(world, c, v, d);
+        if (world && lv === PLANE) drawLine(fctx, false);
+        if (world && lv === CURTAIN) drawBends(fctx);
       }
       if (labelsOn.current && m.chambers) {
         const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
@@ -2021,7 +1752,7 @@ export default function ColonyField({
         ctx.stroke();
         ctx.setLineDash([]);
         const tpx = Math.round(10 * d);
-        pill([{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
+        pill(fctx, [{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
       }
       // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
       // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
@@ -2035,12 +1766,12 @@ export default function ColonyField({
         ctx.lineWidth = 2 * d;
         ctx.stroke();
         const tpx = Math.round(11 * d);
-        pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
+        pill(fctx, [{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-      if (lv === PLANE) drawHoleNames(world, c, v, d, inView);
+      if (lv === PLANE) drawHoleNames(fctx, inView);
       const pn = penRef.current;
-      if (lv === PLANE && pn) drawPen(world, pn, c, v, d);
+      if (lv === PLANE && pn) drawPen(fctx, inputs);
 
       drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
 
