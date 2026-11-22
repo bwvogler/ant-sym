@@ -46,7 +46,7 @@
 // the lane stay unasked, as an --import left them. With --species, that species' bundles. Prints how sharp the answers are.
 //
 // `--lanes get,carry,drop,trail,contact,leave` (review of #281): the ant's response lanes ask only the situations a page game meets
-// (responseSituationsMet: one world, 600 + 600 ants, seeds 1-3, 300 s), under each preset doctrine. They are not in the default `--lanes`.
+// (responseSituationsMet: one world, 600 + 600 ants, seeds 1-6, 300 s), under each preset doctrine. They are not in the default `--lanes`.
 //
 // `--lanes steer` (ja-ykmu.3): the steer lane asks only the explore and follow situations a one-world game meets
 // (steerSituationsMet), not all 1,944.
@@ -158,7 +158,7 @@ function steerSituationsMet() {
 
 /**
  * The response lanes' situations a page game meets (get, carry, drop, trail, contact, leave: PRD §87, review of #281): one world as the
- * page builds it (600 + 600 ants, hyphae, directed combat), 300 s, seeds 1-3, every hook answering as the local rule does while each
+ * page builds it (600 + 600 ants, hyphae, directed combat), 300 s, seeds 1-6 (1-3 first; 4-6 added after a review found a few hole-side combat situations of seeds 8 and 9 missing), every hook answering as the local rule does while each
  * distinct Touch is recorded under the lane's own key. One recording serves the six lanes. Their full spaces are far larger than a
  * game meets (the page asks only what its ants meet), so a lane ships what these games met.
  */
@@ -182,7 +182,7 @@ function responseSituationsMet(hook) {
         ]),
       ),
     );
-    for (const seed of [1, 2, 3]) {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
       const g = new Game(
         generateOneWorld(seed),
         {
