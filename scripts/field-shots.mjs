@@ -92,6 +92,7 @@ const dayAt = (page, phase) =>
  * The scenes, in the order they are rendered: each colour scheme and species has a page of its own, and a scene continues from the one before on
  * its page. `run` leaves the page as it should be drawn; `after`, when given, puts back what the scene changed (it runs once the pixels are read).
  */
+// A new scene goes on another page, or before the labels scene: the labels scene must stay last on its page (the canvas-state leak below).
 const SCENES = [
   { name: "above-start", page: "light", run: (p) => ticks(p, 300) },
   { name: "above-later", page: "light", run: (p) => ticks(p, 2700) },
@@ -111,7 +112,8 @@ const SCENES = [
   },
   { name: "above-pen", page: "light", run: (p) => p.evaluate(() => window.jevAnts.fly(0)) },
   // Last on its page, and put back after: once chamber labels have been on, the canvas keeps the label block's lineJoin and lineWidth for every
-  // later stroke (ColonyField sets them and never resets them), so a scene after this one would show that leak.
+  // later stroke (ColonyField sets them and never resets them), so a scene after this one would show that leak. lineCap is the most widespread leak: it is
+  // never reset either, and resetting it at the start of a frame changed 6 of the first 8 scenes.
   {
     name: "below-nest1-labels",
     page: "light",
