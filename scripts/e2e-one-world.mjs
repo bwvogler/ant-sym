@@ -108,8 +108,21 @@ async function until(fn, what, ms = 10_000, every = 100) {
  * go first, or they push its own out (ja-cila: steps 14 and 17 failed on slow runners, the trace showing the test's notice
  * gone from the field under two of the game's).
  */
-const noNotices = (page, what) =>
-  until(async () => (await page.evaluate(() => document.querySelectorAll('[role="status"] button').length)) === 0, what, 12_000, 100);
+const noNotices = async (page, what) => {
+  const none = () => page.evaluate(() => document.querySelectorAll('[role="status"] button').length === 0);
+  // Empty twice, 700 ms apart: a cue the game raises in the moments after a pause (its stats refresh 150 ms after, the field-guide
+  // check runs every 500 ms) has had time to land before the first notice of the check does (ja-7jvz).
+  await until(
+    async () => {
+      if (!(await none())) return false;
+      await sleep(700);
+      return none();
+    },
+    what,
+    15_000,
+    100,
+  );
+};
 
 /** The step running and the last check that passed: named with a failure. */
 let step = "starting";
@@ -2264,6 +2277,8 @@ try {
   await hp.getByLabel("world seed").fill(String(SEED));
   await hp.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
   await until(() => hp.evaluate(() => !!window.jevAnts?.game.world), "a game for the phone checks", 20_000, 100);
+  await hp.getByRole("button", { name: "Pause", exact: true }).tap();
+  await noNotices(hp, "the game's own notices to go before the checks raise theirs");
   await hp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Colonies", exact: true }).tap();
   await hp
     .getByRole("region", { name: "colonies" })
