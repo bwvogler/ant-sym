@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { defendControl, oneAssay } from "../../experiment.ts";
+import { defendControl, firstResponses, oneAssay } from "../../experiment.ts";
 import { Colony, PLANE } from "../../colony.ts";
 import { localResponses, type Touch } from "../../responses.ts";
 import { Game } from "../../game.ts";
@@ -19,8 +19,8 @@ for (const intent of [false, true]) {
       assert.deepEqual(spec.game?.fight, fight);
       assert.notEqual(spec.game?.fight, fight);
     }
-    assert.equal(undefended.sides?.colony?.defendAt, Infinity);
-    assert.notEqual(sealed.sides?.colony?.defendAt, Infinity);
+    assert.equal(undefended.colonies?.[0]?.colony?.defendAt, Infinity);
+    assert.notEqual(sealed.colonies?.[0]?.colony?.defendAt, Infinity);
     undefended.game!.fight!.rate = 9;
     assert.equal(sealed.game!.fight!.rate, 0.75);
     assert.equal(fight.rate, 0.75);
@@ -31,9 +31,9 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
   const base = oneAssay("defendHome").spec(1);
   const treatment = oneAssay("defendEntrance").spec(1);
   const colony = new Colony(arena(), { antCount: 1, maxAnts: 1 }, mulberry32(1));
-  const contact = treatment.sides!.responses!.contact;
-  const alarmContact = oneAssay("defendAlarmEntrance").spec(1).sides!.responses!.contact;
-  const threatContact = oneAssay("defendThreatEntrance").spec(1).sides!.responses!.contact;
+  const contact = firstResponses(treatment)!.contact;
+  const alarmContact = firstResponses(oneAssay("defendAlarmEntrance").spec(1))!.contact;
+  const threatContact = firstResponses(oneAssay("defendThreatEntrance").spec(1))!.contact;
   const draw = colony.antDraw(0);
   const atHole: Touch = { ...colony.t, mode: "explore", stance: "forage", enemy: true, place: "hole", carrying: "none" };
   assert.equal(localResponses.contact(atHole, draw), "flee");
@@ -56,7 +56,7 @@ test("the entrance assay only changes an unladen defender facing an enemy at the
     assert.equal(threatContact(outnumbered, draw), localResponses.contact(outnumbered, draw));
   }
   assert.equal(treatment.game!.fight!.intent, true);
-  assert.equal(treatment.sides!.rivalResponses, base.sides!.rivalResponses);
+  assert.equal(treatment.colonies?.[1]?.responses, base.colonies?.[1]?.responses);
 });
 
 test("approach defense requires both a currently sensed entrance and alarm", () => {
@@ -65,7 +65,7 @@ test("approach defense requires both a currently sensed entrance and alarm", () 
   for (const event of spec.events ?? []) if (event.kind === "call" && event.at === 0) event.run(game);
   const colony = game.player;
   colony.bind(PLANE);
-  const contact = spec.sides!.responses!.contact;
+  const contact = firstResponses(spec)!.contact;
   const draw = colony.antDraw(0);
   const approach: Touch = {
     ...colony.t,

@@ -14,7 +14,7 @@ import {
   generateOneWorld,
   localResponses,
 } from "../web/src/colony/index.ts";
-import { oneAssay, runAssay } from "../web/src/colony/experiment.ts";
+import { firstResponses, oneAssay, runAssay } from "../web/src/colony/experiment.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
@@ -122,7 +122,7 @@ if (args[0] === "--guard") {
   )
     throw Error("Unknown defense rule");
   const existing = runAssay(assay, seed).metrics;
-  const baseContact = assay.spec(seed).sides?.responses?.contact ?? localResponses.contact;
+  const baseContact = firstResponses(assay.spec(seed))?.contact ?? localResponses.contact;
   let defender;
   let attackers = [];
   const wallAware = defense === "visible-counterattack" || defense === "visible-even-counterattack";

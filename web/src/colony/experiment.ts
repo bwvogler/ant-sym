@@ -13,7 +13,7 @@ import { CELL, hexDistance, R } from "./hex.ts";
 import { STRAINS } from "./fungus.ts";
 import { generateOneWorld, type OneWorld } from "./oneWorld.ts";
 import { enemyHeading, holeRaid } from "./sense.ts";
-import { localResponses, responses } from "./responses.ts";
+import { localResponses, responses, type Responses } from "./responses.ts";
 import { isSky, takeFoodCell, OPEN, rockAt, type WorldMap } from "./world.ts";
 
 import {
@@ -32,6 +32,8 @@ import {
   marchProbe,
   onPlane,
   runGame,
+  firstResponses,
+  withFirstColony,
   type Probe,
   type Rect,
   type RunResult,
@@ -1567,64 +1569,57 @@ const onPlaneGated = (spec: RunSpec): RunSpec => {
  */
 /** Experimental response using the contact policy's existing perception of its own entrance. */
 function entranceDefence(spec: RunSpec, cue: "any contact" | "alarm" | "alarm or outnumbered" | "approach alarm" = "any contact"): RunSpec {
-  const base = spec.sides?.responses ?? spec.game?.species?.responses ?? localResponses;
+  const base = firstResponses(spec) ?? spec.game?.species?.responses ?? localResponses;
   let game: Game | undefined;
   let entranceContacts = 0;
   let entranceContactsWithAlarm = 0;
   let approachAlarmContacts = 0;
   const times: Record<string, number> = {};
-  return {
-    ...spec,
-    events: [
-      ...(spec.events ?? []),
-      {
-        at: 0,
-        kind: "call",
-        run: (started) => {
-          game = started;
-        },
-      },
-    ],
-    probes: [
-      ...(spec.probes ?? []),
-      { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, approachAlarmContacts, ...times }) },
-    ],
-    sides: {
-      ...spec.sides,
-      responses: {
-        ...base,
-        contact(t, draw) {
-          if (t.enemy && t.place === "hole" && t.carrying === "none") {
-            entranceContacts++;
-            if (game) times.firstEntranceContact ??= game.time;
-            if (t.alarm !== "none") {
-              entranceContactsWithAlarm++;
-              if (game) times.firstEntranceContactWithAlarm ??= game.time;
-            }
-            if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
-          }
-          // The assay reuses the current ant's three home sensors. The ordinary contact policy has no home-sensor field.
-          if (
-            cue === "approach alarm" &&
-            game?.player.onPlane &&
-            t.enemy &&
-            t.place === "out" &&
-            t.carrying === "none" &&
-            t.alarm !== "none"
-          ) {
-            const sensed = game.player.s;
-            if (sensed[3] === SEEN || sensed[4] === SEEN || sensed[5] === SEEN) {
-              approachAlarmContacts++;
-              times.firstApproachAlarmContact ??= game.time;
-              return "fight";
-            }
-          }
-          return base.contact(t, draw);
-        },
-      },
+  const entranceResponses: Responses = {
+    ...base,
+    contact(t, draw) {
+      if (t.enemy && t.place === "hole" && t.carrying === "none") {
+        entranceContacts++;
+        if (game) times.firstEntranceContact ??= game.time;
+        if (t.alarm !== "none") {
+          entranceContactsWithAlarm++;
+          if (game) times.firstEntranceContactWithAlarm ??= game.time;
+        }
+        if (cue === "any contact" || t.alarm !== "none" || (cue === "alarm or outnumbered" && t.odds === "outnumbered")) return "fight";
+      }
+      // The assay reuses the current ant's three home sensors. The ordinary contact policy has no home-sensor field.
+      if (cue === "approach alarm" && game?.player.onPlane && t.enemy && t.place === "out" && t.carrying === "none" && t.alarm !== "none") {
+        const sensed = game.player.s;
+        if (sensed[3] === SEEN || sensed[4] === SEEN || sensed[5] === SEEN) {
+          approachAlarmContacts++;
+          times.firstApproachAlarmContact ??= game.time;
+          return "fight";
+        }
+      }
+      return base.contact(t, draw);
     },
-    game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
   };
+  return withFirstColony(
+    {
+      ...spec,
+      events: [
+        ...(spec.events ?? []),
+        {
+          at: 0,
+          kind: "call",
+          run: (started) => {
+            game = started;
+          },
+        },
+      ],
+      probes: [
+        ...(spec.probes ?? []),
+        { tick() {}, summary: () => ({ entranceContacts, entranceContactsWithAlarm, approachAlarmContacts, ...times }) },
+      ],
+      game: { ...spec.game, fight: { ...DEFAULT_FIGHT, ...spec.game?.fight, intent: true } },
+    },
+    { responses: entranceResponses },
+  );
 }
 
 const defendEntrance: Assay = {
