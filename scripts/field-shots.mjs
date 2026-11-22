@@ -86,12 +86,12 @@ async function followOn(page, k, layer) {
 /**
  * A fungus that has had time to grow (the game itself, through the dev hook): Mycelium bought twice at once, then 120 s on, so the hyphae have
  * cords; then Stalks and Knots at level 2, six corpses buried along the hyphae, and 30 s more, so stalks stand on them and starved tips have
- * hardened into knots. The modules come from the dev server (the page's own, so the same instances).
+ * hardened into knots. The module is the dev server's colony index (the page's own instance).
  */
 const growFungus = (page) =>
   page.evaluate(async () => {
-    const { pathTo } = await import("/src/colony/evolution.ts");
-    const { keyCell } = await import("/src/colony/hyphae.ts");
+    // through the colony index, as every module outside colony/ must (CLAUDE.md); the dev server serves the page's own instances
+    const { pathTo, hyphaCell: keyCell } = await import("/src/colony/index.ts");
     const J = window.jevAnts;
     const f = J.game.fungus;
     const e = f.evolution;
@@ -202,7 +202,8 @@ const SCENES = [
   // the whole curtain first (a stalk or a plane cell read on the wrong layer would land somewhere on it), then the second nest zoomed
   { name: "grown-below-wide", page: "grown", run: (p) => view(p, "below") },
   { name: "grown-below", page: "grown", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
-  // Trails, the aphid clump and the line's third hole (a bend, and ants on the strip)
+  // One game, in this order: a smoke scene of the plane's trails (the curtain's are in grown-below), then the third colony and the aphid clump
+  // are added (built-aphids), then the same world below (the bend, ants on the strip)
   { name: "built-trails", page: "built", run: (p) => ticks(p, 1500).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   {
     name: "built-aphids",
