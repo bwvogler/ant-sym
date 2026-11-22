@@ -7379,7 +7379,6 @@ v7 (`STEER_LEVELS`): `search` is "tight: loops close round where it is…", "med
 
 **Checked.** Unit tests for the helpers (`ui/tests/hyphaeLook.test.ts`: same place, same bend, bounded; the spline passes through every point; runs cover every edge once and cut at cord changes; twigs fixed by the key). Before and after screenshots at the same moment of the same game.
 
-
 ## 84. Directed contact and local food delivery: measured, not promoted (experiment in draft PR #281, ja-g7nz, 2026-11-22)
 
 **Where it stands.** PR #281 adds experimental ant actions below the mode lane: directed contact (`fight.intent`), sensed food-delivery roles, a separate drop consent, and carry context (effort, current target, recognised room). Every setting is off, so nothing changes for play. Its code is **not on `main`**: it was written on the stance-era base, and `main` has since deleted the stance lane (#284). It is being redone on stanceless `main` (the plan: land what does not depend on stances first, then re-seat the actions and re-measure). This section lands with the notes (`docs/delivery-actions.md`, `docs/contact-actions.md`) and the loose-food ledger (`scripts/lab/loose-food-ledger.mjs`), which depend on no colony code.

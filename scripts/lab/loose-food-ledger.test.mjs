@@ -79,3 +79,23 @@ test("mixed initial food is reported and cancelling pickup attribution leaves co
   assert.equal(result.collectedAdded, 0);
   assert.equal(result.initial + result.added - result.removed, result.ground);
 });
+
+test("a write that bypasses the field, or a clock that runs backwards, is refused", () => {
+  const cells = [3];
+  const field = {
+    get: () => cells[0],
+    set(_x, _y, n) {
+      cells[0] = n;
+    },
+    forEach(fn) {
+      fn(0, 0, [cells[0]]);
+    },
+  };
+  let now = 5;
+  const ledger = observeLooseFood(field, () => now);
+  now = 4;
+  assert.throws(() => field.set(0, 0, 2), /clock moved backwards/);
+  now = 6;
+  cells[0] = 9; // not through field.set: the ledger's ground no longer matches the field
+  assert.throws(() => ledger.snapshot(), /does not balance/);
+});
