@@ -119,8 +119,7 @@ case "$tool" in
         slow="a multi-seed sweep (npm run exp runs seeds 1-10 unless given one seed: --seeds 1)"
       fi
     fi
-    on "$run"'((side|colony|economy|floor|roomy)-bench|bakeoff|progression|crown|raids|muddle|raid-food|ablate)(\.mjs)?([^A-Za-z0-9_.-]|$)' && slow="a bench or long game run"
-    on "$run"'colony-cost(\.mjs)?[^;|&]*--side' && slow="colony-cost --side"
+    on "$run"'(colony-bench|bakeoff|progression|ablate)(\.mjs)?([^A-Za-z0-9_.-]|$)' && slow="a bench or long game run"
     on "$run"'(colony-live|probe)\.mjs' && slow="a live Jev run (spends money)"
     pre=$(printf '%s' "$cmd" | grep -oE "$run"'precache\.mjs[^;|&]*' | head -1)
     if [ -n "$pre" ] && ! printf '%s' "$pre" | grep -q -- '--import'; then

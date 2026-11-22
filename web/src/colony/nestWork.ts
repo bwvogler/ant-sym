@@ -39,7 +39,6 @@ import {
   HOLD_MAX,
   LAY_INTERVAL,
   MIDDEN_MARK,
-  MIDDEN_NEAR,
   PICK_BROOD,
   PICK_CORPSE,
   PORT_RATE,
@@ -356,9 +355,8 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
   col.antCell(i);
   const cx = CELL[0];
   const cy = CELL[1];
-  // Inside, the middle-aged do it; on the ground near the hole (fights fall there too), whoever is out.
-  const outside = isSky(col.map, cx, cy);
-  if (outside ? Math.abs(cx - col.entranceCol) > MIDDEN_NEAR : col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
+  // Underground, the middle-aged do it.
+  if (col.band(i) !== 1 || (mode === FIGHT && !col.inOwnNest(cx, cy))) return;
   for (const k of col.corpses)
     if (k.held < 0 && (k.layer ?? col.home) === col.cur && hexDistance(k.x, k.y, cx, cy) <= 2) {
       if (!col.responses.get(touch(col, i, !calm, mode, "none", "corpse"), col.antDraw(i))) return;
@@ -366,16 +364,6 @@ export function undertake(col: Colony, i: number, dt: number, calm: boolean): vo
       clearPellet(col, i);
       col.corpse[i] = 1;
       col.pellet[i] = 1;
-      if (outside) {
-        // Already out: straight along the ground to the midden (it won't come up out of the hole, where that is set).
-        // From past the midden, back toward it: carried out from there, it was put down at once where it lay, off the
-        // midden, and picked up again (review of #26: one corpse nine times).
-        const side = col.middenSide();
-        const past = side * (cx - col.entranceCol) > col.middenAt();
-        col.spoilTo[i] = past ? -col.middenAt() : col.middenAt();
-        col.spoilSide[i] = past ? -side : side;
-        col.spoilT[i] = 0;
-      }
       col.mode[i] = RETURN;
       col.homeAfresh(i);
       col.gx[i] = NO_CELL;

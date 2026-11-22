@@ -658,7 +658,6 @@ export default function ColonyField({
         soil = groundSoil(),
         spoil = groundSpoil();
       const fc = m.food.chunk(cx, cy);
-      const lc = m.loose?.chunk(cx, cy);
       // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
       const sensedC = sensedLayer?.chunk(cx, cy);
       const now = sensed.now;
@@ -710,7 +709,6 @@ export default function ColonyField({
           !tilePaint.needsPaint(c, tag, [
             rc,
             fc,
-            lc,
             qc,
             sensedC,
             sporeC,
@@ -734,7 +732,7 @@ export default function ColonyField({
             continue;
           }
           if (rc[i]) {
-            const solid = rc[i] === SOIL ? (lc && lc[i] ? spoil : soil) : rc[i] === AIR ? theme.sky : rock;
+            const solid = rc[i] === SOIL ? soil : rc[i] === AIR ? theme.sky : rock;
             px[o] = solid[0];
             px[o + 1] = solid[1];
             px[o + 2] = solid[2];
@@ -875,19 +873,7 @@ export default function ColonyField({
           const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
           const c =
             cut ??
-            (fv > 0
-              ? food
-              : t === SOIL
-                ? !off && m.loose?.get(x, y)
-                  ? theme.spoil
-                  : theme.soil
-                : t === AIR
-                  ? theme.sky
-                  : t
-                    ? theme.rock
-                    : heap > 0
-                      ? theme.spoil
-                      : theme.paperRgb);
+            (fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
           // Spores over the ground, as strongly as the field draws them (a pixel is too small for its fading in alpha).
           const sv = off || cut ? 0 : spores.get(x, y);
           const a = sv >= SPORE_SHOWN ? 0.35 + 0.5 * Math.min(1, sv / SPORE_FULL) : 0;
@@ -1893,7 +1879,8 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
-        orbit.current,
+        // Above and Below face different planes, so their camera pitch signs differ.
+        lv === PLANE ? { ...orbit.current, tilt: -orbit.current.tilt } : orbit.current,
       );
       const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
       if (orbitAxes.current) orbitAxes.current.hidden = !canRotate;
@@ -2163,7 +2150,7 @@ export default function ColonyField({
     s.fitted = cam.zoom <= fz * 1.0001;
   };
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.max(0, dragOrbit(start, 0, -dy).tilt);
+    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
@@ -2522,7 +2509,7 @@ export default function ColonyField({
         hidden
         type="button"
         aria-label="Tilt close map. Up and down arrow keys tilt. Home resets."
-        title="Drag up to lift the near edge · Home or double-click resets"
+        title="Drag up to tilt · drag down to flatten · Home or double-click resets"
         className="absolute top-1/2 left-1/2 z-10 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none rounded-full border border-line bg-panel px-2 py-1 text-xs text-fg-2 shadow-md active:cursor-grabbing"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);

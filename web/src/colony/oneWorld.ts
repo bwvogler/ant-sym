@@ -142,7 +142,6 @@ export function generateCurtain(seed: number, line: Transect, colonies: readonly
   curtain.sky = new ChunkLayer((n) => new Uint8Array(n), 0);
   for (let y = 0; y < CRUST; y++) for (let s = x0; s < x0 + w; s++) curtain.sky.set(s, y, 1);
   curtain.surfaceRows = CRUST;
-  curtain.loose = new ChunkLayer((n) => new Uint8Array(n), 0);
   curtain.moundCells = 0;
   curtain.chambers = new Chambers();
 

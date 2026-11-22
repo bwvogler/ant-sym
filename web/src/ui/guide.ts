@@ -543,6 +543,16 @@ export const GUIDE: GuideEntry[] = [
 export const NOTES: { note: string; title: string; covers: string }[] = [
   { note: "vision", title: "Vision", covers: "The goal, what an ant may sense, and which behaviours are still scripted." },
   {
+    note: "delivery-actions",
+    title: "Delivery actions",
+    covers: "Experimental food destinations, local floor cues, effort-based reconsideration and separate drop consent.",
+  },
+  {
+    note: "contact-actions",
+    title: "Contact actions",
+    covers: "Experimental directed attacks, ignoring strangers, and asymmetric recognition.",
+  },
+  {
     note: "ant-communication",
     title: "Ant communication",
     covers: "Signal channels, their ranges and lifetimes, rival colonies, combat laws.",
