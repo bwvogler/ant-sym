@@ -17,9 +17,7 @@ import { STRAINS } from "../../web/src/colony/fungus.ts";
 import { CELL, cellOf } from "../../web/src/colony/hex.ts";
 import { generateOneWorld } from "../../web/src/colony/oneWorld.ts";
 
-const [range = "1-3", secs = "600", antArg = "600"] = process.argv
-  .slice(2)
-  .filter((a) => a !== "--one");
+const [range = "1-3", secs = "600", antArg = "600"] = process.argv.slice(2).filter((a) => a !== "--one");
 // The page's landing (web/src/ui/useColony.ts: LANDING_COLONY, GAME_STRAIN), written out here: that module is React's.
 const LANDING_COLONY = 0;
 const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
@@ -52,19 +50,14 @@ function spread(map) {
   });
   const stats = (a) => {
     a.sort((x, y) => x - y);
-    const q = (p) =>
-      a.length ? a[Math.min(a.length - 1, Math.floor(p * a.length))] : 0;
+    const q = (p) => (a.length ? a[Math.min(a.length - 1, Math.floor(p * a.length))] : 0);
     return `median ${q(0.5)}, p95 ${q(0.95)}, p99 ${q(0.99)}, max ${a.length ? a[a.length - 1] : 0}`;
   };
   return `${d.length} cells dug; outward past the end holes (${out.length} cells): ${stats(out)}; any, from the nearest hole: ${stats(d)}`;
 }
 
 for (let seed = lo; seed <= hi; seed++) {
-  const game = new Game(
-    generateOneWorld(seed),
-    { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW },
-    gameRng(seed),
-  );
+  const game = new Game(generateOneWorld(seed), { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
   game.land(LANDING_COLONY, GAME_STRAIN, { evolve: true });
   // The curtain is where the digging is (game.map is the plane).
   const dug = game.world.curtain;
