@@ -60,7 +60,7 @@ const EVERY = Math.round(60 / DT);
 for (let seed = lo; seed <= hi; seed++) {
   const t0 = performance.now();
   const world = generateOneWorld(seed);
-  const game = new Game(world, { antCount: ants, rivalAnts: ants, regrow: GAME_REGROW }, gameRng(seed));
+  const game = new Game(world, { regrow: GAME_REGROW }, gameRng(seed), [{ antCount: ants }, { antCount: ants }]);
   // Per colony and ant slot (by its generation): seconds in a row inside the plane disc going in, or by the hole underground.
   const inDisc = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), most: 0 }));
   const atHole = game.colonies.map((c) => ({ gen: new Uint32Array(c.n), t: new Float32Array(c.n), most: [0, 0] }));
@@ -77,7 +77,7 @@ for (let seed = lo; seed <= hi; seed++) {
     searchTrips: 0,
   }));
   console.log(
-    `seed ${seed}: plane ${world.plane.size.w}×${world.plane.size.h}, curtain ${world.curtain.size.w}×${world.curtain.size.h}, holes ${game.player.holeCells.map((h) => `(${h.px},${h.py})↔col ${h.col}`).join(", ")}`,
+    `seed ${seed}: plane ${world.plane.size.w}×${world.plane.size.h}, curtain ${world.curtain.size.w}×${world.curtain.size.h}, holes ${game.colonies[0].holeCells.map((h) => `(${h.px},${h.py})↔col ${h.col}`).join(", ")}`,
   );
   for (let k = 1; k <= Math.round(seconds / DT); k++) {
     game.tick(DT);

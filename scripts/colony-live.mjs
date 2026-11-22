@@ -174,11 +174,14 @@ for (let t = 0; t < opts.seconds; t += DT)
 const { game } = runGame({
   seed: opts.seed,
   map: world,
-  game: { antCount: opts.ants, rivalAnts: opts.ants },
-  sides: {
-    policy: brain("mode"),
-    responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, brain(h)]))),
-  },
+  colonies: [
+    {
+      antCount: opts.ants,
+      policy: brain("mode"),
+      responses: responses(Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, brain(h)]))),
+    },
+    { antCount: opts.ants },
+  ],
   seconds: opts.seconds,
   events,
 });

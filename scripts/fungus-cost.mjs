@@ -40,7 +40,7 @@ const DT = 1 / 30;
 const BATCH_EVERY = FUNGUS_GATHER_MS / 1000; // the lane lets a part-full request gather this long (colonyJev gatherMs)
 const aim = AIMS[0].text;
 const world = generateOneWorld(seed);
-const g = new Game(world, { antCount: ants, rivalAnts: ants }, mulberry32(seed * 7919));
+const g = new Game(world, {}, mulberry32(seed * 7919), [{ antCount: ants }, { antCount: ants }]);
 const strain = STRAINS.findIndex((s) => s.id === (play.startsWith("bloom") ? "bloom" : play));
 if (play === "bloom-crown") g.fungus.menu = new Set([...g.fungus.menu, "crown"]);
 const menu = g.fungus.menu;

@@ -73,7 +73,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rival)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`,
     );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
@@ -95,14 +95,12 @@ if (isMainThread) {
   const g = new Game(
     generateOneWorld(seed),
     {
-      antCount: 600,
-      rivalAnts: 600,
-      rival: true,
       regrow: GAME_REGROW,
       autoFound: false,
       fungus: { hyphae, flow, ...(sun === null ? {} : { sun }) },
     },
     gameRng(seed, 0),
+    [{ antCount: 600 }, { antCount: 600 }],
   );
   const menu = g.fungus.menu;
   g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
@@ -133,7 +131,7 @@ if (isMainThread) {
     quarter: -1,
     half: -1,
     queen: -1,
-    rival: -1,
+    rivalFirst: -1,
     bought: [],
     minutes: [],
     earned: 0,
@@ -170,7 +168,7 @@ if (isMainThread) {
     if (r.quarter < 0 && a.s >= 0.25) r.quarter = t;
     if (r.half < 0 && a.s >= 0.5) r.half = t;
     if (r.queen < 0 && g.revealed[0]) r.queen = t;
-    if (r.rival < 0 && b && b.n > 0) r.rival = t;
+    if (r.rivalFirst < 0 && b && b.n > 0) r.rivalFirst = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
   r.earned = Math.round(g.fungus.evolution?.earned ?? 0);

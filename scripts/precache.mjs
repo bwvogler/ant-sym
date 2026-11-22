@@ -139,10 +139,10 @@ function fungalSituations() {
 function steerSituationsMet() {
   const met = new Map();
   for (const seed of [1, 2, 3]) {
-    const g = new Game(generateOneWorld(seed), { antCount: 600, rivalAnts: 600 }, gameRng(seed), {
-      colony: { steerLane: 1 },
-      rival: { steerLane: 1 },
-    });
+    const g = new Game(generateOneWorld(seed), {}, gameRng(seed), [
+      { antCount: 600, colony: { steerLane: 1 } },
+      { antCount: 600, colony: { steerLane: 1 } },
+    ]);
     for (const c of g.colonies) c.bindPolicy("steer", (s) => (met.set(steerKey(s), { ...s }), NEUTRAL_STEERING));
     for (let t = 0; t < 300; t += 1 / 30) g.tick(1 / 30);
   }
@@ -192,8 +192,9 @@ function speciesFungalSituations(sp) {
     for (const k of [0, 1]) {
       const g = new Game(
         generateOneWorld(seed),
-        { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+        { regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
         gameRng(seed, 0),
+        [{ antCount: 600 }, { antCount: 600 }],
       );
       g.fungus.bindPolicy("fungus", (s) => (met.add(encodeFungal(s)), "default"));
       for (let t = 0; t < 300; t += 1 / 30) {
@@ -214,8 +215,9 @@ function speciesModeSituations(sp, l, lw) {
   for (const seed of [1, 2, 3]) {
     const g = new Game(
       generateOneWorld(seed),
-      { antCount: 600, rivalAnts: 600, rival: true, regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
+      { regrow: GAME_REGROW, autoFound: false, fungus: { hyphae: true }, species: sp },
       gameRng(seed, 0),
+      [{ antCount: 600 }, { antCount: 600 }],
     );
     for (const c of g.colonies)
       c.bindPolicy("mode", (s) => {
