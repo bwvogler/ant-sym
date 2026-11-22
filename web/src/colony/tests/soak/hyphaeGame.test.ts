@@ -55,7 +55,7 @@ test("the patch lands on the hole's inner side, and its hyphae reach the curtain
   const line = g.world!.line;
   const plane = g.fungus.hyphaeOn(PLANE)!;
   // Every patch cell on the line lies over a column between the holes, never the margin past an end hole.
-  const margin = (cells: Iterable<string>) => {
+  const margin = (cells: Iterable<number>) => {
     let onLine = 0;
     for (const k of cells) {
       const [x, y] = keyCell(k);
