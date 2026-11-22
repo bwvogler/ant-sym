@@ -11,6 +11,7 @@ import { arena, oneColony, smallOne } from "../builders.ts";
 // The behaviour assays (experiment.ts), the gate: the ones today's ants pass, short, two seeds each.
 // The ones they don't pass yet are `todo` in tests/slow/assays.test.ts, with the behaviour MR meant to
 // make them pass (docs/PRD.md §42). Full sweeps: npm run exp.
+// A3 (assaysDeplete.test.ts) and A4 (assaysAlarm.test.ts) on one world have a file each: this one took 54 to 116 s on CI of a 120 s limit.
 
 test("runGame: the same seed gives the same numbers", () => {
   const a = runAssay(oneAssay("deplete"), 3, {}, 90).metrics;
@@ -74,19 +75,6 @@ test("overrides: responses replace the assay's own hook by hook", () => {
   assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
   assert.equal(spec.sides?.responses?.carry(t), "take");
 });
-
-// A3 and A4 on one world (their ONE_ASSAYS twins, S2.2e; PRD §76.1: 20/20 each).
-for (const seed of [1, 2]) {
-  test(`A3 depletion passes on one world (seed ${seed}): traffic leaves an emptied patch within 60 s`, () => {
-    const m = runAssay(oneAssay("deplete"), seed).metrics;
-    assert.equal(m.pass, 1, `clearAfter ${m.clearAfter}`);
-  });
-
-  test(`A4 alarm passes on one world (seed ${seed}): foragers scatter, then the trail recovers`, () => {
-    const m = runAssay(oneAssay("alarm"), seed).metrics;
-    assert.equal(m.pass, 1, `scatter ${m.scatter}, recoverAfter ${m.recoverAfter}`);
-  });
-}
 
 test("nurseZoneProbe: a young ant on the brood and a middle-aged one five cells off give a margin of 5 (ja-k4k.15.1; review of #192, N7)", () => {
   const g = new Game(smallOne(2), { antCount: 2, rival: false }, gameRng(1));
