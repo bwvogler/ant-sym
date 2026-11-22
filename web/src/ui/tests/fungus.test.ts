@@ -123,6 +123,9 @@ function field(o: Setup = {}) {
     dpr: () => o.d ?? 1,
     dev: false,
     reducedMotion: () => false,
+    newCanvas: () => {
+      throw new Error("the fungus layer makes no canvas");
+    },
     newPath: () => {
       const p = new RecordedPath();
       paths.push(p);
