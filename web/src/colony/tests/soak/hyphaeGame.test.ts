@@ -55,17 +55,22 @@ test("the patch lands on the hole's inner side, and its hyphae reach the curtain
   const line = g.world!.line;
   const plane = g.fungus.hyphaeOn(PLANE)!;
   // Every patch cell on the line lies over a column between the holes, never the margin past an end hole.
-  let onLine = 0;
-  for (const k of plane.parent.keys()) {
-    const [x, y] = keyCell(k);
-    for (const s of columnsOver(line, x, y)) {
-      onLine++;
-      assert.ok(s > line.sHole[0]! && s < line.sHole[line.sHole.length - 1]!, `patch cell over column ${s}, outside the holes`);
+  const margin = (cells: Iterable<number>) => {
+    let onLine = 0;
+    for (const k of cells) {
+      const [x, y] = keyCell(k);
+      for (const s of columnsOver(line, x, y)) {
+        onLine++;
+        assert.ok(s > line.sHole[0]! && s < line.sHole[line.sHole.length - 1]!, `patch cell over column ${s}, outside the holes`);
+      }
     }
-  }
-  assert.ok(onLine > 0, "the patch is not on the line");
+    return onLine;
+  };
+  assert.equal(margin(plane.parent.keys()), 0, "the seven-cell flower lies beside the line, not over it");
   assert.equal(g.fungus.hyphaeOn(CURTAIN), null, "hyphae in the curtain before any tip reached the hole");
   const t = crossDown(g);
+  // The seven-cell flower (PRD §85) lies beside the line, not over it: the tips that crossed down the hole grew onto it.
+  assert.ok(margin(g.fungus.hyphaeOn(PLANE)!.parent.keys()) > 0, "no hypha reached the line");
   const curtain = g.fungus.hyphaeOn(CURTAIN)!;
   // Its first tips root on the shaft's walls: soil, below the surface, beside the dug shaft.
   assert.ok(curtain.tips.length > 0, `no tip in the curtain after crossing at ${t} s`);
@@ -557,11 +562,8 @@ test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mas
       const h = g.fungus.hyphaeOn(l);
       if (h) held += h.length * HYPHA_MASS + h.loaded;
     }
-    // From the first round of tip steps on (the body's mass is placed at each round, TIP_STEP apart).
-    // Retuned 5 -> 25 s, bound unchanged (6 %): the body is 5-6 units for its first 25 s and a whole hypha cell (about 0.5, a
-    // fixed rounding of placing mass per round) is 7-10 % of that on every seed 1-13, with the brood odour on or off (base
-    // seed 7 held 5.9 %, by luck; seeds 3 and 5 fail on the base too). From 25 s on every seed tried stays within 3 %.
-    if (t >= 25) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
+    // From the first rounds on (the body's mass is placed at each round, TIP_STEP apart; at 8–9 s the seven-cell landing's body is 4.7 and one hypha is a tenth of it).
+    if (t >= 10) worst = Math.max(worst, Math.abs(held - e.mass) / e.mass);
     const down = g.fungus.hyphaeOn(CURTAIN);
     if (down && down.loaded > 0) curtainFed = true;
   }

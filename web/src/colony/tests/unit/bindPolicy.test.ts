@@ -10,18 +10,18 @@ import { smallOne, ticks } from "../builders.ts";
 // The policy API on the sim (docs/refactor.md S4.4, ja-fnd.5.4): a lane's policy is bound to a colony or the fungus through `bindPolicy`, not assigned
 // to a field, so a species' local rule, Jev's cached answers and a test's stub all arrive the same way.
 
-const game = () => new Game(smallOne(1), { antCount: 20, rivalAnts: 20 }, mulberry32(3));
+const game = () => new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 20 }, { antCount: 20 }]);
 
 test("a colony's mode policy is bound through bindPolicy and are what the tick asks", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   let asked = 0;
   const mode = (): "explore" => (asked++, "explore");
   c.bindPolicy("mode", mode);
   assert.equal(c.policy, mode);
   ticks(g, 30);
   assert.ok(asked > 0, "the colony's ants asked the bound mode policy");
-  assert.notEqual(g.rival!.policy, mode, "the other colony keeps its own");
+  assert.notEqual(g.colonies[1]!.policy, mode, "the other colony keeps its own");
 });
 
 test("the fungus's policy and growth policy are bound through bindPolicy", () => {

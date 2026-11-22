@@ -15,7 +15,7 @@ import { DT, run } from "../builders.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 const small = (seed = 7, w = 160): Game =>
-  new Game(generateOneWorld(seed, { plane: { size: { w, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, gameRng(seed));
+  new Game(generateOneWorld(seed, { plane: { size: { w, h: 100 } } }), {}, gameRng(seed), [{ antCount: 60 }, { antCount: 60 }]);
 const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSave;
 
 /**
@@ -28,7 +28,7 @@ const copy = (s: GameSave): GameSave => JSON.parse(JSON.stringify(s)) as GameSav
 function setUp(): { saved: GameSave; unbroken: string } {
   const g = small();
   g.land(0, GARDEN, { evolve: true });
-  const c = g.player;
+  const c = g.colonies[0]!;
   const h = c.holeCells[c.params.nest]!;
   g.fungus.paint([], centreX(h.col, CRUST + 3), centreY(CRUST + 3), 2, 3, 0, GARDEN, CURTAIN);
   run(g, 2);

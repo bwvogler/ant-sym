@@ -32,14 +32,14 @@ const shares = new Map<number, number>();
 const outShare = (share: number): number => {
   const known = shares.get(share);
   if (known !== undefined) return known;
-  const g = new Game(smallOne(2), { antCount: 120, rival: false }, mulberry32(3));
-  aged(g.player, share);
+  const g = new Game(smallOne(2), {}, mulberry32(3), [{ antCount: 120 }]);
+  aged(g.colonies[0]!, share);
   let out = 0;
   let n = 0;
   for (let k = 0; k < 30 * 90; k++) {
     g.tick(1 / 30);
     if (k % 30 !== 0) continue;
-    const c = g.player;
+    const c = g.colonies[0]!;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.carrying[i] || c.pellet[i]) continue;
       n++;
@@ -70,8 +70,8 @@ test(
 );
 
 test("the young sit deeper than the old, and only the middle-aged dig", () => {
-  const g = new Game(smallOne(2), { antCount: 300, rival: false }, mulberry32(5));
-  const c = g.player;
+  const g = new Game(smallOne(2), {}, mulberry32(5), [{ antCount: 300 }]);
+  const c = g.colonies[0]!;
   const hole = curtainHole(own(c));
   // Ages well inside each band, so none crosses into the next in the two minutes (an ant mid-dig as it comes of age finishes).
   for (let i = 0; i < c.n; i++) {

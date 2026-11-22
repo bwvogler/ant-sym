@@ -16,7 +16,7 @@ function beyondStart(g: Game) {
 }
 
 test("with the rival off, a founded colony takes the nest it dug, not the world's unused second nest", () => {
-  const g = new Game(smallOne(), { antCount: 120, rival: false }, mulberry32(11));
+  const g = new Game(smallOne(), {}, mulberry32(11), [{ antCount: 120 }]);
   run(g, 5);
   const curtain = g.world!.curtain;
   const at = beyondStart(g);
@@ -36,7 +36,7 @@ test("with the rival off, a founded colony takes the nest it dug, not the world'
 });
 
 test("a founded colony that falls does not end the game; the world's own colonies still do", () => {
-  const g = new Game(smallOne(), { antCount: 120, rivalAnts: 120 }, mulberry32(11));
+  const g = new Game(smallOne(), {}, mulberry32(11), [{ antCount: 120 }, { antCount: 120 }]);
   run(g, 2);
   g.addColony({ ...beyondStart(g), antCount: 30, odour: 0 });
   assert.equal(g.colonies[0]!.others.length, 2, "the other colonies know its nest");

@@ -91,11 +91,11 @@ function scriptAll() {
 
 /** One world's: a curtain under the plane, so the fungus has a nest (its view is "side"); Garden painted round the royal chamber. */
 function nestGame() {
-  const g = new Game(smallOne(7), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  const g = new Game(smallOne(7), {}, mulberry32(4), [{ antCount: 60 }, { antCount: 60 }]);
   g.paintSpores(
-    g.player.nest.x,
-    g.player.nest.y,
-    g.player.nest.r + 2,
+    g.colonies[0]!.nest.x,
+    g.colonies[0]!.nest.y,
+    g.colonies[0]!.nest.r + 2,
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
@@ -147,7 +147,7 @@ test("the fungus lane's batch is its own, not the client's: hosts go up to fifty
   const sent = scriptAll();
   const j = make({ batch: 2 });
   const g = nestGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
   await j.start();
@@ -166,7 +166,7 @@ test("the fungus lane waits to gather a fuller request before it sends; the ants
   const sent = scriptAll();
   const j = make({ gatherMs: 600 });
   const g = nestGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
   await j.start();
@@ -191,7 +191,7 @@ test("each lane sends its own ids and feeds its own counter: ants s0.., the fung
   const sent = scriptAll();
   const j = make();
   const g = nestGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   j.attachFungus(g.fungus);
   j.setAim(AIM);
   await j.start();

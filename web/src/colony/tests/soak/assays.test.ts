@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { deplete, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -36,24 +36,49 @@ test("runGame builds the game the page builds (one world, gameRng): same numbers
 
 test("overrides: channel params merge per field and reach the pheromone fields", () => {
   const spec = withOverrides(deplete.spec(1), { colony: { deposit: 9, channels: { food: { evaporation: 0.5 } } } });
-  assert.equal(spec.sides?.colony?.deposit, 9);
-  const { c } = oneColony(10, { ...spec.sides?.colony });
+  assert.equal(spec.colonies?.[0]?.colony?.deposit, 9);
+  const { c } = oneColony(10, { ...spec.colonies?.[0]?.colony });
   assert.equal(c.ph.params.food.evaporation, 0.5);
   assert.equal(c.ph.params.food.diffusion, 0.3);
   assert.equal(c.ph.params.alarm.evaporation, 0.25);
 });
 
 test("overrides: a fight override keeps the other fight params; rival params reach the second colony", () => {
-  const spec = withOverrides(deplete.spec(1), { game: { fight: { rate: 3 } }, rival: { deposit: 7 } });
+  const spec = withOverrides(
+    { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 10 }] },
+    { game: { fight: { rate: 3 } }, rival: { deposit: 7 } },
+  );
   assert.equal(spec.game?.fight?.rate, 3);
   assert.equal(spec.game?.fight?.alarm, 8);
-  const g = new Game(smallOne(1), { antCount: 10, rivalAnts: 10 }, gameRng(1), spec.sides);
+  const g = new Game(smallOne(1), {}, gameRng(1), spec.colonies);
   assert.equal(g.rival?.params.deposit, 7);
   assert.equal(g.player.params.deposit, 4);
 });
 
+test("overrides on a listed spec: both reaches every colony, rivalPolicy only the second, game.antCount/rival/rivalAnts are refused, gameOf builds the list", () => {
+  const base = { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 12 }, { antCount: 14 }] };
+  const both = withOverrides(base, { both: { deposit: 6 } });
+  assert.deepEqual(
+    both.colonies?.map((c) => c.colony?.deposit),
+    [6, 6, 6],
+  );
+  const pol = (() => 0) as never;
+  const rp = withOverrides(base, { policy: pol, rivalPolicy: pol });
+  assert.equal(rp.colonies?.[0]?.policy, pol);
+  assert.equal(rp.colonies?.[1]?.policy, pol);
+  assert.equal(rp.colonies?.[2]?.policy, undefined);
+  assert.equal(withOverrides(base, { rivalPolicy: pol }).colonies?.[0]?.policy, undefined);
+  for (const game of [{ antCount: 5 }, { rival: false }, { rivalAnts: 5 }])
+    assert.throws(() => withOverrides(base, { game }), /name no colony/);
+  const { game } = gameOf({ seed: 1, seconds: 0, map: () => smallOne(1), colonies: [{ antCount: 10 }, { antCount: 12 }] });
+  assert.deepEqual(
+    game.colonies.map((c) => c.params.antCount),
+    [10, 12],
+  );
+});
+
 test("overrides: responses replace the assay's own hook by hook", () => {
-  const base = { ...deplete.spec(1), sides: { responses: { ...localResponses, trailRate: () => 3 } } };
+  const base = { ...deplete.spec(1), colonies: [{ antCount: 10, responses: { ...localResponses, trailRate: () => 3 } }] };
   const spec = withOverrides(base, { responses: { get: () => false } });
   const t = {
     mode: "explore",
@@ -70,10 +95,13 @@ test("overrides: responses replace the assay's own hook by hook", () => {
     returns: "none",
     raid: "strong",
     crowd: "few",
+    deliveryAttempt: "none",
+    deliveryTarget: "none",
+    deliveryPlace: "none",
   } as const;
-  assert.equal(spec.sides?.responses?.get(t), false);
-  assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
-  assert.equal(spec.sides?.responses?.carry(t), "take");
+  assert.equal(spec.colonies?.[0]?.responses?.get(t), false);
+  assert.equal(spec.colonies?.[0]?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
+  assert.equal(spec.colonies?.[0]?.responses?.carry(t), "take");
 });
 
 test("nurseZoneProbe: a young ant on the brood and a middle-aged one five cells off give a margin of 5 (ja-k4k.15.1; review of #192, N7)", () => {
@@ -109,7 +137,8 @@ test("heldProbe: a carrier that won't put its food down at home counts as carryi
       map: smallOne,
       seconds: 200,
       game: { antCount: 60, rivalAnts: 0 },
-      sides: { responses: { ...localResponses, drop } },
+      // the recovery after refused unloading (dropRefusalLimit, ja-g7nz) is off here: this test is about the probe's count of a carrier that never puts down
+      sides: { responses: { ...localResponses, drop }, colony: { dropRefusalLimit: 0 } },
     }).result.metrics;
   const keeps = run(() => false);
   assert.ok(keeps["you.maxCarrying"] > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);

@@ -153,7 +153,7 @@ function side(c: Colony, fungus: Fungus): SideStats {
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
 function chapterFor(game: Game): ChapterView {
   const k = landingOf(game);
-  const c = game.colonies[k] ?? game.player;
+  const c = game.colonies[k] ?? game.colonies[0]!;
   const f = game.fungus.census(c);
   const line = game.lineage(k);
   const gynes = line.reduce((n, j) => n + (game.colonies[j]?.gynes ?? 0), 0);

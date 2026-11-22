@@ -252,11 +252,11 @@ test("groomed: a host among nestmates is groomed whether or not it hides (judged
 
 test("hiding protects a visible strain: Bloom hidden from its groomers keeps more of its load", () => {
   const run = (hide: boolean) => {
-    const g = new Game(smallOne(1), { antCount: 200, rivalAnts: 200 }, mulberry32(5));
+    const g = new Game(smallOne(1), {}, mulberry32(5), [{ antCount: 200 }, { antCount: 200 }]);
     g.fungus.configure({ hide, cull: false }, g.fungus.menu);
-    g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 2, 3, 0.3, ID("bloom"), CURTAIN); // round the royal chamber
+    g.paintSpores(g.colonies[0]!.nest.x, g.colonies[0]!.nest.y, g.colonies[0]!.nest.r + 2, 3, 0.3, ID("bloom"), CURTAIN); // round the royal chamber
     for (let k = 0; k < 30 * 40; k++) g.tick(1 / 30);
-    return g.fungus.census(g.player);
+    return g.fungus.census(g.colonies[0]!);
   };
   const shown = run(false);
   const hidden = run(true);
@@ -368,10 +368,10 @@ test("the fungus lane's request: the aim, a score per lever on the menu for each
 });
 
 test("hiding holds: with hide on, a groomed host stays hidden instead of flipping every step", () => {
-  const g = new Game(smallOne(1), { antCount: 120, rivalAnts: 120 }, mulberry32(4));
+  const g = new Game(smallOne(1), {}, mulberry32(4), [{ antCount: 120 }, { antCount: 120 }]);
   g.fungus.configure({ hide: true, cull: false }, g.fungus.menu);
-  g.paintSpores(g.player.nest.x, g.player.nest.y, g.player.nest.r + 3, 3, 0.4, ID("garden"), CURTAIN);
-  const c = g.player;
+  g.paintSpores(g.colonies[0]!.nest.x, g.colonies[0]!.nest.y, g.colonies[0]!.nest.r + 3, 3, 0.4, ID("garden"), CURTAIN);
+  const c = g.colonies[0]!;
   const prev = new Int16Array(c.n).fill(-1);
   let flips = 0;
   let steps = 0;

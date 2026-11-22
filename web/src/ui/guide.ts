@@ -165,7 +165,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
-      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, or drop its load and run. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. Fights are settled by the odds in the cells around, so in a narrow pass only the front ranks meet.",
+      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, drop its load and run, or ignore it. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. By default, nearby strangers create combat pressure even when they retreat. The experimental directed-combat rules count only ants choosing to attack: mutual peace is safe, but ignoring an attacker gives no protection. Both use the odds in the cells around.",
     scripted: {
       bead: "ja-k4k.6",
       reads:
@@ -547,6 +547,16 @@ export const GUIDE: GuideEntry[] = [
 
 /** The research notes, for the guide's footer (docs/README.md's table). */
 export const NOTES: { note: string; title: string; covers: string }[] = [
+  {
+    note: "delivery-actions",
+    title: "Delivery actions",
+    covers: "Experimental food destinations, local floor cues, effort-based reconsideration and separate drop consent.",
+  },
+  {
+    note: "contact-actions",
+    title: "Contact actions",
+    covers: "Experimental directed attacks, ignoring strangers, and asymmetric recognition.",
+  },
   { note: "vision", title: "Vision", covers: "The goal, what an ant may sense, and which behaviours are still scripted." },
   {
     note: "delivery-actions",
@@ -644,7 +654,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "fungus-unlocks",
     title: "The fungus's unlocks",
     covers:
-      "A plan for the fungus: a smaller landing patch, hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. Not built yet.",
+      "A plan for the fungus: a landing patch that is a seven-cell flower (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
   },
   {
     note: "builder",

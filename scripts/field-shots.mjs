@@ -17,7 +17,7 @@
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
 // on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
 // page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap), a pinned specimen
-// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). Not covered yet, to add with the slice that moves that layer: ants of every stance, a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on), the trace's run and dotted loops. (The lens card is DOM, and
+// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. The `built` page ends with the theme flipped after the first frame and the pointer resting in the queen's pen, and the `retina` page is the same world at two device pixels to a CSS pixel: what ColonyField reads each frame from the page. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). Not covered yet, to add with the slice that moves that layer: ants of every stance, a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on), the trace's run and dotted loops. (The lens card is DOM, and
 // draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
 // stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes), and the same for the plane's other marks (a specimen's
 // ring, a moved ant's trace) drawn on the curtain.
@@ -219,7 +219,7 @@ async function tool(page, name) {
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
 const dayAt = (page, phase) =>
   page.evaluate((phase) => {
-    const p = window.jevAnts.game.player.params;
+    const p = window.jevAnts.game.colonies[0].params;
     const t = phase * p.heatDay - p.heatStart;
     return t < 0 ? t + p.heatDay : t;
   }, phase);
@@ -289,6 +289,31 @@ const SCENES = [
   },
   { name: "built-bend", page: "built", run: (p) => view(p, "below") },
   { name: "built-strip", page: "built", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
+  // What the field reads each frame from the page rather than from the game: the theme (flipped after the first frame, as Settings does) and the
+  // pointer over the queen's pen (the settle preview under it). A layer drawing with a stale one shows here.
+  {
+    name: "built-theme-flip",
+    page: "built",
+    run: async (p) => {
+      await view(p, "above");
+      await p.evaluate(() => {
+        window.jevAnts.goNest(0);
+        document.documentElement.dataset.theme = "dark";
+      });
+      await sleep(500);
+    },
+    after: (p) => p.evaluate(() => document.documentElement.removeAttribute("data-theme")),
+  },
+  {
+    name: "built-pen-hover",
+    page: "built",
+    run: async (p) => {
+      await p.evaluate(() => window.jevAnts.fly(0));
+      await sleep(500);
+      await p.mouse.move(760, 540);
+      await sleep(200);
+    },
+  },
   // The marks of a player: a pinned specimen (a dashed ring and its label), the builder's strokes and clump, and an ant the tweezers moved
   // (its start ring: the page is paused). The builder works by the real pointer on the real canvas, the page paused.
   {
@@ -336,6 +361,9 @@ const SCENES = [
   // A phone-sized page (390 x 844, touch): the field's size and the page's narrow layout
   { name: "phone-above", page: "phone", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "phone-below", page: "phone", run: (p) => view(p, "below") },
+  // The same at two device pixels to a CSS pixel: the lines, dashes, labels and dots scale with it
+  { name: "retina-above", page: "retina", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
+  { name: "retina-below", page: "retina", run: (p) => view(p, "below") },
   { name: "desert-noon", page: "desert", run: async (p) => toTime(p, await dayAt(p, 1 / 3)) },
   { name: "desert-dusk", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.62)) },
   { name: "desert-night", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.84)) },
@@ -349,6 +377,7 @@ const PAGES = {
   grown: { scheme: "light", species: null },
   built: { scheme: "light", species: null },
   marks: { scheme: "light", species: null },
+  retina: { scheme: "light", species: null, scale: 2 },
   // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
   phone: { scheme: "light", species: null, phone: true },
 };
@@ -438,11 +467,11 @@ try {
     );
   }
   const pages = {};
-  for (const [key, { scheme, species, phone }] of Object.entries(PAGES)) {
+  for (const [key, { scheme, species, phone, scale }] of Object.entries(PAGES)) {
     if (only && !SCENES.some((s) => s.page === key && only.has(s.name))) continue; // a page no wanted scene is on is not opened
     const ctx = await browser.newContext({
       ...(phone ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } : { viewport: { width: 1280, height: 900 } }),
-      deviceScaleFactor: 1,
+      deviceScaleFactor: scale ?? 1,
       colorScheme: scheme,
     });
     const page = await ctx.newPage();

@@ -20,7 +20,7 @@ const FIGHT = MODES.indexOf("fight");
 
 /** A small one-world game with every ant young (they stay in), but for those a test makes old; no scouts unless a test sets them. */
 const game = (ants = 10): Game => {
-  const g = new Game(smallOne(), { antCount: ants, rivalAnts: ants, regrow: 0 }, gameRng(SEED));
+  const g = new Game(smallOne(), { regrow: 0 }, gameRng(SEED), [{ antCount: ants }, { antCount: ants }]);
   for (const c of g.colonies) {
     for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(0);
     c.params.scoutRate = 0;
@@ -62,7 +62,7 @@ const carriersDown = (g: Game, c: Colony, ants: readonly number[], seconds: numb
 
 test("one world: a rested forager is held at the top of its shaft until carriers come down with food, then goes out", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = 0;
   toGate(c, i);
   // With nothing coming back (and no scouts), it waits at the gate: never out, never down into the nest.
@@ -106,7 +106,7 @@ test("one world: a rested forager is held at the top of its shaft until carriers
 test("one world: a forager deaf to returns stays at the gate while carriers come down, and leaves only as a scout", () => {
   const leaves = (scoutRate: number): boolean => {
     const g = game();
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.params.leaveGate = 1e9; // deaf: returns are always "none" (the gate is still on)
     c.params.scoutRate = scoutRate;
     toGate(c, 0);
@@ -120,7 +120,7 @@ test("one world: a forager deaf to returns stays at the gate while carriers come
 
 test("one world: a carrier that came down with food goes back out past the gate unprompted, never held", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = 0;
   c.age[i] = ageOf(2);
   const p = planeHole(own(c));
@@ -145,7 +145,7 @@ test("one world: a carrier that came down with food goes back out past the gate 
 
 test("one world: a rested returner with empty jaws is held at the top as soon as it is down its hole", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   // Homing rested and empty (a fight over, say): the local rule would send it exploring on the plane at once.
   c.bindPolicy("mode", (s) => (s.mode === "return" ? "return" : s.mode));
   const i = 0;
@@ -166,7 +166,7 @@ test("one world: a rested returner with empty jaws is held at the top as soon as
 
 test("one world: a tired returner goes down to rest, then comes back up and is held at the top", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = 0;
   c.age[i] = ageOf(2);
   c.fatigue[i] = 2 * c.params.patience;
@@ -197,7 +197,7 @@ test("one world: a tired returner goes down to rest, then comes back up and is h
 test("one world: `leave` = raid sends the ant held at the gate up and out as a recruited raid scout, in fight", () => {
   const raid = (raidGate: number) => {
     const g = game();
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.responses = responses({ leave: () => "raid" });
     c.params.raidScout = 2;
     c.params.raidGate = raidGate;
@@ -229,7 +229,7 @@ test("one world: `leave` = raid sends the ant held at the gate up and out as a r
 test("one world: a finder's raid trail ending at the hole recruits the ants held at the gate, and they go out on it", () => {
   const recruit = (trail: boolean) => {
     const g = game();
-    const c = g.player;
+    const c = g.colonies[0]!;
     c.params.raidRecruit = 1;
     const ants = [0, 1, 2, 3, 4];
     for (const i of ants) toGate(c, i);
@@ -265,7 +265,7 @@ test("one world: a finder's raid trail ending at the hole recruits the ants held
 
 test("one world: a finder lays its raid trail on to its own hole, where the ants held at the gate smell it, and has told once down it", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = 0;
   c.age[i] = ageOf(2);
   const h = own(c);
@@ -293,7 +293,7 @@ test("one world: a finder lays its raid trail on to its own hole, where the ants
 
 test("one world: an ant at the gate senses its place as `hole`, as at a nest's mouth on open ground; deeper in, its tunnels and chambers", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = 0;
   toGate(c, i);
   const places: Where[] = [];
@@ -318,7 +318,7 @@ test("one world: an ant at the gate senses its place as `hole`, as at a nest's m
 
 test("one world: a porter and a spoil carrier at the top of the shaft are never held at the gate", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const at = curtainHole(own(c));
   const royal = g.world!.curtain.chambers!.list.find((r) => r.role === "royal" && r.colony === c.params.nest)!.id;
   // Ant 0 is a porter (food moved between chambers, already the colony's); ant 1 carries spoil up and out. Both old, and
@@ -353,7 +353,7 @@ test("one world: a porter and a spoil carrier at the top of the shaft are never 
 
 test("one world: a crowded gate with no returns sends raid scouts out (crowd is felt at the gate)", () => {
   const g = game(30);
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.params.raidScout = 1;
   c.params.crowdAt = 10;
   for (let i = 0; i < 20; i++) toGate(c, i);
@@ -381,7 +381,7 @@ test("one world: no rival, no raid (review of #53 S1): with the rival beaten, a 
 
 test("one world: a recruited raider in fight at the gate is held until `leave` says go", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.responses = responses({ leave: () => "wait" });
   toGate(c, 0);
   c.recruited[0] = 1;
@@ -392,7 +392,7 @@ test("one world: a recruited raider in fight at the gate is held until `leave` s
 
 test("one world: a middle-aged forager at the top of its shaft is not held at the gate (only the old are; ja-lp4.6.8 revisits it)", () => {
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   toGate(c, 0);
   c.age[0] = ageOf(1);
   let held = 0;
@@ -410,7 +410,7 @@ test("one world: a plane ant's count of strangers met leaks at the plane's rate,
   // The layer switch re-sets the bound layer's gates in the step record (review of #157, S1): without foeLeak's, a plane
   // ant read the curtain's (1) and never forgot the strangers it met.
   const g = game();
-  const c = g.player;
+  const c = g.colonies[0]!;
   for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = ageOf(2);
   const p = planeHole(own(c));
   c.putAnt(0, CURTAIN, c.x[0]!, c.y[0]!);

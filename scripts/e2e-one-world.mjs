@@ -108,8 +108,21 @@ async function until(fn, what, ms = 10_000, every = 100) {
  * go first, or they push its own out (ja-cila: steps 14 and 17 failed on slow runners, the trace showing the test's notice
  * gone from the field under two of the game's).
  */
-const noNotices = (page, what) =>
-  until(async () => (await page.evaluate(() => document.querySelectorAll('[role="status"] button').length)) === 0, what, 12_000, 100);
+const noNotices = async (page, what) => {
+  const none = () => page.evaluate(() => document.querySelectorAll('[role="status"] button').length === 0);
+  // Empty twice, 700 ms apart: a cue the game raises in the moments after a pause (its stats refresh 150 ms after, the field-guide
+  // check runs every 500 ms) has had time to land before the first notice of the check does (ja-7jvz).
+  await until(
+    async () => {
+      if (!(await none())) return false;
+      await sleep(700);
+      return none();
+    },
+    what,
+    15_000,
+    100,
+  );
+};
 
 /** The step running and the last check that passed: named with a failure. */
 let step = "starting";
@@ -888,6 +901,15 @@ try {
   });
   const tu = await tctx.newPage();
   await tu.addInitScript(`window.__clampCam = ${clampCam.toString()};`);
+  // Draw frames so far (ja-jheh): the field reads a crossing in a draw frame, so the follow check counts the frames it was owed.
+  await tu.addInitScript(() => {
+    window.__frames = 0;
+    const tick = () => {
+      window.__frames++;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
   tu.on("pageerror", (e) => errors.push(String(e)));
   await tu.goto(url);
   await tu.getByLabel("world seed").fill(String(SEED));
@@ -998,8 +1020,29 @@ try {
     100,
   ).then(() => tu.evaluate((i) => window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0, hostNo));
   if (wentBelow) {
-    await until(async () => (await tu.evaluate(() => window.jevAnts.view())) === "below", "the view follows the host below", 3000, 50);
-    check(true, "the host went below, and the view followed it");
+    // The field judges a crossing from the layer in each draw frame (ui/field/prelude.ts), so a host below for less than a frame
+    // leaves the view where it was, and on a loaded runner a frame can take more than a second: in the failing run (ja-jheh) each
+    // 50 ms poll took 0.4 s, the host was below at two reads 0.4 s apart and no frame saw it. The view owes the follow only once
+    // three frames were drawn with the host below; a dip shorter than that proves nothing and is said so, not failed.
+    const FRAMES_OWED = 3;
+    const sample = () =>
+      tu.evaluate(
+        (i) => [window.jevAnts.view(), window.jevAnts.game.colonies[window.jevAnts.game.landed.colony].layer[i] !== 0, window.__frames],
+        hostNo,
+      );
+    let [view, below, frames] = await sample();
+    let framesBelow = 0;
+    const end = Date.now() + 8000;
+    while (view !== "below" && framesBelow < FRAMES_OWED && Date.now() < end) {
+      await sleep(50);
+      const [v2, b2, f2] = await sample();
+      if (below && b2) framesBelow += f2 - frames; // the frames of an interval that began and ended with the host below
+      [view, below, frames] = [v2, b2, f2];
+    }
+    if (view === "below") check(true, "the host went below, and the view followed it");
+    else if (framesBelow >= FRAMES_OWED)
+      check(false, `the host was below for ${framesBelow} drawn frames and the view did not follow it (still ${view})`);
+    else console.log(`  --  the host was below for ${framesBelow} drawn frames only: the view-follows-below check was not exercised`);
   } else console.log("  --  the host did not go below before the watch ended: the view-follows-below check was not exercised");
   await tcard.getByRole("button", { name: "Skip tutorial", exact: true }).click();
   await until(async () => (await tcard.count()) === 0, "Skip ends the tutorial");
@@ -2264,6 +2307,8 @@ try {
   await hp.getByLabel("world seed").fill(String(SEED));
   await hp.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
   await until(() => hp.evaluate(() => !!window.jevAnts?.game.world), "a game for the phone checks", 20_000, 100);
+  await hp.getByRole("button", { name: "Pause", exact: true }).tap();
+  await noNotices(hp, "the game's own notices to go before the checks raise theirs");
   await hp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Colonies", exact: true }).tap();
   await hp
     .getByRole("region", { name: "colonies" })

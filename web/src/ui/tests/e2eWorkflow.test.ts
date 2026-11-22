@@ -121,9 +121,16 @@ test("the notices steps pause the game and wait for an empty field before raisin
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(
     script,
-    /const noNotices = \(page, what\) =>\s+until\(async \(\) => \(await page\.evaluate\(\(\) => document\.querySelectorAll\('\[role="status"\] button'\)\.length\)\) === 0,/,
+    /const noNotices = async \(page, what\) => \{\s+const none = \(\) => page\.evaluate\(\(\) => document\.querySelectorAll\('\[role="status"\] button'\)\.length === 0\);/,
     "the helper waits for no notice button",
   );
+  assert.match(
+    script,
+    /if \(!\(await none\(\)\)\) return false;\s+await sleep\(700\);\s+return none\(\);/,
+    "and for it to stay empty 700 ms (review of #296, N1)",
+  );
+  const waitMs = Number(/return none\(\);\s+\},\s+what,\s+([\d_]+),/.exec(script)?.[1]?.replaceAll("_", ""));
+  assert.ok(waitMs > 7000 + 700, `the wait outlasts a notice's 7 s and the 0.7 s settle, not ${waitMs} ms (review of #296, N2)`);
   const stepOf = (n: number): string => {
     const from = script.indexOf(`section("${n}. `);
     assert.ok(from > 0, `step ${n} is in the script`);
@@ -139,8 +146,38 @@ test("the notices steps pause the game and wait for an empty field before raisin
     /fp\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.click\(\);\n\s+await noNotices\(fp, /,
     "step 17 pauses, then waits for a quiet field",
   );
+  assert.match(
+    stepOf(16),
+    /hp\.getByRole\("button", \{ name: "Pause", exact: true \}\)\.tap\(\);\n\s+await noNotices\(hp, /,
+    "step 16's phone page pauses, then waits for a quiet field (review of #296, N3)",
+  );
+  assert.ok(
+    stepOf(16).indexOf("await noNotices(hp") < stepOf(16).indexOf('notify("A notice behind a sheet."'),
+    "step 16 raises its notice only after",
+  );
   assert.ok(stepOf(17).indexOf("await noNotices(fp") < stepOf(17).indexOf("raiseF("), "step 17 raises its notices only after");
   assert.ok(stepOf(14).indexOf("await noNotices(np2") < stepOf(14).indexOf("const raise = "), "step 14 raises its notices only after");
+});
+
+// The field reads a crossing from the layer in each draw frame, so a host that is below for less than a frame leaves the view
+// where it was; on a loaded runner a frame can take over a second. Step 7 failed that way on two unrelated branches (ja-jheh: the
+// trace showed 0.4 s per poll and no frame with the host below). The check counts drawn frames and owes the follow after three.
+test("the tutorial step's view-follows-below check counts drawn frames before it fails (ja-jheh)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(
+    script,
+    /window\.__frames = 0;\s+const tick = \(\) => \{\s+window\.__frames\+\+;\s+requestAnimationFrame\(tick\);/,
+    "the page counts its draw frames",
+  );
+  assert.match(script, /const FRAMES_OWED = 3;/, "three frames are owed");
+  assert.match(
+    script,
+    /if \(below && b2\) framesBelow \+= f2 - frames;/,
+    "only an interval that began and ended with the host below counts",
+  );
+  assert.match(script, /else if \(framesBelow >= FRAMES_OWED\)\s+check\(false, /, "with the frames owed and no follow, the check fails");
+  assert.match(script, /the view-follows-below check was not exercised/, "a shorter dip is said, not failed");
+  assert.doesNotMatch(script, /"the view follows the host below", 3000/, "the 3 s wait for the view alone is gone");
 });
 
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {

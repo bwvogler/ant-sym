@@ -5,7 +5,7 @@ import { Game, mulberry32, generateOneWorld } from "../../colony/index.ts";
 
 /** A small one-world game: the page plays one world only (PRD §55), so only its saves are offered. */
 const small = (seed: number) =>
-  new Game(generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } }), { antCount: 30, rivalAnts: 30 }, mulberry32(seed));
+  new Game(generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(seed), [{ antCount: 30 }, { antCount: 30 }]);
 
 test("save records: a slot each, newest first, the game's own save inside, and a line to show for each", async () => {
   const store = memorySaves();

@@ -8,9 +8,10 @@ import { Game } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 import { encode } from "./save.ts";
+import { localResponses } from "./responses.ts";
 import { dropFood, heapPlane, mulberry32, rockAt, OPEN, type Nest, type WorldMap } from "./world.ts";
 
-import { type Assay, type Event, mean, gateProbe, heldProbe, sideName, type Probe, type RunSpec } from "./harness.ts";
+import { type Assay, type Event, mean, gateProbe, heldProbe, sideName, withFirstColony, type Probe, type RunSpec } from "./harness.ts";
 
 /**
  * G1 — the one-world game (docs/one-world.md §6, U6): generateOneWorld(seed), 600 + 600 ants, 10 minutes, as G is for
@@ -28,7 +29,7 @@ export const game1: Assay = {
     seed,
     seconds: 600,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 600, rivalAnts: 600 },
+    colonies: [{ antCount: 600 }, { antCount: 600 }],
     probes: [heldProbe(PLANE, "Plane"), gateProbe()],
   }),
   score: (r, g) => {
@@ -51,6 +52,62 @@ export const game1: Assay = {
     return { ...m, maxHeld: worst, maxHeldPlane: both("maxHeldPlane"), maxPorting: both("maxPorting"), pass: worst <= 2 ? 1 : 0 };
   },
 };
+
+/** Compare an explicit chamber destination without changing surface homing. */
+function gameRoyalRouting(id: string, title: string, after: number): Assay {
+  return {
+    ...game1,
+    id,
+    title,
+    spec(seed) {
+      const base = game1.spec(seed);
+      let player: Colony | undefined;
+      let royalChoices = 0;
+      return withFirstColony(
+        {
+          ...base,
+          events: [
+            ...(base.events ?? []),
+            {
+              at: 0,
+              kind: "call",
+              run(game) {
+                player = game.player;
+              },
+            },
+          ],
+          probes: [...(base.probes ?? []), { tick() {}, summary: () => ({ royalChoices }) }],
+        },
+        {
+          colony: { deliveryLane: 1 },
+          responses: {
+            ...localResponses,
+            carry(t, draw) {
+              // Elapsed time since pickup is an assay input here; the carry policy schema is unchanged.
+              const aged = after === 0 || (player !== undefined && player.since[player.ti] >= after);
+              if (aged && t.carrying === "food" && (t.place === "tunnel" || t.place === "chamber") && t.deliveryTarget === "none") {
+                royalChoices++;
+                return "to royal";
+              }
+              return localResponses.carry(t, draw);
+            },
+          },
+        },
+      );
+    },
+  };
+}
+
+export const gameRoyalDelivery = gameRoyalRouting(
+  "gameRoyalDelivery",
+  "G1 with explicit royal delivery after sensing an own tunnel or chamber",
+  0,
+);
+export const gameRoyalRecovery = gameRoyalRouting(
+  "gameRoyalRecovery",
+  "G1 with explicit royal delivery after holding food for 60 seconds",
+  60,
+);
 
 /** The open ground of a plane joined to a hole's cell, as a flag per cell (x + y × width): ground a forager can have walked to. */
 function joinedOpen(plane: WorldMap, hc: HoleCell): Uint8Array {
@@ -234,8 +291,11 @@ export const search1: Assay = {
       seed,
       seconds: 600,
       map: (s) => generateOneWorld(s),
-      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      game: { regrow: 0 },
+      colonies: [
+        { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+        { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+      ],
       events: [{ at: 0, kind: "call", run: setUp }],
       probes: [probe],
     };
@@ -398,8 +458,11 @@ function f1Spec(
     seed,
     seconds: F1_SECONDS,
     map: (s) => generateOneWorld(s),
-    game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-    sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+    game: { regrow: 0 },
+    colonies: [
+      { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+      { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+    ],
     events: [{ at: 0, kind: "call", run: setUp }, ...(hooks.events ?? [])],
     probes: [probe, ...(hooks.probes?.(spotX, spotY) ?? [])],
   };
@@ -784,8 +847,11 @@ export const route1: Assay = {
       seed,
       seconds: R1_SECONDS,
       map: (s) => generateOneWorld(s),
-      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      game: { regrow: 0 },
+      colonies: [
+        { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+        { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+      ],
       events: [{ at: 0, kind: "call", run: setUp }],
       probes: [probe],
     };
@@ -910,7 +976,7 @@ export const lockstep1: Assay = {
     seed,
     seconds: 300,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 300, rivalAnts: 300 },
+    colonies: [{ antCount: 300 }, { antCount: 300 }],
     probes: [lockstepProbe()],
   }),
   score: () => ({}),
@@ -1019,7 +1085,7 @@ export const searchTight1: Assay = {
     seed,
     seconds: 300,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 300, rivalAnts: 300 },
+    colonies: [{ antCount: 300 }, { antCount: 300 }],
     probes: [searchTurnProbe()],
   }),
   score: (r): Record<string, number> => (Number.isFinite(r.metrics.ratio) ? { pass: (r.metrics.ratio as number) >= T1_PASS ? 1 : 0 } : {}),

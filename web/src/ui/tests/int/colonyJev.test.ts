@@ -587,11 +587,11 @@ function scriptAll(fungal: string) {
 
 /** A small one-world game with Garden painted round the player's royal chamber. */
 function infectedGame() {
-  const g = new Game(generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } }), { antCount: 60, rivalAnts: 60 }, mulberry32(4));
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 160, h: 100 } } }), {}, mulberry32(4), [{ antCount: 60 }, { antCount: 60 }]);
   g.paintSpores(
-    g.player.nest.x,
-    g.player.nest.y,
-    g.player.nest.r + 2,
+    g.colonies[0]!.nest.x,
+    g.colonies[0]!.nest.y,
+    g.colonies[0]!.nest.r + 2,
     3,
     0.4,
     STRAINS.findIndex((s) => s.id === "garden"),
@@ -604,13 +604,13 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   const reqs = scriptAll("dormant");
   const j = make();
   const g = infectedGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   j.attachFungus(g.fungus);
   j.setAim("Spread unseen.");
   // Off: the local rule (Garden's default, blend).
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
   assert.ok(
-    [...g.player.expr].some((e) => e === preset("blend")),
+    [...g.colonies[0]!.expr].some((e) => e === preset("blend")),
     "off: Garden blends",
   );
   await j.start();
@@ -634,15 +634,16 @@ test("the fungus lane: fungal situations go to Jev under the aim, the answers ar
   // new situation since the last round has no answer yet, and runs the local rule: which one depends on the game's random
   // stream, so the test does not name it.)
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
+  const c0 = g.colonies[0]!;
   let answered = 0;
-  for (let i = 0; i < g.player.n; i++) {
-    if (!g.player.alive[i] || !(g.player.load[i] > 0) || g.player.fungal[i]! < 0) continue;
-    if (j.explainFungus(decodeFungal(g.player.fungal[i]!)).by !== "jev") continue;
+  for (let i = 0; i < c0.n; i++) {
+    if (!c0.alive[i] || !(c0.load[i] > 0) || c0.fungal[i]! < 0) continue;
+    if (j.explainFungus(decodeFungal(c0.fungal[i]!)).by !== "jev") continue;
     answered++;
-    assert.equal(g.player.expr[i], 0, `host ${i}`);
+    assert.equal(c0.expr[i], 0, `host ${i}`);
   }
   assert.ok(answered > 0, "some hosts have Jev's answer (the test's own check)");
-  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
+  const s = decodeFungal(c0.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "jev");
   assert.equal(j.explainFungus(s).answer, encodeLevels(PRESETS[0]!.levels, g.fungus.asked), "Jev's levels: dormant's");
 });
@@ -652,7 +653,7 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
   const store = memoryStore();
   const j = make(store);
   const g = infectedGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   j.attachFungus(g.fungus);
   j.setAim("Calm every meeting.");
   await j.start();
@@ -666,7 +667,7 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
   assert.equal(j.state.lanes.fungus.cached, 0, "nothing cached under the new aim yet");
   j.setAim("Calm every meeting.");
   assert.equal(j.state.lanes.fungus.cached, before, "the old aim's answers are still there");
-  const asked = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
+  const asked = decodeFungal(g.colonies[0]!.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(asked).by, "jev");
   j.setMenu(new Set(["odour", "strangers"]));
   assert.notEqual(j.explainFungus(asked).by, "jev", "other levers on: a new question");
@@ -674,10 +675,10 @@ test("the fungus lane: a new aim is a new cache, a new menu a new question; stop
   assert.equal(g.fungus.menu.has("calm"), false, "and the fungus runs under it");
   await j.stop();
   for (let k = 0; k < 6; k++) g.tick(1 / 30);
-  const s = decodeFungal(g.player.fungal.find((v) => v >= 0) as number);
+  const s = decodeFungal(g.colonies[0]!.fungal.find((v) => v >= 0) as number);
   assert.equal(j.explainFungus(s).by, "local");
   assert.ok(
-    [...g.player.expr].some((e) => e === preset("blend")),
+    [...g.colonies[0]!.expr].some((e) => e === preset("blend")),
     "stopped: the local rule again",
   );
 });
@@ -851,7 +852,7 @@ test("a stored fungus answer is kept only if it has a level for each lever its k
   const store = memoryStore();
   const j = make(store);
   const g = infectedGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   const asked = g.fungus.asked;
   const other = { ...GARDEN, groomed: true };
   store.data.set(fungusContext("Stored aim."), [
@@ -868,7 +869,7 @@ test("a new aim plays the fungus's local rule until Jev answers; the earlier aim
   const store = memoryStore();
   const j = make(store);
   const g = infectedGame();
-  j.attach(g.player);
+  j.attach(g.colonies[0]!);
   const asked = g.fungus.asked;
   store.data.set(fungusContext("Old aim."), [[fungalKey(GARDEN, asked), encodeLevels({}, asked)]]);
   j.attachFungus(g.fungus);

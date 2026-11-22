@@ -1,4 +1,5 @@
 // Steer (docs/refactor.md S3.4): the fourth stage of an ant's step in tick. The heading it walks this step: homing to where it believes its goal is (its vector, the hole, a pellet up the shaft, trails, walls, backfill and stale tunnels), following a trail, fighting or raiding, exploring and digging; then fleeing, alarm, the trail it lays, the wait at home, and the last stretch into its hole. Moved out of Colony.tick verbatim but for `this` becoming `col`; the heading goes to the next stages through the step record.
+import { localDelivery } from "./deliveryAction.ts";
 import { NO_KEY } from "./ants.ts";
 import type { Colony, HoleCell } from "./colony.ts";
 import { backfill, enterStale, staleStep } from "./dig.ts";
@@ -84,13 +85,15 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const item = s.item;
   const resp = s.resp;
   const fleeFrom = s.fleeFrom;
+  const delivering = localDelivery(col, i);
   // Homing steers for where the ant believes the goal is (its drifting home vector), not for the goal itself.
   // A pellet carrier is taking soil up and out: it climbs (gravity), and up the shaft is the hole, so no vector.
   // (Steering it by a drifted one left carriers surfacing off target and dropping spoil in pits beside the hole.)
   // (On one world's plane a loose pellet taken home to backfill homes by its vector, as any returner there.)
-  if (mode === RETURN && (!pellet || (col.line !== null && col.cur === PLANE && col.soil[i] === SOIL_FILL))) nest = believe(col, i, goal);
-  col.goalX = nest.x;
-  col.goalY = nest.y;
+  if (mode === RETURN && !delivering && (!pellet || (col.line !== null && col.cur === PLANE && col.soil[i] === SOIL_FILL)))
+    nest = believe(col, i, goal);
+  col.goalX = delivering ? col.x[i] : nest.x;
+  col.goalY = delivering ? col.y[i] : nest.y;
   col.holeX = goal === col.entrance ? nest.x : (col.entrance?.x ?? 0);
   // Steer by mode. An explorer at a soil face keeps its heading while it digs.
   const noise = (rng() - 0.5) * 2 * dt;
@@ -127,6 +130,9 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     // Out on its heading; a bump turned it (in moveDig, where the step is blocked), and while it wanders after one, it wanders.
     if (detouring) h += noise * p.wander;
     else h = turnToward(h, col.spoilA[i], p.turnRate * dt) + noise * p.wander * 0.25;
+  } else if (mode === RETURN && delivering) {
+    if (walkTunnel(col, i, RETURN, p.speed * dt)) h = col.towardTarget(i);
+    else h += noise * p.wander;
   } else if (mode === RETURN) {
     // Homing uses only what an ant has: its home vector (path integration: real ants count steps
     // against a sky compass), its antennae, and touch. A straight line home walks into the same
@@ -199,7 +205,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       col.enteredCell(i);
     const lx = CELL[0];
     const ly = CELL[1];
-    if (look && backfill(col, i, lx, ly)) {
+    if (look && backfill(col, i, lx, ly, toEnemy !== null)) {
       // Dropped its pellet into unused space beside it: the trip is done; turned round, it is asked afresh next tick.
       h += Math.PI;
       col.gx[i] = NO_CELL;

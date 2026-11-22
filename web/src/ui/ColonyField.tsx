@@ -1,15 +1,10 @@
 import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
-import { moundBalls, type DirtBall } from "./inspectionMound.ts";
-import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "./inspectionGround.ts";
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
-import { MapChunkPaintCache } from "./mapChunkPaintCache.ts";
 import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
-import { HYPHA_COLOURS } from "./hyphaVisual.ts";
 import { chamberFoodSpots } from "./chamberFood.ts";
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
-  CHUNK,
   type ChunkLayer,
   type Colony,
   CURTAIN,
@@ -22,27 +17,13 @@ import {
   centreX,
   centreY,
   R,
-  SIDE,
   INFECTED,
   SPORE_FULL,
   SPORE_SHOWN,
   type Fungus,
-  type Hyphae,
-  hyphaCell,
-  HYPHA_MASS,
-  HYPHA_ROOT,
-  nx as neighbourX,
-  ny as neighbourY,
-  cellKey,
   type OneWorld,
-  STRIP,
   BINS,
   binOf,
-  cellAt,
-  columnsOver,
-  turnAt,
-  segmentCells,
-  type Transect,
   AIR,
   OPEN,
   rockAt,
@@ -70,19 +51,22 @@ import {
 } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame, type ViewCam } from "./field/prelude.ts";
+import { odourColour, odourRgb } from "./field/colour.ts";
+import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
+import { drawFungusGround, drawStalksRaised } from "./field/fungus.ts";
+import { Ground, groundPaper, stripAt } from "./field/ground.ts";
+import { BRICK_ZOOM, HEX_ZOOM } from "./field/zoom.ts";
+import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, pill } from "./field/overlays.ts";
 import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
-import type { PenCircle, Settle } from "./pen.ts";
 import { colonyName } from "./names.ts";
-import { BROOD_RGB, HOME_RGB, ROLE_RGB } from "./palette.ts";
-import { sightOf, type SensedMap } from "./fungusSight.ts";
-import { antTag, badgeParts, nestBadge } from "./badges.ts";
+import { BROOD_RGB } from "./palette.ts";
+import type { SensedMap } from "./fungusSight.ts";
+import { antTag } from "./badges.ts";
 import { isPalm } from "./build.ts";
-import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "./lens.ts";
 import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
 import { type AntTraces, traceAlpha } from "./trace.ts";
-import { type Chain, chainsOf, hash, smoothThrough, twigsOf, wander } from "./hyphaeLook.ts";
 import type { FieldProbe } from "./lensStore.ts";
 import { drawWorkerSprite, workerLod } from "./workerSprites.ts";
 import { drawNestSprite, type NestSprite } from "./nestSprites.ts";
@@ -186,12 +170,7 @@ export interface FieldApi {
 }
 
 /** The pen on the field (one world's top view). */
-export interface FieldPen extends PenCircle {
-  /** where she would settle from plane point p, or why not (pen.ts penSettle) */
-  preview: (p: { x: number; y: number }) => Settle;
-  /** a click on the plane at p */
-  onPick: (p: { x: number; y: number }) => void;
-}
+export type { FieldPen };
 
 const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
@@ -200,9 +179,6 @@ const NO_SPECIMENS: readonly Specimen[] = [];
 
 /** A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. */
 const extentOf = (m: WorldMap): Extent & { x0: number } => ({ x0: m.x0, ...worldExtent(m) });
-
-/** The mound's cut drawn on the side view's strip: at most this many levels (the curtain's sky is STRIP rows). */
-const CUT_MAX = STRIP;
 
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -213,37 +189,12 @@ function rgb(hex: string): [number, number, number] {
   return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
-/** A colony's tone by its odour t (0…1): ink at 0, the warn tone at 1, mixed between. */
-function odourRgb(ink: [number, number, number], warn: [number, number, number], t: number): [number, number, number] {
-  const m = (k: 0 | 1 | 2) => Math.round(ink[k] + (warn[k] - ink[k]) * Math.min(1, Math.max(0, t)));
-  return [m(0), m(1), m(2)];
-}
-function odourColour(ink: [number, number, number], warn: [number, number, number], t: number): string {
-  const [r, g, b] = odourRgb(ink, warn, t);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-/** Device pixels per world unit, per DPR, from which cells are drawn as true hexagons; below, as bricks. */
-const HEX_ZOOM = 12;
-const BRICK_ZOOM = 9;
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
 const PICK_PX = 14;
 /** A linked click opens the other view at least this close (CSS px a cell, as `n` goes to a nest). */
 const LINK_ZOOM = 8;
-/** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
-const NO_CHUNK = -0x80000000;
-/** The builder's sugar (candy pink, as its 🍬) and crumbs (biscuit brown, as its 🍪), drawn apart from the ground's food. */
-const SUGAR_RGB: [number, number, number] = [214, 72, 140];
-const CRUMB_RGB: [number, number, number] = [150, 100, 52];
-
-interface ChunkCanvas {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  img: ImageData;
-}
-
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
 type Gesture = {
   kind: "pan" | "pinch" | "mini" | "paint" | "tweeze" | "none";
@@ -261,55 +212,6 @@ type Gesture = {
   pending?: boolean;
 };
 const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
-
-/** A run of hyphae with what drawing it needs that does not change with the camera: its cells' bent world positions, and the box of cells it spans. */
-interface DrawnChain extends Chain {
-  /** the bent world positions of its cells: x0, y0, x1, y1, … (ui/hyphaeLook.ts wander) */
-  world: number[];
-  /** the box of grid cells it spans */
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
-}
-
-/**
- * The runs of a hyphal tree (ui/hyphaeLook.ts chainsOf) with their bent positions, kept between frames: found again when the
- * tree's size changes, but no sooner than REBUILD_MIN ms after the last time (a growing tree changes every tick), and at the
- * latest every REBUILD_MAX ms (a cut and a sprout that leave the size alone show a moment late). A cell never moves, so only the
- * tree's shape needs finding again, not the camera's view of it.
- */
-const REBUILD_MIN = 60;
-const REBUILD_MAX = 150;
-const chainCache = new WeakMap<Hyphae, { size: number; cords: number; at: number; chains: DrawnChain[] }>();
-function chainsFor(h: Hyphae): DrawnChain[] {
-  const now = performance.now();
-  const hit = chainCache.get(h);
-  if (hit) {
-    const age = now - hit.at;
-    if (age < REBUILD_MIN || (age < REBUILD_MAX && hit.size === h.parent.size && hit.cords === h.cords.size)) return hit.chains;
-  }
-  const spot = [0, 0];
-  const chains = chainsOf(h.parent, h.cords, HYPHA_ROOT).map((ch): DrawnChain => {
-    const world: number[] = [];
-    let x0 = Infinity;
-    let x1 = -Infinity;
-    let y0 = Infinity;
-    let y1 = -Infinity;
-    for (const k of ch.cells) {
-      const [kx, ky] = hyphaCell(k);
-      wander(centreX(kx, ky), centreY(ky), spot);
-      world.push(spot[0]!, spot[1]!);
-      x0 = Math.min(x0, kx);
-      x1 = Math.max(x1, kx);
-      y0 = Math.min(y0, ky);
-      y1 = Math.max(y1, ky);
-    }
-    return { ...ch, world, x0, x1, y0, y1 };
-  });
-  chainCache.set(h, { size: h.parent.size, cords: h.cords.size, at: now, chains });
-  return chains;
-}
 
 export default function ColonyField({
   colonies,
@@ -458,21 +360,19 @@ export default function ColonyField({
     const ctx = canvas.getContext("2d")!;
     // What the frame takes from the outside world: the clock, the pixel ratio, the dev flag, reduced motion and the sprite sets (field/env.ts).
     const env = browserEnv(import.meta.env.DEV);
+    const sprites = env.sprites();
     const {
       cadaver: cadaverSprites,
-      fungal: fungalSprites,
       worker: workerSprites,
       nest: nestSprites,
       resource: resourceSprites,
       surfaceLeaves,
       mapLeaves,
       gait: workerGait,
-    } = env.sprites();
+    } = sprites;
     const voxelMap = new MapVoxelPass(() => draw());
-    const tilePaint = new MapChunkPaintCache();
+    const ground = new Ground(env);
     const sinks: FrameSinks = { dataset: canvas.dataset, orbit, orbitAxes, angled, flatOrbit: mapOrbit, dev: env.dev };
-    let framePaints = 0,
-      frameHits = 0;
     // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
     // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
     // placeholders: bind() sets all of these before the first frame draws
@@ -493,20 +393,6 @@ export default function ColonyField({
     let gh = m.size.h;
     let ext = extentOf(m);
     let geoMap: WorldMap | null = null;
-    const chunks = new Map<string, ChunkCanvas>();
-    const chunkCanvas = (cx: number, cy: number): ChunkCanvas => {
-      const key = `${cx},${cy}`;
-      let c = chunks.get(key);
-      if (!c) {
-        const cv = document.createElement("canvas");
-        cv.width = CHUNK;
-        cv.height = CHUNK;
-        const cctx = cv.getContext("2d")!;
-        c = { canvas: cv, ctx: cctx, img: cctx.createImageData(CHUNK, CHUNK) };
-        chunks.set(key, c);
-      }
-      return c;
-    };
     // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants.
     const mini = document.createElement("canvas");
     const miniCtx = mini.getContext("2d")!;
@@ -519,7 +405,7 @@ export default function ColonyField({
       gw = map.size.w;
       gh = map.size.h;
       ext = extentOf(map);
-      chunks.clear();
+      ground.clear();
       mini.width = Math.ceil(ext.w / 2);
       mini.height = Math.ceil(ext.h / 2);
       miniImg = miniCtx.createImageData(mini.width, mini.height);
@@ -545,7 +431,7 @@ export default function ColonyField({
     };
     bind();
 
-    let theme = {
+    let theme: FieldTheme = {
       paper: "",
       ink: "",
       accent: "",
@@ -569,7 +455,7 @@ export default function ColonyField({
       chamber: rgb("#a39a8a"),
     };
     const retheme = () => {
-      tilePaint.clear();
+      ground.clearTiles();
       workerSprites.clearTints();
       nestSprites.clearTints();
       theme = {
@@ -598,6 +484,30 @@ export default function ColonyField({
       miniAt = -Infinity;
     };
     retheme();
+    // What the layers share and read (field/ctx.ts): filled each frame below, once the camera is known.
+    const fctx: FieldCtx = {
+      ctx,
+      theme,
+      d: 1,
+      v: { w: 0, h: 0 },
+      c: { x: 0, y: 0, zoom: 1 },
+      lv,
+      m,
+      ext,
+      world,
+      colonies,
+      fungus,
+      env,
+      sprites,
+      smellAll,
+      strip,
+      trails,
+      alarms,
+      spores,
+      sensedLayer,
+      sensedNow: sensed.now,
+    };
+    const inputs: FieldInputs = { hover: null, pen: null, penSeen: { current: null }, show: layers.current };
     const mq = matchMedia("(prefers-color-scheme: dark)");
     mq.addEventListener("change", retheme);
     // The player's own choice (Settings → Appearance) is data-theme on <html>.
@@ -619,223 +529,6 @@ export default function ColonyField({
     fitCanvas();
 
     /**
-     * The side view of one world: what the strip and the mound's cut show at column s, row y, from the plane cell under
-     * the line there (P(s)): the strip (row STRIP) is P(s)'s ground (rock, food, or open: the paper, as the side view's
-     * walkway), and the rows above it the mound's cut, `spoil` levels high. null: sky, nothing to draw over it. (The
-     * minimap's; paintChunk inlines it.)
-     */
-    const stripAt = (s: number, y: number): readonly number[] | null => {
-      if (y > STRIP || !cellAt(world.line, s)) return null;
-      const qx = CELL[0];
-      const qy = CELL[1];
-      const plane = world.plane;
-      if (y === STRIP) return rockAt(plane, qx, qy) !== OPEN ? theme.rock : plane.food.get(qx, qy) > 0 ? theme.accentRgb : theme.paperRgb;
-      return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
-    };
-
-    const groundPaper = () => (smellAll ? theme.paperRgb : lv === PLANE ? CLOSE_SPRITE_GROUND.surface : CLOSE_SPRITE_GROUND.back);
-    const groundRock = () => (smellAll ? theme.rock : CLOSE_SPRITE_GROUND.rock);
-    const groundSoil = () => (smellAll ? theme.soil : CLOSE_SPRITE_GROUND.soil);
-    const groundSpoil = () => (smellAll ? theme.spoil : CLOSE_SPRITE_GROUND.spoil);
-
-    /** Paint chunk colours: rock/soil, trails, and legacy food washes unless aerial sprites will show the food. */
-    const paintChunk = (cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array, foodAsSprites: boolean) => {
-      const rock = groundRock(),
-        soil = groundSoil(),
-        spoil = groundSpoil();
-      const fc = m.food.chunk(cx, cy);
-      // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
-      const sensedC = sensedLayer?.chunk(cx, cy);
-      const now = sensed.now;
-      // Every colony's food and home trails and alarm here, read only where something was sensed.
-      const trailC: { food: Float32Array | undefined; home: Float32Array | undefined; tone: [number, number, number] }[] = [];
-      const alarmC: Float32Array[] = [];
-      const qc = m.quality?.chunk(cx, cy);
-      if (sensedC || smellAll) {
-        for (const t of trails) {
-          const food = t.food.chunk(cx, cy);
-          const home = t.home.chunk(cx, cy);
-          if (food || home)
-            trailC.push({
-              food,
-              home,
-              tone: smellAll ? odourRgb(theme.inkRgb, theme.warnRgb, t.odour) : (theme.trail as [number, number, number]),
-            });
-        }
-        for (const a of alarms) {
-          const ac = a.chunk(cx, cy);
-          if (ac) alarmC.push(ac);
-        }
-      }
-      const sporeC = spores.chunk(cx, cy);
-      // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
-      const spoilC = m.spoil?.chunk(cx, cy);
-      const chambers = m.chambers;
-      const chamberC = chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
-      const [fr, fg, fb] = theme.accentRgb;
-      const show = layers.current;
-      const px = c.img.data;
-      const x0 = cx * CHUNK;
-      const y0 = cy * CHUNK;
-      // The strip also depends on projected plane cells; keep its existing live repaint path.
-      if (!(strip && world && cy === STRIP >> 6)) {
-        const tag = JSON.stringify([
-          foodAsSprites,
-          show.food,
-          show.home,
-          smellAll,
-          gx0,
-          gw,
-          gh,
-          sensedC && !smellAll ? now : 0,
-          chambers?.list.map((ch) => ch.role),
-          trailC.map((t) => t.tone),
-        ]);
-        if (
-          !tilePaint.needsPaint(c, tag, [
-            rc,
-            fc,
-            qc,
-            sensedC,
-            sporeC,
-            spoilC,
-            chamberC,
-            ...trailC.flatMap((t) => [t.food, t.home]),
-            ...alarmC,
-          ])
-        ) {
-          frameHits++;
-          return;
-        }
-      }
-      framePaints++;
-      for (let ly = 0; ly < CHUNK; ly++) {
-        for (let lx = 0; lx < CHUNK; lx++) {
-          const i = ly * CHUNK + lx;
-          const o = i * 4;
-          if (x0 + lx < gx0 || x0 + lx >= gx0 + gw || y0 + ly >= gh) {
-            px[o + 3] = 0; // past the edge of the map
-            continue;
-          }
-          if (rc[i]) {
-            const solid = rc[i] === SOIL ? soil : rc[i] === AIR ? theme.sky : rock;
-            px[o] = solid[0];
-            px[o + 1] = solid[1];
-            px[o + 2] = solid[2];
-            px[o + 3] = 255;
-            continue;
-          }
-          const fv = fc ? fc[i] : 0;
-          if (fv > 0 && !foodAsSprites) {
-            // The builder's sugar and crumbs (quality above and below the ground's 1) in their own colours (ja-kjj8).
-            const q = qc ? qc[i]! : 1;
-            const [qr, qg, qb] = q > 1.01 ? SUGAR_RGB : q < 0.99 ? CRUMB_RGB : [fr, fg, fb];
-            px[o] = qr;
-            px[o + 1] = qg;
-            px[o + 2] = qb;
-            px[o + 3] = 120 + Math.min(135, fv * 12);
-            continue;
-          }
-          // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike); everywhere in smell vision.
-          const w = smellAll ? 1 : sensedC ? sightOf(sensedC[i]!, now) : 0;
-          let al = 0;
-          if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / ALARM_FULL));
-          if (al > ALARM_SHOWN) {
-            px[o] = theme.alarm[0];
-            px[o + 1] = theme.alarm[1];
-            px[o + 2] = theme.alarm[2];
-            px[o + 3] = Math.round(40 + al * 150);
-            continue;
-          }
-          // Spores: the fungus's own mark on the ground, under food and alarm, over the trails.
-          const sv = sporeC ? sporeC[i] : 0;
-          if (sv >= SPORE_SHOWN) {
-            const sp = Math.min(1, sv / SPORE_FULL);
-            px[o] = theme.sporeRgb[0];
-            px[o + 1] = theme.sporeRgb[1];
-            px[o + 2] = theme.sporeRgb[2];
-            px[o + 3] = Math.round(35 + sp * 130);
-            continue;
-          }
-          const heap = spoilC ? spoilC[i] : 0;
-          if (heap > 0) {
-            px[o] = spoil[0];
-            px[o + 1] = spoil[1];
-            px[o + 2] = spoil[2];
-            px[o + 3] = Math.min(255, 110 + heap * 45);
-            continue;
-          }
-          // Every colony's trails, as freshly as a host sensed them; where two overlap, the stronger shows.
-          let f = 0;
-          let h = 0;
-          let ft = theme.trail as [number, number, number];
-          if (w > 0)
-            for (const t of trailC) {
-              const tf = show.food || smellAll ? (t.food ? w * Math.min(1, t.food[i]! / FOOD_FULL) : 0) : 0;
-              if (tf > f) {
-                f = tf;
-                ft = t.tone;
-              }
-              // The home trail covers most walked ground: scaled softer, so it reads as a wash under the food trail.
-              if (show.home && t.home) h = Math.max(h, w * Math.min(1, t.home[i]! / HOME_FULL));
-            }
-          if (f >= h && f > TRAIL_SHOWN) {
-            px[o] = ft[0];
-            px[o + 1] = ft[1];
-            px[o + 2] = ft[2];
-            px[o + 3] = Math.round(f * 150);
-          } else if (h > TRAIL_SHOWN) {
-            px[o] = HOME_RGB[0];
-            px[o + 1] = HOME_RGB[1];
-            px[o + 2] = HOME_RGB[2];
-            px[o + 3] = Math.round(h * 90);
-          } else if (chamberC && chamberC[i]) {
-            const role = chambers!.list[chamberC[i] - 1]?.role ?? "none";
-            const tint = ROLE_RGB[role] ?? theme.chamber;
-            px[o] = tint[0];
-            px[o + 1] = tint[1];
-            px[o + 2] = tint[2];
-            px[o + 3] = role === "none" ? 55 : 70;
-          } else px[o + 3] = 0;
-        }
-      }
-      // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
-      // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
-      if (strip && cy === STRIP >> 6) {
-        const line = world.line;
-        const plane = world.plane;
-        const ly = STRIP - y0;
-        for (let lx = 0; lx < CHUNK; lx++) {
-          if (!cellAt(line, x0 + lx)) continue;
-          const qx = CELL[0];
-          const qy = CELL[1];
-          let o = (ly * CHUNK + lx) * 4;
-          const food = plane.food.get(qx, qy);
-          if (rockAt(plane, qx, qy) !== OPEN) {
-            px[o] = theme.rock[0];
-            px[o + 1] = theme.rock[1];
-            px[o + 2] = theme.rock[2];
-            px[o + 3] = 255;
-          } else if (food > 0) {
-            px[o] = fr;
-            px[o + 1] = fg;
-            px[o + 2] = fb;
-            px[o + 3] = 120 + Math.min(135, food * 12);
-          } else px[o + 3] = 0; // open ground: the paper, as the side view's walkway
-          const cut = Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0);
-          for (let k = 1; k <= cut; k++) {
-            o = ((ly - k) * CHUNK + lx) * 4;
-            px[o] = theme.spoil[0];
-            px[o + 1] = theme.spoil[1];
-            px[o + 2] = theme.spoil[2];
-            px[o + 3] = 255;
-          }
-        }
-      }
-      c.ctx.putImageData(c.img, 0, 0);
-    };
-
-    /**
      * The minimap's picture: each pixel the cell under its centre (food, rock, soil or open ground), washed with the
      * fungus's colour where it has spores the field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
      */
@@ -855,7 +548,7 @@ export default function ColonyField({
           const t = off ? 1 : m.rock.get(x, y);
           const fv = off ? 0 : m.food.get(x, y);
           const o = (my * mini.width + mx) * 4;
-          const cut = strip && !off ? stripAt(x, y) : null;
+          const cut = strip && !off ? stripAt(fctx, x, y) : null;
           const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
           const c =
             cut ??
@@ -888,514 +581,28 @@ export default function ColonyField({
       miniCtx.putImageData(miniImg, 0, 0);
     };
 
-    /**
-     * Up close: the cells in view as true hexagons. Each cell's colour is its pixel in its chunk's colour
-     * buffer (painted this frame), laid over the paper; soil (the commonest, underground) is the
-     * background, and the rest are batched into one path per colour, so a frame is a few dozen fills.
-     */
-    const paths = new Map<number, Path2D>();
-    const drawHexes = (c: Camera, v: Viewport, rx0: number, rx1: number, ry0: number, ry1: number, hexMix: number) => {
-      const paper = groundPaper();
-      const spoil = groundSpoil();
-      const pelletAlpha = !smellAll && lv === PLANE ? Math.max(0, Math.min(1, (c.zoom / (v.dpr ?? 1) - HEX_ZOOM) / 8)) : 0;
-      const moundTints = new Map<number, Path2D>();
-      const pellets = new Map<string, DirtBall>();
-      const bg = paper;
-      const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
-      ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
-      const [ax, ay] = toScreen(c, v, gx0, 0);
-      const [bx, by] = toScreen(c, v, gx0 + ext.w, ext.h);
-      ctx.fillRect(ax, ay, bx - ax, by - ay);
-      paths.clear();
-      // At the distant end these six vertices describe the same staggered rectangles as the chunk pass.
-      const x = c.zoom * 0.5 * (1 + 0.04 * hexMix);
-      const shoulder = c.zoom * (R / 2 + (SIDE * 0.52 - R / 2) * hexMix);
-      const tip = c.zoom * (R / 2 + (SIDE * 1.04 - R / 2) * hexMix);
-      const [c0, c1, c2, c3, c4, c5] = [x, 0, -x, -x, 0, x];
-      const [s0, s1, s2, s3, s4, s5] = [shoulder, tip, shoulder, -shoulder, -tip, -shoulder];
-      const ox = v.w / 2 - c.x * c.zoom;
-      const oy = v.h / 2 - c.y * c.zoom;
-      for (let y = ry0; y <= ry1; y++) {
-        const cy = y >> 6;
-        const ly = y & 63;
-        const sy = (y + 0.5) * R * c.zoom + oy;
-        const shift = 0.5 + 0.5 * (y & 1);
-        let chunkX = NO_CHUNK; // a chunk column can be −1 (one world's curtain): none is a value no chunk takes
-        let data: Uint8ClampedArray | null = null;
-        let terrain: Uint8Array | undefined;
-        let heaps: Uint16Array | undefined;
-        for (let x = rx0; x <= rx1; x++) {
-          if (x >> 6 !== chunkX) {
-            chunkX = x >> 6;
-            data = chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
-            terrain = pelletAlpha ? m.rock.chunk(chunkX, cy) : undefined;
-            heaps = pelletAlpha ? m.spoil?.chunk(chunkX, cy) : undefined;
-          }
-          if (!data) continue;
-          const index = (ly << 6) | (x & 63);
-          const o = index * 4;
-          // Leave scent, food and chamber washes in their own colours over the shared ground palette.
-          const kind = terrain?.[index];
-          const heap = heaps?.[index] ?? 0;
-          if (heap > 0 && (kind ?? OPEN) === OPEN) {
-            // Shared world positions let the flat pellets cross hex edges and stack in the same order as voxels.
-            for (const ball of moundBalls(heap, cellKey(x, y)))
-              if (!pellets.has(ball.id)) pellets.set(ball.id, { ...ball, x: ball.x + x + shift, y: ball.y + (y + 0.5) * R });
-          }
-          // The spoil wash fades out as the overhead pellets appear.
-          const spoilWash = heap > 0 && data[o] === spoil[0] && data[o + 1] === spoil[1] && data[o + 2] === spoil[2];
-          const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
-          const a = spoilWash ? opacity * (1 - pelletAlpha * pelletAlpha) : opacity;
-          const r = Math.round(data[o] * a + paper[0] * (1 - a));
-          const g = Math.round(data[o + 1] * a + paper[1] * (1 - a));
-          const b = Math.round(data[o + 2] * a + paper[2] * (1 - a));
-          const key = (r << 16) | (g << 8) | b;
-          if (key === bgKey) continue;
-          const paint = spoilWash ? moundTints : paths;
-          let path = paint.get(key);
-          if (!path) {
-            path = new Path2D();
-            paint.set(key, path);
-          }
-          const sx = (x + shift) * c.zoom + ox;
-          path.moveTo(sx + c0, sy + s0);
-          path.lineTo(sx + c1, sy + s1);
-          path.lineTo(sx + c2, sy + s2);
-          path.lineTo(sx + c3, sy + s3);
-          path.lineTo(sx + c4, sy + s4);
-          path.lineTo(sx + c5, sy + s5);
-          path.closePath();
-        }
-      }
-      // Keep the returning brown tint behind the fading pellets so both are visible.
-      for (const [key, path] of moundTints) {
-        ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
-        ctx.fill(path);
-      }
-      if (pellets.size) {
-        ctx.save();
-        ctx.globalAlpha = pelletAlpha;
-        for (const ball of [...pellets.values()].sort((a, b) => a.z - b.z)) {
-          ctx.fillStyle = INSPECTION_GROUND.dugSoil[ball.grain];
-          ctx.beginPath();
-          ctx.arc(ball.x * c.zoom + ox, ball.y * c.zoom + oy, ball.radius * c.zoom, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-      for (const [key, path] of paths) {
-        ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
-        ctx.fill(path);
-      }
-    };
-
-    /**
-     * The mycelium's hyphae (ja-2bw.3, docs/hyphal-growth.md): each run of cells between branch points as one wandering curve
-     * through the cells' centres (bent by a smooth seeded warp, so no hex-to-hex straights: ui/hyphaeLook.ts), the loops
-     * fusion closed, short fuzz twigs off the thin hyphae when zoomed in, and a dot at each tip. On the plane (`under`) faint,
-     * as threads just under the surface; in the curtain plainer. Only the cells in view (rows ry0…ry1, columns rx0…rx1, a
-     * cell's margin).
-     */
-    const drawHyphae = (
-      h: Hyphae,
-      c: Camera,
-      v: Viewport,
-      d: number,
-      under: boolean,
-      rx0: number,
-      rx1: number,
-      ry0: number,
-      ry1: number,
-    ) => {
-      const inView = (x: number, y: number) => x >= rx0 - 1 && x <= rx1 + 1 && y >= ry0 - 1 && y <= ry1 + 1;
-      const distant = c.zoom < HEX_ZOOM * d;
-      {
-        const spot = [0, 0];
-        /** the screen position of cell (x, y)'s centre, bent by the warp */
-        const at = (x: number, y: number): [number, number] => {
-          wander(centreX(x, y), centreY(y), spot);
-          return toScreen(c, v, spot[0]!, spot[1]!);
-        };
-        const path = new Path2D();
-        // Cords (a web, ja-2bw.8): the runs of cord cells, drawn thicker.
-        const cords = new Path2D();
-        const pts: number[] = [];
-        for (const ch of chainsFor(h)) {
-          if (ch.x1 < rx0 - 1 || ch.x0 > rx1 + 1 || ch.y1 < ry0 - 1 || ch.y0 > ry1 + 1) continue;
-          pts.length = 0;
-          for (let i = 0; i < ch.world.length; i += 2)
-            pts.push((ch.world[i]! - c.x) * c.zoom + v.w / 2, (ch.world[i + 1]! - c.y) * c.zoom + v.h / 2);
-          smoothThrough(ch.cord ? cords : path, pts);
-        }
-        // The loops fusion closed: a gently bowed curve from one cell to the other.
-        for (let i = 0; i + 1 < h.fusions.length; i += 2) {
-          const a = h.fusions[i]!;
-          const b = h.fusions[i + 1]!;
-          const [ax, ay] = hyphaCell(a);
-          const [bx, by] = hyphaCell(b);
-          if (!inView(ax, ay) && !inView(bx, by)) continue;
-          const [sx, sy] = at(ax, ay);
-          const [tx, ty] = at(bx, by);
-          const bow = (hash(a, b, 3) - 0.5) * 0.7;
-          path.moveTo(sx, sy);
-          path.quadraticCurveTo((sx + tx) / 2 - (ty - sy) * bow, (sy + ty) / 2 + (tx - sx) * bow, tx, ty);
-        }
-        ctx.save();
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = HYPHA_COLOURS.body;
-        const thin = Math.max(1 * d, Math.min(3 * d, c.zoom * 0.12));
-        ctx.globalAlpha = under ? 0.45 : 0.9;
-        ctx.lineWidth = thin;
-        ctx.stroke(path);
-        ctx.lineWidth = Math.max(2.5 * d, Math.min(8 * d, c.zoom * 0.32));
-        ctx.stroke(cords);
-        ctx.restore();
-        if (!distant) {
-          const twigs = new Path2D();
-          for (const ch of chainsFor(h)) {
-            if (ch.cord || ch.x1 < rx0 - 1 || ch.x0 > rx1 + 1 || ch.y1 < ry0 - 1 || ch.y0 > ry1 + 1) continue;
-            for (let i = 1; i < ch.cells.length; i++) {
-              const j = 2 * i;
-              const x = ch.world[j],
-                y = ch.world[j + 1];
-              const [hx, hy] = hyphaCell(ch.cells[i]);
-              if (!inView(hx, hy)) continue;
-              const [sx, sy] = toScreen(c, v, x, y);
-              const angle = Math.atan2(y - ch.world[j - 1], x - ch.world[j - 2]);
-              twigsOf(twigs, ch.cells[i], sx, sy, angle, c.zoom * 0.12, 0.65);
-            }
-          }
-          ctx.save();
-          ctx.strokeStyle = HYPHA_COLOURS.core;
-          ctx.lineWidth = Math.max(d, c.zoom * 0.025);
-          ctx.stroke(twigs);
-          ctx.restore();
-        }
-      }
-      const bent = (x: number, y: number): [number, number] => {
-        const point = [0, 0];
-        wander(centreX(x, y), centreY(y), point);
-        return toScreen(c, v, point[0], point[1]);
-      };
-      ctx.save();
-      ctx.fillStyle = HYPHA_COLOURS.body;
-      ctx.globalAlpha = 1;
-      const r = Math.max(1.5 * d, Math.min(4 * d, c.zoom * 0.18));
-      for (const t of h.tips) {
-        if (!inView(t.x, t.y)) continue;
-        const [x, y] = bent(t.x, t.y),
-          dx = centreX(neighbourX(t.x, t.y, t.heading), neighbourY(t.y, t.heading)) - centreX(t.x, t.y),
-          dy = centreY(neighbourY(t.y, t.heading)) - centreY(t.y);
-        fungalSprites.draw(ctx, { tips: [[dx, dy]] }, 0, x, y, c.zoom);
-      }
-      // Mass in transit (ja-tgw9, flow on): a soft glow on each cell it fills, brighter and wider the more there is, so the
-      // player sees where the mycelium is feeding and a front cut off from it going dim.
-      for (const [k, load] of h.loads) {
-        if (load < HYPHA_MASS * 0.1) continue;
-        const [lx, ly] = hyphaCell(k);
-        if (!inView(lx, ly)) continue;
-        const [x, y] = bent(lx, ly);
-        const full = Math.min(1, load / (HYPHA_MASS * 2));
-        ctx.globalAlpha = (under ? 0.3 : 0.5) * full;
-        ctx.beginPath();
-        ctx.arc(x, y, r * (1 + full), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      const fruits = new Set(h.fruits);
-      for (const k of new Set([...h.knots.keys(), ...fruits])) {
-        const [kx, ky] = hyphaCell(k);
-        if (!inView(kx, ky)) continue;
-        const [x, y] = bent(kx, ky);
-        fungalSprites.draw(
-          ctx,
-          { knot: h.knots.has(k), knotSprouted: h.knots.get(k)?.sprouted ?? false, fruit: fruits.has(k) },
-          k,
-          x,
-          y,
-          c.zoom,
-        );
-      }
-      ctx.restore();
-    };
-
-    /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
-    const pill = (parts: { text: string; fill: string }[], x: number, y: number, px: number) => {
-      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-      const gap = px * 0.45;
-      const widths = parts.map((p) => ctx.measureText(p.text).width);
-      const w = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1) + px;
-      const h = px * 1.6;
-      ctx.globalAlpha = 0.92;
-      ctx.fillStyle = theme.paper;
-      ctx.strokeStyle = theme.line;
-      ctx.lineWidth = Math.max(1, px / 12);
-      ctx.beginPath();
-      ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "start";
-      let at = x - w / 2 + px / 2;
-      parts.forEach((p, n) => {
-        ctx.fillStyle = p.fill;
-        ctx.fillText(p.text, at, y);
-        at += widths[n]! + gap;
-      });
-      ctx.textBaseline = "alphabetic";
-    };
-    /** Text with a paper halo, centred at screen (x, y). */
-    const label = (text: string, x: number, y: number, px: number, alpha = 1, fill = theme.ink) => {
-      ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = Math.max(2, px / 4);
-      ctx.strokeStyle = theme.paper;
-      ctx.globalAlpha = 0.85 * alpha;
-      ctx.strokeText(text, x, y);
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = fill;
-      ctx.fillText(text, x, y);
-      ctx.globalAlpha = 1;
-      ctx.textAlign = "start";
-      ctx.textBaseline = "alphabetic";
-    };
-
-    /**
-     * Columns lo … hi of the line as one dashed stretch through the centres of the plane cells they lie under (P(s)), so it
-     * turns where its tiles turn (ja-lp4.17).
-     */
-    const traceColumns = (line: Transect, lo: number, hi: number, c: Camera, v: Viewport) => {
-      for (let s = lo; s <= hi; s++) {
-        cellAt(line, s);
-        const [x, y] = toScreen(c, v, centreX(CELL[0], CELL[1]), centreY(CELL[1]));
-        if (s === lo) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-    };
-
-    /** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
-    const drawLine = (w: OneWorld, c: Camera, v: Viewport, d: number, holes = true) => {
-      const line = w.line;
-      const k = line.holes.length - 1;
-      ctx.strokeStyle = theme.ink;
-      ctx.lineWidth = Math.max(1, d * 1.2);
-      ctx.setLineDash([6 * d, 5 * d]);
-      // The margins: from each end hole to the line's end, P(sMin) and P(sMax).
-      ctx.globalAlpha = 0.25;
-      ctx.beginPath();
-      traceColumns(line, line.sMin, line.sHole[0]!, c, v);
-      traceColumns(line, line.sHole[k]!, line.sMax, c, v);
-      ctx.stroke();
-      ctx.globalAlpha = 0.6;
-      ctx.beginPath();
-      traceColumns(line, line.sHole[0]!, line.sHole[k]!, c, v);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = theme.ink;
-      if (holes)
-        for (const h of line.holes) {
-          const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
-          ctx.beginPath();
-          ctx.arc(x, y, Math.max(2.5 * d, 0.36 * c.zoom), 0, Math.PI * 2);
-          ctx.fill();
-        }
-      ctx.globalAlpha = 1;
-    };
-
-    /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
-    const drawHoleNames = (w: OneWorld, c: Camera, v: Viewport, d: number, inView: (x: number, y: number) => boolean) => {
-      const holes = anyColony.holeCells;
-      const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
-      for (const h of w.line.holes) {
-        const wx = centreX(h.x, h.y);
-        const wy = centreY(h.y);
-        if (!inView(wx, wy)) continue;
-        let k = -1;
-        for (let n = 0; n < holes.length && k < 0; n++) if (holes[n]!.px === h.x && holes[n]!.py === h.y) k = n;
-        const [x, y] = toScreen(c, v, wx, wy);
-        const above = y - Math.max(12 * d, 4.5 * c.zoom);
-        const col = k >= 0 ? colonies[k] : undefined;
-        if (!col) {
-          label("empty hole", x, above, px);
-          continue;
-        }
-        const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
-        pill(
-          badgeParts(nestBadge(col, k, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
-          x,
-          above - px * 0.2,
-          px,
-        );
-      }
-    };
-
-    /** One world's side view: a faint rule down the curtain at each bend (an interior hole's s), labelled with its turn. */
-    const drawBends = (w: OneWorld, c: Camera, v: Viewport, d: number) => {
-      const line = w.line;
-      const px = Math.round(12 * d);
-      for (let j = 1; j < line.holes.length - 1; j++) {
-        const s = line.sHole[j]!;
-        const [x, top] = toScreen(c, v, centreX(s, STRIP), 0);
-        const [, bottom] = toScreen(c, v, 0, ext.h);
-        if (x < -px * 4 || x > v.w + px * 4) continue;
-        ctx.strokeStyle = theme.ink;
-        ctx.globalAlpha = 0.18;
-        ctx.lineWidth = Math.max(1, d);
-        ctx.beginPath();
-        ctx.moveTo(x, Math.max(0, top));
-        ctx.lineTo(x, Math.min(v.h, bottom));
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        const turn = turnAt(line, j);
-        label(`${turn >= 0 ? "↱" : "↰"} ${Math.round(Math.abs(turn))}°`, x, Math.max(px, top + px), px, 0.8);
-      }
-    };
-
-    /**
-     * One world's side view: the ants on the plane standing on a cell under the line, drawn on the strip at its column(s)
-     * (columnsOver: two at a bend), level, in their colony's colour, a crumb on a carrier. Ants elsewhere on the plane
-     * aren't in this view (one-world §5).
-     */
-    const drawStripAnts = (w: OneWorld, c: Camera, v: Viewport, len: number, crumb: number, inView: (x: number, y: number) => boolean) => {
-      const half = len / 2;
-      const wy = centreY(STRIP);
-      ctx.lineCap = "round";
-      ctx.lineWidth = Math.max(1, len * 0.3);
-      for (const col of colonies) {
-        ctx.beginPath();
-        let carriers = 0;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || col.layer[i] !== PLANE) continue;
-          cellOf(col.x[i], col.y[i]);
-          const over = columnsOver(w.line, CELL[0], CELL[1]);
-          for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j], STRIP);
-            if (!inView(wx, wy)) continue;
-            const [x, y] = toScreen(c, v, wx, wy);
-            ctx.moveTo(x - half, y);
-            ctx.lineTo(x + half, y);
-            if (col.carrying[i]) carriers++;
-          }
-        }
-        ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-        ctx.globalAlpha = 0.85;
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        if (carriers === 0) continue;
-        ctx.fillStyle = theme.accent;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
-          cellOf(col.x[i], col.y[i]);
-          const over = columnsOver(w.line, CELL[0], CELL[1]);
-          for (let j = 0; j < over.length; j++) {
-            const wx = centreX(over[j], STRIP);
-            if (!inView(wx, wy)) continue;
-            const [x, y] = toScreen(c, v, wx, wy);
-            ctx.fillRect(x + half - crumb / 2, y - crumb / 2, crumb, crumb);
-          }
-        }
-      }
-    };
-
-    /** The last preview under the pointer: the pen asked once per cell (and side of the circle's edge), not every frame. */
-    let penSeen: { pen: FieldPen; key: string; at: Settle } | null = null;
-    /**
-     * One world's queen's pen, on the top view: her flight's circle round her mother's hole and, under the pointer,
-     * the cell she would settle on (the new segment of the line dashed to it from the end it grows) or why she can't.
-     */
-    const drawPen = (w: OneWorld, pn: FieldPen, c: Camera, v: Viewport, d: number) => {
-      const [cx, cy] = toScreen(c, v, pn.x, pn.y);
-      ctx.beginPath();
-      ctx.arc(cx, cy, pn.r * c.zoom, 0, Math.PI * 2);
-      ctx.fillStyle = theme.accent;
-      ctx.globalAlpha = 0.06;
-      ctx.fill();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = 2 * d;
-      ctx.setLineDash([8 * d, 6 * d]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 1;
-      const hp = hover.current;
-      if (!hp) return;
-      const [wx, wy] = toWorld(c, v, hp[0], hp[1]);
-      cellOf(wx, wy);
-      const key = `${CELL[0]},${CELL[1]},${Math.hypot(wx - pn.x, wy - pn.y) <= pn.r}`;
-      if (!penSeen || penSeen.pen !== pn || penSeen.key !== key) penSeen = { pen: pn, key, at: pn.preview({ x: wx, y: wy }) };
-      const at = penSeen.at;
-      const px = Math.round(12 * d);
-      if (!at.ok) {
-        // Kept inside the field: the reason is read near the pointer, whichever edge it is at.
-        ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-        const half = ctx.measureText(at.reason).width / 2 + 6 * d;
-        const lx = half * 2 >= v.w ? v.w / 2 : Math.max(half, Math.min(v.w - half, hp[0]));
-        label(at.reason, lx, Math.max(px, hp[1] - 18 * d), px, 1, theme.warn);
-        return;
-      }
-      const tx = centreX(at.cell.x, at.cell.y);
-      const ty = centreY(at.cell.y);
-      const [sx, sy] = toScreen(c, v, tx, ty);
-      const holes = w.line.holes;
-      const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = Math.max(1.5, d * 1.5);
-      ctx.setLineDash([6 * d, 5 * d]);
-      // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
-      const seg = segmentCells(e, at.cell);
-      ctx.beginPath();
-      for (let i = 0; i < seg.length; i += 2) {
-        const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      ctx.setLineDash([]);
-      // From where she lands to where she settles, when she walks on.
-      if (Math.hypot(sx - hp[0], sy - hp[1]) > 4 * d) {
-        ctx.globalAlpha = 0.5;
-        ctx.lineWidth = d;
-        ctx.beginPath();
-        ctx.moveTo(hp[0], hp[1]);
-        ctx.lineTo(sx, sy);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-      const rr = Math.max(6 * d, c.zoom * 1.2);
-      ctx.beginPath();
-      ctx.arc(sx, sy, rr, 0, Math.PI * 2);
-      ctx.lineWidth = 2 * d;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(2.5 * d, 0.6 * c.zoom), 0, Math.PI * 2);
-      ctx.fillStyle = theme.accent;
-      ctx.fill();
-      label("her hole", sx, sy - rr - px, px);
-    };
-
     const draw = () => {
       const started = env.dev ? env.now() : 0;
       bind();
       const d = env.dpr();
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
-      framePaints = frameHits = 0;
+      ground.beginFrame();
       // The followed ant as it stood when the frame began (the prelude below ends the follow of an ant that is gone).
       const f = follow.current;
       const fcol = f ? followedColony(colonies, f) : null;
       const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
       // The follow, the crossing through a hole and the camera's ease (field/prelude.ts), then the frame draws with the camera it gives.
       const c = prepareFrame(colonies, lv, ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
+      Object.assign(fctx, { theme, d, v, c, lv, m, ext, smellAll, strip, trails, alarms, spores, sensedLayer, sensedNow: sensed.now });
+      inputs.show = layers.current;
+      inputs.hover = hover.current;
+      inputs.pen = penRef.current;
       ctx.fillStyle = theme.paper;
       ctx.fillRect(0, 0, v.w, v.h);
       ctx.imageSmoothingEnabled = false;
       const [left, top] = toScreen(c, v, gx0, 0);
       const [right, bottom] = toScreen(c, v, gx0 + ext.w, ext.h);
-      ctx.fillStyle = `rgb(${groundPaper().join(",")})`;
+      ctx.fillStyle = `rgb(${groundPaper(fctx).join(",")})`;
       ctx.fillRect(left, top, right - left, bottom - top);
 
       // The rows of hexagons in view, and the chunks they fall in. Every chunk in view is painted
@@ -1416,27 +623,8 @@ export default function ColonyField({
         workerStyle = hexes && workerSprites.ready(resourceLod) ? "voxel" : "ink";
       // Both maps face the ants' walking plane: aerial above, straight onto the back wall below.
       const resourceImage = hexes ? resourceSprites.get(resourceLod) : null;
-      for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
-        for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
-          const rc = m.rock.chunk(cx, cy);
-          if (!rc) continue;
-          const cc = chunkCanvas(cx, cy);
-          paintChunk(cx, cy, cc, rc, !!resourceImage);
-          if (hexMix > 0) continue;
-          // Zoomed out: bricks. Each row of the chunk is a strip one cell high (R), odd rows shifted
-          // half a cell right: the same six neighbours as hexagons, and a few draws per chunk.
-          const ly0 = Math.max(0, ry0 - cy * CHUNK);
-          const ly1 = Math.min(CHUNK - 1, ry1 - cy * CHUNK);
-          for (let ly = ly0; ly <= ly1; ly++) {
-            const y = cy * CHUNK + ly;
-            const [ax, ay] = toScreen(c, v, cx * CHUNK + 0.5 * (y & 1), y * R);
-            const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
-            const dx = Math.round(ax);
-            const dy = Math.round(ay);
-            ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
-          }
-        }
-      if (hexMix > 0) drawHexes(c, v, rx0, rx1, ry0, ry1, hexMix);
+      const cellWindow = { rx0, rx1, ry0, ry1 };
+      ground.draw(fctx, inputs.show, cellWindow, hexMix, !!resourceImage);
       if (hexMix > 0) {
         ctx.save();
         ctx.globalAlpha = hexMix;
@@ -1447,10 +635,7 @@ export default function ColonyField({
           v.h / 2 - c.y * c.zoom,
           [rx0, rx1, ry0, ry1],
           (x, y) => rockAt(m, x, y),
-          (x, y) => {
-            const data = chunks.get(`${x >> 6},${y >> 6}`)?.img.data;
-            return !!data && data[(((y & 63) << 6) | (x & 63)) * 4 + 3] === 0;
-          },
+          (x, y) => ground.isBare(x, y),
           theme.ink,
           theme.paper,
         );
@@ -1497,26 +682,8 @@ export default function ColonyField({
         }
         ctx.globalAlpha = 1;
       }
-      const hy = fungus.hyphaeOn(lv);
-      if (hy) drawHyphae(hy, c, v, d, lv === PLANE, rx0, rx1, ry0, ry1);
-      const corpseCells = new Set(colonies.flatMap((col) => visibleCadavers(col, lv).map((k) => cellKey(k.x, k.y))));
-      const stalks = new Set(fungus.stalksOn(lv)),
-        stalkLevel = fungus.evolution?.level("stalks") ?? 0;
-      for (const [k, left] of fungus.corpsesOn(lv)) {
-        const [sx, sy] = hyphaCell(k);
-        if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
-        const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
-        fungalSprites.draw(
-          ctx,
-          { colonised: true, sporulating: left > 0, stalkLevel: stalks.has(k) ? stalkLevel : 0 },
-          k,
-          x,
-          y,
-          c.zoom,
-          "ground",
-        );
-        if (stalks.has(k) && !corpseCells.has(k)) cadaverSprites.draw(ctx, workerLod(c.zoom, d), 1, x, y, c.zoom);
-      }
+      // The fungus on the ground: this layer's hyphae, and the corpses it has colonised (field/fungus.ts).
+      const fungusFrame = drawFungusGround(fctx, cellWindow);
 
       // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
       // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
@@ -1525,8 +692,8 @@ export default function ColonyField({
       const half = len / 2;
       const crumb = Math.max(1.5, len * 0.35);
       const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
-      if (lv === PLANE) drawLine(world, c, v, d);
-      if (lv === CURTAIN) drawBends(world, c, v, d);
+      if (lv === PLANE) drawLine(fctx);
+      if (lv === CURTAIN) drawBends(fctx);
       const alateOverlays: (() => void)[] = [];
       for (const col of [...colonies].reverse()) {
         // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
@@ -1814,15 +981,9 @@ export default function ColonyField({
           }
         }
       }
-      if (strip) drawStripAnts(world, c, v, len, crumb, inView);
+      if (strip) drawStripAnts(fctx, len, crumb, inView);
 
-      // Tall structures occlude bodies in the aerial view, just as they do in 3D inspection.
-      for (const k of stalks) {
-        const [sx, sy] = hyphaCell(k);
-        if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
-        const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
-        fungalSprites.draw(ctx, { stalkLevel }, k, x, y, c.zoom, "raised");
-      }
+      drawStalksRaised(fctx, cellWindow, fungusFrame);
 
       // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
       const voxel = voxelMap.draw(
@@ -1852,8 +1013,8 @@ export default function ColonyField({
           voxelAlpha: voxel.alpha,
           angled: frameAngled,
           canRotate,
-          chunkPaints: framePaints,
-          chunkCacheHits: frameHits,
+          chunkPaints: ground.paints,
+          chunkCacheHits: ground.hits,
         },
         sinks,
       );
@@ -1899,8 +1060,8 @@ export default function ColonyField({
           }
           ctx.globalAlpha = 1;
         }
-        if (world && lv === PLANE) drawLine(world, c, v, d, false);
-        if (world && lv === CURTAIN) drawBends(world, c, v, d);
+        if (world && lv === PLANE) drawLine(fctx, false);
+        if (world && lv === CURTAIN) drawBends(fctx);
       }
       if (labelsOn.current && m.chambers) {
         const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
@@ -2021,7 +1182,7 @@ export default function ColonyField({
         ctx.stroke();
         ctx.setLineDash([]);
         const tpx = Math.round(10 * d);
-        pill([{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
+        pill(fctx, [{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
       }
       // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
       // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
@@ -2035,12 +1196,12 @@ export default function ColonyField({
         ctx.lineWidth = 2 * d;
         ctx.stroke();
         const tpx = Math.round(11 * d);
-        pill([{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
+        pill(fctx, [{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
       }
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-      if (lv === PLANE) drawHoleNames(world, c, v, d, inView);
+      if (lv === PLANE) drawHoleNames(fctx, inView);
       const pn = penRef.current;
-      if (lv === PLANE && pn) drawPen(world, pn, c, v, d);
+      if (lv === PLANE && pn) drawPen(fctx, inputs);
 
       drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
 

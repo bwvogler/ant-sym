@@ -33,6 +33,10 @@ export interface FieldEnv {
   dev: boolean;
   /** the player prefers reduced motion (read when asked: it can change while the page is open) */
   reducedMotion(): boolean;
+  /** a new, empty path (a Path2D: a Node test has none, and gives a recording one) */
+  newPath(): Path2D;
+  /** a new canvas of this size (a chunk's buffer: a Node test has no document, and gives a fake with a recording context) */
+  newCanvas(width: number, height: number): HTMLCanvasElement;
   /** a fresh set of sprite sets (the field builds them again when its colonies, world or fungus change) */
   sprites(): SpriteSets;
 }
@@ -45,6 +49,13 @@ export function browserEnv(dev: boolean): FieldEnv {
     dpr: () => Math.min(2, window.devicePixelRatio || 1),
     dev,
     reducedMotion: () => (motion ??= matchMedia("(prefers-reduced-motion: reduce)")).matches,
+    newPath: () => new Path2D(),
+    newCanvas: (width, height) => {
+      const cv = document.createElement("canvas");
+      cv.width = width;
+      cv.height = height;
+      return cv;
+    },
     sprites: () => ({
       cadaver: new CadaverSprites(),
       fungal: new FungalMapSprites(),

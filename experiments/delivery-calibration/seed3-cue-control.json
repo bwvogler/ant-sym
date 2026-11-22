@@ -1,0 +1,62 @@
+{
+  "harnessSha256": "14dd36fef07a8844fd2879762da912b7b62e77423baad3676e30731180cb275a",
+  "commit": "117bafc0a080388b021aedfb032dae24abf2eaa4",
+  "seed": 3,
+  "seconds": 600,
+  "ants": 60,
+  "royalCap": 20,
+  "cueLoss": null,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads or locations. Optional timed mark-gain loss is an experimental intervention, not simulated fungal infection. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "royalField": {
+        "markedCells": 183,
+        "nearCapCells": 154,
+        "max": 20
+      },
+      "name": "context5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "context",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 287.69335685713077
+        },
+        {
+          "role": "reception",
+          "food": 0
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 409,
+      "portTrips": 0,
+      "finalLarder": 287.69335685713077,
+      "carriedDown": 409,
+      "held": 10,
+      "maxHeld": 16,
+      "maxActive": 16,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 419,
+      "switches": 68,
+      "deliveries": 409,
+      "releases": 0,
+      "releaseCalls": 0,
+      "cueLossCarryCalls": 0,
+      "cueLossRecognisedCalls": 0,
+      "checkpoints": [],
+      "activeSeconds": 4869.033333333464,
+      "longSeconds": 0,
+      "carryCalls": 164102,
+      "longCalls": 0,
+      "wallSeconds": 44.273281469000004
+    }
+  ]
+}

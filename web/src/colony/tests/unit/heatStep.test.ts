@@ -12,7 +12,7 @@ import type { ColonyParams } from "../../params.ts";
 // effects (feeling hot, dying of it) without playing a game. dt = 0 leaves the body's heat where the test put it, so the flag and the
 // death are read alone.
 
-const game = (): Game => new Game(generateOneWorld(1), { antCount: 8, rival: false, species: DESERT_ANT }, gameRng(1));
+const game = (): Game => new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 8 }]);
 
 /** Colony 0 with ant 0 on the plane (`on` PLANE) or inside (CURTAIN), at body heat `above` degrees over the nest's; the others dead, so only ant 0 steps. */
 function setup(on: number, above: number): { c: Colony; p: ColonyParams } {
