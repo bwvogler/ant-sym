@@ -13,7 +13,7 @@ import { smallOne } from "../builders.ts";
 const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 
 test("the queen's larger grooming cap is the evolving game's: a lab or test game's queen is groomed as before (PR #43 review, S1)", () => {
-  const queenAt = (queenGroomers: number, evolve: boolean) => {
+  const queenAt = (queenGroomers: number, evolve: boolean, seconds = 45) => {
     const g = new Game(smallOne(1), { antCount: 300, rivalAnts: 300, fungus: { queenGroomers } }, mulberry32(7919));
     g.land(0, GARDEN, { evolve });
     if (evolve) {
@@ -21,11 +21,12 @@ test("the queen's larger grooming cap is the evolving game's: a lab or test game
       g.fungus.strains[GARDEN]!.transmission = 0.3;
       g.fungus.strains[GARDEN]!.decay = 0;
     }
-    for (let k = 0; k < 30 * 45; k++) g.tick(1 / 30);
+    for (let k = 0; k < 30 * seconds; k++) g.tick(1 / 30);
     return g.colonies[0]!.queen!.load;
   };
   assert.equal(queenAt(8, false), queenAt(4, false), "not evolving: the cap is not read");
-  const four = queenAt(4, true);
-  const eight = queenAt(8, true);
+  // The seven-cell landing (PRD §85) takes the fungus about a minute to reach her: 120 s, where the caps part (0.543 vs 0.501).
+  const four = queenAt(4, true, 120);
+  const eight = queenAt(8, true, 120);
   assert.ok(four > 0 && eight !== four, `evolving: the cap is read (${four.toFixed(3)} vs ${eight.toFixed(3)})`);
 });

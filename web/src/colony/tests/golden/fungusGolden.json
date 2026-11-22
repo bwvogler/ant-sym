@@ -38,23 +38,23 @@
    ],
    "fungus": {
     "state": {
-     "spores": "912cd527",
-     "sporeStrain": "39b457e0",
-     "sporeCells": "b1e884a5",
-     "hosts": "87e146ec",
+     "spores": "a30ffdee",
+     "sporeStrain": "3f88afb8",
+     "sporeCells": "10de22b",
+     "hosts": "8ff29ca5",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "860aeacc",
-     "base": "8ea4ab75",
-     "hyphae": "c85f763a",
+     "evolution": "6d9e7b6a",
+     "base": "d2dabcb3",
+     "hyphae": "ab2a1833",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
-     "links": "741638a5",
+     "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     39,
+     15,
      0
     ]
    }
@@ -97,23 +97,23 @@
    ],
    "fungus": {
     "state": {
-     "spores": "fdd7ef10",
-     "sporeStrain": "39b457e0",
-     "sporeCells": "b1e884a5",
-     "hosts": "f72c6887",
+     "spores": "7702583f",
+     "sporeStrain": "3f88afb8",
+     "sporeCells": "10de22b",
+     "hosts": "8af0562f",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "a1791279",
-     "base": "8ea4ab75",
-     "hyphae": "2f67de3e",
+     "evolution": "c951e922",
+     "base": "d2dabcb3",
+     "hyphae": "636d3a74",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
-     "links": "741638a5",
+     "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     83,
+     21,
      0
     ]
    }
@@ -156,23 +156,23 @@
    ],
    "fungus": {
     "state": {
-     "spores": "b7349b9a",
-     "sporeStrain": "3b62d33",
-     "sporeCells": "b6698703",
-     "hosts": "f31f9648",
+     "spores": "c97f7c7f",
+     "sporeStrain": "9618822b",
+     "sporeCells": "601a3a7d",
+     "hosts": "91e39541",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "476eaa4a",
-     "base": "8ea4ab75",
-     "hyphae": "da4f3600",
+     "evolution": "91be2fd1",
+     "base": "d2dabcb3",
+     "hyphae": "d4c67268",
      "corpses": "1467e1bc",
      "corpseAges": "b45c43d2",
      "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     96,
+     14,
      0
     ]
    }
@@ -215,23 +215,23 @@
    ],
    "fungus": {
     "state": {
-     "spores": "56abf23",
-     "sporeStrain": "65888de1",
-     "sporeCells": "9cba375c",
-     "hosts": "f921de51",
+     "spores": "2757a9f2",
+     "sporeStrain": "213b52f9",
+     "sporeCells": "87d9b452",
+     "hosts": "15e8e23b",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "8f33c918",
-     "base": "8ea4ab75",
-     "hyphae": "38d3754c",
+     "evolution": "66b57cb3",
+     "base": "d2dabcb3",
+     "hyphae": "179650ce",
      "corpses": "a40adcd9",
      "corpseAges": "fa95424c",
      "links": "26717f43",
      "layers": "7eb63dca"
     },
     "infected": [
-     78,
+     6,
      1
     ]
    }
