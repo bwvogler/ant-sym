@@ -159,6 +159,27 @@ test("the notices steps pause the game and wait for an empty field before raisin
   assert.ok(stepOf(14).indexOf("await noNotices(np2") < stepOf(14).indexOf("const raise = "), "step 14 raises its notices only after");
 });
 
+// The field reads a crossing from the layer in each draw frame, so a host that is below for less than a frame leaves the view
+// where it was; on a loaded runner a frame can take over a second. Step 7 failed that way on two unrelated branches (ja-jheh: the
+// trace showed 0.4 s per poll and no frame with the host below). The check counts drawn frames and owes the follow after three.
+test("the tutorial step's view-follows-below check counts drawn frames before it fails (ja-jheh)", () => {
+  const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
+  assert.match(
+    script,
+    /window\.__frames = 0;\s+const tick = \(\) => \{\s+window\.__frames\+\+;\s+requestAnimationFrame\(tick\);/,
+    "the page counts its draw frames",
+  );
+  assert.match(script, /const FRAMES_OWED = 3;/, "three frames are owed");
+  assert.match(
+    script,
+    /if \(below && b2\) framesBelow \+= f2 - frames;/,
+    "only an interval that began and ended with the host below counts",
+  );
+  assert.match(script, /else if \(framesBelow >= FRAMES_OWED\)\s+check\(false, /, "with the frames owed and no follow, the check fails");
+  assert.match(script, /the view-follows-below check was not exercised/, "a shorter dip is said, not failed");
+  assert.doesNotMatch(script, /"the view follows the host below", 3000/, "the 3 s wait for the view alone is gone");
+});
+
 test("the tutorial step's camera check reads the poll's last value, not a second read (review of #253, N1)", () => {
   const script = readFileSync(join(ROOT, "scripts/e2e-one-world.mjs"), "utf8");
   assert.match(script, /let off = null;\s*await until\(/, "the value the check reads is declared before the poll");
