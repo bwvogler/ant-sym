@@ -138,10 +138,12 @@ Crowding is where a knob meets spread: S1 is contact transmission, so a crowd is
 
 ## Open questions
 
-- Whether to accept a design limit with no direct source for nurses leaving a crowd (owner), or to bound the heap physically (one ant per cell), a bigger change to movement.
+- ~~Whether to accept a design limit with no direct source for nurses leaving a crowd, or to bound the heap physically.~~ Owner, 2026-11-22: build the soft form (`broodCrowd`) for testing. A physical cap was weighed and set aside: the nest is sized for about 10 ants a floor cell, and a refused step needs somewhere to go. The graded rule and the fungus knobs are `ja-k4k.15.7`.
+- ~~Whether the knobs sit under the existing reach groups (the player spends mutations to widen how far a group reaches).~~ Owner, 2026-11-22: yes.
+- Whether to turn the climb on now with `broodCrowd` 3, or hold until the physics step exists (owner).
 - The threshold: 3 beats 6 by the worst seed on seeds 1–20 (not yet confirmed on a second set); tuned against `nurseZone` and `game1`, not measured.
 - Whether the same jam appears in other settings (rate 0.3 had 42 porting on one seed: `ja-097s`-like).
-- Full texts of Robinson 2009 and Sendova-Franks 1995.
+- Whether to read the full texts of Stroeymeyt 2018, Gravish 2015, Aguilar 2018, Robinson 2009 and Sendova-Franks 1995 before building on them.
 
 ## Sources
 

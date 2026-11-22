@@ -6932,7 +6932,9 @@ By the worst seed, 3. Its game1 misses hold 3–4 against a limit of 2; main's w
 
 **A correction (owner, 2026-11-22).** The plan first listed "the nest widens chambers when crowded" as a colony counter. That is `Colony.crowded()`: the colony's head count underground against its total chamber floor, a prohibited read already on the gap list (vision.md "Digging gate", `ja-k4k.3.1`). It decides when a brood chamber grows, so `ja-k4k.15.7` is blocked by `ja-k4k.3.1`; the limit (`ja-k4k.15.6`) is not, because it reads the ant's own cell.
 
-**Open:** whether the knobs sit under the existing reach groups (owner); a second set of seeds for the threshold; full texts of Stroeymeyt 2018, Gravish 2015 and Aguilar 2018 before building on them.
+**Decided (owner, 2026-11-22):** the knobs sit under the existing reach groups. The physics step is its own bead, `ja-k4k.15.7`'s first child, not blocked by `ja-k4k.3.1`.
+
+**Open:** whether to turn the climb on now with `broodCrowd` 3 or hold for the physics step (owner); a second set of seeds for the threshold; full texts of Stroeymeyt 2018, Gravish 2015 and Aguilar 2018 before building on them.
 
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 
