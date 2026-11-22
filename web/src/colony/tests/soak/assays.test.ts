@@ -36,24 +36,27 @@ test("runGame builds the game the page builds (one world, gameRng): same numbers
 
 test("overrides: channel params merge per field and reach the pheromone fields", () => {
   const spec = withOverrides(deplete.spec(1), { colony: { deposit: 9, channels: { food: { evaporation: 0.5 } } } });
-  assert.equal(spec.sides?.colony?.deposit, 9);
-  const { c } = oneColony(10, { ...spec.sides?.colony });
+  assert.equal(spec.colonies?.[0]?.colony?.deposit, 9);
+  const { c } = oneColony(10, { ...spec.colonies?.[0]?.colony });
   assert.equal(c.ph.params.food.evaporation, 0.5);
   assert.equal(c.ph.params.food.diffusion, 0.3);
   assert.equal(c.ph.params.alarm.evaporation, 0.25);
 });
 
 test("overrides: a fight override keeps the other fight params; rival params reach the second colony", () => {
-  const spec = withOverrides(deplete.spec(1), { game: { fight: { rate: 3 } }, rival: { deposit: 7 } });
+  const spec = withOverrides(
+    { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 10 }] },
+    { game: { fight: { rate: 3 } }, rival: { deposit: 7 } },
+  );
   assert.equal(spec.game?.fight?.rate, 3);
   assert.equal(spec.game?.fight?.alarm, 8);
-  const g = new Game(smallOne(1), { antCount: 10, rivalAnts: 10 }, gameRng(1), spec.sides);
+  const g = new Game(smallOne(1), {}, gameRng(1), spec.colonies);
   assert.equal(g.rival?.params.deposit, 7);
   assert.equal(g.player.params.deposit, 4);
 });
 
 test("overrides: responses replace the assay's own hook by hook", () => {
-  const base = { ...deplete.spec(1), sides: { responses: { ...localResponses, trailRate: () => 3 } } };
+  const base = { ...deplete.spec(1), colonies: [{ antCount: 10, responses: { ...localResponses, trailRate: () => 3 } }] };
   const spec = withOverrides(base, { responses: { get: () => false } });
   const t = {
     mode: "explore",
@@ -71,9 +74,9 @@ test("overrides: responses replace the assay's own hook by hook", () => {
     raid: "strong",
     crowd: "few",
   } as const;
-  assert.equal(spec.sides?.responses?.get(t), false);
-  assert.equal(spec.sides?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
-  assert.equal(spec.sides?.responses?.carry(t), "take");
+  assert.equal(spec.colonies?.[0]?.responses?.get(t), false);
+  assert.equal(spec.colonies?.[0]?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
+  assert.equal(spec.colonies?.[0]?.responses?.carry(t), "take");
 });
 
 test("nurseZoneProbe: a young ant on the brood and a middle-aged one five cells off give a margin of 5 (ja-k4k.15.1; review of #192, N7)", () => {
