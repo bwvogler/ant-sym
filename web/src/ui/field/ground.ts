@@ -339,8 +339,8 @@ export class Ground {
           px[o + 3] = 120 + Math.min(135, food * 12);
         } else px[o + 3] = 0; // open ground: the paper, as the side view's walkway
         const cut = Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0);
-        for (let k = 1; k <= cut; k++) {
-          o = ((ly - k) * CHUNK + lx) * 4;
+        for (let up = 1; up <= cut; up++) {
+          o = ((ly - up) * CHUNK + lx) * 4;
           px[o] = theme.spoil[0];
           px[o + 1] = theme.spoil[1];
           px[o + 2] = theme.spoil[2];

@@ -293,6 +293,24 @@ test("scent: a trail or alarm shows only where hosts sensed it lately (or in sme
   assert.deepEqual(px(simg, 9, 1), [...odourRgb(THEME.inkRgb, THEME.warnRgb, 0.5), 150]);
 });
 
+test("scent edge cases: an alarm past its full strength is capped, a colony with only a home trail still shows it", () => {
+  const alarm = new Float32Array(CHUNK * CHUNK);
+  const sensed = new Float32Array(CHUNK * CHUNK).fill(-Infinity);
+  const home = new Float32Array(CHUNK * CHUNK);
+  alarm[cell(1, 1)] = ALARM_FULL * 3;
+  sensed[cell(1, 1)] = FRESH;
+  home[cell(2, 1)] = HOME_FULL;
+  sensed[cell(2, 1)] = FRESH;
+  const f = field(null, {
+    sensed,
+    alarm,
+    trails: [{ food: layer(undefined), home: layer(home), odour: 0 }] as unknown as FieldCtx["trails"],
+  });
+  const img = paint(f);
+  assert.deepEqual(px(img, 1, 1), [...THEME.alarm, 190], "capped at full: 40 + 150");
+  assert.deepEqual(px(img, 2, 1), [...HOME_RGB, 90], "a home trail of a colony with no food trail here");
+});
+
 test("chambers: a faint wash in the room's role colour, the page's chamber colour for a role with none, fainter for none", () => {
   const cellsOf = new Uint8Array(CHUNK * CHUNK);
   cellsOf[cell(1, 1)] = 1; // the first chamber
@@ -389,6 +407,10 @@ test("the side view's strip: the plane cell under each column of the line, its g
   for (let up = 1; up <= 3; up++) assert.deepEqual(px(cc.img, lx(s + 3), STRIP - up), [...THEME.spoil, 255], `the cut's level ${up}`);
   assert.deepEqual(px(cc.img, lx(s + 3), STRIP - 4), [...THEME.sky, 255], "no higher than the mound is: the sky");
   assert.deepEqual([f.ground.paints, f.ground.hits], [1, 0]);
+  assert.ok(
+    (cc.canvas as unknown as RecordedCanvas).rec.log.includes("putImageData(ImageData(64x64), 0, 0)"),
+    "the buffer reaches the canvas",
+  );
   f.ground.paintChunk(f.k, SHOW, cx, 0, cc, rc, false);
   assert.deepEqual([f.ground.paints, f.ground.hits], [2, 0], "the strip's chunk is never served from the cache");
   plane.spoil!.set(mx, my, 99);
@@ -739,4 +761,180 @@ test("draw, up close: a food wash that happens to be the mound's colour is not t
     f.log.includes(`fillStyle = ${rgb(blended(CLOSE_SPRITE_GROUND.spoil, 132, paper))}`),
     "filled at its own opacity, not the tint's fade",
   );
+});
+
+/** Chunk layers for a map of several chunks: arrays by "cx,cy". */
+const chunked = (by: Record<string, ArrayLike<number>>) => ({ chunk: (cx: number, cy: number) => by[`${cx},${cy}`] }) as never;
+
+/**
+ * A map the shape of one world's curtain: its first column is negative (x0 = -70), 140 wide, and a window over it crosses a chunk column
+ * (x = -64) and a chunk row (y = 64). Chunks (-2, 0), (-1, 0), (-2, 1), (-1, 1) hold what the tests put in them.
+ */
+function curtainish() {
+  const chunks = ["-2,0", "-1,0", "-2,1", "-1,1"];
+  const rock = Object.fromEntries(chunks.map((c) => [c, new Uint8Array(CHUNK * CHUNK)]));
+  const food = Object.fromEntries(chunks.map((c) => [c, new Float32Array(CHUNK * CHUNK)]));
+  const spoil = Object.fromEntries(chunks.map((c) => [c, new Uint16Array(CHUNK * CHUNK)]));
+  // cell (x, y) is chunk (x >> 6, y >> 6) at index ((y & 63) << 6) | (x & 63)
+  const at = (x: number, y: number) => ({ key: `${x >> 6},${y >> 6}`, i: ((y & 63) << 6) | (x & 63) });
+  const put = <A extends Record<string, { [i: number]: number }>>(by: A, x: number, y: number, v: number) => {
+    const { key, i } = at(x, y);
+    by[key]![i] = v;
+  };
+  const m = {
+    x0: -70,
+    size: { w: 140, h: 100 },
+    rock: chunked(rock),
+    food: chunked(food),
+    spoil: chunked(spoil),
+  } as unknown as WorldMap;
+  return { m, rock, food, spoil, put, ext: { x0: -70, w: 140, h: 100 } };
+}
+
+/** The hexagon's six vertices round cell (x, y) as drawHexes lays them, at this zoom, blend and camera. */
+function hexagon(x: number, y: number, zoom: number, hexMix: number, c: { x: number; y: number }, v: { w: number; h: number }): string[] {
+  const hx = zoom * 0.5 * (1 + 0.04 * hexMix);
+  const shoulder = zoom * (R / 2 + (SIDE * 0.52 - R / 2) * hexMix);
+  const tip = zoom * (R / 2 + (SIDE * 1.04 - R / 2) * hexMix);
+  const sx = (x + 0.5 + 0.5 * (y & 1)) * zoom + (v.w / 2 - c.x * zoom);
+  const sy = (y + 0.5) * R * zoom + (v.h / 2 - c.y * zoom);
+  return [
+    `moveTo(${r3(sx + hx)}, ${r3(sy + shoulder)})`,
+    `lineTo(${r3(sx)}, ${r3(sy + tip)})`,
+    `lineTo(${r3(sx - hx)}, ${r3(sy + shoulder)})`,
+    `lineTo(${r3(sx - hx)}, ${r3(sy - shoulder)})`,
+    `lineTo(${r3(sx)}, ${r3(sy - tip)})`,
+    `lineTo(${r3(sx + hx)}, ${r3(sy - shoulder)})`,
+    "closePath()",
+  ];
+}
+
+test("draw, up close on a curtain-shaped map: across two chunk columns and two chunk rows, from a negative first column, each chunk is its own canvas and every cell lands where it should", () => {
+  const w = curtainish();
+  w.put(w.rock, -66, 62, ROCK); // chunk (-2, 0)
+  w.put(w.rock, -63, 64, ROCK); // chunk (-1, 1)
+  w.put(w.food, -64, 63, 1); // chunk (-1, 0): a wash, not opaque
+  const c = { x: -64, y: 64, zoom: 20 };
+  const f = field(null, { m: w.m, ext: w.ext as FieldCtx["ext"], c: c as FieldCtx["c"] });
+  f.ground.draw(f.k, SHOW, { rx0: -66, rx1: -62, ry0: 62, ry1: 66 }, 1, false);
+  assert.deepEqual(
+    [...f.ground.chunks.keys()].sort(),
+    ["-1,0", "-1,1", "-2,0", "-2,1"],
+    "a canvas for each chunk in the window, by its own key",
+  );
+  assert.equal(f.canvases.length, 4);
+  const cmds = f.paths.flatMap((p) => p.cmds);
+  for (const [x, y] of [
+    [-66, 62],
+    [-63, 64],
+    [-64, 63],
+  ] as const)
+    assert.ok(cmds.includes(hexagon(x, y, 20, 1, c, f.k.v)[0]!), `a hexagon at (${x}, ${y})`);
+  assert.equal(f.paths.length, 2, "two colours: the rock's and the food wash's");
+  // the paper covers the map from its own first column
+  const [ax, ay] = toScreen(c, f.k.v, -70, 0);
+  const [bx, by] = toScreen(c, f.k.v, -70 + 140, 100);
+  assert.ok(f.log.includes(`fillRect(${r3(ax)}, ${r3(ay)}, ${r3(bx - ax)}, ${r3(by - ay)})`), "the paper from x0 to x0 + width");
+  // isBare: the chunk's canvas by (cx, cy), the pixel's alpha
+  assert.equal(f.ground.isBare(-66, 62), false, "rock (opaque)");
+  assert.equal(f.ground.isBare(-63, 64), false, "rock in chunk (-1, 1)");
+  assert.equal(f.ground.isBare(-64, 63), false, "a wash (translucent) is not bare");
+  assert.equal(f.ground.isBare(-65, 63), true, "nothing on it");
+  assert.equal(f.ground.isBare(-62, 65), true, "nothing on it, in chunk (-1, 1)");
+  // a window that starts in chunk column -1 (the first a curtain has to the left of 0) and in chunk row 1 only
+  const w2 = curtainish();
+  w2.put(w2.rock, -60, 65, ROCK);
+  const c2 = { x: -60, y: 65, zoom: 20 };
+  const g = field(null, { m: w2.m, ext: w2.ext as FieldCtx["ext"], c: c2 as FieldCtx["c"] });
+  g.ground.draw(g.k, SHOW, { rx0: -62, rx1: -58, ry0: 65, ry1: 66 }, 1, false);
+  assert.ok(
+    g.paths.flatMap((p) => p.cmds).includes(hexagon(-60, 65, 20, 1, c2, g.k.v)[0]!),
+    "a hexagon in chunk column -1, which is not 'no chunk yet'",
+  );
+  assert.deepEqual([...g.ground.chunks.keys()], ["-1,1"], "only the chunk the window is in: not the rows above it");
+});
+
+test("draw, up close: the mound's pellets fade in over the first CSS pixels past a hexagon and not before, in the plane only and never in smell vision", () => {
+  const heap = (zoom: number, over: Over = {}) => {
+    const w = curtainish();
+    w.put(w.spoil, -66, 62, 6);
+    const c = { x: -64, y: 64, zoom };
+    const f = field(null, { m: w.m, ext: w.ext as FieldCtx["ext"], c: c as FieldCtx["c"], ...over });
+    f.ground.draw(f.k, SHOW, { rx0: -66, rx1: -62, ry0: 62, ry1: 66 }, 0.5, false);
+    return f;
+  };
+  const alphaOfPellets = (f: ReturnType<typeof heap>) => {
+    const save = f.log.indexOf("save()");
+    return save < 0 ? null : f.log[save + 1];
+  };
+  assert.equal(alphaOfPellets(heap(10)), null, "under 12 px no pellet is drawn at all (not drawn at a negative alpha)");
+  assert.equal(alphaOfPellets(heap(12)), null, "nor at exactly 12");
+  assert.equal(alphaOfPellets(heap(16)), "globalAlpha = 0.5");
+  assert.equal(alphaOfPellets(heap(24)), "globalAlpha = 1", "from 20 px, fully");
+  assert.equal(alphaOfPellets(heap(40)), "globalAlpha = 1", "and no more than fully");
+  // the tint fades out as they fade in: gone altogether once they are full
+  const tinted = (f: ReturnType<typeof heap>) => f.paths.length;
+  assert.equal(tinted(heap(10)), 1, "the heap's tint, at full strength while no pellets show");
+  assert.equal(tinted(heap(24)), 0, "no tint left once the pellets are full: the wash fades to nothing, and nothing is filled");
+  assert.equal(tinted(heap(40)), 0);
+  // never in smell vision, never on the curtain
+  assert.equal(alphaOfPellets(heap(24, { smellAll: true })), null, "smell vision: the washes only");
+  assert.equal(alphaOfPellets(heap(24, { lv: CURTAIN })), null, "the curtain has no pellets");
+});
+
+test("draw, between bricks and hexagons: the hexagon's height scales with the blend as its width does", () => {
+  const w = curtainish();
+  w.put(w.rock, -66, 62, ROCK);
+  const c = { x: -64, y: 64, zoom: 12 };
+  for (const mix of [0.25, 0.5, 1]) {
+    const f = field(null, { m: w.m, ext: w.ext as FieldCtx["ext"], c: c as FieldCtx["c"] });
+    f.ground.draw(f.k, SHOW, { rx0: -66, rx1: -62, ry0: 62, ry1: 66 }, mix, false);
+    assert.deepEqual(f.paths[0]!.cmds, hexagon(-66, 62, 12, mix, c, f.k.v), `at a blend of ${mix}`);
+  }
+});
+
+test("draw hands what it is given on to paintChunk: the settings and whether sprites show the food reach the buffer", () => {
+  const food = new Float32Array(CHUNK * CHUNK);
+  const home = new Float32Array(CHUNK * CHUNK);
+  const sensed = new Float32Array(CHUNK * CHUNK).fill(-Infinity);
+  food[cell(1, 1)] = 1; // a food wash (or a sprite)
+  home[cell(2, 1)] = HOME_FULL; // a home trail, sensed now
+  sensed[cell(2, 1)] = FRESH;
+  const win = { rx0: 0, rx1: 10, ry0: 0, ry1: 3 };
+  const run = (show: GroundShow, sprites: boolean) => {
+    const f = field(null, { cells: { food }, sensed, home });
+    f.ground.draw(f.k, show, win, 0, sprites);
+    return f.ground.chunkCanvas(0, 0).img;
+  };
+  const both = run(SHOW, false);
+  assert.deepEqual(px(both, 1, 1), [...THEME.accentRgb, 132]);
+  assert.deepEqual(px(both, 2, 1), [...HOME_RGB, 90]);
+  assert.equal(px(run(SHOW, true), 1, 1)[3], 0, "sprites show the food: no wash");
+  assert.equal(px(run({ food: true, home: false }, false), 2, 1)[3], 0, "the home setting is off: no home trail");
+});
+
+test("draw, zoomed out across chunks: each chunk row's strips are clipped to the window and drawn from that chunk's own canvas", () => {
+  const w = curtainish();
+  w.put(w.rock, -66, 62, ROCK);
+  w.put(w.rock, -63, 64, ROCK);
+  const c = { x: -64, y: 64, zoom: 6 };
+  const f = field(null, { m: w.m, ext: w.ext as FieldCtx["ext"], c: c as FieldCtx["c"] });
+  const win = { rx0: -66, rx1: -62, ry0: 60, ry1: 70 };
+  f.ground.draw(f.k, SHOW, win, 0, false);
+  const draws = f.log.filter((l) => l.startsWith("drawImage("));
+  assert.equal(draws.length, 2 * 11, "eleven rows in each of the two chunk columns");
+  const expected: string[] = [];
+  for (let cy = 0; cy <= 1; cy++)
+    for (let cx = -2; cx <= -1; cx++) {
+      const canvas = f.ground.chunks.get(`${cx},${cy}`)!.canvas;
+      for (let ly = Math.max(0, 60 - cy * CHUNK); ly <= Math.min(CHUNK - 1, 70 - cy * CHUNK); ly++) {
+        const y = cy * CHUNK + ly;
+        const [ax, ay] = toScreen(c, f.k.v, cx * CHUNK + 0.5 * (y & 1), y * R);
+        const [bx, by] = toScreen(c, f.k.v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
+        const dx = Math.round(ax);
+        const dy = Math.round(ay);
+        expected.push(`drawImage(${canvas}, 0, ${ly}, 64, 1, ${dx}, ${dy}, ${Math.round(bx) - dx}, ${Math.round(by) - dy})`);
+      }
+    }
+  assert.deepEqual(draws, expected, "the rows of chunk row 0 (60 to 63), then of chunk row 1 (64 to 70), each chunk its own canvas");
 });
