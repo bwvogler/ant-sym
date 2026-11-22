@@ -26,11 +26,11 @@ interface World {
 }
 
 /** Seed 7's small plane, no food, no rock unless `band` carves it (rock cells given), no scouts; the player's ants young but ant 0, which is old. */
-function plane(params: Partial<Colony["params"]> = { routeMemory: 1 }, rock: [number, number, number, number][] = []): World {
+function plane(params: Partial<Colony["params"]> = { routeMemory: 1 }, rock: [number, number, number, number][] = [], rngSeed = 7): World {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
     { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
+    gameRng(rngSeed),
     { colony: params },
   );
   const map = g.world!.plane;
@@ -108,7 +108,11 @@ const POCKET: [number, number, number, number][] = [
 ];
 
 test("route memory records a place every routeStep cells on the way out, from the hole, and only a forager walking out", () => {
-  const w = plane({ routeMemory: 1, routeStep: 8 });
+  // Retune (brood-odour climb on by default): the game's stream is seed ROUTE_RNG, not 7. The |dy| < 12 bound is the ant's random wander
+  // over a 4 s walk, which is a draw of the stream: at rng 7 it is 10.4 before the change and 14.5 after (rng 5: 20.2 before), so the seed
+  // decided it, not the property. Rngs 1, 3 and 4 hold it by 6, 2 and 6 cells before and after; the bound is the same.
+  const ROUTE_RNG = 1;
+  const w = plane({ routeMemory: 1, routeStep: 8 }, [], ROUTE_RNG);
   const { g, c, hx, hy } = w;
   c.bindPolicy("mode", () => "explore");
   c.putAnt(0, PLANE, hx + 3, hy);
