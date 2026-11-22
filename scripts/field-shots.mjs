@@ -16,8 +16,8 @@
 // What a scene shows is in SCENES below: the generic ant's world above and below (each nest zoomed, so the minimap shows; a followed ant on each
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
 // on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
-// page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap, a no-entry sign), a pinned specimen
-// and a moved ant's trace; the `phone` page: 390 px wide, touch. Not covered yet, to add with the slice that moves that layer: ants of every stance. (The lens card is DOM, and
+// page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap), a pinned specimen
+// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). Not covered yet, to add with the slice that moves that layer: ants of every stance, a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on), the trace's run and dotted loops. (The lens card is DOM, and
 // draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
 // stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes), and the same for the plane's other marks (a specimen's
 // ring, a moved ant's trace) drawn on the curtain.
@@ -168,14 +168,46 @@ async function antScreen(page, k, layer) {
   return at;
 }
 
-/** A stroke with the mouse, in canvas pixels, in a few steps (a tool of the builder's tray acts along it). */
-async function stroke(page, from, to) {
-  await page.mouse.move(from[0], from[1]);
-  await page.mouse.down();
-  for (let t = 1; t <= 6; t++) await page.mouse.move(from[0] + ((to[0] - from[0]) * t) / 6, from[1] + ((to[1] - from[1]) * t) / 6);
-  await page.mouse.up();
-  await sleep(200); // the stroke reaches the game before the next tool is taken
+/** What the builder's tools and the tweezers change, as one string: the plane's food and terrain, the crayon lines, the aphid clumps, the ants' places. */
+const stateNow = (page) =>
+  page.evaluate(() => {
+    const g = window.jevAnts.game;
+    const plane = g.world.plane;
+    let terrain = 0;
+    for (let y = 0; y < plane.size.h; y++) for (let x = 0; x < plane.size.w; x++) terrain += plane.rock.get(x, y) * (1 + ((x * 7 + y) % 5));
+    let ants = 0;
+    for (const c of g.colonies) for (let i = 0; i < c.n; i++) ants += c.x[i] + c.y[i];
+    return `${plane.foodLeft}|${terrain}|${g.crayons.length}|${g.aphids.length}|${ants}`;
+  });
+
+/**
+ * Do something with the mouse and prove it landed: the game's state (stateNow) must change within two seconds. A pointer-down that arrives before the field uses
+ * the tool just taken does nothing (the page says the tool is pressed, yet the stroke is lost: seen in review, one run in three on one scene),
+ * and a scene hashed after a lost stroke would silently stop covering that tool. A lost stroke changed nothing, so it is tried once more; if it
+ * is lost again the run stops, so a record never keeps such a scene.
+ */
+async function landed(page, what, act) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const before = await stateNow(page);
+    await act();
+    for (let i = 0; i < 20; i++) {
+      await sleep(100);
+      if ((await stateNow(page)) !== before) return;
+    }
+  }
+  throw new Error(`${what}: the mouse did nothing (the game's state did not change after two tries)`);
 }
+
+/** A stroke with the mouse, in canvas pixels, in a few steps (a tool of the builder's tray acts along it). */
+const stroke = (page, from, to) =>
+  landed(page, "a stroke", async () => {
+    await page.mouse.move(from[0], from[1]);
+    await page.mouse.down();
+    for (let t = 1; t <= 6; t++) await page.mouse.move(from[0] + ((to[0] - from[0]) * t) / 6, from[1] + ((to[1] - from[1]) * t) / 6);
+    await page.mouse.up();
+  });
+
+const tap = (page, at) => landed(page, "a tap", () => page.mouse.click(at[0], at[1]));
 
 /** Take a tray tool (its exact accessible name) and wait until the tray says it is the one in hand: a stroke before that would not be the tool's. */
 async function tool(page, name) {
@@ -258,7 +290,7 @@ const SCENES = [
   { name: "built-bend", page: "built", run: (p) => view(p, "below") },
   { name: "built-strip", page: "built", run: (p) => p.evaluate(() => window.jevAnts.goNest(1)) },
   // The marks of a player: a pinned specimen (a dashed ring and its label), the builder's strokes and clump, and an ant the tweezers moved
-  // (its trace home). The builder works by the real pointer on the real canvas, the page paused.
+  // (its start ring: the page is paused). The builder works by the real pointer on the real canvas, the page paused.
   {
     name: "marks-specimen",
     page: "marks",
@@ -287,9 +319,7 @@ const SCENES = [
       await tool(p, "Trail crayon, Ink");
       await stroke(p, [c[0] - 220, c[1] + 120], [c[0] + 60, c[1] + 160]);
       await tool(p, "Aphids");
-      await p.mouse.click(c[0] + 160, c[1] + 120);
-      await tool(p, "No entry sign");
-      await p.mouse.click(c[0] - 40, c[1] + 70);
+      await tap(p, [c[0] + 160, c[1] + 120]);
       await tool(p, "Move");
     },
   },
