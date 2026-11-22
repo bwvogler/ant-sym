@@ -1,6 +1,69 @@
 {
   "bundles": [
     {
+      "lane": "carry",
+      "doctrine": "cautious",
+      "context": "carry-v16-35b74e71",
+      "file": "carry-cautious.json",
+      "answers": 43
+    },
+    {
+      "lane": "carry",
+      "doctrine": "forage",
+      "context": "carry-v16-33bae78a",
+      "file": "carry-forage.json",
+      "answers": 43
+    },
+    {
+      "lane": "carry",
+      "doctrine": "warlike",
+      "context": "carry-v16-943738c4",
+      "file": "carry-warlike.json",
+      "answers": 43
+    },
+    {
+      "lane": "contact",
+      "doctrine": "cautious",
+      "context": "contact-v16-768ea06e",
+      "file": "contact-cautious.json",
+      "answers": 32
+    },
+    {
+      "lane": "contact",
+      "doctrine": "forage",
+      "context": "contact-v16-0b7fa16b",
+      "file": "contact-forage.json",
+      "answers": 32
+    },
+    {
+      "lane": "contact",
+      "doctrine": "warlike",
+      "context": "contact-v16-a19d24a3",
+      "file": "contact-warlike.json",
+      "answers": 32
+    },
+    {
+      "lane": "drop",
+      "doctrine": "cautious",
+      "context": "drop-v16-3000bf41",
+      "file": "drop-cautious.json",
+      "answers": 13
+    },
+    {
+      "lane": "drop",
+      "doctrine": "forage",
+      "context": "drop-v16-2d75161a",
+      "file": "drop-forage.json",
+      "answers": 13
+    },
+    {
+      "lane": "drop",
+      "doctrine": "warlike",
+      "context": "drop-v16-dbd38754",
+      "file": "drop-warlike.json",
+      "answers": 13
+    },
+    {
       "lane": "fungus",
       "aim": "peace",
       "context": "fungus-v8-side-153cd1a5",
@@ -22,6 +85,27 @@
       "answers": 193
     },
     {
+      "lane": "get",
+      "doctrine": "cautious",
+      "context": "get-v16-3ad4dc3f",
+      "file": "get-cautious.json",
+      "answers": 19
+    },
+    {
+      "lane": "get",
+      "doctrine": "forage",
+      "context": "get-v16-84929d20",
+      "file": "get-forage.json",
+      "answers": 19
+    },
+    {
+      "lane": "get",
+      "doctrine": "warlike",
+      "context": "get-v16-6407259a",
+      "file": "get-warlike.json",
+      "answers": 19
+    },
+    {
       "lane": "growth",
       "aim": "peace",
       "context": "growth-v4-0e171926",
@@ -41,6 +125,27 @@
       "context": "growth-v4-12d896ff",
       "file": "growth-unite.json",
       "answers": 48
+    },
+    {
+      "lane": "leave",
+      "doctrine": "cautious",
+      "context": "leave-v16-6dd04dfd",
+      "file": "leave-cautious.json",
+      "answers": 8
+    },
+    {
+      "lane": "leave",
+      "doctrine": "forage",
+      "context": "leave-v16-a9f0ab76",
+      "file": "leave-forage.json",
+      "answers": 8
+    },
+    {
+      "lane": "leave",
+      "doctrine": "warlike",
+      "context": "leave-v16-3e2e4be8",
+      "file": "leave-warlike.json",
+      "answers": 8
     },
     {
       "lane": "mode",
@@ -131,6 +236,27 @@
       "context": "steer-v7-694ce533",
       "file": "steer-warlike.json",
       "answers": 203
+    },
+    {
+      "lane": "trail",
+      "doctrine": "cautious",
+      "context": "trail-v16-8618d93a",
+      "file": "trail-cautious.json",
+      "answers": 67
+    },
+    {
+      "lane": "trail",
+      "doctrine": "forage",
+      "context": "trail-v16-b60a3b07",
+      "file": "trail-forage.json",
+      "answers": 67
+    },
+    {
+      "lane": "trail",
+      "doctrine": "warlike",
+      "context": "trail-v16-57b444b7",
+      "file": "trail-warlike.json",
+      "answers": 67
     }
   ],
   "versions": {
