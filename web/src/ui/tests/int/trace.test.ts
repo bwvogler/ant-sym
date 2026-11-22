@@ -21,11 +21,10 @@ import { AntTraces, TRACE_FADE_MS, TRACE_MAX, traceAlpha } from "../../trace.ts"
 const pt = (x: number, y: number) => ({ x: centreX(x, y), y: centreY(y) });
 
 function setUp() {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 30, rivalAnts: 30, regrow: 0 },
-    mulberry32(3),
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { regrow: 0 }, mulberry32(3), [
+    { antCount: 30 },
+    { antCount: 30 },
+  ]);
   for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
   const c = g.colonies[0]!;
   const i = [...Array(c.n).keys()].find((j) => c.alive[j] && c.layer[j] === PLANE)!;

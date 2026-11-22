@@ -16,8 +16,8 @@ const middleAged = (c: Colony) => {
 };
 
 test("an undertaker that dies leaves the corpse it carried lying; the unclaimed dead rot", () => {
-  const g = new Game(smallOne(2), { antCount: 150, rival: false }, mulberry32(4));
-  const c = g.player;
+  const g = new Game(smallOne(2), {}, mulberry32(4), [{ antCount: 150 }]);
+  const c = g.colonies[0]!;
   const hole = curtainHole(own(c));
   middleAged(c);
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
@@ -51,7 +51,7 @@ const onRivalSide = (c: Colony, i: number, rival: Colony) => {
 let raid: { young: number; atHole: number; longest: number; raiders: number } | undefined;
 const raidOfEveryAge = () => {
   if (raid) return raid;
-  const g = new Game(smallOne(1), { antCount: 150, rivalAnts: 150 }, mulberry32(1));
+  const g = new Game(smallOne(1), {}, mulberry32(1), [{ antCount: 150 }, { antCount: 150 }]);
   const [a, b] = g.colonies as [Colony, Colony];
   // Ages as a new colony has them (0 to half a lifespan, Colony's constructor): about a third young, every band present.
   for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);
@@ -109,7 +109,7 @@ test(
     // ever got into a nest that had one. Now the turn-back falls with the raiders around (a scout shies, a raid presses on).
     // On one world the midden is a ring off the mound (soak/oneWorldMound), laid by the colony's own dead; in this run the rival
     // has none (no dead in 90 s), so this reads only the way in. The midden half waits for ja-utdq (review of #247, S3).
-    const g = new Game(smallOne(1), { antCount: 150, rivalAnts: 150 }, mulberry32(1));
+    const g = new Game(smallOne(1), {}, mulberry32(1), [{ antCount: 150 }, { antCount: 150 }]);
     const [a, b] = g.colonies as [Colony, Colony];
     middleAged(b);
     for (let k = 0; k < 30 * 30; k++) g.tick(1 / 30);

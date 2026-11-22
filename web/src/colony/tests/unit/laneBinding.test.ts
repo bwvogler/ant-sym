@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_MENU, askedLevers } from "../../fungus.ts";
-import { DOCTRINES, MODE_WORDS, packModeRequest, policyContext, readMode, situationKey } from "../../colonyBrain.ts";
+import { DOCTRINES, MODE_WORDS, RESPONSE_HOOKS, packModeRequest, policyContext, readMode, situationKey } from "../../colonyBrain.ts";
 import { AIMS, askedIn, fungalKey, fungusContext, packFungusRequest, readLevels, validLevels, worthAsking } from "../../fungusBrain.ts";
 import { decodeSituation, localPolicy, SITUATIONS } from "../../colony.ts";
 import { growthContext, growthKey, localGrowthChoice, packGrowthRequest } from "../../growthBrain.ts";
@@ -25,33 +25,28 @@ const FUNGAL_SEEN: FungalSituation[] = [
 ];
 const MENUS = [new Set(DEFAULT_MENU), new Set(["food", "rival", "trail"])];
 
-test("the registry lists the four lanes, each with its flags, variants, words and batching", () => {
+test("the registry lists the ten lanes (mode, fungus, growth, steer and the six response hooks), each with its flags, variants, words and batching", () => {
   assert.deepEqual(
     LANE_LIST.map((l) => l.name),
-    ["mode", "fungus", "growth", "steer"],
+    ["mode", "fungus", "growth", "steer", "get", "carry", "drop", "trail", "contact", "leave"],
   );
   for (const l of LANE_LIST) assert.equal(l.kind, LANE_KINDS[l.name], `${l.name}'s flags are LANE_KINDS' row`);
   assert.deepEqual(
     LANE_LIST.map((l) => l.variants),
-    [[""], [""], [""], [""]],
+    [[""], [""], [""], [""], [""], [""], [""], [""], [""], [""]],
   );
   assert.deepEqual(
     LANE_LIST.map((l) => l.wordsField),
-    ["doctrine", "aim", "aim", "doctrine"],
+    ["doctrine", "aim", "aim", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine", "doctrine"],
   );
   assert.equal(LANES.mode.presets, DOCTRINES);
   assert.equal(LANES.fungus.presets, AIMS);
   assert.equal(LANES.growth.presets, AIMS, "the growth lane asks under the fungus's aim");
   assert.equal(LANES.steer.presets, DOCTRINES, "the steer lane asks under the colony's doctrine (ja-ykmu.3)");
-  // Only the fungus's lanes gather a fuller request and have a batch of their own (the ants' lanes take the client's).
+  // Only the fungus's lanes have a batch of their own (the ants' lanes take the client's); the fungus's and the response hooks gather a fuller request.
   assert.deepEqual(
     LANE_LIST.map((l) => [l.gather, l.batch]),
-    [
-      [false, null],
-      [true, 50],
-      [true, 96],
-      [false, null],
-    ],
+    [[false, null], [true, 50], [true, 96], [false, null], ...RESPONSE_HOOKS.map((): [boolean, null] => [true, null])],
   );
   assert.equal(LANES.mode.sample, SAMPLE_SITUATION);
   assert.equal(LANES.fungus.sample, SAMPLE_FUNGAL);

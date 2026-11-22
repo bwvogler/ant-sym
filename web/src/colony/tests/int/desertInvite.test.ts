@@ -49,26 +49,26 @@ test("the ablation: with no pull, a finder changes nothing (the cue does the wor
 });
 
 test("in a game, a finder coming down the shaft raises the pace of ants waiting at the top, and they leave by it", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
+  const g = new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 60 }]);
   let raised = 0;
   for (let k = 0; k < 60 * 30; k++) {
     g.tick(1 / 30);
-    const c = g.player;
+    const c = g.colonies[0]!;
     for (let i = 0; i < c.n; i++) if (c.alive[i] && c.pace[i] >= P.paceFew) raised++;
   }
   assert.ok(raised > 0, `ant-ticks at a raised pace in a minute: ${raised}`);
-  const generic = new Game(generateOneWorld(1), { antCount: 60, rival: false }, gameRng(1));
+  const generic = new Game(generateOneWorld(1), {}, gameRng(1), [{ antCount: 60 }]);
   run(generic, 30);
   assert.ok(
-    generic.player.pace.every((v) => v === 0),
+    generic.colonies[0]!.pace.every((v) => v === 0),
     "the generic ant keeps no pace",
   );
 });
 
 test("in a game, what an ant's leave response reads as returns is its own pace", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
+  const g = new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 60 }]);
   run(g, 1);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const i = c.alive.indexOf(1);
   for (const [pace, returns] of [
     [P.paceRest, "none"],
@@ -81,8 +81,8 @@ test("in a game, what an ant's leave response reads as returns is its own pace",
 });
 
 test("in a game, a pace rises only for an ant held at the top of its shaft (review of #186, S3)", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: DESERT_ANT }, gameRng(1));
-  const c = g.player;
+  const g = new Game(generateOneWorld(1), { species: DESERT_ANT }, gameRng(1), [{ antCount: 60 }]);
+  const c = g.colonies[0]!;
   let prev = Float32Array.from(c.pace);
   let rises = 0;
   for (let k = 0; k < 60 * 30; k++) {
@@ -109,11 +109,11 @@ test("in a game, a pace rises only for an ant held at the top of its shaft (revi
 test("in a game with a rival (where the crowd sense is wired), a crowd at the shaft top damps the pace a finder raised (review of #186, S3)", () => {
   const raised = (paceCrowd: number) => {
     const sp = { ...DESERT_ANT, params: { ...DESERT_ANT.params, paceCrowd } };
-    const g = new Game(generateOneWorld(1), { antCount: 60, rivalAnts: 60, species: sp }, gameRng(1));
+    const g = new Game(generateOneWorld(1), { species: sp }, gameRng(1), [{ antCount: 60 }, { antCount: 60 }]);
     let n = 0;
     for (let k = 0; k < 60 * 30; k++) {
       g.tick(1 / 30);
-      for (let i = 0; i < g.player.n; i++) if (g.player.alive[i] && g.player.pace[i] >= P.paceFew) n++;
+      for (let i = 0; i < g.colonies[0]!.n; i++) if (g.colonies[0]!.alive[i] && g.colonies[0]!.pace[i] >= P.paceFew) n++;
     }
     return n;
   };

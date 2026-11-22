@@ -14,9 +14,9 @@ const RETURN = MODES.indexOf("return");
 
 /** Seconds (up to `limit`) a lone carrier 12 px from its hole along (dx, dy) takes to get down it, believing the hole `err` px farther on. */
 function carrierHome(dx: number, dy: number, err: number, limit: number): number {
-  const g = new Game(generateOneWorld(7), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(7));
+  const g = new Game(generateOneWorld(7), { regrow: 0 }, gameRng(7), [{ antCount: 10 }, { antCount: 10 }]);
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN; // the rest stay in
-  const c = g.player;
+  const c = g.colonies[0]!;
   const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
   c.age[0] = 0.5 * LIFESPAN;
   c.putAnt(0, PLANE, H.x + 12 * dx, H.y + 12 * dy);

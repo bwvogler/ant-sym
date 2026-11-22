@@ -19,17 +19,15 @@ const DT = 1 / 30;
 const RETURN = MODES.indexOf("return");
 
 function plane(params: Partial<Colony["params"]>): { g: Game; c: Colony; hx: number; hy: number } {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-    { colony: { routeMemory: 1, ...params } },
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10, colony: { routeMemory: 1, ...params } },
+    { antCount: 10 },
+  ]);
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-  const c = g.player;
+  const c = g.colonies[0]!;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0 });
   c.age[0] = 0.5 * LIFESPAN;
   const hc = c.holeCells[c.params.nest] as HoleCell;
@@ -242,4 +240,37 @@ test("routeFight 1: an ant walking out in fight mode stores its places; 0, it do
   assert.equal(stored(1, 0), 1, "routeFight 1: a fighter records");
   assert.equal(stored(0, 0), 0, "routeFight 0: it does not");
   assert.equal(stored(1, 1), 0, "routeFight 1, food in its jaws: nothing");
+});
+
+test("a waypoint resets the stall count; repeated failed retrace targets release the route", () => {
+  const { c, hx, hy } = plane({ routeStallLimit: 3 });
+  const places = wayOut(hx, hy);
+  carrier(c, hx - 30, hy + 20, places, 100, 0.25);
+  onPlane(c, () => {
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeStalls[0], 1);
+    assert.equal(routeFail(c, 0, false), true);
+    assert.equal(c.routeStalls[0], 1);
+
+    const [x, y] = places[c.routeGoal[0]]!;
+    c.x[0] = x;
+    c.y[0] = y;
+    believePlane(c, 0, c.nest);
+    assert.equal(c.routeStalls[0], 0);
+    assert.equal(c.routeState[0], 1);
+    for (let k = 0; k < 2; k++) assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeState[0], 1);
+
+    c.search[0] = 6;
+    c.wall[0] = 1;
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeN[0], 0);
+    assert.equal(c.routeState[0], 0);
+    assert.equal(c.search[0], 6);
+    assert.equal(c.wall[0], 1);
+    assert.equal(c.driftSurf[0], 0.25);
+    assert.equal(c.carrying[0], 1);
+    assert.equal(routeFail(c, 0, true), false, "ordinary homing handles another stall");
+  });
 });

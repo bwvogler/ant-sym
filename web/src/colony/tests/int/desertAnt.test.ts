@@ -29,9 +29,9 @@ test("its lane is its own: its context, its 128 situations, no follow", () => {
 test("it plays a game alone: no trail, its own situations, food found and brought home", () => {
   const asked: SpeciesSituation[] = [];
   const spy: Policy = (s) => (asked.push(s as SpeciesSituation), DESERT_ANT.policy!(s));
-  const g = new Game(generateOneWorld(1), { antCount: 60, rival: false, species: { ...DESERT_ANT, policy: spy } }, gameRng(1));
+  const g = new Game(generateOneWorld(1), { species: { ...DESERT_ANT, policy: spy } }, gameRng(1), [{ antCount: 60 }]);
   for (let k = 0; k < 30 * 120; k++) g.tick(1 / 30);
-  const c = g.player;
+  const c = g.colonies[0]!;
   const plane = c.layers[PLANE]!.ph;
   assert.equal(plane.live("food"), false, "no food trail");
   assert.equal(plane.live("home"), false, "no home trail");
@@ -54,7 +54,7 @@ test("D1: a desert ant lays no trail (the assay, with the species)", () => {
 });
 
 test("each desert ant's stance is its own, like any ant's: a threat felt on home ground makes it defend, far from home it does not (owner, #184 D1)", () => {
-  const g = new Game(smallOne(7), { antCount: 6, rivalAnts: 6, species: DESERT_ANT, regrow: 0 }, gameRng(1));
+  const g = new Game(smallOne(7), { species: DESERT_ANT, regrow: 0 }, gameRng(1), [{ antCount: 6 }, { antCount: 6 }]);
   const [a, b] = g.colonies as [Colony, Colony];
   for (const c of [a, b]) for (let i = 0; i < c.n; i++) c.alive[i] = i === 0 ? 1 : 0;
   // Ant 0 of the first colony has felt a threat (as oneWorldGame's and aphids' tests give it); it stands at its own hole, then at the other colony's.
@@ -68,7 +68,7 @@ test("each desert ant's stance is its own, like any ant's: a threat felt on home
   };
   assert.equal(stand(planeHole(own(a))), "defend", "on home ground it defends");
   assert.equal(stand(planeHole(own(b))), "forage", "far from home the same threat does not make it stand");
-  assert.equal(g.player.params.maxAnts, 200, "about 200 workers (C. fortis)");
+  assert.equal(g.colonies[0]!.params.maxAnts, 200, "about 200 workers (C. fortis)");
 });
 
 test("it fights a stranger it touches with nothing in its jaws, whatever the odds; a carrier takes its load home (owner, review of #138 D1)", () => {

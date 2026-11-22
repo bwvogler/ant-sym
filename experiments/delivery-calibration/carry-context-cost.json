@@ -1,0 +1,47 @@
+{
+  "method": "Offline estimateTokens, one food-carrying situation, doctrine forage; baseline removes only new fields and their legend passages. No live calls.",
+  "results": [
+    {
+      "hook": "get",
+      "oldTokens": 2100,
+      "newTokens": 2264,
+      "oldBytes": 4435,
+      "newBytes": 4780
+    },
+    {
+      "hook": "carry",
+      "oldTokens": 2439,
+      "newTokens": 2626,
+      "oldBytes": 5150,
+      "newBytes": 5544
+    },
+    {
+      "hook": "drop",
+      "oldTokens": 2100,
+      "newTokens": 2264,
+      "oldBytes": 4435,
+      "newBytes": 4780
+    },
+    {
+      "hook": "trail",
+      "oldTokens": 2215,
+      "newTokens": 2378,
+      "oldBytes": 4676,
+      "newBytes": 5021
+    },
+    {
+      "hook": "contact",
+      "oldTokens": 2255,
+      "newTokens": 2418,
+      "oldBytes": 4761,
+      "newBytes": 5106
+    },
+    {
+      "hook": "leave",
+      "oldTokens": 2372,
+      "newTokens": 2535,
+      "oldBytes": 5008,
+      "newBytes": 5353
+    }
+  ]
+}

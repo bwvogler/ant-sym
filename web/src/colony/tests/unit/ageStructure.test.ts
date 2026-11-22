@@ -16,7 +16,7 @@ const short: Species = {
 
 test("the age bands are shares of the species' lifespan", () => {
   const colony = (species?: Species) =>
-    new Game(smallOne(2), { antCount: 20, rival: false, ...(species ? { species } : {}) }, mulberry32(4)).player;
+    new Game(smallOne(2), { ...(species ? { species } : {}) }, mulberry32(4), [{ antCount: 20 }]).colonies[0]!;
   const g = colony();
   const s = colony(short);
   assert.equal(g.params.lifespan, LIFESPAN);

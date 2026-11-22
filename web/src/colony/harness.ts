@@ -472,6 +472,37 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   return { ...spec, sides, game, events };
 }
 
+/** The first colony's responses in a spec, whichever way it names its colonies (the list, or the pair's `sides`). */
+export function firstResponses(spec: RunSpec): Responses | undefined {
+  return spec.colonies ? spec.colonies[0]?.responses : spec.sides?.responses;
+}
+
+/**
+ * The spec with its first colony's params and responses patched, whichever way it names its colonies: in the list (docs/game-colonies.md)
+ * `sides` is ignored, so an assay that sets the first colony's responses must go through here (the delivery and entrance assays did not
+ * after #309 moved the base assays onto the list).
+ */
+export function withFirstColony(spec: RunSpec, patch: { colony?: Partial<ColonyParams>; responses?: Responses }): RunSpec {
+  if (spec.colonies) {
+    const [first, ...rest] = spec.colonies;
+    if (!first) throw new Error("withFirstColony: the spec lists no colony");
+    const patched = {
+      ...first,
+      ...(patch.colony ? { colony: { ...first.colony, ...patch.colony } } : {}),
+      ...(patch.responses ? { responses: patch.responses } : {}),
+    };
+    return { ...spec, colonies: [patched, ...rest] };
+  }
+  return {
+    ...spec,
+    sides: {
+      ...spec.sides,
+      ...(patch.colony ? { colony: { ...spec.sides?.colony, ...patch.colony } } : {}),
+      ...(patch.responses ? { responses: patch.responses } : {}),
+    },
+  };
+}
+
 /** `withOverrides` for a spec that names its colonies: `colony` is the first colony's, `rival` the second's (if any), `both` every one's. */
 function withColonyOverrides(spec: RunSpec, o: Overrides): RunSpec {
   if (o.game && ("antCount" in o.game || "rival" in o.game || "rivalAnts" in o.game))

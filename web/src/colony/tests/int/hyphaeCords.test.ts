@@ -14,8 +14,9 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 function game(): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { antCount: 40, rivalAnts: 40, autoFound: false, fungus: { hyphae: true } },
+    { autoFound: false, fungus: { hyphae: true } },
     gameRng(7),
+    [{ antCount: 40 }, { antCount: 40 }],
   );
   g.land(0, GARDEN, { evolve: true });
   return g;

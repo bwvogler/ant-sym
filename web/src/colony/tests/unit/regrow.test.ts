@@ -35,7 +35,7 @@ const surface = (g: Game) => {
 };
 
 test("off by default: eaten ground stays bare", () => {
-  const g = new Game(smallOne(2), { antCount: 1, rival: false }, mulberry32(1));
+  const g = new Game(smallOne(2), {}, mulberry32(1), [{ antCount: 1 }]);
   assert.ok(strip(g) > 0, "the map has ground food");
   for (let k = 0; k < 30 * 60; k++) g.tick(1 / 30);
   assert.equal(surface(g), 0);
@@ -43,7 +43,7 @@ test("off by default: eaten ground stays bare", () => {
 });
 
 test("on: bare piles grow back at their deficit over the regrowth time, a unit at a time, and the books balance", () => {
-  const g = new Game(smallOne(2), { antCount: 1, rival: false, regrow: 600 }, mulberry32(1));
+  const g = new Game(smallOne(2), { regrow: 600 }, mulberry32(1), [{ antCount: 1 }]);
   const total0 = plane(g).foodTotal;
   const taken = strip(g);
   const left0 = plane(g).foodLeft;

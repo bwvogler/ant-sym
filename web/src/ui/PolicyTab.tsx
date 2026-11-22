@@ -530,9 +530,8 @@ function ResponsesExplainer() {
   return (
     <>
       <p className="text-[13px]">
-        On this page an ant's small responses are decided by the local rule: Jev is not asked them here.{" "}
-        <span className="font-mono text-xs">scripts/colony-live.mjs</span> asks the questions below offline, against this legend; the alarm
-        rule has no question yet.
+        Worker actions use cached answers for the colony's doctrine. Ants use the rules below while an answer is missing. Follow an ant to
+        see its recent cached action decisions.
       </p>
       <dl className="flex flex-col gap-1 text-[13px]">
         {LOCAL_RESPONSE_RULES.map(([hook, rule]) => (

@@ -48,7 +48,7 @@ function sameAsWholeWalk(c: Colony, what: string): void {
 }
 
 function curtainColony(k = 0): Colony {
-  const g = new Game(smallOne(), { antCount: 4, rivalAnts: 4 }, gameRng(1));
+  const g = new Game(smallOne(), {}, gameRng(1), [{ antCount: 4 }, { antCount: 4 }]);
   const c = g.colonies[k]!;
   c.bind(CURTAIN);
   return c;

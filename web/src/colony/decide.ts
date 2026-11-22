@@ -1,8 +1,12 @@
 // Decide (docs/refactor.md S3.4): the third stage of an ant's step in tick. Where homing heads (the goal: its chamber, the hole, a brood or food chamber), the mode it takes (a load sends it home; else the mode policy is asked when its situation changed, or it waits held at the gate), and strangers in reach, where the contact response decides over the policy. Moved out of Colony.tick verbatim but for `this` becoming `col`; what it decided goes to the next stages through the step record.
+import type { AttackCue } from "./attackCue.ts";
+import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
+import { contactAction } from "./contactAction.ts";
+import type { CombatObserver } from "./combatObservation.ts";
 import { chamberGoal, putDown } from "./dig.ts";
 import { homeField, homeGoal } from "./homing.ts";
-import type { Item } from "./responses.ts";
+import type { Contact, Item } from "./responses.ts";
 import { touch } from "./sense.ts";
 import { MODE_STRIDE, packSituation } from "./situation.ts";
 import type { AntStep } from "./step.ts";
@@ -21,7 +25,7 @@ import {
   trailLevel,
 } from "./vocab.ts";
 
-export function decide(col: Colony, i: number, s: AntStep): void {
+export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObserver, attackCue?: AttackCue): void {
   const p = s.p;
   const dt = s.dt;
   const fl = s.fl;
@@ -47,7 +51,7 @@ export function decide(col: Colony, i: number, s: AntStep): void {
   if (nursing && goal === col.nest && col.entrance) goal = chamberGoal(col, col.broodTo[i]);
   // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
   // its food to (a forager: reception, or the royal chamber until there is one).
-  else if (carrying && col.queen && goal === col.nest && col.entrance) goal = chamberGoal(col, col.foodTo(i));
+  else if (carrying && col.queen && goal === col.nest && col.entrance && !requestedDelivery(col, i)) goal = chamberGoal(col, col.foodTo(i));
   let nest = goal;
   const x0 = col.x[i];
   const y0 = col.y[i];
@@ -174,20 +178,41 @@ export function decide(col: Colony, i: number, s: AntStep): void {
     }
   }
   let fleeFrom: number | null = null;
+  col.attackLayer[i] = -1;
+  s.contactAction = null; // the step record is shared: never leak the preceding ant's encounter
   // Strangers in reach: the contact response (behaviour MR 4) decides, every step they are, over what the mode policy
   // said. Before it, every ant with an enemy near fought. A fleeing ant runs away from the strangers while they are in
   // reach; once they are gone its mode policy is asked afresh (locally: back to its trail, or exploring).
   if (toEnemy !== null) {
-    const answer = resp.contact(touch(col, i, true, mode, item), col.antDraw(i));
-    if (answer === "fight" && !reporting) {
-      if (mode !== FIGHT && !carrying && !pellet && !nursing) mode = FIGHT;
+    const sensed = touch(col, i, true, mode, item);
+    const draw = col.antDraw(i);
+    let answer: Contact;
+    if (sensed.carrying === "none" && (sensed.odds === "outnumbering" || sensed.odds === "even") && attackCue?.(col, i)) {
+      // The local fallback can counterattack, while an authored contact policy still decides its own response.
+      sensed.recentAttack = true;
+      try {
+        answer = resp.contact(sensed, draw);
+      } finally {
+        delete sensed.recentAttack;
+      }
     } else {
-      if (answer === "drop and run" && (carrying || pellet || nursing)) putDown(col, i);
+      answer = resp.contact(sensed, draw);
+    }
+    const action = contactAction(answer, carrying || pellet || nursing, reporting);
+    s.contactAction = action;
+    observer?.contact(action, i, sensed, toEnemy);
+    if (action.movement === "attack") {
+      mode = FIGHT;
+      col.attackLayer[i] = col.layer[i];
+    } else if (action.movement === "ignore") {
+      if (mode === FIGHT) mode = EXPLORE;
+    } else if (action.movement === "withdraw") {
+      if (action.release) putDown(col, i);
       if (mode !== RETURN) col.homeAfresh(i);
       mode = RETURN;
       // A carrier flees by taking its load home: turned straight away from the strangers, on the side view's ground
       // line that was often away from its hole (G seed 5, raid stance: 3–5 carriers held over 120 s between the nests).
-      if (!carrying && !pellet && !nursing) fleeFrom = toEnemy;
+      if (action.target === "stranger") fleeFrom = toEnemy;
     }
     col.mode[i] = mode;
     // The situation as answered, with the mode the contact response set: else the mode policy, asked again next step,

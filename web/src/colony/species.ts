@@ -9,7 +9,7 @@ import type { LaneWords, Mode, Policy, Situation } from "./vocab.ts";
 export interface Species {
   id: string;
   name: string;
-  /** Overrides of DEFAULT_COLONY for every colony of the species (speed, patience, maxAnts, deposit rates, per-channel params). Explicit settings of a game (`Sides.colony`) win over it; a founded colony takes `nest`, `odour`, `tolerance` and `antCount` from its founding, and `maxAnts` from the founding, else from here, else from the game's size. */
+  /** Overrides of DEFAULT_COLONY for every colony of the species (speed, patience, maxAnts, deposit rates, per-channel params). Explicit settings of a game (a `ColonySpec`'s `colony`) win over it; a founded colony takes `nest`, `odour`, `tolerance` and `antCount` from its founding, and `maxAnts` from the founding, else from here, else from the game's size. */
   params: Partial<ColonyParams>;
   /** The local rule set: what it lays, how it answers contact, leaving, alarm. The generic ant reuses `localResponses` itself (Colony compares its functions by identity). */
   responses: Responses;

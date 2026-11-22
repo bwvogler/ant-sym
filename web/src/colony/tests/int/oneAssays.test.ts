@@ -64,7 +64,8 @@ const arena = () =>
     { x: 12, y: 20, r: 3 },
     { x: 48, y: 20, r: 3 },
   ]);
-const oneGame = (seed = 3, ants = 20): Game => new Game(oneArena(arena(), seed), { antCount: ants, rivalAnts: ants }, gameRng(seed));
+const oneGame = (seed = 3, ants = 20): Game =>
+  new Game(oneArena(arena(), seed), {}, gameRng(seed), [{ antCount: ants }, { antCount: ants }]);
 
 test("oneArena: the arena is the plane, a hole at each nest open on both layers, the curtain dug under the line", () => {
   const plane = arena();
@@ -108,22 +109,22 @@ test("oneArena: no buried food unless asked, so `stored` counts only food carrie
       seed: 5,
       seconds: 1 / 30,
       map: arena,
-      game: { antCount: 5, rival: false },
-      events: [{ at: 0, kind: "call", run: (g) => void (g.player.stored = 10) }],
+      colonies: [{ antCount: 5 }],
+      events: [{ at: 0, kind: "call", run: (g) => void (g.colonies[0]!.stored = 10) }],
     },
     { buried: true },
   );
   const { game, result } = runGame(spec);
   const curtainFood = game.world!.curtain.foodTotal;
   assert.ok(curtainFood > 0);
-  assert.equal(result.metrics["you.foodHome"], game.player.stored / (game.world!.plane.foodTotal + curtainFood));
+  assert.equal(result.metrics["you.foodHome"], game.colonies[0]!.stored / (game.world!.plane.foodTotal + curtainFood));
   // onPlane, like oneArena, buries nothing unless asked.
   const bare = specMap(onPlane({ seed: 5, seconds: 1, map: arena }));
   assert.ok(isOneWorld(bare) && bare.curtain.foodTotal === 0);
 });
 
 test("game1 (G1) scores the worst colony on both layers against the bound of 2", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 5, rivalAnts: 5 }, gameRng(1));
+  const g = new Game(generateOneWorld(1), {}, gameRng(1), [{ antCount: 5 }, { antCount: 5 }]);
   const r = (metrics: Record<string, number>) => ({ seed: 1, metrics }) as unknown as RunResult;
   assert.equal(game1.score(r({ "you.maxHeld": 2, "rival.maxHeld": 1, "you.maxHeldPlane": 0 }), g).pass, 1);
   const s = game1.score(r({ "you.maxHeld": 1, "rival.maxHeld": 3, "rival.maxHeldPlane": 0 }), g);
@@ -143,7 +144,7 @@ test("ONE_ASSAYS: every one runs on one world, A6's open-ground control too", ()
 test("S1 sets its carriers down on the plane at their vector's end, the miss growing with the trip, and scores them", () => {
   // One tick: the set-up has run (at t = 0) and nobody has gone far.
   const { game } = runGame({ ...search1.spec(2), seconds: 1 / 30 });
-  const c = game.player;
+  const c = game.colonies[0]!;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
   const hy = centreY(hc.py);
@@ -178,7 +179,7 @@ test("S1 sets its carriers down on the plane at their vector's end, the miss gro
 
 test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cells out on open ground, and scores their reach", () => {
   const { game } = runGame({ ...forage1.spec(2), seconds: 1 / 30 });
-  const c = game.player;
+  const c = game.colonies[0]!;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
   const hy = centreY(hc.py);
@@ -192,7 +193,7 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
   const spec = forage1.spec(2);
   const [first, ...rest] = spec.colonies ?? [];
   const on = runGame({ ...spec, colonies: [{ ...first!, colony: { ...first?.colony, siteFidelity: 1 } }, ...rest], seconds: 1 / 30 }).game
-    .player;
+    .colonies[0]!;
   for (let i = 0; i < F1_ANTS; i++) {
     assert.ok(!Number.isNaN(on.foodX[i]), `ant ${i} remembers its spot`);
     assert.ok(
@@ -216,7 +217,7 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
 
 test("R1 puts one pile in a pocket (no clear line, a way round at least 1.8 times the straight line) and sets foragers out on the way to it", () => {
   const { game, result } = runGame({ ...route1.spec(4), seconds: 1 / 30 });
-  const c = game.player;
+  const c = game.colonies[0]!;
   const plane = game.world!.plane;
   const hc = c.holeCells[c.params.nest] as HoleCell;
   const hx = centreX(hc.px, hc.py);
@@ -279,7 +280,7 @@ const isolate = (c: Colony, a: number, b: number) => {
 
 test("antsNear counts the plane's ants only in one world: a curtain ant at the same x, y is underground", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const spot = at(30, 20);
   isolate(c, 0, 1);
   put(c, 0, PLANE, spot.x, spot.y);
@@ -293,7 +294,7 @@ test("antsNear counts the plane's ants only in one world: a curtain ant at the s
 
 test("occupancy and crossing probes count the plane's ants only in one world", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   isolate(c, 0, 1);
   const gate = cellRect(26, 18, 34, 22);
   const occ = occupancyProbe({ gate });
@@ -313,7 +314,7 @@ test("occupancy and crossing probes count the plane's ants only in one world", (
 
 test("outingProbe in one world: outside is on the plane, past the plane's nest; every curtain ant is in", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const disc = (c.layers[PLANE] as Layer).nest;
   const probe = outingProbe(disc, { All: [0, 1] });
   for (let i = 0; i < c.n; i++) put(c, i, PLANE, disc.x, disc.y);
@@ -331,7 +332,7 @@ test("outingProbe in one world: outside is on the plane, past the plane's nest; 
 
 test("heldProbe(PLANE) counts carriers on the plane only; by default every layer", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const all = heldProbe();
   const plane = heldProbe(PLANE, "Plane");
   for (let i = 0; i < c.n; i++) c.carrying[i] = 0;
@@ -354,17 +355,17 @@ test("an assay's paint lands on the plane in one world, and Game.paintSpores on 
     seed: 3,
     seconds: 1 / 30,
     map: arena,
-    game: { antCount: 5, rival: false },
+    colonies: [{ antCount: 5 }],
     events: [{ at: 0, kind: "paint", channel: "alarm", x: spot.x, y: spot.y, r: 2, amount: 5 }],
   });
   const { game } = runGame(spec);
-  const c = game.player;
+  const c = game.colonies[0]!;
   const read = (l: number) => (c.layers[l] as Layer).ph.read("alarm", spot.x, spot.y);
   assert.ok(read(PLANE) > 1, `alarm on the plane: ${read(PLANE)}`);
   assert.equal(read(CURTAIN), 0, "none in the curtain");
   // Spores by the royal chamber (the unity guard's paint): on the curtain, none on the plane there.
   const g = oneGame();
-  const nest = (g.player.layers[CURTAIN] as Layer).nest;
+  const nest = (g.colonies[0]!.layers[CURTAIN] as Layer).nest;
   g.paintSpores(nest.x, nest.y, nest.r + 2, 3, 0.3, GARDEN, CURTAIN);
   cellOf(nest.x, nest.y);
   const [cx, cy] = [CELL[0]!, CELL[1]!];
@@ -402,7 +403,7 @@ test("L on one world: the three lifecycle arms run a solo one world with the fun
   const { game, result } = runGame({ ...lifecycleOne[1]!.spec(1), seconds: 2 });
   assert.ok(game.world && game.colonies.length === 1, "a solo one world");
   assert.equal(game.landed?.colony, 0, "the fungus has landed by the first colony's hole");
-  assert.equal(game.player.queen?.signal, 0.4, "the signal arm damps the queen's signal");
+  assert.equal(game.colonies[0]!.queen?.signal, 0.4, "the signal arm damps the queen's signal");
   assert.ok(Number.isNaN(result.metrics["t.daughterOut"]), "no daughter yet, 2 s in");
 });
 
@@ -424,7 +425,7 @@ test("L on one world: a daughter is out only once one of her ants is up on the p
 
 test("raidProbe in one world (A11): reach and stuck on the plane only, a recruit in the curtain is home, the trail read at the hole", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const own = at(12, 20);
   const rival = at(48, 20);
   const mid = at(30, 20);
@@ -485,7 +486,7 @@ test("A11 and A12 remap their control runs too (deaf, straight; forage), so a ga
 
 test("marchProbe (S2.2c): turns a walked ant on the plane toward the other colony's hole, lets go of one that senses a stranger", () => {
   const g = oneGame();
-  const c = g.player;
+  const c = g.colonies[0]!;
   const foe = g.colonies[1]!;
   const probe = marchProbe(0, 1);
   const hole = at(48, 20);

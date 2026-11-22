@@ -1,3 +1,4 @@
+import { snapshotAttackCue } from "./attackCue.ts";
 import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
@@ -941,7 +942,8 @@ export class Game {
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
-    for (const c of this.colonies) c.tick(dt);
+    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(this.colonies) : undefined;
+    for (const c of this.colonies) c.tick(dt, attackCue);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;

@@ -10,7 +10,7 @@ import { mulberry32 } from "../../world.ts";
 // can't disagree: here, on random points round the line's ends, every founding lands on the cell settleAt named, and every
 // refusal is a founding refused for the same reason.
 
-const game = (seed: number): Game => new Game(generateOneWorld(seed), { antCount: 4, rivalAnts: 4, regrow: 0 }, gameRng(seed));
+const game = (seed: number): Game => new Game(generateOneWorld(seed), { regrow: 0 }, gameRng(seed), [{ antCount: 4 }, { antCount: 4 }]);
 
 for (const seed of [1, 2]) {
   test(`settleAt and addColony agree on random points round the line's ends (seed ${seed})`, () => {
@@ -32,7 +32,7 @@ for (const seed of [1, 2]) {
       assert.deepEqual(g.settleAt(p, mainGround(world)), s, "settleAt with the ground passed in reads otherwise");
       const before = g.colonies.length;
       if (s.ok) {
-        const k = g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.player.nestOdour });
+        const k = g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.colonies[0]!.nestOdour });
         const spot = g.founded[g.founded.length - 1]!.spot!;
         assert.equal(k, before);
         assert.deepEqual(
@@ -44,7 +44,7 @@ for (const seed of [1, 2]) {
       } else {
         assert.equal(s.reason, NO_ROOM);
         assert.throws(
-          () => g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.player.nestOdour }),
+          () => g.addColony({ x: p.x, y: p.y, antCount: 0, odour: g.colonies[0]!.nestOdour }),
           new RegExp(NO_ROOM),
           `point ${n}: settleAt refused, addColony founded`,
         );

@@ -7,7 +7,7 @@ import type { DoctrineChoice } from "../../useColonyJev.ts";
 
 // A new queen's founding on the page, without React (ja-fnd.6.2): ui/flight.ts over a real one-world game.
 
-const game = (seed = 1): Game => new Game(generateOneWorld(seed), { antCount: 8, rivalAnts: 8, regrow: 0 }, gameRng(seed));
+const game = (seed = 1): Game => new Game(generateOneWorld(seed), { regrow: 0 }, gameRng(seed), [{ antCount: 8 }, { antCount: 8 }]);
 
 /** A flight from colony `mother`, pending (as Colony.flown gives one). */
 function fly(g: Game, mother: number): Flight {

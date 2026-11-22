@@ -10,7 +10,7 @@ import { smallOne, ticks } from "../builders.ts";
 // The response lanes drawn from Jev's probabilities (ja-m7rr; weighted.ts AntDraw): each ant draws its own answer for a
 // hook and situation, keeps it while the situation lasts (the hooks are asked every step), and draws afresh after `reroll`.
 
-const colony = () => new Game(smallOne(1), { antCount: 40, rival: false }, mulberry32(3)).player;
+const colony = () => new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 40 }]).colonies[0]!;
 
 const near: Touch = {
   mode: "explore",
@@ -27,6 +27,9 @@ const near: Touch = {
   returns: "none",
   raid: "none",
   crowd: "few",
+  deliveryAttempt: "none",
+  deliveryTarget: "none",
+  deliveryPlace: "none",
 };
 
 test("pickFor draws once with the ant's draw for its salt; with no draw, or a certain or bare answer, Jev's own", () => {
@@ -54,8 +57,12 @@ test("responseOf: get and drop read as booleans; validResponse holds an answer t
   assert.equal(responseOf("drop", "k", "false=0.5,true=0.5"), false);
   assert.equal(responseOf("contact", "k", "drop and run=0.6,flee=0.4"), "drop and run");
   assert.ok(validResponse("contact", "drop and run=0.6,flee=0.4"));
+  assert.equal(responseOf("contact", "k", "ignore=1"), "ignore");
+  assert.ok(validResponse("contact", "ignore=0.6,fight=0.4"));
   assert.ok(validResponse("get", "true=1"));
   assert.ok(!validResponse("get", "yes=1"));
+  assert.equal(responseOf("carry", "k", "to brood=1"), "to brood");
+  assert.ok(validResponse("carry", "to store=0.6,take=0.4"));
   assert.ok(!validResponse("carry", "take=0.5,return=0.5"), "a mode is no carry answer");
 });
 
@@ -148,7 +155,7 @@ test("an ant draws afresh after `reroll` seconds, each at its own phase; with re
 });
 
 test("the local responses never draw: a game on them takes no salt from the rng", () => {
-  const g = new Game(smallOne(1), { antCount: 40 }, mulberry32(3));
+  const g = new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 40 }, { antCount: 800 }]);
   ticks(g, 300);
   for (const c of g.colonies) assert.equal(c.drawSalt, -1);
   assert.equal(localResponses.contact(near), "flee");

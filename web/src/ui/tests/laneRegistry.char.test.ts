@@ -203,6 +203,12 @@ test("each lane's flags: id prefix, context prefix, hits, reconsidering, situati
     mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
     fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
     growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 96 },
+    get: { idPrefix: "aget", contextPrefix: "get-", countsHits: false, reconsiders: false, perRequest: 100 },
+    carry: { idPrefix: "acarry", contextPrefix: "carry-", countsHits: false, reconsiders: false, perRequest: 100 },
+    drop: { idPrefix: "adrop", contextPrefix: "drop-", countsHits: false, reconsiders: false, perRequest: 100 },
+    trail: { idPrefix: "atrail", contextPrefix: "trail-", countsHits: false, reconsiders: false, perRequest: 100 },
+    contact: { idPrefix: "acontact", contextPrefix: "contact-", countsHits: false, reconsiders: false, perRequest: 100 },
+    leave: { idPrefix: "aleave", contextPrefix: "leave-", countsHits: false, reconsiders: false, perRequest: 100 },
     steer: { idPrefix: "w", contextPrefix: "steer-", countsHits: false, reconsiders: true, perRequest: 100 },
   });
 });
@@ -224,6 +230,12 @@ test("the client's state carries these fields, in this order (the page shows and
     fungus: { asked: 0, cached: 0 },
     growth: { asked: 0, cached: 0 },
     steer: { asked: 0, cached: 0 },
+    get: { asked: 0, cached: 0 },
+    carry: { asked: 0, cached: 0 },
+    drop: { asked: 0, cached: 0 },
+    trail: { asked: 0, cached: 0 },
+    contact: { asked: 0, cached: 0 },
+    leave: { asked: 0, cached: 0 },
   });
 });
 

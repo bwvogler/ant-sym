@@ -1,5 +1,6 @@
 // Homing (docs/refactor.md S3.3): path integration, where an ant believes home is, route memory and search, the home field, and the way to and out of the hole. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c` and `goal` becoming `homeGoal`.
 
+import { requestedDelivery } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { NO_CELL, SOIL_FILL, UP_FIRST, gauss, walkable } from "./grid.ts";
 import { CELL, R, cellOf, centreX, centreY, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
@@ -325,6 +326,7 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
 
 /** Ant i has no places stored: a fresh trip (ja-lp4.16). Its slot's places are left; routeN says none are in use. A newborn gets the same through the table (ants.ts `reset`): a field added here is marked there too. */
 export function routeClear(c: Colony, i: number): void {
+  c.routeStalls[i] = 0;
   c.routeN[i] = 0;
   c.routeGap[i] = c.params.routeStep;
   c.routeAt[i] = 0;
@@ -362,12 +364,22 @@ export function routeRecord(c: Colony, i: number): void {
  * One world's plane (ja-lp4.16): the vector of carrier i has failed (a stall, or its belief reached with no hole there:
  * `stalled`). Retracing, a stall means this place is out of reach: it aims for the one before. Not yet, with routeMemory
  * on, places stored, and food in its jaws: it starts to retrace, from its newest place, once a trip. Returns whether route
- * memory took the failure (the caller's search then waits).
+ * memory took the failure (the caller's search then waits). A configured stall limit can end retracing early and
+ * give the existing home vector and search another chance on the next step.
  */
 export function routeFail(c: Colony, i: number, stalled: boolean): boolean {
   const p = c.params;
   if (p.routeMemory <= 0 || c.line === null || c.cur !== PLANE) return false;
-  if (c.routeState[i] === 1) return stalled ? routeTo(c, i, c.routeGoal[i] - 1) : true;
+  if (c.routeState[i] === 1) {
+    if (!stalled) return true;
+    if (p.routeStallLimit > 0 && ++c.routeStalls[i] >= p.routeStallLimit) {
+      routeClear(c, i);
+      c.bestD[i] = Infinity;
+      c.stallT[i] = 0;
+      return true;
+    }
+    return routeTo(c, i, c.routeGoal[i] - 1);
+  }
   if (c.routeState[i] !== 0 || c.routeN[i] === 0 || c.carrying[i] !== 1 || c.pellet[i] === 1 || (!stalled && p.routeMemory < 2))
     return false;
   c.routeState[i] = 1;
@@ -437,7 +449,10 @@ export function routeBelief(c: Colony, i: number, goal0: Nest): Nest | null {
     }
   }
   if (e < 0 && Math.hypot(c.routePlaces[at + 2 * goal] - x, c.routePlaces[at + 2 * goal + 1] - y) < LOOP_AT) e = goal;
-  if (e >= 0) routeTo(c, i, e - 1);
+  if (e >= 0) {
+    c.routeStalls[i] = 0;
+    routeTo(c, i, e - 1);
+  }
   if (c.routeState[i] !== 1) return null;
   const g = c.routeGoal[i];
   const b = c.belief;
@@ -518,6 +533,8 @@ export function destMark(c: Colony, i: number): Mark {
 }
 
 export function trueDestMark(c: Colony, i: number): Mark {
+  const chosen = requestedDelivery(c, i);
+  if (chosen) return chosen;
   if (c.broodHeld[i]) return "brood";
   if (c.carrying[i] && c.queen) {
     const role = c.map.chambers?.list[c.foodTo(i)]?.role;

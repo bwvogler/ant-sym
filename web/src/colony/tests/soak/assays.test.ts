@@ -20,18 +20,23 @@ test("runGame: the same seed gives the same numbers", () => {
 });
 
 test("runGame: a game is one world, so a spec on a bare arena is refused (onPlane or oneArena make one)", () => {
-  assert.throws(() => runGame({ seed: 1, seconds: 1, map: arena(), game: { antCount: 5, rival: false } }), /one world/);
-  runGame(onPlane({ seed: 1, seconds: 1, map: arena(), game: { antCount: 5, rival: false } }));
+  assert.throws(() => runGame({ seed: 1, seconds: 1, map: arena(), colonies: [{ antCount: 5 }] }), /one world/);
+  runGame(onPlane({ seed: 1, seconds: 1, map: arena(), colonies: [{ antCount: 5 }] }));
 });
 
 test("runGame builds the game the page builds (one world, gameRng): same numbers after 10 s", () => {
   // runGame's default map is still the side view's until Game is one world only (S2.3d); one world is named here.
-  const { game } = runGame({ seed: 4, map: (seed) => generateOneWorld(seed), seconds: 10, game: { antCount: 150, rivalAnts: 150 } });
-  const page = new Game(generateOneWorld(4), { antCount: 150, rivalAnts: 150 }, gameRng(4));
+  const { game } = runGame({
+    seed: 4,
+    map: (seed) => generateOneWorld(seed),
+    seconds: 10,
+    colonies: [{ antCount: 150 }, { antCount: 150 }],
+  });
+  const page = new Game(generateOneWorld(4), {}, gameRng(4), [{ antCount: 150 }, { antCount: 150 }]);
   for (let k = 0; k < 300; k++) page.tick(1 / 30);
-  assert.equal(page.player.stored, game.player.stored);
-  assert.equal(page.rival?.stored, game.rival?.stored);
-  assert.equal(page.player.decisions, game.player.decisions);
+  assert.equal(page.colonies[0]!.stored, game.colonies[0]!.stored);
+  assert.equal(page.colonies[1]?.stored, game.colonies[1]?.stored);
+  assert.equal(page.colonies[0]!.decisions, game.colonies[0]!.decisions);
 });
 
 test("overrides: channel params merge per field and reach the pheromone fields", () => {
@@ -51,8 +56,8 @@ test("overrides: a fight override keeps the other fight params; rival params rea
   assert.equal(spec.game?.fight?.rate, 3);
   assert.equal(spec.game?.fight?.alarm, 8);
   const g = new Game(smallOne(1), {}, gameRng(1), spec.colonies);
-  assert.equal(g.rival?.params.deposit, 7);
-  assert.equal(g.player.params.deposit, 4);
+  assert.equal(g.colonies[1]?.params.deposit, 7);
+  assert.equal(g.colonies[0]!.params.deposit, 4);
 });
 
 test("overrides on a listed spec: both reaches every colony, rivalPolicy only the second, game.antCount/rival/rivalAnts are refused, gameOf builds the list", () => {
@@ -95,6 +100,9 @@ test("overrides: responses replace the assay's own hook by hook", () => {
     returns: "none",
     raid: "strong",
     crowd: "few",
+    deliveryAttempt: "none",
+    deliveryTarget: "none",
+    deliveryPlace: "none",
   } as const;
   assert.equal(spec.colonies?.[0]?.responses?.get(t), false);
   assert.equal(spec.colonies?.[0]?.responses?.trailRate(t), 3, "the assay's own trailRate stays");
@@ -102,8 +110,8 @@ test("overrides: responses replace the assay's own hook by hook", () => {
 });
 
 test("nurseZoneProbe: a young ant on the brood and a middle-aged one five cells off give a margin of 5 (ja-k4k.15.1; review of #192, N7)", () => {
-  const g = new Game(smallOne(2), { antCount: 2, rival: false }, gameRng(1));
-  const c = g.player;
+  const g = new Game(smallOne(2), {}, gameRng(1), [{ antCount: 2 }]);
+  const c = g.colonies[0]!;
   const royal = g.world!.curtain.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
   const y = royal.floorRow - 2;
   const x = royal.x0 + 1;
@@ -133,8 +141,8 @@ test("heldProbe: a carrier that won't put its food down at home counts as carryi
       seed: 1,
       map: smallOne,
       seconds: 200,
-      game: { antCount: 60, rivalAnts: 0 },
-      sides: { responses: { ...localResponses, drop } },
+      // the recovery after refused unloading (dropRefusalLimit, ja-g7nz) is off here: this test is about the probe's count of a carrier that never puts down
+      colonies: [{ antCount: 60, responses: { ...localResponses, drop }, colony: { dropRefusalLimit: 0 } }, { antCount: 0 }],
     }).result.metrics;
   const keeps = run(() => false);
   assert.ok(keeps["you.maxCarrying"] > 0, `maxCarrying ${keeps["you.maxCarrying"]}`);

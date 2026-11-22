@@ -41,8 +41,8 @@ test("the nest: its own chambers only, the royal one with the queen in it, below
 });
 
 test("one world's nest: an ant on the plane over a chamber is not in it; only the curtain's ants count", () => {
-  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { antCount: 30, rivalAnts: 30 }, gameRng(7));
-  const col = g.player;
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(7), [{ antCount: 30 }, { antCount: 30 }]);
+  const col = g.colonies[0]!;
   const before = nestView(col)!;
   const royal = before.chambers.find((c) => c.role === "royal")!;
   const inRoyal = royal.ants;

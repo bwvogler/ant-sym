@@ -94,7 +94,7 @@ const B = host({ task: "forager", place: "outside", carrying: "food" });
  * within a few cycles went without it.
  */
 function make(): ColonyJev {
-  const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 10, rival: false }, mulberry32(3));
+  const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), {}, mulberry32(3), [{ antCount: 10 }]);
   const c = g.colonies[0]!;
   c.fungal.fill(-1);
   [A, B, A].forEach((s, i) => (c.fungal[i] = encodeFungal(s)));
