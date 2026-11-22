@@ -47,7 +47,7 @@ test("the fungus's levers on channels a species lacks are inert", () => {
 
 test("a species without alarm raises none in a game where the generic ant does", () => {
   const alarmed = (species: Species) => {
-    const g = new Game(smallOne(7), { antCount: 60, rivalAnts: 60, species }, mulberry32(3));
+    const g = new Game(smallOne(7), { species }, mulberry32(3), [{ antCount: 60 }, { antCount: 60 }]);
     let live = false;
     for (let k = 0; k < 30 * 60; k++) {
       g.tick(1 / 30);
@@ -65,7 +65,7 @@ test("a species without the chambers' marks can't tell which chamber it is in (o
     const seen = new Set<Situation["homeTrail"]>();
     const spy: Policy = (s) => (seen.add(s.homeTrail), localPolicy(s));
     const species: Species = { ...GENERIC_ANT, id: "s", policy: spy, params: { channelSet: has } };
-    const g = new Game(smallOne(7), { antCount: 60, rival: false, species }, mulberry32(3));
+    const g = new Game(smallOne(7), { species }, mulberry32(3), [{ antCount: 60 }]);
     for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
     return [...seen].filter((h) => (MARKS as readonly string[]).includes(h));
   };

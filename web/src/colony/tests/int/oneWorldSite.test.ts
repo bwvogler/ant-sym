@@ -18,16 +18,15 @@ const EXPLORE = MODES.indexOf("explore");
 const FOLLOW = MODES.indexOf("follow");
 
 function plane(params: Partial<Colony["params"]> = { siteFidelity: 1 }): { g: Game; c: Colony; hx: number; hy: number } {
-  const g = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-  );
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10 },
+    { antCount: 10 },
+  ]);
   const map = g.world!.plane;
   for (let y = 0; y < map.size.h; y++) for (let x = 0; x < map.size.w; x++) map.food.set(x, y, 0);
   map.foodLeft = 0;
   for (const k of g.colonies) for (let i = 0; i < k.n; i++) if (k.alive[i]) k.age[i] = 0.05 * LIFESPAN;
-  const c = g.player;
+  const c = g.colonies[0]!;
   Object.assign(c.params, { scoutRate: 0, raidScout: 0, ...params });
   const hc = c.holeCells[c.params.nest] as HoleCell;
   return { g, c, hx: centreX(hc.px, hc.py), hy: centreY(hc.py) };
@@ -216,15 +215,14 @@ test("site fidelity: a new colony remembers nothing, the default is off, and a s
   c.foodY[3] = 33;
   for (let k = 0; k < 10; k++) g.tick(DT);
   const saved = JSON.parse(JSON.stringify(g.save()));
-  const fresh = new Game(
-    generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }),
-    { antCount: 10, rivalAnts: 10, regrow: 0 },
-    gameRng(7),
-  );
+  const fresh = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 }, rockiness: 0 } }), { regrow: 0 }, gameRng(7), [
+    { antCount: 10 },
+    { antCount: 10 },
+  ]);
   fresh.load(saved);
   for (const k of [0, 3, 1]) {
-    assert.ok(Object.is(fresh.player.foodX[k], c.foodX[k]), `ant ${k}: x ${fresh.player.foodX[k]} against ${c.foodX[k]}`);
-    assert.ok(Object.is(fresh.player.foodY[k], c.foodY[k]), `ant ${k}: y`);
+    assert.ok(Object.is(fresh.colonies[0]!.foodX[k], c.foodX[k]), `ant ${k}: x ${fresh.colonies[0]!.foodX[k]} against ${c.foodX[k]}`);
+    assert.ok(Object.is(fresh.colonies[0]!.foodY[k], c.foodY[k]), `ant ${k}: y`);
   }
 });
 

@@ -30,7 +30,7 @@ test("chapters follow the game in order, each ending when what it asks for is tr
 });
 
 test("landing (one world): spores fall on the plane by the hole, no ant is dosed, and ants walking out become the first hosts", () => {
-  const g = new Game(generateOneWorld(1), { antCount: 300, rivalAnts: 300 }, mulberry32(7919));
+  const g = new Game(generateOneWorld(1), {}, mulberry32(7919), [{ antCount: 300 }, { antCount: 300 }]);
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   const at = g.land(0, garden);
   assert.ok(g.fungus.sporeCells > 0, "spores on the ground");

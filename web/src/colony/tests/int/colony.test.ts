@@ -137,8 +137,8 @@ test("a policy answering nonsense falls back to the plain rule instead of breaki
 
 test("the colony forages on the local rule alone: food comes home within a minute", () => {
   // On one world (S2.3c); that food is conserved is int/oneWorldGame's "food and ants are conserved over 90 s".
-  const g = new Game(smallOne(7), { antCount: 600, rival: false }, mulberry32(101));
-  const c = g.player;
+  const g = new Game(smallOne(7), {}, mulberry32(101), [{ antCount: 600 }]);
+  const c = g.colonies[0]!;
   for (let k = 0; k < 30 * 60; k++) g.tick(1 / 30);
   assert.ok(c.stored > 200, `stored ${c.stored}`);
   const laid = (ch: "food" | "home") => c.layers.reduce((sum, l) => sum + l.ph.total(ch), 0);

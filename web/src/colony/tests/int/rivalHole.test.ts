@@ -11,14 +11,14 @@ import { DT, curtainHole, planeHole, smallOne } from "../builders.ts";
 
 /** A game of few ants, every founder young (they stay in) but the carrier. */
 function game(seed: number): Game {
-  const g = new Game(smallOne(seed), { antCount: 10, rivalAnts: 10, regrow: 0 }, gameRng(seed));
+  const g = new Game(smallOne(seed), { regrow: 0 }, gameRng(seed), [{ antCount: 10 }, { antCount: 10 }]);
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.age[i] = 0.05 * LIFESPAN;
   return g;
 }
 
 /** Ant 0 of the player, a carrier with an exact vector, put at (x, y) on `layer`. */
 function carrier(g: Game, layer: number, x: number, y: number): Colony {
-  const c = g.player;
+  const c = g.colonies[0]!;
   c.age[0] = 0.5 * LIFESPAN;
   c.putAnt(0, layer, x, y);
   c.carrying[0] = 1;
@@ -46,7 +46,7 @@ test("a carrier homing across the plane passes the rival's hole without going do
   for (const seed of [7, 1, 8])
     for (const off of [5, -5]) {
       const g = game(seed);
-      const c = g.player;
+      const c = g.colonies[0]!;
       const r = g.colonies[1]!;
       const H = planeHole(c.holeCells[c.params.nest] as HoleCell);
       const R = planeHole(r.holeCells[r.params.nest] as HoleCell);

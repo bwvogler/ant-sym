@@ -10,7 +10,7 @@ import { smallOne, ticks } from "../builders.ts";
 // The response lanes drawn from Jev's probabilities (ja-m7rr; weighted.ts AntDraw): each ant draws its own answer for a
 // hook and situation, keeps it while the situation lasts (the hooks are asked every step), and draws afresh after `reroll`.
 
-const colony = () => new Game(smallOne(1), { antCount: 40, rival: false }, mulberry32(3)).player;
+const colony = () => new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 40 }]).colonies[0]!;
 
 const near: Touch = {
   mode: "explore",
@@ -148,7 +148,7 @@ test("an ant draws afresh after `reroll` seconds, each at its own phase; with re
 });
 
 test("the local responses never draw: a game on them takes no salt from the rng", () => {
-  const g = new Game(smallOne(1), { antCount: 40 }, mulberry32(3));
+  const g = new Game(smallOne(1), {}, mulberry32(3), [{ antCount: 40 }, { antCount: 800 }]);
   ticks(g, 300);
   for (const c of g.colonies) assert.equal(c.drawSalt, -1);
   assert.equal(localResponses.contact(near), "flee");

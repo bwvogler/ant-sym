@@ -23,7 +23,7 @@ const LONE: Species = { id: "lone", name: "Lone", params: {}, responses: localRe
 
 /** Ant-ticks spent in FOLLOW over `seconds` of a one-world game. */
 function followTicks(species: Species, seconds: number): number {
-  const g = new Game(smallOne(7), { antCount: 60, rival: false, species }, mulberry32(1));
+  const g = new Game(smallOne(7), { species }, mulberry32(1), [{ antCount: 60 }]);
   let f = 0;
   for (let k = 0; k < 30 * seconds; k++) {
     g.tick(1 / 30);
@@ -39,16 +39,19 @@ test("whether a species follows comes from its mode words", () => {
 });
 
 test("the Game hands its colonies the species' local rule and its mode set; an explicit param still wins", () => {
-  const g = new Game(smallOne(7), { antCount: 10, species: LONE }, () => 0.5);
+  const g = new Game(smallOne(7), { species: LONE }, () => 0.5, [{ antCount: 10 }, { antCount: 800 }]);
   for (const c of g.colonies) {
     assert.equal(c.policy, lonePolicy);
     assert.equal(c.params.follows, false);
   }
-  const generic = new Game(smallOne(7), { antCount: 10 }, () => 0.5);
-  assert.equal(generic.player.policy, localPolicy);
-  assert.equal(generic.player.params.follows, true);
-  const forced = new Game(smallOne(7), { antCount: 10, species: { ...LONE, params: { follows: true } } }, () => 0.5);
-  assert.equal(forced.player.params.follows, true, "the species' own params can set it");
+  const generic = new Game(smallOne(7), {}, () => 0.5, [{ antCount: 10 }, { antCount: 800 }]);
+  assert.equal(generic.colonies[0]!.policy, localPolicy);
+  assert.equal(generic.colonies[0]!.params.follows, true);
+  const forced = new Game(smallOne(7), { species: { ...LONE, params: { follows: true } } }, () => 0.5, [
+    { antCount: 10 },
+    { antCount: 800 },
+  ]);
+  assert.equal(forced.colonies[0]!.params.follows, true, "the species' own params can set it");
 });
 
 test("a species whose words drop follow never enters FOLLOW, where the generic ant does on the same world", () => {
@@ -68,7 +71,7 @@ test("a no-follow species is never asked about a situation in which it is follow
 });
 
 test("a colony founded mid-game takes the species' rule and mode set too (review of #121, S1)", () => {
-  const g = new Game(smallOne(), { antCount: 60, rivalAnts: 60, species: LONE }, mulberry32(11));
+  const g = new Game(smallOne(), { species: LONE }, mulberry32(11), [{ antCount: 60 }, { antCount: 60 }]);
   const v = g.world!.line.holes[0]!;
   const k = g.addColony({ x: centreX(v.x, v.y) - 20, y: centreY(v.y), antCount: 20, odour: 0 });
   assert.equal(g.founded.length, 1, "a colony was founded beyond V₀");
