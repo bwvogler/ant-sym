@@ -60,6 +60,7 @@ A new mechanic starts with a note here. The `adding-mechanics` skill ([.claude/s
 - [refactor.md](./refactor.md) (a roadmap, not a research note): the foundation refactor before new species, structures and UI, stages S0–S6 (`ja-fnd`, PRD §57).
 - [field-split.md](./field-split.md) (a plan, not a research note): taking `ColonyField` apart: the layers and the context they share, the pixel guard and the headless renderer test that prove each move, the slices (`ja-fnd.6.3.1` to `.20`; the table gives their order) and the risks, and what a frame shares that decides the shape. The detail behind refactor.md S5.3.
 - [one-world-only.md](./one-world-only.md) (a working inventory, not a research note): what each test, assay and slow guard on the old top-down and side maps became when stage S2 retired them: port, covered, delete or keep (`ja-fnd.3.1`), with a note per stage (done).
+- [game-colonies.md](./game-colonies.md) (a refactor design, not a research note, `ja-fnd.5.4.2`): the game's start colonies as a list of specs instead of a player and a rival, and the migration in three stages (not built).
 - [species.md](./species.md) (a design, not a research note): what a species is in this code, the three tiers a species can differ in, the `Species` descriptor at tier 1 and the order of work (`ja-fnd.5.3`, PRD §62).
 - [PRD.md](PRD.md) is the decision log. It holds every product decision, why it was made, and the measured Jev numbers, milestone by milestone. §1–8 are the removed picture mode.
 
