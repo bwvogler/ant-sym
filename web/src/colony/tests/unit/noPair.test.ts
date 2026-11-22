@@ -16,12 +16,15 @@ const OLD = /\.rival\b|\.player\b|rivalAnts|rivalPolicy|rivalResponses|\bSides\b
  * colony), and the G1 verdict's `rival` figure (a column of its table).
  */
 const OTHER: { file: string; text: string }[] = [
-  { file: join("src", "ui", "useColony.ts"), text: "rival" },
+  { file: join("src", "ui", "useColony.ts"), text: "s.rival" },
+  { file: join("src", "ui", "useColony.ts"), text: "settings.rival" },
+  { file: join("src", "ui", "useColony.ts"), text: "controls.rival" },
+  { file: join("src", "ui", "useColony.ts"), text: "rival: " },
   { file: join("src", "ui", "LabCards.tsx"), text: "controls.rival" },
   { file: join("src", "ColonyApp.tsx"), text: "r.player." },
   { file: join("src", "ColonyApp.tsx"), text: "n.player," },
   { file: join("src", "colony", "tests", "slow", "g1", "g1Rule.ts"), text: "h.rival" },
-  { file: join("src", "colony", "tests", "unit", "g1Rule.test.ts"), text: "rival" },
+  { file: join("src", "colony", "tests", "unit", "g1Rule.test.ts"), text: "rival: " },
   { file: join("src", "colony", "tests", "unit", "noPair.test.ts"), text: "" },
 ];
 

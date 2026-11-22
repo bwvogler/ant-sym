@@ -63,6 +63,8 @@ export interface RunSpec {
   game?: Partial<GameParams>;
   /** The colonies the game starts with (docs/game-colonies.md): a list, in order; default `DEFAULT_COLONIES`. */
   colonies?: ColonySpec[];
+  /** `colonies` is `DEFAULT_COLONIES` with overrides (`withOverrides`, `withFirstColony`): `gameOf` cuts it to the world's start nests, as the default is. */
+  defaultColonies?: boolean;
   seconds: number;
   /** sim step, seconds; the page steps at most 1/30 s */
   dt?: number;
@@ -91,7 +93,8 @@ export function specMap(spec: RunSpec): OneWorld {
 /** The game a spec starts: its one world, its colonies and its seed (before any tick). */
 export function gameOf(spec: RunSpec): { world: OneWorld; game: Game } {
   const world = specMap(spec);
-  return { world, game: new Game(world, spec.game, gameRng(spec.seed), spec.colonies) };
+  const colonies = spec.defaultColonies ? spec.colonies?.slice(0, Math.max(1, world.curtain.nests.length)) : spec.colonies;
+  return { world, game: new Game(world, spec.game, gameRng(spec.seed), colonies) };
 }
 
 /** Run a game headless and collect the standard numbers plus every probe's. */
@@ -456,6 +459,7 @@ export interface Assay {
 /** An assay's run with overrides merged in (colony and second-colony params deep-merged per channel; fight merged; brains as documented on Overrides). `colony` is the first colony's, `second` the second's (if any), `both` every one's. */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const touches = o.both || o.colony || o.second || o.policy || o.secondPolicy || o.responses;
+  const fromDefault = Boolean(touches) && !spec.colonies;
   const colonies = touches ? (spec.colonies ?? DEFAULT_COLONIES).map((c) => ({ ...c })) : spec.colonies;
   if (colonies) {
     const [first, second] = colonies;
@@ -473,7 +477,7 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
-  return { ...spec, ...(colonies ? { colonies } : {}), game, events };
+  return { ...spec, ...(colonies ? { colonies } : {}), ...(fromDefault ? { defaultColonies: true } : {}), game, events };
 }
 
 /** The first colony's responses in a spec (the list's first). */
@@ -490,7 +494,7 @@ export function withFirstColony(spec: RunSpec, patch: { colony?: Partial<ColonyP
     ...(patch.colony ? { colony: { ...first.colony, ...patch.colony } } : {}),
     ...(patch.responses ? { responses: patch.responses } : {}),
   };
-  return { ...spec, colonies: [patched, ...rest] };
+  return { ...spec, colonies: [patched, ...rest], ...(spec.colonies ? {} : { defaultColonies: true }) };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

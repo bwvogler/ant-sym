@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withFirstColony, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -78,6 +78,20 @@ test("overrides on a listed spec: both reaches every colony, secondPolicy only t
     game.colonies.map((c) => c.params.antCount),
     [10, 12],
   );
+});
+
+test("overrides on a spec with no colony list keep the default's clamp: a one-nest world builds one colony (review of #321, S1)", () => {
+  const map = () => generateOneWorld(2, { plane: { size: { w: 160, h: 100 }, nestCount: 1 } });
+  const base = { seed: 2, seconds: 0, map };
+  assert.equal(gameOf(base).game.colonies.length, 1, "the default alone");
+  for (const spec of [withOverrides(base, { both: { deposit: 6 } }), withOverrides(base, { colony: { deposit: 6 } })]) {
+    const { game } = gameOf(spec);
+    assert.equal(game.colonies.length, 1);
+    assert.equal(game.colonies[0]!.params.deposit, 6);
+  }
+  assert.equal(gameOf(withFirstColony(base, { colony: { deposit: 7 } })).game.colonies[0]!.params.deposit, 7);
+  // On a two-nest world the same specs build the pair.
+  assert.equal(gameOf({ ...base, map: () => generateOneWorld(2, { plane: { size: { w: 160, h: 100 } } }) }).game.colonies.length, 2);
 });
 
 test("overrides: responses replace the assay's own hook by hook", () => {

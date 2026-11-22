@@ -84,6 +84,9 @@ function combos(sets) {
       values.map((v) => {
         const o = structuredClone(c.o);
         const keys = path.split(".");
+        if (keys[0] === "rival") throw new Error(`--set ${path}: "rival." is now "second." (the second colony's params)`);
+        if (!["colony", "second", "both", "game"].includes(keys[0]))
+          throw new Error(`--set ${path}: the path starts under colony, second, both or game`);
         let at = o;
         for (const key of keys.slice(0, -1)) at = at[key] ??= {};
         at[keys.at(-1)] = v;
