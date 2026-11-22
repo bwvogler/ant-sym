@@ -4,7 +4,7 @@
 import { DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { type Colony, type ColonyParams, PLANE } from "./colony.ts";
 import { type Policy, type SteerPolicy } from "./vocab.ts";
-import { Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
+import { type ColonySpec, Game, type GameParams, gameRng, isOneWorld, type Sides } from "./game.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny, R } from "./hex.ts";
 import type { Journal } from "./journal.ts";
 import { generateOneWorld, oneWorldOn, type OneWorld } from "./oneWorld.ts";
@@ -61,6 +61,11 @@ export interface RunSpec {
    */
   map?: WorldMap | OneWorld | ((seed: number) => WorldMap | OneWorld);
   game?: Partial<GameParams>;
+  /**
+   * The colonies the game starts with (docs/game-colonies.md): a list, in order. The pair's words (`antCount`, `rival`, `rivalAnts` in
+   * `game`, and `sides`) are the older way, until the tests move (stage B); a spec uses one or the other.
+   */
+  colonies?: ColonySpec[];
   sides?: Sides;
   seconds: number;
   /** sim step, seconds; the page steps at most 1/30 s */
@@ -87,10 +92,15 @@ export function specMap(spec: RunSpec): OneWorld {
   return m;
 }
 
+/** The game a spec starts: its one world, its colonies and its seed (before any tick). */
+export function gameOf(spec: RunSpec): { world: OneWorld; game: Game } {
+  const world = specMap(spec);
+  return { world, game: new Game(world, spec.game, gameRng(spec.seed), spec.colonies ?? spec.sides) };
+}
+
 /** Run a game headless and collect the standard numbers plus every probe's. */
 export function runGame(spec: RunSpec): { game: Game; result: RunResult } {
-  const world = specMap(spec);
-  const game = new Game(world, spec.game, gameRng(spec.seed), spec.sides);
+  const { world, game } = gameOf(spec);
   // The food the world began with: the plane's piles and the curtain's buried pockets.
   const foodTotal = world.plane.foodTotal + world.curtain.foodTotal;
   const dt = spec.dt ?? 1 / 30;
@@ -441,6 +451,7 @@ export interface Assay {
 
 /** An assay's run with overrides merged in (colony and rival params deep-merged per channel; fight merged; brains as documented on Overrides). */
 export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
+  if (spec.colonies) return withColonyOverrides(spec, o);
   const sides: Sides = { ...spec.sides };
   if (o.both) {
     sides.colony = mergeColony(sides.colony, o.both);
@@ -459,6 +470,28 @@ export function withOverrides(spec: RunSpec, o: Overrides = {}): RunSpec {
   if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
   else delete game.fight;
   return { ...spec, sides, game, events };
+}
+
+/** `withOverrides` for a spec that names its colonies: `colony` is the first colony's, `rival` the second's (if any), `both` every one's. */
+function withColonyOverrides(spec: RunSpec, o: Overrides): RunSpec {
+  if (o.game && ("antCount" in o.game || "rival" in o.game || "rivalAnts" in o.game))
+    throw new Error("game.antCount, game.rival and game.rivalAnts name no colony when the assay lists its colonies");
+  const colonies = (spec.colonies ?? []).map((c) => ({ ...c }));
+  const [first, second] = colonies;
+  if (o.both) for (const c of colonies) c.colony = mergeColony(c.colony, o.both);
+  if (o.colony && first) first.colony = mergeColony(first.colony, o.colony);
+  if (o.rival && second) second.colony = mergeColony(second.colony, o.rival);
+  if (o.policy && first && !first.policy) first.policy = o.policy;
+  if (o.rivalPolicy && second && !second.policy) second.policy = o.rivalPolicy;
+  if (o.responses && first) first.responses = { ...(first.responses ?? localResponses), ...o.responses };
+  const steer = o.steer;
+  const events = steer
+    ? [...(spec.events ?? []), { at: 0, kind: "call" as const, run: (g: Game) => g.colonies.forEach((c) => c.bindPolicy("steer", steer)) }]
+    : spec.events;
+  const game: Partial<GameParams> = { ...spec.game, ...o.game, fight: undefined };
+  if (o.game?.fight || spec.game?.fight) game.fight = { ...DEFAULT_FIGHT, ...spec.game?.fight, ...o.game?.fight };
+  else delete game.fight;
+  return { ...spec, colonies, game, events };
 }
 
 function mergeColony(a: ColonyOptions = {}, b: ColonyOptions = {}): ColonyOptions {

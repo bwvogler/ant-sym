@@ -152,7 +152,7 @@ function bridgeSpec(seed: number): RunSpec {
         ) // food room
         .pile(76, row, 4, 40)
         .build([{ x: 8, y: row, r: 3 }]),
-    game: { antCount: 300, rival: false },
+    colonies: [{ antCount: 300 }],
     probes: [occupancyProbe(gates, 60), crossingProbe(gates, 60)],
   };
 }
@@ -188,7 +188,7 @@ export const twin: Assay = {
         .pile(25, 20, 3, 200)
         .pile(75, 20, 3, 200)
         .build([{ x: 50, y: 85, r: 3 }]),
-    game: { antCount: 300, rival: false },
+    colonies: [{ antCount: 300 }],
   }),
   score: (_r, game) => {
     const start = 200 * cellsIn(game.map.size, 25, 20, 3);
@@ -221,7 +221,7 @@ export const richPoor: Assay = {
           .pile(25, 20, 3, 200, richLeft ? 1.5 : 0.5)
           .pile(75, 20, 3, 200, richLeft ? 0.5 : 1.5)
           .build([{ x: 50, y: 85, r: 3 }]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
     };
   },
   score: (r, game) => {
@@ -279,7 +279,7 @@ export const deplete: Assay = {
       seed,
       seconds: 300,
       map: () => new Arena(100, 100, true).pile(50, 40, 2, 10).build([{ x: 50, y: 80, r: 3 }]),
-      game: { antCount: 200, rival: false },
+      colonies: [{ antCount: 200 }],
       probes: [probe],
     };
   },
@@ -330,7 +330,7 @@ export const alarm: Assay = {
       seed,
       seconds: 240,
       map: () => new Arena(100, 100, true).pile(50, 18, 3, 200).build([{ x: 50, y: 82, r: 3 }]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [{ at: when, kind: "paint", channel: "alarm", x: spot.x, y: spot.y, r: 3, amount: 12 }],
       probes: [probe],
     };
@@ -416,7 +416,7 @@ export const regulate: Assay = {
       seed,
       seconds: 360,
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [{ at: 120, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 }],
       probes: [outingProbe(nest, { Before: [60, 120], After: [240, 360] })],
     };
@@ -446,7 +446,7 @@ export const regulateStop: Assay = {
       seed,
       seconds: 420,
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 50, r: 3 }]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [
         { at: 60, kind: "food", x: food.x, y: food.y, r: 3, perCell: 200 },
         { at: 240, kind: "call", run: (g) => clearFood(g, food.x, food.y, 3) },
@@ -477,14 +477,10 @@ function battleSpec(seed: number, pass: boolean): RunSpec {
         { x: 20, y: 20, r: 3 },
         { x: 100, y: 20, r: 3 },
       ]),
-    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
     // Every attacker marches at the defenders' hole (raidGate 0): A6 is about who reaches whom at a pass, not about finding the
     // rival (A11). Raiding by trail, only recruited ants went, a few at a time, and no battle formed at the pass (ja-sf1:
     // gain 1.26, 3/20 on main).
-    sides: {
-      policy: always<Mode>("fight"),
-      colony: { raidGate: 0 },
-    },
+    colonies: [{ antCount: 200, policy: always<Mode>("fight"), colony: { raidGate: 0 } }, { antCount: PASS_DEFENDERS }],
   };
 }
 
@@ -631,7 +627,7 @@ export function raidProbe(own: { x: number; y: number }, rival: { x: number; y: 
       }
     },
     summary(game) {
-      const n = Math.max(1, game.player.params.antCount);
+      const n = Math.max(1, game.colonies[0]?.params.antCount ?? 0);
       let hit = 0;
       let dead = 0;
       let deadHit = 0;
@@ -671,8 +667,10 @@ function raidFindSpec(seed: number, colony?: Partial<ColonyParams>): RunSpec {
         { x: 20, y: 30, r: 3 },
         { x: 100, y: 30, r: 3 },
       ]),
-    game: { antCount: 200, rivalAnts: PASS_DEFENDERS },
-    sides: { responses: RAIDING, rivalResponses: NEVER_RAID, ...(colony ? { colony } : {}) },
+    colonies: [
+      { antCount: 200, responses: RAIDING, ...(colony ? { colony } : {}) },
+      { antCount: PASS_DEFENDERS, responses: NEVER_RAID },
+    ],
     probes: [raidProbe(own, rival)],
   };
 }
@@ -738,8 +736,7 @@ function raidStopSpec(seed: number, stance: Stance): RunSpec {
         { x: 91, y: 91, r: 3 },
       ]);
     },
-    game: { antCount: 300, rivalAnts: 30 },
-    sides: { responses: stance === "raid" ? RAIDING : NEVER_RAID },
+    colonies: [{ antCount: 300, responses: stance === "raid" ? RAIDING : NEVER_RAID }, { antCount: 30 }],
     probes: [outingProbe(nest, { Late: [720, 900] }), { tick() {}, summary: () => ({ foodAt: food.y }) }],
   };
 }
@@ -782,8 +779,10 @@ export const contact: Assay = {
         { x: 12, y: 30, r: 3 },
         { x: 108, y: 30, r: 3 },
       ]),
-    game: { antCount: 200, rivalAnts: 200 },
-    sides: { responses: NEVER_RAID, rivalResponses: NEVER_RAID },
+    colonies: [
+      { antCount: 200, responses: NEVER_RAID },
+      { antCount: 200, responses: NEVER_RAID },
+    ],
   }),
   score: (r) => {
     const lost = r.metrics["you.losses"] + r.metrics["rival.losses"];
@@ -824,12 +823,10 @@ function defendSpec(seed: number, sealed: boolean, colony?: Partial<ColonyParams
         { x: 150, y: 30, r: 3 },
       ]);
     },
-    game: { antCount: 200, rivalAnts: 80 },
-    sides: {
-      ...(colony ? { colony } : {}),
-      rivalPolicy: always<Mode>("fight"),
-      rival: { raidGate: 0 },
-    },
+    colonies: [
+      { antCount: 200, ...(colony ? { colony } : {}) },
+      { antCount: 80, policy: always<Mode>("fight"), colony: { raidGate: 0 } },
+    ],
     probes: [
       {
         tick(game) {
@@ -874,7 +871,7 @@ export const defendWalked: Assay = {
     const none = run(false, { defendAt: Infinity });
     const killed = r.metrics["rival.losses"];
     const vsNone = control > 0 && none["you.stored"] > 0 ? stored / none["you.stored"] : NaN;
-    const half = game.params.rivalAnts / 2;
+    const half = (game.colonies[1]?.params.antCount ?? 0) / 2;
     const lost = r.metrics["you.losses"];
     return {
       stored,
@@ -929,7 +926,7 @@ export const faintAlarm: Assay = {
       seconds: 60,
       // No food: every ant explores, as the idle foragers a faint alarm should draw (on a busy trail they follow it).
       map: () => new Arena(100, 100, true).build([{ x: 50, y: 82, r: 3 }]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       // Faint: above the sensors' FAINT (0.05), well under STRONG (1), for a few seconds at the spot.
       events: [0, 2, 4, 6, 8].map((d) => ({
         at: when + d,
@@ -957,7 +954,7 @@ export const game: Assay = {
   target:
     "≤ 2 foragers holding food over 120 s per colony at any 10-s sample (the side view's slow/side.test bound, now G1's); food home and outcome reported",
   seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rivalAnts: 600 } }),
+  spec: (seed) => ({ seed, seconds: 600, colonies: [{ antCount: 600 }, { antCount: 600 }] }),
   score: (r) => {
     const worst = Math.max(r.metrics["you.maxHeld"] ?? 0, r.metrics["rival.maxHeld"] ?? 0);
     // Porters are reported, not judged: they have no bound yet (ja-3po).
@@ -1031,7 +1028,7 @@ export const nestFlow: Assay = {
   target:
     "report only (Tschinkel, Rink & Kwapich 2015: food dropped in the top chambers is carried down by others); larvae unfed beside food ≤ 5 is the economy test's bound",
   seconds: 900,
-  spec: (seed) => ({ seed, seconds: 900, game: { antCount: 600, rival: false }, probes: [nestFlowProbe()] }),
+  spec: (seed) => ({ seed, seconds: 900, colonies: [{ antCount: 600 }], probes: [nestFlowProbe()] }),
   score: (r) => ({
     beyond: r.metrics.beyond as number,
     receptionMax: r.metrics.receptionMax as number,
@@ -1100,7 +1097,7 @@ export const nurseZone: Assay = {
   title: "Nurse zone: the young keep nearer the brood than the middle-aged",
   target: "margin (middle-aged's mean distance to the nearest brood less the young's, cells) > 0; report the distances to the queen",
   seconds: 600,
-  spec: (seed) => ({ seed, seconds: 600, game: { antCount: 600, rival: false }, probes: [nurseZoneProbe()] }),
+  spec: (seed) => ({ seed, seconds: 600, colonies: [{ antCount: 600 }], probes: [nurseZoneProbe()] }),
   score: (r) => ({
     youngToBrood: r.metrics.youngToBrood as number,
     middleToBrood: r.metrics.middleToBrood as number,
@@ -1162,7 +1159,7 @@ export const pockets: Assay = {
   target:
     "design (docs/foraging-tunnels.md): a measurable share of the buried food within 3,600 s, by the worst seed; food home, workers alive, cells opened and ms per tick not worse",
   seconds: 3600,
-  spec: (seed) => ({ seed, seconds: 3600, game: { antCount: 600, rival: false }, probes: [buriedProbe()] }),
+  spec: (seed) => ({ seed, seconds: 3600, colonies: [{ antCount: 600 }], probes: [buriedProbe()] }),
   score: (r) => ({
     buriedShare: r.metrics.buriedShare as number,
     buriedTaken: r.metrics.buriedTaken as number,
@@ -1220,7 +1217,7 @@ export const larvae: Assay = {
     seed,
     map: economyMap,
     seconds: 3600,
-    game: { antCount: 110, rival: false },
+    colonies: [{ antCount: 110 }],
     probes: [nestFlowProbe(), starvedProbe()],
   }),
   score: (r) => ({
@@ -1295,7 +1292,7 @@ function lifecycleAssay(arm: "none" | "signal" | "scent", one = false): Assay {
       seed,
       seconds: 1800,
       ...(one ? { map: (s: number) => generateOneWorld(s) } : {}),
-      game: { antCount: 600, rival: false },
+      colonies: [{ antCount: 600 }],
       events: [
         {
           at: 0,

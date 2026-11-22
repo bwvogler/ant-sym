@@ -28,7 +28,7 @@ export const game1: Assay = {
     seed,
     seconds: 600,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 600, rivalAnts: 600 },
+    colonies: [{ antCount: 600 }, { antCount: 600 }],
     probes: [heldProbe(PLANE, "Plane"), gateProbe()],
   }),
   score: (r, g) => {
@@ -234,8 +234,11 @@ export const search1: Assay = {
       seed,
       seconds: 600,
       map: (s) => generateOneWorld(s),
-      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      game: { regrow: 0 },
+      colonies: [
+        { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+        { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+      ],
       events: [{ at: 0, kind: "call", run: setUp }],
       probes: [probe],
     };
@@ -398,8 +401,11 @@ function f1Spec(
     seed,
     seconds: F1_SECONDS,
     map: (s) => generateOneWorld(s),
-    game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-    sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+    game: { regrow: 0 },
+    colonies: [
+      { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+      { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+    ],
     events: [{ at: 0, kind: "call", run: setUp }, ...(hooks.events ?? [])],
     probes: [probe, ...(hooks.probes?.(spotX, spotY) ?? [])],
   };
@@ -784,8 +790,11 @@ export const route1: Assay = {
       seed,
       seconds: R1_SECONDS,
       map: (s) => generateOneWorld(s),
-      game: { antCount: n + 20, rivalAnts: 10, regrow: 0 },
-      sides: { colony: { scoutRate: 0, raidScout: 0 }, rival: { scoutRate: 0, raidScout: 0 } },
+      game: { regrow: 0 },
+      colonies: [
+        { antCount: n + 20, colony: { scoutRate: 0, raidScout: 0 } },
+        { antCount: 10, colony: { scoutRate: 0, raidScout: 0 } },
+      ],
       events: [{ at: 0, kind: "call", run: setUp }],
       probes: [probe],
     };
@@ -910,7 +919,7 @@ export const lockstep1: Assay = {
     seed,
     seconds: 300,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 300, rivalAnts: 300 },
+    colonies: [{ antCount: 300 }, { antCount: 300 }],
     probes: [lockstepProbe()],
   }),
   score: () => ({}),
@@ -1019,7 +1028,7 @@ export const searchTight1: Assay = {
     seed,
     seconds: 300,
     map: (s) => generateOneWorld(s),
-    game: { antCount: 300, rivalAnts: 300 },
+    colonies: [{ antCount: 300 }, { antCount: 300 }],
     probes: [searchTurnProbe()],
   }),
   score: (r): Record<string, number> => (Number.isFinite(r.metrics.ratio) ? { pass: (r.metrics.ratio as number) >= T1_PASS ? 1 : 0 } : {}),

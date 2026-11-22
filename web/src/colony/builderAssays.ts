@@ -118,7 +118,7 @@ export const crayonLine: Assay = {
       seconds: 90,
       // No food (as Choe et al.'s line led to none): a pile found on either side lays a trail of its own and swamps the cue.
       map: () => new Arena(100, 100, true).build([NEST]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [strokeAt(5, { tool: "crayon", layer: PLANE, colony: 0, points: along(line.a, line.b) })],
       probes: [
         {
@@ -153,7 +153,7 @@ export const wall: Assay = {
       seed,
       seconds: 420,
       map: trailArena,
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [strokeAt(150, { tool: "rock", layer: PLANE, points: along(at(35, 55), at(65, 55)) }, (_, n) => (walled = n))],
       probes: [
         {
@@ -182,7 +182,7 @@ export const rain: Assay = {
       seed,
       seconds: 360,
       map: trailArena,
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [strokeAt(150, { tool: "rain", layer: PLANE, points: along(at(50, 80), at(50, 27), 3) })],
       probes: [
         {
@@ -221,7 +221,7 @@ export const lateSugar: Assay = {
       seed,
       seconds: 330,
       map: () => new Arena(100, 100, true).pile(30, 25, 3, 200, 0.5).build([NEST]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [
         strokeAt(150, { tool: "sugar", layer: PLANE, points: [sugar, ...ring] }, (g) => {
           atDrop = { crumb: foodIn(g.map, crumb.x, crumb.y, 4), sugar: foodIn(g.map, sugar.x, sugar.y, 4) };
@@ -270,7 +270,7 @@ export const crayonRing: Assay = {
       seed,
       seconds: 200,
       map: () => new Arena(100, 100, true).pile(50, 15, 3, 200).build([nest]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [strokeAt(5, { tool: "crayon", layer: PLANE, colony: 0, points: circle })],
       probes: [
         {
@@ -300,7 +300,8 @@ export const fillShaft: Assay = {
       seed,
       seconds: 300,
       map: () => generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }),
-      game: { antCount: 150, rivalAnts: 20, regrow: 0 },
+      game: { regrow: 0 },
+      colonies: [{ antCount: 150 }, { antCount: 20 }],
       events: [
         strokeAt(
           60,
@@ -401,7 +402,7 @@ function noEntryForkAssay(paint: boolean): Assay {
         seconds: 80,
         // No food: the crayon is the only trail, as in B1.
         map: () => new Arena(100, 100, true).build([NEST]),
-        game: { antCount: 300, rival: false },
+        colonies: [{ antCount: 300 }],
         events,
         probes: [
           {
@@ -440,7 +441,7 @@ export const tweezers: Assay = {
       seed,
       seconds: 420,
       map: () => new Arena(100, 100, true).pile(50, 25, 3, 400).build([NEST]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [
         {
           at: 120,
@@ -539,7 +540,7 @@ export const aphidsFound: Assay = {
       seed,
       seconds: 240,
       map: () => new Arena(100, 100, true).build([NEST]),
-      game: { antCount: 60, rival: false },
+      colonies: [{ antCount: 60 }],
       events: [
         strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(FAR) }, (g) => {
           base = { total: g.map.foodTotal, left: g.map.foodLeft };
@@ -585,7 +586,7 @@ function renewableAssay(tool: "aphids" | "sugar"): Assay {
         seed,
         seconds: 320,
         map: () => new Arena(100, 100, true).build([NEST]),
-        game: { antCount: 300, rival: false },
+        colonies: [{ antCount: 300 }],
         events: [strokeAt(5, { tool, layer: PLANE, points: clumpPoints(CLUMP) })],
         probes: [
           {
@@ -630,7 +631,7 @@ export const tendersDefend: Assay = {
       seed,
       seconds: 300,
       map: () => new Arena(120, 60, true).build(nests),
-      game: { antCount: 200, rivalAnts: 200, rival: true },
+      colonies: [{ antCount: 200 }, { antCount: 200 }],
       events: [strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(clump) })],
       probes: [
         {
@@ -692,7 +693,7 @@ export const aphidsEaten: Assay = {
       seed,
       seconds: 240,
       map: () => new Arena(100, 100, true).build([NEST]),
-      game: { antCount: 300, rival: false },
+      colonies: [{ antCount: 300 }],
       events: [strokeAt(5, { tool: "aphids", layer: PLANE, points: clumpPoints(CLUMP) })],
       probes: [
         {

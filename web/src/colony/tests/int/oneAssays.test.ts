@@ -190,7 +190,8 @@ test("F1 sets foragers down at their hole, exploring, each with a spot 40-80 cel
   }
   // With fidelity on each forager remembers its spot (its find's offset from where it believed its hole), off none do.
   const spec = forage1.spec(2);
-  const on = runGame({ ...spec, sides: { ...spec.sides, colony: { ...spec.sides?.colony, siteFidelity: 1 } }, seconds: 1 / 30 }).game
+  const [first, ...rest] = spec.colonies ?? [];
+  const on = runGame({ ...spec, colonies: [{ ...first!, colony: { ...first?.colony, siteFidelity: 1 } }, ...rest], seconds: 1 / 30 }).game
     .player;
   for (let i = 0; i < F1_ANTS; i++) {
     assert.ok(!Number.isNaN(on.foodX[i]), `ant ${i} remembers its spot`);
