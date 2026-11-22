@@ -194,8 +194,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const lastSound = useRef(0);
   // Colonies founded mid-game join the same array (Game.addColony): its length is what changes.
   const colonyCount = game.colonies.length;
-  const trails = game.player.ph.has("food");
-  const pp = game.player.params;
+  const trails = game.colonies[0]!.ph.has("food");
+  const pp = game.colonies[0]!.params;
   const tends = pp.aphidPlume > 0 || pp.tendDefend > 0 || pp.aphidPrey > 0;
   // Some tools work in one view only (Dirt below, aphids above): the tray offers each where it can be placed.
   const view = controls.view;
@@ -657,7 +657,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
         off: theme === t ? "in use" : undefined,
         run: () => setTheme(t),
       })),
-      ...guideFor((c) => game.player.ph.has(c), game.params.species.id).map((e) => ({
+      ...guideFor((c) => game.colonies[0]!.ph.has(c), game.params.species.id).map((e) => ({
         id: `learn-${e.id}`,
         label: `Codex: ${e.title}`,
         group: "Codex",
@@ -747,20 +747,20 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             <IconButton icon="search" label={`Commands (${MOD_K})`} onClick={() => setPalette(true)} className="max-sm:hidden" />
             <SimClock className="px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden" />
             {/* A species with a day (the desert ant, ja-rf5.8): the sun as its ants see it, and the ground's heat now. */}
-            {game.player.params.heatDay > 0 && (
+            {game.colonies[0]!.params.heatDay > 0 && (
               <>
                 <span
                   className="flex items-center gap-1 px-2 font-mono text-[13px] text-fg-2 tabular-nums max-sm:hidden"
                   aria-label="sun"
                   title="The sun as the desert ants see it (out under a high sun, in when it is low or down), and the ground's heat"
                 >
-                  <Sun params={game.player.params} />
+                  <Sun params={game.colonies[0]!.params} />
                   {/* Only where the species has its own guide entry (review of #194, N2). */}
                   {ownEntry && <Help to={{ tab: "guide", id: ownEntry }} label={game.params.species.name.toLowerCase()} />}
                 </span>
                 {/* On a phone, short (owner, review of #194 D1). */}
                 <span className="px-1.5 font-mono text-[12px] text-fg-2 tabular-nums sm:hidden" aria-label="sun, short">
-                  <Sun params={game.player.params} short />
+                  <Sun params={game.colonies[0]!.params} short />
                 </span>
               </>
             )}

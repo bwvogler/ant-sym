@@ -301,7 +301,7 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
       <div className="mt-3 flex items-center justify-between">
         <span className="flex items-center gap-1.5">
           Trails drawn {/* the guide's trail entries are left out for a species that lays no food trail (ja-rf5.11): no link to nowhere */}
-          {game.player.ph.has("food") && <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />}
+          {game.colonies[0]!.ph.has("food") && <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />}
         </span>
         <div className="flex overflow-hidden rounded-md border border-line text-sm">
           <button
@@ -615,7 +615,8 @@ export function LeverChips({
 }) {
   // Levers on channels the game's species lacks have no scent to bend (ja-fnd.5.11): greyed, and their tip says why (ja-fnd.5.12); an
   // invite lever (rouse) is inert where the species' finders invite no one (ja-rf5.18).
-  const inert = new Set(inertLevers(game.player.params.channelSet, game.player.params.invitePace > 0));
+  const first = game.colonies[0]!.params;
+  const inert = new Set(inertLevers(first.channelSet, first.invitePace > 0));
   // What the fungus has kept and whether it has a nest change with play, outside the stats.
   const reach = useGameRead(() => game.fungus.evolution?.reach() ?? null, sameRecord);
   const hasNest = useGameRead(() => game.fungus.hasNest);

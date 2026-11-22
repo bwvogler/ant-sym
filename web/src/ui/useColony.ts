@@ -98,15 +98,14 @@ export function buildGame(s: GameSettings): Game {
   return new Game(
     map,
     {
-      antCount: s.antCount,
-      rivalAnts: s.antCount,
-      rival: s.rival,
       regrow: GAME_REGROW,
       autoFound: false,
       fungus: { hyphae: true },
       species: speciesById(s.species),
     },
     gameRng(s.seed, s.generation),
+    // The settings' ant count and rival box name the colonies the game starts with: one, or a pair of the same size.
+    s.rival ? [{ antCount: s.antCount }, { antCount: s.antCount }] : [{ antCount: s.antCount }],
   );
 }
 
