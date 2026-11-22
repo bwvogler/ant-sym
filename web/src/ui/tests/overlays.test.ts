@@ -6,6 +6,7 @@ import type { Camera, Viewport } from "../camera.ts";
 import { toScreen } from "../camera.ts";
 import { odourColour } from "../field/colour.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "../field/ctx.ts";
+import type { FieldEnv, SpriteSets } from "../field/env.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, label, pill } from "../field/overlays.ts";
 import { buildGame } from "../useColony.ts";
 import { callsOf, recordingContext } from "./recordingContext.ts";
@@ -39,6 +40,10 @@ const THEME: FieldTheme = {
 
 const V: Viewport = { w: 800, h: 600, dpr: 1 };
 
+/** The overlays use neither the clock, a path nor a sprite; a layer that does gets a fake from its own test. */
+const NO_ENV = {} as FieldEnv;
+const NO_SPRITES = {} as SpriteSets;
+
 /** A game of seed 3 with two colonies, stepped a while so ants are out; `third`: a colony beyond the line's far end, so the line has a bend. */
 function world(third: boolean): Game {
   const g = buildGame({ species: "generic", seed: 3, antCount: 40, rival: true, generation: 0 });
@@ -62,6 +67,8 @@ function field(g: Game, lv: number, c: Camera, over: Partial<FieldCtx> = {}) {
     world: g.world,
     colonies: g.colonies,
     fungus: g.fungus,
+    env: NO_ENV,
+    sprites: NO_SPRITES,
     ...over,
   };
   return { k, ...rec };

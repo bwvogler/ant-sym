@@ -7,6 +7,7 @@ import type { Colony, Fungus, OneWorld, WorldMap } from "../../colony/index.ts";
 import type { Camera, Extent, Viewport } from "../camera.ts";
 import type { PenCircle, Settle } from "../pen.ts";
 import type { Rgb } from "./colour.ts";
+import type { FieldEnv, SpriteSets } from "./env.ts";
 
 /** The page's colours as the field draws with them: CSS colours for strokes and fills, triples for what is mixed pixel by pixel. */
 export interface FieldTheme {
@@ -59,6 +60,10 @@ export interface FieldCtx {
   world: OneWorld;
   colonies: readonly Colony[];
   fungus: Fungus;
+  /** what the frame takes from the outside world: the clock, a new path (field/env.ts) */
+  env: FieldEnv;
+  /** the sprite sets this field draws with (built once per field: env.sprites()) */
+  sprites: SpriteSets;
 }
 
 /** The last preview under the pointer: the pen asked once per cell (and side of the circle's edge), not every frame. */
