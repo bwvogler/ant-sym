@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { deplete, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -53,6 +53,28 @@ test("overrides: a fight override keeps the other fight params; rival params rea
   const g = new Game(smallOne(1), {}, gameRng(1), spec.colonies);
   assert.equal(g.rival?.params.deposit, 7);
   assert.equal(g.player.params.deposit, 4);
+});
+
+test("overrides on a listed spec: both reaches every colony, rivalPolicy only the second, game.antCount/rival/rivalAnts are refused, gameOf builds the list", () => {
+  const base = { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 12 }, { antCount: 14 }] };
+  const both = withOverrides(base, { both: { deposit: 6 } });
+  assert.deepEqual(
+    both.colonies?.map((c) => c.colony?.deposit),
+    [6, 6, 6],
+  );
+  const pol = (() => 0) as never;
+  const rp = withOverrides(base, { policy: pol, rivalPolicy: pol });
+  assert.equal(rp.colonies?.[0]?.policy, pol);
+  assert.equal(rp.colonies?.[1]?.policy, pol);
+  assert.equal(rp.colonies?.[2]?.policy, undefined);
+  assert.equal(withOverrides(base, { rivalPolicy: pol }).colonies?.[0]?.policy, undefined);
+  for (const game of [{ antCount: 5 }, { rival: false }, { rivalAnts: 5 }])
+    assert.throws(() => withOverrides(base, { game }), /name no colony/);
+  const { game } = gameOf({ seed: 1, seconds: 0, map: () => smallOne(1), colonies: [{ antCount: 10 }, { antCount: 12 }] });
+  assert.deepEqual(
+    game.colonies.map((c) => c.params.antCount),
+    [10, 12],
+  );
 });
 
 test("overrides: responses replace the assay's own hook by hook", () => {
