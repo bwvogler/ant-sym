@@ -87,7 +87,7 @@ const out: SteerSituation = {
   find: "far",
 };
 const colony = () =>
-  new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), { antCount: 10, rival: false }, mulberry32(3)).player;
+  new Game(generateOneWorld(1, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(3), [{ antCount: 10 }]).colonies[0]!;
 
 test("a request asks a score per default weight; a reply reads as levels, and only answers its weights could give are valid", () => {
   const key = steerKey(out);

@@ -64,9 +64,9 @@ test("its schema is its own: a key and a question over its fields, the generic a
 
 test("its ants are asked about their own situation, and keep its codes", () => {
   asked.length = 0;
-  const g = new Game(smallOne(7), { antCount: 40, rival: false, species: AGED }, mulberry32(1));
+  const g = new Game(smallOne(7), { species: AGED }, mulberry32(1), [{ antCount: 40 }]);
   for (let k = 0; k < 30 * 20; k++) g.tick(1 / 30);
-  const c = g.player;
+  const c = g.colonies[0]!;
   assert.equal(c.seen.length, SCHEMA.size, "situations seen are counted over its own");
   assert.ok(c.situationsSeen > 0);
   assert.ok(asked.length > 0, "its policy was asked");
@@ -121,12 +121,15 @@ test("a schema without every mode, or too big for an ant's question code, is ref
 
 test("a sensed value outside its field's values is refused (review of #122, nit)", () => {
   const bad: Species = { ...AGED, sense: () => ({ age: "ancient" }) };
-  const g = new Game(smallOne(7), { antCount: 20, rival: false, species: bad }, mulberry32(1));
+  const g = new Game(smallOne(7), { species: bad }, mulberry32(1), [{ antCount: 20 }]);
   assert.throws(() => {
     for (let k = 0; k < 30 * 5; k++) g.tick(1 / 30);
   }, /"age" is ancient/);
 });
 
 test("a species that leaves generic fields out brings its own local rule (review of #122, D1)", () => {
-  assert.throws(() => new Game(smallOne(7), { antCount: 10, species: { ...AGED, policy: undefined } }, mulberry32(1)), /homeTrail, alarm/);
+  assert.throws(
+    () => new Game(smallOne(7), { species: { ...AGED, policy: undefined } }, mulberry32(1), [{ antCount: 10 }, { antCount: 800 }]),
+    /homeTrail, alarm/,
+  );
 });

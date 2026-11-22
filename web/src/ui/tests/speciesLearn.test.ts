@@ -95,7 +95,7 @@ test("the request the drawer shows for a species is its own: its legend, its fie
 
 test("situations are counted out of the species' own, and its questions cost its own tokens (review of #132)", () => {
   const game = (species: Species) =>
-    new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
+    new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { species }, mulberry32(1), [{ antCount: 5 }]);
   assert.equal(situationsOf(game(GENERIC_ANT).colonies), 3888);
   assert.equal(situationsOf(game(LONE).colonies), SCHEMA.size);
   const own = tokensPerQuestion("mode", "forage", WORDS);
@@ -110,8 +110,8 @@ test("the desert ant's rule text says what its rule does, in every situation it 
 
 test("the field guide leaves out the entries on trails a species doesn't lay: the desert ant's has no trail entries (owner, ja-rf5.11)", () => {
   const ids = (species: Species) => {
-    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
-    return guideFor((c) => g.player.ph.has(c), species.id).map((e) => e.id);
+    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { species }, mulberry32(1), [{ antCount: 5 }]);
+    return guideFor((c) => g.colonies[0]!.ph.has(c), species.id).map((e) => e.id);
   };
   const common = GUIDE.filter((e) => e.species === undefined).map((e) => e.id);
   assert.deepEqual(ids(GENERIC_ANT), common, "the generic ant sees every entry but another species' own");
@@ -132,8 +132,8 @@ test("the field guide leaves out the entries on trails a species doesn't lay: th
   ]);
   assert.ok(ids(DESERT_ANT).includes("way-home"), "the way home, without a trail, is every species' (owner, review of #144 D1)");
   const note = (species: Species) => {
-    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { antCount: 5, rival: false, species }, mulberry32(1));
-    return guideNote((c) => g.player.ph.has(c), species.name);
+    const g = new Game(generateOneWorld(1, { plane: { size: { w: 64, h: 48 } } }), { species }, mulberry32(1), [{ antCount: 5 }]);
+    return guideNote((c) => g.colonies[0]!.ph.has(c), species.name);
   };
   assert.equal(note(GENERIC_ANT), null, "no note for the generic ant (review of #144, S2)");
   assert.match(note(DESERT_ANT) ?? "", /^The desert ant lays no trails of some kinds/);
