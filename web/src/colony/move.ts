@@ -74,9 +74,6 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
   if (face === DIG_FACE && map.sky) {
     cellOf(nx, ny);
     col.antCell(i);
-    // Loose soil is picked up only by the rules of pickPlane (spreading, backfill), never dug at head-on: explorers on
-    // the ground line chewed the mound and carried it to the hole and out again. (From below it can't be met: the ground
-    // under the mound is crust, see crust. Digging it "from below in a quarter of the time" never ran: review of MR 15.)
     if (!col.mayDig(CELL[0], CELL[1])) face = GLANCE;
   }
   if (face !== NO_FACE) {

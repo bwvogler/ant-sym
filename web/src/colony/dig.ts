@@ -257,8 +257,7 @@ export function roleFor(self: Colony, y: number): Role {
 
 /**
  * The side view: whether soil cell (x, y) is the ground line's crust (it touches the sky). Ants leave it: digging
- * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance. Loose soil
- * (the mound) is no crust.
+ * it would undermine the walkway or hole the ground everywhere; the hole they keep is their entrance.
  */
 export function crust(self: Colony, x: number, y: number): boolean {
   const ent = self.entrance;
@@ -268,8 +267,6 @@ export function crust(self: Colony, x: number, y: number): boolean {
   for (let d = 0; d < 6; d++) {
     const tx = stepX(x, y, d);
     const ty = stepY(y, d);
-    // The ground under the mound is crust too: dug out under a blanket of spoil, the next pellet picked off the
-    // top opened a new hole into the tunnels, away from every entrance (agent review of MR 15).
     if (isSky(self.map, tx, ty)) return true;
   }
   return false;

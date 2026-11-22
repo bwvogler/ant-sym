@@ -505,8 +505,7 @@ export function widenWay(col: Colony, cx: number, cy: number, prefer: number): n
 }
 
 /**
- * Whether soil cell (x, y) is a face an explorer may dig for chamber `c` (null: a new chamber): soil, not the mound's
- * loose soil nor the crust, not put back lately (refilled: dug at, it glances off), and a place a chamber cell may be (chamberSpot).
+ * Whether soil cell (x, y) is a face an explorer may dig for chamber `c` (null: a new chamber): soil, not the crust, not put back lately (refilled: dug at, it glances off), and a place a chamber cell may be (chamberSpot).
  */
 export function chamberFace(col: Colony, x: number, y: number, c: Chamber | null): boolean {
   return (

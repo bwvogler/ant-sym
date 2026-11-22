@@ -11,10 +11,9 @@ import { smallOne } from "../builders.ts";
 // (`npm run test:slow`). The rest are in ../int/chambers.test.ts. On the curtain of a small one world (S2.3c), whose columns
 // run from x0 (negative) to x0 + w; the ground there is the crust under the strip's sky.
 
-/** The ground's top in column x as dug: under the mound's loose soil (what a chamber's depth is measured from). */
+/** The ground's top in column x as dug (what a chamber's depth is measured from). */
 function soilTop(map: WorldMap, x: number): number {
-  let y = groundTop(map, x);
-  return y;
+  return groundTop(map, x);
 }
 
 /** Every pair of cells of two different chambers that touch, as text (none: ""). */
