@@ -7448,7 +7448,7 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 | G1 the one-world game, held food | pass 17/20 (failing 3, 4, 20) | pass 15/20 (failing 3, 12, 14, 19, 20) | median losses a colony 74 → 1; stored food 2746 → 2559 (you), 2807 → 2731 (rival) |
 | A13 defence from senses, the war party walked at the hole | pass 9/20 | **pass 4/20** | the defended colony: median losses 35.5 → 144, stored 265 → 117, ants alive 222 → 94; raiders' losses 40.5 → 36 |
 
-So directed combat makes neutral play much calmer and makes defending against a raid much worse: the defenders lose four times the ants and store less food, while the raiders lose no more. The entrance-defence variants of §86 (`defendEntrance`, `defendAlarmEntrance`, `defendThreatEntrance`) are the answer being tried and are not on by default. Whether the page's new games should start with `intent` on is the owner's call (D2, review of 91fd83c); on this evidence the page's A13 behaviour is worse with it on, and its A9 and G1 behaviour better.
+So directed combat makes neutral play much calmer and makes defending against a raid much worse: the defenders lose four times the ants and store less food, while the raiders lose no more. The entrance-defence variants of §86 (`defendEntrance`, `defendAlarmEntrance`, `defendThreatEntrance`) are the answer being tried and are not on by default. **Owner's decision (2026-11-22, D2, review of 91fd83c): keep `intent` on in the page's new games**, knowing A13 raid defence is worse with it on (9/20 → 4/20) and A9 and G1 are better; the entrance-defence variants stay the way to recover it.
 
 
 ## 87. Local delivery actions (ja-g7nz)
@@ -7478,5 +7478,5 @@ So directed combat makes neutral play much calmer and makes defending against a 
 | stored, shipped ÷ local | 0.69 | 1.04 | 0.99 | 0.86 | 0.90 | 0.83 | 0.95 | 0.94 | 1.48 | 0.74 |
 | losses, local → shipped | 0 → 3 | 0 → 13 | 0 → 1 | 0 → 7 | 0 → 18 | 0 → 23 | 0 → 0 | 0 → 7 | 0 → 2 | 0 → 0 |
 
-Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rule loses no ant on any of these seeds; the shipped answers lose 0 to 23 (74 in all over ten seeds). So Jev's weighted answers cost the colonies about 8 % of their stored food at the median, up to 31 % on the worst seed, and some ants, where the local rule loses none. One doctrine (`forage`), one size and 240 s, so it shows a direction, not a ship rule.
+Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rule loses no ant on any of these seeds; the shipped answers lose 0 to 23 (74 in all over ten seeds). So Jev's weighted answers cost the colonies about 8 % of their stored food at the median, up to 31 % on the worst seed, and some ants, where the local rule loses none. One doctrine (`forage`), one size and 240 s, so it shows a direction, not a ship rule. **Owner's decision (2026-11-22, D1): keep the six lanes on** with these answers shipped.
 
