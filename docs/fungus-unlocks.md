@@ -1,0 +1,112 @@
+# The fungus's unlocks: a small landing patch, mats and new patches, two budgets, a lichen partner
+
+*Research + design note for epic `ja-vlla` (PRD §84). Written 2026-11-22, against code at `0d2738f8`. Owner's ask (2026-11-22): additions to the fungus that are unlocked rather than bought from one pool: ant-specific abilities from mass in ants, free-fungus abilities from mass outside; a downstream algae or plant partner (a lichen: use rock, break it down, spread across it) unlocked by contact; a new patch from 7 completely connected tiles; and a smaller first piece. Searches ran on 2026-11-22 through Europe PMC and the PMC full-text service; Wiley, Taylor & Francis and ScienceDirect pages were bot-walled, so Boddy 1999, Trinci 1974, Dowson et al. 1988, Chen et al. 2000 and Armstrong's rates were not read: where the text leans on them it says "(from memory; not fetched)". This is ecology and mycelial architecture only.*
+
+**The question.** When a mycelium meets a rich place, does it settle there, and what do the lichen-forming fungi do with rock and a photosynthetic partner, that a game fungus could be given the same way?
+
+## TL;DR
+
+- **Dense mats where it is rich: only partly supported.** The slow, dense "phalanx" against fast, sparse "guerrilla" contrast is real, but as a difference between *species*; no paper read measures the same species branching more on rich than on poor substrate, and one sugar fungus (*Mortierella*) is dense in a rich habitat (§1). A thickening rule is mostly **design**.
+- **A new focus at a new resource: supported.** A cord-forming mycelium that reaches a new resource aggregates the cords that join old and new and grows out from the new base (§2). A new patch at a resource has a source; a patch at 7 filled tiles has none, and the number 7 is **design**.
+- **Lichens break rock with acid and hyphae, slowly, from the edge in:** oxalic acid and hyphae penetrating the grain, and wet-dry swelling (§3). The photobiont feeds the fungus carbon; contact turns the symbiosis genes on (§4).
+- **Fungi that are not lichens can touch algae too** (yeast and *Chlamydomonas* in the lab, *Mortierella* taking in *Nannochloropsis*): an alga-fungus partnership does not need a lichen (§4). *Metarhizium* with algae: not found, so the partner is **design**.
+- **The two budgets and the 7-tile landing patch are design:** no source gives them. The repo's notes already separate the fungus's soil life from its life in hosts (`docs/fungus-body.md` §1, §3).
+- **What the game does today:** one mass pool and one currency (mutations, derived from growth in the soil and in hosts); a patch is a counter plus a disc of 19 cells; rock is impassable; there is nothing to touch (no plants, algae or lichen). §5.
+
+## 1. Dense where it is rich: a species axis, not a measured response
+
+- **Phalanx and guerrilla.** Outgrowth patterns of cord-formers run from "slowly extending search fronts densely populated by hyphae, which are unlikely to miss new resources" (*Hypholoma fasciculare*) to "more rapidly extending but sparser systems" (*Phanerochaete velutina*) and, at the far end, *Armillaria*. The slow-dense ones are "phalanx", short-range; the fast-sparse ones "guerrilla", long-range; plants have the same split (clump against runner) (Fricker, Heaton, Jones & Boddy 2017, *Microbiol Spectr* 5:FUNK-0033-2017, full text). No numbers are given.
+- **A gradient of connectivity, and a counter-example.** *Mucor*, in nutrient-rich habitats, makes a sparse, tree-like, fast network of very low hyphal density; *Phanerochaete* and *Mortierella* sit near the dense, many-loops end, though *Mortierella* is also a sugar fungus of rich habitats, which cuts against "rich means sparse" (Aguilar-Trigueros, Boddy, Rillig & Fricker 2022, *ISME Commun* 2:2, full text).
+- **Little plasticity within a species.** In 30 clones each of cord-formers with soil grazers, shape changes were limited and species-specific, not the extreme plasticity usually assumed for modular organisms; fungi can still raise local occupancy "by increasing branching rates" in patchy resources, citing Boddy 1999 (Aguilar-Trigueros, Boddy & Fricker 2025, *Ecol Lett* 28:e70281, full text; the claim about branching rates is second-hand here).
+- **Branching frequency.** That branching is more frequent, and the hyphal growth unit smaller, on richer medium is Trinci 1974 and Boddy 1999 (from memory; not fetched).
+- **A solid mat on a resource:** the nearest thing read is a zoned ring of mycelium in leaf litter (*Clitocybe nebularis*, Fricker 2017). No paper read describes a solid mat.
+
+**In the game:** a tip thickening to fill its neighbours when well supplied has partial support (species-level dense foragers, and Boddy 1999 as recalled) and no measurement behind it: it is **design**, stated as such. The cue that says "rich" should be a place the game already calls a resource: a colonised corpse (`docs/hyphal-growth.md` §6: a hypha that reaches a corpse grows over it). The thickening is a growth-lane answer over what the tip senses; the local rule, which plays when there is no answer, never thickens, so off is today's game.
+
+## 2. A new focus at a new resource
+
+- **Cords re-form round a new resource.** When a mycelium meets a new resource, the parts that connect old and new aggregate into cords and non-connecting mycelium dies back; short-range foragers reallocate biomass "rapidly and extensively", leaving "often only the connective cord and outward growth from the newly colonized resource after a few months"; long-range ones reallocate little unless the new resource is considerably bigger (Fricker et al. 2017, full text).
+- **Moving house depends on distance and size.** *P. velutina* inoculum blocks on unsterilised soil moved to a bait more often when it was near (1 cm) than far (15 cm), and to large baits more than small; bait weight loss (energy gained) and hyphal coverage on soil (foraging cost) were the drivers (Fukasawa & Ishii 2023, *Front Cell Dev Biol* 11:1244673, full text; percentages not extracted).
+- **How big a new base is:** only bait volumes (4 and 8 cm³) and 20×20×10 mm blocks in these papers; no threshold size at which a focus forms. Dowson, Rayner & Boddy 1988 (*FEMS Microbiol Lett* 53:291) is the classic on foraging between discontinuous resources (not read).
+
+**In the game:** a **new patch is a new focus at a resource**, which is where the biology puts it: where hyphae have filled a hex and its six neighbours (7 cells, **design**: no paper gives a size) the 7 become a patch. The seven cells' mass is already in the hyphae, so nothing is conjured: the patch adds capacity and a spore source, not free mass. A source that is a corpse is the natural first place.
+
+## 3. Lichens and rock
+
+- **Acid and hyphae.** Fungi secrete organic acids, "especially oxalic acid", which acidify the surface and dissolve minerals; hyphae penetrate the substrate; calcium and magnesium oxalates and carbonates re-form round the hyphae and can fill cracks, so the effect on stone is mixed, and lichen biomineralisation can even consolidate it (Paiva et al. 2026, *J Fungi* 12:128, full text; a review of stone heritage, not lichen-specific). Fungi, lichens included, are weathering agents by biomechanical and biochemical means (Burford, Fomina & Gadd 2003, *Mineral Mag* 67:1127, abstract only).
+- **A mechanism in grit.** In the Atacama, lichens grew attached to grit stones with single hyphae penetrating them; algal partners reached the middle of grits; fog wetting and drying swelled organisms and mineral, and pH shifts broke the grit down into a loose soil (Jung et al. 2020, *iScience* 23:101647, full text). No mm a year is given.
+- **Rates.** A review of lichen weathering (Chen, Blume & Beyer 2000, *Catena* 39:121) was not read, so there are no weathering rates here.
+- **Spread.** Crustose and foliose lichens grow as near-circular disks; small ones slowly, with a rising radial rate; large ones at a roughly constant radial speed, the edge doing the work (a model predicts a maximum of about 26 mm a year against the fastest reported, about 13 mm a year, *Parmelia*) (Seminara, Fritz, Brenner & Pringle 2018, *J R Soc Interface* 15:20180063, full text; the 13 mm figure is **unverified**, second-hand). Typical crustose rates well under 1 mm a year are from memory; not fetched.
+
+**In the game:** growing across and into rock, and breaking it down, is a late unlock (M4) with a slow, edge-led spread; it gives the fungus rock as ground it can enter, as the *borer* gave it undug soil. The speed is **design** timing (real lichens are far slower than a game minute).
+
+## 4. The partner, and contact
+
+- **What the alga gives, and what it wants.** In co-culture of the lichen fungus and alga of *Usnea hakonensis*, the algae supply photosynthetic product and the fungus supplies phosphorus and nitrogen compounds; the fungal cell wall is modified at fungal-algal contact sites and a hydrophobic layer ensheathes both, and the symbiosis genes switch on at contact (Kono et al. 2020, *BMC Genomics* 21:671, full text). Lichens are active only when wet and lit (Palmqvist 2000: from memory; not fetched).
+- **Fungi that are not lichens do it too.** Yeast and *Chlamydomonas reinhardtii* formed an obligate mutualism on reciprocal carbon and nitrogen exchange; *Aspergillus nidulans* hyphae made tight wall-to-wall contacts with the alga like a lichen interface, with no hyphal penetration of algal cells (Hom & Murray 2014, *Science* 345:94, full text). *Nannochloropsis oceanica* cells were taken into *Mortierella elongata* hyphae after close contact, with carbon and nitrogen moving between them (Du et al. 2019, *eLife* 8:e47815, full text).
+- **A plant partner.** The repo already has *Metarhizium* as a root endophyte moving insect nitrogen to plants (Behie et al. 2012, *Science* 336:1576, `docs/fungus-body.md` §1).
+- **Not found:** *Metarhizium* with algae.
+
+**In the game:** the partner is a downstream organism the fungus meets: **contact** with an alga or a plant unlocks it, and with it its senses and abilities (rock, spreading across it). The partner, what there is on the map to touch, and its own senses are for the owner (open, M4); this note only records that the biology supports contact as the trigger and carbon for nutrients as the trade, and that a *Metarhizium* partnership is **design**.
+
+## 5. What the game does today
+
+- **One pool.** `Evolution.mass` is the mycelium's mass; `growth` adds new fungus made on the ground (`grow`), from corpses (`feed`) and in hosts (`replicate`); mutations are `0.25 × growth − spent`, and every level costs one rising price (PRD §80). Mass in ants exists only as a display (`inHosts`, `ui/stats.ts`): the sum of fungus load over living ants of the strain, not part of `Evolution.mass`. Nothing is priced from either.
+- **A patch** is a count (`Evolution.patches`) plus a disc of cells: `Fungus.root` takes every non-rock cell within `LANDING.radius` (2: 19 cells), makes them `base` and hypha `sources`, and sends three tips out of the rim. Capacity is `capacity × patches`. Patches are made at the landing and by a founding queen carrying the fungus.
+- **Rock** is impassable to hyphae (`enterable`, `hyphae.ts`); the *borer* only lets them into undug soil. **Nothing on the map is a plant, alga or lichen.**
+- **Hyphae** are one cell wide and turn away from their own hypha, so a cell with all six neighbours hyphal is rare: measured on seeds 1–6, ten minutes, shipped answers, the number of cells with all six neighbours hyphal was 4–6 in every game and did not grow between minutes 3 and 10, so they are the landing disc's own interior: the hyphae outside it never added one.
+
+## What was not found
+
+- Branching frequency, hyphal length per area or a branch interval for one species on poor against rich substrate.
+- A paper on a solid mycelial mat on a resource; the size at which a new focus forms.
+- Lichen weathering rates; measured crustose lichen growth in mm a year; the carbon fraction a photobiont gives.
+- *Metarhizium* (or any entomopathogen) with an alga.
+- Boddy 1999, Trinci 1974, Dowson et al. 1988, Chen et al. 2000, Armstrong & Smith 1996, Palmqvist 2000, Joneson & Lutzoni 2009 could not be read: they are cited from memory or by title.
+
+## The mechanic
+
+Four milestones, each its own PR, the first the smallest (owner: "the first patch should be smaller"):
+
+1. **M1: the landing patch is the 7-cell flower** (`ja-vlla.2` the assay, `ja-vlla.3` the build). `LANDING.radius` 2 becomes 1: a hex and its six neighbours, for the landing and for a queen's founding. A parameter whose off is today. It shrinks the spore ground (7 cells hold at most `7 × maxSpores`, against 19) and the first patch's capacity use, so P1 is re-tuned by the worst seed; no Jev change. Whether `Fungus.paint` keeps radius 2 is chosen by the assay (`ja-vlla.2`).
+2. **M2: mats and new patches** (`ja-vlla.4`–`.6`; owner: "hyphae must fill them"). A growth-lane answer, **thicken**: the tip fills the open, enterable neighbours of its cell, HYPHA_MASS each from its supply. A cell whose six neighbours are all hyphae and itself a hypha is a flower and becomes a patch: layer 0 only (as every root today), mass conserved, three tips out of the rim. The answer changes the lane's legend (`GROWTH_BRAIN_VERSION` 5): a re-ask of about $0.002 an aim and a free `--import`. The cue for "a resource is here" is open (a colonised corpse beside the tip, a fifth situation field: 48 situations become 96).
+3. **M3: two budgets** (`ja-vlla.7`; design with the owner first). Ant abilities (infectivity, persistence, evasion and the reach upgrades) from fungus made in hosts; free-fungus abilities (mycelium, knots, fruiting, stalks) from mass outside. Open: stock or earnings; one price or two; which is which.
+4. **M4: the lichen partner** (`ja-vlla.8`; design with the owner first): something to touch, the partner's own senses and abilities, using rock.
+
+For every milestone, off is today bit for bit and the goldens stay exact until a milestone re-records them.
+
+## Play
+
+- **See:** M1: a smaller purple flower at the landing instead of a disc. M2: where hyphae reach something rich, they thicken into a fan of cells, and when they close a flower it turns into a new patch (a new base with its own spores) the player can watch spread from. M3: two meters in the drawer, one for ants and one for the ground. M4: algae or plants on the map and, once touched, a partner that creeps across rock.
+- **Choose:** M1 none (the start is smaller). M2: the aim steers where it thickens ("settle where there is food" against "keep reaching"): the first new say in where the fungus plants a second base. M3: which budget to grow, so which abilities. M4: whether to seek the partner.
+- **Progression:** a smaller start is a slower start: P1 is the guard. New patches are mass-neutral, so a second patch costs the reach it did not grow; capacity is the reward.
+- **Cost:** none in M1. M2 re-asks the growth lane (about $0.002 an aim, once; cached games spend nothing), and a fifth situation field would raise the lane's tokens a question (to be measured with `scripts/colony-cost.mjs`). M3 and M4 are not asked of Jev unless they add a lane.
+- **Risks:** a **cliff** early (M1 shrinks spores and capacity at the start: worst seed of P1); a **runaway** (capacity grows with patches, so a patch that is cheap to make would snowball: it is mass-neutral and needs seven cells of mass, and the rate is the number to watch); an **invisible** rule (a patch forming with no sign: it needs a mark and a notice); a **free lever** (the partner skipping the slope: it is unlocked by contact and starts weak); a mat rule with only species-level support, which a reviewer can fairly call design (it is marked so).
+
+## Open questions
+
+- **Owner (M2):** the cue for "rich": a colonised corpse (best supported: a new focus at a resource), anywhere well supplied (design only), or only when the aim asks (policy only).
+- **Owner (M3):** are the budgets a *stock* (unlock when mass in ants or outside passes a level) or *earnings* spent like mutations? One rising price or one per budget?
+- **Owner (M4):** what the partner is (algae on rock, a plant with roots, a lichen), what contact means on the map, what senses it brings.
+- **To measure:** P1 with radius 1 (`ja-vlla.2`); flowers per game with a thicken answer (`ja-vlla.6`); the cost of a fifth situation field.
+- **To read:** the sources this search could not (`ja-vlla.1`).
+
+## Sources
+
+- Fricker MD, Heaton LLM, Jones NS, Boddy L (2017). The Mycelium as a Network. *Microbiol Spectr* 5(3):FUNK-0033-2017. [PMC11687498](https://pmc.ncbi.nlm.nih.gov/articles/PMC11687498/) (full text)
+- Aguilar-Trigueros CA, Boddy L, Rillig MC, Fricker MD (2022). Network traits predict ecological strategies in fungi. *ISME Commun* 2:2. [PMC9723744](https://pmc.ncbi.nlm.nih.gov/articles/PMC9723744/) (full text)
+- Aguilar-Trigueros CA, Boddy L, Fricker MD (2025). Not Extremely Plastic: Testing the Limits of Morphological Plasticity in Fungal Mycelia in Response to Soil Grazers. *Ecol Lett* 28:e70281. [doi:10.1111/ele.70281](https://doi.org/10.1111/ele.70281), [PMC12675975](https://pmc.ncbi.nlm.nih.gov/articles/PMC12675975/) (full text)
+- Fukasawa Y, Ishii K (2023). Foraging strategies of fungal mycelial networks: responses to quantity and distance of new resources. *Front Cell Dev Biol* 11:1244673. [PMC10483288](https://pmc.ncbi.nlm.nih.gov/articles/PMC10483288/) (full text)
+- Lindahl BD, Olsson S (2004). Fungal translocation - creating and responding to environmental heterogeneity. *Mycologist* 18:79–88. [doi:10.1017/S0269915X04002046](https://doi.org/10.1017/S0269915X04002046) (abstract only)
+- Paiva DS, Fernandes L, Portugal A (2026). Fungi and Stone Heritage Conservation: Friend, Foe, or a Bit of Both. *J Fungi* 12:128. [PMC12941447](https://pmc.ncbi.nlm.nih.gov/articles/PMC12941447/) (full text)
+- Jung P, Baumann K, Emrich D, Springer A, Felde VJMNL, Dultz S, Baum C et al. (2020). Lichens Bite the Dust - A Bioweathering Scenario in the Atacama Desert. *iScience* 23:101647. [PMC7578742](https://pmc.ncbi.nlm.nih.gov/articles/PMC7578742/) (full text)
+- Burford EP, Fomina M, Gadd GM (2003). Fungal involvement in bioweathering and biotransformation of rocks and minerals. *Mineral Mag* 67:1127–1155. [doi:10.1180/0026461036760154](https://doi.org/10.1180/0026461036760154) (abstract only)
+- Seminara A, Fritz J, Brenner MP, Pringle A (2018). A universal growth limit for circular lichens. *J R Soc Interface* 15:20180063. [PMC6030627](https://pmc.ncbi.nlm.nih.gov/articles/PMC6030627/) (full text)
+- Kono M, Kon Y, Ohmura Y, Satta Y, Terai Y (2020). In vitro resynthesis of lichenization reveals the genetic background of symbiosis-specific fungal-algal interaction in *Usnea hakonensis*. *BMC Genomics* 21:671. [PMC7526373](https://pmc.ncbi.nlm.nih.gov/articles/PMC7526373/) (full text)
+- Hom EFY, Murray AW (2014). Niche engineering demonstrates a latent capacity for fungal-algal mutualism. *Science* 345:94–98. [PMC4409001](https://pmc.ncbi.nlm.nih.gov/articles/PMC4409001/) (full text)
+- Du ZY, Zienkiewicz K, Vande Pol N, Ostrom NE, Benning C, Bonito GM (2019). Algal-fungal symbiosis leads to photosynthetic mycelium. *eLife* 8:e47815. [PMC6634985](https://pmc.ncbi.nlm.nih.gov/articles/PMC6634985/) (full text)
+- Behie SW, Zelisko PM, Bidochka MJ (2012). Endophytic insect-parasitic fungi translocate nitrogen directly from insects to plants. *Science* 336:1576–1577. [doi:10.1126/science.1222289](https://doi.org/10.1126/science.1222289)
+- Boddy L (1999). Saprotrophic cord-forming fungi: meeting the challenge of heterogeneous environments. *Mycologia* 91:13. [doi:10.1080/00275514.1999.12060990](https://doi.org/10.1080/00275514.1999.12060990) (not read)
+- Trinci APJ (1974). A Study of the Kinetics of Hyphal Extension and Branch Initiation of Fungal Mycelia. *J Gen Microbiol* 81:225–236. [doi:10.1099/00221287-81-1-225](https://doi.org/10.1099/00221287-81-1-225) (not read)
+- Dowson CG, Rayner ADM, Boddy L (1988). Foraging patterns of *Phallus impudicus*, *Phanerochaete laevis* and *Steccherinum fimbriatum* between discontinuous resource units in soil. *FEMS Microbiol Lett* 53:291–298. [doi:10.1016/0378-1097(88)90486-7](https://doi.org/10.1016/0378-1097(88)90486-7) (not read)
+- Chen J, Blume HP, Beyer L (2000). Weathering of rocks induced by lichen colonization: a review. *Catena* 39:121–146. [doi:10.1016/S0341-8162(99)00085-5](https://doi.org/10.1016/S0341-8162(99)00085-5) (not read; title and DOI checked in Crossref)
