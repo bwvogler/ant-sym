@@ -6,6 +6,7 @@ export * from "./brood.ts";
 export * from "./aphids.ts";
 export * from "./builder.ts";
 export * from "./chambers.ts";
+export * from "./combatObservation.ts";
 export * from "./chapters.ts";
 export * from "./chunks.ts";
 export * from "./colony.ts";
@@ -49,3 +50,6 @@ export * from "./vocab.ts";
 export * from "./weighted.ts";
 export * from "./steerBrain.ts";
 export * from "./world.ts";
+
+export { touch } from "./sense.ts";
+export { deliveryExplanation, requestedDelivery } from "./deliveryAction.ts";

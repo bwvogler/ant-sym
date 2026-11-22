@@ -243,3 +243,36 @@ test("routeFight 1: an ant walking out in fight mode stores its places; 0, it do
   assert.equal(stored(0, 0), 0, "routeFight 0: it does not");
   assert.equal(stored(1, 1), 0, "routeFight 1, food in its jaws: nothing");
 });
+
+test("a waypoint resets the stall count; repeated failed retrace targets release the route", () => {
+  const { c, hx, hy } = plane({ routeStallLimit: 3 });
+  const places = wayOut(hx, hy);
+  carrier(c, hx - 30, hy + 20, places, 100, 0.25);
+  onPlane(c, () => {
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeStalls[0], 1);
+    assert.equal(routeFail(c, 0, false), true);
+    assert.equal(c.routeStalls[0], 1);
+
+    const [x, y] = places[c.routeGoal[0]]!;
+    c.x[0] = x;
+    c.y[0] = y;
+    believePlane(c, 0, c.nest);
+    assert.equal(c.routeStalls[0], 0);
+    assert.equal(c.routeState[0], 1);
+    for (let k = 0; k < 2; k++) assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeState[0], 1);
+
+    c.search[0] = 6;
+    c.wall[0] = 1;
+    assert.equal(routeFail(c, 0, true), true);
+    assert.equal(c.routeN[0], 0);
+    assert.equal(c.routeState[0], 0);
+    assert.equal(c.search[0], 6);
+    assert.equal(c.wall[0], 1);
+    assert.equal(c.driftSurf[0], 0.25);
+    assert.equal(c.carrying[0], 1);
+    assert.equal(routeFail(c, 0, true), false, "ordinary homing handles another stall");
+  });
+});

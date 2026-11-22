@@ -44,6 +44,8 @@ export interface ColonyParams {
   nest: number;
   /** cells per second */
   speed: number;
+  /** Experimental surface retreat speed multiplier for an unladen ant moving away from a sensed threat. */
+  withdrawalSpeed?: number;
   /** how far ahead the three sensors sit, cells */
   sensorDistance: number;
   /** left and right sensors, radians off the heading */
@@ -97,6 +99,12 @@ export interface ColonyParams {
    * ja-ykmu; docs/steering.md): 0, never (every weight neutral: main's steering bit for bit); 1, at each mode decision.
    */
   steerLane: number;
+  /** Permit explicit food destination roles from carry responses; 0 preserves legacy routing. */
+  deliveryLane: number;
+  /** Seconds before carry senses a long local delivery attempt; 0 disables tracking (design). */
+  deliveryReconsider: number;
+  /** Cumulative seconds of refused unloading at eligible sites before a forager releases food for pickup. Zero disables recovery. */
+  dropRefusalLimit: number;
   /** With steerLane: within this (cells) of where it believes its last find is, an ant steers by its `near` weights (design). */
   findNear: number;
   /** With steerLane: how far the `search` weight scales random turning: ÷ this at low (tight), × this at high (wide); 1 = no effect (design). */
@@ -335,6 +343,8 @@ export interface ColonyParams {
    * 2008). Steering only.
    */
   routeEnd: number;
+  /** Consecutive stalled retrace targets before resuming ordinary homing. Zero keeps the existing retrace. */
+  routeStallLimit: number;
   /**
    * One world's plane, with routeMemory (ja-lp4.6.3.1, docs/route-memory.md §5): 1 = an ant walking out in `fight` mode stores its
    * places too, as an explorer does (a fighter that then finds food had no way out to retrace: G1 seed 3); 0 = only exploring and
@@ -464,6 +474,9 @@ export const DEFAULT_COLONY: ColonyParams = {
   reroll: 10,
   rerollLaw: 0,
   steerLane: 0,
+  deliveryLane: 0,
+  deliveryReconsider: 0,
+  dropRefusalLimit: 2,
   findNear: 8,
   searchSpan: 1.33,
   foodTrailPlane: 1,
@@ -518,6 +531,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   routeMax: 64,
   routeJoin: 0,
   routeEnd: 1,
+  routeStallLimit: 0,
   routeFight: 0,
   piErrorLaw: 1,
   piErrorAt: 50,

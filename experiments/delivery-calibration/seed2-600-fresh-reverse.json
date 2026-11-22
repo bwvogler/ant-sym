@@ -1,0 +1,120 @@
+{
+  "harnessSha256": "83cfa136eb6e611b3f1d1e62631ab032c3a6d5df9e012e2189cb35305f1a2532",
+  "commit": "4aa11ef72e2bb1e65d2a5ec63ba3ee013aa70721",
+  "seed": 2,
+  "seconds": 600,
+  "ants": 60,
+  "design": "One colony on a generated 160x100 plane; no rival, no forced food, loads, cues or locations. Local base policy. Baseline and retain are negative controls. Same initial RNG seed does not mean identical draws after trajectories diverge.",
+  "results": [
+    {
+      "name": "royal",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "royal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 562.5615798897724
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 684,
+      "portTrips": 0,
+      "finalLarder": 562.5615798897724,
+      "carriedDown": 684,
+      "held": 7,
+      "maxHeld": 30,
+      "maxActive": 30,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 691,
+      "switches": 0,
+      "deliveries": 684,
+      "activeSeconds": 7829.8000000001175,
+      "longSeconds": 0,
+      "carryCalls": 260870,
+      "longCalls": 0,
+      "wallSeconds": 11.354388404
+    },
+    {
+      "name": "royal5",
+      "lane": 1,
+      "limit": 5,
+      "doctrine": "redirectRoyal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 124.18522740810842
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 245,
+      "portTrips": 0,
+      "finalLarder": 124.18522740810842,
+      "carriedDown": 250,
+      "held": 10,
+      "maxHeld": 27,
+      "maxActive": 27,
+      "maxHeldOver120": 15,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 255,
+      "switches": 107,
+      "deliveries": 245,
+      "activeSeconds": 11021.133333333608,
+      "longSeconds": 5789.866666685167,
+      "carryCalls": 363095,
+      "longCalls": 174028,
+      "wallSeconds": 10.501676222
+    },
+    {
+      "name": "royal20",
+      "lane": 1,
+      "limit": 20,
+      "doctrine": "redirectRoyal",
+      "initialAlive": 60,
+      "initialLarder": 0,
+      "finalAlive": 90,
+      "chambers": [
+        {
+          "role": "royal",
+          "food": 209.6500927305583
+        }
+      ],
+      "queenAlive": true,
+      "births": 30,
+      "diedHungry": 0,
+      "stored": 331,
+      "portTrips": 0,
+      "finalLarder": 209.6500927305583,
+      "carriedDown": 349,
+      "held": 23,
+      "maxHeld": 32,
+      "maxActive": 32,
+      "maxHeldOver120": 0,
+      "broodStarved": 0,
+      "unresolved": [],
+      "starts": 354,
+      "switches": 181,
+      "deliveries": 331,
+      "activeSeconds": 11269.466666666567,
+      "longSeconds": 0,
+      "carryCalls": 344151,
+      "longCalls": 331,
+      "wallSeconds": 10.843199433000002
+    }
+  ],
+  "harnessSnapshot": "harness-source.txt",
+  "routingVariant": "fresh-reverse"
+}
