@@ -389,6 +389,7 @@ export function Lab({ game, controls, update }: Props) {
                 <div className="flex items-center justify-between">
                   <span className={colonyTone(k)}>{colonyName(k)}</span>
                   <PresetPicker
+                    label={`${colonyName(k)} doctrine presets`}
                     presets={DOCTRINES}
                     active={(p) => d.id === p.id}
                     disabled={locked}

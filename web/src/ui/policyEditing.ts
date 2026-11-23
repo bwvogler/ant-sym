@@ -46,8 +46,6 @@ export const wordsBoxClass = (more: string, grow: boolean, open: boolean): strin
 export const growShape = (open: boolean): { rows: number; wrap: "soft" | "off" } =>
   open ? { rows: 4, wrap: "soft" } : { rows: 1, wrap: "off" };
 
-/** What the box's events do: each takes only what it reads of the event.
-
 /** What the box's events do (pure, so `node --test` covers them): each takes only what it reads of the event. */
 export interface WordsRules {
   /** the words as typed (a draft: not settled) */

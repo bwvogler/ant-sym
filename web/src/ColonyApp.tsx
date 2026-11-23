@@ -33,6 +33,7 @@ import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
+import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import { seg } from "./ui/styles.ts";
 import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
@@ -883,28 +884,22 @@ function Aim() {
         <SectionHead>
           Aim <Help to={{ tab: "policy", id: "fungus" }} label="how the fungus decides" />
         </SectionHead>
-        <div className="flex overflow-hidden rounded-md border border-line text-sm">
-          {AIMS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={seg(aim.id === a.id)}
-              disabled={locked}
-              onClick={() => session.setAim({ id: a.id, text: a.text })}
-            >
-              {a.name}
-            </button>
-          ))}
-        </div>
+        <PresetPicker
+          presets={AIMS}
+          active={(a) => aim.id === a.id}
+          disabled={locked}
+          label="aim presets"
+          onPick={(a) => session.setAim({ id: a.id, text: a.text })}
+        />
       </div>
-      <textarea
-        className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+      <WordsBox
+        label="aim"
+        className="mt-2 w-full px-2 py-1.5 text-xs"
         rows={4}
         value={aim.text}
         disabled={locked}
-        onChange={(e) => session.draftAim({ id: "custom", text: e.target.value })}
-        onBlur={(e) => session.setAim({ id: aim.id, text: e.target.value })}
-        aria-label="aim"
+        onDraft={(text) => session.draftAim({ id: "custom", text })}
+        onCommit={(text) => session.setAim({ id: aim.id, text })}
       />
       {locked ? (
         <p className="mt-1 text-xs text-warn">{lock}</p>

@@ -79,15 +79,44 @@ test("a growing box is one line, not wrapping and with its overflow hidden, unti
   assert.match(wordsBoxClass("x", true, false), /overflow-hidden/);
   assert.doesNotMatch(wordsBoxClass("x", true, true), /overflow-hidden/);
   assert.doesNotMatch(wordsBoxClass("x", false, false), /overflow-hidden/, "only a growing box hides its overflow");
-  assert.match(wordsBoxClass("mt-1 w-full", false, false), /^resize-none .*mt-1 w-full$/);
+  assert.equal(
+    wordsBoxClass("mt-1 w-full", false, false),
+    "resize-none rounded-md border border-line bg-paper text-fg outline-none focus:border-accent disabled:opacity-60 mt-1 w-full",
+  );
 });
 
-// One editor: no component keeps a words box of its own.
-const UI = new URL("../", import.meta.url).pathname;
+// One editor: no component keeps a words box of its own, anywhere in the page's sources (the page itself included).
+const SRC = new URL("../../", import.meta.url).pathname;
 
-test("no <textarea outside PolicyEditor.tsx", () => {
-  const found = readdirSync(UI)
-    .filter((f) => f.endsWith(".tsx") && f !== "PolicyEditor.tsx")
-    .filter((f) => /<textarea\b/.test(readFileSync(join(UI, f), "utf8")));
+function* tsxFiles(dir: string): Generator<string> {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name !== "tests") yield* tsxFiles(p);
+    } else if (e.name.endsWith(".tsx")) yield p;
+  }
+}
+
+/** The source files that hold a `<textarea`. */
+export const withTextarea = (files: Iterable<string>, read: (f: string) => string): string[] =>
+  [...files].filter((f) => /<textarea\b/.test(read(f)));
+
+test("no <textarea outside PolicyEditor.tsx, in any folder of the page", () => {
+  const found = withTextarea(tsxFiles(SRC), (f) => readFileSync(f, "utf8"))
+    .map((f) => f.slice(SRC.length))
+    .filter((f) => f !== "ui/PolicyEditor.tsx");
   assert.deepEqual(found, [], "use WordsBox (and PresetPicker for the presets)");
+});
+
+test("the guard sees a textarea in the page itself and in a subfolder", () => {
+  const files = ["ColonyApp.tsx", "ui/field/Zz.tsx", "ui/Plain.tsx"];
+  const text: Record<string, string> = {
+    "ColonyApp.tsx": "<textarea rows={4} />",
+    "ui/field/Zz.tsx": "x <textarea\n/>",
+    "ui/Plain.tsx": "<div />",
+  };
+  assert.deepEqual(
+    withTextarea(files, (f) => text[f]!),
+    ["ColonyApp.tsx", "ui/field/Zz.tsx"],
+  );
 });
