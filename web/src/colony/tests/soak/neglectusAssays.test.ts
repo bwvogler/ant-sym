@@ -4,6 +4,7 @@ import { INFECTED } from "../../fungus.ts";
 import {
   N1_DOSE,
   N3_BASE,
+  N3_MIN_MEET,
   classN3,
   n1Pass,
   n1Read,
@@ -73,7 +74,16 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   // different layers counted as meeting): a band catches a miscount. The band moved with the law, its width the same share
   // (13–16.5 round 14.9 then, 10.9–13.8 round 12.5 now).
   // The band is a fingerprint of this one run (a miscount catches it; a change of stream moves it), not what N3 is for: that is the two asserts below.
-  assert.ok(near.meetings > 12.4 && near.meetings < 15.8, `meetings ${near.meetings}`);
+  // Retune 2 (the odour channel's fade went 0.03 -> 0.1, moving every stream again): seed 27 now meets 9.93, so the band is re-recorded on this run
+  // at the same share of its width (8.6-11.0 = 9.93 x 0.867-1.105, the ratios of the 12.4-15.8 band round 14.3). It stays a fingerprint of this one
+  // run, kept because it is the only guard on a miscount of meetings (PRD §79) and a stream-free bound cannot catch one. What does not depend on the
+  // stream is looped over more alike seeds below: each must meet above N3_MIN_MEET (so its trial counts) and never fight (seeds 1 and 2 met 13.9 and 12.2; a third seed was left out to keep the file under the soak tier's limit).
+  assert.ok(near.meetings > 8.6 && near.meetings < 11.0, `meetings ${near.meetings}`);
+  for (const seed of [1, 2]) {
+    const alike = runAssay(neglectusTolerance, seed).metrics;
+    assert.ok(alike.meetings > N3_MIN_MEET, `seed ${seed}: meetings ${alike.meetings}`);
+    assert.equal(alike.fought, 0, `seed ${seed} alike: ${alike.deaths} deaths`);
+  }
   assert.equal(near.fought, 0, `alike: ${near.deaths} deaths`);
   assert.ok(far.deaths > 0 && far.fought === 1, `far apart: ${far.deaths} deaths`);
 });
