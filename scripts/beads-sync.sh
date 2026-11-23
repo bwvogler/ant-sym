@@ -171,6 +171,8 @@ pull_or_adopt() {
 
 case "$cmd" in
 start|seed)
+  # bd warns on every call until beads.role is set, and git config is per clone. maintainer: this repo's beads live on its own beads-dolt branch (ja-5plw). A role already set wins.
+  git config --local --get beads.role >/dev/null 2>&1 || git config --local beads.role maintainer
   acquire_lock || exit 0
   remote_sha="$(remote_branch)"; rs=$?
   if [ "$rs" -eq 1 ]; then
