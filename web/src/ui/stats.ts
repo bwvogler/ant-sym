@@ -84,6 +84,8 @@ export interface EvolutionStats {
   inHosts: number;
   /** mutations to give (whole ones), and how many it makes a minute now: it mutates as fast as it grows */
   mutations: number;
+  /** the same, by pool (PRD §85 M3): the ants' from fungus made in hosts, the free pool's from the ground and corpses */
+  pools: { ants: number; free: number };
   perMinute: number;
   /** the level chosen of each upgrade, by id */
   levels: Record<string, number>;
@@ -102,6 +104,7 @@ function evolutionStats(game: Game): EvolutionStats | null {
     mass: e.mass,
     inHosts,
     mutations: Math.floor(e.mutations),
+    pools: { ants: Math.floor(e.pools.ants), free: Math.floor(e.pools.free) },
     perMinute: 60 * e.rate,
     levels: Object.fromEntries(UPGRADES.map((u) => [u.id, e.level(u.id)])),
   };

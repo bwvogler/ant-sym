@@ -2,11 +2,13 @@ import {
   CURTAIN,
   PLANE,
   UPGRADES,
+  type Pool,
   type Upgrade,
   LETHAL_LEVERS,
   canKeep,
   keptLevels,
   nextCost,
+  poolOf,
   price,
   MET,
   type Game,
@@ -59,7 +61,7 @@ import PassNote from "./ui/PassNote.tsx";
 import Tip from "./ui/Tip.tsx";
 import UpgradeTree from "./ui/UpgradeTree.tsx";
 import { useWideTree } from "./ui/upgradeBranches.ts";
-import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
+import { ANTS_TIP, BODY_TIP, FREE_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
@@ -1078,7 +1080,7 @@ function EvolvePanel({ evolve, menu, wide }: { evolve: (id: string) => boolean; 
 /** Whether the fungus has a mutation it can keep: only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not). */
 function affordableIn(s: ColonyStats | null, menu: readonly string[]): boolean {
   const ev = s?.evolution;
-  return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
+  return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.pools, u.id)) : false;
 }
 
 /** Where the fungus is, and how far the colonies have come together. */
@@ -1184,8 +1186,22 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
 }
 
 function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
-  // One price for every level, rising with each one kept (PRD §80): shown here, by the mutations in hand, not on each level.
-  const next = UPGRADES.some((u) => nextCost(e.levels, u.id) !== null) ? price(keptLevels(e.levels)) : null;
+  // Two pools, each with one price that rises with each level kept in it (PRD §80, §85 M3): shown here, by the mutations in hand in each, not on each level.
+  const nextIn = (pool: Pool): number | null =>
+    UPGRADES.some((u) => poolOf(u.id) === pool && nextCost(e.levels, u.id) !== null) ? price(keptLevels(e.levels, pool)) : null;
+  const meter = (pool: Pool, label: string, tip: string) => {
+    const n = e.pools[pool];
+    const next = nextIn(pool);
+    return (
+      <div className="mt-2 flex items-baseline justify-between text-xs" data-pool={pool}>
+        <Tip tip={tip}>{label}</Tip>
+        <span className="font-mono tabular-nums">
+          <span className={n > 0 ? "text-spore" : "text-fg-3"}>{n.toLocaleString()}</span>
+          {next !== null && <span className="text-fg-2"> · next {next.toLocaleString()}</span>}
+        </span>
+      </div>
+    );
+  };
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1196,19 +1212,15 @@ function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: str
           mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
         </Tip>
       </div>
-      <div className="mt-2 flex items-baseline justify-between text-xs">
-        <Tip tip={MUTATION_TIP}>Mutations</Tip>
-        <span className="font-mono tabular-nums">
-          <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
-          {next !== null && <span className="text-fg-2"> · next {next.toLocaleString()}</span>}
-          <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
-        </span>
-      </div>
+      {meter("ants", "Mutations from ants", ANTS_TIP)}
+      {meter("free", "Mutations from the ground", FREE_TIP)}
       <p className="mt-1 text-[11px] text-fg-3">
-        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep. Some levels need
-        others first, and every level costs the same price, which rises with each one you keep.
+        <Tip tip={MUTATION_TIP}>Every bit of new fungus can mutate</Tip>: fungus made in ants pays for the levels that act on ants; fungus
+        made on the ground and in corpses pays for the fungus's own (mycelium, knots, stalks, fruiting). You choose which to keep. Each pool
+        has its own price, which rises with each level you keep from it. +
+        {e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min in all.
       </p>
-      <UpgradeTree levels={e.levels} mutations={e.mutations} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
+      <UpgradeTree levels={e.levels} pools={e.pools} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
     </div>
   );
 }

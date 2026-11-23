@@ -41,11 +41,11 @@
      "spores": "5fc07b40",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
-     "hosts": "8ff29ca5",
+     "hosts": "85f04e50",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "80695cd7",
+     "evolution": "e9f27a57",
      "base": "d2dabcb3",
      "hyphae": "53af221f",
      "corpses": "d08749ad",
@@ -54,7 +54,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     15,
+     16,
      0
     ]
    }
@@ -100,11 +100,11 @@
      "spores": "861bb0c9",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
-     "hosts": "8af0562f",
+     "hosts": "8ce14ecb",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "29c0d81f",
+     "evolution": "24f4de22",
      "base": "d2dabcb3",
      "hyphae": "dc674053",
      "corpses": "d08749ad",
@@ -113,7 +113,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     21,
+     28,
      0
     ]
    }
@@ -159,11 +159,11 @@
      "spores": "b451cc9a",
      "sporeStrain": "9618822b",
      "sporeCells": "601a3a7d",
-     "hosts": "91e39541",
+     "hosts": "8be5ca66",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "d627af2f",
+     "evolution": "a49156a6",
      "base": "d2dabcb3",
      "hyphae": "6ec8c868",
      "corpses": "1467e1bc",
@@ -172,7 +172,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     14,
+     25,
      0
     ]
    }
@@ -218,11 +218,11 @@
      "spores": "f0b2f32a",
      "sporeStrain": "213b52f9",
      "sporeCells": "87d9b452",
-     "hosts": "15e8e23b",
+     "hosts": "8d01a276",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "382fde60",
+     "evolution": "42679f75",
      "base": "d2dabcb3",
      "hyphae": "41b68a3d",
      "corpses": "a40adcd9",
@@ -231,7 +231,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     6,
+     15,
      1
     ]
    }
