@@ -60,11 +60,11 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   reception: { evaporation: 0.01, diffusion: 0 },
   midden: { evaporation: 0.01, diffusion: 0 },
   // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Fading at 0.1 and
-  // spreading at 0.5 it reaches across a chamber (design; no range is measured). 0.03 and 0.5 took the nurse zone furthest (13/20
-  // against main's 8/20) but left the odour in every tunnel, and soil carriers stalled there on some seeds (175 and 194 at 180 s in
-  // the chambers game against main's 61 and 94); 0.1 and 0.5 matches main on game1 (17/20) and A12 (19/20), keeps the chambers
-  // trend, and still beats main on the nurse zone (10/20) and A13 (11/20). PRD §77.6.
-  broodOdour: { evaporation: 0.1, diffusion: 0.5 },
+  // spreading at 0.3 it reaches across a chamber (design; no range is measured). 0.03/0.5 took the nurse zone furthest (13/20 against
+  // main's 8/20) but left the odour in every tunnel, and soil carriers stalled there on some seeds; 0.1/0.5 passed the chambers and
+  // A12 guards but failed G1 (seed 10 held 17 foragers with both colonies set); 0.1/0.3 clears G1 (worst 4 held), the chambers trend
+  // (8 of 9 games) and A12, and still beats main on the nurse zone (9/20), A13 (12/20) and A12 (20/20). PRD §77.6.
+  broodOdour: { evaporation: 0.1, diffusion: 0.3 },
 };
 
 /** A record with one entry per channel. */

@@ -7,7 +7,7 @@ import { OPEN, rockAt } from "../../world.ts";
 import { oneColony } from "../builders.ts";
 
 // Brood odour (ja-k4k.15.2, docs/brood-odour.md): the brood gives off its own scent where it lies, reaching across a
-// chamber (0.1 and 0.5: PRD §77.6), strongest on the pile. Off (broodOdour 0) the channel stays empty.
+// chamber (0.1 and 0.3: PRD §77.6), strongest on the pile. Off (broodOdour 0) the channel stays empty.
 
 /** A colony of one ant with `items` brood items on one cell of the royal chamber, run `seconds`; the cell and the row's open cells east. */
 function pile(items: number, broodOdour: number, seconds = 30, held = false) {
@@ -27,19 +27,19 @@ function pile(items: number, broodOdour: number, seconds = 30, held = false) {
   return { c, at };
 }
 
-test("brood odour: strongest on the brood, falling off with distance, smelt three cells out even from a single egg", () => {
+test("brood odour: strongest on the brood, falling off with distance, a single egg smelt two cells out and a pile of 20 three", () => {
   const one = pile(1, 1);
   assert.ok(
     one.at(0) > one.at(1) && one.at(1) > one.at(2) && one.at(2) > one.at(3),
     `falls off: ${[0, 1, 2, 3].map((d) => one.at(d).toFixed(3)).join(", ")}`,
   );
-  assert.ok(one.at(3) >= FAINT, `a single egg is smelt three cells away: ${one.at(3).toFixed(3)}`);
-  // Laid a second, not a tick: after 30 s a single egg's own cell holds about 3 (30 × as much a tick would reach the cap, 20).
+  assert.ok(one.at(2) >= FAINT, `a single egg is smelt two cells away: ${one.at(2).toFixed(3)}`);
   assert.ok(one.at(0) > 1 && one.at(0) < 6, `a single egg's own cell: ${one.at(0).toFixed(3)}`);
   const many = pile(20, 1);
+  assert.ok(many.at(3) >= FAINT, `a pile is smelt three cells away: ${many.at(3).toFixed(3)}`);
   assert.ok(
     many.at(3) > one.at(3) * 3,
-    `a pile is smelt much stronger three cells away: ${many.at(3).toFixed(3)} against ${one.at(3).toFixed(3)}`,
+    `and much stronger there than a single egg: ${many.at(3).toFixed(3)} against ${one.at(3).toFixed(3)}`,
   );
 });
 
@@ -67,5 +67,5 @@ test("brood odour is saved with the colony's fields and loads back as it was", (
 test("the brood-odour climb is on by default (PRD §77.4): the odour, the climb at gain 1, the crowd limit at 3, the wide channel", () => {
   const { c } = oneColony(1, { maxAnts: 1 }, () => "explore", 1);
   assert.deepEqual([c.params.broodOdour, c.params.broodClimb, c.params.broodCrowd], [1, 1, 3]);
-  assert.deepEqual(DEFAULT_CHANNELS.broodOdour, { evaporation: 0.1, diffusion: 0.5 });
+  assert.deepEqual(DEFAULT_CHANNELS.broodOdour, { evaporation: 0.1, diffusion: 0.3 });
 });
