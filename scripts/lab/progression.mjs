@@ -57,6 +57,7 @@ if (isMainThread) {
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
+    trace: flag("trace"),
     traffic: flag("traffic"),
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
@@ -87,7 +88,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat}) · traffic leans ${r.leans}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · traffic leans ${r.leans}`,
     );
     if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
@@ -95,6 +96,7 @@ if (isMainThread) {
         `  growth made: ground ${r.split.ground.toFixed(0)} · corpses ${r.split.corpses.toFixed(0)} · hosts ${r.split.hosts.toFixed(0)}`,
       );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
+    if (r.trace?.length) console.log(`  trace: ${r.trace.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
   const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
@@ -122,6 +124,7 @@ if (isMainThread) {
     landing,
     rootRadius,
     split: wantSplit,
+    trace,
     traffic: wantTraffic,
     bias,
     radius,
@@ -211,11 +214,14 @@ if (isMainThread) {
     growth: 0,
     mass: 0,
     flowers: 0,
+    spread: 0,
     patches: 0,
     mat: 0,
     leans: "",
     split,
+    trace: [],
   };
+  let seen = [0, 0];
   const share = (c) => {
     const f = g.fungus.census(c);
     return {
@@ -240,6 +246,12 @@ if (isMainThread) {
         }
       }
     }
+    if (trace && (g.fungus.spread !== seen[0] || g.fungus.flowers !== seen[1])) {
+      seen = [g.fungus.spread, g.fungus.flowers];
+      r.trace.push(
+        `${g.time.toFixed(1)}s spread ${seen[0]} flowers ${seen[1]} base ${g.fungus.patchOn(0).length / 2} hyphae ${g.fungus.hyphaeOn(0)?.parent.size}`,
+      );
+    }
     if (k % 15) continue;
     const t = Math.round(g.time);
     const [a, b] = g.colonies.map(share);
@@ -255,6 +267,7 @@ if (isMainThread) {
   r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
   r.mass = (g.fungus.evolution?.mass ?? 0).toFixed(1);
   r.flowers = g.fungus.flowers;
+  r.spread = g.fungus.spread;
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
   r.leans = `${g.fungus.hyphaeOn(0)?.trafficLeans ?? 0} of ${g.fungus.hyphaeOn(0)?.sideChoices ?? 0} side choices; tropisms ${g.fungus.hyphaeOn(0)?.tropisms ?? 0} of ${g.fungus.hyphaeOn(0)?.tropismChoices ?? 0} grow steps`;

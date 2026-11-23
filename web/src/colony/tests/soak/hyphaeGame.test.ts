@@ -714,7 +714,7 @@ test("thickening beside the landing makes no flower: its cells are the landing's
   assert.equal(g.fungus.evolution!.patches, patches);
 });
 
-test("a corpse with rock beside it closes no flower: its seven cells are not all hyphae, so nothing becomes a patch", () => {
+test("a corpse with rock beside it: no flower takes a rock cell, and the corpse's own cell, with rock beside it, is no flower's middle", () => {
   const g = game(true);
   g.fungus.bindPolicy("growth", () => "thicken");
   const plane = g.world!.plane;
@@ -728,15 +728,79 @@ test("a corpse with rock beside it closes no flower: its seven cells are not all
       if (rock >= 1 && rock <= 3) at = [x, y];
     }
   assert.ok(at, "no open cell with rock beside it");
-  const patches = g.fungus.evolution!.patches;
-  const base = g.fungus.patchOn(PLANE).length;
   g.fungus.colonise(PLANE, ...at);
   runFor(g, 20);
   assert.ok(g.fungus.hyphaeOn(PLANE)!.mat.size > 0, "it did thicken");
-  assert.equal(g.fungus.flowers, 0);
-  assert.equal(g.fungus.evolution!.patches, patches);
-  assert.equal(g.fungus.patchOn(PLANE).length, base);
+  const patch = g.fungus.patchOn(PLANE);
+  for (let i = 0; i < patch.length; i += 2) assert.equal(rockAt(plane, patch[i]!, patch[i + 1]!), OPEN, "no rock cell is base");
+  const near = new Set<number>();
+  for (let i = 0; i < patch.length; i += 2) near.add(hyphaKey(patch[i]!, patch[i + 1]!));
+  assert.ok(!near.has(hyphaKey(...at)), "the corpse's own cell, with rock beside it, is in no flower");
 });
+
+test("a flower that touches a patch spreads it over its other cells, and the patch count stays; one centred in a patch counts for nothing", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "rest");
+  const e = g.fungus.evolution!;
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  const patch = g.fungus.patchOn(PLANE);
+  const inPatch = (x: number, y: number) => {
+    for (let i = 0; i < patch.length; i += 2) if (patch[i] === x && patch[i + 1] === y) return true;
+    return h.sources.has(hyphaKey(x, y));
+  };
+  const [bx, by] = [patch[0]!, patch[1]!];
+  const patches = e.patches;
+  // A hex centred on a cell of the patch itself is no flower, however full its neighbours are.
+  for (let d = 0; d < 6; d++) h.addCell(nx(bx, by, d), ny(by, d));
+  runFor(g, 1);
+  assert.equal(g.fungus.spread, 0, "a middle inside the patch spreads nothing");
+  assert.equal(g.fungus.flowers, 0);
+  // A hex centred on a cell just outside it, with some of its cells in the patch, spreads the patch over the rest.
+  let mid: [number, number] | null = null;
+  for (let d = 0; d < 6 && !mid; d++) {
+    const x = nx(bx, by, d);
+    const y = ny(by, d);
+    if (!inPatch(x, y)) mid = [x, y];
+  }
+  assert.ok(mid, "a cell beside the patch is outside it");
+  const before = g.fungus.patchOn(PLANE).length / 2;
+  const [mx, my] = mid!;
+  h.addCell(mx, my);
+  for (let d = 0; d < 6; d++) h.addCell(nx(mx, my, d), ny(my, d));
+  runFor(g, 1);
+  const added = g.fungus.patchOn(PLANE).length / 2 - before;
+  assert.ok(added > 0 && added < 7, `the patch took the cells that were not its own (${added})`);
+  assert.equal(g.fungus.spread, added, "spread counts them");
+  assert.equal(g.fungus.flowers, 0, "it is no new patch");
+  assert.equal(e.patches, patches, "and the patch count stays");
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.equal(back.fungus.spread, added, "a save keeps the count");
+});
+
+for (const last of ["a neighbour", "the middle"] as const) {
+  test(`a flower closes by whichever of its seven cells grows last: ${last}`, () => {
+    const g = game(true);
+    g.fungus.bindPolicy("growth", () => "rest");
+    const e = g.fungus.evolution!;
+    const h = g.fungus.hyphaeOn(PLANE)!;
+    const tip = h.tips[0]!;
+    const [x, y] = openSpot(g, tip, 25);
+    const ring = [0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)] as [number, number]);
+    const cells = last === "the middle" ? ring : [[x, y] as [number, number], ...ring.slice(0, 5)];
+    const final = last === "the middle" ? [x, y] : ring[5]!;
+    const patches = e.patches;
+    for (const [cx, cy] of cells) h.addCell(cx, cy);
+    // A settle round falls between the two additions: six of the seven cells are not a flower.
+    runFor(g, 10);
+    assert.equal(g.fungus.flowers, 0, "six of seven cells close nothing");
+    h.addCell(final[0]!, final[1]!);
+    runFor(g, 10);
+    assert.equal(g.fungus.flowers, 1, `the seventh cell, ${last}, closes it`);
+    assert.equal(e.patches, patches + 1, "a new patch");
+  });
+}
 
 test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
   const g = game(true);
@@ -748,6 +812,6 @@ test("tips thickening in the curtain leave no list growing: every map's thickene
   assert.ok(at);
   g.fungus.colonise(CURTAIN, ...at);
   runFor(g, 20);
-  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeThickened(), [], "nothing left over from the rounds before");
+  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeGrown(), [], "nothing left over from the rounds before");
   assert.equal(g.fungus.flowers, 0, "layer 0 only");
 });

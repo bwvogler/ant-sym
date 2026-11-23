@@ -201,8 +201,8 @@ export class Hyphae {
   sources = new Set<number>();
   /** cells a tip thickened (PRD §85): a mat does not fade as an unused dead end does, until a cut takes it */
   mat = new Set<number>();
-  /** cells a tip thickened round since the caller last took them (takeThickened): where a flower may have closed; not saved */
-  #thickened: number[] = [];
+  /** cells grown since the caller last took them (takeGrown): where a flower may have closed; not saved */
+  #grown: number[] = [];
   /** load lost with cut cells since the caller last took it (takeLost) */
   #lost = 0;
 
@@ -215,7 +215,9 @@ export class Hyphae {
   /** A root cell with no tip of its own (a landing's patch: the base). Not paid from `spent`, but it embodies HYPHA_MASS like any cell. */
   addCell(x: number, y: number): void {
     const k = cellKey(x, y);
-    if (!this.parent.has(k)) this.parent.set(k, ROOT);
+    if (this.parent.has(k)) return;
+    this.parent.set(k, ROOT);
+    this.#grown.push(k);
   }
 
   /** Whether (x, y) is a hypha cell. */
@@ -237,6 +239,7 @@ export class Hyphae {
       return false;
     }
     this.parent.set(k, cellKey(tip.x, tip.y));
+    this.#grown.push(k);
     tip.x = x;
     tip.y = y;
     tip.heading = d;
@@ -255,6 +258,7 @@ export class Hyphae {
     const k = cellKey(x, y);
     if (this.parent.has(k)) return false;
     this.parent.set(k, cellKey(tip.x, tip.y));
+    this.#grown.push(k);
     this.mat.add(k);
     this.spent += price;
     return true;
@@ -707,15 +711,10 @@ export class Hyphae {
     return faded;
   }
 
-  /** `tip` is thickening round its own cell: remember it as the middle of a possible flower. */
-  noteThickened(tip: Tip): void {
-    this.#thickened.push(cellKey(tip.x, tip.y));
-  }
-
-  /** The cells tips have thickened round since the last call: each is the middle of a possible flower (Fungus.settle). */
-  takeThickened(): number[] {
-    const out = this.#thickened;
-    this.#thickened = [];
+  /** The cells grown since the last call: each may have closed a flower round itself or a neighbour (Fungus.settle). */
+  takeGrown(): number[] {
+    const out = this.#grown;
+    this.#grown = [];
     return out;
   }
 
@@ -1153,7 +1152,6 @@ function stepTip(
       break;
     case "thicken":
       // Fill the open, enterable cells round the tip's own cell, a hypha's mass each from what has reached it; the tip stays.
-      h.noteThickened(tip);
       for (let k = 0; k < 6; k++) {
         if (budget.free < HYPHA_MASS) break;
         const [x, y] = ahead(tip.x, tip.y, k);
