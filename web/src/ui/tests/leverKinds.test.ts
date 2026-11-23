@@ -87,7 +87,14 @@ const READS: [file: string, fields: string[]][] = [
 
 /** The places that show a lever's name: each hands `LeverName` the lever's kind (`kind={x.kind}`, not a literal) and keeps what it passed before. */
 const NAMES: [file: string, keeps: RegExp[]][] = [
-  ["ui/AntCard.tsx", [/title=\{/, /stale \? "opacity-50"/, /rounded bg-raised px-1\.5 py-0\.5 font-mono/]],
+  [
+    "ui/AntCard.tsx",
+    [
+      /<LeverName[^]*?title=\{`\$\{LEVER_KIND\[lever\.kind\]\.what\}/,
+      /stale \? "opacity-50"/,
+      /rounded bg-raised px-1\.5 py-0\.5 font-mono/,
+    ],
+  ],
   ["ui/PolicyTab.tsx", [/className="font-mono text-xs"/]],
   ["ui/UpgradeTips.tsx", []],
 ];
