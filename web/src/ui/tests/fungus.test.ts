@@ -483,3 +483,40 @@ test("drawStalksRaised: each stalk again, raised, in the window only, at the lev
   drawStalksRaised(none.k, WIN, { stalks: new Set(), stalkLevel: 2 });
   assert.deepEqual(none.log, []);
 });
+
+test("drawHyphae: neighbouring cells of a patch are joined by a bowed curve each, unless a hypha joins them already or both are out of view", () => {
+  const mk = (sources: boolean, link: boolean): Hyphae => {
+    const h = new Hyphae();
+    const a = key(10, 10);
+    const b = key(neighbourX(10, 10, 0), neighbourY(10, 0));
+    const c = key(neighbourX(10, 10, 1), neighbourY(10, 1));
+    for (const k of [a, b, c]) h.parent.set(k, HYPHA_ROOT);
+    if (link) h.parent.set(b, a); // a real hypha runs a → b
+    h.parent.set(key(60, 10), HYPHA_ROOT);
+    h.parent.set(key(61, 10), HYPHA_ROOT);
+    if (sources) for (const k of [a, b, c, key(60, 10), key(61, 10)]) h.sources.add(k);
+    return h;
+  };
+  const moves = (h: Hyphae) => {
+    const f = field({ hyphae: h });
+    drawHyphae(f.k, f.h, true, WIN);
+    return { n: f.paths[0]!.cmds.filter((c) => c.startsWith("moveTo")).length, f };
+  };
+  // three cells that all touch: three curves (the triangle); the far pair is out of the window
+  assert.equal(moves(mk(true, false)).n - moves(mk(false, false)).n, 3, "a triangle of three joins");
+  // a hypha already runs a → b: only the other two pairs are added
+  assert.equal(moves(mk(true, true)).n - moves(mk(false, true)).n, 2, "the pair a hypha joins is not drawn twice");
+  // the curve is the loop's: a bowed quadratic between the cells' bent places
+  const { f } = moves(mk(true, false));
+  const a = key(10, 10);
+  const b = key(neighbourX(10, 10, 0), neighbourY(10, 0));
+  const [sx, sy] = bentAt(f.k, 10, 10);
+  const [tx, ty] = bentAt(f.k, neighbourX(10, 10, 0), neighbourY(10, 0));
+  const bow = (hash(a, b, 4) - 0.5) * 0.7;
+  assert.ok(
+    f.paths[0]!.cmds.includes(
+      `quadraticCurveTo(${r3((sx + tx) / 2 - (ty - sy) * bow)}, ${r3((sy + ty) / 2 + (tx - sx) * bow)}, ${r3(tx)}, ${r3(ty)})`,
+    ),
+    "a gently bowed curve from one patch cell to its neighbour",
+  );
+});
