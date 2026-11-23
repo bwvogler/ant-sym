@@ -3,26 +3,19 @@
 // Nothing plays before the player's first touch (the context is made in a gesture's handler) or while sound is off.
 
 import type { TrayTool } from "./build.ts";
+import { persisted } from "./storage.ts";
 
 export type Cue = TrayTool | "undo" | "on" | "off";
 
-const SOUND_KEY = "jevants.sound";
+const sound = persisted("jevants.sound");
 
 /** Whether sound is on (per browser; on unless turned off). */
 export function soundOn(): boolean {
-  try {
-    return localStorage.getItem(SOUND_KEY) !== "off";
-  } catch {
-    return true;
-  }
+  return sound.get() !== "off";
 }
 
 export function setSoundOn(on: boolean): void {
-  try {
-    localStorage.setItem(SOUND_KEY, on ? "on" : "off");
-  } catch {
-    // no storage: it stays as it is for this page
-  }
+  sound.set(on ? "on" : "off");
 }
 
 let ctx: AudioContext | null = null;

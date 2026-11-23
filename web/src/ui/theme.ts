@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from "react";
+import { persisted } from "./storage.ts";
+import { createStore, type Store, useStore } from "./store.ts";
 
 // The player's choice of light or dark (PRD §69.9, ja-mvo9.5): the system's by default, or either, kept per browser. It
 // is `data-theme` on <html>, which index.css reads (the dark variables are there twice, under the system's preference and
@@ -17,13 +18,7 @@ export function parseTheme(raw: string | null | undefined): Theme {
 /** What Settings and the palette say for each. */
 export const THEME_LABEL: Record<Theme, string> = { system: "System", light: "Light", dark: "Dark" };
 
-function stored(): Theme {
-  try {
-    return parseTheme(localStorage.getItem(THEME_KEY));
-  } catch {
-    return "system";
-  }
-}
+const kept = persisted(THEME_KEY);
 
 /** Show a theme on the page: data-theme on <html>, absent for the system's. */
 export function applyTheme(t: Theme, root: { dataset: DOMStringMap } = document.documentElement): void {
@@ -31,38 +26,28 @@ export function applyTheme(t: Theme, root: { dataset: DOMStringMap } = document.
   else root.dataset.theme = t;
 }
 
-let current: Theme | null = null;
-const listeners = new Set<() => void>();
+// Held for this page where the browser keeps nothing. Read when first asked for, not at import: a test or a render with no browser has no storage yet.
+let store: Store<Theme> | null = null;
+const themeStore = (): Store<Theme> => (store ??= createStore<Theme>(parseTheme(kept.get())));
 
-export const getTheme = (): Theme => (current ??= stored());
+export const getTheme = (): Theme => themeStore().get();
 
 /** Choose a theme: shown now, kept for next time (where the browser lets the page keep anything). */
 export function setTheme(t: Theme): void {
-  current = t;
   applyTheme(t);
-  try {
-    if (t === "system") localStorage.removeItem(THEME_KEY);
-    else localStorage.setItem(THEME_KEY, t);
-  } catch {
-    // no storage: it holds for this page only
-  }
-  for (const fn of listeners) fn();
+  kept.set(t === "system" ? null : t);
+  themeStore().set(t);
 }
 
 // A theme chosen in another tab of the page shows here at once.
 if (typeof window !== "undefined")
   window.addEventListener("storage", (e) => {
     if (e.key !== THEME_KEY && e.key !== null) return;
-    current = parseTheme(e.key === null ? null : e.newValue);
-    applyTheme(current);
-    for (const fn of listeners) fn();
+    const t = parseTheme(e.key === null ? null : e.newValue);
+    applyTheme(t);
+    themeStore().set(t);
   });
 
-function subscribe(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => void listeners.delete(fn);
-}
-
 export function useTheme(): Theme {
-  return useSyncExternalStore(subscribe, getTheme, () => "system");
+  return useStore(themeStore(), "system");
 }

@@ -1,6 +1,7 @@
 import { INFECTED, PLANE, type Colony, type Game } from "../colony/index.ts";
 import { landingOf } from "./landing.ts";
 import { colonyName } from "./names.ts";
+import { type KeyStore, persisted } from "./storage.ts";
 
 // The first game's tutorial (ja-7x4, PRD §61): the landing, the first ant the fungus gets into, paused and followed
 // until its nestmates groom it clean, then the aim. A pure machine (no React, no DOM): the page feeds it what the game
@@ -247,17 +248,10 @@ export function cardFor(t: Tutorial, landing = 0): Card {
 
 /** The done flag, in the browser (per viewer). Storage may throw or be gone: then the tutorial just shows again. */
 const KEY = "jev-ants.tutorial";
-export function tutorialDone(store: Pick<Storage, "getItem"> | null): boolean {
-  try {
-    return store?.getItem(KEY) === "done";
-  } catch {
-    return false;
-  }
+const done = (store: Partial<KeyStore> | null) => persisted(KEY, { store: () => store as KeyStore | null });
+export function tutorialDone(store: Pick<KeyStore, "getItem"> | null): boolean {
+  return done(store).get() === "done";
 }
-export function markTutorialDone(store: Pick<Storage, "setItem"> | null): void {
-  try {
-    store?.setItem(KEY, "done");
-  } catch {
-    // private window or blocked storage: nothing to remember it in
-  }
+export function markTutorialDone(store: Pick<KeyStore, "setItem"> | null): void {
+  done(store).set("done"); // private window or blocked storage: nothing to remember it in
 }
