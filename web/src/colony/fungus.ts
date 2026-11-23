@@ -32,7 +32,7 @@ import {
   type Reach,
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
-import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NW, SE, SW, W } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
   cellKey,
@@ -229,8 +229,12 @@ export const DEFAULT_FUNGUS: FungusParams = {
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
 
-/** The headings of the tips a landing's hyphae set out on: three, a third of the way round from each other (hex.ts E, SW, NW). */
-const ROOT_HEADINGS = [E, SW, NW];
+/**
+ * The headings of the tips a landing's hyphae set out on: all six ways (hex.ts E, SE, SW, W, NW, NE), so no direction is
+ * forced out and none held back; which of them push is the growth rule's (or the growth lane's) to say, tip by tip (owner,
+ * 2026-11-18). Before, three: a third of the way round from each other.
+ */
+const ROOT_HEADINGS = [E, SE, SW, W, NW, NE];
 /**
  * A corpse the fungus grows out of (ja-2bw.7, docs/hyphal-growth.md §6): the spores it puts out on its cell, free (paid
  * by the cadaver, not the mycelium: Khun et al. 2021 counted about 1.3 × 10⁸ conidia a cadaver; the amount is design),
@@ -1342,8 +1346,8 @@ export class Fungus {
     });
     this.#evolution.root();
     if (!this.params.hyphae) return;
-    // As hyphae: the patch is the hyphae's first cells, and three tips set out from its rim, going outward (a weak start):
-    // one heading at `toward` (one world: the hole, ja-2bw.14) and the others a third of the way round each side.
+    // As hyphae: the patch is the hyphae's first cells, and a tip sets out from its rim in each of the six ways, going outward:
+    // the first at `toward` (one world: the hole, ja-2bw.14), then round from it. Which push is the growth answers' to decide.
     const h = (this.#hyphae[layer] ??= new Hyphae());
     for (const key of L.base) {
       h.addCell(keyX(key), keyY(key));
@@ -1354,7 +1358,7 @@ export class Fungus {
     const cy = CELL[1];
     if (rockAt(map, cx, cy)) return;
     const first = toward ? dirOf(Math.atan2(toward.y - y, toward.x - x)) : null;
-    const headings = first === null ? ROOT_HEADINGS : [first, (first + 2) % 6, (first + 4) % 6];
+    const headings = first === null ? ROOT_HEADINGS : ROOT_HEADINGS.map((_, k) => (first + k) % 6);
     for (const d of headings) {
       // Out from the middle along d to the patch's last cell that way.
       let px = cx;
