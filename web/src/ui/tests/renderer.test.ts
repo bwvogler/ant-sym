@@ -5,15 +5,18 @@ import { visible } from "../camera.ts";
 import type { FieldCtx, FieldInputs, FieldTheme } from "../field/ctx.ts";
 import { groundPaper } from "../field/ground.ts";
 import {
+  actorsStage,
   beginFrame,
   FieldRenderer,
   type FieldParts,
   type FrameRefs,
   type FrameState,
   foodStage,
+  fungusStage,
   groundStage,
   heatStage,
   labelsStage,
+  marksStage,
   minimapStage,
   paperStage,
   STAGES,
@@ -206,11 +209,18 @@ test("an ant's length, half of it and a crumb follow the zoom, within bounds; a 
 });
 
 test("the stage list is the frame's order, and a stage that returns false ends the frame there", () => {
-  assert.equal(STAGES.length, 10);
-  assert.deepEqual(STAGES.slice(0, 4), [STAGES[0], STAGES[1], STAGES[2], STAGES[3]]);
-  assert.equal(STAGES[0], paperStage);
-  assert.equal(STAGES[6], voxelStage);
-  assert.equal(STAGES[9], minimapStage);
+  assert.deepEqual(STAGES, [
+    paperStage,
+    groundStage,
+    foodStage,
+    heatStage,
+    fungusStage,
+    actorsStage,
+    voxelStage,
+    labelsStage,
+    marksStage,
+    minimapStage,
+  ]);
   const s = setup();
   const seen: string[] = [];
   const mk =
