@@ -55,3 +55,22 @@ export function shouldStart(b: Backend | null, s: JevStatus, starting: boolean):
 export function canResume(b: Backend | null, s: JevStatus, starting: boolean): boolean {
   return !!b?.hasBackend && b.hasKey && !b.needsPass && s.phase !== "running" && !starting;
 }
+
+/** The flags the page keeps for the client and its setters, written after the render that changed them (useColonyJev's effect). */
+export interface JevFlagRefs {
+  /** why no policy can change now: the setters read it, so words Jev can't read are not taken */
+  lockRef: { current: string | null };
+  /** whether a miss should start a run now: the client's `wantsRun` reads it on every miss, from the game's tick */
+  startRef: { current: boolean };
+}
+
+/**
+ * Tell the client whether it may ask and the page whether a miss may start a run. While Jev can answer (no lock), a miss plays the local rule
+ * until the answer comes; earlier words' answers play only while it can't (ja-lo8.15). `startable` is shouldStart's answer, which can change
+ * while the lock stays null (a run's time cap ends it: the lock is null again, and a miss may start another), so both are inputs.
+ */
+export function applyJevFlags(jev: { canAsk: boolean }, refs: JevFlagRefs, lock: string | null, startable: boolean): void {
+  refs.lockRef.current = lock;
+  refs.startRef.current = startable;
+  jev.canAsk = lock === null;
+}

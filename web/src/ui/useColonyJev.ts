@@ -16,7 +16,7 @@ import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, PAGE_ASKS_RESPONSE_LANES, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import type { Backend } from "./backend.ts";
-import { canResume, policyLock, shouldStart } from "./policyLock.ts";
+import { applyJevFlags, canResume, policyLock, shouldStart } from "./policyLock.ts";
 import { loadPrecache } from "./precache.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
@@ -117,12 +117,7 @@ export function useColonyJev(
   const resumable = useSyncExternalStore(subscribe, () => canResume(backend, jev.state, starting));
   /** Whether a miss should start a run now, read on every miss (so a ref, not state). */
   const startRef = useRef(false);
-  useEffect(() => {
-    lockRef.current = lock;
-    startRef.current = startable;
-    // While Jev can answer, a miss plays the local rule until the answer comes; earlier words' answers only while it can't (ja-lo8.15).
-    jev.canAsk = lock === null;
-  }, [jev, lock, startable]);
+  useEffect(() => applyJevFlags(jev, { lockRef, startRef }, lock, startable), [jev, lock, startable]);
   // A situation with no answer under the current words, and no run on: start one (S7). Called on every such miss, from
   // the game's tick, so it only checks a ref, and starts after the tick.
   useEffect(() => {

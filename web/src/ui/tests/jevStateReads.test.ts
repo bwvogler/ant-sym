@@ -19,12 +19,15 @@ const pages = [
   "ui/useKeys.ts",
 ];
 
+/** A read of the client's state: `jev.state`, or a destructuring of it out of `jev` (`const { state } = jev`, `{ state: s } = jev`). */
+const READ = /\bjev\.state\b|\{[^}]*\bstate\b[^}]*\}\s*=\s*jev\b/;
+
 test("no component or page hook reads `jev.state`: the whole state comes from useJevState(jev.client)", () => {
   const reads = pages.flatMap((file) =>
     readFileSync(join(SRC, file), "utf8")
       .split("\n")
       .map((l, i) => ({ file, n: i + 1, l }))
-      .filter(({ l }) => /\bjev\.state\b/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)),
+      .filter(({ l }) => READ.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)),
   );
   assert.deepEqual(
     reads.map((r) => `${r.file}:${r.n}: ${r.l.trim()}`),
@@ -33,8 +36,11 @@ test("no component or page hook reads `jev.state`: the whole state comes from us
 });
 
 test("the guard sees a read, and not a comment", () => {
-  assert.match("const running = jev.state.phase === 'running';", /\bjev\.state\b/);
-  assert.doesNotMatch("const state = useJevState(jev.client);", /\bjev\.state\b/);
+  assert.match("const running = jev.state.phase === 'running';", READ);
+  assert.match("const { state } = jev;", READ);
+  assert.match("const { lock, state: st } = jev;", READ);
+  assert.doesNotMatch("const state = useJevState(jev.client);", READ);
+  assert.doesNotMatch("const { lock, phase } = jev;", READ);
 });
 
 test("the client's state is one object until it changes, and a new one each change: what useSyncExternalStore needs of a snapshot", () => {
