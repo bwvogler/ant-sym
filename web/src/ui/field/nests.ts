@@ -114,6 +114,7 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   ctx.beginPath();
   for (const corpse of visibleCadavers(col, lv)) {
     // One world: a corpse lies on its layer (carried up to the plane's midden, or dropped there; home when unset).
+    // (visibleCadavers already keeps only the dead on `lv` that nobody carries, for a layer shown of 0 or 1: `bind()` sets it before any frame.)
     if (corpse.held >= 0 || (corpse.layer ?? col.home) !== lv) continue;
     const wx = centreX(corpse.x, corpse.y);
     const wy = centreY(corpse.y);

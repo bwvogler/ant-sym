@@ -7,6 +7,8 @@ import { odourColour, odourRgb } from "../field/colour.ts";
 import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
 import { drawNest, type NestFrame } from "../field/nests.ts";
 import { drawNestSprite, type NestSprite } from "../nestSprites.ts";
+import { drawResourceSprite } from "../resourceSprites.ts";
+import type { WorkerLod } from "../workerSprites.ts";
 import { BROOD_RGB } from "../palette.ts";
 import { buildGame } from "../useColony.ts";
 import { RecordedCanvas, callsOf, recordingContext } from "./recordingContext.ts";
@@ -111,9 +113,16 @@ function setup(o: Over = {}) {
 }
 
 /** The drawImage line `drawNestSprite` makes for a sprite: the oracle for which sprite, where and how big (it prints the sheet as canvas#n). */
-function spriteCall(kind: NestSprite, image: RecordedCanvas, x: number, y: number, zoom = 10): string {
+function spriteCall(kind: NestSprite, image: RecordedCanvas, x: number, y: number, zoom = 10, lod: WorkerLod = "tiny"): string {
   const r = recordingContext();
-  drawNestSprite(r.ctx, image as unknown as HTMLCanvasElement, "tiny", kind, x, y, zoom);
+  drawNestSprite(r.ctx, image as unknown as HTMLCanvasElement, lod, kind, x, y, zoom);
+  return r.log[0]!;
+}
+
+/** The same for a resource sprite (a seed of the chamber stores is a "plain" food morsel). */
+function resourceCall(image: RecordedCanvas, x: number, y: number, zoom = 10, lod: WorkerLod = "tiny"): string {
+  const r = recordingContext();
+  drawResourceSprite(r.ctx, image as unknown as HTMLCanvasElement, lod, "plain", 0, x, y, zoom);
   return r.log[0]!;
 }
 
@@ -533,4 +542,161 @@ test("on a real world: each colony's nest, last colony first, finite numbers thr
     for (const col of [...g.colonies].reverse()) drawNest(k, f, col);
     assert.ok(callsOf(rec.log, "arc").length >= g.colonies.length, `a ring each on layer ${lv}`);
   }
+});
+
+const chamber = (o: Record<string, unknown> = {}) => ({ id: 1, colony: 7, food: 3, cells: 10, floorRow: 5, x0: 20, x1: 21, ...o });
+
+for (const lod of ["tiny", "walk"] as const)
+  test(`every sprite is asked for, and drawn, at the frame's level of detail (${lod}), tinted for the colony, on the ground's darkness`, () => {
+    const sheet = new RecordedCanvas(1, 1);
+    const resources = new RecordedCanvas(1, 1);
+    const tint = odourRgb(THEME.inkRgb, THEME.warnRgb, 0.25).join(",");
+    const f = {
+      resourceLod: lod,
+      hexes: true,
+      darkSprites: true,
+      nestImage: sheet as unknown as HTMLCanvasElement,
+      resourceImage: resources as unknown as HTMLCanvasElement,
+    };
+    // brood
+    const brood = setup({ col: { brood: { items: [{ x: 44, y: 30, stage: 1, held: -1 }] } }, f });
+    run(brood);
+    const [bx, by] = sc(centreX(44, 30), centreY(30));
+    assert.deepEqual(callsOf(brood.log, "drawImage"), [spriteCall("brood-1", sheet, bx!, by!, 10, lod).slice(10, -1)]);
+    // chamber seeds: a resource sprite each, kind plain, variant 0, at the zoom
+    const seeds = setup({ m: { chambers: { list: [chamber({ food: 1 })], at: () => 1 } }, f });
+    run(seeds);
+    const [sx, sy] = sc(centreX(20, 5), centreY(5));
+    assert.deepEqual(callsOf(seeds.log, "drawImage"), [resourceCall(resources, sx!, sy!, 10, lod).slice(10, -1)]);
+    const far = setup({ m: { chambers: { list: [chamber({ food: 1 })], at: () => 1 } }, f, c: { x: 50, y: 40, zoom: 4 } });
+    run(far);
+    const [fx, fy] = sc(centreX(20, 5), centreY(5), { x: 50, y: 40, zoom: 4 });
+    assert.deepEqual(callsOf(far.log, "drawImage"), [resourceCall(resources, fx!, fy!, 4, lod).slice(10, -1)], "the zoom is the camera's");
+    // the nest's own corpse sprite, turned about the place
+    const dead = setup({ col: { corpses: [{ x: 44, y: 30, held: -1, died: 1000, layer: PLANE, heading: 0.5 }] }, f });
+    run(dead);
+    const [dx, dy] = sc(centreX(44, 30), centreY(30));
+    const at = dead.log.indexOf("save()");
+    assert.deepEqual(dead.log.slice(at, at + 5), [
+      "save()",
+      `translate(${dx}, ${dy})`,
+      "rotate(0.5)",
+      spriteCall("corpse", sheet, 0, 0, 10, lod),
+      "restore()",
+    ]);
+    assert.ok(dead.cadavers[0]!.startsWith(`${lod}|`), "the cadaver sprites too");
+    // the queen
+    const queen = setup({ col: { queen: { x: 42, y: 31, alive: false } }, f });
+    run(queen);
+    const [qx, qy] = sc(42, 31);
+    assert.deepEqual(queen.gets, [`${lod}|${tint}|true`]);
+    assert.deepEqual(callsOf(queen.log, "drawImage"), [spriteCall("queen-dead", queen.nestImage, qx!, qy!, 10, lod).slice(10, -1)]);
+    // the alates: a request each, the wings and then the body
+    const alates = setup({
+      col: {
+        alates: [
+          { x: 43, y: 31, load: 0 },
+          { x: 44, y: 32, load: 0 },
+        ],
+      },
+      f,
+    });
+    run(alates);
+    assert.deepEqual(alates.gets, [`${lod}|${tint}|true`, `${lod}|${tint}|true`]);
+    assert.deepEqual(
+      callsOf(alates.log, "drawImage"),
+      [sc(43, 31), sc(44, 32)].flatMap(([x, y]) => [
+        spriteCall("alate-wings", alates.nestImage, x!, y!, 10, lod).slice(10, -1),
+        spriteCall("alate-body", alates.nestImage, x!, y!, 10, lod).slice(10, -1),
+      ]),
+    );
+    // a light ground: the tint is asked for with the dark flag off
+    const light = setup({ col: { queen: { x: 42, y: 31, alive: true } }, f: { ...f, darkSprites: false } });
+    run(light);
+    assert.deepEqual(light.gets, [`${lod}|${tint}|false`]);
+  });
+
+test("a chamber's seeds are on the cells it owns: floor and the row above, not a cell another chamber owns", () => {
+  const owner = (x: number, y: number) => (y === 5 ? 1 : y === 4 ? (x === 21 ? 2 : 1) : 0);
+  const s = setup({ m: { chambers: { list: [chamber({ food: 4 })], at: owner } } });
+  run(s);
+  const bd = 4;
+  const rect = ([x, y]: number[]) => {
+    const [sx, sy] = sc(centreX(x!, y!), centreY(y!));
+    return `${r3(sx! - bd / 2)}, ${r3(sy! - bd / 2)}, ${bd}, ${bd}`;
+  };
+  assert.deepEqual(
+    callsOf(s.log, "fillRect"),
+    [
+      [20, 5],
+      [21, 5],
+      [20, 4],
+      [20, 5],
+    ].map(rect),
+    "four seeds over the three cells it owns (the floor, then the row above where it is the chamber's; not [21, 4], another's)",
+  );
+});
+
+test("the dead on the curtain: the layer shown, not the colony's home, picks them", () => {
+  const dead = (o: Record<string, unknown>) => ({ x: 44, y: 30, held: -1, died: 1000, heading: 0, ...o });
+  const s = setup({
+    lv: CURTAIN,
+    col: { corpses: [dead({ layer: CURTAIN, x: 44 }), dead({ layer: PLANE, x: 45 }), dead({ layer: undefined, x: 46 })] },
+  });
+  run(s);
+  assert.equal(s.cadavers.length, 1, "the one on the curtain (a corpse with no layer is at home: the plane)");
+  const [x, y] = sc(centreX(44, 30), centreY(30));
+  assert.ok(s.cadavers[0]!.includes(`|${x},${y}|`));
+  assert.deepEqual(callsOf(s.log, "moveTo"), [`${r3(x! - 4)}, ${r3(y! - 4)}`, `${r3(x! + 4)}, ${r3(y! - 4)}`]);
+});
+
+test("inView is asked with the world x first, for each thing the stage draws", () => {
+  // in view: east of x = 40 and north of y = 35; swapped, no point of these tests is
+  const east = (wx: number, wy: number) => wx > 40 && wy < 35;
+  const queen = (x: number) => setup({ col: { queen: { x, y: 31, alive: true } }, f: { inView: east } });
+  const q = queen(42);
+  run(q);
+  assert.equal(callsOf(q.log, "ellipse").length, 1, "the queen east of 40 is drawn");
+  const w = queen(38);
+  run(w);
+  assert.equal(callsOf(w.log, "ellipse").length, 0, "west of it, not");
+  const alates = setup({
+    col: {
+      alates: [
+        { x: 43, y: 31, load: 0 },
+        { x: 38, y: 31, load: 0 },
+      ],
+    },
+    f: { inView: east },
+  });
+  run(alates);
+  assert.equal(callsOf(alates.log, "ellipse").length, 3, "one alate (a body and two wings)");
+  // chamber seeds: cells at world x 21, 22 and 20.5; east of 20.9 only the first two
+  const seeds = setup({
+    m: { chambers: { list: [chamber({})], at: () => 1 } },
+    f: { inView: (wx: number, wy: number) => wx > 20.9 && wy < 35 },
+  });
+  run(seeds);
+  assert.equal(callsOf(seeds.log, "fillRect").length, 2);
+  // the dead: east of 41 only
+  const dead = (x: number) => ({ x, y: 30, held: -1, died: 1000, layer: PLANE, heading: 0 });
+  const corpses = setup({
+    col: { corpses: [dead(44), dead(40), dead(47)] },
+    f: { inView: (wx: number, wy: number) => wx > 41 && wy < 35 },
+  });
+  run(corpses);
+  assert.equal(corpses.cadavers.length, 2);
+});
+
+test("small workers: the queen is at least 3 pixels, an alate's spore dot at least a pixel and a half, the mound outline a pixel at a small device ratio", () => {
+  const queen = setup({ col: { queen: { x: 42, y: 31, alive: true } }, f: { len: 2 } });
+  run(queen);
+  assert.equal(callsOf(queen.log, "ellipse")[0]!.split(", ")[2], "4.2", "3 * 1.4");
+  const dot = setup({ col: { alates: [{ x: 43, y: 31, load: 2 }] }, f: { len: 2 } });
+  run(dot);
+  assert.ok(callsOf(dot.log, "arc").at(-1)!.endsWith(", 1.5, 0, 6.283"), "the spore dot: 1.5, not 2.5 * 0.45");
+  const fine = setup({ col: { soilOut: 400 }, d: 0.5 });
+  run(fine);
+  assert.ok(fine.log.includes("lineWidth = 1"), "the outline is at least 1");
+  assert.ok(!fine.log.includes("lineWidth = 0.6"));
 });
