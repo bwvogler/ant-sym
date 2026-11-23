@@ -1395,8 +1395,8 @@ export class Fungus {
   spread = 0;
 
   /**
-   * A flower is a cell and its six neighbours, all hyphae (PRD §85, ja-vlla.5; owner 2026-11-23: anywhere, and one
-   * may touch a patch). A cell the hyphae have just grown closes a flower round itself or round any of its six
+   * A flower is a cell outside every patch and its six neighbours, all hyphae (PRD §85, ja-vlla.5; owner 2026-11-23:
+   * anywhere, and one may touch a patch). A cell the hyphae have just grown closes a flower round itself or round any of its six
    * neighbours. The seven's cells not yet in a patch (base or sources) join it: when none of the seven were, they are a
    * new patch (the count, room to grow, goes up by one, with no start of its own: the mass is the hyphae's); when some
    * were, the patch spreads over them and the count stays. Layer 0 only, as every root today. Nothing without an
@@ -1419,6 +1419,8 @@ export class Fungus {
         const cells = [cellKey(cx, cy)];
         for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
         if (!cells.every((c) => h.parent.has(c))) continue;
+        // The middle is new ground (a patch grows from outside in): a hex centred on a patch's own edge cell is the tips' first steps, not a web.
+        if (inPatch(cells[0]!)) continue;
         const fresh = cells.filter((c) => !inPatch(c));
         if (fresh.length === 0) continue;
         for (const c of fresh) {
