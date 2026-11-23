@@ -1,6 +1,5 @@
 import { mapCameraOrbit, mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
-import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   type ChunkLayer,
@@ -20,7 +19,6 @@ import {
   rockAt,
   type WorldMap,
   type BuildTool,
-  aphidCount,
   type AphidClump,
 } from "../colony/index.ts";
 import { type Camera, toScreen, toWorld, type Viewport, visible } from "./camera.ts";
@@ -35,21 +33,21 @@ import { drawFungusGround, drawStalksRaised } from "./field/fungus.ts";
 import { Ground, groundPaper } from "./field/ground.ts";
 import { Minimap } from "./field/minimap.ts";
 import { type AntFrame, drawAnts } from "./field/ants.ts";
+import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./field/marks.ts";
 import { drawNest, type NestFrame } from "./field/nests.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "./field/zoom.ts";
-import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, pill } from "./field/overlays.ts";
+import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./field/overlays.ts";
 import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import { colonyName } from "./names.ts";
 import type { SensedMap } from "./fungusSight.ts";
-import { antTag } from "./badges.ts";
 import { isPalm } from "./build.ts";
-import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
-import { type AntTraces, traceAlpha } from "./trace.ts";
+import type { Specimen } from "./specimens.ts";
+import type { AntTraces } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
 import { workerLod } from "./workerSprites.ts";
 import { drawMapTerrainGrain } from "./mapTerrain.ts";
-import { APHID_SPOTS, FOOD_SPOTS, aphidDensity, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
+import { FOOD_SPOTS, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
 
 export type { FieldProbe };
 
@@ -597,6 +595,7 @@ export default function ColonyField({
       const alateOverlays: (() => void)[] = [];
       const nestFrame: NestFrame = { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage };
       const antFrame: AntFrame = { ...nestFrame, half, crumb };
+      const markFrame: MarkFrame = nestFrame;
       for (const col of [...colonies].reverse()) {
         const alates = drawNest(fctx, nestFrame, col);
         if (alates) alateOverlays.push(alates);
@@ -688,119 +687,16 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
-      // Aphid marks show aggregate clump density, not individually simulated insects. Fixed-size glyphs at hex zoom;
-      // the original green dots farther out / while loading, fading by the same clump-life convention.
-      const clumps = aphidsRef.current?.();
-      if (voxel.alpha < 1 && clumps?.length && lv === PLANE) {
-        ctx.fillStyle = theme.aphid;
-        const r = Math.max(1.2 * d, 0.13 * c.zoom);
-        for (const cl of clumps) {
-          const n = aphidCount(cl);
-          const cells = cl.cells.length / 2;
-          if (n <= 0 || !cells) continue;
-          const density = aphidDensity(n, cells);
-          ctx.globalAlpha = density.alpha;
-          for (let k = 0; k < cl.cells.length; k += 2) {
-            const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
-            const wy = centreY(cl.cells[k + 1]!);
-            if (!inView(wx, wy)) continue;
-            for (let j = 0; j < density.marks; j++) {
-              const [ox, oy] = APHID_SPOTS[j]!;
-              const [x, y] = toScreen(c, v, wx + ox, wy + oy);
-              if (resourceImage)
-                drawResourceSprite(ctx, resourceImage, resourceLod, "aphid", cl.cells[k]! + cl.cells[k + 1]! + j, x, y, c.zoom);
-              else {
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
-          }
-        }
-        ctx.globalAlpha = 1;
-      }
-      // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
-      // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
-      const tr = tracesRef.current;
-      if (tr) {
-        const now = env.now();
-        tr.update(now);
-        if (lv === PLANE)
-          for (const t of tr.traces) {
-            const n = t.xs.length;
-            const a = traceAlpha(t, now);
-            if (!n || a <= 0) continue;
-            ctx.globalAlpha = 0.85 * a;
-            ctx.strokeStyle = theme.accent;
-            ctx.fillStyle = theme.accent;
-            ctx.lineWidth = Math.max(1.5 * d, 0.25 * c.zoom);
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            for (let k = 1; k < n;) {
-              // One run of points in the same phase, as one path.
-              const ph = t.search[k]!;
-              ctx.setLineDash(ph ? [2 * d, 4 * d] : []);
-              ctx.beginPath();
-              const [x0, y0] = toScreen(c, v, t.xs[k - 1]!, t.ys[k - 1]!);
-              ctx.moveTo(x0, y0);
-              for (; k < n && t.search[k] === ph; k++) {
-                const [x, y] = toScreen(c, v, t.xs[k]!, t.ys[k]!);
-                ctx.lineTo(x, y);
-              }
-              ctx.stroke();
-            }
-            ctx.setLineDash([]);
-            const [sx, sy] = toScreen(c, v, t.xs[0]!, t.ys[0]!);
-            ctx.beginPath();
-            ctx.arc(sx, sy, Math.max(5 * d, 0.8 * c.zoom), 0, Math.PI * 2);
-            ctx.lineWidth = 2 * d;
-            ctx.stroke();
-            if (t.end === "home") {
-              const [ex, ey] = toScreen(c, v, t.xs[n - 1]!, t.ys[n - 1]!);
-              ctx.beginPath();
-              ctx.arc(ex, ey, Math.max(4 * d, 0.6 * c.zoom), 0, Math.PI * 2);
-              ctx.fill();
-            }
-            ctx.globalAlpha = 1;
-          }
-      }
-      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring, drawn
-      // after these so its tag stays on top (review of #218).
-      for (const s of pinnedRef.current) {
-        const sc = followedColony(colonies, s);
-        if (!sc || sc.layer[s.i] !== lv || (f && sameAnt(f, s))) continue;
-        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
-        const r = Math.max(7 * d, c.zoom * 1.3);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.setLineDash([3 * d, 3 * d]);
-        ctx.strokeStyle = theme.ink;
-        ctx.lineWidth = 1.5 * d;
-        ctx.stroke();
-        ctx.setLineDash([]);
-        const tpx = Math.round(10 * d);
-        pill(fctx, [{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
-      }
-      // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
-      // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
-      // (ja-rkse, PRD §61).
-      if (f && fcol && fHere) {
-        const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
-        ctx.beginPath();
-        const r = Math.max(9 * d, c.zoom * 1.6);
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2 * d;
-        ctx.stroke();
-        const tpx = Math.round(11 * d);
-        pill(fctx, [{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
-      }
+      drawAphids(fctx, markFrame, aphidsRef.current?.() ?? [], voxel.alpha);
+      drawTraces(fctx, tracesRef.current);
+      drawSpecimens(fctx, pinnedRef.current, f);
+      drawFollowed(fctx, f, fcol, fHere);
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
       if (lv === PLANE) drawHoleNames(fctx, inView);
       const pn = penRef.current;
       if (lv === PLANE && pn) drawPen(fctx, inputs);
 
-      drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
+      drawInspection(fctx);
 
       minimap.draw(fctx, vis);
       publishDrawMs(env.now() - started, sinks);
