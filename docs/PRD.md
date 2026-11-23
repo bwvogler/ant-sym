@@ -7459,15 +7459,27 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 
 **Built, experimental.** Attack intent is recorded per ant/layer, resolved through reusable odour-band pressure grids, and cleared on the next decision or slot reuse. Ignore continues work without attack or load release. Response cache version 13 when built; the response brain is at 16 now (PRD §87). The 20-seed 120 s contact sweep reduced median losses from 33.5 to 0 and raised median food from 532.5 to 593.5; worst paired food fell to 0.898 (seed 5). `DEFAULT_FIGHT` stays legacy (`intent` off); only the page's new games turn it on (see the owner's decision below). See the [note and paired results](contact-actions.md#implemented-and-measured-2026-11-18).
 
-**Directed-combat validation on stanceless main (2026-11-22, `contact-validation.yml`, `workflow_dispatch` on #281 head c29dd92, GitHub, seeds 1-20, standard length; no Jev).** `game.fight.intent` off against on:
+**Directed-combat validation on stanceless main (2026-11-22).** Two configurations were measured, and only the second is what the page ships.
 
-| Assay | intent off | intent on | What moves |
+*Plain `intent` only* (`contact-validation.yml`, `workflow_dispatch` on #281 head c29dd92, GitHub, seeds 1-20, standard length, `--set game.fight.intent=false,true`; no Jev). This is **not** the page's setting (it has no `attackDistance` and no `counterattack`):
+
+| Assay | intent off | plain intent on | What moves |
 |---|---|---|---|
-| A9 strangers meet at food (neutral contact) | pass 8/20 | **pass 20/20** | peaceful meetings no longer end in fights |
+| A9 strangers meet at food (neutral contact) | pass 8/20 | pass 20/20 | peaceful meetings no longer end in fights |
 | G1 the one-world game, held food | pass 17/20 (failing 3, 4, 20) | pass 15/20 (failing 3, 12, 14, 19, 20) | median losses a colony 74 → 1; stored food 2746 → 2559 (you), 2807 → 2731 (rival) |
-| A13 defence from senses, the war party walked at the hole | pass 9/20 | **pass 4/20** | the defended colony: median losses 35.5 → 144, stored 265 → 117, ants alive 222 → 94; raiders' losses 40.5 → 36 |
+| A13 defence from senses, the war party walked at the hole | pass 9/20 | **pass 4/20** | the defended colony: median losses 35.5 → 144, stored 265 → 117, ants alive 222 → 94 |
 
-So directed combat makes neutral play much calmer and makes defending against a raid much worse: the defenders lose four times the ants and store less food, while the raiders lose no more. The entrance-defence variants of §86 (`defendEntrance`, `defendAlarmEntrance`, `defendThreatEntrance`) are the answer being tried and are not on by default. **Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games**, knowing A13 raid defence is worse with it on (9/20 → 4/20) and A9 and G1 are better; the entrance-defence variants stay the way to recover it.
+*The page's settings* (`game.fight.intent=true attackDistance=0.65 counterattack=true`, the `useColony.ts` fight settings; GitHub `assays.yml`, one world, no Jev, each arm paired with an intent-off run of the same seeds: runs 45123855840 (off) and 45199179642 (page) for seeds 1-10, 45202286738 (off) and 45202279633 (page) for seeds 11-20, on `main` at 99ea51d, 6ada438 and fbd1c83; `github.com/bwvogler/ant-sym/actions/runs/<id>`). Raid defence is **better** than legacy with these, not worse:
+
+| Assay | intent off, seeds 1-10 / 11-20 | the page's settings, seeds 1-10 / 11-20 | What moves |
+|---|---|---|---|
+| A13 raid defence | pass 3/10, 6/10 (9/20) | pass **7/10, 8/10 (15/20)** | defender losses a median 30.5 / 36.5 → 43.5 / 40; stored 512 / 224 → 551 / 288; raiders' losses 37 / 41.5 → 42 / 42 |
+| A9 neutral contact | pass 3/10, 5/10 (8/20) | pass **10/10, 10/10 (20/20)** | losses a colony 37.5 / 32 → 0 |
+| G1 the one-world game (seeds 11-20 only) | pass 9/10 (failing 20) | pass **4/10** (failing 12, 14, 15, 17, 19, 20) | stored food 2573 → 2785 (you), 2791 → 2624 (rival); losses 74 → 0.5; but `maxHeld` (foragers holding food over 120 s, G1's pass bound of 2) a median 2 → 3 |
+
+So with the page's settings directed combat calms neutral play, defends a raid better than legacy and loses far fewer ants in the whole game, at the price of one more forager holding food over 120 s at the median (G1's bound of 2 fails on 6 of 10 seeds, against 1 of 10), with the same stored food. Plain `intent` (above) is the weaker configuration, and the entrance-defence variants do not help the page's settings: with them A13 passes 2/10 on seeds 1-10 (`defendEntrance`; the alarm- and odds-gated variants were not run with the page's settings), against 7/10 without.
+
+**Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games.** That decision was taken on the plain-`intent` table above; the page's settings measure better on A13 and A9 and worse only on G1's held-food bound, so it stands.
 
 
 ## 87. Local delivery actions (ja-g7nz)
