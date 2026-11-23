@@ -11,6 +11,7 @@ import { destMark } from "../../homing.ts";
 import { walkTunnel } from "../../tunnel.ts";
 import { digCell, OPEN, rockAt } from "../../world.ts";
 import { NO_CELL } from "../../grid.ts";
+import { CELL, cellKey } from "../../hex.ts";
 import { decide } from "../../decide.ts";
 import { stanceStep } from "../../stance.ts";
 import { AntStep } from "../../step.ts";
@@ -225,6 +226,31 @@ test("the destination follows local signs at a fork, ignoring an opposite global
   assert.equal(walkTunnel(c, 0, RETURN, 0.1), true);
   assert.equal(c.gx[0], 24);
   assert.equal(c.gy[0], y);
+});
+
+// walkTunnel gives up on a cell it stamped "no tunnel" a moment ago and steers freely (open ground), but an ant going to a delivery
+// destination does not: it walks the cell by the floor marks (review of #281: the `!delivering` term of that check was reached by no test).
+test("a carrier on its way to a destination keeps walking a cell stamped no-tunnel; one that is not delivering gives it up", () => {
+  const { c, y } = setup();
+  put(c, 0, 23, y);
+  c.heading[0] = 0;
+  c.goalX = -1000;
+  c.goalY = -1000;
+  const stamp = () => {
+    c.gx[0] = NO_CELL;
+    c.antCell(0);
+    c.noTunnel[0] = cellKey(CELL[0], CELL[1]);
+  };
+  chooseDelivery(c, 0, "to store");
+  assert.equal(localDelivery(c, 0), true, "the ant is delivering in the first half");
+  stamp();
+  assert.equal(walkTunnel(c, 0, RETURN, 0.1), true, "delivering: the stamp does not send it onto open ground");
+  assert.notEqual(c.gx[0], NO_CELL);
+  c.params.deliveryLane = 0; // the same ant, the same stamp, no longer delivering
+  assert.equal(localDelivery(c, 0), false, "and not in the second");
+  stamp();
+  assert.equal(walkTunnel(c, 0, RETURN, 0.1), false, "not delivering: it gives the cell up");
+  assert.equal(c.gx[0], NO_CELL);
 });
 
 test("inspection is read-only and a JSON save preserves the delivery commitment", () => {
