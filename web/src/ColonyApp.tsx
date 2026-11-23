@@ -8,11 +8,9 @@ import {
   keptLevels,
   nextCost,
   price,
-  MAX_COLONIES,
   MET,
   type Game,
   AIMS,
-  type Flight,
   GENERIC_ANT,
   INFECTED,
   Builder,
@@ -26,10 +24,10 @@ import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
 import type { GameLoop } from "./ui/gameLoop.ts";
 import { SessionContext, useLoopStats, useStats } from "./ui/session.ts";
-import { chapterNameOf, evolutionOf, flightInAir, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
+import { chapterNameOf, evolutionOf, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
-import ColonyField, { type FieldApi, type FieldBuild, type FieldPen } from "./ui/ColonyField.tsx";
+import ColonyField, { type FieldApi, type FieldBuild } from "./ui/ColonyField.tsx";
 import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.tsx";
 import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
@@ -71,7 +69,8 @@ import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
 import { clock } from "./ui/clock.ts";
 import Specimens from "./ui/Specimens.tsx";
-import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./ui/specimens.ts";
+import { sameAnt, unpin } from "./ui/specimens.ts";
+import { useSpecimens } from "./ui/useSpecimens.ts";
 import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
@@ -82,10 +81,8 @@ import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
 import { NOTICE_LEVEL_LABEL, NOTICE_LEVELS, pushToast, setNoticeLevel, toastPlace, useNoticeLevel } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
-import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
-import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
-import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
-import type { DoctrineChoice } from "./ui/useColonyJev.ts";
+import QueenPen from "./ui/QueenPen.tsx";
+import { useFlight } from "./ui/useFlight.ts";
 import { installDevHook } from "./dev/hook.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
@@ -136,10 +133,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
-  // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game.
-  const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
-  const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
-  const setSpecimens = useCallback((list: Specimen[]) => setPinned({ token: gameToken, list }), [gameToken]);
+  // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
+  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -367,41 +362,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     }
     goTo(hosts[hostTurn.current++ % hosts.length]!);
   }, [game, goTo]);
-  /** Pin the followed ant as a specimen, or unpin it; a fourth replaces the oldest, and a notice says so. */
-  const togglePin = useCallback(
-    (f: Followed) => {
-      if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
-      // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
-      // It is said here: the watch won't see it again.
-      const { kept, gone } = living(specimens, game.colonies);
-      for (const g of gone)
-        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info", {
-          group: "specimen-died",
-        });
-      const r = pin(kept, f);
-      setSpecimens(r.list);
-      if (r.dropped)
-        pushToast(
-          `Three specimens at most: ${specimenLabel(r.dropped.no)}, ant #${r.dropped.i} of ${colonyName(r.dropped.k)}, is unpinned.`,
-          "info",
-        );
-    },
-    [specimens, setSpecimens, game],
-  );
-  // A specimen that dies leaves the list, with a notice (checked once a second: the rows show nothing once it is gone).
-  useEffect(() => {
-    if (!specimens.length) return;
-    const t = setInterval(() => {
-      const { kept, gone } = living(specimens, game.colonies);
-      if (!gone.length) return;
-      setSpecimens(kept);
-      for (const f of gone)
-        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info", {
-          group: "specimen-died",
-        });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [specimens, game, setSpecimens]);
   // The page's keys (ui/keys.ts): one handler, one table, which the shortcuts sheet reads.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -459,84 +419,17 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     },
     [loadSave, jev, update],
   );
-  // A new queen has flown (ja-lo8.9): the game is paused for her. The pen opens if the fungus is in her, her mother's
-  // queen was reached and Jev can read new words; else she founds on her mother's doctrine at once, and a notice says why.
-  const inAir = useLoopStats(loop, flightInAir);
-  const flight: Flight | null = inAir ? (game.flights[0] ?? null) : null;
-  // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
-  const [devPen, setDevPen] = useState(false);
-  const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
-  // The founding rules are ui/flight.ts's (ja-fnd.6.2); the page shows what they return and resumes once no queen is in the air.
-  const apply = useCallback(
-    (r: Founded) => {
-      if (r.notice) pushToast(r.notice.text, r.notice.tone);
-      if (r.resume) {
-        update({ playing: true });
-        setDevPen(false); // the dev hook's pen was for that flight only
-      }
-    },
-    [update],
-  );
-  useEffect(() => {
-    if (!flight || !gate || gate.open) return;
-    apply(foundOnMothers(game, jev, jev.doctrines, flight, gate.reason));
-  }, [flight, gate, game, jev, apply]);
-  /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
-  const foundOn = useCallback(
-    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => apply(foundOnWords(game, jev, f, d, at)),
-    [game, jev, apply],
-  );
-  // The pen's side and distance chooser is the side view's: it goes with the page's view code (S2.3e); she flies as the game says.
-  const foundHers = useCallback(
-    (d: DoctrineChoice, _at: Landing) => {
-      if (flight) foundOn(flight, d, game.landing(flight.mother));
-    },
-    [flight, game, foundOn],
-  );
-  // One world's pen (owner, 2026-11-10): she flies where the player clicks on the top view, within her flight of her
-  // mother's hole. The page shows the top view, round her circle; the field previews where she would settle
-  // (Game.settleAt, on the ground kept while the line is the same: penGround) and a click there founds her colony.
-  const penOpen = flight !== null && gate?.open === true;
-  const circle = penOpen && oneWorld && flight ? flightCircle(game, flight) : null;
-  const penWords = useRef<DoctrineChoice>({ id: "", text: "" });
-  /** "Let her fly": her own flight from her mother's hole (Game.landing), on the pen's words: no pointer needed. */
-  const onFly = useCallback(
-    (d: DoctrineChoice) => {
-      if (flight) foundOn(flight, d, game.landing(flight.mother));
-    },
-    [flight, game, foundOn],
-  );
-  const onWords = useCallback((d: DoctrineChoice) => {
-    penWords.current = d;
-  }, []);
-  const penFor = circle ? `${circle.x},${circle.y},${flight?.at}` : null;
-  useEffect(() => {
-    if (!circle) return;
-    setFollowed(null); // the pen's circle, not an ant, is what the top view shows
-    field.current?.centreOn(PLANE, circle.x, circle.y, { span: 2.6 * circle.r });
-    setView("above");
-    // Once as the pen opens (its circle's place and the flight say which).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [penFor, setView, setFollowed]);
-  const pen: FieldPen | null = useMemo(() => {
-    if (!circle || !flight || !oneWorld) return null;
-    const mother = colonyName(flight.mother);
-    return {
-      ...circle,
-      preview: (p) =>
-        penSettle(circle, p, mother, (q) =>
-          game.colonies.length >= MAX_COLONIES
-            ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` }
-            : game.settleAt(q, penGround(oneWorld)),
-        ),
-      onPick: (p) => {
-        if (!withinFlight(circle, p)) return pushToast(`She can't fly that far: click within ${circle.r} of ${mother}'s hole.`, "warn");
-        if (!penWords.current.text) return pushToast("Write her doctrine first.", "warn");
-        foundOn(flight, penWords.current, p);
-      },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [penFor, flight, oneWorld, game, foundOn]);
+  // A new queen has flown (ja-lo8.9): the game is paused for her; the pen, or her mother's doctrine at once (ui/useFlight.ts).
+  const { flight, gate, circle, pen, penCard, foundHers, onFly, onWords, openDevPen } = useFlight({
+    game,
+    loop,
+    jev,
+    update,
+    setFollowed,
+    setView,
+    field,
+    oneWorld,
+  });
   // The dev hook (dev/hook.ts): the game and the page's views on window, for the Playwright guard. Dev builds only, not in the Pages build.
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
@@ -550,7 +443,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       setFollowed,
       sensed,
       field,
-      openPen: () => setDevPen(true),
+      openPen: openDevPen,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed, sensed, traces]);
@@ -570,7 +463,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jev.lock, jev.state.phase);
-  const penCard = flight && gate?.open && oneWorld && circle;
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
   // The palette's commands (ui/commands.ts ranks them): everything the HUD, the rail, the map's menu and the keys do,
   // and every guide entry. Built only while the palette is open (review of #196, N3); running one closes a pinned lens
@@ -879,13 +771,13 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           >
             {penCard ? (
               <QueenPen
-                key={flight.at}
-                flight={flight}
-                mother={colonyName(flight.mother)}
+                key={penCard.flight.at}
+                flight={penCard.flight}
+                mother={colonyName(penCard.flight.mother)}
                 daughter={colonyName(game.colonies.length)}
-                doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+                doctrine={jev.doctrines[penCard.flight.mother] ?? jev.doctrines[0]!}
                 onFound={foundHers}
-                place={{ radius: circle.r, onWords, onFly }}
+                place={{ radius: penCard.circle.r, onWords, onFly }}
               />
             ) : followed || specimens.length ? (
               <>
