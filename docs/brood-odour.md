@@ -121,7 +121,7 @@
 
 ## What MR 15 built from this (PRD §77)
 
-Built and on by default (`ja-k4k.15.5`, 2026-11-22): `broodOdour` 1, `broodClimb` 1, `broodCrowd` 3, the odour channel at evaporation 0.03 and diffusion 0.5. The young ant's turn to the queen's x,y is gone (`ja-k4k.2.1`); with `broodClimb` 0 the young only search. The desert ant has the channel too.
+Built and on by default (`ja-k4k.15.5`, 2026-11-22): `broodOdour` 1, `broodClimb` 1, `broodCrowd` 3, the odour channel at evaporation 0.1 and diffusion 0.5 (0.03 and 0.5 first, until it left soil carriers stalling in tunnels on some seeds: PRD §77.6). The young ant's turn to the queen's x,y is gone (`ja-k4k.2.1`); with `broodClimb` 0 the young only search. The desert ant has the channel too.
 
 What the measurements overturned:
 - **The reach is not two or three cells.** At 0.3 evaporation and 0.3 diffusion the young found the odour 10% of the time and the nurse-zone assay passed 5/10. At 0.03 and 0.5 it passes 13/20 (against main's 8/20) and a single egg is smelt more than three cells away (**design**: the reach is tuned, not measured).
