@@ -38,19 +38,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "a30ffdee",
+     "spores": "5fc07b40",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
      "hosts": "8ff29ca5",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "6d9e7b6a",
+     "evolution": "80695cd7",
      "base": "d2dabcb3",
-     "hyphae": "ab2a1833",
+     "hyphae": "53af221f",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
-     "links": "26717f43",
+     "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -97,19 +97,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "7702583f",
+     "spores": "861bb0c9",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
      "hosts": "8af0562f",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "c951e922",
+     "evolution": "29c0d81f",
      "base": "d2dabcb3",
-     "hyphae": "636d3a74",
+     "hyphae": "dc674053",
      "corpses": "d08749ad",
      "corpseAges": "d08749ad",
-     "links": "26717f43",
+     "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -156,19 +156,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "c97f7c7f",
+     "spores": "b451cc9a",
      "sporeStrain": "9618822b",
      "sporeCells": "601a3a7d",
      "hosts": "91e39541",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "91be2fd1",
+     "evolution": "d627af2f",
      "base": "d2dabcb3",
-     "hyphae": "d4c67268",
+     "hyphae": "6ec8c868",
      "corpses": "1467e1bc",
      "corpseAges": "b45c43d2",
-     "links": "26717f43",
+     "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
@@ -215,19 +215,19 @@
    ],
    "fungus": {
     "state": {
-     "spores": "2757a9f2",
+     "spores": "f0b2f32a",
      "sporeStrain": "213b52f9",
      "sporeCells": "87d9b452",
      "hosts": "15e8e23b",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "66b57cb3",
+     "evolution": "382fde60",
      "base": "d2dabcb3",
-     "hyphae": "179650ce",
+     "hyphae": "41b68a3d",
      "corpses": "a40adcd9",
      "corpseAges": "fa95424c",
-     "links": "26717f43",
+     "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
