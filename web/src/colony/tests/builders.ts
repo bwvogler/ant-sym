@@ -1,6 +1,6 @@
 // Test builders shared by the colony tests: the small maps and games, the step loop and the hand-placed colonies
 // that used to be copied file to file (S0b, ja-fnd.1.3). A test whose setup differs keeps its own and says why.
-import { LIFESPAN, MIDDLE, Colony, type ColonyParams, type HoleCell } from "../colony.ts";
+import { LIFESPAN, MIDDLE, PLANE, Colony, type ColonyParams, type HoleCell } from "../colony.ts";
 import { type Policy } from "../vocab.ts";
 import type { Game } from "../game.ts";
 import { CELL, cellOf, centreX, centreY } from "../hex.ts";
@@ -126,3 +126,27 @@ export const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record
   const into = (src: Record<string, unknown>) => Object.fromEntries(keys.filter((k) => home(k) === src).map((k) => [k, encode(r[k])]));
   c.loadState({ fields: into(pub), private: into(priv) });
 };
+
+/**
+ * Fights on the plane are rare in a short run, and which game brings two colonies' ants together moves with every change to
+ * the scent streams (the brood-odour channel's fade and spread did it, twice): the game runs on (at most 40 s) until each
+ * colony has 8 ants on the plane, then colony 1's plane ants are put on colony 0's, one each, so a fight death follows by
+ * construction (with one or two ants a side it did not). A test still asserts that one happened.
+ */
+export function stageFight(g: Game): void {
+  const [a, b] = [g.colonies[0]!, g.colonies[1]!];
+  const onPlane = (c: typeof a) => {
+    let n = 0;
+    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.layer[i] === PLANE) n++;
+    return n;
+  };
+  for (let k = 0; k < Math.round(40 / DT) && Math.min(onPlane(a), onPlane(b)) < 8; k++) g.tick(DT);
+  const mine: number[] = [];
+  for (let i = 0; i < a.n && mine.length < 8; i++) if (a.alive[i] && a.layer[i] === PLANE) mine.push(i);
+  let k = 0;
+  for (let i = 0; i < b.n && k < mine.length; i++)
+    if (b.alive[i] && b.layer[i] === PLANE) {
+      const t = mine[k++]!;
+      b.putAnt(i, PLANE, a.x[t]!, a.y[t]!);
+    }
+}

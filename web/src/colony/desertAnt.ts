@@ -93,8 +93,8 @@ export const DESERT_ANT: Species = {
   name: "Desert ant",
   params: {
     maxAnts: 200,
-    // No trail or alarm channel: only the nest's floor marks (it can tell its chambers apart: ja-fnd.5.14).
-    channelSet: MARKS,
+    // No trail or alarm channel: only the nest's floor marks (it can tell its chambers apart: ja-fnd.5.14) and the brood's odour.
+    channelSet: [...MARKS, "broodOdour"],
     homeTrail: 0,
     raidGate: 0,
     undertakes: false,

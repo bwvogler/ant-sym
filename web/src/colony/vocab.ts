@@ -108,6 +108,8 @@ export interface CellCounts {
   any(x0: number, y0: number, x1: number, y1: number): boolean;
   /** count, from now on, what is a stranger to this odour at this tolerance (recognition.ts); absent: everything counts */
   look?(odour: number, tolerance: number): void;
+  /** a grid kept by ants as they move changes a count by n (CountGrid; ja-k4k.15.7.1 keeps the nest's contact count true within a tick) */
+  add?(x: number, y: number, n?: number): void;
 }
 
 /** A cell holds an enemy an ant reacts to when its (calm-weighted) strangers reach this. */

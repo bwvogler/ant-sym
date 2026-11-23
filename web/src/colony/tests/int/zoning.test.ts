@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, CURTAIN, LIFESPAN, MIDDLE, PLANE, YOUNG } from "../../colony.ts";
+import { CountGrid } from "../../battle.ts";
 import { Game } from "../../game.ts";
 import { responses } from "../../responses.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
@@ -111,6 +112,73 @@ test("the young sit deeper than the old, and only the middle-aged dig", () => {
     near[0]! / inside[0]! < near[1]! / inside[1]!,
     `from the queen, underground: young ${(near[0]! / inside[0]!).toFixed(1)}, middle-aged ${(near[1]! / inside[1]!).toFixed(1)}`,
   );
+});
+
+test("a young ant in a chamber turns toward the brood's odour, not the queen's position (ja-k4k.15)", () => {
+  // One young ant mid-chamber facing up, brood odour under its left antenna, the queen moved to its right: over 100 single ticks
+  // it turns left, up the odour. By the queen's position (the rule before, removed with ja-k4k.2.1) it would turn right; with the
+  // climb off (broodClimb 0) or no odour it turns either way alike.
+  const w = smallOne(2);
+  const royal = w.curtain.chambers!.list.find((k) => k.colony === 0 && k.role === "royal")!;
+  const x = centreX(Math.round((royal.x0 + royal.x1) / 2), royal.floorRow - 5);
+  const y = centreY(royal.floorRow - 5);
+  let lastRms = 0;
+  const turn = (broodClimb: number, odour: number, broodCrowd = 0, here = 1) => {
+    let sum = 0;
+    let sq = 0;
+    const trials = 100;
+    for (let t = 0; t < trials; t++) {
+      const c = new Colony(
+        w.curtain,
+        { antCount: 1, maxAnts: 5, broodOdour: 1, broodClimb, broodCrowd },
+        mulberry32(t + 1),
+        () => "explore",
+        {
+          plane: w.plane,
+          line: w.line,
+        },
+      );
+      c.age[0] = 0.02 * LIFESPAN;
+      c.lifespan[0] = Infinity;
+      c.x[0] = x;
+      c.y[0] = y;
+      c.heading[0] = -Math.PI / 2;
+      c.queen!.x = x + 6;
+      c.queen!.y = y;
+      const { sensorDistance: d, sensorAngle: a } = c.params;
+      cellOf(x + Math.cos(-Math.PI / 2 - a) * d, y + Math.sin(-Math.PI / 2 - a) * d);
+      if (odour > 0) c.layers[CURTAIN]!.ph.fields.broodOdour.set(CELL[0], CELL[1], odour);
+      // `here` ants in the ant's own cell, itself included, as the game's friends grid counts.
+      const grid = new CountGrid();
+      c.friends = grid;
+      cellOf(x, y);
+      grid.add(CELL[0], CELL[1], here);
+      cellOf(x + Math.cos(-Math.PI / 2 - a) * d, y + Math.sin(-Math.PI / 2 - a) * d);
+      c.tick(1 / 30);
+      sum += c.heading[0]! + Math.PI / 2;
+      sq += (c.heading[0]! + Math.PI / 2) ** 2;
+    }
+    lastRms = Math.sqrt(sq / trials);
+    return sum / trials;
+  };
+  const toward = turn(1, 50);
+  const queen = turn(0, 50);
+  const blind = turn(1, 0);
+  // Left is a smaller angle (−a from straight ahead).
+  assert.ok(toward < -0.005, `toward the odour: ${toward.toFixed(4)} rad a tick`);
+  assert.ok(Math.abs(queen) < 0.005, `broodClimb 0 does not turn to the queen any more: ${queen.toFixed(4)}`);
+  assert.ok(Math.abs(blind) < 0.005, `no odour, no bias: ${blind.toFixed(4)}`);
+  // ja-k4k.15.6: with 6 nestmates already in its cell (7 counting itself) and the limit at 6, it stops climbing; with 5, it still does;
+  // the limit off (0) it climbs however many stand there.
+  const full = turn(1, 50, 6, 7);
+  const fullRms = lastRms; // read now: the later calls overwrite it
+  const room = turn(1, 50, 6, 6);
+  const off = turn(1, 50, 0, 40);
+  assert.ok(Math.abs(full) < 0.005, `a full cell: no climb ${full.toFixed(4)}`);
+  // It wanders on (noise only) instead of standing still, so it spreads out and does not queue in the cell.
+  assert.ok(fullRms > 0.005, `a full cell: it still wanders (turn spread ${fullRms.toFixed(4)})`);
+  assert.ok(room < -0.005, `one short of full: still climbs ${room.toFixed(4)}`);
+  assert.ok(off < -0.005, `no limit: climbs ${off.toFixed(4)}`);
 });
 
 test("an old forager in a dead-end tunnel whose tip lies just under the ground by the hole goes back down and out by the shaft (review of #25)", () => {
