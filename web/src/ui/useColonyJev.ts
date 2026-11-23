@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import {
   SPECIES,
   type Colony,
@@ -11,19 +11,18 @@ import {
   GENERIC_ANT,
   type Species,
 } from "../colony/index.ts";
-import { COLONY_NAMES } from "./names.ts";
 import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, PAGE_ASKS_RESPONSE_LANES, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import type { Backend } from "./backend.ts";
-import { applyJevFlags, canResume, policyLock, shouldStart } from "./policyLock.ts";
+import { type DoctrineChoice, JevSession } from "./jevSession.ts";
 import { loadPrecache } from "./precache.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
-// (the colonies change with the world, the caches do not), its state mirrored
-// into React, each colony's doctrine (its nature: a scenario setting, not the
-// player's lever) and the fungus's aim (the player's). Cached answers live in
-// localStorage under their context (cacheStore.ts).
+// (the colonies change with the world, the caches do not) and the session over it
+// (jevSession.ts), which keeps the lock, whether a miss may start a run, each colony's doctrine (its nature: a scenario
+// setting, not the player's lever) and the fungus's aim (the player's). Cached answers live in localStorage under their
+// context (cacheStore.ts).
 //
 // Jev in the fungus game (ja-lo8.2; PR #42 review S6–S8): spend nothing while answers are cached, and ask Jev only for
 // the situations that aren't. The page plays the answers it ships and those Jev gave before; a situation with no answer
@@ -38,17 +37,10 @@ export const TOKENS_PER_SITUATION = tokensPerQuestion("mode", DOCTRINES[0]!.text
 /** The same for a fungal situation (legend + aim dominate, as for the ants). */
 export const TOKENS_PER_FUNGAL_SITUATION = tokensPerQuestion("fungus", AIMS[0]!.text);
 
-export interface DoctrineChoice {
-  /** a preset's id, or "custom" */
-  id: string;
-  text: string;
-}
-
-/** Every colony starts foraging: one doctrine, one shared cache, no extra spend. */
-const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINES[0]!.id, text: DOCTRINES[0]!.text }));
+export type { DoctrineChoice };
 
 /** The client's whole state, drawn again on every change of it (the Lab's Jev card: its counters tick with each batch). */
-export function useJevState(client: ColonyJev): ColonyJevState {
+export function useJevState(client: { state: ColonyJevState; subscribe: ColonyJev["subscribe"] }): ColonyJevState {
   const subscribe = useCallback((fn: () => void) => client.subscribe(fn), [client]);
   return useSyncExternalStore(subscribe, () => client.state);
 }
@@ -60,29 +52,31 @@ export function useColonyJev(
   journal: Journal | null = null,
   species: Species = GENERIC_ANT,
 ) {
-  const jev = useMemo(() => new ColonyJev({}, browserCache), []);
+  // One session for the page's life (ui/jevSession.ts): it keeps what the page holds about Jev and decides, synchronously, the lock and whether a
+  // miss may start a run. This hook is its React face: it feeds it the backend, follows it with useSyncExternalStore, and runs its lifecycle.
+  const session = useMemo(() => new JevSession(new ColonyJev({}, browserCache)), []);
+  const jev = session.client as ColonyJev;
   jev.journal = journal;
-  const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);
-  const [aim, setAimState] = useState<DoctrineChoice>({ id: AIMS[0]!.id, text: AIMS[0]!.text });
-  /** Why no policy can change now (policyLock), read by the setters: words Jev can't read are not taken. */
-  const lockRef = useRef<string | null>(null);
+  useEffect(() => session.setBackend(backend), [session, backend]);
+  const snap = useSyncExternalStore(session.subscribe, session.snapshot);
 
   useEffect(() => {
-    FIRST_DOCTRINES.forEach((d, k) => jev.setDoctrineFor(k, d.text));
-    jev.setAim(AIMS[0]!.text);
+    const close = session.open();
+    session.initWords();
     // Answers are written to the store a second after the last reply: a tab hidden or closed in that second writes them now.
     const flush = () => jev.flushCache();
     const hidden = () => document.visibilityState === "hidden" && flush();
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", flush);
     return () => {
+      close();
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("pagehide", flush);
       // Leaving the page: end the run on the server (stop and dispose write what the replies brought).
       if (jev.state.phase === "running") void jev.stop();
       jev.dispose();
     };
-  }, [jev]);
+  }, [session, jev]);
   // Jev's answers shipped with the page (ui/precache.ts), under any this browser already has.
   const seeded = useRef(false);
   useEffect(() => {
@@ -101,105 +95,32 @@ export function useColonyJev(
   // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
 
-  // A run starts at the first miss where Jev can run (shouldStart), or by hand (Lab → Jev → Resume).
-  const [starting, setStarting] = useState(false);
-  const start = useCallback(() => {
-    setStarting(true);
-    void jev.start().finally(() => setStarting(false));
-  }, [jev]);
-  const stop = useCallback(() => void jev.stop(), [jev]);
-  // What the page reads of the client's state is a few small values derived from it, each read from the client (useSyncExternalStore) so the page
-  // draws again when one of them changes and not on every counter the client ticks: the Lab's Jev card reads the whole state itself (useJevState).
-  const subscribe = useCallback((fn: () => void) => jev.subscribe(fn), [jev]);
-  const phase = useSyncExternalStore(subscribe, () => jev.state.phase);
-  const lock = useSyncExternalStore(subscribe, () => policyLock(backend, jev.state, starting));
-  const startable = useSyncExternalStore(subscribe, () => shouldStart(backend, jev.state, starting));
-  const resumable = useSyncExternalStore(subscribe, () => canResume(backend, jev.state, starting));
-  /** Whether a miss should start a run now, read on every miss (so a ref, not state). */
-  const startRef = useRef(false);
-  useEffect(() => applyJevFlags(jev, { lockRef, startRef }, lock, startable), [jev, lock, startable]);
-  // A situation with no answer under the current words, and no run on: start one (S7). Called on every such miss, from
-  // the game's tick, so it only checks a ref, and starts after the tick.
-  useEffect(() => {
-    jev.wantsRun = () => {
-      if (!startRef.current) return;
-      startRef.current = false;
-      queueMicrotask(start);
-    };
-    return () => {
-      jev.wantsRun = null;
-    };
-  }, [jev, start]);
-
-  const draftDoctrine = useCallback((k: number, d: DoctrineChoice) => setDoctrinesState((all) => all.map((x, j) => (j === k ? d : x))), []);
-  const setDoctrine = useCallback(
-    (k: number, d: DoctrineChoice) => {
-      if (lockRef.current !== null) return;
-      draftDoctrine(k, d);
-      jev.setDoctrineFor(k, d.text);
-    },
-    [jev, draftDoctrine],
-  );
-
-  /**
-   * A daughter colony k's words as she founds (ja-lo8.9): the player's, from the queen's pen (which opens only while
-   * Jev can read them), or her mother's (no pen: not a change of policy, so not held back by the lock; the mother's
-   * answers are cached under the same words).
-   */
-  const foundWith = useCallback(
-    (k: number, d: DoctrineChoice) => {
-      draftDoctrine(k, { ...d });
-      jev.setDoctrineFor(k, d.text);
-    },
-    [jev, draftDoctrine],
-  );
-
+  const start = useCallback(() => session.start(), [session]);
+  const stop = useCallback(() => session.stop(), [session]);
   const explain = useCallback((s: Situation, k: number) => jev.explain(s, k), [jev]);
   const explainFungus = useCallback((s: FungalSituation) => jev.explainFungus(s), [jev]);
-  const setAim = useCallback(
-    (a: DoctrineChoice) => {
-      if (lockRef.current !== null) return;
-      setAimState(a);
-      jev.setAim(a.text, { askNow: true }); // a player's change: Jev asks what the new aim lacks at once (ja-lo8.21)
-    },
-    [jev],
-  );
-
   const fungusAnswers = useCallback(() => jev.fungusAnswers(), [jev]);
-  /**
-   * A saved game's words back (ui/saves.ts): its aim and each colony's doctrine. Not a change of policy, so not held
-   * back by the lock: the answers under those words are cached, and what is not is asked as it comes up.
-   */
-  const restore = useCallback(
-    (a: DoctrineChoice, ds: DoctrineChoice[]) => {
-      setAimState(a);
-      jev.setAim(a.text);
-      setDoctrinesState(ds.map((d) => ({ ...d })));
-      ds.forEach((d, k) => jev.setDoctrineFor(k, d.text));
-    },
-    [jev],
-  );
 
   return {
     /** the client itself: a reader that needs its whole state takes it with useJevState(client) */
     client: jev,
-    phase,
+    phase: snap.phase,
     /** the daily budget the page loaded with: today's spend is the last run's figure when there is one (the Lab's Jev card) */
-    backendBudget: backend?.budget ?? null,
+    backendBudget: snap.backendBudget,
     start,
     stop,
-    lock,
-    resumable,
+    lock: snap.lock,
+    resumable: snap.resumable,
     fungusAnswers,
-    restore,
-    doctrines,
-    setDoctrine,
-    draftDoctrine,
-    foundWith,
+    restore: session.restore,
+    doctrines: snap.doctrines as DoctrineChoice[],
+    setDoctrine: session.setDoctrine,
+    draftDoctrine: session.draftDoctrine,
+    foundWith: session.foundWith,
     explain,
-    aim,
-    setAim,
-    draftAim: setAimState,
+    aim: snap.aim,
+    setAim: session.setAim,
+    draftAim: session.draftAim,
     explainFungus,
   };
 }
