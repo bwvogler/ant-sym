@@ -411,8 +411,19 @@ export class FieldRenderer {
     this.stages = stages;
   }
 
-  /** Draw a frame (`beginFrame` builds its state from what the shell read: the camera is already eased). */
+  /**
+   * Draw a frame (`beginFrame` builds its state from what the shell read: the camera is already eased). Each stage starts from the same stroke state
+   * (round caps, mitred joins, a 1 px line): the canvas keeps what the last stroke set, so a stage that did not set its own cap, join or width used to
+   * draw with whatever the stage before it, or the frame before it, left (ja-fnd.6.3.10: the chamber labels' round join, which stayed on for every
+   * stroke after them once the labels had been shown). The other state (the alpha, the smoothing, the styles) is still handed from stage to stage on purpose.
+   */
   frame(fs: FrameState): void {
-    for (const stage of this.stages) if (stage(fs) === false) return;
+    const { ctx } = fs.fc;
+    for (const stage of this.stages) {
+      ctx.lineCap = "round";
+      ctx.lineJoin = "miter";
+      ctx.lineWidth = 1;
+      if (stage(fs) === false) return;
+    }
   }
 }

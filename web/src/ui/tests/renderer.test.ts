@@ -238,6 +238,40 @@ test("the stage list is the frame's order, and a stage that returns false ends t
   assert.equal(new FieldRenderer().stages, STAGES, "the default list");
 });
 
+test("each stage starts from the same stroke state, whatever the stage before it left set, and the rest of the state is still handed on", () => {
+  const s = setup();
+  const state = (prop: string) => s.rec.state[prop];
+  const seen: unknown[][] = [];
+  const stage =
+    (set: () => void): Stage =>
+    (fs) => {
+      seen.push([state("lineCap"), state("lineJoin"), state("lineWidth"), state("globalAlpha"), state("imageSmoothingEnabled")]);
+      void fs;
+      set();
+    };
+  const ctx = s.fs.fc.ctx;
+  new FieldRenderer([
+    stage(() => {
+      ctx.lineCap = "butt";
+      ctx.lineJoin = "bevel";
+      ctx.lineWidth = 9;
+      ctx.globalAlpha = 0.5;
+      ctx.imageSmoothingEnabled = false;
+    }),
+    stage(() => {}),
+  ]).frame(s.fs);
+  assert.deepEqual(seen[0]!.slice(0, 3), ["round", "miter", 1], "the first stage");
+  assert.deepEqual(
+    seen[1],
+    ["round", "miter", 1, 0.5, false],
+    "the second: the stroke state is the frame's, the alpha and the smoothing are the first's",
+  );
+  // and a frame after a frame: the same start
+  seen.length = 0;
+  new FieldRenderer([stage(() => {})]).frame(s.fs);
+  assert.deepEqual(seen[0]!.slice(0, 3), ["round", "miter", 1]);
+});
+
 test("the paper fills the canvas, then the ground's own paper the map's rectangle, with smoothing off", () => {
   const s = setup({ zoom: 20 });
   paperStage(s.fs);

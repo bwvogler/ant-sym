@@ -1,203 +1,217 @@
 {
   "above-fit": {
-    "hash": "e09c02b224f261b9",
-    "calls": 3511,
+    "hash": "ebf2afc1d2e8fc50",
+    "calls": 3541,
     "pixels": "7deb7fecceef7167",
     "drawImages": 2945,
     "strokes": 14
   },
   "above-nest0": {
-    "hash": "c0500c4005535072",
-    "calls": 416,
+    "hash": "2b623e9b5f70e4c0",
+    "calls": 446,
     "pixels": "3973a5e6d897194a",
     "drawImages": 17,
     "strokes": 10
   },
   "above-nest0-near": {
-    "hash": "fd5e00169930bc3b",
-    "calls": 401,
+    "hash": "7cdb25b478baf3f8",
+    "calls": 431,
     "pixels": "589bd526212a4225",
     "drawImages": 2,
     "strokes": 10
   },
   "above-ants": {
-    "hash": "f4937414870cbad9",
-    "calls": 426,
+    "hash": "26b0b8b774e4385b",
+    "calls": 456,
     "pixels": "41951b9237a22a04",
     "drawImages": 22,
     "strokes": 10
   },
   "above-followed": {
-    "hash": "1de55def43de67ec",
-    "calls": 447,
+    "hash": "7ec39be20a04cd3d",
+    "calls": 477,
     "pixels": "41951b9237a22a04",
     "drawImages": 22,
     "strokes": 12
   },
   "below-labels": {
-    "hash": "5e9c2930fb93b5c8",
-    "calls": 186,
+    "hash": "460700403812965d",
+    "calls": 216,
     "pixels": "9173149e8bb669c5",
     "drawImages": 20,
     "strokes": 14
   },
   "above-dark": {
-    "hash": "5e001b3403ed7ecd",
-    "calls": 426,
+    "hash": "63025b31a390ee97",
+    "calls": 456,
     "pixels": "27b9ca24f60464e3",
     "drawImages": 22,
     "strokes": 10
   },
   "above-retina": {
-    "hash": "5d38ff53676c026f",
-    "calls": 432,
+    "hash": "e5876c75dec83255",
+    "calls": 462,
     "pixels": "2c08a31c7a89e019",
     "drawImages": 27,
     "strokes": 12
   },
   "above-smell": {
-    "hash": "1409c3e8b81f9feb",
-    "calls": 416,
+    "hash": "255d5cde301d6b06",
+    "calls": 446,
     "pixels": "912e40e1c5e78412",
     "drawImages": 17,
     "strokes": 10
   },
   "above-specimens": {
-    "hash": "d05099282079f630",
-    "calls": 465,
+    "hash": "3056684d2abd6920",
+    "calls": 495,
     "pixels": "41951b9237a22a04",
     "drawImages": 17,
     "strokes": 14
   },
   "far-aphids": {
-    "hash": "fcaf1f70beb4002b",
-    "calls": 417,
+    "hash": "9f09aeaae1ef65bf",
+    "calls": 447,
     "pixels": "aaf428466683c7ce",
     "drawImages": 2,
     "strokes": 12
   },
   "far-ants": {
-    "hash": "1c984230f2fe0a1c",
-    "calls": 665,
+    "hash": "50686834471d646c",
+    "calls": 695,
     "pixels": "73e9f0459a25ad6b",
     "drawImages": 148,
     "strokes": 15
   },
   "far-nest": {
-    "hash": "f600f69bb105039d",
-    "calls": 465,
+    "hash": "fd47b061f9420fa1",
+    "calls": 495,
     "pixels": "aaf428466683c7ce",
     "drawImages": 76,
     "strokes": 12
   },
   "far-hyphae": {
-    "hash": "78b3adccca299c33",
-    "calls": 423,
+    "hash": "582b60dd38dc0428",
+    "calls": 453,
     "pixels": "aaf428466683c7ce",
     "drawImages": 2,
     "strokes": 12
   },
+  "above-trace": {
+    "hash": "a53c577dd9c23f79",
+    "calls": 475,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 17,
+    "strokes": 13
+  },
+  "far-followed-low": {
+    "hash": "8348f1c6fae6242e",
+    "calls": 1359,
+    "pixels": "d17f32d86404d48c",
+    "drawImages": 797,
+    "strokes": 15
+  },
   "above-pen": {
-    "hash": "1c1e95b52bd3d898",
-    "calls": 623,
+    "hash": "0a2b9ffa31f04093",
+    "calls": 653,
     "pixels": "3973a5e6d897194a",
     "drawImages": 17,
     "strokes": 14
   },
   "above-pen-refused": {
-    "hash": "319abec14b6437a6",
-    "calls": 450,
+    "hash": "06f9817ded22fd8b",
+    "calls": 480,
     "pixels": "3973a5e6d897194a",
     "drawImages": 17,
     "strokes": 13
   },
   "above-aphids": {
-    "hash": "1ab4b29934607da4",
-    "calls": 427,
+    "hash": "fd66e72c02836a9a",
+    "calls": 457,
     "pixels": "3973a5e6d897194a",
     "drawImages": 19,
     "strokes": 12
   },
   "above-hyphae": {
-    "hash": "e017b7299dbea3e7",
-    "calls": 442,
+    "hash": "e8014a73fef4666a",
+    "calls": 472,
     "pixels": "3973a5e6d897194a",
     "drawImages": 17,
     "strokes": 12
   },
   "desert-noon": {
-    "hash": "845b07fd43c5f526",
-    "calls": 486,
+    "hash": "a9041a2c1dff67ec",
+    "calls": 516,
     "pixels": "7e16660cec818dda",
     "drawImages": 34,
     "strokes": 10
   },
   "desert-night": {
-    "hash": "669dfd1f7b7ea281",
-    "calls": 494,
+    "hash": "fd90f4d378f9dd8c",
+    "calls": 524,
     "pixels": "7e16660cec818dda",
     "drawImages": 18,
     "strokes": 12
   },
   "desert-hyphae": {
-    "hash": "b410fbf64e42e4f5",
-    "calls": 443,
+    "hash": "de354b0b7d68eaa5",
+    "calls": 473,
     "pixels": "645d8cad53c876ff",
     "drawImages": 17,
     "strokes": 10
   },
   "queen-below": {
-    "hash": "91d8a1e8cde5aed3",
-    "calls": 130,
+    "hash": "6072e917d83155be",
+    "calls": 160,
     "pixels": "debda1be547a7168",
     "drawImages": 12,
     "strokes": 12
   },
   "queen-below-dark": {
-    "hash": "d5f6f4631f282222",
-    "calls": 154,
+    "hash": "b84742914ca1f217",
+    "calls": 184,
     "pixels": "f169f50abcd3540f",
     "drawImages": 3,
     "strokes": 14
   },
   "above-corpse": {
-    "hash": "a26840219ca6f238",
-    "calls": 427,
+    "hash": "158f2498c7c4292b",
+    "calls": 457,
     "pixels": "41951b9237a22a04",
     "drawImages": 23,
     "strokes": 10
   },
   "below-fit": {
-    "hash": "8dd9492f84be186d",
-    "calls": 1985,
+    "hash": "b140da25f02452a6",
+    "calls": 2015,
     "pixels": "a931c3e3b92372cd",
     "drawImages": 1706,
     "strokes": 14
   },
   "below-near": {
-    "hash": "deb547971bd85b6d",
-    "calls": 111,
+    "hash": "b993847ca2169bb9",
+    "calls": 141,
     "pixels": "3df79100f4106d4d",
     "drawImages": 2,
     "strokes": 12
   },
   "below-ants": {
-    "hash": "38dad97ce26e8f8f",
-    "calls": 193,
+    "hash": "593c1d95bdbe6e6e",
+    "calls": 223,
     "pixels": "9173149e8bb669c5",
     "drawImages": 2,
     "strokes": 14
   },
   "below-followed": {
-    "hash": "b73cfd3e6832aa9f",
-    "calls": 172,
+    "hash": "0abc38bfcc09dce8",
+    "calls": 202,
     "pixels": "9173149e8bb669c5",
     "drawImages": 20,
     "strokes": 14
   },
   "below-dark": {
-    "hash": "0a64603735639f86",
-    "calls": 151,
+    "hash": "4af359cb823c67c6",
+    "calls": 181,
     "pixels": "fb1b87adfdb53774",
     "drawImages": 20,
     "strokes": 12

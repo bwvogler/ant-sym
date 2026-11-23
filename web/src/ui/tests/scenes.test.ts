@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { cellKey, centreX, centreY, CURTAIN, type Game, HYPHA_ROOT, Hyphae, PLANE, R } from "../../colony/index.ts";
 import type { FieldPen } from "../field/ctx.ts";
+import { stateAt } from "./recordingContext.ts";
 import { renderScene, type Scene } from "./sceneHarness.ts";
 
 // The renderer's scenes, headless (ja-fnd.6.3.9): each is one frame of FieldRenderer over a small real game on the recording context, with the sprite
@@ -122,6 +123,17 @@ export const SCENES: Record<string, Scene> = {
   },
   "far-nest": { ticks: 200, at: nest0(10), size: { w: 800, h: 600, dpr: 2 } },
   "far-hyphae": { ticks: 200, at: nest0(10), setup: withHyphae },
+  "above-trace": {
+    ticks: 200,
+    at: nest0(24),
+    traces: (g) => {
+      const n = g.colonies[0]!.nest;
+      const xs = [0, 1, 2, 3, 4, 5, 5.5, 5, 5.5, 6].map((k) => n.x + 2 + k);
+      const ys = [0, 0, 0, 0, 0, 0, 0.6, 1.2, 1.8, 1.4].map((k) => n.y + k);
+      return [{ colony: 0, i: 0, gen: 0, move: 1, xs, ys, search: [0, 0, 0, 0, 0, 0, 1, 1, 1, 1], done: null, end: null }];
+    },
+  },
+  "far-followed-low": { ticks: 200, at: atAnt(PLANE, 4), size: { w: 800, h: 600, dpr: 2 }, follow: (g) => antOn(g, PLANE) },
   "above-pen": { ticks: 200, at: nest0(24), pen: (g) => penAt(g, true), hover: [400, 300] },
   "above-pen-refused": { ticks: 200, at: nest0(24), size: { w: 800, h: 600, dpr: 2 }, pen: (g) => penAt(g, false), hover: [400, 300] },
   "above-aphids": {
@@ -182,6 +194,23 @@ for (const [name, scene] of Object.entries(SCENES)) {
     if (!write) assert.deepEqual(now, recorded[name], `${name}: record again with GOLDEN_WRITE=1 if the change is meant`);
   });
 }
+
+test("a frame's strokes are drawn the same whatever the frame before it left set: cap, join and width at every stroke", () => {
+  const PROPS = ["lineCap", "lineJoin", "lineWidth"];
+  const strokes = (log: string[], from: number, to: number) => {
+    const out: string[] = [];
+    for (let i = from; i < to; i++)
+      if (/^(stroke|strokeText)\(/.test(log[i]!))
+        out.push(`${i - from} ${log[i]!.slice(0, 40)} ${PROPS.map((p) => stateAt(log, i, p)).join("/")}`);
+    return out;
+  };
+  for (const [name, scene] of Object.entries(SCENES)) {
+    const { full, from } = renderScene({ ...scene, frames: 2 });
+    const first = strokes(full, 0, from);
+    assert.ok(first.length > 0, `${name} strokes`);
+    assert.deepEqual(strokes(full, from, full.length), first, `${name}: the second frame's strokes see what the first left set`);
+  }
+});
 
 test("the scenes are the recorded set, and a write records them", { concurrency: false }, () => {
   if (write) writeFileSync(FILE, JSON.stringify(made, null, 2) + "\n");

@@ -49,7 +49,7 @@ export function pill(k: FieldCtx, parts: { text: string; fill: string }[], x: nu
   ctx.textBaseline = "alphabetic";
 }
 
-/** Text with a paper halo, centred at screen (x, y). Leaves lineJoin and lineWidth set (the canvas-state leak, docs/field-split.md). */
+/** Text with a paper halo, centred at screen (x, y). Leaves lineJoin and lineWidth set until the stage ends (FieldRenderer.frame starts each stage from its own stroke state, docs/field-split.md). */
 export function label(k: FieldCtx, text: string, x: number, y: number, px: number, alpha = 1, fill = k.theme.ink): void {
   const { ctx, theme } = k;
   ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -167,7 +167,7 @@ export function drawBends(k: FieldCtx): void {
 /**
  * One world's side view: the ants on the plane standing on a cell under the line, drawn on the strip at its column(s)
  * (columnsOver: two at a bend), level, in their colony's colour, a crumb on a carrier. Ants elsewhere on the plane
- * aren't in this view (one-world §5). Leaves lineCap and lineWidth set (the canvas-state leak).
+ * aren't in this view (one-world §5). Leaves lineCap and lineWidth set until the stage ends (FieldRenderer.frame starts each stage clean).
  */
 export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (x: number, y: number) => boolean): void {
   const { ctx, theme, c, v, colonies } = k;
