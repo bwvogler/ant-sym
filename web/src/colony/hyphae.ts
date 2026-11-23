@@ -149,6 +149,11 @@ export interface Ground {
    * Absent when the fungus's `trafficBias` is off.
    */
   traffic?: (x: number, y: number) => number;
+  /**
+   * With `traffic`: a tip that answers `grow` leans one turn toward the side with more traffic on every `tropism`-th cell it
+   * grows (its `run`), if that side has more than the cell straight ahead (a tropism, ja-ogph.3). 0 or absent: never.
+   */
+  tropism?: number;
 }
 
 /** The six directions round from `d` by `k` (positive: clockwise, the hex.ts order). */
@@ -185,6 +190,9 @@ export class Hyphae {
   /** side choices with both sides open where the ground had a traffic reading, and how many of them it decided (ja-ogph.3; counts for the assays, not saved) */
   sideChoices = 0;
   trafficLeans = 0;
+  /** grow steps with a tropism reading, and how many of them veered toward the ants (ja-ogph.3; counts for the assays, not saved) */
+  tropismChoices = 0;
+  tropisms = 0;
   /** seconds owed toward the next round of tip steps */
   clock = 0;
   /** mass in transit in each hypha cell (ja-tgw9, flow on): what a tip there grows from */
@@ -1067,9 +1075,30 @@ function stepTip(
   if (a === "thicken" && s.resource !== "corpse") a = localGrowth(h, g, tip, s, level);
   const d = tip.heading;
   switch (a) {
-    case "grow":
+    case "grow": {
+      // A tropism (ja-ogph.3): on every `tropism`-th cell, a tip with more ants to one side than straight ahead grows that way.
+      const every = g.tropism ?? 0;
+      if (g.traffic && every > 0 && tip.run % every === every - 1) {
+        const [ax, ay] = ahead(tip.x, tip.y, d);
+        const [lx, ly] = ahead(tip.x, tip.y, turn(d, -1));
+        const [rx, ry] = ahead(tip.x, tip.y, turn(d, 1));
+        const here = g.traffic(ax, ay);
+        const l = g.traffic(lx, ly);
+        const r = g.traffic(rx, ry);
+        h.tropismChoices++;
+        if (l !== r && Math.max(l, r) > here) {
+          const k = l > r ? -1 : 1;
+          const [sx, sy] = k < 0 ? [lx, ly] : [rx, ry];
+          if (enterable(h, g, sx, sy, level) && !h.has(sx, sy)) {
+            h.tropisms++;
+            veer(turn(d, k));
+            break;
+          }
+        }
+      }
       grow(tip, d);
       break;
+    }
     case "turn": {
       const side = sideFor(h, g, tip, s, level);
       if (side === "left") veer(turn(d, -1));

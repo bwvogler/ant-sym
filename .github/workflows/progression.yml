@@ -50,6 +50,9 @@ on:
       radius:
         description: "The bias's neighbourhood radius in cells (--radius)"
         default: "3"
+      tropism:
+        description: "A growing tip leans toward ants on every this-many-th cell (--tropism; 0: never)"
+        default: "0"
       traffic:
         description: "Also sample the ants' occupancy round the hypha tips (--traffic; reads only, docs/hyphal-traffic.md)"
         type: boolean
@@ -80,6 +83,7 @@ jobs:
           TRAFFIC: ${{ inputs.traffic }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
+          TROPISM: ${{ inputs.tropism }}
         run: |
           set -f # no glob expansion of the inputs
           bad() { echo "::error title=progression input::$1"; exit 1; }
@@ -90,6 +94,7 @@ jobs:
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
           [[ "$BIAS" =~ ^(off|count|levels)$ ]] || bad "bias: off, count or levels"
           [[ "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: 1 to 6"
+          [[ "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
           # later one ignores it.
           args="--map one --evolve --seconds $SECONDS_IN --aim $AIM"
@@ -97,7 +102,7 @@ jobs:
           [ "$GROWTH" = "true" ] && args="$args --growth"
           [ "$FLOW" = "true" ] && args="$args --flow"
           [ "$TRAFFIC" = "true" ] && args="$args --traffic"
-          [ "$BIAS" != "off" ] && args="$args --bias $BIAS --radius $RADIUS"
+          [ "$BIAS" != "off" ] && args="$args --bias $BIAS --radius $RADIUS --tropism $TROPISM"
           seeds=$(node -e '
             const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
             const u = [...new Set(s)];

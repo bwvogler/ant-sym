@@ -1289,3 +1289,31 @@ test("a branch takes the side with more traffic when both are open, else the alt
     "equal traffic: it alternates",
   );
 });
+
+test("a tropism: on its every-nth cell a growing tip grows toward the side with more traffic than straight ahead; never otherwise", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const busy =
+    (c: readonly [number, number], n = 4) =>
+    (x: number, y: number) =>
+      x === c[0] && y === c[1] ? n : 0;
+  const grown = (traffic: Ground["traffic"], tropism: number, run = 0) => {
+    const g: Ground = { topsoil: true, kind: () => "open", traffic, tropism };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    const tip = h.tips[0]!;
+    tip.run = run;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "grow");
+    return { h, cells: [...h.parent.keys()] };
+  };
+  const key = (c: readonly [number, number]) => cellKey(c[0], c[1]);
+  // Every cell (1): it grows into the busy left cell, or the busy right one, instead of straight ahead.
+  assert.ok(grown(busy(cell(-1)), 1).cells.includes(key(cell(-1))), "left busy: grows left");
+  assert.ok(grown(busy(cell(1)), 1).cells.includes(key(cell(1))), "right busy: grows right");
+  assert.ok(grown(busy(cell(-1)), 1).h.tropisms === 1);
+  // Not the nth cell: straight ahead. No tropism set: straight ahead. Busy straight ahead too: straight ahead.
+  assert.ok(grown(busy(cell(-1)), 3, 0).cells.includes(key(cell(0))), "run 0 of every 3: straight");
+  assert.ok(grown(busy(cell(-1)), 3, 2).cells.includes(key(cell(-1))), "run 2 of every 3: leans");
+  assert.ok(grown(busy(cell(-1)), 0).cells.includes(key(cell(0))), "tropism 0: straight");
+  assert.ok(grown((x) => (x >= 11 ? 4 : 0), 1).cells.includes(key(cell(0))), "as busy ahead as to the sides: straight");
+  assert.ok(grown(() => 2, 1).cells.includes(key(cell(0))), "equal traffic: straight");
+});

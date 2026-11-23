@@ -213,6 +213,11 @@ export interface FungusParams {
   trafficBias: "off" | "count" | "levels";
   /** the radius in cells of that neighbourhood */
   trafficRadius: number;
+  /**
+   * with a traffic bias on, a growing tip leans one turn toward the busier side on every this-many-th cell it grows (a
+   * tropism, ja-ogph.3), if that side has more ants than straight ahead; 0, never
+   */
+  trafficTropism: number;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -234,6 +239,7 @@ export const DEFAULT_FUNGUS: FungusParams = {
   flow: true,
   trafficBias: "off",
   trafficRadius: 3,
+  trafficTropism: 0,
 };
 
 /**
@@ -577,6 +583,7 @@ export class Fungus {
     const grids = this.#seen?.[layer];
     if (bias === "off" || !grids) return ground;
     ground.traffic = (x, y) => trafficAt(grids, map, bias, r, x, y);
+    ground.tropism = this.params.trafficTropism;
     return ground;
   }
 
