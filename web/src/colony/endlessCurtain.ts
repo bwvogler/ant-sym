@@ -15,9 +15,9 @@ import { CRUST, CURTAIN_DEPTH, CURTAIN_WORLD, groundCell, groundSeed } from "./o
 import { AIR, hash4, mulberry32, nearNests, OPEN, ROCK, rockCut, soilCut, type Nest } from "./world.ts";
 
 /** Rows of the curtain, sky included. */
-export const CURTAIN_RS = CRUST + CURTAIN_DEPTH;
+export const CURTAIN_ROWS = CRUST + CURTAIN_DEPTH;
 /** Row bands of 64 rows: chunk rows 0 … CURTAIN_BANDS − 1. */
-export const CURTAIN_BANDS = Math.ceil(CURTAIN_RS / CHUNK);
+export const CURTAIN_BANDS = Math.ceil(CURTAIN_ROWS / CHUNK);
 
 /** A line's seed: the world seed itself for the first line (salt 0: today's ground and food), else mixed with the salt. */
 export function lineSeed(seed: number, salt: number): number {
@@ -62,7 +62,7 @@ export class EndlessCurtain {
 
   /** The curtain's ground at column s, row y before any pocket opens it: sky above the crust, then the side view's ground. */
   groundAt(s: number, y: number): number {
-    if (y < 0 || y >= CURTAIN_RS) return ROCK;
+    if (y < 0 || y >= CURTAIN_ROWS) return ROCK;
     if (y < CRUST) return AIR;
     return groundCell(this.#gs, y - CRUST, centreX(s, y), centreY(y), this.#cut, this.#scut);
   }
@@ -80,7 +80,7 @@ export class EndlessCurtain {
       for (let tries = 0; tries < 12; tries++) {
         const row = by * CHUNK + Math.floor(r() * CHUNK);
         const s = bs * CHUNK + Math.floor(r() * CHUNK);
-        if (row >= CURTAIN_RS - 3 || row < CRUST + 10) continue;
+        if (row >= CURTAIN_ROWS - 3 || row < CRUST + 10) continue;
         const x = centreX(s, row);
         const y = centreY(row);
         const radius = 2 + r() * 2;
@@ -98,7 +98,7 @@ export class EndlessCurtain {
     const have = this.#blocks.get(bs);
     if (have) return have;
     const w = 3 * CHUNK;
-    const h = CURTAIN_RS;
+    const h = CURTAIN_ROWS;
     const s0 = (bs - 1) << CHUNK_BITS;
     const rock = new Uint8Array(w * h);
     const food = new Float32Array(w * h);

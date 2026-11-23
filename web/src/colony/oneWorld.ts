@@ -174,7 +174,7 @@ export function generateCurtain(seed: number, line: Transect, colonies: readonly
  * pocket's radius is up to 4), each from its own stream, as the side view's ground places them. `floor(s)`: no cell of a
  * pocket opens above that row of column s (Infinity: not at all, a column that keeps what it has).
  */
-function buryAlong(
+export function buryAlong(
   curtain: WorldMap,
   seed: number,
   lo: number,

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CHUNK, local } from "../../chunks.ts";
-import { CURTAIN_BANDS, EndlessCurtain, lineSeed } from "../../endlessCurtain.ts";
-import { CRUST, CURTAIN_WORLD } from "../../oneWorld.ts";
-import { AIR, ROCK, SOIL } from "../../world.ts";
+import { CURTAIN_BANDS, CURTAIN_ROWS, EndlessCurtain, lineSeed } from "../../endlessCurtain.ts";
+import { buryAlong, CRUST, CURTAIN_WORLD, groundCell, groundSeed } from "../../oneWorld.ts";
+import { AIR, type Nest, nearNests, reachableFrom, ROCK, rockCut, SOIL, soilCut, worldFromArrays } from "../../world.ts";
 import { centreX, centreY, nx, ny } from "../../hex.ts";
 
 // The endless curtain's ground and food (docs/endless-world.md §3, PRD §66 E2.2): pure per (seed, line salt, block of columns).
@@ -128,8 +128,19 @@ test("food: 12 a cell, never on rock or in the sky, about the curtain's pockets 
 });
 
 test("pockets keep clear of the nests the world placed on the line, and of nothing else", () => {
-  const nest = { x: centreX(10, CRUST + 30), y: centreY(CRUST + 30), r: 3 };
   const free = new EndlessCurtain(1);
+  // put the nest on a food cell the free curtain has, so that the free run has food at the nest and the held run must not
+  let nest: Nest | null = null;
+  for (let by = 0; by < CURTAIN_BANDS && !nest; by++) {
+    const { food } = free.chunk(0, by);
+    for (let j = 0; j < CHUNK && !nest; j++)
+      for (let i = 0; i < CHUNK; i++)
+        if (food[local(i, j)]) {
+          nest = { x: centreX(i, by * CHUNK + j), y: centreY(by * CHUNK + j), r: 3 };
+          break;
+        }
+  }
+  assert.ok(nest, "the free curtain has food in block 0");
   const held = new EndlessCurtain(1, 0, [nest]);
   const dist = (s: number, y: number) => Math.hypot(centreX(s, y) - nest.x, centreY(y) - nest.y);
   let nearFree = 0;
@@ -140,10 +151,62 @@ test("pockets keep clear of the nests the world placed on the line, and of nothi
       for (let i = 0; i < CHUNK; i++) {
         const y = by * CHUNK + j;
         if (a.food[local(i, j)] && dist(i, y) < CURTAIN_WORLD.foodMinDist) nearFree++;
-        assert.ok(!(b.food[local(i, j)] && dist(i, y) < CURTAIN_WORLD.foodMinDist - 4), `food at ${i},${y} next to the nest`);
+        // a pocket's centre keeps foodMinDist + radius + 1 from the nest and its cells lie within radius of the centre
+        assert.ok(!(b.food[local(i, j)] && dist(i, y) < CURTAIN_WORLD.foodMinDist + 1), `food at ${i},${y} next to the nest`);
       }
   }
-  void nearFree;
+  assert.ok(nearFree > 0, "the free curtain had food near that nest");
+});
+
+/**
+ * The bounded curtain's food pass on a wide map (oneWorld.ts buryAlong, the production code), then the crust's whole-map flood: what a block
+ * of the endless curtain must equal, cell for cell, away from the map's ends.
+ */
+function boundedCurtain(seed: number, nests: readonly Nest[]) {
+  const lo = -320;
+  const w = 640;
+  const h = CURTAIN_ROWS;
+  const cut = rockCut(CURTAIN_WORLD.rockiness);
+  const scut = soilCut(CURTAIN_WORLD.soil);
+  const gs = groundSeed(seed);
+  const rock = new Uint8Array(w * h);
+  rock.fill(AIR, 0, CRUST * w);
+  for (let y = CRUST; y < h; y++)
+    for (let s = lo; s < lo + w; s++) rock[y * w + s - lo] = groundCell(gs, y - CRUST, centreX(s, y), centreY(y), cut, scut);
+  const map = worldFromArrays({ w, h }, [{ x: 0, y: 0, r: 3 }], { rock, seed, x0: lo });
+  buryAlong(map, seed, lo, lo + w - 1, nearNests(nests), () => CRUST + 4);
+  const from = [];
+  for (let s = lo; s < lo + w; s++) from.push({ x: centreX(s, CRUST), y: centreY(CRUST) });
+  return { map, reach: reachableFrom(map, from, "diggable"), lo, w };
+}
+
+test("blocks equal the bounded curtain's ground and food, cell for cell: the same pockets (neighbours', nests', rows), the same reach", () => {
+  // seeds 3 and 10 put pockets on the rows the placement limits (the first row a pocket may centre on, the last rows of the floor): one-off mutants of
+  // those limits differ from the bounded pass on them (and on 6, 7, 13, 16, 18, 22, 23), and on no more than a handful of seeds in 24
+  for (const seed of [3, 10]) {
+    for (const withNest of [false, true]) {
+      const nests: Nest[] = withNest ? [{ x: centreX(10, CRUST + 30), y: centreY(CRUST + 30), r: 3 }] : [];
+      const { map, reach, lo, w } = boundedCurtain(seed, nests);
+      const c = new EndlessCurtain(seed, 0, nests);
+      let food = 0;
+      for (let bs = -3; bs <= 2; bs++)
+        for (let by = 0; by < CURTAIN_BANDS; by++) {
+          const { rock: r, food: f } = c.chunk(bs, by);
+          for (let j = 0; j < CHUNK; j++) {
+            const y = by * CHUNK + j;
+            if (y >= CURTAIN_ROWS) continue;
+            for (let i = 0; i < CHUNK; i++) {
+              const s = bs * CHUNK + i;
+              assert.equal(r[local(i, j)], map.rock.get(s, y), `seed ${seed} nest ${withNest}: rock at ${s},${y}`);
+              const want = reach[y * w + s - lo] ? map.food.get(s, y) : 0;
+              if (want) food++;
+              assert.equal(f[local(i, j)], want, `seed ${seed} nest ${withNest}: food at ${s},${y}`);
+            }
+          }
+        }
+      assert.ok(food > 200, `${food} food cells compared`);
+    }
+  }
 });
 
 test("a block's food is only what digging from the crust reaches: in ground sealed by rock all of it is dropped, in soil it is kept", () => {
