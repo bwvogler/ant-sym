@@ -27,7 +27,7 @@
 - ***Atta cephalotes*:** speed falls with concentration like a fluid, and flow peaks at a high concentration with speeds well below free flow (Burd et al. 2002, *Am Nat*, abstract, **unverified**).
 - ***Linepithema humile*:** on a bridge, flow showed no decline even at 80% occupancy; ants slowed and avoided time-consuming interactions at high density (Poissonnier et al. 2019, *eLife*, full text).
 - ***L. niger*:** at high crowding a second trail formed before flow dropped (Dussutour et al. 2004, *Nature*, full text via arXiv).
-- ***Solenopsis invicta*, tunnels:** individual idleness reduced clogs, and selective retreat shortened clog dissolution (Aguilar et al. 2018, *Science*, abstract only, **unverified**: no idle-fraction numbers).
+- ***Solenopsis invicta*, tunnels:** see the next section (Aguilar et al. 2018, full text read).
 
 **In the game:** the simulation lets any number of ants stand in a cell, which no real ant can. Real crowding is bounded by bodies and floor area first, and the sensed responses above (slow, turn about, retreat) act at the edge of that bound. A limit in the model stands in for that bound.
 
@@ -43,7 +43,7 @@
 ## Ants do not push in corridors; they stop, slow, retreat and idle
 
 - ***Solenopsis invicta*, tunnels:** incipient nest tunnels are 1.06 ± 0.23 body lengths wide (L = 3.5 ± 0.5 mm), so a tunnel is one ant wide; ants run at over 9 L/s even there (Gravish et al. 2013, *PNAS*, full text). Jams come from two causes, bodies that cannot interpenetrate and a time delay from antennation (about 0.45 s a stop, quoted in Poissonnier from Gravish 2015); they appear only above a critical density, and their relaxation depends on tunnel diameter (Gravish et al. 2015, *Soft Matter*, abstract only, **unverified**).
-- ***S. invicta*, digging in narrow tunnels:** individual idleness reduces how often flow-stopping clogs form, and selective retreat shortens the dissolution of the rare clusters that still form (Aguilar et al. 2018, *Science*, abstract only, **unverified**: no idle fractions read).
+- ***S. invicta*, digging in narrow tunnels (full text read):** groups of about 30 workers dug vertical tunnels about one body length wide. A fraction never entered the tunnel in 48 h (0.22 ± 0.1 at soil moisture 0.01, 0.31 ± 0.13 at 0.1: "nonvisitors"), and activity among the rest was unequal (Gini 0.75 ± 0.10). **Reversals** were ants entering the tunnel and returning to the exit *without a soil pellet*: 26 ± 13% of trips at 0.01 and 18 ± 3% at 0.1 in the first 3 h, often tied to local crowding at the digging face (16 ± 12% and 10 ± 2%), and rising with overall activity (R² = 0.69). Where one ant blocks another, the first reverses after collecting its pellet and forces the one behind to reverse without digging. In the paper's cellular-automaton model a blocked ant reverses toward the exit with probability 0.34 a step (set from those counts); idleness reduces how often clusters form and reversal shortens how long they last; flow peaks at about one digger per body width of tunnel, and fire ants run in that range. Ants that adjusted their re-entry by how often they had reversed without digging converged on the observed unequal workload (the one-at-a-time model). In the robots, a retreat was a timeout: a robot that had not reached the face within a set time turned back (Aguilar et al. 2018, *Science*, full text via the NSF author copy).
 - ***L. humile*, bridges:** ants move without overtaking and do not lane-segregate at high density; they slow and avoid time-consuming interactions (Poissonnier et al. 2019).
 - **Not found:** direct evidence of bulldozing or climbing over nestmates in nest corridors (ants do walk on each other in rafts and towers); how ants decide to retreat from or wait at a full brood chamber; any priority for food-laden ants.
 
@@ -69,6 +69,19 @@ A map of options only, from a pass that fetched nothing: only the DOIs below wer
 
 **In the game:** the options a hex-grid ant can use are slowing (with a floor), refusal with a sidestep, and a behaviour switch on the contact count; the hard cap alone is the likeliest to gridlock. Test any rule at 10 times the colony on a fixed map: the per-cell rule hits first.
 
+## Clogs in a one-ant-wide tunnel: who backs off, who goes first, and what the sim lacks
+
+What the sources show (Aguilar 2018, full text; Dussutour et al. 2009, *Atta colombica*, abstract only, **unverified**):
+- **The ants that retreat are unloaded.** A reversal is an ant going in and coming back with no pellet. A loaded ant is already heading out. On a forced-narrow leaf-cutter trail, inbound clusters were led by laden ants and unladen ants did not overtake them (Dussutour 2009): the loaded go first and the unloaded wait behind.
+- **Idleness is the main control, retreat the second.** A fifth to a third of the workers never enter; the active ones adjust their re-entry by how often they reversed. Retreat only shortens the clogs that still form.
+- **The trigger is blockage over time, not a head count.** The model reverses a blocked ant at 0.34 a step, and the robots turn back after a set time without reaching the face.
+- **Pellet size is fixed** by what an ant can carry through crowded tunnels (Monaenkova 2015, abstract only, **unverified**).
+- **Not found:** what a loaded ant does with a pellet it cannot deliver (the paper's ants deposit on exit), and any case of a loaded ant backing off.
+
+**The sim has no clog in this sense.** Ants overlap freely, and nothing blocks an ant but rock and soil. So Aguilar's mechanisms (idleness, reversal) have nothing to act on here, and the stalled soil carriers on the climb branch (PRD §77.5: 175 against 61 on main, 173 in tunnels, 72% wall-following) are not stuck behind each other. They are blocked by walls and give up late. A retreat rule for loaded ants would not help, and the sources do not support one. What the sources would support, if the sim ever gets body exclusion, is the opposite order: loaded ants first, unloaded ants queueing, and an idle fraction.
+
+**In the game:** do not add a retreat for carriers. First find why the climb leaves soil carriers wall-following (a steering trace of one stalled carrier against one on main). A per-cell cap was tried as body exclusion and broke the colony (PRD §77.5): the way ants wait there was the problem, not their presence.
+
 ## A correction: the digging gate reads a head count
 
 An earlier draft of this plan listed "the nest widens chambers when crowded (already built)" as a colony counter to the crowd rule. That counter is a prohibited read: `Colony.crowded()` (`colony.ts`) compares the colony's whole count underground with its total chamber floor, and gates digs in `tunnel.ts` and `move.ts`. It is a known gap (vision.md "Digging gate", bead `ja-k4k.3.1`, found in the 2026-11-14 audit) and it matters here: it decides when a brood chamber grows, and the crowd on seed 1 formed because that chamber stayed small. **`ja-k4k.15.7` is blocked by `ja-k4k.3.1`**; the soft limit (`ja-k4k.15.6`) is not, because it reads only the ant's own cell count. The sensed replacement named in the bead, the nestmates met within reach, is the same `friends` count the crowd rule reads, so one sense can serve both.
@@ -84,9 +97,9 @@ The owner asked (2026-11-22) for the fungus to have knobs here, as PR #281's ant
 | Knob | Class (fungus-policy §4) | Effect | Basis |
 |---|---|---|---|
 | Crowd-feel gain, ×0–3 | A, perception | down: hosts press into crowds (piles, jams, hot spots); up: they spread out (dilution) | pathogen exposure changes behaviour of exposed ants and nestmates, reinforcing transmission-inhibitory properties of the contact network (Stroeymeyt et al. 2018, *Lasius niger*, abstract read; the nurse/forager segregation is from memory) |
-| Yield threshold | A, like A7 | the contact count at which an ant steps back; may fall with age | Aguilar 2018 (abstract); Rajendran 2026 (target area falls with age) |
+| Yield threshold | A, like A7 | the contact count at which an ant steps back; may fall with age | Aguilar 2018 (full text: a blocked unloaded ant reverses); Rajendran 2026 (target area falls with age) |
 | Contact pause | D, body | longer antennation stops: more transmission, less throughput | Gravish 2015 (abstract) |
-| Idle fraction | D, body | up: fewer clogs; down: jams | Aguilar 2018 (abstract) |
+| Idle fraction | D, body | up: fewer clogs; down: jams | Aguilar 2018 (full text: 22–31% never enter the tunnel; idleness lowers clog frequency) |
 | Gather scent | C, emission | a faint lure drawing hosts to a cell, as A5's graded alarm | **design**; faint alarm attracts in *Pogonomyrmex* (catalogue) |
 | Mycelium CO₂ | C, emission | nurses drawn to the mycelium as to brood: the fungus steers where crowds (and brood piles) form | leaf-cutting ants prefer elevated CO₂ to tend brood (Römer et al. 2018, abstract read); **design** that a fungus does it |
 | Hyphal narrowing | world | hyphae thickening across a corridor cut its capacity (PR #312's thicken answer) | **design** |
@@ -104,11 +117,11 @@ Crowding is where a knob meets spread: S1 is contact transmission, so a crowd is
 
 - A primary source showing nurses sense local density at the brood and leave it. **The crowd limit below is design.**
 - A measured number of nurses per larva or per brood chamber.
-- Open full text of Robinson 2009, Sendova-Franks 1995, Pratt 2005, Mersch 2013 and Aguilar 2018.
+- Open full text of Robinson 2009, Sendova-Franks 1995, Pratt 2005 and Mersch 2013.
 - A tunnel-congestion paper by Dussutour.
 - Larval begging in ants by Schultner; Cassill & Tschinkel's work matching nurse numbers to brood demand beyond the 1995 and 2000 titles.
 - A source showing a fungus changing how ants crowd, beyond the pathogen-exposure network changes of Stroeymeyt 2018 (and the odour effects in fungus-policy §4).
-- The full texts of Gravish 2015, Aguilar 2018, Burd 2002 and Cassill & Tschinkel 1999.
+- The full texts of Gravish 2015, Burd 2002 and Cassill & Tschinkel 1999; what a loaded ant does with a pellet it cannot deliver; Monaenkova 2015's body text (abstract only).
 
 ## The mechanic
 
@@ -143,7 +156,7 @@ Crowding is where a knob meets spread: S1 is contact transmission, so a crowd is
 - Whether to turn the climb on now with `broodCrowd` 3, or hold until the physics step exists (owner).
 - The threshold: 3 beats 6 by the worst seed on seeds 1–20 (not yet confirmed on a second set); tuned against `nurseZone` and `game1`, not measured.
 - Whether the same jam appears in other settings (rate 0.3 had 42 porting on one seed: `ja-097s`-like).
-- Whether to read the full texts of Stroeymeyt 2018, Gravish 2015, Aguilar 2018, Robinson 2009 and Sendova-Franks 1995 before building on them.
+- Whether to read the full texts of Stroeymeyt 2018, Gravish 2015, Robinson 2009 and Sendova-Franks 1995 before building on them.
 
 ## Sources
 
