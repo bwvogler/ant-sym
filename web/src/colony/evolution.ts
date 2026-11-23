@@ -381,6 +381,14 @@ export class Evolution {
   }
 
   /**
+   * A flower of hyphae becomes a patch (Fungus.settle, PRD §85): room to grow, but no start of its own: its seven cells'
+   * mass is the hyphae's already, so the body's mass is unchanged.
+   */
+  settle(): void {
+    this.patches++;
+  }
+
+  /**
    * dt seconds of the mycelium on its patches: it grows logistically to what they hold and puts out the fruiting body's
    * share of its mass as spores, paid out of that mass. Its growth counts toward mutations. Returns the spores put out.
    */

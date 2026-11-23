@@ -184,6 +184,8 @@ export class Hyphae {
   sources = new Set<number>();
   /** cells a tip thickened (PRD §85): a mat does not fade as an unused dead end does, until a cut takes it */
   mat = new Set<number>();
+  /** cells a tip thickened round since the caller last took them (takeThickened): where a flower may have closed; not saved */
+  #thickened: number[] = [];
   /** load lost with cut cells since the caller last took it (takeLost) */
   #lost = 0;
 
@@ -688,6 +690,18 @@ export class Hyphae {
     return faded;
   }
 
+  /** `tip` is thickening round its own cell: remember it as the middle of a possible flower. */
+  noteThickened(tip: Tip): void {
+    this.#thickened.push(cellKey(tip.x, tip.y));
+  }
+
+  /** The cells tips have thickened round since the last call: each is the middle of a possible flower (Fungus.settle). */
+  takeThickened(): number[] {
+    const out = this.#thickened;
+    this.#thickened = [];
+    return out;
+  }
+
   /** The mat cells still held (a cut or a regrowth by another route can leave a stale key). */
   #liveMat(): number[] {
     return [...this.mat].filter((k) => this.parent.has(k));
@@ -1074,6 +1088,7 @@ function stepTip(
       break;
     case "thicken":
       // Fill the open, enterable cells round the tip's own cell, a hypha's mass each from what has reached it; the tip stays.
+      h.noteThickened(tip);
       for (let k = 0; k < 6; k++) {
         if (budget.free < HYPHA_MASS) break;
         const [x, y] = ahead(tip.x, tip.y, k);

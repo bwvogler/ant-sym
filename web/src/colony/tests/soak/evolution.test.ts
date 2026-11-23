@@ -472,3 +472,15 @@ test("the tree's edges are the design note's table (docs/mutation-tree.md, ja-52
     "crown1<weapon1",
   ]);
 });
+
+test("a flower becoming a patch adds room to grow but no start of its own (PRD §85)", () => {
+  const e = new Evolution(GARDEN);
+  e.root();
+  const mass = e.mass;
+  e.settle();
+  assert.equal(e.patches, 2);
+  assert.equal(e.mass, mass, "the seven cells' mass is the hyphae's already");
+  const before = e.mass;
+  e.grow(0.1);
+  assert.ok(e.mass !== before, "the body grows on both patches' room");
+});
