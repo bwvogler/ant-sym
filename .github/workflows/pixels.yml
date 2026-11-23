@@ -9,6 +9,8 @@
 #   scripts/field-shots.mjs and scripts/lib/ are copied into that checkout, so a PR that adds a scene records it on both sides.
 # - A scene that differs fails the check, named in an ::error line and the job summary; every scene's picture (the baseline's, and `<scene>.now.png`
 #   for a scene that differs) goes up as the `pixels` artifact.
+# Cost: the 38 scenes take 5 to 11 minutes a run (record, then check), so a run is 14 to 22 minutes on a runner (the first passing run took 14, the first failing run 22:
+# runner speed varies by half); only a labelled PR pays it, in place of the reviewer's repeat by hand.
 # A change that moves pixels on purpose (a new scene, ja-fnd.6.3.10's canvas state) leaves the label off and says which scenes move in its PR.
 # Chromium and the system font are set up as e2e.yml does (the scenes' text is the system stack's Inter). ui/tests/pixelsWorkflow.test.ts holds this
 # file to the script's usage.
@@ -48,7 +50,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'pixel-guard') &&
       (github.event.action != 'labeled' || github.event.label.name == 'pixel-guard')
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       PLAYWRIGHT_VERSION: 1.63.0
       BASE: ${{ github.event.pull_request.base.sha }}
