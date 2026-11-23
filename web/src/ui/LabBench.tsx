@@ -80,8 +80,9 @@ export default function LabBench(
   // A queen in flight waits for the page to found her (the pen), as play does.
   const flying = useGameRead(() => game.flights.length > 0);
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
-  // Escape, with focus in the Lab, closes it (the owner, D1 on #237): one Escape, one thing, so not when a chart's crosshair took it
-  // (it settles the event) or a tooltip or the Codex is open above (escape.ts). The map takes the focus back (the effect above).
+  // Escape, with focus in the Lab, closes it (the owner, D1 on #237): only for a key pressed with focus in it (else the claim passes, to a
+  // drawer or the builder), and one Escape, one thing, so not when a chart's crosshair took it (it settles the event) or a tooltip or the Codex
+  // is open above (escape.ts). The map takes the focus back (the effect above).
   const section = useRef<HTMLElement>(null);
   useEscape(
     ESCAPE_LAYER.lab,

@@ -96,20 +96,34 @@ export function attachEscape(
 }
 
 const detach: Record<EscapePhase, (() => void) | null> = { above: null, below: null };
+
+/**
+ * Claim Escape on `layer` of a phase's stack, and listen on `target` while that stack has a claim: a capture listener for `above`, a bubble one
+ * for `below`, each attached by its first claim and taken off with its last. Returns the release. (`useEscape` is this in an effect.)
+ */
+export function claimEscape(
+  phase: EscapePhase,
+  layer: number,
+  claim: EscapeClaim,
+  target: Pick<Window, "addEventListener" | "removeEventListener"> = window,
+): () => void {
+  const stack = escapes[phase];
+  detach[phase] ??= attachEscape(stack, target, phase === "above");
+  const off = stack.register(layer, claim);
+  return () => {
+    off();
+    if (stack.size === 0) {
+      detach[phase]?.();
+      detach[phase] = null;
+    }
+  };
+}
+
 /** Claim Escape on `layer` of a stack (above the field by default) while `active`. The claim may change between renders: the latest is the one asked. */
 export function useEscape(layer: number, claim: EscapeClaim, active = true, phase: EscapePhase = "above"): void {
   const latest = useLatest(claim);
   useEffect(() => {
     if (!active) return;
-    const stack = escapes[phase];
-    detach[phase] ??= attachEscape(stack, window, phase === "above");
-    const off = stack.register(layer, (e) => latest.current(e));
-    return () => {
-      off();
-      if (stack.size === 0) {
-        detach[phase]?.();
-        detach[phase] = null;
-      }
-    };
+    return claimEscape(phase, layer, (e) => latest.current(e));
   }, [layer, active, phase, latest]);
 }
