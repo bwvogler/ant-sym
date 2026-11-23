@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { type Colony, PLANE, type OneWorld } from "../colony/index.ts";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { colonyName } from "./names.ts";
 
 // The "Go to" menu over the field (PRD §69; ja-fnd.6.3.12, docs/field-split.md): one compact menu, so the overlay never runs off a phone's width. The
@@ -28,25 +29,23 @@ export default function FieldGoToMenu({
 }) {
   const [goOpen, setGoOpen] = useState(false);
   const goRef = useRef<HTMLDivElement>(null);
-  // The Go to menu, open: Escape closes it (first, in the capture phase, so a drawer under it stays open) and so does a
-  // press anywhere outside it. An Escape something above it took (a pinned lens card) or one a dialog over it will take
-  // (the palette) is not its own: one Escape closes one thing (review of #196, S1).
+  // The Go to menu, open: Escape closes it (a popover layer of the Escape manager, escape.ts: under a dialog or a pinned lens card, over
+  // a drawer and the followed ant: one Escape closes one thing, review of #196, S1) and so does a press anywhere outside it.
+  useEscape(
+    ESCAPE_LAYER.popover,
+    () => {
+      setGoOpen(false);
+      return true;
+    },
+    goOpen,
+  );
   useEffect(() => {
     if (!goOpen) return;
-    const key = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
-      e.preventDefault();
-      setGoOpen(false);
-    };
     const outside = (e: globalThis.PointerEvent) => {
       if (!goRef.current?.contains(e.target as Node)) setGoOpen(false);
     };
-    window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", outside, true);
-    return () => {
-      window.removeEventListener("keydown", key, true);
-      window.removeEventListener("pointerdown", outside, true);
-    };
+    return () => window.removeEventListener("pointerdown", outside, true);
   }, [goOpen]);
   const button =
     "pointer-events-auto rounded-md border border-line bg-panel/90 px-2.5 py-1 text-xs text-fg-2 shadow-sm backdrop-blur-sm hover:bg-raised";

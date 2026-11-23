@@ -5,29 +5,25 @@ import Help from "./Help.tsx";
 import Tip from "./Tip.tsx";
 import { FLOAT } from "./kit.tsx";
 import { seg } from "./styles.ts";
-import type { DoctrineChoice } from "./useColonyJev.ts";
+import { useJev, useJevSession } from "./jevContext.tsx";
 
 // The fungus's aim as a bar along the bottom of the map (PRD §69.2, ja-mvo9.2): the presets and the player's words,
 // one line until it has focus, then four. From 1024 px wide; narrower, the aim lives in The fungus drawer.
 
 export default function AimBar({
-  aim,
-  setAim,
-  draftAim,
-  lock,
   tokens,
   leftOpen,
 }: {
-  aim: DoctrineChoice;
-  setAim: (a: DoctrineChoice) => void;
-  draftAim: (a: DoctrineChoice) => void;
-  /** why the aim can't change now (Jev locked), or null */
-  lock: string | null;
   /** tokens per situation asked, for the field's tooltip */
   tokens: number;
   /** a drawer is open at the left: the bar keeps clear of it (the inspector stops above the bar instead) */
   leftOpen: boolean;
 }) {
+  const session = useJevSession();
+  const aim = useJev((s) => s.aim);
+  // Why the aim can't change now (Jev locked), or null.
+  const lock = useJev((s) => s.lock);
+  const { setAim, draftAim } = session;
   const [open, setOpen] = useState(false);
   const locked = lock !== null;
   return (

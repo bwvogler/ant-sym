@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from "react";
 import type { Followed } from "./follow.ts";
+import { createStore, useStore } from "./store.ts";
 
 // Where the lens looks (PRD §69.3): one small store, so the map reports the pointer straight to the lens's layer and the
 // page doesn't re-render on every mouse move (review of #196, N3).
@@ -38,28 +38,17 @@ export function shownOn(s: LensState, lv: number): FieldProbe | null {
 }
 
 const EMPTY: LensState = { pinned: null, hover: null };
-let current: LensState = EMPTY;
-const listeners = new Set<() => void>();
-
-function set(s: LensState): void {
-  if (s.pinned === current.pinned && s.hover === current.hover) return;
-  current = s;
-  for (const fn of listeners) fn();
-}
+// A set that keeps both cards as they were tells nobody (the pointer leaving twice, an unpin with none pinned).
+const store = createStore<LensState>(EMPTY, { equal: (a, b) => a.pinned === b.pinned && a.hover === b.hover });
 
 /** The map's report of the pointer (ColonyField's onProbe). */
-export const offerProbe = (p: FieldProbe | null): void => set(nextLens(current, p));
+export const offerProbe = (p: FieldProbe | null): void => store.update((s) => nextLens(s, p));
 /** Close the pinned card (its ×, Escape): the lens goes back to the pointer. */
-export const unpin = (): void => set({ pinned: null, hover: current.hover });
+export const unpin = (): void => store.update((s) => ({ pinned: null, hover: s.hover }));
 /** Close everything: the lens turned off or on, a command run, the Lab opened. */
-export const clearProbe = (): void => set(EMPTY);
-export const lensNow = (): LensState => current;
-
-function subscribe(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => void listeners.delete(fn);
-}
+export const clearProbe = (): void => store.set(EMPTY);
+export const lensNow = (): LensState => store.get();
 
 export function useLens(): LensState {
-  return useSyncExternalStore(subscribe, lensNow, lensNow);
+  return useStore(store);
 }

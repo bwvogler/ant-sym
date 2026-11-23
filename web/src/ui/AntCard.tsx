@@ -2,16 +2,13 @@ import {
   deliveryExplanation,
   type Colony,
   MODES,
-  TRAILS,
   type Mode,
-  type Situation,
   INFECTED,
   STRAINS,
   type Fungus,
   pulled,
   UPGRADES,
   decodeFungal,
-  type FungalSituation,
   decodeSteering,
   STEER_NEUTRAL,
   STEER_WEIGHTS,
@@ -20,8 +17,11 @@ import {
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import Help from "./Help.tsx";
-import { openLearn, type LearnTarget } from "./learn.ts";
+import { situationChips } from "./helpLinks.ts";
+import { openLearn } from "./learn.ts";
 import { cachedActionTrace, type DecidedBy } from "./colonyJev.ts";
+import { useJevSession } from "./jevContext.tsx";
+import type { JevSession } from "./jevSession.ts";
 import { useSimTick } from "./session.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
@@ -37,8 +37,6 @@ interface Props {
   colonies: readonly Colony[];
   fungus: Fungus;
   /** who decided, for an ant of colony k */
-  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy; weights?: [Mode, number][] };
-  explainFungus: (s: FungalSituation) => { answer: string; by: DecidedBy };
   onClose: () => void;
   /** the fields the game's species asks about (LaneWords.schema), or the generic ones: the chips show only these (review of #132) */
   fields?: readonly string[];
@@ -54,7 +52,8 @@ const BY: Record<DecidedBy, string> = {
   local: "the local rule",
 };
 
-export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields, pinned = false, onPin }: Props) {
+export default function AntCard({ followed, colonies, fungus, onClose, fields, pinned = false, onPin }: Props) {
+  const { explain, explainFungus } = useJevSession();
   useSimTick(250);
   const col = followedColony(colonies, followed);
   const i = followed.i;
@@ -111,7 +110,7 @@ export default function AntCard({ followed, colonies, fungus, explain, explainFu
       ) : q ? (
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-fg-3">last asked:</span>
-          {chips(q, fields).map(([k, v, to]) => (
+          {situationChips(q, fields).map(([k, v, to]) => (
             <button
               key={k}
               type="button"
@@ -164,7 +163,7 @@ const FUNGUS_BY: Record<DecidedBy, string> = {
   local: "the strain's default",
 };
 
-function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
+function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: JevSession["explainFungus"] }) {
   const load = col.load[i];
   const resist = col.resist[i];
   if (load < INFECTED)
@@ -240,22 +239,6 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
       </p>
     </>
   );
-}
-
-/** The situation's fields, each with where it is explained: the Codex's guide, or Lab mode's Policy tab ("mode"). */
-function chips(s: Situation, fields?: readonly string[]): [string, string, LearnTarget][] {
-  const underground = !(TRAILS as readonly string[]).includes(s.homeTrail);
-  // Each chip with the situation field it shows; a species' own schema keeps only its fields (review of #132).
-  const all: [field: string, chip: [string, string, LearnTarget]][] = [
-    ["mode", ["mode", s.mode, { tab: "policy", id: "mode" }]],
-    ["tired", [s.tired ? "tired" : "fresh", "", { tab: "guide", id: "fatigue" }]],
-    ["foodTrail", ["food", s.foodTrail, { tab: "guide", id: "food-trail" }]],
-    ["homeTrail", ["home", s.homeTrail, { tab: "guide", id: underground ? "inside" : "home-trail" }]],
-    ["alarm", ["alarm", s.alarm, { tab: "guide", id: "alarm" }]],
-    ["enemy", ["enemy", s.enemy, { tab: "guide", id: "strangers" }]],
-    ["stance", ["stance", s.stance, { tab: "guide", id: "strangers" }]],
-  ];
-  return all.filter(([field]) => !fields || fields.includes(field)).map(([, chip]) => chip);
 }
 
 /** What each steering weight's level means, in a few words (ja-ykmu; docs/steering.md). */

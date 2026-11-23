@@ -119,6 +119,16 @@
 - A fire-ant-like queen volatile as a species option (no range measured). Owner, 2026-11-15: no queen attractant otherwise; her contact pheromone stays for caste.
 - The field's reach: two or three cells is **design**; the target is the zoning assay below, not a measured range.
 
+## What MR 15 built from this (PRD §77)
+
+Built and on by default (`ja-k4k.15.5`, 2026-11-22): `broodOdour` 1, `broodClimb` 1, `broodCrowd` 3, the odour channel at evaporation 0.1 and diffusion 0.5 (0.03 and 0.5 first, until the slow guards failed there: chambers, A12 and A6, soil carriers stalling in tunnels on some seeds, PRD §77.6; it was tried again with `deliveryFallback` and failed chambers and A12 on CI, PRD §77.7). The young ant's turn to the queen's x,y is gone (`ja-k4k.2.1`); with `broodClimb` 0 the young only search. The desert ant has the channel too.
+
+What the measurements overturned:
+- **The reach is not two or three cells.** At 0.3 evaporation and 0.3 diffusion the young found the odour 10% of the time and the nurse-zone assay passed 5/10. At 0.03 and 0.5 it passes 13/20 (against main's 8/20) and a single egg is smelt more than three cells away (**design**: the reach is tuned, not measured).
+- **The climb needs a limit.** At rate 1 one seed of `game1` piled about 340 young ants at the mouth of a small brood chamber, and about 210 foragers holding food stuck behind them. [nurse-crowding](nurse-crowding.md) holds the research and the limit (`broodCrowd` 3: at the final head no seed over 4 held on G1 seeds 1-10, and porters stalled on some seeds of 11-20, PRD §77.7).
+- **The economy guard needed the deadlock fix first.** Colonies collapsed on `economy.test`'s setup through the all-old deadlock (`ja-rvli`), not the climb; task reversion cut it.
+- **The hunger override was already there.** The fetch branch already makes a hungry young ant leave the climb, so no override was added; making a larva still owed growth food beg (`owedBeg`) measured worse and stays off.
+
 ## Sources
 
 A title in square brackets describes the paper; it isn't the paper's own title.

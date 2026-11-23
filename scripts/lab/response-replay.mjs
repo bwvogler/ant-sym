@@ -2,6 +2,10 @@
 // SHIPPED answers (web/public/precache/<hook>-<doctrine>.json, drawn as the page draws them) as when they play the local rule?
 // One world as the page builds it (directed combat on, hyphae), both colonies on the same arm, paired seeds.
 // Usage (repository root): node scripts/lab/response-replay.mjs [--doctrine forage] [--seeds 1-10] [--ants 150] [--seconds 300]
+//   [--hooks get,carry,...] [--per-lane]
+//   --hooks limits the hooks the shipped arm binds (the others play the local rule); with --per-lane it limits the lanes tried.
+//   --per-lane: play each hook's shipped answers ALONE (the other hooks on the local rule) and print each lane's stored-food ratio
+//   and losses against the local rule, to find which lane costs what.
 import { readFileSync } from "node:fs";
 import {
   Game,
@@ -23,6 +27,9 @@ const doctrine = value("--doctrine", "forage");
 const [from, to] = String(value("--seeds", "1-10")).split("-").map(Number);
 const ants = Number(value("--ants", 150));
 const seconds = Number(value("--seconds", 300));
+const perLane = args.includes("--per-lane");
+const only = String(value("--hooks", RESPONSE_HOOKS.join(","))).split(",");
+for (const h of only) if (!RESPONSE_HOOKS.includes(h)) throw new Error(`--hooks: no hook "${h}" (known: ${RESPONSE_HOOKS.join(", ")})`);
 
 const cache = Object.fromEntries(
   RESPONSE_HOOKS.map((h) => [
@@ -31,9 +38,10 @@ const cache = Object.fromEntries(
   ]),
 );
 
-function play(seed, shipped) {
+function play(seed, shipped, hooks = only) {
   const hits = Object.fromEntries(RESPONSE_HOOKS.map((h) => [h, [0, 0]]));
-  const r = shipped ? responsesFromAnswers(cache, localResponses, (h, hit) => hits[h][hit ? 0 : 1]++) : localResponses;
+  const used = Object.fromEntries(Object.entries(cache).filter(([h]) => hooks.includes(h)));
+  const r = shipped ? responsesFromAnswers(used, localResponses, (h, hit) => hits[h][hit ? 0 : 1]++) : localResponses;
   const g = new Game(
     generateOneWorld(seed),
     {
@@ -51,6 +59,28 @@ function play(seed, shipped) {
   for (let t = 0; t < seconds; t += 1 / 30) g.tick(1 / 30);
   const [a, b] = g.colonies;
   return { stored: a.stored + b.stored, p1: a.stored, losses: a.losses + b.losses, pop: a.population + b.population, hits };
+}
+
+if (perLane) {
+  console.log(`doctrine ${doctrine}, ${ants} + ${ants} ants, ${seconds} s; each hook's shipped answers alone against the local rule`);
+  console.log(`| seed | local stored / losses | ${only.map((h) => `${h} ratio / losses`).join(" | ")} |`);
+  console.log(`| ---: | ---: | ${only.map(() => "---:").join(" | ")} |`);
+  const byHook = Object.fromEntries(only.map((h) => [h, []]));
+  for (let seed = from; seed <= to; seed++) {
+    const l = play(seed, false);
+    const cells = only.map((h) => {
+      const s = play(seed, true, [h]);
+      byHook[h].push([s.stored / l.stored, s.losses]);
+      return `${(s.stored / l.stored).toFixed(2)} / ${s.losses}`;
+    });
+    console.log(`| ${seed} | ${l.stored} / ${l.losses} | ${cells.join(" | ")} |`);
+  }
+  const med = (xs) => [...xs].sort((a, b) => a - b)[(xs.length - 1) >> 1];
+  console.log(
+    `| median | | ${only.map((h) => `${med(byHook[h].map((x) => x[0])).toFixed(2)} / ${byHook[h].reduce((n, x) => n + x[1], 0)}`).join(" | ")} |`,
+  );
+  console.log("(each cell: stored food shipped-lane / local, then that lane's losses; the median row's losses are summed over seeds)");
+  process.exit(0);
 }
 
 console.log(

@@ -69,3 +69,12 @@ test("Resume is offered only where a run could start", () => {
   assert.equal(canResume({ hasBackend: true, hasKey: false }, off, false), false);
   assert.equal(canResume({ hasBackend: false, hasKey: false }, off, false), false);
 });
+
+// The effect that tells the client and the page's setters whether Jev can run (useColonyJev): the paid-run path's last step before a miss starts one.
+
+test("whether a miss may start a run changes while the lock stays null (a run's time cap), so a reader of either must follow both (the session's flags do: ui/jevSession.ts)", () => {
+  const during = { lock: policyLock(server, running), startable: shouldStart(server, running, false) };
+  const after = { lock: policyLock(server, stopped("time-cap")), startable: shouldStart(server, stopped("time-cap"), false) };
+  assert.deepEqual(during, { lock: null, startable: false }, "a run is on: no start");
+  assert.deepEqual(after, { lock: null, startable: true }, "its time cap ended it: the lock is still null and a miss may start another");
+});

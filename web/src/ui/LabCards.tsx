@@ -17,7 +17,8 @@ import { journalLine } from "./journal.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
-import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
+import { useJev, useJevSession } from "./jevContext.tsx";
+import { TOKENS_PER_SITUATION, useJevState } from "./useColonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import { useFps, useGameRead, useStats } from "./session.ts";
 import { sameRecord, wholeStats } from "./statSelect.ts";
@@ -29,15 +30,12 @@ import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts
 // fungus's menu, each colony's doctrine, the foundings), saved games, debug and the journal. Each shows in its home: a
 // drawer (BareCards: the drawer has the frame) or a tab of Lab mode's workbench.
 
-type Jev = ReturnType<typeof useColonyJev>;
-
 interface Props {
   game: Game;
   controls: ColonyControls;
   update: (patch: Partial<ColonyControls>) => void;
   restart: () => void;
   newWorld: () => void;
-  jev: Jev;
   /** the game journal, when ?log= asked for one (ui/journal.ts) */
   journal: Journal | null;
   saves: { list: SaveRecord[]; save: (slot: number) => Promise<void> };
@@ -118,13 +116,18 @@ export function Colonies() {
   );
 }
 
-export function JevCard({ jev }: Props) {
-  const running = jev.state.phase === "running";
-  const run = jev.state.run;
-  const choices = jev.state.hits + jev.state.misses;
+export function JevCard() {
+  const jev = useJevSession();
+  const lock = useJev((s) => s.lock);
+  const resumable = useJev((s) => s.resumable);
+  const backendBudget = useJev((s) => s.backendBudget);
+  const state = useJevState(jev.client);
+  const running = state.phase === "running";
+  const run = state.run;
+  const choices = state.hits + state.misses;
   const perHour = run && run.elapsedSeconds > 5 ? (run.usd / run.elapsedSeconds) * 3600 : null;
   /** today's spend against the server's overall budget (PR #42 review S8) */
-  const budget = jev.budget;
+  const budget = state.run?.budget ?? backendBudget;
   return (
     <Card
       label="colony jev"
@@ -155,8 +158,8 @@ export function JevCard({ jev }: Props) {
             type="button"
             className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
             onClick={jev.start}
-            disabled={!jev.resumable}
-            title={jev.lock ?? undefined}
+            disabled={!resumable}
+            title={lock ?? undefined}
           >
             Resume Jev
           </button>
@@ -172,20 +175,20 @@ export function JevCard({ jev }: Props) {
         <Stat label="this run" value={run ? usd(run.usd) : "—"} />
         <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
         <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
-        <Stat label="situations asked" value={String(jev.state.lanes.mode.asked)} />
+        <Stat label="situations asked" value={String(state.lanes.mode.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.lanes.mode.cached} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
+          value={`${state.lanes.mode.cached} · ${state.lanes.fungus.cached} fungus · ${state.lanes.growth.cached} growth`}
         />
-        <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
+        <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>
           {running ? "jev on" : "jev not running · cached answers"}
         </span>
       </div>
-      {jev.lock && <p className="mt-3 rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn">{jev.lock}</p>}
-      {jev.state.lastError && (
-        <p className="mt-2 truncate rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn" title={jev.state.lastError}>
-          {jev.state.lastError}
+      {lock && <p className="mt-3 rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn">{lock}</p>}
+      {state.lastError && (
+        <p className="mt-2 truncate rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn" title={state.lastError}>
+          {state.lastError}
         </p>
       )}
     </Card>
@@ -327,7 +330,10 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
 }
 
 /** For experiments, not play: the fungus's menu, and each colony's doctrine. */
-export function Lab({ game, controls, update, jev }: Props) {
+export function Lab({ game, controls, update }: Props) {
+  const jev = useJevSession();
+  const lock = useJev((s) => s.lock);
+  const doctrines = useJev((s) => s.doctrines);
   const stats = useStats(wholeStats);
   // A re-ask costs the game's species' own questions (ja-fnd.5.12, review of #132 S2): its words and fields, not the generic ant's.
   const perSituation = game.params.species.lanes.mode?.schema
@@ -342,7 +348,7 @@ export function Lab({ game, controls, update, jev }: Props) {
   const [note, setNote] = useState<{ token: object; text: string | null } | null>(null);
   const foundNote = note && note.token === gameToken ? note.text : null;
   const setFoundNote = (text: string | null) => setNote({ token: gameToken, text });
-  const locked = jev.lock !== null;
+  const locked = lock !== null;
   return (
     <Card label="levers" title="Levers" wide>
       <p className="mt-1 text-xs text-fg-3">
@@ -354,7 +360,7 @@ export function Lab({ game, controls, update, jev }: Props) {
           <span className="flex items-center gap-1.5">
             Levers the fungus may pull <Help to={{ tab: "policy", id: "fungus" }} label="the fungus's policy" />
           </span>
-          <LeverChips game={game} menu={controls.menu} locked={locked} lock={jev.lock} onChange={(menu) => update({ menu })} />
+          <LeverChips game={game} menu={controls.menu} locked={locked} lock={lock} onChange={(menu) => update({ menu })} />
           <label className="mt-2 flex items-center justify-between text-xs">
             <span>Local rule: groomed hosts hide (show a quarter)</span>
             <input type="checkbox" checked={controls.hide} disabled={locked} onChange={(e) => update({ hide: e.target.checked })} />
@@ -377,7 +383,7 @@ export function Lab({ game, controls, update, jev }: Props) {
               Show the colonies' doctrines (lab: in the game they stay closed until you reach a queen)
             </button>
           ) : (
-            jev.doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
+            doctrines.slice(0, stats ? stats.sides.length : 1).map((d, k) => (
               <div key={k} className="mt-2">
                 <div className="flex items-center justify-between">
                   <span className={colonyTone(k)}>{colonyName(k)}</span>
@@ -466,7 +472,7 @@ export function Lab({ game, controls, update, jev }: Props) {
         <span className="text-fg-3">{game.colonies.length} colonies. In the game a colony is founded by a new queen (ja-lo8.9).</span>
         {foundNote && <span className="text-warn">{foundNote}</span>}
       </div>
-      {locked && <p className="mt-3 text-xs text-warn">{jev.lock}</p>}
+      {locked && <p className="mt-3 text-xs text-warn">{lock}</p>}
     </Card>
   );
 }

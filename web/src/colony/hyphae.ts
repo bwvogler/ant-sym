@@ -143,6 +143,17 @@ export type GrowthAnswer = (typeof GROWTH_ANSWERS)[number];
 export interface Ground {
   kind(x: number, y: number): "soil" | "open" | "rock";
   topsoil: boolean;
+  /**
+   * How much ant traffic a cell has round it, as a number to compare (docs/hyphal-traffic.md, ja-ogph.3): a tip that may turn
+   * either way takes the side with the larger number, and a tie, or no `traffic`, is the alternating choice as before.
+   * Absent when the fungus's `trafficBias` is off.
+   */
+  traffic?: (x: number, y: number) => number;
+  /**
+   * With `traffic`: a tip that answers `grow` leans one turn toward the side with more traffic on every `tropism`-th cell it
+   * grows (its `run`), if that side has more than the cell straight ahead (a tropism, ja-ogph.3). 0 or absent: never.
+   */
+  tropism?: number;
 }
 
 /** The six directions round from `d` by `k` (positive: clockwise, the hex.ts order). */
@@ -176,6 +187,12 @@ export class Hyphae {
   /** tip extensions tried, and how many of them ran into the mycelium's own cells (assay H3) */
   steps = 0;
   selfHits = 0;
+  /** side choices with both sides open where the ground had a traffic reading, and how many of them it decided (ja-ogph.3; counts for the assays, not saved) */
+  sideChoices = 0;
+  trafficLeans = 0;
+  /** grow steps with a tropism reading, and how many of them veered toward the ants (ja-ogph.3; counts for the assays, not saved) */
+  tropismChoices = 0;
+  tropisms = 0;
   /** seconds owed toward the next round of tip steps */
   clock = 0;
   /** mass in transit in each hypha cell (ja-tgw9, flow on): what a tip there grows from */
@@ -916,10 +933,25 @@ function freeAt(h: Hyphae, g: Ground, tip: Tip, level: number): (k: number) => b
  */
 export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, level: number, wide = true): GrowthAnswer {
   const free = freeAt(h, g, tip, level);
-  const sideWith = (want: (k: number) => boolean): GrowthAnswer => {
+  // `by` is how many turns off one step of `want`'s k is (1, or 2 along a flat wall).
+  const sideWith = (want: (k: number) => boolean, by = 1): GrowthAnswer => {
     const l = want(-1);
     const r = want(1);
-    if (l && r) return h.steps % 2 ? "left" : "right";
+    if (l && r) {
+      // Both sides free: the one with more ants round it, if the ground says (ja-ogph.3); else by its own count of steps.
+      if (g.traffic) {
+        const [lx, ly] = ahead(tip.x, tip.y, turn(tip.heading, -by));
+        const [rx, ry] = ahead(tip.x, tip.y, turn(tip.heading, by));
+        const a = g.traffic(lx, ly);
+        const b = g.traffic(rx, ry);
+        h.sideChoices++;
+        if (a !== b) {
+          h.trafficLeans++;
+          return a > b ? "left" : "right";
+        }
+      }
+      return h.steps % 2 ? "left" : "right";
+    }
     return l ? "left" : r ? "right" : "rest";
   };
   if (s.ahead === "open" && s.exposed !== "open")
@@ -935,11 +967,11 @@ export function sideFor(h: Hyphae, g: Ground, tip: Tip, s: GrowthSituation, leve
     };
     const one = sideWith(open);
     if (one !== "rest") return one;
-    const two = sideWith((k) => open(2 * k));
+    const two = sideWith((k) => open(2 * k), 2);
     if (two !== "rest") return two;
   }
   const near = sideWith(free);
-  return near !== "rest" || !wide ? near : sideWith((k) => free(2 * k));
+  return near !== "rest" || !wide ? near : sideWith((k) => free(2 * k), 2);
 }
 
 /** How a step went: cells grown, for the caller's mass. */
@@ -1042,9 +1074,30 @@ function stepTip(
   if (a === "thicken" && s.resource !== "corpse") a = localGrowth(h, g, tip, s, level);
   const d = tip.heading;
   switch (a) {
-    case "grow":
+    case "grow": {
+      // A tropism (ja-ogph.3): on every `tropism`-th cell, a tip with more ants to one side than straight ahead grows that way.
+      const every = g.tropism ?? 0;
+      if (g.traffic && every > 0 && tip.run % every === every - 1) {
+        const [ax, ay] = ahead(tip.x, tip.y, d);
+        const [lx, ly] = ahead(tip.x, tip.y, turn(d, -1));
+        const [rx, ry] = ahead(tip.x, tip.y, turn(d, 1));
+        const here = g.traffic(ax, ay);
+        const l = g.traffic(lx, ly);
+        const r = g.traffic(rx, ry);
+        h.tropismChoices++;
+        if (l !== r && Math.max(l, r) > here) {
+          const k = l > r ? -1 : 1;
+          const [sx, sy] = k < 0 ? [lx, ly] : [rx, ry];
+          if (budget.free >= HYPHA_MASS && enterable(h, g, sx, sy, level) && !h.has(sx, sy)) {
+            h.tropisms++;
+            veer(turn(d, k));
+            break;
+          }
+        }
+      }
       grow(tip, d);
       break;
+    }
     case "turn": {
       const side = sideFor(h, g, tip, s, level);
       if (side === "left") veer(turn(d, -1));
@@ -1062,11 +1115,23 @@ function stepTip(
       // tips every round without growing a cell (review of #115, S1: 5.2 million tips 40 s into a game). The local rule never does.
       if (s.supply === "short") break;
       // A branch one turn aside (60°, §2); blocked ahead, the tip splits: the branch one way, the tip the other.
-      const side = h.steps % 2 ? 1 : -1;
       const open = (k: number) => {
         const [x, y] = ahead(tip.x, tip.y, turn(d, k));
         return enterable(h, g, x, y, level);
       };
+      // Which side the branch takes: by its own count of steps, or, with both sides open and ants round one more than the
+      // other (the ground's `traffic`, ja-ogph.3), toward the ants.
+      let side = h.steps % 2 ? 1 : -1;
+      if (g.traffic && open(-1) && open(1)) {
+        const [lx, ly] = ahead(tip.x, tip.y, turn(d, -1));
+        const [rx, ry] = ahead(tip.x, tip.y, turn(d, 1));
+        const more = g.traffic(lx, ly) - g.traffic(rx, ry);
+        h.sideChoices++;
+        if (more !== 0) {
+          h.trafficLeans++;
+          side = more > 0 ? -1 : 1;
+        }
+      }
       // Blocked ahead, split as wide as it must: one turn each way round a point, two along a flat wall.
       const k = s.ahead === "rock" && !(open(-1) && open(1)) ? 2 : 1;
       const b = h.branch(tip, turn(d, side * k), BRANCH_START);

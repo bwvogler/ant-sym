@@ -385,14 +385,34 @@ export interface ColonyParams {
   homeGround: number;
   /**
    * Brood odour each brood item lying in the nest gives off, a second (ja-k4k.15, docs/brood-odour.md): the young climb it
-   * in a chamber (broodClimb). 0: none laid, the channel stays empty (main bit for bit).
+   * in a chamber (broodClimb). 0: none laid, the channel stays empty.
    */
   broodOdour: number;
   /**
    * A young ant in a chamber climbs brood odour (ja-k4k.15.3, docs/brood-odour.md), turning at turnRate × this; 0: it
-   * turns toward the queen's position instead (the scripted rule it replaces, main bit for bit).
+   * only searches. (It once turned toward the queen's position: a read no ant can make, removed with ja-k4k.2.1.)
    */
   broodClimb: number;
+  /**
+   * A young ant climbing the brood odour stops when this many nestmates or more share its cell (ja-k4k.15.6,
+   * docs/nurse-crowding.md): it wanders to the next cell instead, so the climb can't heap hundreds on a small brood
+   * chamber. Bodies limit it (1 cell ≈ 1 body length); the soft form of a per-cell cap. **Design.** 0: no limit.
+   */
+  broodCrowd: number;
+  /**
+   * The most ants of its colony one cell of the nest holds (ja-k4k.15.7.1, docs/nurse-crowding.md): an ant slows as its cell
+   * fills (CROWD_SLOW_FLOOR) and a step into a full cell is mostly refused and sidestepped (CELL_REFUSE), read from the
+   * contact count `friends`. Bodies limit a cell (1 cell ~ 1 body length, so about 2-3 fit by footprint; the nest is sized for
+   * about 10 a floor cell, so a cap needs more floor). **Design.** Nest only: the plane has no count. 0: no limit.
+   */
+  cellCap: number;
+  /**
+   * Seconds a forager carrying food in the nest searches for its destination's road signs (the reception chamber's, once it has
+   * RECEPTION_MIN cells) before it tries the royal chamber's instead, whose signs run through the whole nest (docs/nurse-crowding.md,
+   * PRD §77.7). Without it a carrier whose destination has no signs where it stands wall-follows for ever: on one-world G1 seed 10
+   * 16 foragers held food over two minutes. Its own timer only. 0: never (the search runs on).
+   */
+  deliveryFallback: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -541,8 +561,11 @@ export const DEFAULT_COLONY: ColonyParams = {
   raidOnward: 1,
   defendAt: 1,
   homeGround: 10,
-  broodOdour: 0,
-  broodClimb: 0,
+  broodOdour: 1,
+  broodClimb: 1,
+  broodCrowd: 3,
+  cellCap: 0,
+  deliveryFallback: 60,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,
