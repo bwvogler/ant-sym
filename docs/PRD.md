@@ -7499,3 +7499,29 @@ So directed combat makes neutral play much calmer and makes defending against a 
 
 Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rule loses no ant on any of these seeds; the shipped answers lose 0 to 23 (74 in all over ten seeds). So Jev's weighted answers cost the colonies about 8 % of their stored food at the median, up to 31 % on the worst seed, and some ants, where the local rule loses none. One doctrine (`forage`), one size and 240 s, so it shows a direction, not a ship rule. **Owner's decision (2026-11-22, D1): keep the six lanes on** with these answers shipped.
 
+
+
+## 88. Hyphal tips lean toward ant traffic (design, ja-ogph, 2026-11-23)
+
+**Research basis:** [hyphal-traffic.md](hyphal-traffic.md) (abstracts only; entries marked unverified there).
+- Fungal tips re-orient to gradients and to touch (Brand & Gow 2009; Almeida & Brand 2017); soil pathogens grow toward host plant signals (Turrà et al. 2015).
+- No paper shows an insect-killing fungus growing toward insects or their traffic: the lean is **design**, not biology.
+- Ants keep walking over fungus-contaminated ground (Pereira et al. 2021) but dig around contamination (Leclerc et al. 2018), so traffic persists where the fungus is.
+
+**The problem (measured).** With six landing tips and mass flow on (#280), the curtain has 4 hyphae cells at 150 s against 21 with three tips, and progression seed 6 is 346 s against 250 s (+38 %). The owner accepted that and asked for a tip sense of traffic (2026-11-22). Today `sideFor` alternates `h.steps % 2` when both side cells are free, so no cue reaches it. Flowers then rooted no tips (#344, owner 2026-11-23).
+
+**Decisions.**
+- Keep six landing tips; a flower roots none (owner).
+- Option A, steering only, is the proposed start; B (a `traffic` situation field, 96 to 192 situations) and C (footfall memory) wait (proposed: needs the owner).
+
+**The mechanic.** Cue: ant counts within r cells, read from the colony's `CountGrid`s. Response: when both side cells are free, `sideFor` picks the busier side. Off = `h.steps % 2`, bit for bit. It reads no global state a tip could not sense in the game's terms; whether ants count as a sensed cue for a tip is the open decision.
+
+**Play.** A fungus that thickens where ants walk, so the curtain and tunnels fill sooner; counterplay is routes away from the mat. See the note's Play section.
+
+**Assays and targets.** T1 share of hyphae near traffic (ablation); T2 P1 progression no seed more than 10 % slower and the worst seed not worse; T3 no cliff: no seed more than 25 % faster; T4 report the F2 curtain count (21 / 4) and flowers. Seeds 1-10, confirm 11-20; the probe lands first with no behaviour change.
+
+**Cost (estimated).** None for option A (steering is free); about $0.01 for one re-ask if option B is chosen.
+
+**Beads.** ja-ogph (epic), ja-ogph.1 research, ja-ogph.2 probe, ja-ogph.3 behaviour; the idea is ja-ob97.
+
+**Still open.** Owner review of the plan; the research full texts; the radius r; whether ants count as a tip sense in the sense table.
