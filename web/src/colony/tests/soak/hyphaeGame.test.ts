@@ -643,7 +643,8 @@ test("thickening at a colonised corpse far from every patch closes a flower that
   assert.equal(g.fungus.flowers, 1, "one flower closed");
   const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
   const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
-  assert.ok(there >= 5, `the corpse's two tips and the flower's three stand in it (${there})`);
+  // The flower roots no tips of its own (owner, 2026-11-23): only the corpse's own two (east and west) can still stand in it.
+  assert.ok(there <= 2, `no tip is rooted by the flower: at most the corpse's two stand in it (${there})`);
   assert.equal(e.patches, patches + 1, "one more patch, room to grow");
   assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
   for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])

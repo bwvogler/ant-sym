@@ -65,6 +65,21 @@ test("a file whose result line is for another seed fails the table (a misnamed o
   assert.match(out, /::error title=progression::seed-1\.txt has no result line for seed 1/);
 });
 
+test("where every seed says patches, flowers and mat cells, the table gains those columns and a flowers line; with one seed lacking them, it does not", () => {
+  const withPatches = (seed: number, flowers: number) =>
+    seedText(seed, "100 s", "200 s").replace(
+      "mycelium 8.6",
+      `mycelium 8.6, patches ${1 + flowers} (flowers ${flowers}, mat cells ${flowers * 7})`,
+    );
+  const all = run({ "seed-1.txt": withPatches(1, 0), "seed-2.txt": withPatches(2, 3), "seed-3.txt": withPatches(3, 1) });
+  assert.match(all.out, /\| seed \| first host \| quarter \| half \| queen \| patches \| flowers \| mat cells \|/);
+  assert.match(all.out, /\| 2 \| 5 s \| 100 s \| never \| 200 s \| 4 \| 3 \| 21 \|/);
+  assert.match(all.out, /flowers: 4 in all, in 2 of 3 games; patches: median 2/);
+  const mixed = run({ "seed-1.txt": withPatches(1, 2), "seed-2.txt": seedText(2, "100 s", "200 s") });
+  assert.doesNotMatch(mixed.out, /patches \|/);
+  assert.doesNotMatch(mixed.out, /flowers:/);
+});
+
 test("two commits are both named, so a table that mixes arms shows it", () => {
   const { out } = run({
     "seed-1.txt": seedText(1, "100 s", "200 s", "aaaaaaa000000000000000000000000000000000"),

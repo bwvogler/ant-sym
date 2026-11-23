@@ -1396,8 +1396,8 @@ export class Fungus {
    * A cell the hyphae have thickened round, whose six neighbours are all hyphae too, is a flower; it becomes a patch
    * (PRD §85, ja-vlla.5) when none of its seven cells is in a patch already (base or sources: the landing's own cells
    * never count): the seven are a base that sporulates and sources of mass, the patch count (room to grow) goes up by
-   * one with no start of its own (the mass is the hyphae's), and three tips set out from it as at a landing. Layer 0
-   * only, as every root today. Nothing without an evolution.
+   * one with no start of its own (the mass is the hyphae's), and no tips of its own (owner, 2026-11-23: its seven cells
+   * are hyphae already, and the tips that closed it run on). Layer 0 only, as every root today. Nothing without an evolution.
    */
   #settle(): void {
     const e = this.#evolution;
@@ -1420,18 +1420,6 @@ export class Fungus {
       }
       e.settle();
       this.flowers++;
-      for (const d of ROOT_HEADINGS) {
-        let px = cx;
-        let py = cy;
-        for (let i = 0; i < 2; i++) {
-          const qx = nx(px, py, d);
-          const qy = ny(py, d);
-          if (!h.has(qx, qy)) break;
-          px = qx;
-          py = qy;
-        }
-        h.root(px, py, d);
-      }
     }
   }
 
