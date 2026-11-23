@@ -42,6 +42,8 @@ interface Ant {
   pellet?: number;
   corpse?: number;
   broodStage?: 0 | 1 | 2;
+  /** when the corpse it carries died (default: the run's `died`) */
+  died?: number;
   alive?: boolean;
   layer?: number;
 }
@@ -79,7 +81,7 @@ function setup(ants: Ant[], o: Opts = {}) {
     pellet: get((a) => a.pellet, 0),
     corpse,
     carriesCorpse: (i: number) => corpse[i] === 1,
-    corpses: ants.flatMap((a, i) => (a.corpse ? [{ held: i, died: o.died ?? 90 }] : [])),
+    corpses: ants.flatMap((a, i) => (a.corpse ? [{ held: i, died: a.died ?? o.died ?? 90 }] : [])),
     brood: { items: brood },
     item: (i: number) => (brood.some((b) => b.held === i) ? "brood" : "none"),
   } as unknown as Colony;
@@ -347,4 +349,25 @@ test("a soil crumb's sprite is the crumb column, as a crumb of food is; the cros
   assert.equal(one[one.indexOf("strokeStyle = #mound") + 1], "lineWidth = 1");
   const two = run([{ x: 50, y: 40, pellet: 1 }], { d: 2 }).rec.log;
   assert.equal(two[two.indexOf("strokeStyle = #mound") + 1], "lineWidth = 1.6");
+});
+
+test("each carried corpse has its own decay stage, and the nest sheet's brood sprite is the carried brood's stage", () => {
+  const two = run([
+    { x: 50, y: 40, pellet: 1, corpse: 1, died: 90 },
+    { x: 51, y: 40, pellet: 1, corpse: 1, died: -800 },
+  ]);
+  assert.deepEqual(
+    two.cadavers.map((k) => k.stage),
+    [decayStage(100, 90), decayStage(100, -800)],
+    "each carrier's own corpse",
+  );
+  assert.notEqual(decayStage(100, 90), decayStage(100, -800));
+  const sheet = (stage: 0 | 1 | 2) =>
+    run([{ x: 50, y: 40, heading: 0, broodStage: stage }], { nestImage: true, hexes: true, zoom: 40 }).rec.log.filter((l) =>
+      l.startsWith("drawImage(nest"),
+    )[0];
+  const [egg, larva, pupa] = [sheet(0), sheet(1), sheet(2)];
+  assert.notEqual(egg, larva);
+  assert.notEqual(larva, pupa);
+  assert.notEqual(egg, pupa);
 });
