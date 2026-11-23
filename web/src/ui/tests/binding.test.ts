@@ -112,15 +112,24 @@ test("rebuild only when the map is another or has changed size", () => {
   assert.equal(log[0], "ground.clear", "another map");
 });
 
-test("fill copies the bound view and the sensed clock into the frame's context", () => {
-  const { b } = setup();
+test("fill copies every bound field into the frame's context, after the view has changed", () => {
+  const { b, st } = setup();
+  st.shown = CURTAIN;
+  st.smell = true;
+  b.bind();
   const fc = {} as FieldCtx;
   b.fill(fc);
-  assert.equal(fc.lv, b.lv);
+  assert.equal(fc.lv, CURTAIN);
   assert.equal(fc.m, b.m);
+  assert.equal(fc.ext, b.ext);
   assert.equal(fc.theme, b.theme);
+  assert.equal(fc.smellAll, true);
+  assert.equal(fc.strip, true);
   assert.equal(fc.trails, b.trails);
+  assert.equal(fc.alarms, b.alarms);
   assert.equal(fc.spores, b.spores);
+  assert.equal(fc.sensedLayer, b.sensedLayer);
+  assert.notEqual(fc.sensedLayer, null);
   assert.equal(fc.sensedNow, 7);
 });
 
