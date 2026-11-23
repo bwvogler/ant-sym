@@ -1397,18 +1397,21 @@ export class Fungus {
    */
   #settle(): void {
     const e = this.#evolution;
+    // Every map's list is emptied, so none grows without bound; only layer 0's is looked at.
+    const lists = this.#hyphae.map((h) => h?.takeThickened() ?? []);
     const h = this.#hyphae[0];
     if (!e || !h) return;
     const L = this.#layers[0] as SporeLayer;
-    for (const k of h.takeThickened()) {
+    const base = new Set(L.base);
+    for (const k of lists[0]!) {
       const [cx, cy] = keyCell(k);
       const cells = [k];
       for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
       if (!cells.every((c) => h.parent.has(c))) continue;
-      const base = new Set(L.base);
       if (cells.some((c) => base.has(c) || h.sources.has(c))) continue;
       for (const c of cells) {
         L.base.push(c);
+        base.add(c);
         h.sources.add(c);
       }
       e.settle();
