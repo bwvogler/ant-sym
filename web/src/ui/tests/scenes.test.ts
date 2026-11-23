@@ -13,9 +13,10 @@ import { renderScene, type Scene } from "./sceneHarness.ts";
 // arbiter of pixels.
 //
 // How sharp the net is (measured when it was recorded): every stage dropped from the list, and every pair of neighbouring stages swapped, fails a scene
-// (19 of 19). Of 70 sampled arithmetic mutants of the layer files, 43 fail one. The 27 that pass are clamps that no scene makes binding (a minimum of
+// (19 of 19; three of them, dropping the fungus or voxel stage and swapping the fungus with the actors, fail by a later stage throwing for want of what
+// the dropped one leaves, not by a changed log). Of 70 sampled arithmetic mutants of the layer files (a seeded sample; the script is not kept), 43 fail one. The 27 that pass are clamps that no scene makes binding (a minimum of
 // `7 * d` against a zoom term that is larger at these zooms), and paths no scene reaches (a carried ant's head offset, the brood's square, a nest's mound
-// radius, the spore tint of the minimap). Those are guarded by each layer's own log tests (ants, nests, marks, ground, fungus, overlays), which were swept
+// radius, the spore tint of the minimap). The fungal sprite set is never drawn (its stalks stand on colonised corpses, which a game this young has none of); the nest sheet is drawn only by the queen scenes, and the cadaver set by one corpse. Those are guarded by each layer's own log tests (ants, nests, marks, ground, fungus, overlays), which were swept
 // the same way as they moved.
 
 const FILE = fileURLToPath(new URL("./fixtures/scenes.json", import.meta.url));
@@ -23,6 +24,13 @@ const FILE = fileURLToPath(new URL("./fixtures/scenes.json", import.meta.url));
 const nest0 =
   (zoom: number): Scene["at"] =>
   (g) => ({ x: g.colonies[0]!.nest.x, y: g.colonies[0]!.nest.y, zoom });
+/** The queen and the brood are on the home layer: a scene centred on the queen shows the nest sheet's sprites. */
+const atQueen: Scene["at"] = (g) => ({ x: g.colonies[0]!.queen!.x, y: g.colonies[0]!.queen!.y, zoom: 24 });
+/** A dead worker on the plane at the first ant: the cadaver sprite set draws it. */
+const withCorpse = (g: Game) => {
+  const a = antOn(g, PLANE);
+  g.colonies[0]!.corpses.push({ x: a.x, y: a.y, held: -1, died: g.colonies[0]!.time - 30, heading: 0.5, load: 0, strain: 0, layer: PLANE });
+};
 const middle =
   (zoom: number): Scene["at"] =>
   (_g, e) => ({ x: e.x0 + e.w / 2, y: e.h / 2, zoom });
@@ -130,6 +138,9 @@ export const SCENES: Record<string, Scene> = {
   "desert-noon": { species: "desert", ticks: 100, at: atAnt(PLANE, 24), setup: (g) => setDay(g, 0.33) },
   "desert-night": { species: "desert", ticks: 100, at: atAnt(PLANE, 24), size: { w: 800, h: 600, dpr: 2 }, setup: (g) => setDay(g, 0.84) },
   "desert-hyphae": { species: "desert", ticks: 100, at: nest0(24), setup: (g) => (setDay(g, 0.84), withHyphae(g)) },
+  "queen-below": { ticks: 200, lv: CURTAIN, at: atQueen },
+  "queen-below-dark": { ticks: 200, lv: CURTAIN, at: atQueen, dark: true, size: { w: 800, h: 600, dpr: 2 } },
+  "above-corpse": { ticks: 200, at: atAnt(PLANE, 24), setup: withCorpse },
   "below-fit": { ticks: 200, lv: CURTAIN },
   "below-near": { ticks: 200, lv: CURTAIN, at: middle(24) },
   "below-ants": { ticks: 200, lv: CURTAIN, at: atAnt(CURTAIN, 24), size: { w: 800, h: 600, dpr: 2 } },
@@ -175,5 +186,4 @@ for (const [name, scene] of Object.entries(SCENES)) {
 test("the scenes are the recorded set, and a write records them", { concurrency: false }, () => {
   if (write) writeFileSync(FILE, JSON.stringify(made, null, 2) + "\n");
   else assert.deepEqual(Object.keys(recorded).sort(), Object.keys(SCENES).sort());
-  void PLANE;
 });

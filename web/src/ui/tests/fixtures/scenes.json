@@ -146,6 +146,27 @@
     "drawImages": 17,
     "strokes": 10
   },
+  "queen-below": {
+    "hash": "91d8a1e8cde5aed3",
+    "calls": 130,
+    "pixels": "debda1be547a7168",
+    "drawImages": 12,
+    "strokes": 12
+  },
+  "queen-below-dark": {
+    "hash": "d5f6f4631f282222",
+    "calls": 154,
+    "pixels": "f169f50abcd3540f",
+    "drawImages": 3,
+    "strokes": 14
+  },
+  "above-corpse": {
+    "hash": "a26840219ca6f238",
+    "calls": 427,
+    "pixels": "41951b9237a22a04",
+    "drawImages": 23,
+    "strokes": 10
+  },
   "below-fit": {
     "hash": "8dd9492f84be186d",
     "calls": 1985,
