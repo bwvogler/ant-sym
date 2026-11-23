@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { AIMS } from "../colony/index.ts";
-import { aimKey } from "./aimKey.ts";
 import Help from "./Help.tsx";
 import Tip from "./Tip.tsx";
 import { FLOAT } from "./kit.tsx";
-import { seg } from "./styles.ts";
+import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
 import { useJev, useJevSession } from "./jevContext.tsx";
 
 // The fungus's aim as a bar along the bottom of the map (PRD §69.2, ja-mvo9.2): the presets and the player's words,
@@ -24,7 +22,6 @@ export default function AimBar({
   // Why the aim can't change now (Jev locked), or null.
   const lock = useJev((s) => s.lock);
   const { setAim, draftAim } = session;
-  const [open, setOpen] = useState(false);
   const locked = lock !== null;
   return (
     // The free width along the map's bottom: past the rail (and an open drawer), at most 46 rem. The inspector stops
@@ -36,44 +33,28 @@ export default function AimBar({
         <span className="flex shrink-0 items-center gap-1 self-center pl-1 text-[11px] font-medium tracking-wide text-spore uppercase">
           Aim <Help to={{ tab: "policy", id: "fungus" }} label="how the fungus decides" />
         </span>
-        <div className="flex shrink-0 overflow-hidden rounded-md border border-line text-[13px]" role="group" aria-label="aim presets">
-          {AIMS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={`${seg(aim.id === a.id)} px-2.5 py-1`}
-              aria-pressed={aim.id === a.id}
-              disabled={locked}
-              onClick={() => setAim({ id: a.id, text: a.text })}
-            >
-              {a.name}
-            </button>
-          ))}
-        </div>
-        <textarea
-          className={`min-w-0 flex-1 resize-none rounded-md border border-line bg-paper px-2 py-1 text-[13px] leading-snug text-fg outline-none focus:border-accent disabled:opacity-60 ${open ? "" : "overflow-hidden"}`}
-          rows={open ? 4 : 1}
-          wrap={open ? "soft" : "off"}
+        <PresetPicker
+          style="compact"
+          label="aim presets"
+          presets={AIMS}
+          active={(a) => aim.id === a.id}
+          disabled={locked}
+          onPick={(a) => setAim({ id: a.id, text: a.text })}
+        />
+        {/* Enter commits (blur), Shift+Enter is a new line; Escape leaves the words as typed and gives the map the keys. */}
+        <WordsBox
+          label="aim"
+          className="min-w-0 flex-1 px-2 py-1 text-[13px] leading-snug"
+          grow
+          enterCommits
           value={aim.text}
           disabled={locked}
           title={
             lock ??
             `What the fungus wants, in your words. Jev reads it and decides what the fungus does inside each ant it lives in. ≈ ${tokens} tokens per situation asked.`
           }
-          onFocus={() => setOpen(true)}
-          onChange={(e) => draftAim({ id: "custom", text: e.target.value })}
-          onBlur={(e) => {
-            setOpen(false);
-            setAim({ id: aim.id, text: e.target.value });
-          }}
-          onKeyDown={(e) => {
-            // Enter commits (blur), Shift+Enter is a new line; Escape leaves the words as typed and gives the map the keys.
-            if (aimKey(e.key, e.shiftKey, e.nativeEvent.isComposing) === "done") {
-              e.preventDefault();
-              e.currentTarget.blur();
-            }
-          }}
-          aria-label="aim"
+          onDraft={(text) => draftAim({ id: "custom", text })}
+          onCommit={(text) => setAim({ id: aim.id, text })}
         />
         {locked && (
           <Tip tip={lock} className="shrink-0 self-center text-xs text-warn">
