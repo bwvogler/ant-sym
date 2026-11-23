@@ -7481,7 +7481,7 @@ G1 passes when the worse colony's `maxHeld` (foragers holding food over 120 s) i
 
 In short, with the page's settings directed combat calms neutral play, defends a raid better than legacy by A13's pass rule (at a few more defender losses), and loses far fewer ants over the whole game, with about the same stored food (you +8 % and rival -6 % on seeds 11-20, you -4 % and rival -14 % on seeds 1-10); its cost is G1's held-food bound, 13/20 against legacy's 17/20 and plain `intent`'s 15/20. Plain `intent` is weaker on A13 (4/20 against 15/20) and better on G1 (15/20 against 13/20); the page's settings are worse than plain `intent` on G1, not only than legacy. `defendEntrance` does not help the page's settings (A13 2/10 on seeds 1-10, against 7/10); the alarm- and odds-gated entrance variants were not run with them.
 
-**Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games.** It was taken on the plain-`intent` table above. The page's settings are measured here, and this section asks for the owner's re-confirmation: keep them on, or hold `intent` off for new games until G1's held-food bound is looked at (which gives up the A13 and A9 gains).
+**Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games.** It was taken on the plain-`intent` table above. The page's settings were then measured (this section), with A13 15/20 and A9 20/20 against legacy's 9/20 and 8/20 and G1 13/20 against 17/20 (the held-food bound). **Owner's re-confirmation (2026-11-23): keep the page's settings on.** Open, not blocking: look at what the extra foragers holding food in G1 (seeds 12, 14, 15, 17, 19) are doing.
 
 
 ## 87. Local delivery actions (ja-g7nz)
