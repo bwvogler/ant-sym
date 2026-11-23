@@ -96,8 +96,8 @@ export function outField(c: Colony): OutField {
   const { w: mw, h } = map.size;
   const mx0 = map.x0;
   const kept = c.outDist;
-  // The map's origin, width and the window's length never differ from the kept field's in play: the curtain grows only by `addColony`, which
-  // rebuilds; this check is defensive, so a stale window is never read.
+  // The map's origin and width differing from the kept field's is how a colony's field is rebuilt after `addColony` grows the curtain (it touches no
+  // other colony's `outDist`); only the window's length term (`dist.length === w * h`) is defensive, so a mismatched window is never read.
   const have = kept && kept.mapX0 === mx0 && kept.mapW === mw && kept.dist.length === kept.w * h ? kept : null;
   if (have && (c.outVersion === version || c.time - c.outAt < OUT_FIELD_EVERY)) return have;
   // A fresh window over columns [lo, hi), within the map: every cell −1, nothing reached yet.

@@ -5,7 +5,7 @@ import { CRUST } from "../../oneWorld.ts";
 import { CURTAIN_BANDS, EndlessCurtain } from "../../endlessCurtain.ts";
 import { EndlessPlane } from "../../endlessPlane.ts";
 import { FoodLedger } from "../../foodLedger.ts";
-import { centreX, centreY } from "../../hex.ts";
+import { centreX, centreY, R } from "../../hex.ts";
 
 // The endless world's food totals (docs/endless-world.md §3, PRD §66 E2.3): the ledger counts generated food once per chunk, and foodHome's
 // denominator is a fixed disc, the same in any order of generation.
@@ -18,6 +18,13 @@ test("the ledger counts a chunk once, however often it is generated", () => {
   assert.equal(l.generated("curtain", chunkKey(0, 0), 36), true, "the same key on another layer is another chunk");
   assert.equal(l.generatedTotal, 216);
   assert.equal(l.chunks, 3);
+});
+
+test("a chunk that generates differently the second time is an error, not a silent first count", () => {
+  const l = new FoodLedger();
+  l.generated("plane", 7, 100);
+  assert.throws(() => l.generated("plane", 7, 101), /counted as 100/);
+  assert.equal(l.generatedTotal, 100);
 });
 
 test("total is generated plus added, left is total less taken, and neither moves the generated count", () => {

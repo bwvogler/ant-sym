@@ -10,10 +10,15 @@ export class FoodLedger {
   #added = 0;
   #taken = 0;
 
-  /** A chunk (or curtain block) `key` of `layer` was generated holding `amount` food: counted the first time only. Returns whether it was new. */
+  /** A chunk (or curtain block) `key` of `layer` was generated holding `amount` food: counted the first time only (a second, different amount throws). Returns whether it was new. */
   generated(layer: string, key: number, amount: number): boolean {
     const k = `${layer}:${key}`;
-    if (this.#chunks.has(k)) return false;
+    const have = this.#chunks.get(k);
+    if (have !== undefined) {
+      // A chunk generates identically each time (the generators' guarantee): a different amount means that guarantee broke.
+      if (have !== amount) throw new Error(`FoodLedger: ${k} was counted as ${have} food and now holds ${amount}`);
+      return false;
+    }
     this.#chunks.set(k, amount);
     this.#generated += amount;
     return true;
