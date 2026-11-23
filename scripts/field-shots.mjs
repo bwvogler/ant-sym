@@ -12,6 +12,8 @@
 // must `check` clean (the scenes are built to be deterministic: a fresh game of seed 3 stepped a fixed number of ticks with the page paused, the
 // camera let to settle, the canvas read as pixels). Hashes depend on the browser and its fonts, so a baseline belongs to the machine and the
 // Chromium it was recorded on (hashes.json says which; `check` refuses another one); keep <dir> outside the repo and never commit one.
+// In CI: a PR with the `pixel-guard` label runs .github/workflows/pixels.yml, which does both on one runner (record on the merge base with this
+// script, check on the head) and names the scenes that differ; that is the proof a refactor PR cites instead of a run by hand.
 //
 // What a scene shows is in SCENES below: the generic ant's world above and below (each nest zoomed, so the minimap shows; a followed ant on each
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
