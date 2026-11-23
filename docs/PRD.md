@@ -7512,7 +7512,8 @@ Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rul
 
 **Decisions.**
 - Keep six landing tips; a flower roots none (owner).
-- Option A, steering only, is the proposed start; B (a `traffic` situation field, 96 to 192 situations) and C (footfall memory) wait (proposed: needs the owner).
+- Option A, steering only, first; the probe (`ja-ogph.2`) before any behaviour change (owner, 2026-11-23). B (a `traffic` situation field, 96 to 192 situations) and C (footfall memory) wait.
+- The sense may be percent occupancy over a few distance bands, perhaps in levels, instead of one count within `r` (owner is considering it); the probe measures the bands to choose from.
 
 **The mechanic.** Cue: ant counts within r cells, read from the colony's `CountGrid`s. Response: when both side cells are free, `sideFor` picks the busier side. Off = `h.steps % 2`, bit for bit. It reads no global state a tip could not sense in the game's terms; whether ants count as a sensed cue for a tip is the open decision.
 

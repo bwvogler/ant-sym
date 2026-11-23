@@ -12,7 +12,10 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
+// --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
+// the plane, for docs/hyphal-traffic.md (ja-ogph.2, PRD §88): the share of cells occupied in three distance bands (1, 2-3, 4-6),
+// how often the two cells a tip could turn into differ in the ants round them, and the share of hyphae near ant traffic.
 // --split reports where the growth that mutations come from was made: the mycelium on the ground, corpses, and hosts (PRD §85 M3).
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
@@ -52,6 +55,7 @@ if (isMainThread) {
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
+    traffic: flag("traffic"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -80,6 +84,7 @@ if (isMainThread) {
     console.log(
       `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})`,
     );
+    if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
       console.log(
         `  growth made: ground ${r.split.ground.toFixed(0)} · corpses ${r.split.corpses.toFixed(0)} · hosts ${r.split.hosts.toFixed(0)}`,
@@ -112,6 +117,7 @@ if (isMainThread) {
     landing,
     rootRadius,
     split: wantSplit,
+    traffic: wantTraffic,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -202,9 +208,11 @@ if (isMainThread) {
       resist: f.meanResist,
     };
   };
+  const probe = wantTraffic ? await trafficProbe(g) : null;
   const queue = [...order];
   for (let k = 0; g.time < seconds; k++) {
     g.tick(DT);
+    if (probe && k % 150 === 0) probe.sample(r.quarter >= 0);
     const e = g.fungus.evolution;
     if (e && buy) {
       // The first upgrade in the order it can keep now, as a player would: one it can't yet afford doesn't hold up a cheaper one.
@@ -233,9 +241,142 @@ if (isMainThread) {
   r.flowers = g.fungus.flowers;
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
+  if (probe) r.traffic = probe.result();
   parentPort.postMessage(r);
 }
 
 function fmt(t) {
   return t < 0 ? "never" : `${t} s`;
+}
+
+/** The probe's one line per seed (trafficProbe's result). */
+function trafficLine(name, t) {
+  const pc = (x) => `${(100 * x).toFixed(1)}%`;
+  const bands = ["1", "2-3", "4-6"];
+  return (
+    `  traffic ${name} a quarter: ${t.tipSamples} tip samples over ${t.samples} samples · cells occupied by band ${bands.map((b, i) => `${b} ${pc(t.occupied[i])}`).join(", ")}` +
+    ` · tips with none in band ${bands.map((b, i) => `${b} ${pc(t.empty[i])}`).join(", ")}` +
+    ` · tips by occupied share of band 2-3, none / to 4% (one cell) / to 10% / more: ${t.levels.map(pc).join(" / ")}` +
+    ` · sides differ within r 1 ${pc(t.differ[0])}, 2 ${pc(t.differ[1])}, 3 ${pc(t.differ[2])}` +
+    ` · hyphae within r cells of an ant in the last 60 s, r 1 ${pc(t.near[0])}, 2 ${pc(t.near[1])}, 3 ${pc(t.near[2])}`
+  );
+}
+
+/**
+ * The traffic probe (ja-ogph.2): reads the game's ants and the plane's hyphae, changes nothing. `sample()` is called every 5 s
+ * of game time; `result()` has the means over the samples taken while the plane had tips.
+ */
+async function trafficProbe(g) {
+  const { CountGrid, occupancy } = await import("../../web/src/colony/battle.ts");
+  const { cellKey, keyCell, hexDistance, nx, ny, discOffsets } = await import("../../web/src/colony/hex.ts");
+  const { inBounds } = await import("../../web/src/colony/world.ts");
+  const grids = g.colonies.map(() => new CountGrid());
+  const bounds = g.colonies[0].layers[0].map;
+  const inside = (x, y) => inBounds(bounds, x, y);
+  const BANDS = [
+    [1, 1],
+    [2, 3],
+    [4, 6],
+  ];
+  const count = (x, y) => grids.reduce((n, gr) => n + gr.get(x, y), 0);
+  const recent = new Map();
+  const make = () => ({
+    samples: 0,
+    tipSamples: 0,
+    occ: [0, 0, 0],
+    empty: [0, 0, 0],
+    levels: [0, 0, 0, 0],
+    sides: 0,
+    differ: [0, 0, 0],
+    near: [0, 0, 0],
+    nearN: 0,
+  });
+  const phases = { before: make(), after: make() };
+  let acc = phases.before;
+  /** ants within r cells of (x, y), over every colony */
+  const within = (x, y, r) => {
+    const o = discOffsets(r)[y & 1];
+    let n = 0;
+    for (let k = 0; k < o.length; k += 2) if (inside(x + o[k], y + o[k + 1])) n += count(x + o[k], y + o[k + 1]);
+    return n;
+  };
+  return {
+    /** `after`: a quarter of the colony is infected (the progression's chapter), so the samples go to the second set */
+    sample(after = false) {
+      acc = after ? phases.after : phases.before;
+      const h = g.fungus.hyphaeOn(0);
+      if (!h || h.tips.length === 0) return;
+      g.colonies.forEach((c, k) => occupancy(c, grids[k], 0));
+      for (const gr of grids) {
+        const st = gr.saveState();
+        for (let k = 0; k < st.length; k += 3) recent.set(cellKey(st[k], st[k + 1]), g.time);
+      }
+      acc.samples++;
+      const o = discOffsets(6);
+      for (const t of h.tips) {
+        acc.tipSamples++;
+        const cells = [0, 0, 0];
+        const occ = [0, 0, 0];
+        const off = o[t.y & 1];
+        for (let k = 0; k < off.length; k += 2) {
+          const x = t.x + off[k];
+          const y = t.y + off[k + 1];
+          const d = hexDistance(t.x, t.y, x, y);
+          const b = BANDS.findIndex(([lo, hi]) => d >= lo && d <= hi);
+          if (b < 0 || !inside(x, y)) continue;
+          cells[b]++;
+          if (count(x, y) > 0) occ[b]++;
+        }
+        for (let b = 0; b < 3; b++) {
+          const f = cells[b] ? occ[b] / cells[b] : 0;
+          acc.occ[b] += f;
+          if (occ[b] === 0) acc.empty[b]++;
+          if (b === 1) acc.levels[f === 0 ? 0 : f <= 0.04 ? 1 : f <= 0.1 ? 2 : 3]++;
+        }
+        const sides = [-1, 1].map((d) => {
+          const hd = (((t.heading + d) % 6) + 6) % 6;
+          return [nx(t.x, t.y, hd), ny(t.y, hd)];
+        });
+        if (sides.every(([x, y]) => inside(x, y))) {
+          acc.sides++;
+          for (let r = 1; r <= 3; r++) if (within(...sides[0], r) !== within(...sides[1], r)) acc.differ[r - 1]++;
+        }
+      }
+      // The share of hyphae within r cells (1, 2, 3) of a cell an ant stood on in the last 60 s.
+      let hy = 0;
+      const near = [0, 0, 0];
+      const o3 = discOffsets(3);
+      for (const key of h.parent.keys()) {
+        const [x, y] = keyCell(key);
+        hy++;
+        const off = o3[y & 1];
+        let least = 4;
+        for (let k = 0; k < off.length; k += 2) {
+          const seen = recent.get(cellKey(x + off[k], y + off[k + 1]));
+          if (seen !== undefined && g.time - seen <= 60) least = Math.min(least, hexDistance(x, y, x + off[k], y + off[k + 1]));
+        }
+        for (let r = 1; r <= 3; r++) if (least <= r) near[r - 1]++;
+      }
+      if (hy) {
+        for (let r = 0; r < 3; r++) acc.near[r] += near[r] / hy;
+        acc.nearN++;
+      }
+    },
+    result() {
+      const one = (acc) => {
+        if (acc.samples === 0) return null;
+        const n = acc.tipSamples || 1;
+        return {
+          samples: acc.samples,
+          tipSamples: acc.tipSamples,
+          occupied: acc.occ.map((v) => v / n),
+          empty: acc.empty.map((v) => v / n),
+          levels: acc.levels.map((v) => v / n),
+          differ: acc.differ.map((v) => v / (acc.sides || 1)),
+          near: acc.near.map((v) => v / (acc.nearN || 1)),
+        };
+      };
+      return { before: one(phases.before), after: one(phases.after) };
+    },
+  };
 }

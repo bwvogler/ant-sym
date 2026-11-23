@@ -42,6 +42,10 @@ on:
         description: "Mass flows along the hyphae (--flow)"
         type: boolean
         default: false
+      traffic:
+        description: "Also sample the ants' occupancy round the hypha tips (--traffic; reads only, docs/hyphal-traffic.md)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -65,6 +69,7 @@ jobs:
           HYPHAE: ${{ inputs.hyphae }}
           GROWTH: ${{ inputs.growth }}
           FLOW: ${{ inputs.flow }}
+          TRAFFIC: ${{ inputs.traffic }}
         run: |
           set -f # no glob expansion of the inputs
           bad() { echo "::error title=progression input::$1"; exit 1; }
@@ -79,6 +84,7 @@ jobs:
           [ "$HYPHAE" = "true" ] && args="$args --hyphae"
           [ "$GROWTH" = "true" ] && args="$args --growth"
           [ "$FLOW" = "true" ] && args="$args --flow"
+          [ "$TRAFFIC" = "true" ] && args="$args --traffic"
           seeds=$(node -e '
             const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
             const u = [...new Set(s)];
@@ -153,3 +159,9 @@ jobs:
           missing=$(node -e 'const fs = require("fs"); console.log(JSON.parse(process.argv[1]).filter((s) => !fs.existsSync(`out/seed-${s}.txt`)).join(" "))' "$SEEDS")
           if [ -n "$missing" ]; then echo "::error title=progression::no result for seeds $missing (their runners failed)"; exit 1; fi
           exit $status
+      # --traffic's lines (one per seed and phase), in the log and on the summary page.
+      - name: traffic
+        run: |
+          if grep -q '^  traffic ' out/seed-*.txt; then
+            { echo; echo '```'; grep -H '^  traffic ' out/seed-*.txt | sed 's/^out\///'; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
