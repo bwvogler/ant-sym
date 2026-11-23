@@ -143,6 +143,40 @@ const buildWorld = (page) =>
     if (g.colonies.length < 3 || !g.aphids.length) throw new Error("the world was not built");
   });
 
+/**
+ * Every kind of ant the field draws, in view at once (the game itself, through the dev hook; the page is paused, so nothing moves after): each
+ * alive ant takes an odour from five bands (the strokes and sprites are tinted by band) and one of nine kinds by its place in the colony: bare,
+ * lightly infected (the faint spore dot), heavily infected (the full dot), carrying food of three qualities (plain, sweet, crumb), carrying soil, carrying a corpse,
+ * carrying brood. Where each kind lands on screen depends on where the ants have walked (600 steps first).
+ */
+const markAnts = (page) =>
+  page.evaluate(() => {
+    const g = window.jevAnts.game;
+    for (const c of g.colonies) {
+      const alive = [];
+      for (let i = 0; i < c.n; i++) if (c.alive[i]) alive.push(i);
+      let brood = 0;
+      alive.forEach((i, n) => {
+        c.odour[i] = [0, 0.15, 0.4, 0.65, 0.9][n % 5];
+        const kind = n % 9;
+        if (kind === 1) c.load[i] = 0.3;
+        else if (kind === 2) c.load[i] = 1;
+        else if (kind === 3) ((c.carrying[i] = 1), (c.quality[i] = 1));
+        else if (kind === 4) ((c.carrying[i] = 1), (c.quality[i] = 2));
+        else if (kind === 5) c.pellet[i] = 1;
+        else if (kind === 6) {
+          c.pellet[i] = 1;
+          c.corpse[i] = 1;
+          c.corpses.push({ x: c.x[i], y: c.y[i], held: i, died: g.time - 5, load: 0, strain: 0 });
+        } else if (kind === 8) ((c.carrying[i] = 1), (c.quality[i] = 0.5));
+        else if (kind === 7 && brood < c.brood.items.length) {
+          c.broodHeld[i] = 1;
+          c.brood.items[brood++].held = i;
+        }
+      });
+    }
+  });
+
 /** The canvas pixel (CSS px, as the mouse takes it) of colony `k`'s ant nearest the middle of the canvas on layer `layer`, or a thrown error. */
 async function antScreen(page, k, layer) {
   const at = await page.evaluate(
@@ -214,6 +248,13 @@ async function tool(page, name) {
   const button = page.getByRole("button", { name, exact: true });
   await button.click();
   await page.waitForFunction((el) => el.getAttribute("aria-pressed") === "true", await button.elementHandle());
+}
+
+/** Turn the mouse wheel over the middle of the canvas (deltaY < 0 zooms in), and let the camera settle. */
+async function zoomWheel(page, deltaY) {
+  const r = await page.evaluate(() => document.querySelector("canvas").getBoundingClientRect().toJSON());
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+  await page.mouse.wheel(0, deltaY);
 }
 
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
@@ -364,6 +405,18 @@ const SCENES = [
   // The same at two device pixels to a CSS pixel: the lines, dashes, labels and dots scale with it
   { name: "retina-above", page: "retina", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "retina-below", page: "retina", run: (p) => view(p, "below") },
+  // Every kind of ant (markAnts), above, and below at the whole curtain (strokes), at a nest, and zoomed in with the wheel (sprites)
+  {
+    name: "ants-above",
+    page: "ants",
+    run: (p) =>
+      ticks(p, 600)
+        .then(() => markAnts(p))
+        .then(() => p.evaluate(() => window.jevAnts.goNest(0))),
+  },
+  { name: "ants-below-wide", page: "ants", run: (p) => view(p, "below") },
+  { name: "ants-below-nest0", page: "ants", run: (p) => p.evaluate(() => window.jevAnts.goNest(0)) },
+  { name: "ants-below-near", page: "ants", run: (p) => zoomWheel(p, -900) },
   { name: "desert-noon", page: "desert", run: async (p) => toTime(p, await dayAt(p, 1 / 3)) },
   { name: "desert-dusk", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.62)) },
   { name: "desert-night", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.84)) },
@@ -377,6 +430,7 @@ const PAGES = {
   grown: { scheme: "light", species: null },
   built: { scheme: "light", species: null },
   marks: { scheme: "light", species: null },
+  ants: { scheme: "light", species: null },
   retina: { scheme: "light", species: null, scale: 2 },
   // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
   phone: { scheme: "light", species: null, phone: true },
