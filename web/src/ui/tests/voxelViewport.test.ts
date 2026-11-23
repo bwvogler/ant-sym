@@ -8,8 +8,10 @@ import { voxelFrustum } from "../voxelViewport.ts";
 import { PLANE, CURTAIN, STRIP, centreX, centreY, cellKey } from "../../colony/index.ts";
 import { InspectionSoftware } from "../inspectionSoftware.ts";
 import * as T from "three";
-import { mapTiltTarget, orbitCamera } from "../inspectionOrbit.ts";
-import { inspectionColour } from "../InspectionScene.ts";
+import { inspectionCameraPose, mapCameraOrbit } from "../inspectionOrbit.ts";
+import { InspectionScene, inspectionColour } from "../InspectionScene.ts";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { css, HOME_RGB, ROLE_RGB } from "../palette.ts";
 
 test("voxel overlays retain the map palette's space-separated RGB colours", () => {
@@ -46,14 +48,14 @@ test("tilting keeps the center ground line fixed in either map projection", () =
   const y = -0.31;
   for (const mode of ["surface", "below"] as const) {
     const ground = new T.Vector3(x, mode === "surface" ? -y : 1.08, mode === "surface" ? 0 : -y);
-    const target = new T.Vector3(...mapTiltTarget(mode, x, y));
     const camera = new T.OrthographicCamera(-3, 3, 2, -2, 0.05, 50);
     for (const angle of [0, 0.3, 0.65, 1.15]) {
-      const tilt = mode === "surface" ? angle : -angle;
-      const orbit = orbitCamera(mode, { yaw: 0, tilt });
-      camera.position.copy(target).add(new T.Vector3(...orbit.position));
-      camera.up.set(...orbit.up);
-      camera.lookAt(target);
+      const tilt = mode === "surface" ? angle : -angle; // what the camera turns by: Above up from the ground, Below down
+      // the scene's own camera: the same pose InspectionScene.draw takes, from the stored (never positive) tilt through mapCameraOrbit
+      const pose = inspectionCameraPose(mode, mapCameraOrbit(mode === "surface" ? PLANE : CURTAIN, { yaw: 0, tilt: -angle }), { x, y });
+      camera.position.set(...pose.position);
+      camera.up.set(...pose.up);
+      camera.lookAt(new T.Vector3(...pose.target));
       camera.updateMatrixWorld();
       for (const dx of [-1, 0, 1]) {
         const point = ground
@@ -163,4 +165,99 @@ test("software viewport resizing resets depth and idle caches without stretching
   renderer.render(scene, camera);
   assert.equal(writes, 2);
   renderer.dispose();
+});
+
+test("the scene draws with the camera the orbit and the viewport give: its pose, and a frustum of the raster in world units (InspectionScene.draw)", async () => {
+  const realFetch = globalThis.fetch;
+  const g0 = globalThis as unknown as { getComputedStyle?: unknown };
+  g0.getComputedStyle = () => ({ getPropertyValue: () => "" }); // the scene reads the page's colours; none here: its defaults
+  // the model file is a file: URL that Node's fetch does not read
+  globalThis.fetch = (async (url: string | URL | Request) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(fileURLToPath(String(url)), "utf8")),
+  })) as unknown as typeof fetch;
+  const canvas = {
+    width: 32,
+    height: 32,
+    getContext: () => ({
+      createImageData: (width: number, height: number) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }),
+      putImageData: () => undefined,
+    }),
+  } as unknown as HTMLCanvasElement;
+  const scenes: InspectionScene[] = [];
+  try {
+    // a game long enough that the nest has a mound and the surface cells near it have stalks and heaps for the patch's frame to fit
+    const g = buildGame({ species: "generic", seed: 3, antCount: 40, rival: false, generation: 0 });
+    for (let t = 0; t < 2400; t++) g.tick(1 / 30);
+    const sensed = new SensedMap();
+    for (const [mode, layer] of [
+      ["surface", PLANE],
+      ["below", CURTAIN],
+    ] as const) {
+      const nest = g.colonies[0]!.layers[layer]!.nest;
+      const patch = inspectViewport(g, sensed, layer, nest.x, nest.y, 6, 4, { food: false, home: false });
+      assert.equal(patch.mode, mode);
+      const scene = await InspectionScene.create(canvas, mode, true);
+      scenes.push(scene);
+      const draw = () => scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const forward = new T.Vector3();
+      const looksAt = (target: [number, number, number], what: string) => {
+        scene.camera.getWorldDirection(forward);
+        const toTarget = new T.Vector3(...target).sub(scene.camera.position).normalize();
+        assert.ok(forward.distanceTo(toTarget) < 1e-9, what);
+      };
+      // a live viewport: the pose about the ground under the map's centre, and the raster's size in world units
+      for (const orbit of [
+        { yaw: 0, tilt: 0.65 },
+        { yaw: 0.3, tilt: 1.1 },
+      ]) {
+        scene.setViewport({ width: 480, height: 300, pixelsPerWorld: 60, x: 0.12, y: -0.3, orbit });
+        draw();
+        const pose = inspectionCameraPose(mode, orbit, { x: 0.12, y: -0.3 });
+        assert.deepEqual(scene.camera.position.toArray(), pose.position, `${mode}: the camera's position (tilt ${orbit.tilt})`);
+        assert.deepEqual(scene.camera.up.toArray(), pose.up, `${mode}: its up`);
+        looksAt(pose.target, `${mode}: looking at the target`);
+        assert.deepEqual(
+          [scene.camera.left, scene.camera.right, scene.camera.top, scene.camera.bottom],
+          [-4, 4, 2.5, -2.5],
+          "480 by 300 pixels at 60 a world unit",
+        );
+      }
+    }
+    // no viewport (the cell inspection's own camera): the scene's own orbit about the patch's own centre, a frustum that fits the patch
+    for (const [mode, layer] of [
+      ["surface", PLANE],
+      ["below", CURTAIN],
+    ] as const) {
+      const nest = g.colonies[0]!.layers[layer]!.nest;
+      const patch = inspectViewport(g, sensed, layer, nest.x, nest.y, 6, 4, { food: false, home: false });
+      const scene = await InspectionScene.create(canvas, mode, true);
+      scenes.push(scene);
+      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const flatFrame = scene.camera.right / 2.15;
+      scene.orbit = { yaw: 0.2, tilt: 0.65 };
+      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const pose = inspectionCameraPose(mode, scene.orbit);
+      assert.deepEqual(pose.target, mode === "surface" ? [0, 0, 0.15] : [0, 0.6, 0]);
+      assert.deepEqual(scene.camera.position.toArray(), pose.position, `${mode}: the scene's own orbit, about the patch's centre`);
+      assert.deepEqual(scene.camera.up.toArray(), pose.up);
+      const frame = scene.camera.right / 2.15;
+      assert.deepEqual(
+        [scene.camera.left, scene.camera.right, scene.camera.top, scene.camera.bottom],
+        [-2.15 * frame, 2.15 * frame, 1.792 * frame, -1.792 * frame],
+      );
+      if (mode === "surface") {
+        assert.ok(frame > 1.5, `the surface patch's mound and stalks widen the frame (${frame})`);
+        assert.notEqual(
+          frame,
+          flatFrame,
+          "the frame fits the patch as the scene's own orbit sees it (a tilted view needs another frame than a flat one)",
+        );
+      } else assert.equal(frame, 1, "nothing to fit below: the unit frame");
+    }
+  } finally {
+    for (const scene of scenes) scene.dispose();
+    globalThis.fetch = realFetch;
+    delete g0.getComputedStyle;
+  }
 });

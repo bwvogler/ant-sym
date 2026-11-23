@@ -1,14 +1,10 @@
-import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
+import { mapCameraOrbit, mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
-import { decayStage, visibleCadavers } from "./cadaverVisual.ts";
-import { chamberFoodSpots } from "./chamberFood.ts";
-import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   type ChunkLayer,
   type Colony,
   CURTAIN,
-  moundRadius,
   PLANE,
   groundHeat,
   sunDown,
@@ -17,16 +13,12 @@ import {
   centreX,
   centreY,
   R,
-  INFECTED,
   type Fungus,
   type OneWorld,
-  BINS,
-  binOf,
   OPEN,
   rockAt,
   type WorldMap,
   type BuildTool,
-  aphidCount,
   type AphidClump,
 } from "../colony/index.ts";
 import { type Camera, toScreen, toWorld, type Viewport, visible } from "./camera.ts";
@@ -35,29 +27,27 @@ import { prepareFrame } from "./field/prelude.ts";
 import { handleKey, handleWheel, type KeyHost } from "./field/keyboard.ts";
 import { PointerController, type PointerHost, type PointerInput } from "./field/pointer.ts";
 import { CameraRig, extentOf } from "./field/rig.ts";
-import { odourColour, odourRgb } from "./field/colour.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
 import { drawFungusGround, drawStalksRaised } from "./field/fungus.ts";
 import { Ground, groundPaper } from "./field/ground.ts";
 import { Minimap } from "./field/minimap.ts";
+import { type AntFrame, drawAnts } from "./field/ants.ts";
+import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./field/marks.ts";
+import { drawNest, type NestFrame } from "./field/nests.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "./field/zoom.ts";
-import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, pill } from "./field/overlays.ts";
+import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./field/overlays.ts";
 import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import { colonyName } from "./names.ts";
-import { BROOD_RGB } from "./palette.ts";
 import type { SensedMap } from "./fungusSight.ts";
-import { antTag } from "./badges.ts";
 import { isPalm } from "./build.ts";
-import { sameAnt, type Specimen, specimenLabel } from "./specimens.ts";
-import { type AntTraces, traceAlpha } from "./trace.ts";
+import type { Specimen } from "./specimens.ts";
+import type { AntTraces } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
-import { drawWorkerSprite, workerLod } from "./workerSprites.ts";
-import { drawNestSprite, type NestSprite } from "./nestSprites.ts";
+import { workerLod } from "./workerSprites.ts";
 import { drawMapTerrainGrain } from "./mapTerrain.ts";
-import { carriedBroodOn } from "./mapCargo.ts";
-import { APHID_SPOTS, FOOD_SPOTS, aphidDensity, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
+import { FOOD_SPOTS, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
 
 export type { FieldProbe };
 
@@ -336,7 +326,6 @@ export default function ColonyField({
       resource: resourceSprites,
       surfaceLeaves,
       mapLeaves,
-      gait: workerGait,
     } = sprites;
     const voxelMap = new MapVoxelPass(() => draw());
     const ground = new Ground(env);
@@ -604,291 +593,13 @@ export default function ColonyField({
       if (lv === PLANE) drawLine(fctx);
       if (lv === CURTAIN) drawBends(fctx);
       const alateOverlays: (() => void)[] = [];
+      const nestFrame: NestFrame = { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage };
+      const antFrame: AntFrame = { ...nestFrame, half, crumb };
+      const markFrame: MarkFrame = nestFrame;
       for (const col of [...colonies].reverse()) {
-        // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
-        const nest = (col.layers[lv] ?? col.layers[0]!).nest;
-        // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
-        const home = lv === col.home;
-        const [nx, ny] = toScreen(c, v, nest.x, nest.y);
-        // The side view's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
-        if (col.soilOut > 0 && !nest.entrance && !m.spoil) {
-          // The mound is on the surface, above this slice: every pellet brought out, heaped round the
-          // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the
-          // tunnels under it still show.
-          const inner = Math.max(4, nest.r * c.zoom);
-          const outer = Math.max(inner, moundRadius(col.soilOut, nest.r) * c.zoom);
-          ctx.beginPath();
-          ctx.arc(nx, ny, outer, 0, Math.PI * 2);
-          ctx.arc(nx, ny, inner, 0, Math.PI * 2, true);
-          ctx.fillStyle = theme.mound;
-          ctx.globalAlpha = 0.12;
-          ctx.fill();
-          ctx.globalAlpha = 0.8;
-          ctx.beginPath();
-          ctx.arc(nx, ny, outer, 0, Math.PI * 2);
-          ctx.strokeStyle = theme.mound;
-          ctx.lineWidth = Math.max(1, d * 1.2);
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-        ctx.beginPath();
-        ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
-        ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.7;
-        ctx.stroke();
-        if (nest.entrance) {
-          // The side view: the entrance, a small ring on the ground line where the shaft comes up.
-          const [ex, ey] = toScreen(c, v, nest.entrance.x, nest.entrance.y);
-          ctx.beginPath();
-          ctx.arc(ex, ey, Math.max(3, 1.5 * c.zoom), 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-        // Nest slice 4: the brood where it lies (eggs pale, larvae cream, pupae tan) and the queen, larger, in her colony's
-        // colour (dead: hollow, and crossed out).
-        const bd = Math.max(1.5, len * 0.4);
-        for (const b of col.brood.items) {
-          if (b.held >= 0 || !home) continue;
-          const wx = centreX(b.x, b.y);
-          const wy = centreY(b.y);
-          if (!inView(wx, wy)) continue;
-          const [x, y] = toScreen(c, v, wx, wy);
-          if (nestImage) drawNestSprite(ctx, nestImage, resourceLod, `brood-${b.stage}` as NestSprite, x, y, c.zoom);
-          else {
-            ctx.fillStyle = BROOD_RGB[b.stage] as string;
-            ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
-          }
-        }
-        // Nest slice 5: food lying in this colony's chambers, as seeds along each floor (up to 40 drawn a chamber).
-        if (home && m.chambers) {
-          ctx.fillStyle = theme.accent;
-          for (const ch of m.chambers.list) {
-            if (ch.colony !== col.params.nest || ch.food < 1 || ch.cells === 0) continue;
-            for (const [fx, fy] of chamberFoodSpots(ch, (x, y) => m.chambers!.at(x, y) === ch.id && rockAt(m, x, y) === OPEN)) {
-              const wx = centreX(fx, fy);
-              const wy = centreY(fy);
-              if (!inView(wx, wy)) continue;
-              const [x, y] = toScreen(c, v, wx, wy);
-              if (resourceImage) drawResourceSprite(ctx, resourceImage, resourceLod, "plain", 0, x, y, c.zoom);
-              else ctx.fillRect(x - bd / 2, y - bd / 2, bd, bd);
-            }
-          }
-        }
-        // Nest slice 7: the dead, where they lie or on the midden (a grey cross each).
-        ctx.strokeStyle = theme.mound;
-        ctx.lineWidth = Math.max(1, d * 0.8);
-        ctx.beginPath();
-        for (const k of visibleCadavers(col, lv)) {
-          // One world: a corpse lies on its layer (carried up to the plane's midden, or dropped there; home when unset).
-          if (k.held >= 0 || (k.layer ?? col.home) !== lv) continue;
-          const wx = centreX(k.x, k.y);
-          const wy = centreY(k.y);
-          if (!inView(wx, wy)) continue;
-          const [x, y] = toScreen(c, v, wx, wy);
-          if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, k.died), x, y, c.zoom, k.heading)) continue;
-          if (nestImage) {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(k.heading ?? 0);
-            drawNestSprite(ctx, nestImage, resourceLod, "corpse", 0, 0, c.zoom);
-            ctx.restore();
-            continue;
-          }
-          ctx.moveTo(x - bd, y - bd);
-          ctx.lineTo(x + bd, y + bd);
-          ctx.moveTo(x + bd, y - bd);
-          ctx.lineTo(x - bd, y + bd);
-        }
-        // Historical burial counts remain in the inspector, rather than permanent exposed-body crosses.
-        ctx.stroke();
-        if (home && col.queen && inView(col.queen.x, col.queen.y)) {
-          const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
-          const queenImage = hexes ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
-          if (queenImage) {
-            drawNestSprite(ctx, queenImage, resourceLod, col.queen.alive ? "queen" : "queen-dead", x, y, c.zoom);
-          } else {
-            const qr = Math.max(3, len * 0.9);
-            ctx.beginPath();
-            ctx.ellipse(x, y, qr * 1.4, qr * 0.8, 0, 0, Math.PI * 2);
-            const qc = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-            ctx.lineWidth = Math.max(1, d);
-            if (col.queen.alive) {
-              ctx.fillStyle = qc;
-              ctx.fill();
-            } else {
-              ctx.strokeStyle = qc;
-              ctx.globalAlpha = 0.6;
-              ctx.stroke();
-              ctx.beginPath();
-              ctx.moveTo(x - qr * 1.4, y - qr);
-              ctx.lineTo(x + qr * 1.4, y + qr);
-              ctx.stroke();
-              ctx.globalAlpha = 1;
-            }
-          }
-        }
-        // Alates (ja-lo8.9): new queens, smaller than the queen, with wings, as they wait and walk out to fly.
-        const drawAlates = () => {
-          for (const al of col.alates) {
-            if (!home || !inView(al.x, al.y)) continue;
-            const [x, y] = toScreen(c, v, al.x, al.y);
-            const ar = Math.max(2.5, len * 0.7);
-            const alateImage = hexes
-              ? nestSprites.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites)
-              : null;
-            if (alateImage) {
-              drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
-              drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
-            } else {
-              ctx.beginPath();
-              ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
-              ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-              ctx.fill();
-              ctx.beginPath();
-              ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
-              ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
-              ctx.globalAlpha = 0.5;
-              ctx.fillStyle = theme.paper;
-              ctx.fill();
-              ctx.globalAlpha = 1;
-            }
-            if (al.load > 0) {
-              ctx.beginPath();
-              ctx.arc(x, y, Math.max(1.5, ar * 0.45), 0, Math.PI * 2);
-              ctx.fillStyle = theme.spore;
-              ctx.fill();
-            }
-          }
-        };
-        drawAlates();
-        if (col.alates.length) alateOverlays.push(drawAlates);
-        ctx.lineCap = "round";
-        ctx.lineWidth = Math.max(1, len * 0.3);
-        ctx.globalAlpha = 0.85;
-        workerGait.update(col);
-        // A front-facing curtain worker is the same silhouette as the aerial worker against its walking plane.
-        // The surface strip is a separate diagrammatic projection, not another underground population.
-        const lod = workerLod(c.zoom, d);
-        // One stroke per odour band (most frames: one band per colony).
-        let bands = 0;
-        for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === lv) bands |= 1 << binOf(col.odour[i]);
-        for (let b = 0; b < BINS; b++) {
-          if (!(bands & (1 << b))) continue;
-          const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
-          const sprite = hexes ? workerSprites.get(lod, colour, darkSprites) : null;
-          const spriteMix = sprite ? Math.min(1, (zoom - HEX_ZOOM) / 2) : 0;
-          ctx.beginPath();
-          for (let i = 0; i < col.n; i++) {
-            if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
-            const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-            if (sprite && spriteMix > 0) {
-              ctx.globalAlpha = spriteMix;
-              const pose = lod === "walk" && !env.reducedMotion() ? workerGait.pose(col, i) : 0;
-              drawWorkerSprite(ctx, sprite, lod, col.heading[i], pose, x, y, c.zoom);
-            }
-            if (spriteMix < 1) {
-              const hc = Math.cos(col.heading[i]) * half;
-              const hs = Math.sin(col.heading[i]) * half;
-              ctx.moveTo(x - hc, y - hs);
-              ctx.lineTo(x + hc, y + hs);
-            }
-          }
-          ctx.globalAlpha = 1 - spriteMix;
-          ctx.strokeStyle = theme.ink;
-          ctx.stroke();
-          if (spriteMix < 1) {
-            ctx.beginPath();
-            for (let i = 0; i < col.n; i++) {
-              if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
-              const [x, y] = toScreen(c, v, col.x[i], col.y[i]),
-                co = Math.cos(col.heading[i]),
-                si = Math.sin(col.heading[i]),
-                ax = x - co * half * 0.45,
-                ay = y - si * half * 0.45,
-                w = Math.max(d, half * 0.35);
-              ctx.moveTo(ax - si * w, ay + co * w);
-              ctx.lineTo(ax + si * w, ay - co * w);
-            }
-            ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
-            ctx.stroke();
-          }
-        }
-        ctx.globalAlpha = 1;
-        // Infected ants: a spore-coloured dot on the body, fainter for a light load.
-        const dot = Math.max(1.5, len * 0.45);
-        ctx.fillStyle = theme.spore;
-        for (const [lo, hi, alpha] of [
-          [INFECTED, 0.5, 0.55],
-          [0.5, 2, 1],
-        ] as const) {
-          ctx.globalAlpha = alpha;
-          for (let i = 0; i < col.n; i++) {
-            const l = col.load[i];
-            if (!col.alive[i] || l < lo || l >= hi || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
-            const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-            ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
-          }
-        }
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = theme.accent;
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.carrying[i] || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
-          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-          if (resourceImage) {
-            const reach = 0.46 * c.zoom;
-            drawResourceSprite(
-              ctx,
-              resourceImage,
-              resourceLod,
-              foodKind(col.quality[i]),
-              0,
-              x + Math.cos(col.heading[i]) * reach,
-              y + Math.sin(col.heading[i]) * reach,
-              c.zoom,
-            );
-          } else
-            ctx.fillRect(x + Math.cos(col.heading[i]) * half - crumb / 2, y + Math.sin(col.heading[i]) * half - crumb / 2, crumb, crumb);
-        }
-        ctx.fillStyle = theme.mound;
-        ctx.strokeStyle = theme.mound;
-        ctx.lineWidth = Math.max(1, d * 0.8);
-        ctx.beginPath();
-        for (let i = 0; i < col.n; i++) {
-          if (!col.alive[i] || !col.pellet[i] || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
-          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-          const reach = hexes ? c.zoom * 0.46 : half;
-          const px = x + Math.cos(col.heading[i]) * reach;
-          const py = y + Math.sin(col.heading[i]) * reach;
-          if (col.carriesCorpse(i)) {
-            const dead = col.corpses.find((k) => k.held === i);
-            if (cadaverSprites.draw(ctx, resourceLod, decayStage(col.time, dead?.died ?? col.time), px, py, c.zoom)) continue;
-            if (nestImage) {
-              drawNestSprite(ctx, nestImage, resourceLod, "corpse", px, py, c.zoom);
-              continue;
-            }
-            // A corpse in the jaws: the dead's grey cross, half size (slice 7 review: it was drawn as a soil crumb).
-            const h = crumb * 0.75;
-            ctx.moveTo(px - h, py - h);
-            ctx.lineTo(px + h, py + h);
-            ctx.moveTo(px + h, py - h);
-            ctx.lineTo(px - h, py + h);
-          } else if (resourceImage) drawResourceSprite(ctx, resourceImage, resourceLod, "crumb", 0, px, py, c.zoom);
-          else ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
-        }
-        ctx.stroke();
-        for (const { i, stage } of carriedBroodOn(col, lv)) {
-          if (!inView(col.x[i], col.y[i])) continue;
-          const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
-          const reach = hexes ? c.zoom * 0.46 : half;
-          const px = x + Math.cos(col.heading[i]) * reach,
-            py = y + Math.sin(col.heading[i]) * reach;
-          if (nestImage) drawNestSprite(ctx, nestImage, resourceLod, `brood-${stage}` as NestSprite, px, py, c.zoom);
-          else {
-            ctx.fillStyle = BROOD_RGB[stage] as string;
-            ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
-          }
-        }
+        const alates = drawNest(fctx, nestFrame, col);
+        if (alates) alateOverlays.push(alates);
+        drawAnts(fctx, antFrame, col);
       }
       if (strip) drawStripAnts(fctx, len, crumb, inView);
 
@@ -907,8 +618,7 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
-        // Above and Below face different planes, so their camera pitch signs differ.
-        lv === PLANE ? { ...orbit.current, tilt: -orbit.current.tilt } : orbit.current,
+        mapCameraOrbit(lv, orbit.current),
       );
       const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
       const frameAngled = "angled" in voxel && voxel.angled === true;
@@ -977,119 +687,16 @@ export default function ColonyField({
         ctx.textBaseline = "alphabetic";
       }
 
-      // Aphid marks show aggregate clump density, not individually simulated insects. Fixed-size glyphs at hex zoom;
-      // the original green dots farther out / while loading, fading by the same clump-life convention.
-      const clumps = aphidsRef.current?.();
-      if (voxel.alpha < 1 && clumps?.length && lv === PLANE) {
-        ctx.fillStyle = theme.aphid;
-        const r = Math.max(1.2 * d, 0.13 * c.zoom);
-        for (const cl of clumps) {
-          const n = aphidCount(cl);
-          const cells = cl.cells.length / 2;
-          if (n <= 0 || !cells) continue;
-          const density = aphidDensity(n, cells);
-          ctx.globalAlpha = density.alpha;
-          for (let k = 0; k < cl.cells.length; k += 2) {
-            const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
-            const wy = centreY(cl.cells[k + 1]!);
-            if (!inView(wx, wy)) continue;
-            for (let j = 0; j < density.marks; j++) {
-              const [ox, oy] = APHID_SPOTS[j]!;
-              const [x, y] = toScreen(c, v, wx + ox, wy + oy);
-              if (resourceImage)
-                drawResourceSprite(ctx, resourceImage, resourceLod, "aphid", cl.cells[k]! + cl.cells[k + 1]! + j, x, y, c.zoom);
-              else {
-                ctx.beginPath();
-                ctx.arc(x, y, r, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            }
-          }
-        }
-        ctx.globalAlpha = 1;
-      }
-      // A moved ant's way home (ja-cwjp): from where the tweezers set it down (a ring), the run of its old vector in a
-      // solid line, then its search loops dotted; a dot where it went down a hole. It fades once it is home or dead.
-      const tr = tracesRef.current;
-      if (tr) {
-        const now = env.now();
-        tr.update(now);
-        if (lv === PLANE)
-          for (const t of tr.traces) {
-            const n = t.xs.length;
-            const a = traceAlpha(t, now);
-            if (!n || a <= 0) continue;
-            ctx.globalAlpha = 0.85 * a;
-            ctx.strokeStyle = theme.accent;
-            ctx.fillStyle = theme.accent;
-            ctx.lineWidth = Math.max(1.5 * d, 0.25 * c.zoom);
-            ctx.lineJoin = "round";
-            ctx.lineCap = "round";
-            for (let k = 1; k < n;) {
-              // One run of points in the same phase, as one path.
-              const ph = t.search[k]!;
-              ctx.setLineDash(ph ? [2 * d, 4 * d] : []);
-              ctx.beginPath();
-              const [x0, y0] = toScreen(c, v, t.xs[k - 1]!, t.ys[k - 1]!);
-              ctx.moveTo(x0, y0);
-              for (; k < n && t.search[k] === ph; k++) {
-                const [x, y] = toScreen(c, v, t.xs[k]!, t.ys[k]!);
-                ctx.lineTo(x, y);
-              }
-              ctx.stroke();
-            }
-            ctx.setLineDash([]);
-            const [sx, sy] = toScreen(c, v, t.xs[0]!, t.ys[0]!);
-            ctx.beginPath();
-            ctx.arc(sx, sy, Math.max(5 * d, 0.8 * c.zoom), 0, Math.PI * 2);
-            ctx.lineWidth = 2 * d;
-            ctx.stroke();
-            if (t.end === "home") {
-              const [ex, ey] = toScreen(c, v, t.xs[n - 1]!, t.ys[n - 1]!);
-              ctx.beginPath();
-              ctx.arc(ex, ey, Math.max(4 * d, 0.6 * c.zoom), 0, Math.PI * 2);
-              ctx.fill();
-            }
-            ctx.globalAlpha = 1;
-          }
-      }
-      // The specimens (PRD §69.5): a dashed ring and the label, on the view's layer; the followed one has its own ring, drawn
-      // after these so its tag stays on top (review of #218).
-      for (const s of pinnedRef.current) {
-        const sc = followedColony(colonies, s);
-        if (!sc || sc.layer[s.i] !== lv || (f && sameAnt(f, s))) continue;
-        const [x, y] = toScreen(c, v, sc.x[s.i], sc.y[s.i]);
-        const r = Math.max(7 * d, c.zoom * 1.3);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.setLineDash([3 * d, 3 * d]);
-        ctx.strokeStyle = theme.ink;
-        ctx.lineWidth = 1.5 * d;
-        ctx.stroke();
-        ctx.setLineDash([]);
-        const tpx = Math.round(10 * d);
-        pill(fctx, [{ text: specimenLabel(s.no), fill: theme.ink }], x, y - r - tpx, tpx);
-      }
-      // The followed ant: a jade ring (in one world, while it is on the view's layer). No mark while it is on the other one:
-      // the camera goes with it through a hole, so the "gone below / up" ring only flashed for a frame and was removed
-      // (ja-rkse, PRD §61).
-      if (f && fcol && fHere) {
-        const [x, y] = toScreen(c, v, fcol.x[f.i], fcol.y[f.i]);
-        ctx.beginPath();
-        const r = Math.max(9 * d, c.zoom * 1.6);
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = theme.accent;
-        ctx.lineWidth = 2 * d;
-        ctx.stroke();
-        const tpx = Math.round(11 * d);
-        pill(fctx, [{ text: antTag(fcol, f.i), fill: theme.accent }], x, y - r - tpx, tpx);
-      }
+      drawAphids(fctx, markFrame, aphidsRef.current?.() ?? [], voxel.alpha);
+      drawTraces(fctx, tracesRef.current);
+      drawSpecimens(fctx, pinnedRef.current, f);
+      drawFollowed(fctx, f, fcol, fHere);
       // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
       if (lv === PLANE) drawHoleNames(fctx, inView);
       const pn = penRef.current;
       if (lv === PLANE && pn) drawPen(fctx, inputs);
 
-      drawMapInspection(ctx, mapInspectionNow(), lv, c, v, d, env.reducedMotion() ? 0 : env.now() / 1000);
+      drawInspection(fctx);
 
       minimap.draw(fctx, vis);
       publishDrawMs(env.now() - started, sinks);
@@ -1135,7 +742,7 @@ export default function ColonyField({
   const camera = () => rig.camera();
   const setCamera = (c: Camera) => rig.set(c);
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
+    const tilt = tiltFromDrag(start, dy);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();

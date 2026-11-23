@@ -147,5 +147,10 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-22 | `ja-fnd.6.3.7`: the ground (`ground.ts`: `Ground`, `paintChunk`, `drawHexes`, `stripAt`, the chunk cache), `FieldEnv.newCanvas` | #314 |
 | 2026-11-22 | `ja-fnd.6.3.19`: the minimap (`minimap.ts`: `Minimap`, its canvas, buffer and clock) | #317 |
 | 2026-11-22 | `ja-fnd.6.3.11`, part 1 of 3: the cameras (`rig.ts`: `CameraRig`, the per-view cameras and what moves them) | #322 |
+| 2026-11-23 | `ja-fnd.6.3.17` decided by the owner: **A**, the canvas state is made explicit per layer (`ja-fnd.6.3.10`, after the moves, changing pixels on purpose) | (bead) |
+| 2026-11-23 | `ja-fnd.6.3.14`: the nests stage (`nests.ts`: `drawNest`, one colony's nest, brood, stores, dead, queen, alates) | #325 |
+| 2026-11-23 | `ja-fnd.6.3.15`: the ants stage (`ants.ts`: `drawAnts`, one colony's ants: a stroke or sprite a body by odour band, the spore dots, what each carries; four `ants` scenes, 38 in all; 15 log tests) | #330 |
 | 2026-11-23 | `ja-fnd.6.3.11`, part 2 of 3: the pointer's gestures (`pointer.ts`: `PointerController` over a `PointerHost`, with 20 unit tests) | #324 |
-| 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | #326 |
+| 2026-11-23 | `ja-fnd.6.3.16`: the marks stage (`marks.ts`: `drawAphids`, `drawTraces`, `drawSpecimens`, `drawFollowed`, `drawInspection`; 38 scenes match; 9 log tests) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.18`: the pixel guard in CI (`pixels.yml`: a `pixel-guard` label records the scenes on the merge base and checks them on the head, on one runner) | (this PR) |

@@ -117,6 +117,8 @@ export class MapVoxelPass {
       const projectedTop = (worldHeight / 2 + BELOW_WALK_PLANE * Math.abs(Math.sin(tilt))) / Math.cos(tilt);
       const stripInView = !!g.world && layer === CURTAIN && camera.y - projectedTop <= centreY(STRIP) + SIDE;
       // The surface strip only has navigation hit targets in the flat projection.
+      // So tilting Below near the strip switches between the tilted view and the flat map: intended (mapRendering.test.ts, "the underground camera tilts
+      // at close zoom while the projected strip stays flat").
       if (stripInView && tilt !== 0) return { alpha: 0, renderer: "sprites" };
       const angled = alpha === 1 && orbit && (orbit.yaw !== 0 || tilt !== 0);
       const span = Math.hypot(worldWidth, worldHeight);
@@ -133,6 +135,8 @@ export class MapVoxelPass {
           trails,
           clumps,
         ),
+        // A tilted frame on the software renderer (no WebGL: it rasterises on the CPU) takes a third of the map's CSS size (the canvas's device
+        // size over `dpr`, over 3), not a half, to keep its frame time (#287, "Reduce tilted map work on the software renderer").
         scale = 1 / (dpr * (angled && !scene.accelerated ? 3 : 2)),
         width = Math.max(1, Math.round(view.w * scale)),
         height = Math.max(1, Math.round(view.h * scale));
@@ -156,6 +160,8 @@ export class MapVoxelPass {
         }
         ctx.drawImage(this.surface, 0, 0, view.w, view.h);
         if (angled && layer !== CURTAIN && Math.abs(orbit.tilt) > 0.5) {
+          // Only Above (never Below) fogs, and Above's camera tilt is never negative (mapCameraOrbit), so the horizon is always the top edge;
+          // the bottom-edge branch is kept for an orbit with the other sign.
           const horizon = orbit.tilt < 0 ? view.h : 0;
           const inner = horizon === 0 ? view.h * 0.56 : view.h * 0.44;
           const fog = ctx.createLinearGradient(0, horizon, 0, inner);
