@@ -117,7 +117,7 @@ Owner: "try the tropism". Built as `trafficTropism` N (off, 0, by default): with
 
 ## Play
 
-- **What is built** (both off by default): a side-choice lean (inert) and a tropism that overrides the growth lane's `grow` answer on every N-th cell; the Tropism and Ablation sections above say what each did. The text below is the design as first written.
+- **What is built** (the tropism on by default since 2026-11-23 with N = 4; the side-choice lean it rides on is inert): a side-choice lean (inert) and a tropism that overrides the growth lane's `grow` answer on every N-th cell; the Tropism and Ablation sections above say what each did. The text below is the design as first written.
 - **See:** hyphae on the surface lean toward the ants' paths and the hole instead of fanning out evenly; at 4× it shows as threads that follow a trail for some cells. The Learn text must say the lean is a guess ("no one has shown an insect-killing fungus doing this"), and the Codex entry should call it design.
 - **Choose:** none directly, it is groundwork: the lean is a body rule, as thigmotropism is. It makes the fungus's aim matter in one place: a tip that answers `turn` now turns somewhere informed.
 - **Counterplay and progression:** colonies still cut hyphae when they dig, groom hosts and remove corpses; surface foragers keep walking over fungus (Pereira et al. 2021), so the lean steers hyphae toward contact. The risk to the slope is a cliff: hyphae reaching ant traffic sooner could bring the quarter forward on some seeds.
