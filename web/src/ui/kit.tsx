@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { IMAGE_ICONS, iconUrl } from "./iconUrl.ts";
 
 // The page's building blocks (PRD §69, ja-mvo9.1): one section head, one set of buttons and icons, and the drawer that
@@ -172,8 +173,8 @@ export function Drawer({
 
 /**
  * A dialog over the whole page (the command palette, the shortcuts sheet): focus moves into it (its first field, or the
- * panel) and goes back to what had it when it closes; Tab stays inside; Escape closes it first (in the capture phase, so
- * a drawer or a follow under it stays), and so does a press on the backdrop.
+ * panel) and goes back to what had it when it closes; Tab stays inside; Escape closes it first (the top layer of the Escape
+ * manager, escape.ts, so a drawer or a follow under it stays), and so does a press on the backdrop.
  */
 export function Modal({
   label,
@@ -194,13 +195,13 @@ export function Modal({
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
+  useEscape(ESCAPE_LAYER.modal, () => {
+    onClose();
+    return true;
+  });
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-      } else if (e.key === "Tab" && panel.current) {
+      if (e.key === "Tab" && panel.current) {
         const all = [...panel.current.querySelectorAll<HTMLElement>("button, input, textarea, a[href], [tabindex='0']")].filter(
           (el) => !el.hasAttribute("disabled"),
         );
