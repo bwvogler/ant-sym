@@ -448,7 +448,7 @@ export class Fungus {
   #made = 0;
   /** each map's hyphae (params.hyphae): null until the evolving fungus roots there */
   readonly #hyphae: (Hyphae | null)[];
-  /** the occupancy grids of the step under way, per layer and colony (what a tip's traffic bias reads); null between games */
+  /** the occupancy grids of the step under way, per layer and colony (what a tip's traffic bias reads), the last step's once one has run */
   #seen: readonly (readonly CountGrid[])[] | null = null;
   /** each map's spore spots: its patch and the dug spots its tips fruited on, refreshed each round of tip steps */
   #sporeSpots: (number[] | null)[] = [];

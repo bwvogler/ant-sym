@@ -1317,3 +1317,47 @@ test("a tropism: on its every-nth cell a growing tip grows toward the side with 
   assert.ok(grown((x) => (x >= 11 ? 4 : 0), 1).cells.includes(key(cell(0))), "as busy ahead as to the sides: straight");
   assert.ok(grown(() => 2, 1).cells.includes(key(cell(0))), "equal traffic: straight");
 });
+
+test("a branch does not lean into a blocked side: with the busier side rock, traffic does not pull it there", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const blocked = cellKey(...cell(-1));
+  const g: Ground = {
+    topsoil: true,
+    kind: (x, y) => (cellKey(x, y) === blocked ? "rock" : "open"),
+    traffic: (x, y) => (x === cell(-1)[0] && y === cell(-1)[1] ? 9 : 0),
+  };
+  // On an odd step the alternating rule takes the right side; traffic on the blocked left must not override it (the old
+  // alternating rule is not blocked-aware on an even step, which this does not change).
+  const h = new Hyphae();
+  h.root(10, 10, E);
+  h.steps = 1;
+  const tip = h.tips[0]!;
+  stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "branch");
+  const branch = h.tips.find((t) => t !== tip)!;
+  assert.equal(branch.heading, turn(E, 1), "the branch goes to the open side");
+});
+
+test("a tropism needs a strictly busier open side: busy ahead, equal sides and a rock side all grow straight", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const key = (c: readonly [number, number]) => cellKey(c[0], c[1]);
+  const at =
+    (...busy: [readonly [number, number], number][]) =>
+    (x: number, y: number) =>
+      busy.find(([c]) => c[0] === x && c[1] === y)?.[1] ?? 0;
+  const run = (traffic: Ground["traffic"], rock?: number) => {
+    const g: Ground = { topsoil: true, kind: (x, y) => (cellKey(x, y) === rock ? "rock" : "open"), traffic, tropism: 1 };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    const tip = h.tips[0]!;
+    tip.run = 0;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "grow");
+    return [...h.parent.keys()];
+  };
+  // Busy straight ahead (9) and to the left (4): ahead is busier than the side, so straight.
+  assert.ok(run(at([cell(0), 9], [cell(-1), 4])).includes(key(cell(0))), "ahead busier than the side");
+  // Both sides busy, equally, ahead empty: no side is busier, so straight.
+  assert.ok(run(at([cell(-1), 4], [cell(1), 4])).includes(key(cell(0))), "equal sides");
+  // The busier side is rock: straight.
+  const left = run(at([cell(-1), 9]), key(cell(-1)));
+  assert.ok(left.includes(key(cell(0))) && !left.includes(key(cell(-1))), "rock side: straight, not into rock");
+});

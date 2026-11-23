@@ -1089,7 +1089,7 @@ function stepTip(
         if (l !== r && Math.max(l, r) > here) {
           const k = l > r ? -1 : 1;
           const [sx, sy] = k < 0 ? [lx, ly] : [rx, ry];
-          if (enterable(h, g, sx, sy, level) && !h.has(sx, sy)) {
+          if (budget.free >= HYPHA_MASS && enterable(h, g, sx, sy, level) && !h.has(sx, sy)) {
             h.tropisms++;
             veer(turn(d, k));
             break;
