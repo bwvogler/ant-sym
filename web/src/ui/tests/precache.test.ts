@@ -66,7 +66,7 @@ const VALID: Record<string, readonly string[]> = {
   ),
 };
 // The steer lane: the mode lane's situations whose mode is explore or follow (half of 3,888), with no find, far from one and near it.
-const SIZE: Record<string, number> = { mode: SITUATIONS, growth: 48, steer: (SITUATIONS / 2) * 3 };
+const SIZE: Record<string, number> = { mode: SITUATIONS, growth: 96, steer: (SITUATIONS / 2) * 3 };
 
 // The tables above are literals on purpose (deriving what a test expects from the registry it checks would prove nothing), so a lane added to the
 // registry (colony/lanes.ts) needs its rows here: this fails, naming the table, when it has none.

@@ -28,8 +28,8 @@ const garden = STRAINS.findIndex((strain) => strain.id === "garden");
 
 function run(seed, damp, contextual, recover = false) {
   const world = generateOneWorld(seed, { plane: { size: { w: 120, h: 80 } } });
-  const game = new Game(world, { antCount: workers, rival: false }, gameRng(seed));
-  const colony = game.player;
+  const game = new Game(world, {}, gameRng(seed), [{ antCount: workers }]);
+  const colony = game.colonies[0];
   colony.params.dropRefusalLimit = recover ? 2 : 0;
   const queen = colony.queen;
   const nest = world.plane.nests[0];

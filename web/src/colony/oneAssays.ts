@@ -72,7 +72,7 @@ function gameRoyalRouting(id: string, title: string, after: number): Assay {
               at: 0,
               kind: "call",
               run(game) {
-                player = game.player;
+                player = game.colonies[0]!;
               },
             },
           ],
@@ -171,7 +171,7 @@ export const search1: Assay = {
       const rng = mulberry32(seed * 7907 + 101);
       const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
       const plane = game.world!.plane;
-      const c = game.player;
+      const c = game.colonies[0]!;
       const hc = c.holeCells[c.params.nest] as HoleCell;
       const hx = centreX(hc.px, hc.py);
       const hy = centreY(hc.py);
@@ -222,7 +222,7 @@ export const search1: Assay = {
     };
     const probe: Probe = {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         const hc = c.holeCells[c.params.nest] as HoleCell;
         const sample = game.time + 1e-9 >= nextAt;
         if (sample) nextAt += 1;
@@ -338,7 +338,7 @@ function f1Spec(
     const rng = mulberry32(seed * 6101 + 17);
     const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
     const plane = game.world!.plane;
-    const c = game.player;
+    const c = game.colonies[0]!;
     const hc = c.holeCells[c.params.nest] as HoleCell;
     const hx = centreX(hc.px, hc.py);
     const hy = centreY(hc.py);
@@ -409,7 +409,7 @@ function f1Spec(
   };
   const probe: Probe = {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       for (let i = 0; i < n; i++) {
         if (c.layer[i] !== PLANE) continue;
         const x = c.x[i];
@@ -428,7 +428,7 @@ function f1Spec(
     },
     summary(game) {
       const m: Record<string, number> = {};
-      const c = game.player;
+      const c = game.colonies[0]!;
       const left: number[] = [];
       for (let i = 0; i < n; i++) if (reachT[i] === Infinity) left.push(Math.hypot(c.x[i] - spotX[i], c.y[i] - spotY[i]));
       left.sort((a, b) => a - b);
@@ -524,7 +524,7 @@ export const memory1: Assay = {
     let ux = 1;
     let uy = 0;
     const keep = (game: Game): void => {
-      const ph = (game.player.layers[PLANE] as Layer).ph;
+      const ph = (game.colonies[0]!.layers[PLANE] as Layer).ph;
       for (let k = 0; k < cells.length; k += 2) {
         const now = ph.fields.food.get(cells[k] as number, cells[k + 1] as number);
         if (now < M1_LEVEL) ph.depositCell("food", cells[k] as number, cells[k + 1] as number, M1_LEVEL - now);
@@ -569,7 +569,7 @@ export const memory1: Assay = {
     const probes = (spotX: Float64Array, spotY: Float64Array): Probe[] => [
       {
         tick(game) {
-          const c = game.player;
+          const c = game.colonies[0]!;
           for (let i = 0; i < n; i++) {
             if (!counted[i] || first[i] || c.layer[i] !== PLANE) continue;
             const x = c.x[i];
@@ -694,7 +694,7 @@ export const route1: Assay = {
       const rng = mulberry32(seed * 8209 + 31);
       const gauss = (): number => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
       const plane = game.world!.plane;
-      const c = game.player;
+      const c = game.colonies[0]!;
       const hc = c.holeCells[c.params.nest] as HoleCell;
       const hx = centreX(hc.px, hc.py);
       const hy = centreY(hc.py);
@@ -769,7 +769,7 @@ export const route1: Assay = {
     };
     const probe: Probe = {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         const hc = c.holeCells[c.params.nest] as HoleCell;
         const plane = game.world!.plane;
         const { w } = plane.size;
@@ -823,7 +823,7 @@ export const route1: Assay = {
       },
       summary(game) {
         const m: Record<string, number> = { pockets, dist: pileDist, way: pileWay };
-        const c = game.player;
+        const c = game.colonies[0]!;
         const counted: number[] = [];
         for (let i = 0; i < n; i++) if (pickT[i] <= R1_SECONDS - R1_WAIT) counted.push(i);
         const took = (i: number): number => homeAt[i] - pickT[i];
@@ -1012,7 +1012,7 @@ export function searchTurnProbe(): Probe {
   let walkFar = 0;
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       if (pickX.length < c.n) {
         const grow = <T extends Float64Array | Uint8Array | Uint32Array>(a: T, make: (n: number) => T, fill?: number): T => {
           const b = make(c.n);

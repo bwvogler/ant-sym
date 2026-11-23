@@ -114,7 +114,7 @@ export const neglectusImmunisation: Assay = {
     let read: N1Read | null = null;
     const probe: Probe = {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         if (exposed < 0) return;
         peak = Math.max(peak, c.load[exposed] ?? 0);
         if (read || game.time < N1_EXPOSE_AT + N1_READ_AFTER - 1e-6) return;
@@ -134,7 +134,7 @@ export const neglectusImmunisation: Assay = {
           at: N1_EXPOSE_AT,
           kind: "call",
           run: (g: Game) => {
-            const c = g.player;
+            const c = g.colonies[0]!;
             exposed = insideAnt(c);
             if (exposed < 0) return;
             c.load[exposed] = N1_DOSE;

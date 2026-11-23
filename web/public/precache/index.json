@@ -108,23 +108,23 @@
     {
       "lane": "growth",
       "aim": "peace",
-      "context": "growth-v4-0e171926",
+      "context": "growth-v5-da1f0500",
       "file": "growth-peace.json",
-      "answers": 48
+      "answers": 96
     },
     {
       "lane": "growth",
       "aim": "spread",
-      "context": "growth-v4-1918cb6b",
+      "context": "growth-v5-248a136d",
       "file": "growth-spread.json",
-      "answers": 48
+      "answers": 96
     },
     {
       "lane": "growth",
       "aim": "unite",
-      "context": "growth-v4-12d896ff",
+      "context": "growth-v5-728bf13d",
       "file": "growth-unite.json",
-      "answers": 48
+      "answers": 96
     },
     {
       "lane": "leave",
@@ -262,6 +262,6 @@
   "versions": {
     "colony": 7,
     "fungus": 8,
-    "growth": 4
+    "growth": 5
   }
 }

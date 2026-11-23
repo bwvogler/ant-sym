@@ -573,9 +573,35 @@ test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mas
   assert.ok(worst < 0.06, `the hyphae held ${(worst * 100).toFixed(1)} % off the body's mass`);
   assert.ok(curtainFed, "no mass reached the curtain");
   const down = g.fungus.hyphaeOn(CURTAIN)!;
-  assert.ok(down.length > 6, `the curtain's hyphae grew to ${down.length} cells`);
+  // Past the hole's mouth: 21 cells at 150 s while the landing rooted three tips, 4 with six (owner, 2026-11-22: six tips share
+  // the mass, so less of it goes down the hole; accepted after the progression comparison, PR #280). The test holds that tips
+  // do grow on mass that reaches the curtain, not how many.
+  assert.ok(down.length > 3, `the curtain's hyphae grew to ${down.length} cells`);
   // Mass flows out to the tips rather than sitting where it entered: most of the body is hypha, not load in transit
   // (with the patch's mass spread over cells no hypha grows from, two thirds of it sat stuck).
   const loaded = g.fungus.hyphaeOn(PLANE)!.loaded + down.loaded;
   assert.ok(loaded < 0.4 * e.mass, `${loaded.toFixed(1)} of ${e.mass.toFixed(1)} in transit`);
 });
+
+// A game feeds its colonised corpses to the tips (PRD §85, ja-vlla.4): with a policy that always answers thicken, a tip
+// beside a colonised corpse puts out a mat, and with no corpse it puts out none. Run with the plain budget and with flow.
+for (const flow of [false, true])
+  test(`a tip beside a colonised corpse thickens into a mat, and none without a corpse (${flow ? "flow on" : "flow off"}; PRD §85)`, () => {
+    const mat = (corpse: boolean): number => {
+      const g = game(true, flow);
+      g.fungus.bindPolicy("growth", () => "thicken");
+      const plane = g.fungus.hyphaeOn(PLANE)!;
+      if (corpse) {
+        const tip = plane.tips[0]!;
+        g.fungus.colonise(PLANE, nx(tip.x, tip.y, tip.heading), ny(tip.y, tip.heading));
+        assert.equal(g.fungus.corpsesOn(PLANE).size, 1);
+      }
+      runFor(g, 20);
+      const h = g.fungus.hyphaeOn(PLANE)!;
+      // H4 in the game: thickening spends no more than the mycelium's mass.
+      assert.ok(h.length * HYPHA_MASS <= g.fungus.evolution!.mass + HYPHA_MASS, "more hypha than mass");
+      return h.mat.size;
+    };
+    assert.equal(mat(false), 0, "no corpse, no mat");
+    assert.ok(mat(true) > 0, "no mat beside a colonised corpse");
+  });
