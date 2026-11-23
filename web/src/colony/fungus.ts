@@ -238,9 +238,9 @@ const ROOT_HEADINGS = [E, SE, SW, W, NW, NE];
 /**
  * A corpse the fungus grows out of (ja-2bw.7, docs/hyphal-growth.md §6): the spores it puts out on its cell, free (paid
  * by the cadaver, not the mycelium: Khun et al. 2021 counted about 1.3 × 10⁸ conidia a cadaver; the amount is design),
- * how fast, the mass it adds to the mycelium, and the tips that set out from it (east and west).
+ * how fast, the mass it adds to the mycelium, and the tips that set out from it (one in each of the six hex ways, as at the landing, so a corpse's hyphae fan out and not only along east-west).
  */
-export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: [E, W] as readonly number[] };
+export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: ROOT_HEADINGS as readonly number[] };
 
 /**
  * Stalks (synnemata, ja-2bw.10, PRD §63.12), by the *Stalks* upgrade's level (none, a stalk, a tall stalk): a colonised

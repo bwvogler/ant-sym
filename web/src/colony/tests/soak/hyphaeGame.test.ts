@@ -158,7 +158,7 @@ test("a host that died of the fungus, buried on the midden, is a new start that 
   // The burial hook as an undertaker calls it, a cell clear of the landing patch.
   const [x, y] = [60, 40];
   g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
-  assert.equal(plane.tips.length, tips + 2, "two tips set out from the corpse");
+  assert.equal(plane.tips.length, tips + 6, "six tips set out from the corpse");
   assert.ok(plane.has(x, y));
   assert.equal(g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y)), CORPSE.spores);
   assert.ok(e.mass >= mass + CORPSE.mass - 1e-9, "the cadaver fed the mycelium");
@@ -638,7 +638,7 @@ test("thickening at a colonised corpse far from every patch closes a flower that
   assert.equal(g.fungus.flowers, 1, "one flower closed");
   const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
   const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
-  assert.ok(there >= 5, `the corpse's two tips and the flower's three stand in it (${there})`);
+  assert.ok(there >= 9, `the corpse's six tips and the flower's three stand in it (${there})`);
   assert.equal(e.patches, patches + 1, "one more patch, room to grow");
   assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
   for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
