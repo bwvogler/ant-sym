@@ -202,7 +202,7 @@ test("each lane's flags: id prefix, context prefix, hits, reconsidering, situati
   assert.deepEqual(LANE_KINDS, {
     mode: { idPrefix: "s", contextPrefix: "colony-", countsHits: true, reconsiders: true, perRequest: 100 },
     fungus: { idPrefix: "h", contextPrefix: "fungus-", countsHits: false, reconsiders: false, perRequest: 50 },
-    growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 48 },
+    growth: { idPrefix: "g", contextPrefix: "growth-", countsHits: false, reconsiders: false, perRequest: 96 },
     get: { idPrefix: "aget", contextPrefix: "get-", countsHits: false, reconsiders: false, perRequest: 100 },
     carry: { idPrefix: "acarry", contextPrefix: "carry-", countsHits: false, reconsiders: false, perRequest: 100 },
     drop: { idPrefix: "adrop", contextPrefix: "drop-", countsHits: false, reconsiders: false, perRequest: 100 },

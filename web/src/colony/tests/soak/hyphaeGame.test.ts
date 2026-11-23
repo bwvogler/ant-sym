@@ -582,3 +582,26 @@ test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mas
   const loaded = g.fungus.hyphaeOn(PLANE)!.loaded + down.loaded;
   assert.ok(loaded < 0.4 * e.mass, `${loaded.toFixed(1)} of ${e.mass.toFixed(1)} in transit`);
 });
+
+// A game feeds its colonised corpses to the tips (PRD §85, ja-vlla.4): with a policy that always answers thicken, a tip
+// beside a colonised corpse puts out a mat, and with no corpse it puts out none. Run with the plain budget and with flow.
+for (const flow of [false, true])
+  test(`a tip beside a colonised corpse thickens into a mat, and none without a corpse (${flow ? "flow on" : "flow off"}; PRD §85)`, () => {
+    const mat = (corpse: boolean): number => {
+      const g = game(true, flow);
+      g.fungus.bindPolicy("growth", () => "thicken");
+      const plane = g.fungus.hyphaeOn(PLANE)!;
+      if (corpse) {
+        const tip = plane.tips[0]!;
+        g.fungus.colonise(PLANE, nx(tip.x, tip.y, tip.heading), ny(tip.y, tip.heading));
+        assert.equal(g.fungus.corpsesOn(PLANE).size, 1);
+      }
+      runFor(g, 20);
+      const h = g.fungus.hyphaeOn(PLANE)!;
+      // H4 in the game: thickening spends no more than the mycelium's mass.
+      assert.ok(h.length * HYPHA_MASS <= g.fungus.evolution!.mass + HYPHA_MASS, "more hypha than mass");
+      return h.mat.size;
+    };
+    assert.equal(mat(false), 0, "no corpse, no mat");
+    assert.ok(mat(true) > 0, "no mat beside a colonised corpse");
+  });

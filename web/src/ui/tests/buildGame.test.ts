@@ -36,12 +36,12 @@ test("the page builds the game with the species its settings name, and refuses o
   assert.equal(desert.params.species, DESERT_ANT);
   assert.equal(desert.params.fight.intent, true);
   assert.equal(desert.params.fight.counterattack, true);
-  assert.equal(desert.player.responses.contact, DESERT_ANT.responses.contact);
+  assert.equal(desert.colonies[0]!.responses.contact, DESERT_ANT.responses.contact);
   const garden = buildGame({ ...settings, species: "neglectus" });
   assert.equal(garden.params.species, NEGLECTUS_ANT);
   assert.equal(garden.params.fight.intent, true);
   assert.equal(garden.params.fight.counterattack, true);
-  assert.equal(garden.player.responses.contact, GENERIC_ANT.responses.contact);
+  assert.equal(garden.colonies[0]!.responses.contact, GENERIC_ANT.responses.contact);
 });
 
 test("directed combat follows species recognition and contact decisions when workers meet", () => {

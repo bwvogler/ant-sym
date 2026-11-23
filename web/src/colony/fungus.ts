@@ -1162,9 +1162,9 @@ export class Fungus {
       }
     const budget = { free: Math.max(0, e.mass - length * HYPHA_MASS), tips, flow: p.flow };
     // Every map's tips step together, in turns (hyphae.ts stepRound), on the first map's clock.
-    const maps: { h: Hyphae; g: Ground; sinks?: Map<number, number> }[] = [];
+    const maps: { h: Hyphae; g: Ground; sinks?: Map<number, number>; resources?: ReadonlyMap<number, unknown> }[] = [];
     this.#hyphae.forEach((h, l) => {
-      if (h) maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined });
+      if (h) maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined, resources: this.#corpses[l] });
     });
     const clock = maps[0]!.h;
     clock.clock += dt;
