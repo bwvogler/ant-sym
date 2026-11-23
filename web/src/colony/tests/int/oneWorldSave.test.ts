@@ -7,7 +7,7 @@ import { centreX, centreY } from "../../hex.ts";
 import { CRUST, generateOneWorld, growWorld } from "../../oneWorld.ts";
 import type { Flight } from "../../royal.ts";
 import { hashGame } from "../saveHash.ts";
-import { DT, run } from "../builders.ts";
+import { DT, run, stageFight } from "../builders.ts";
 
 // One-world saves (U4b, ja-lp4.4.2; docs/one-world.md §4): run, save, load into a game built afresh from the same seed
 // and options, run on. The result must hash as the unbroken run on both layers: the plane, the curtain as dug and grown,
@@ -138,6 +138,11 @@ for (const layer of [PLANE, CURTAIN])
   test(`one world: a save on a tick with a fight death on the ${layer === PLANE ? "plane" : "curtain"} runs on exactly`, () => {
     const make = () => small();
     const whole = make();
+    if (layer === PLANE) {
+      // Fights on the plane are rare too (see stageFight): colony 1's ants put on colony 0's.
+      run(whole, 2);
+      stageFight(whole);
+    }
     if (layer === CURTAIN) {
       // Fights underground are rare in a short run: Amber's ants put into Ink's royal chamber, by the queen.
       run(whole, 2);

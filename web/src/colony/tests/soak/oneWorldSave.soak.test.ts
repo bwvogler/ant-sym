@@ -6,7 +6,7 @@ import { STRAINS } from "../../fungus.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
 import { hashGame } from "../saveHash.ts";
-import { DT, run, ticks } from "../builders.ts";
+import { DT, run, stageFight, ticks } from "../builders.ts";
 
 // One-world saves (U4b, ja-lp4.4.2; docs/one-world.md §4): run, save, load into a game built afresh from the same seed
 // and options, run on. The result must hash as the unbroken run on both layers: the plane, the curtain as dug and grown,
@@ -44,12 +44,16 @@ test("one world: a sweep of 30 save ticks round a fight death, each run on 1 tic
   const make = () => small();
   const whole = make();
   whole.land(0, GARDEN, { evolve: true });
+  run(whole, 2);
+  stageFight(whole);
   assert.ok(toFightDeath(whole, PLANE, 100), "a fight death on the plane");
   // The tick of the death: saves from 15 ticks before it to 14 after, from the same game run again from the start.
   const t0 = Math.round(whole.time / DT);
   const base = make();
   base.land(0, GARDEN, { evolve: true });
-  ticks(base, t0 - 15);
+  run(base, 2);
+  stageFight(base);
+  ticks(base, t0 - Math.round(2 / DT) - 15);
   const saves: GameSave[] = [];
   const hashes: string[] = [];
   for (let k = 0; k < 30 + 89; k++) {
@@ -72,7 +76,9 @@ test("one world: a sweep of 30 save ticks round a fight death, each run on 1 tic
   const twin = make();
   for (const g of [self, twin]) {
     g.land(0, GARDEN, { evolve: true });
-    ticks(g, t0);
+    run(g, 2);
+    stageFight(g);
+    ticks(g, t0 - Math.round(2 / DT));
   }
   self.load(copy(self.save()));
   run(self, 3);

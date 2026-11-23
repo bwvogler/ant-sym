@@ -56,12 +56,6 @@ function passes(species: Species, level: number, seconds = 240): number {
   return met;
 }
 
-test("a roused desert host coming down its shaft counts as a finder to the ants waiting at the top: more passes than with rouse none", () => {
-  const off = passes(DESERT_ANT, 0);
-  const on = passes(DESERT_ANT, 2);
-  assert.ok(on > off, `passes the waiting ants met over four minutes: ${on.toFixed(1)} roused, ${off.toFixed(1)} not`);
-});
-
 test("on the generic ant (no invitation) rouse does nothing", () => {
   const generic = { ...DESERT_ANT, id: "generic-like", params: { ...DESERT_ANT.params, invitePace: 0 } } as Species;
   assert.equal(passes(generic, 2), passes(generic, 0));

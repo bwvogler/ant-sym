@@ -4,6 +4,7 @@ import { INFECTED } from "../../fungus.ts";
 import {
   N1_DOSE,
   N3_BASE,
+  N3_MIN_MEET,
   classN3,
   n1Pass,
   n1Read,
@@ -55,17 +56,34 @@ test("N1 reads carriers at INFECTED and up, and scores on the exposed ant's load
   assert.ok(Number.isNaN(n1Score(null, 0.8).carriers));
 });
 
+const NEAR_SEED = 27;
+
 test("N3 plays the seed's odour distance on its trial's world, on band centres: alike never fight, past the tolerance they do", () => {
   assert.deepEqual(n3Trial(1), { distance: 0, trial: 0 });
   assert.deepEqual(n3Trial(9), { distance: 0, trial: 1 });
   assert.equal(N3_BASE, 0.25);
-  const near = runAssay(neglectusTolerance, 1).metrics;
+  const near = runAssay(neglectusTolerance, NEAR_SEED).metrics;
   const far = runAssay(neglectusTolerance, 6).metrics;
   assert.equal(far.distance, 0.5);
-  // Meetings on seed 1 are 12.5 ant-seconds with piErrorLaw 1 (PRD §79; 14.9 by the odometer law, 17.8 then if ants on
+  // Retune (brood-odour climb on by default, which moved every game's stream): meetings are a trajectory, and seed 1's fell from 12.5 to
+  // 3.0 (below N3_MIN_MEET, so that trial would not even count); across the alike seeds they run 0-100 ant-seconds either way. Seed 27 (world 4,
+  // distance 0.2, under the tolerance, so alike: no fight) now meets 14.3, and the band below is this one's 12.5 band (10.9-13.8) scaled by
+  // 14.3/12.5, the same share of its width (the move the comment below records for the law). Alike never fight (distances up to 0.3 on seeds 1-4, 9-12, 17-20, 25-28, 33-36: 0
+  // deaths) and far apart do whenever the colonies meet (seeds 6-8, 13-16, 24, 30-32, 37-40 all fought; 21-23 never met) still hold; the bounds on `fought` are untouched.
+  // Meetings on seed 1 were 12.5 ant-seconds with piErrorLaw 1 (PRD §79; 14.9 by the odometer law, 17.8 then if ants on
   // different layers counted as meeting): a band catches a miscount. The band moved with the law, its width the same share
   // (13–16.5 round 14.9 then, 10.9–13.8 round 12.5 now).
-  assert.ok(near.meetings > 10.9 && near.meetings < 13.8, `meetings ${near.meetings}`);
+  // The band is a fingerprint of this one run (a miscount catches it; a change of stream moves it), not what N3 is for: that is the two asserts below.
+  // Retune 2 (the odour channel's fade went 0.03 -> 0.1, moving every stream again): seed 27 now meets 9.93, so the band is re-recorded on this run
+  // at the same share of its width (8.6-11.0 = 9.93 x 0.867-1.105, the ratios of the 12.4-15.8 band round 14.3). It stays a fingerprint of this one
+  // run, kept because it is the only guard on a miscount of meetings (PRD §79) and a stream-free bound cannot catch one. What does not depend on the
+  // stream is looped over more alike seeds below: each must meet above N3_MIN_MEET (so its trial counts) and never fight (seeds 1 and 2 met 13.9 and 12.2; a third seed was left out to keep the file under the soak tier's limit).
+  assert.ok(near.meetings > 8.6 && near.meetings < 11.0, `meetings ${near.meetings}`);
+  for (const seed of [1, 2]) {
+    const alike = runAssay(neglectusTolerance, seed).metrics;
+    assert.ok(alike.meetings > N3_MIN_MEET, `seed ${seed}: meetings ${alike.meetings}`);
+    assert.equal(alike.fought, 0, `seed ${seed} alike: ${alike.deaths} deaths`);
+  }
   assert.equal(near.fought, 0, `alike: ${near.deaths} deaths`);
   assert.ok(far.deaths > 0 && far.fought === 1, `far apart: ${far.deaths} deaths`);
 });
