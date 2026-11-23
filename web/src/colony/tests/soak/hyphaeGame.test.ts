@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, PLANE } from "../../colony.ts";
-import { CORPSE, STALK, STRAINS, type Fungus } from "../../fungus.ts";
+import { CORPSE, corpseHeadings, STALK, STRAINS, type Fungus } from "../../fungus.ts";
 import { pathTo } from "../../evolution.ts";
 import { Game, gameRng, type GameSave } from "../../game.ts";
 import { cellKey as hyphaKey, HYPHA_MASS, KNOT, keyCell } from "../../hyphae.ts";
@@ -149,6 +149,21 @@ test("with hyphae off, the fungus grows none", () => {
   assert.equal(g.fungus.hyphaeOn(CURTAIN), null);
 });
 
+test("a corpse's six tips are rooted body axis first, and a body turned round roots them in the same order", () => {
+  // headings round the circle, none on the line between two hex ways (there a body and its reverse can round to different ways
+  // by a rounding error): the same six directions, and the same order for a body and its reverse
+  for (let k = 0; k < 12; k++) {
+    const heading = (k * Math.PI) / 6 - Math.PI + 0.1;
+    const order = corpseHeadings(heading);
+    assert.deepEqual([...order].sort(), [0, 1, 2, 3, 4, 5], `all six ways (heading ${heading})`);
+    const axis = (dirOf(heading) % 3) + 0; // + 0: dirOf can give -0
+    assert.deepEqual(order.slice(0, 2), [axis, axis + 3], "the body's axis first");
+    assert.deepEqual(corpseHeadings(heading + Math.PI), order, "a reversed body: the same order");
+  }
+  assert.deepEqual(corpseHeadings(-Math.PI / 3), [2, 5, 3, 0, 4, 1]);
+  assert.deepEqual(corpseHeadings(), [...CORPSE.headings], "no heading: the fallback");
+});
+
 test("a host that died of the fungus, buried on the midden, is a new start that fruits for free", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
@@ -159,7 +174,19 @@ test("a host that died of the fungus, buried on the midden, is a new start that 
   const [x, y] = [60, 40];
   g.colonies[0]!.onBury!({ x, y, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
   assert.equal(plane.tips.length, tips + 6, "six tips set out from the corpse");
+  // No recorded heading: the fallback order.
+  assert.deepEqual(
+    plane.tips.slice(tips).map((tip) => tip.heading),
+    [...CORPSE.headings],
+  );
   assert.ok(plane.has(x, y));
+  // A recorded heading (the burial hook gets the body's): its axis is rooted first.
+  const before = plane.tips.length;
+  g.colonies[0]!.onBury!({ x: x + 6, y, held: -1, died: g.time, heading: -Math.PI / 3, load: 0.5, strain: e.strain }, PLANE);
+  assert.deepEqual(
+    plane.tips.slice(before).map((tip) => tip.heading),
+    [2, 5, 3, 0, 4, 1],
+  );
   assert.equal(g.fungus.corpsesOn(PLANE).get(hyphaKey(x, y)), CORPSE.spores);
   assert.ok(e.mass >= mass + CORPSE.mass - 1e-9, "the cadaver fed the mycelium");
   runFor(g, 10);
@@ -219,7 +246,15 @@ test("a host that dies on the plane is a new start where it lies; a clean ant le
   c.load[i] = 0.5;
   c.strain[i] = g.fungus.evolution!.strain;
   const before = g.fungus.corpsesOn(PLANE).size;
+  c.heading[i] = Math.PI / 3;
+  const tips = g.fungus.hyphaeOn(PLANE)!.tips;
+  const first = tips.length;
   c.kill(i);
+  // The body's own axis first (a heading of 60 degrees: the axis of directions 1 and 4), then the other two axes in pairs.
+  assert.deepEqual(
+    tips.slice(first).map((tip) => tip.heading),
+    [1, 4, 2, 5, 3, 0],
+  );
   assert.equal(g.fungus.corpsesOn(PLANE).size, before + 1);
   const j = pick(i + 1);
   assert.ok(j >= 0);
