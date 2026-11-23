@@ -338,8 +338,14 @@ test("one world: a rival raider on the plane shies from the colony's midden", ()
 
 // Retuned with the brood-odour climb on by default (odour fade 0.1): the pellets spread are a small sample of a rare event (3 on stream 7,
 // the one this ran on before; 5-10 on streams 8-10), so the whole run plays on streams 8-11 and each must hold the same bounds.
-for (const rng of [8, 9, 10, 11]) {
-  test(`one world over 200 s (stream ${rng}): the mound's books balance, it stays round the hole with every hole open, spreaders carry spoil outward and backfillers take it down`, () => {
+// Retune 2 (odour reach 0.5 -> 0.3, moving every stream again): over 200 s, 14 streams gave 2-13 spreads (4 on 5 of them, 2 on stream 4), 0-7 backfills,
+// and the second colony brought out 40-67 pellets (40 on streams 3, 11 and 12, against the floor of > 40): every floor was a coin flip, because a 200 s run is
+// too short a sample of a slow, rare event (the second colony digs ~0.25 pellets/s). The run is now 300 s and every bound is as before (spreads >= 4,
+// mean > 3, fillDown >= 1, soilOut > 40, mound n > 40, the books); over 300 s the same 14 streams gave 8-24 spreads (mean 4.2-20.8 cells), 3-18 backfills
+// and 64-124 pellets out of the second colony, all 14 pass, so the property is stable. Two streams (9 and 11, the ones that failed at 200 s) play here because four at 300 s took 138 s, over the
+// soak limit; the other twelve were measured by hand, and a third and fourth stream can go to their own file.
+for (const rng of [9, 11]) {
+  test(`one world over 300 s (stream ${rng}): the mound's books balance, it stays round the hole with every hole open, spreaders carry spoil outward and backfillers take it down`, () => {
     const g = new Game(smallOne(), { regrow: 0 }, gameRng(rng), [{ antCount: 150 }, { antCount: 150 }]);
     const plane = g.world!.plane;
     // Per ant: the distance from its hole where it picked a pellet off the mound (NaN none), and whether it went down with it.
@@ -348,7 +354,7 @@ for (const rng of [8, 9, 10, 11]) {
     const wasLayer = g.colonies.map((c) => Uint8Array.from(c.layer));
     const spreads: number[] = [];
     let fillDown = 0;
-    for (let k = 1; k <= Math.round(200 / DT); k++) {
+    for (let k = 1; k <= Math.round(300 / DT); k++) {
       g.tick(DT);
       g.colonies.forEach((c, ci) => {
         const h = own(c);

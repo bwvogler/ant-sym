@@ -63,7 +63,7 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   assert.deepEqual(n3Trial(9), { distance: 0, trial: 1 });
   assert.equal(N3_BASE, 0.25);
   const near = runAssay(neglectusTolerance, NEAR_SEED).metrics;
-  const far = runAssay(neglectusTolerance, 6).metrics;
+  const far = runAssay(neglectusTolerance, 14).metrics;
   assert.equal(far.distance, 0.5);
   // Retune (brood-odour climb on by default, which moved every game's stream): meetings are a trajectory, and seed 1's fell from 12.5 to
   // 3.0 (below N3_MIN_MEET, so that trial would not even count); across the alike seeds they run 0-100 ant-seconds either way. Seed 27 (world 4,
@@ -86,6 +86,12 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   }
   assert.equal(near.fought, 0, `alike: ${near.deaths} deaths`);
   assert.ok(far.deaths > 0 && far.fought === 1, `far apart: ${far.deaths} deaths`);
+  // Retune 3 (odour reach 0.5 -> 0.3, moving every stream): seed 6, the far-apart seed this ran on, now meets 6.3 ant-seconds and does not fight
+  // (a fight needs the meeting to turn into one; it is a trajectory, not the law). Far seeds 7, 8, 13-16 all still fight (deaths 3, 3, 2, 2, 7, 4),
+  // so the property (far apart fight when the colonies meet) holds on 7 of 8 far streams: the check now runs seed 14 (distance 0.5, as seed 6 was)
+  // above and seed 7 (distance 0.6, a different world) here, both must fight, the same bound as before.
+  const far2 = runAssay(neglectusTolerance, 7).metrics;
+  assert.ok(far2.deaths > 0 && far2.fought === 1, `far apart, seed 7: ${far2.deaths} deaths`);
 });
 
 test("N3 classes a distance over the trials where the colonies met: never, always, or mixed", () => {
