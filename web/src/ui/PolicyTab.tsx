@@ -1,22 +1,13 @@
 import { useState, type ReactNode } from "react";
 import {
   type Colony,
-  HOMES,
-  MODES,
-  STANCES,
-  TRAILS,
   type Situation,
   DOCTRINES,
   MODE_CRITERIA,
   RESPONSE_LEGEND,
   responseQuestion,
   RESPONSE_HOOKS,
-  AROUSALS,
-  CARRYING,
   decodeFungal,
-  FUNGAL_PLACES,
-  TASKS,
-  TOUCHES,
   type FungalSituation,
   INFECTED,
   LEVERS,
@@ -34,12 +25,14 @@ import { docUrl } from "./guide.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import {
   byRows,
+  FUNGAL_SENSES,
   LOCAL_FUNGUS_RULES,
   LOCAL_MODE_OTHERWISE,
   LOCAL_MODE_RULES,
   LOCAL_MODE_STRANGERS,
   LOCAL_RESPONSE_RULES,
   localModeOtherwise,
+  MODE_SENSES,
 } from "./policyText.ts";
 import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQuestion, type Sample } from "./prompt.ts";
 import { openLab } from "./labStore.ts";
@@ -263,17 +256,6 @@ function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: n
   return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
 
-/** What the generic senses rows say about each mode-lane field, by name: a species' own schema reuses them for the fields it keeps. */
-const MODE_SENSES: Record<string, [values: string, about: string]> = {
-  mode: [MODES.join(" · "), "what it is doing now"],
-  tired: ["true · false", "it searched long outside without finding food"],
-  foodTrail: [TRAILS.join(" · "), "food scent just ahead"],
-  homeTrail: [HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
-  alarm: [TRAILS.join(" · "), "alarm scent just ahead"],
-  enemy: ["none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
-  stance: [STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
-};
-
 function ModeExplainer(props: PolicyProps) {
   const fol = followedSituation(props.colonies, props.followed);
   const s = fol?.s ?? SAMPLE_SITUATION;
@@ -354,14 +336,7 @@ function FungusExplainer(props: PolicyProps) {
         what the fungus senses in the ant → a level for each lever → what the ant perceives, and what it gives off → the ant's own choice
       </p>
       <Senses
-        rows={[
-          ["arousal", AROUSALS.join(" · "), "the host's arousal: it smells alarm, or strangers are close (amines rise with fighting)"],
-          ["touch", TOUCHES.join(" · "), "who touches its cuticle: a nestmate or an ant of another colony"],
-          ["place", FUNGAL_PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
-          ["task", TASKS.join(" · "), "its body's stage of life (juvenile hormone tracks task): nurse, inside worker, forager"],
-          ["carrying", CARRYING.join(" · "), "what is in its jaws"],
-          ["groomed", "true · false", "its nestmates are grooming the fungus off it"],
-        ]}
+        rows={FUNGAL_SENSES}
         note={
           <>
             Most of these are marked design in the research note: no paper shows a fungus reading them.{" "}

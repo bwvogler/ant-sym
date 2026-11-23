@@ -2,17 +2,17 @@ import {
   CURTAIN,
   PLANE,
   UPGRADES,
+  type Pool,
   type Upgrade,
   LETHAL_LEVERS,
   canKeep,
   keptLevels,
   nextCost,
+  poolOf,
   price,
-  MAX_COLONIES,
   MET,
   type Game,
   AIMS,
-  type Flight,
   GENERIC_ANT,
   INFECTED,
   Builder,
@@ -26,10 +26,10 @@ import { setTheme, THEME_LABEL, THEMES, useTheme } from "./ui/theme.ts";
 import { sunChip } from "./ui/sun.ts";
 import type { GameLoop } from "./ui/gameLoop.ts";
 import { SessionContext, useLoopStats, useStats } from "./ui/session.ts";
-import { chapterNameOf, evolutionOf, flightInAir, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
+import { chapterNameOf, evolutionOf, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
-import ColonyField, { type FieldApi, type FieldBuild, type FieldPen } from "./ui/ColonyField.tsx";
+import ColonyField, { type FieldApi, type FieldBuild } from "./ui/ColonyField.tsx";
 import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.tsx";
 import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
@@ -61,7 +61,7 @@ import PassNote from "./ui/PassNote.tsx";
 import Tip from "./ui/Tip.tsx";
 import UpgradeTree from "./ui/UpgradeTree.tsx";
 import { useWideTree } from "./ui/upgradeBranches.ts";
-import { BODY_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
+import { ANTS_TIP, BODY_TIP, FREE_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
@@ -71,7 +71,8 @@ import { MOD_K, pageKey } from "./ui/keys.ts";
 import LensLayer from "./ui/LensLayer.tsx";
 import { clock } from "./ui/clock.ts";
 import Specimens from "./ui/Specimens.tsx";
-import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./ui/specimens.ts";
+import { sameAnt, unpin } from "./ui/specimens.ts";
+import { useSpecimens } from "./ui/useSpecimens.ts";
 import { useCodex, useCodexWatch } from "./ui/useCodex.ts";
 import { clearProbe, offerProbe } from "./ui/lensStore.ts";
 import Palette, { type Runnable } from "./ui/Palette.tsx";
@@ -82,10 +83,8 @@ import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
 import { NOTICE_LEVEL_LABEL, NOTICE_LEVELS, pushToast, setNoticeLevel, toastPlace, useNoticeLevel } from "./ui/toasts.ts";
 import { AntTraces } from "./ui/trace.ts";
-import QueenPen, { type Landing } from "./ui/QueenPen.tsx";
-import { flightCircle, penGate, penGround, penSettle, withinFlight } from "./ui/pen.ts";
-import { type Founded, foundOnMothers, foundOnWords } from "./ui/flight.ts";
-import type { DoctrineChoice } from "./ui/useColonyJev.ts";
+import QueenPen from "./ui/QueenPen.tsx";
+import { useFlight } from "./ui/useFlight.ts";
 import { installDevHook } from "./dev/hook.ts";
 
 // The game's main screen (ja-lo8.2; laid out by PRD §69): the map fills the screen; a HUD over its top (play, speed, view,
@@ -136,10 +135,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
-  // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game.
-  const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
-  const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
-  const setSpecimens = useCallback((list: Specimen[]) => setPinned({ token: gameToken, list }), [gameToken]);
+  // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
+  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -367,41 +364,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     }
     goTo(hosts[hostTurn.current++ % hosts.length]!);
   }, [game, goTo]);
-  /** Pin the followed ant as a specimen, or unpin it; a fourth replaces the oldest, and a notice says so. */
-  const togglePin = useCallback(
-    (f: Followed) => {
-      if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
-      // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
-      // It is said here: the watch won't see it again.
-      const { kept, gone } = living(specimens, game.colonies);
-      for (const g of gone)
-        pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info", {
-          group: "specimen-died",
-        });
-      const r = pin(kept, f);
-      setSpecimens(r.list);
-      if (r.dropped)
-        pushToast(
-          `Three specimens at most: ${specimenLabel(r.dropped.no)}, ant #${r.dropped.i} of ${colonyName(r.dropped.k)}, is unpinned.`,
-          "info",
-        );
-    },
-    [specimens, setSpecimens, game],
-  );
-  // A specimen that dies leaves the list, with a notice (checked once a second: the rows show nothing once it is gone).
-  useEffect(() => {
-    if (!specimens.length) return;
-    const t = setInterval(() => {
-      const { kept, gone } = living(specimens, game.colonies);
-      if (!gone.length) return;
-      setSpecimens(kept);
-      for (const f of gone)
-        pushToast(`${specimenLabel(f.no)}, ant #${f.i} of ${colonyName(f.k)}, has died: it leaves your specimens.`, "info", {
-          group: "specimen-died",
-        });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [specimens, game, setSpecimens]);
   // The page's keys (ui/keys.ts): one handler, one table, which the shortcuts sheet reads.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -459,84 +421,17 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     },
     [loadSave, jev, update],
   );
-  // A new queen has flown (ja-lo8.9): the game is paused for her. The pen opens if the fungus is in her, her mother's
-  // queen was reached and Jev can read new words; else she founds on her mother's doctrine at once, and a notice says why.
-  const inAir = useLoopStats(loop, flightInAir);
-  const flight: Flight | null = inAir ? (game.flights[0] ?? null) : null;
-  // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
-  const [devPen, setDevPen] = useState(false);
-  const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
-  // The founding rules are ui/flight.ts's (ja-fnd.6.2); the page shows what they return and resumes once no queen is in the air.
-  const apply = useCallback(
-    (r: Founded) => {
-      if (r.notice) pushToast(r.notice.text, r.notice.tone);
-      if (r.resume) {
-        update({ playing: true });
-        setDevPen(false); // the dev hook's pen was for that flight only
-      }
-    },
-    [update],
-  );
-  useEffect(() => {
-    if (!flight || !gate || gate.open) return;
-    apply(foundOnMothers(game, jev, jev.doctrines, flight, gate.reason));
-  }, [flight, gate, game, jev, apply]);
-  /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
-  const foundOn = useCallback(
-    (f: Flight, d: DoctrineChoice, at: { x: number; y: number } | null) => apply(foundOnWords(game, jev, f, d, at)),
-    [game, jev, apply],
-  );
-  // The pen's side and distance chooser is the side view's: it goes with the page's view code (S2.3e); she flies as the game says.
-  const foundHers = useCallback(
-    (d: DoctrineChoice, _at: Landing) => {
-      if (flight) foundOn(flight, d, game.landing(flight.mother));
-    },
-    [flight, game, foundOn],
-  );
-  // One world's pen (owner, 2026-11-10): she flies where the player clicks on the top view, within her flight of her
-  // mother's hole. The page shows the top view, round her circle; the field previews where she would settle
-  // (Game.settleAt, on the ground kept while the line is the same: penGround) and a click there founds her colony.
-  const penOpen = flight !== null && gate?.open === true;
-  const circle = penOpen && oneWorld && flight ? flightCircle(game, flight) : null;
-  const penWords = useRef<DoctrineChoice>({ id: "", text: "" });
-  /** "Let her fly": her own flight from her mother's hole (Game.landing), on the pen's words: no pointer needed. */
-  const onFly = useCallback(
-    (d: DoctrineChoice) => {
-      if (flight) foundOn(flight, d, game.landing(flight.mother));
-    },
-    [flight, game, foundOn],
-  );
-  const onWords = useCallback((d: DoctrineChoice) => {
-    penWords.current = d;
-  }, []);
-  const penFor = circle ? `${circle.x},${circle.y},${flight?.at}` : null;
-  useEffect(() => {
-    if (!circle) return;
-    setFollowed(null); // the pen's circle, not an ant, is what the top view shows
-    field.current?.centreOn(PLANE, circle.x, circle.y, { span: 2.6 * circle.r });
-    setView("above");
-    // Once as the pen opens (its circle's place and the flight say which).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [penFor, setView, setFollowed]);
-  const pen: FieldPen | null = useMemo(() => {
-    if (!circle || !flight || !oneWorld) return null;
-    const mother = colonyName(flight.mother);
-    return {
-      ...circle,
-      preview: (p) =>
-        penSettle(circle, p, mother, (q) =>
-          game.colonies.length >= MAX_COLONIES
-            ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` }
-            : game.settleAt(q, penGround(oneWorld)),
-        ),
-      onPick: (p) => {
-        if (!withinFlight(circle, p)) return pushToast(`She can't fly that far: click within ${circle.r} of ${mother}'s hole.`, "warn");
-        if (!penWords.current.text) return pushToast("Write her doctrine first.", "warn");
-        foundOn(flight, penWords.current, p);
-      },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [penFor, flight, oneWorld, game, foundOn]);
+  // A new queen has flown (ja-lo8.9): the game is paused for her; the pen, or her mother's doctrine at once (ui/useFlight.ts).
+  const { flight, gate, circle, pen, penCard, foundHers, onFly, onWords, openDevPen } = useFlight({
+    game,
+    loop,
+    jev,
+    update,
+    setFollowed,
+    setView,
+    field,
+    oneWorld,
+  });
   // The dev hook (dev/hook.ts): the game and the page's views on window, for the Playwright guard. Dev builds only, not in the Pages build.
   useEffect(() => {
     if (!(import.meta as { env?: { DEV?: boolean } }).env?.DEV) return;
@@ -550,7 +445,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       setFollowed,
       sensed,
       field,
-      openPen: () => setDevPen(true),
+      openPen: openDevPen,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, controls.view, setFollowed, sensed, traces]);
@@ -570,7 +465,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jev.lock, jev.state.phase);
-  const penCard = flight && gate?.open && oneWorld && circle;
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
   // The palette's commands (ui/commands.ts ranks them): everything the HUD, the rail, the map's menu and the keys do,
   // and every guide entry. Built only while the palette is open (review of #196, N3); running one closes a pinned lens
@@ -879,13 +773,13 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           >
             {penCard ? (
               <QueenPen
-                key={flight.at}
-                flight={flight}
-                mother={colonyName(flight.mother)}
+                key={penCard.flight.at}
+                flight={penCard.flight}
+                mother={colonyName(penCard.flight.mother)}
                 daughter={colonyName(game.colonies.length)}
-                doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
+                doctrine={jev.doctrines[penCard.flight.mother] ?? jev.doctrines[0]!}
                 onFound={foundHers}
-                place={{ radius: circle.r, onWords, onFly }}
+                place={{ radius: penCard.circle.r, onWords, onFly }}
               />
             ) : followed || specimens.length ? (
               <>
@@ -1186,7 +1080,7 @@ function EvolvePanel({ evolve, menu, wide }: { evolve: (id: string) => boolean; 
 /** Whether the fungus has a mutation it can keep: only upgrades the panel shows, and that would do something now (a lethal lever off the menu would not). */
 function affordableIn(s: ColonyStats | null, menu: readonly string[]): boolean {
   const ev = s?.evolution;
-  return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.mutations, u.id)) : false;
+  return ev ? UPGRADES.some((u) => !idle(u, menu) && canKeep(ev.levels, ev.pools, u.id)) : false;
 }
 
 /** Where the fungus is, and how far the colonies have come together. */
@@ -1292,8 +1186,22 @@ function idle(u: Upgrade, menu: readonly string[]): boolean {
 }
 
 function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: string) => boolean; menu: readonly string[]; wide: boolean }) {
-  // One price for every level, rising with each one kept (PRD §80): shown here, by the mutations in hand, not on each level.
-  const next = UPGRADES.some((u) => nextCost(e.levels, u.id) !== null) ? price(keptLevels(e.levels)) : null;
+  // Two pools, each with one price that rises with each level kept in it (PRD §80, §85 M3): shown here, by the mutations in hand in each, not on each level.
+  const nextIn = (pool: Pool): number | null =>
+    UPGRADES.some((u) => poolOf(u.id) === pool && nextCost(e.levels, u.id) !== null) ? price(keptLevels(e.levels, pool)) : null;
+  const meter = (pool: Pool, label: string, tip: string) => {
+    const n = e.pools[pool];
+    const next = nextIn(pool);
+    return (
+      <div className="mt-2 flex items-baseline justify-between text-xs" data-pool={pool}>
+        <Tip tip={tip}>{label}</Tip>
+        <span className="font-mono tabular-nums">
+          <span className={n > 0 ? "text-spore" : "text-fg-3"}>{n.toLocaleString()}</span>
+          {next !== null && <span className="text-fg-2"> · next {next.toLocaleString()}</span>}
+        </span>
+      </div>
+    );
+  };
   return (
     <div className="mt-4" aria-label="evolution">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -1304,19 +1212,15 @@ function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: str
           mycelium {e.mass.toFixed(0)} · in ants {e.inHosts.toFixed(0)}
         </Tip>
       </div>
-      <div className="mt-2 flex items-baseline justify-between text-xs">
-        <Tip tip={MUTATION_TIP}>Mutations</Tip>
-        <span className="font-mono tabular-nums">
-          <span className={e.mutations > 0 ? "text-spore" : "text-fg-3"}>{e.mutations.toLocaleString()}</span>
-          {next !== null && <span className="text-fg-2"> · next {next.toLocaleString()}</span>}
-          <span className="text-fg-3"> · +{e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min</span>
-        </span>
-      </div>
+      {meter("ants", "Mutations from ants", ANTS_TIP)}
+      {meter("free", "Mutations from the ground", FREE_TIP)}
       <p className="mt-1 text-[11px] text-fg-3">
-        Every bit of new fungus can mutate, so the faster it grows the faster mutations come. You choose which to keep. Some levels need
-        others first, and every level costs the same price, which rises with each one you keep.
+        <Tip tip={MUTATION_TIP}>Every bit of new fungus can mutate</Tip>: fungus made in ants pays for the levels that act on ants; fungus
+        made on the ground and in corpses pays for the fungus's own (mycelium, knots, stalks, fruiting). You choose which to keep. Each pool
+        has its own price, which rises with each level you keep from it. +
+        {e.perMinute < 10 ? e.perMinute.toFixed(1) : Math.round(e.perMinute).toLocaleString()}/min in all.
       </p>
-      <UpgradeTree levels={e.levels} mutations={e.mutations} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
+      <UpgradeTree levels={e.levels} pools={e.pools} evolve={evolve} idle={(u) => idle(u, menu)} wide={wide} />
     </div>
   );
 }
