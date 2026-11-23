@@ -7,7 +7,7 @@ import { OPEN, rockAt } from "../../world.ts";
 import { oneColony } from "../builders.ts";
 
 // Brood odour (ja-k4k.15.2, docs/brood-odour.md): the brood gives off its own scent where it lies, reaching across a
-// chamber (slow to fade, 0.03 and 0.5: PRD §77.2), strongest on the pile. Off (broodOdour 0) the channel stays empty.
+// chamber (0.1 and 0.5: PRD §77.6), strongest on the pile. Off (broodOdour 0) the channel stays empty.
 
 /** A colony of one ant with `items` brood items on one cell of the royal chamber, run `seconds`; the cell and the row's open cells east. */
 function pile(items: number, broodOdour: number, seconds = 30, held = false) {
@@ -64,8 +64,8 @@ test("brood odour is saved with the colony's fields and loads back as it was", (
   for (let d = 0; d <= 3; d++) assert.equal(back.ph.fields.broodOdour.get(royal.x0 + 1 + d, royal.floorRow - 3), at(d), `${d} cells east`);
 });
 
-test("the brood-odour climb is on by default (PRD §77.4): the odour, the climb at gain 1, the crowd limit at 3, the slow wide channel", () => {
+test("the brood-odour climb is on by default (PRD §77.4): the odour, the climb at gain 1, the crowd limit at 3, the wide channel", () => {
   const { c } = oneColony(1, { maxAnts: 1 }, () => "explore", 1);
   assert.deepEqual([c.params.broodOdour, c.params.broodClimb, c.params.broodCrowd], [1, 1, 3]);
-  assert.deepEqual(DEFAULT_CHANNELS.broodOdour, { evaporation: 0.03, diffusion: 0.5 });
+  assert.deepEqual(DEFAULT_CHANNELS.broodOdour, { evaporation: 0.1, diffusion: 0.5 });
 });
