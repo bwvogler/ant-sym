@@ -219,6 +219,7 @@ export class PointerController {
     this.pointers.delete(e.id);
     // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
     if (!cancelled && g.kind === "paint" && g.pending) host.paint([[g.sx, g.sy]], true);
+    // `p` is missing only for a lifting whose press this controller never saw (another pointer's gesture is under way): no tap.
     if (!host.angled() && !cancelled && g.kind === "pan" && g.button === 0 && g.moved <= host.slop() && p) {
       const pen = host.pen();
       if (host.lensOn() && !(pen && host.onPlane())) {

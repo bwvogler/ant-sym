@@ -309,6 +309,34 @@ test("a tool in hand: a mouse paints at once and then by segments; a finger wait
   assert.deepEqual(pinch.st.strokes, [], "a second finger made it a pinch: nothing was built");
 });
 
+test("a pen is a finger, not a mouse: with a tool in hand it waits, places on a tap, and paints from where it landed once past the slop", () => {
+  const pen = (id: number, x: number, y: number) => ev(id, x, y, { pointerType: "pen" });
+  const tap = setup({ tool: "dirt" });
+  tap.ptr.down(tap.host, pen(1, 100, 100));
+  assert.equal(tap.st.strokes.length, 0, "a pen builds nothing yet: a second pointer may join");
+  tap.ptr.up(tap.host, pen(1, 100, 100));
+  assert.deepEqual(tap.st.strokes, [{ pts: [[100, 100]], first: true }]);
+
+  const drag = setup({ tool: "dirt" });
+  drag.ptr.down(drag.host, pen(1, 100, 100));
+  drag.ptr.move(drag.host, pen(1, 120, 100));
+  assert.deepEqual(drag.st.strokes, [
+    {
+      pts: [
+        [100, 100],
+        [120, 100],
+      ],
+      first: true,
+    },
+  ]);
+
+  const tweeze = setup({ tool: "tweezers", ant: ANT });
+  tweeze.ptr.down(tweeze.host, pen(1, 300, 200));
+  assert.equal(tweeze.st.tweezes.length, 0, "a pen waits before it lifts");
+  tweeze.ptr.move(tweeze.host, pen(1, 320, 200));
+  assert.equal(tweeze.st.tweezes[0]!.first, true);
+});
+
 test("the tweezers lift the ant under the pointer on the top view: a mouse at once, a finger past the slop; with none, or below, the pointer pans", () => {
   const mouse = setup({ tool: "tweezers", ant: ANT });
   const [wx, wy] = toWorld(mouse.st.cam, VIEW, 300, 200);
