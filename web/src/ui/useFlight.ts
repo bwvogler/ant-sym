@@ -9,7 +9,8 @@ import type { Landing } from "./QueenPen.tsx";
 import { useLoopStats } from "./session.ts";
 import { flightInAir } from "./statSelect.ts";
 import { pushToast } from "./toasts.ts";
-import type { JevView } from "./jevContext.tsx";
+import { useJev } from "./jevContext.tsx";
+import type { JevSession } from "./jevSession.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 import type { ColonyControls } from "./useColony.ts";
 
@@ -51,7 +52,7 @@ export function useFlight({
 }: {
   game: Game;
   loop: GameLoop;
-  jev: JevView;
+  jev: JevSession;
   update: (patch: Partial<ColonyControls>) => void;
   setFollowed: (f: null) => void;
   setView: (view: "above" | "below") => void;
@@ -62,7 +63,8 @@ export function useFlight({
   const flight: Flight | null = inAir ? (game.flights[0] ?? null) : null;
   // `devPen` (dev builds only, set by the dev hook's fly(): the Playwright guard) opens the pen without Jev.
   const [devPen, setDevPen] = useState(false);
-  const gate = flight ? penGate(flight, game.revealed, devPen ? null : jev.lock, colonyName(flight.mother)) : null;
+  const lock = useJev((s) => s.lock);
+  const gate = flight ? penGate(flight, game.revealed, devPen ? null : lock, colonyName(flight.mother)) : null;
   // The founding rules are ui/flight.ts's (ja-fnd.6.2); the page shows what they return and resumes once no queen is in the air.
   const apply = useCallback(
     (r: Founded) => {
@@ -76,7 +78,7 @@ export function useFlight({
   );
   useEffect(() => {
     if (!flight || !gate || gate.open) return;
-    apply(foundOnMothers(game, jev, jev.doctrines, flight, gate.reason));
+    apply(foundOnMothers(game, jev, jev.snapshot().doctrines, flight, gate.reason));
   }, [flight, gate, game, jev, apply]);
   /** Found flight f's colony at `at` on the player's words `d` (the queen's pen). */
   const foundOn = useCallback(

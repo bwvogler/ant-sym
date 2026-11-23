@@ -24,7 +24,7 @@ import { sunChip } from "./ui/sun.ts";
 import type { GameLoop } from "./ui/gameLoop.ts";
 import { SessionContext, useLoopStats, useStats } from "./ui/session.ts";
 import { chapterNameOf, evolutionOf, outcomeOf, simTime, slowPace, wholeStats } from "./ui/statSelect.ts";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import AntCard from "./ui/AntCard.tsx";
 import ColonyField, { type FieldApi } from "./ui/ColonyField.tsx";
 import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.tsx";
@@ -61,7 +61,7 @@ import { useWideTree } from "./ui/upgradeBranches.ts";
 import { ANTS_TIP, BODY_TIP, FREE_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
-import { JevContext, useJev, useJevSession, useJevView } from "./ui/jevContext.tsx";
+import { JevContext, useJev, useJevSession } from "./ui/jevContext.tsx";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
 import { GUIDE, REPO } from "./ui/guide.ts";
@@ -116,12 +116,20 @@ export default function ColonyApp() {
   );
 }
 
+/** The queen's pen on her mother's doctrine: read here, so the page does not draw again as the doctrines change. */
+function MotherPen(props: Omit<ComponentProps<typeof QueenPen>, "doctrine">) {
+  const doctrines = useJev((s) => s.doctrines);
+  return <QueenPen {...props} doctrine={doctrines[props.flight.mother] ?? doctrines[0]!} />;
+}
+
 function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const { game, loop, controls, update, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = colony;
   const backend = useBackend();
-  // What the page-level code still reads of Jev (saves, the pen, the notices): the whole snapshot with the commands. The leaves take theirs from the
-  // context, each its own slice (ui/jevContext.tsx).
-  const jev = useJevView();
+  // The page reads no Jev value that changes as the player types: the session for its commands and call-time reads (a save, the pen), and the two
+  // values that change rarely (the lock and the run's phase) for the notices. The leaves take theirs from the context (ui/jevContext.tsx).
+  const jev = useJevSession();
+  const jevLock = useJev((s) => s.lock);
+  const jevPhase = useJev((s) => s.phase);
   // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
   // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
   const lab = useLab() !== null;
@@ -260,7 +268,10 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const games = useSaves(
     game,
     settings,
-    { aim: jev.aim, doctrines: jev.doctrines, menu: controls.menu, hide: controls.hide, cull: controls.cull },
+    () => {
+      const { aim, doctrines } = jev.snapshot();
+      return { aim, doctrines: [...doctrines], menu: controls.menu, hide: controls.hide, cull: controls.cull };
+    },
     loop.stats,
     controls.started,
   );
@@ -319,7 +330,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   };
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
-  useNotices(loop, affordable, jev.lock, jev.phase);
+  useNotices(loop, affordable, jevLock, jevPhase);
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
   // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
@@ -551,12 +562,11 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             className={`panel-in pointer-events-auto absolute inset-x-2 bottom-16 z-10 max-h-[min(55dvh,calc(100%-9rem))] overflow-y-auto rounded-lg shadow-lg sm:inset-x-auto sm:top-[4.5rem] sm:right-3 sm:bottom-auto sm:max-h-[calc(100%-6rem)] sm:w-[26rem] lg:max-h-[calc(100%-12rem)] ${drawer ? "max-lg:hidden" : ""}`}
           >
             {penCard ? (
-              <QueenPen
+              <MotherPen
                 key={penCard.flight.at}
                 flight={penCard.flight}
                 mother={colonyName(penCard.flight.mother)}
                 daughter={colonyName(game.colonies.length)}
-                doctrine={jev.doctrines[penCard.flight.mother] ?? jev.doctrines[0]!}
                 onFound={foundHers}
                 place={{ radius: penCard.circle.r, onWords, onFly }}
               />
@@ -619,12 +629,11 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
         <Toasts place={toastPlace({ building, drawer: drawer !== null, lab })} />
         {/* The pen over the field, were her mother to have no hole: she lands by herself. */}
         {flight && gate?.open && !circle && (
-          <QueenPen
+          <MotherPen
             key={flight.at}
             flight={flight}
             mother={colonyName(flight.mother)}
             daughter={colonyName(game.colonies.length)}
-            doctrine={jev.doctrines[flight.mother] ?? jev.doctrines[0]!}
             onFound={foundHers}
           />
         )}
@@ -1033,7 +1042,7 @@ export interface Saves {
  * Saved games (ja-lo8.6): the list (newest first), saving to a slot, and the autosave: every AUTOSAVE_MS while a game
  * is under way, and when the tab is hidden (the player may not come back to this tab).
  */
-function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats: () => ColonyStats | null, started: boolean): Saves {
+function useSaves(game: Game, settings: GameSettings, player: () => PlayerState, stats: () => ColonyStats | null, started: boolean): Saves {
   const store = useMemo(() => browserSaves(), []);
   const [list, setList] = useState<SaveRecord[]>([]);
   const refresh = useCallback(
@@ -1046,16 +1055,16 @@ function useSaves(game: Game, settings: GameSettings, player: PlayerState, stats
   );
   useEffect(refresh, [refresh]);
   // The latest of everything, for the timer and the hidden-tab handler (they outlive renders).
-  const now = useRef({ game, settings, player, stats, started });
+  const now = useRef({ game, settings, playerState: player, stats, started });
   useEffect(() => {
-    now.current = { game, settings, player, stats, started };
+    now.current = { game, settings, playerState: player, stats, started };
   });
   const save = useCallback(
     async (slot: number) => {
       const n = now.current;
       if (!n.started) return;
       try {
-        await store.put(record(slot, n.settings, n.player, n.game.save(), n.stats()?.chapter.goal ?? ""));
+        await store.put(record(slot, n.settings, n.playerState(), n.game.save(), n.stats()?.chapter.goal ?? ""));
         refresh();
       } catch (e) {
         pushToast(`Couldn't save: ${String(e)}`, "warn");
