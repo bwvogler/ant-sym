@@ -150,16 +150,25 @@ test("with hyphae off, the fungus grows none", () => {
 });
 
 test("a corpse's six tips are rooted body axis first, and a body turned round roots them in the same order", () => {
-  // headings round the circle, none on the line between two hex ways (there a body and its reverse can round to different ways
-  // by a rounding error): the same six directions, and the same order for a body and its reverse
-  for (let k = 0; k < 12; k++) {
-    const heading = (k * Math.PI) / 6 - Math.PI + 0.1;
+  // headings round the circle at Float32 precision (as a worker's are stored), every 15 degrees: that takes in the hex ways, the
+  // lines between two axes (where a rounding error used to send a body and its reverse to different axes: #288's review) and
+  // the places between. The same six directions, and the same order for a body and its reverse, whichever way it is written.
+  for (let k = 0; k < 24; k++) {
+    const heading = Math.fround((k * Math.PI) / 12 - Math.PI);
     const order = corpseHeadings(heading);
     assert.deepEqual([...order].sort(), [0, 1, 2, 3, 4, 5], `all six ways (heading ${heading})`);
-    const axis = (dirOf(heading) % 3) + 0; // + 0: dirOf can give -0
-    assert.deepEqual(order.slice(0, 2), [axis, axis + 3], "the body's axis first");
-    assert.deepEqual(corpseHeadings(heading + Math.PI), order, "a reversed body: the same order");
+    for (const reverse of [Math.fround(heading + Math.PI), Math.fround(heading - Math.PI)])
+      assert.deepEqual(corpseHeadings(reverse), order, `a reversed body (${heading}, ${reverse}): the same order`);
+    // the body's axis first: the hex axis nearest the heading (either of two on a line between them), then its opposite way
+    const off = (axis: number) => {
+      const d = Math.abs((((heading - (axis * Math.PI) / 3) % Math.PI) + Math.PI) % Math.PI);
+      return Math.min(d, Math.PI - d);
+    };
+    const chosen = order[0]!;
+    assert.ok(chosen < 3 && order[1] === chosen + 3, `the first two tips are one axis (heading ${heading})`);
+    assert.ok(off(chosen) <= Math.min(off(0), off(1), off(2)) + 1e-3, `the nearest axis (heading ${heading})`);
   }
+  assert.deepEqual(corpseHeadings(Math.fround(Math.PI / 2)), corpseHeadings(Math.fround(-Math.PI / 2)), "a vertical body, either way");
   assert.deepEqual(corpseHeadings(-Math.PI / 3), [2, 5, 3, 0, 4, 1]);
   assert.deepEqual(corpseHeadings(), [...CORPSE.headings], "no heading: the fallback");
 });

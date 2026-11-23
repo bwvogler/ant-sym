@@ -249,10 +249,17 @@ export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: ROOT_HEADINGS 
  * axis, snapped to the nearest hex axis, then the other two axes in pairs. The two ways along one axis go in the same order
  * whichever way the body faced, so turning a cadaver round does not change which tip has priority (PRD §63.2). With no
  * recorded heading, CORPSE.headings.
+ *
+ * A heading and its reverse are folded to the same half-turn before they are snapped, with a tie rule: a heading on the line
+ * between two axes (straight up or down, 30 degrees off the hex ways) is rounded the same way for both, even when the
+ * stored heading is a Float32 and so a hair off (#288's review: the two orientations of a vertical body gave [2,5] and [1,4]).
  */
+/** How far past the line between two axes still counts as the far side: well over a Float32's rounding (1e-7), well under a degree. */
+const AXIS_TIE = 1e-4;
 export function corpseHeadings(heading?: number): readonly number[] {
   if (heading === undefined) return CORPSE.headings;
-  const axis = dirOf(heading) % 3;
+  const half = ((heading % Math.PI) + Math.PI) % Math.PI;
+  const axis = Math.floor(half / (Math.PI / 3) + 0.5 + AXIS_TIE) % 3;
   return [0, 3, 1, 4, 2, 5].map((k) => (axis + k) % 6);
 }
 
