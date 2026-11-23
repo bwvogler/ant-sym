@@ -1,4 +1,4 @@
-import { dragOrbit, mapOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
+import { mapCameraOrbit, mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.ts";
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
 import { decayStage } from "./cadaverVisual.ts";
 import { drawMapInspection, mapInspectionNow } from "./mapInspection.ts";
@@ -751,8 +751,7 @@ export default function ColonyField({
         aphidsRef.current?.() ?? [],
         theme,
         !smellAll,
-        // Above and Below face different planes, so their camera pitch signs differ.
-        lv === PLANE ? { ...orbit.current, tilt: -orbit.current.tilt } : orbit.current,
+        mapCameraOrbit(lv, orbit.current),
       );
       const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
       const frameAngled = "angled" in voxel && voxel.angled === true;
@@ -979,7 +978,7 @@ export default function ColonyField({
   const camera = () => rig.camera();
   const setCamera = (c: Camera) => rig.set(c);
   const tiltMap = (start: InspectionOrbit, dy: number) => {
-    const tilt = Math.min(0, dragOrbit(start, 0, dy).tilt);
+    const tilt = tiltFromDrag(start, dy);
     if (tilt === orbit.current.tilt) return;
     const current = camera();
     const readyZoom = MAP_ORBIT_READY_ZOOM * dpr();
