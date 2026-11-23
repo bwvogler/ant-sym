@@ -140,6 +140,8 @@ Each is its own small PR that **merges the day it opens**, with a fresh review, 
 | `useCameraRig.ts`, `useLatest.ts` | the rig built once from the shell's refs; a ref that holds a prop as of the last commit | the e2e |
 | `FieldGoToMenu.tsx`, `FieldOrbitHandle.tsx` | the Go to menu with its Escape and outside-press, and the tilt handle | the e2e |
 
+The React-compiler rules (`eslint-plugin-react-hooks`, the recommended set) are not in CI: the repo lints with oxlint only. They were run once by hand on the shell and the new components and hooks (none reported; on the shell before the split they reported five: refs read in render, `api.current` mutated, `goNest` used before it is declared). `useFieldFrame`'s effect still carries the `eslint-disable react-hooks/exhaustive-deps` the old effect had: it reads the shell's refs on purpose, and its dependency list is `[colonies, count, fungus, onFrame, world, sensed]` as before.
+
 One deviation from the plan above: the bead named `field/Hud.tsx` and `field/GoToMenu.tsx`. They are in `ui/` as `FieldOrbitHandle.tsx` and `FieldGoToMenu.tsx`, because `field/` is the plain-TypeScript folder and a component in it would break the line `fieldPlain.test.ts` holds. The shell is a little over the 300 lines the bead aimed at (320): what is left is the pointer and key glue, which reads the page's props and cannot be plain.
 
 ## Decisions taken (and what overturns them)
