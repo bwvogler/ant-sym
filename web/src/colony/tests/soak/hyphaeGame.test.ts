@@ -779,6 +779,29 @@ test("a flower that touches a patch spreads it over its other cells, and the pat
   assert.equal(back.fungus.spread, added, "a save keeps the count");
 });
 
+for (const last of ["a neighbour", "the middle"] as const) {
+  test(`a flower closes by whichever of its seven cells grows last: ${last}`, () => {
+    const g = game(true);
+    g.fungus.bindPolicy("growth", () => "rest");
+    const e = g.fungus.evolution!;
+    const h = g.fungus.hyphaeOn(PLANE)!;
+    const tip = h.tips[0]!;
+    const [x, y] = openSpot(g, tip, 25);
+    const ring = [0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)] as [number, number]);
+    const cells = last === "the middle" ? ring : [[x, y] as [number, number], ...ring.slice(0, 5)];
+    const final = last === "the middle" ? [x, y] : ring[5]!;
+    const patches = e.patches;
+    for (const [cx, cy] of cells) h.addCell(cx, cy);
+    // A settle round falls between the two additions: six of the seven cells are not a flower.
+    runFor(g, 10);
+    assert.equal(g.fungus.flowers, 0, "six of seven cells close nothing");
+    h.addCell(final[0]!, final[1]!);
+    runFor(g, 10);
+    assert.equal(g.fungus.flowers, 1, `the seventh cell, ${last}, closes it`);
+    assert.equal(e.patches, patches + 1, "a new patch");
+  });
+}
+
 test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
   const g = game(true);
   g.fungus.bindPolicy("growth", () => "thicken");

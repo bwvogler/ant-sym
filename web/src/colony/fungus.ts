@@ -1479,6 +1479,7 @@ export class Fungus {
   #settle(): void {
     const e = this.#evolution;
     // Every map's list is emptied, so none grows without bound; only layer 0's is looked at.
+    // The lists are not saved: a cell grown outside the round (a corpse) and not yet taken when a save is made loses its check.
     const lists = this.#hyphae.map((h) => h?.takeGrown() ?? []);
     const h = this.#hyphae[0];
     if (!e || !h) return;
@@ -1495,8 +1496,8 @@ export class Fungus {
         if (!cells.every((c) => h.parent.has(c))) continue;
         // The middle is new ground (a patch grows from outside in): a hex centred on a patch's own edge cell is the tips' first steps, not a web.
         if (inPatch(cells[0]!)) continue;
+        // The middle is outside every patch, so there is always at least one fresh cell.
         const fresh = cells.filter((c) => !inPatch(c));
-        if (fresh.length === 0) continue;
         for (const c of fresh) {
           L.base.push(c);
           base.add(c);
