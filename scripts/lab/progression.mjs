@@ -12,7 +12,8 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split]
+// --split reports where the growth that mutations come from was made: the mycelium on the ground, corpses, and hosts (PRD §85 M3).
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
@@ -50,6 +51,7 @@ if (isMainThread) {
     price: opt("price", null),
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
+    split: flag("split"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -78,6 +80,10 @@ if (isMainThread) {
     console.log(
       `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})`,
     );
+    if (job.split)
+      console.log(
+        `  growth made: ground ${r.split.ground.toFixed(0)} · corpses ${r.split.corpses.toFixed(0)} · hosts ${r.split.hosts.toFixed(0)}`,
+      );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
@@ -89,7 +95,24 @@ if (isMainThread) {
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, hyphae, growth, grant, sun, flow, price, landing, rootRadius } = workerData;
+  const {
+    seed,
+    seconds,
+    aim,
+    evolve,
+    buy,
+    order,
+    strain,
+    hyphae,
+    growth,
+    grant,
+    sun,
+    flow,
+    price,
+    landing,
+    rootRadius,
+    split: wantSplit,
+  } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
     const { PRICE } = await import("../../web/src/colony/evolution.ts");
@@ -122,6 +145,24 @@ if (isMainThread) {
     STRAINS.findIndex((s) => s.id === strain),
     { evolve },
   );
+  // --split: where the growth that mutations come from was made (evolution.ts): the mycelium on the ground (grow), a corpse's
+  // substance (feed), and load passed on in hosts (replicate). The three methods are wrapped on this game's evolution only.
+  const split = { ground: 0, corpses: 0, hosts: 0 };
+  if (wantSplit && g.fungus.evolution) {
+    const e = g.fungus.evolution;
+    const wrap = (name, key) => {
+      const f = e[name].bind(e);
+      e[name] = (...a) => {
+        const before = e.growth;
+        const out = f(...a);
+        split[key] += e.growth - before;
+        return out;
+      };
+    };
+    wrap("grow", "ground");
+    wrap("feed", "corpses");
+    wrap("replicate", "hosts");
+  }
   const { MUTATION, pathTo } = await import("../../web/src/colony/evolution.ts");
   // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then.
   for (const id of grant) {
@@ -149,6 +190,7 @@ if (isMainThread) {
     flowers: 0,
     patches: 0,
     mat: 0,
+    split,
   };
   const share = (c) => {
     const f = g.fungus.census(c);
