@@ -118,6 +118,30 @@ Each is its own small PR that **merges the day it opens**, with a fresh review, 
 | s | `ja-fnd.6.3.12` | `ColonyField.tsx` is a shell under about 300 lines (`Hud.tsx` and `GoToMenu.tsx` extracted); docs; the epic closes | acceptance above |
 | any | `ja-fnd.6.3.18` | optional: a label-triggered workflow that records on the base and checks on the head on one runner (about 3 minutes a slice) | the next slice's PR can cite it |
 
+## What was built (the epic's close, 2026-11-23)
+
+`ColonyField.tsx` is a shell of about 320 lines: the props' refs, the page's handle on the cameras (`FieldApi`), the pointer and key glue, and the canvas with its two small components. Everything else is in files that say what they are. `ui/field/` is plain TypeScript (no React, no DOM global, no clock: `fieldPlain.test.ts` holds that), so a Node test runs each; the React and the browser's observers are beside the shell in `ui/`.
+
+| file | what it is | tested by |
+|---|---|---|
+| `field/env.ts` | `FieldEnv`: the clock, the pixel ratio, the dev flag, reduced motion, new paths and canvases, the sprite sets | `ground.test.ts`, the scenes |
+| `field/ctx.ts` | `FieldCtx`, `FieldInputs`, `FieldTheme`: what a frame's layers share and read | (types) |
+| `field/api.ts` | `FieldProps`, `FieldBuild`, `FieldApi`: what the page gives the field and may ask of it | (types) |
+| `field/binding.ts` | `FieldBinding`: the shown layer and map, each colony's trails and alarm on it, the spores, the theme from the CSS, the sprite sets and their load | `binding.test.ts` |
+| `field/prelude.ts` | the follow, the crossing through a hole and the camera's ease, before a frame draws | `prelude.test.ts` |
+| `field/rig.ts` | `CameraRig`: the cameras, one per view, `centreOn`, fit, `goTo` | `rig` tests |
+| `field/pointer.ts`, `field/keyboard.ts` | the pointer gestures (`PointerController`) and the keys and wheel | `pointer.test.ts`, `fieldKeyboard.test.ts` |
+| `field/hit.ts` | what is under a point: the ant to pick (`PICK_PX`), the chamber, where a click on the line or strip asks to look | `hit.test.ts` |
+| `field/orbit.ts` | the inspection tilt of the close map: `tiltMap`, `orbitKey`, `resetOrbit` | `orbit.test.ts` |
+| `field/ground.ts`, `field/minimap.ts` | the ground a chunk at a time, the strip, the minimap | `ground.test.ts`, `minimap` tests |
+| `field/fungus.ts`, `field/overlays.ts`, `field/nests.ts`, `field/ants.ts`, `field/marks.ts` | the layers: the hyphae and stalks; the line, the hole names, the pen; the nests; the ants; the specimens, traces, aphids and inspection | each its own test file |
+| `field/renderer.ts` | `FieldRenderer`: a frame is a list of stages, each started from the same stroke state | `renderer.test.ts`, `scenes.test.ts` |
+| `useFieldFrame.ts` | the frame loop: builds the parts, watches the canvas, the theme and the wheel, draws on every tick (a hook: the observers are the browser's) | the e2e, the pixel guard |
+| `useCameraRig.ts`, `useLatest.ts` | the rig built once from the shell's refs; a ref that holds a prop as of the last commit | the e2e |
+| `FieldGoToMenu.tsx`, `FieldOrbitHandle.tsx` | the Go to menu with its Escape and outside-press, and the tilt handle | the e2e |
+
+One deviation from the plan above: the bead named `field/Hud.tsx` and `field/GoToMenu.tsx`. They are in `ui/` as `FieldOrbitHandle.tsx` and `FieldGoToMenu.tsx`, because `field/` is the plain-TypeScript folder and a component in it would break the line `fieldPlain.test.ts` holds. The shell is a little over the 300 lines the bead aimed at (320): what is left is the pointer and key glue, which reads the page's props and cannot be plain.
+
 ## Decisions taken (and what overturns them)
 
 These were open in the review of #291; I took them so work can start, and each is one line to change.
@@ -159,3 +183,4 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-23 | `ja-fnd.6.3.8`, part 2 of 2: the binding (`binding.ts`: `FieldBinding` holds the shown layer and map, the colonies' scent and spores on it, the theme read from the CSS, the sprite sets and their load/dispose; the render effect is wiring; 7 log tests) | (this PR) |
 | 2026-11-23 | `ja-fnd.6.3.9`: the headless scenes (`tests/sceneHarness.ts`, `scenes.test.ts`: 29 scenes of FieldRenderer over a real small game, sprites ready, goldens as hashes of the call log and of the images' pixels; every stage drop and neighbour swap fails; ~8 s) | (this PR) |
 | 2026-11-23 | `ja-fnd.6.3.10`: the canvas state explicit: `FieldRenderer.frame` starts every stage from round caps, mitred joins and a 1 px line; two scenes added (a walking trace; the followed ring at a low zoom); the headless scenes re-recorded (a stage now sets three properties); the pixel guard names the scenes that move | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.12`: the shell (`ColonyField.tsx` 722 → 320 lines; about 2,600 when the split was planned): `field/hit.ts`, `field/orbit.ts`, `field/api.ts` (plain, 11 tests); `useFieldFrame`, `useCameraRig`, `useLatest`, `FieldGoToMenu`, `FieldOrbitHandle` beside it; `api` prop renamed `apiRef`; 40 scenes match, the e2e passes; the epic closes | (this PR) |

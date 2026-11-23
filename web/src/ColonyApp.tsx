@@ -684,7 +684,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             view={controls.view === "above" ? PLANE : CURTAIN}
             onLink={onLink}
             onCross={onCross}
-            api={field}
+            apiRef={field}
             specimens={specimens}
             pen={pen}
             lens={lensOn}
