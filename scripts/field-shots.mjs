@@ -19,7 +19,7 @@
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
 // on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
 // page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap), a pinned specimen
-// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. The `built` page ends with the theme flipped after the first frame and the pointer resting in the queen's pen, and the `retina` page is the same world at two device pixels to a CSS pixel: what ColonyField reads each frame from the page. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). The `ants` page: every kind of ant at once (markAnts: odour bands, light and heavy infection, three qualities of food, soil, a corpse, brood), as strokes and as sprites (the scenes hold the stroke and sprite paths, the dots and the cargo the sheets draw; what is drawn only while a sheet is not ready, the grey cross for a carried corpse and the nest sheet's corpse and brood sprites, is held by ui/tests/ants.test.ts). Not covered yet, to add with the slice that moves that layer: a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on), the trace's run and dotted loops. (The lens card is DOM, and
+// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. The `built` page ends with the theme flipped after the first frame and the pointer resting in the queen's pen, and the `retina` page is the same world at two device pixels to a CSS pixel: what ColonyField reads each frame from the page. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). The `ants` page: every kind of ant at once (markAnts: odour bands, light and heavy infection, three qualities of food, soil, a corpse, brood), as strokes and as sprites (the scenes hold the stroke and sprite paths, the dots and the cargo the sheets draw; what is drawn only while a sheet is not ready, the grey cross for a carried corpse and the nest sheet's corpse and brood sprites, is held by ui/tests/ants.test.ts). Not covered yet, to add with the slice that moves that layer: a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on). (The trace's run and dotted loops and the followed ring at a low zoom are `marks-trace-walk` and `marks-followed-far`.) (The lens card is DOM, and
 // draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
 // stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes), and the same for the plane's other marks (a specimen's
 // ring, a moved ant's trace) drawn on the curtain.
@@ -401,6 +401,36 @@ const SCENES = [
       await tool(p, "Move");
     },
   },
+  // The moved ant then walks: a trace is recorded a point a drawn frame, so the page steps ten ticks and lets a frame draw, six times (the trace's solid
+  // run and, once its vector is out, its dotted search loops: the scene above holds only the start ring).
+  {
+    name: "marks-trace-walk",
+    page: "walk",
+    run: async (p) => {
+      // what the marks page has done by its trace scene: the world played, the camera at the nest with ants in view, the builder open
+      await ticks(p, 900);
+      await p.evaluate(() => window.jevAnts.goNest(0));
+      await sleep(1500);
+      await p.getByRole("button", { name: "Builder", exact: true }).click();
+      await tool(p, "Tweezers: pick up an ant");
+      const { sx, sy } = await antScreen(p, 0, 0);
+      await stroke(p, [sx, sy], [sx + 140, sy - 110]);
+      await tool(p, "Move");
+      for (let k = 0; k < 6; k++) {
+        await ticks(p, 10);
+        await sleep(150);
+      }
+    },
+  },
+  // The followed ant's ring at a low zoom, where its radius is the 9 device px floor (the scenes' zoom makes zoom * 1.6 win).
+  {
+    name: "marks-followed-far",
+    page: "marks",
+    run: async (p) => {
+      await followOn(p, 0, 0);
+      await zoomWheel(p, 1500);
+    },
+  },
   // A phone-sized page (390 x 844, touch): the field's size and the page's narrow layout
   { name: "phone-above", page: "phone", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "phone-below", page: "phone", run: (p) => view(p, "below") },
@@ -433,6 +463,8 @@ const PAGES = {
   built: { scheme: "light", species: null },
   marks: { scheme: "light", species: null },
   ants: { scheme: "light", species: null },
+  // a page of its own: the tweezers' stroke needs an ant nothing has moved (the marks page's scene before it moved the same one)
+  walk: { scheme: "light", species: null },
   retina: { scheme: "light", species: null, scale: 2 },
   // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
   phone: { scheme: "light", species: null, phone: true },

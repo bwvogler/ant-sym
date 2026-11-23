@@ -78,6 +78,10 @@ export interface Scene {
   hover?: readonly [number, number] | null;
   labels?: boolean;
   smell?: boolean;
+  /** the walking traces of moved ants (what AntTraces holds): a run of the old vector, then a search loop */
+  traces?: (g: Game) => unknown[];
+  /** frames drawn on the one context (default 1): the log is the last one's, which starts from what the frames before it left set */
+  frames?: number;
   /** aphid clumps and a hook to add them */
   aphids?: unknown[] | ((g: Game) => unknown[]);
 }
@@ -115,7 +119,14 @@ const DARK = (name: string) =>
   })[name] ?? "";
 
 /** One frame of the renderer over a real game; returns the call log of the main canvas (and the game, for assertions). */
-export function renderScene(s: Scene = {}): { log: string[]; pixels: Uint8ClampedArray[]; game: Game; frameState: unknown } {
+export function renderScene(s: Scene = {}): {
+  log: string[];
+  full: string[];
+  from: number;
+  pixels: Uint8ClampedArray[];
+  game: Game;
+  frameState: unknown;
+} {
   RecordedImage.made.length = 0;
   RecordedCanvas.count = 0; // canvases print as canvas#n: a scene's log is the same whichever scenes ran before it
   const g = (globalThis as { Path2D?: unknown }).Path2D;
@@ -194,22 +205,31 @@ export function renderScene(s: Scene = {}): { log: string[]; pixels: Uint8Clampe
     };
     const f = typeof s.follow === "function" ? s.follow(game) : (s.follow ?? null);
     const fcol = f ? followedColony(game.colonies, f) : null;
-    const fs = beginFrame(
-      fctx,
-      inputs,
-      parts,
-      {
-        orbit: { yaw: 0, tilt: 0 } as never,
-        labelsOn: !!s.labels,
-        aphids: (typeof s.aphids === "function" ? s.aphids(game) : (s.aphids ?? [])) as never,
-        traces: null as never,
-        specimens: typeof s.specimens === "function" ? s.specimens(game) : (s.specimens ?? []),
-        sensed,
-      },
-      { started: 0, f, fcol, fHere: !!(f && fcol && fcol.layer[f.i] === lv) },
-    );
-    new FieldRenderer().frame(fs);
-    return { log: rec.log, pixels: RecordedImage.made.map((i) => i.data), game, frameState: fs };
+    const makeFrame = () =>
+      beginFrame(
+        fctx,
+        inputs,
+        parts,
+        {
+          orbit: { yaw: 0, tilt: 0 } as never,
+          labelsOn: !!s.labels,
+          aphids: (typeof s.aphids === "function" ? s.aphids(game) : (s.aphids ?? [])) as never,
+          traces: (s.traces ? { traces: s.traces(game), update: () => {} } : null) as never,
+          specimens: typeof s.specimens === "function" ? s.specimens(game) : (s.specimens ?? []),
+          sensed,
+        },
+        { started: 0, f, fcol, fHere: !!(f && fcol && fcol.layer[f.i] === lv) },
+      );
+    // The same context for every frame, as the page has it: what one frame leaves set on it, the next starts from. The log is the last frame's.
+    const renderer = new FieldRenderer();
+    let fs!: ReturnType<typeof makeFrame>;
+    let from = 0;
+    for (let k = 0; k < (s.frames ?? 1); k++) {
+      from = rec.log.length;
+      fs = makeFrame();
+      renderer.frame(fs);
+    }
+    return { log: rec.log.slice(from), full: rec.log, from, pixels: RecordedImage.made.map((i) => i.data), game, frameState: fs };
   } finally {
     (globalThis as { Path2D?: unknown }).Path2D = g;
   }

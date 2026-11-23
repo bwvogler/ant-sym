@@ -143,7 +143,11 @@ test("label: text with a paper halo, then the text; the halo's line width grows 
     "textAlign = start",
     "textBaseline = alphabetic",
   ]);
-  assert.equal(state.lineJoin, "round", "the canvas-state leak (docs/field-split.md): the join stays set");
+  assert.equal(
+    state.lineJoin,
+    "round",
+    "the join stays set to the end of the stage (the renderer resets it for the next, docs/field-split.md)",
+  );
   const faint = field(world(false), PLANE, { x: 0, y: 0, zoom: 1 });
   label(faint.k, "x", 1, 2, 4, 0.5, "#fill");
   assert.ok(
@@ -304,7 +308,7 @@ test("drawStripAnts: the plane's live ants over the line are drawn level on the 
     "fillStyle = #accent",
     `fillRect(${r(x(s2) + 4 - 1.5)}, ${r(y - 1.5)}, 3, 3)`,
   ]);
-  assert.equal(state.lineCap, "round", "the canvas-state leak: the cap stays set");
+  assert.equal(state.lineCap, "round", "the cap stays set to the end of the stage (the renderer resets it for the next)");
   assert.notEqual(tone(c0), tone(c1));
   // nobody carries: the ants are drawn and no crumb is
   for (const col of g.colonies) col.carrying.fill(0);
