@@ -7,7 +7,19 @@ import { cellKey, crossedDir, gauss, NO_CELL, refilled, soilFace, tunnel, wallSi
 import { CELL, cellOf, centreX, centreY, DIR_ANGLE } from "./hex.ts";
 import { touchProbe } from "./sense.ts";
 import type { AntStep } from "./step.ts";
-import { DIG_FACE, DIG_TIME, GLANCE, HUG_TIME, NO_FACE, ROOMY_DIG, START, START_FACE, WALL_LOST, WALL_PROBE } from "./tuning.ts";
+import {
+  CELL_SQUEEZE,
+  DIG_FACE,
+  DIG_TIME,
+  GLANCE,
+  HUG_TIME,
+  NO_FACE,
+  ROOMY_DIG,
+  START,
+  START_FACE,
+  WALL_LOST,
+  WALL_PROBE,
+} from "./tuning.ts";
 import { EXPLORE, RETURN } from "./vocab.ts";
 import { digCell, rockAt, setTunnelHeading, SOIL, OPEN } from "./world.ts";
 import { pointDown } from "./plane.ts";
@@ -32,6 +44,9 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
   let speed = p.speed;
   if (p.withdrawalSpeed !== undefined && col.onPlane && !carrying && !pellet && s.fleeFrom !== null && Math.cos(h - s.fleeFrom) < 0)
     speed *= p.withdrawalSpeed;
+  // Bodies (ja-k4k.15.7.1, off at cellCap 0): a step into a full cell is refused below.
+  const cap = p.cellCap;
+  const crowd = cap > 0 ? col.friends : null;
   const nx = Math.fround(col.x[i] + Math.cos(h) * speed * dt);
   const ny = Math.fround(col.y[i] + Math.sin(h) * speed * dt);
   col.detour[i] = col.detour[i] - dt;
@@ -212,6 +227,24 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
     return true;
   } else {
     col.digT[i] = 0; // the face it was digging opened (another ant dug it), or it turned off it (its aim stays: it is walking up to the face)
+    if (crowd !== null) {
+      // A step into a cell that is full is mostly refused: the ant stays and turns aside (a sidestep), so it does not queue in line.
+      col.antCell(i);
+      const ox = CELL[0];
+      const oy = CELL[1];
+      const there = lx !== ox || ly !== oy ? crowd.get(lx, ly) : 0;
+      // Full: refused. Between the cap and twice it, an ant squeezes in now and then (so none waits for ever); past twice, never.
+      if (there >= cap && (there >= 2 * cap || rng() >= 1 - Math.exp(-CELL_SQUEEZE * dt))) {
+        h += (rng() < 0.5 ? -1 : 1) * (Math.PI / 3 + (rng() * Math.PI) / 3);
+        s.h = h;
+        return false;
+      }
+      // The grid is a tick old: keep it true as ants move, so a cell fills no further than it holds within a tick.
+      if (lx !== ox || ly !== oy) {
+        crowd.add?.(ox, oy, -1);
+        crowd.add?.(lx, ly, 1);
+      }
+    }
     col.x[i] = nx;
     col.y[i] = ny;
     col.cellX[i] = lx;

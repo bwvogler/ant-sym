@@ -399,6 +399,13 @@ export interface ColonyParams {
    * chamber. Bodies limit it (1 cell ≈ 1 body length); the soft form of a per-cell cap. **Design.** 0: no limit.
    */
   broodCrowd: number;
+  /**
+   * The most ants of its colony one cell of the nest holds (ja-k4k.15.7.1, docs/nurse-crowding.md): an ant slows as its cell
+   * fills (CROWD_SLOW_FLOOR) and a step into a full cell is mostly refused and sidestepped (CELL_REFUSE), read from the
+   * contact count `friends`. Bodies limit a cell (1 cell ~ 1 body length, so about 2-3 fit by footprint; the nest is sized for
+   * about 10 a floor cell, so a cap needs more floor). **Design.** Nest only: the plane has no count. 0: no limit.
+   */
+  cellCap: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -550,6 +557,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   broodOdour: 1,
   broodClimb: 1,
   broodCrowd: 3,
+  cellCap: 0,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,
