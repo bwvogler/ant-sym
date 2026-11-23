@@ -2,6 +2,7 @@ import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } fro
 import { type BuildEvent, Builder, CURTAIN, type Game, PLANE } from "../colony/index.ts";
 import type { FieldApi, FieldBuild } from "./ColonyField.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./build.ts";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { colonyName } from "./names.ts";
 import { play, say } from "./sounds.ts";
 import { pushToast } from "./toasts.ts";
@@ -35,6 +36,12 @@ function buildNotice(e: BuildEvent): string {
       return "Your aphids are all gone: aphid families grow, then fade away.";
   }
 }
+
+/** Whether a key went to a field being typed in (the builder's keys are not for it). */
+const typing = (target: EventTarget | null): boolean => {
+  const t = target as HTMLElement | null;
+  return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+};
 
 export function useBuilder({
   game,
@@ -158,20 +165,31 @@ export function useBuilder({
     }, 1000);
     return () => clearInterval(timer);
   }, [builder]);
-  // Ctrl/⌘+Z undoes a stroke while building; Escape leaves the builder.
+  // Escape leaves the builder (the bottom layer below the field, escape.ts: after a tooltip, the Codex, the Lab and a drawer), but not from a
+  // field being typed in.
+  useEscape(
+    ESCAPE_LAYER.builder,
+    (e) => {
+      if (typing(e.target)) return false;
+      toggleBuilding();
+      return true;
+    },
+    building,
+    "below",
+  );
+  // Ctrl/⌘+Z undoes a stroke while building.
   useEffect(() => {
     if (!building) return;
     const key = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (typing(e.target)) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         undoBuild();
-      } else if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector('[role="dialog"]')) toggleBuilding();
+      }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [building, undoBuild, toggleBuilding]);
+  }, [building, undoBuild]);
   /** The tray's "little" switch (a smaller set of tools): flipping it leaves the tool in hand for Move. */
   const toggleLittle = () => {
     setLittle((l) => !l);

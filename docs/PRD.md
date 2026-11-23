@@ -5859,7 +5859,7 @@ They chose to build it directly, in stages: S1 the shell, S2 on the map, S3 the 
 ### 69.1 S1: the kit and the full-bleed shell (ja-mvo9.1)
 - **`ui/kit.tsx`:** `SectionHead`, `Button`, `IconButton` (its badge read out as a description), inline-SVG `Icon`s (no dependency), the floating surface style `FLOAT`, and `Drawer`.
   - A `Drawer` is a column under the HUD on a desktop, and a bottom sheet above the tab bar on a phone.
-  - Escape closes it, unless a tooltip, Learn or Details is above it.
+  - Escape closes it, unless a tooltip or the Codex is above it (the layer order is in §69, one Escape closes one thing).
 - **The layout:**
   - **The map:** fills the viewport, with no page scroll and no aspect box.
   - **The HUD:** play, the speeds, above/below, the clock, the pace warning, and the goal pill. On a phone the clock and the pace move into the goal pill so the bar fits 390 px.
@@ -5928,7 +5928,7 @@ The second half of stage 2: ways to find any action and to learn what anything o
   - The game's keys wait while a dialog has the page (the palette, the sheet, Details, Learn, the start, the queen's pen); ⌘K still works.
   - **Changed from the plan:** S2's plan put the lens on ?. The key ? is the shortcuts sheet's, as on most sites, and the lens is i. The owner can overrule.
 - **The shortcuts sheet:** the key ?, the palette, or Settings → Keyboard shortcuts.
-- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu, then the followed ant, then the drawer. The Go to menu leaves an Escape that something above it took.
+- **Escape closes one thing at a time:** the palette or the sheet, then a pinned lens card, then the Go to menu or the notices, then the followed ant, then (after any control that took the key itself: a chart's crosshair, the aim box, the tilt handle) a tooltip, the Codex, the Lab (only with focus in it), a drawer, and last the builder. One manager holds the order (`ui/escape.ts`: two stacks, above and below the field; docs/refactor.md S5.4); a surface that takes the key settles it, so nothing under it acts on the same press. The Go to menu leaves an Escape that something above it took.
 - **The phone's HUD:** the speed and view buttons are tighter below 640 px, so the lens button fits from 360 px wide.
 - **The kit gains `Modal`:** a dialog over the page. Focus moves in and comes back, Tab stays inside, and Escape and a press on the backdrop close it. It also gains `Kbd` and two icons.
 - **Unchanged:** the simulation; no legend, question or schema, so no Jev cost change. The field's picture is bit-for-bit the same: its thresholds moved into named constants with the same values.
@@ -6055,7 +6055,7 @@ The Codex was the field guide, the nest and the policy. The policy is about how 
 - **The keyboard.**
   - A "?" moves focus to the section it opened, so pressing one by key lands there (review of #237, S1).
   - Escape, with focus in the Lab, closes it and gives the map the focus (the owner, D1 on #237). This replaces the Codex's Escape after a "?".
-  - One Escape closes one thing. A chart's crosshair takes it first, and the Lab leaves it alone while a tooltip or a dialog that takes Escape is open (not the tutorial's coach card, which takes none).
+  - One Escape closes one thing. A chart's crosshair takes it first, and the Lab takes it only with focus in it and not while a tooltip or the Codex is open above it (`ui/escape.ts`, §69).
   - Opening the Lab by `l`, the palette or Settings takes no focus, so Space still plays and pauses. A button inside it that swaps the tab under it (Policy's "the Levers tab") leaves focus on the selected tab.
 - **The Codex** keeps two tabs: the field guide and the nest. Its ids stay `learn-…`, and the Lab's policy sections are `lab-…`, so the two never share one.
 - **Two chart fixes** from #226's re-review (`ja-mvo9.4.1`):
@@ -6457,7 +6457,7 @@ Merging is not delegated: PRs wait for the owner.
   - **With Move:** the field is as ever (one finger pans, a tap follows an ant).
   - **Two fingers** pinch and pan for an adult.
   - **Palms:** a touch wider or taller than 60 px is set aside (design).
-  - **Keys:** Ctrl/⌘+Z undoes; Escape leaves the builder.
+  - **Keys:** Ctrl/⌘+Z undoes; Escape leaves the builder (after a tooltip, the Codex, the Lab and a drawer have had it; not from a field being typed in).
 - **Smell vision** (owner): while building and on (the default), every colony's food trail shows everywhere, each in its colony's tone, with the home trail and alarm as before. With the builder off, §65 holds. It is a picture only.
 - **Sugar and crumbs** draw in their own colours (candy pink, biscuit brown); food of quality 1 is unchanged.
 - **Little hands** (owner: a switch in the builder): Move, Sugar, Dig and Rain, at 88 px; no smell vision.

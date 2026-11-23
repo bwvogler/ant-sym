@@ -1,24 +1,35 @@
 import { useEffect } from "react";
 import { useLatest } from "./useLatest.ts";
 
-// One Escape manager (ja-fnd.6.4.1, docs/refactor.md S5.4). Escape closes one thing: the palette or the shortcuts sheet, then a pinned lens
-// card, then the Go to menu (and the notices list), then the followed ant, then a drawer (PRD §69). Each surface that takes Escape used to
-// listen for itself and decide whether it was first by asking the page: a `[aria-modal]` in the document, a `[role=tooltip]`, `defaultPrevented`.
-// A surface now registers a claim on a layer while it is open, and the one listener here gives the key to the highest layer that takes it, so
-// no surface looks at the DOM to know whether another is above it.
+// One Escape manager (ja-fnd.6.4, docs/refactor.md S5.4). Escape closes one thing: the palette or the shortcuts sheet, then a pinned lens
+// card, then the Go to menu (and the notices list), then the followed ant, then a tooltip, the Codex, the Lab or a drawer, then the builder
+// (PRD §69). Each surface that takes Escape used to listen for itself and decide whether it was first by asking the page: a `[aria-modal]` in
+// the document, a `[role=tooltip]`, `defaultPrevented`. A surface now registers a claim on a layer while it is open, and a listener here gives
+// the key to the highest layer that takes it, so no surface looks at the DOM to know whether another is above it.
 //
-// This is the group above the field, in the capture phase. A claim that takes the key stops it there, so the field (which drops a follow on an
-// Escape nobody took, keyboard.ts) and the surfaces under it (a drawer, the Codex, the Lab, the builder: still the bubble phase, with
-// `defaultPrevented` as their rule) never see it.
+// There are two stacks, either side of the map. `above` is a capture listener: it comes before the field's own handler (which drops a follow on
+// an Escape nobody took, keyboard.ts) and before every element's, and a claim that takes the key stops it there. `below` is a bubble listener
+// on the window: the field has had its turn, and so has a control with focus (a chart's crosshair, the aim box), which settle the event
+// themselves (`defaultPrevented` is the one rule between a handler and the stack).
 
-/** Where a claim sits: a higher layer is asked first. */
+/** Where a claim sits, in its stack: a higher layer is asked first. */
 export const ESCAPE_LAYER = {
-  /** a pinned lens card */
-  card: 80,
-  /** a menu or a list over the field (the Go to menu, the notices) */
-  popover: 60,
-  /** a dialog over the whole page (the palette, the shortcuts sheet) */
+  /** above the field: a dialog over the whole page (the palette, the shortcuts sheet) */
   modal: 100,
+  /** above the field: a pinned lens card */
+  card: 80,
+  /** above the field: a menu or a list over the field (the Go to menu, the notices) */
+  popover: 60,
+  /** below the field: a tooltip */
+  tooltip: 90,
+  /** below the field: the Codex */
+  codex: 70,
+  /** below the field: the Lab (only for a key pressed with focus in it) */
+  lab: 60,
+  /** below the field: a drawer beside the map */
+  drawer: 50,
+  /** below the field: the builder */
+  builder: 40,
 } as const;
 
 /** Whether the claim took the key (true), or does not want it now (false: the next layer is asked). */
@@ -67,30 +78,52 @@ export class EscapeStack {
   }
 }
 
-/** The page's stack, and its one listener (on while anything is registered). */
-export const escapes = new EscapeStack();
+/** Which side of the field a claim is on: `above` comes before the field's own Escape (capture), `below` after it (bubble). */
+export type EscapePhase = "above" | "below";
 
-/** Listen on `target` for the stack while it has a claim: a capture listener, so it comes before the field's and every surface's own. */
-export function attachEscape(stack: EscapeStack, target: Pick<Window, "addEventListener" | "removeEventListener">): () => void {
+/** The page's two stacks. */
+export const escapes: Record<EscapePhase, EscapeStack> = { above: new EscapeStack(), below: new EscapeStack() };
+
+/** Listen on `target` for the stack: in the capture phase (before the field's and every element's handler) or the bubble phase (after them). */
+export function attachEscape(
+  stack: EscapeStack,
+  target: Pick<Window, "addEventListener" | "removeEventListener">,
+  capture = true,
+): () => void {
   const key = (e: KeyboardEvent) => void stack.handle(e);
-  target.addEventListener("keydown", key, true);
-  return () => target.removeEventListener("keydown", key, true);
+  target.addEventListener("keydown", key, capture);
+  return () => target.removeEventListener("keydown", key, capture);
 }
 
-let detach: (() => void) | null = null;
-/** Claim Escape on `layer` while `active`. The claim may change between renders: the latest is the one asked. */
-export function useEscape(layer: number, claim: EscapeClaim, active = true): void {
+const detach: Record<EscapePhase, (() => void) | null> = { above: null, below: null };
+
+/**
+ * Claim Escape on `layer` of a phase's stack, and listen on `target` while that stack has a claim: a capture listener for `above`, a bubble one
+ * for `below`, each attached by its first claim and taken off with its last. Returns the release. (`useEscape` is this in an effect.)
+ */
+export function claimEscape(
+  phase: EscapePhase,
+  layer: number,
+  claim: EscapeClaim,
+  target: Pick<Window, "addEventListener" | "removeEventListener"> = window,
+): () => void {
+  const stack = escapes[phase];
+  detach[phase] ??= attachEscape(stack, target, phase === "above");
+  const off = stack.register(layer, claim);
+  return () => {
+    off();
+    if (stack.size === 0) {
+      detach[phase]?.();
+      detach[phase] = null;
+    }
+  };
+}
+
+/** Claim Escape on `layer` of a stack (above the field by default) while `active`. The claim may change between renders: the latest is the one asked. */
+export function useEscape(layer: number, claim: EscapeClaim, active = true, phase: EscapePhase = "above"): void {
   const latest = useLatest(claim);
   useEffect(() => {
     if (!active) return;
-    detach ??= attachEscape(escapes, window);
-    const off = escapes.register(layer, (e) => latest.current(e));
-    return () => {
-      off();
-      if (escapes.size === 0) {
-        detach?.();
-        detach = null;
-      }
-    };
-  }, [layer, active, latest]);
+    return claimEscape(phase, layer, (e) => latest.current(e));
+  }, [layer, active, phase, latest]);
 }
