@@ -94,11 +94,20 @@ test("the page reads no Jev value that changes as the player types: no whole-sna
   const page = readFileSync(join(SRC, "ColonyApp.tsx"), "utf8");
   assert.doesNotMatch(page, /useJevView/);
   assert.doesNotMatch(page, /\bjev\.(aim|doctrines|phase|lock)\b/);
-  // Page's own body: a selector of the aim or doctrines, or a snapshot read of them, would bring back the draw per keystroke (MotherPen, a leaf of its own,
-  // selects the doctrines on purpose).
+  // Page's own body: a render-time selector of the aim or doctrines would bring back the draw per keystroke (MotherPen, a leaf of its own, selects the
+  // doctrines on purpose). A call-time read (`jev.snapshot()` inside a handler or a getter, as the saves do) subscribes to nothing and is how a save reads
+  // them, so it is not forbidden. The pattern is a tripwire for the likely shapes (any parameter name, a type argument), not a proof.
   const body = page.slice(page.indexOf("function Page("), page.indexOf("\nfunction ", page.indexOf("function Page(") + 1));
   assert.ok(body.length > 1000, "found Page's body");
-  assert.doesNotMatch(body, /useJev\(\s*\(?\s*s\s*\)?\s*=>\s*s\.(aim|doctrines)\b/);
-  assert.doesNotMatch(body, /snapshot\(\)\s*\.(aim|doctrines)\b/);
+  const SELECTS = /useJev\b[^;]*?\b\w+\.(aim|doctrines)\b/;
+  assert.doesNotMatch(body, SELECTS);
+  for (const l of [
+    "useJev((s) => s.aim)",
+    "useJev((snap) => snap.doctrines)",
+    "useJev<X>((st) => st.aim.text)",
+    "useJev(\n  (s) => s.aim)",
+  ])
+    assert.match(l, SELECTS, l);
+  assert.doesNotMatch("const lock = useJev((s) => s.lock);", SELECTS);
   assert.doesNotMatch(readFileSync(join(SRC, "ui/useFlight.ts"), "utf8"), /\bjev\.(aim|lock)\b|JevView/);
 });
