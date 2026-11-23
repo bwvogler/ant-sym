@@ -1,0 +1,205 @@
+{
+  "above-fit": {
+    "hash": "e09c02b224f261b9",
+    "calls": 3511,
+    "pixels": "7deb7fecceef7167",
+    "drawImages": 2945,
+    "strokes": 14
+  },
+  "above-nest0": {
+    "hash": "c0500c4005535072",
+    "calls": 416,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 17,
+    "strokes": 10
+  },
+  "above-nest0-near": {
+    "hash": "fd5e00169930bc3b",
+    "calls": 401,
+    "pixels": "589bd526212a4225",
+    "drawImages": 2,
+    "strokes": 10
+  },
+  "above-ants": {
+    "hash": "f4937414870cbad9",
+    "calls": 426,
+    "pixels": "41951b9237a22a04",
+    "drawImages": 22,
+    "strokes": 10
+  },
+  "above-followed": {
+    "hash": "1de55def43de67ec",
+    "calls": 447,
+    "pixels": "41951b9237a22a04",
+    "drawImages": 22,
+    "strokes": 12
+  },
+  "below-labels": {
+    "hash": "5e9c2930fb93b5c8",
+    "calls": 186,
+    "pixels": "9173149e8bb669c5",
+    "drawImages": 20,
+    "strokes": 14
+  },
+  "above-dark": {
+    "hash": "5e001b3403ed7ecd",
+    "calls": 426,
+    "pixels": "27b9ca24f60464e3",
+    "drawImages": 22,
+    "strokes": 10
+  },
+  "above-retina": {
+    "hash": "5d38ff53676c026f",
+    "calls": 432,
+    "pixels": "2c08a31c7a89e019",
+    "drawImages": 27,
+    "strokes": 12
+  },
+  "above-smell": {
+    "hash": "1409c3e8b81f9feb",
+    "calls": 416,
+    "pixels": "912e40e1c5e78412",
+    "drawImages": 17,
+    "strokes": 10
+  },
+  "above-specimens": {
+    "hash": "d05099282079f630",
+    "calls": 465,
+    "pixels": "41951b9237a22a04",
+    "drawImages": 17,
+    "strokes": 14
+  },
+  "far-aphids": {
+    "hash": "fcaf1f70beb4002b",
+    "calls": 417,
+    "pixels": "aaf428466683c7ce",
+    "drawImages": 2,
+    "strokes": 12
+  },
+  "far-ants": {
+    "hash": "1c984230f2fe0a1c",
+    "calls": 665,
+    "pixels": "73e9f0459a25ad6b",
+    "drawImages": 148,
+    "strokes": 15
+  },
+  "far-nest": {
+    "hash": "f600f69bb105039d",
+    "calls": 465,
+    "pixels": "aaf428466683c7ce",
+    "drawImages": 76,
+    "strokes": 12
+  },
+  "far-hyphae": {
+    "hash": "78b3adccca299c33",
+    "calls": 423,
+    "pixels": "aaf428466683c7ce",
+    "drawImages": 2,
+    "strokes": 12
+  },
+  "above-pen": {
+    "hash": "1c1e95b52bd3d898",
+    "calls": 623,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 17,
+    "strokes": 14
+  },
+  "above-pen-refused": {
+    "hash": "319abec14b6437a6",
+    "calls": 450,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 17,
+    "strokes": 13
+  },
+  "above-aphids": {
+    "hash": "1ab4b29934607da4",
+    "calls": 427,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 19,
+    "strokes": 12
+  },
+  "above-hyphae": {
+    "hash": "e017b7299dbea3e7",
+    "calls": 442,
+    "pixels": "3973a5e6d897194a",
+    "drawImages": 17,
+    "strokes": 12
+  },
+  "desert-noon": {
+    "hash": "845b07fd43c5f526",
+    "calls": 486,
+    "pixels": "7e16660cec818dda",
+    "drawImages": 34,
+    "strokes": 10
+  },
+  "desert-night": {
+    "hash": "669dfd1f7b7ea281",
+    "calls": 494,
+    "pixels": "7e16660cec818dda",
+    "drawImages": 18,
+    "strokes": 12
+  },
+  "desert-hyphae": {
+    "hash": "b410fbf64e42e4f5",
+    "calls": 443,
+    "pixels": "645d8cad53c876ff",
+    "drawImages": 17,
+    "strokes": 10
+  },
+  "queen-below": {
+    "hash": "91d8a1e8cde5aed3",
+    "calls": 130,
+    "pixels": "debda1be547a7168",
+    "drawImages": 12,
+    "strokes": 12
+  },
+  "queen-below-dark": {
+    "hash": "d5f6f4631f282222",
+    "calls": 154,
+    "pixels": "f169f50abcd3540f",
+    "drawImages": 3,
+    "strokes": 14
+  },
+  "above-corpse": {
+    "hash": "a26840219ca6f238",
+    "calls": 427,
+    "pixels": "41951b9237a22a04",
+    "drawImages": 23,
+    "strokes": 10
+  },
+  "below-fit": {
+    "hash": "8dd9492f84be186d",
+    "calls": 1985,
+    "pixels": "a931c3e3b92372cd",
+    "drawImages": 1706,
+    "strokes": 14
+  },
+  "below-near": {
+    "hash": "deb547971bd85b6d",
+    "calls": 111,
+    "pixels": "3df79100f4106d4d",
+    "drawImages": 2,
+    "strokes": 12
+  },
+  "below-ants": {
+    "hash": "38dad97ce26e8f8f",
+    "calls": 193,
+    "pixels": "9173149e8bb669c5",
+    "drawImages": 2,
+    "strokes": 14
+  },
+  "below-followed": {
+    "hash": "b73cfd3e6832aa9f",
+    "calls": 172,
+    "pixels": "9173149e8bb669c5",
+    "drawImages": 20,
+    "strokes": 14
+  },
+  "below-dark": {
+    "hash": "0a64603735639f86",
+    "calls": 151,
+    "pixels": "fb1b87adfdb53774",
+    "drawImages": 20,
+    "strokes": 12
+  }
+}
