@@ -1204,3 +1204,160 @@ test("thicken in flow mode pays from the tip's own load, and keeps what is left"
   assert.equal(h.mat.size, 2, "two cells' mass in the load, two cells");
   assert.ok(Math.abs((h.loads.get(k) ?? 0) - HYPHA_MASS * 0.5) < 1e-9, "the half cell's mass stays in the load");
 });
+
+// A tip in the open soil of a flat plane, heading east: both sides (NE, SE) free (docs/hyphal-traffic.md, ja-ogph.3).
+test("a tip that may turn either way takes the side with more traffic, and a tie or no traffic is the alternating choice", () => {
+  const plane = (traffic?: Ground["traffic"]): Ground => ({ topsoil: true, kind: () => "open", traffic });
+  const side = (g: Ground, steps: number) => {
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    h.steps = steps;
+    const tip = h.tips[0]!;
+    return sideFor(h, g, tip, situationOf(h, g, tip, 0, 1e9, 1), 0);
+  };
+  const left = [nx(10, 10, turn(E, -1)), ny(10, turn(E, -1))] as const;
+  const right = [nx(10, 10, turn(E, 1)), ny(10, turn(E, 1))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 5 : 0);
+  // No traffic on the ground: the alternating choice, one way on an odd step, the other on an even one.
+  assert.equal(side(plane(), 1), "left");
+  assert.equal(side(plane(), 2), "right");
+  // Traffic round one side: that side, whatever the step.
+  for (const steps of [1, 2]) {
+    assert.equal(side(plane(at(left)), steps), "left", `left busy, step ${steps}`);
+    assert.equal(side(plane(at(right)), steps), "right", `right busy, step ${steps}`);
+  }
+  // Equal traffic round both: back to the alternating choice.
+  assert.equal(
+    side(
+      plane(() => 3),
+      1,
+    ),
+    "left",
+  );
+  assert.equal(
+    side(
+      plane(() => 3),
+      2,
+    ),
+    "right",
+  );
+});
+
+test("with both near sides blocked, the two-turn sides lean the same way: toward the cell two turns off with more traffic", () => {
+  // A tip heading east on a flat wall: NE, SE and E blocked; the cells two turns off (NW-ish SW side and the other) free.
+  const h = new Hyphae();
+  h.root(10, 10, E);
+  const tip = h.tips[0]!;
+  const near = new Set([-1, 0, 1].map((k) => cellKey(nx(10, 10, turn(E, k)), ny(10, turn(E, k)))));
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 4 : 0);
+  const ground = (traffic: Ground["traffic"]): Ground => ({
+    topsoil: true,
+    kind: (x, y) => (near.has(cellKey(x, y)) ? "rock" : "open"),
+    traffic,
+  });
+  for (const steps of [1, 2]) {
+    h.steps = steps;
+    const g = ground(at(cell(-2)));
+    assert.equal(sideFor(h, g, tip, situationOf(h, g, tip, 0, 1e9, 1), 0), "left", `traffic two turns left, step ${steps}`);
+    const g2 = ground(at(cell(2)));
+    assert.equal(sideFor(h, g2, tip, situationOf(h, g2, tip, 0, 1e9, 1), 0), "right", `traffic two turns right, step ${steps}`);
+  }
+});
+
+test("a branch takes the side with more traffic when both are open, else the alternating side", () => {
+  const sideOfBranch = (traffic: Ground["traffic"], steps: number): number => {
+    const g: Ground = { topsoil: true, kind: () => "open", traffic };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    h.steps = steps;
+    const tip = h.tips[0]!;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "branch");
+    const branch = h.tips.find((t) => t !== tip)!;
+    return branch.heading;
+  };
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 4 : 0);
+  for (const steps of [1, 2]) {
+    assert.equal(sideOfBranch(at(cell(-1)), steps), turn(E, -1), `traffic on the left, step ${steps}`);
+    assert.equal(sideOfBranch(at(cell(1)), steps), turn(E, 1), `traffic on the right, step ${steps}`);
+  }
+  assert.notEqual(sideOfBranch(undefined, 1), sideOfBranch(undefined, 2), "no traffic: it alternates");
+  assert.notEqual(
+    sideOfBranch(() => 2, 1),
+    sideOfBranch(() => 2, 2),
+    "equal traffic: it alternates",
+  );
+});
+
+test("a tropism: on its every-nth cell a growing tip grows toward the side with more traffic than straight ahead; never otherwise", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const busy =
+    (c: readonly [number, number], n = 4) =>
+    (x: number, y: number) =>
+      x === c[0] && y === c[1] ? n : 0;
+  const grown = (traffic: Ground["traffic"], tropism: number, run = 0) => {
+    const g: Ground = { topsoil: true, kind: () => "open", traffic, tropism };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    const tip = h.tips[0]!;
+    tip.run = run;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "grow");
+    return { h, cells: [...h.parent.keys()] };
+  };
+  const key = (c: readonly [number, number]) => cellKey(c[0], c[1]);
+  // Every cell (1): it grows into the busy left cell, or the busy right one, instead of straight ahead.
+  assert.ok(grown(busy(cell(-1)), 1).cells.includes(key(cell(-1))), "left busy: grows left");
+  assert.ok(grown(busy(cell(1)), 1).cells.includes(key(cell(1))), "right busy: grows right");
+  assert.ok(grown(busy(cell(-1)), 1).h.tropisms === 1);
+  // Not the nth cell: straight ahead. No tropism set: straight ahead. Busy straight ahead too: straight ahead.
+  assert.ok(grown(busy(cell(-1)), 3, 0).cells.includes(key(cell(0))), "run 0 of every 3: straight");
+  assert.ok(grown(busy(cell(-1)), 3, 2).cells.includes(key(cell(-1))), "run 2 of every 3: leans");
+  assert.ok(grown(busy(cell(-1)), 0).cells.includes(key(cell(0))), "tropism 0: straight");
+  assert.ok(grown((x) => (x >= 11 ? 4 : 0), 1).cells.includes(key(cell(0))), "as busy ahead as to the sides: straight");
+  assert.ok(grown(() => 2, 1).cells.includes(key(cell(0))), "equal traffic: straight");
+});
+
+test("a branch does not lean into a blocked side: with the busier side rock, traffic does not pull it there", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const blocked = cellKey(...cell(-1));
+  const g: Ground = {
+    topsoil: true,
+    kind: (x, y) => (cellKey(x, y) === blocked ? "rock" : "open"),
+    traffic: (x, y) => (x === cell(-1)[0] && y === cell(-1)[1] ? 9 : 0),
+  };
+  // On an odd step the alternating rule takes the right side; traffic on the blocked left must not override it (the old
+  // alternating rule is not blocked-aware on an even step, which this does not change).
+  const h = new Hyphae();
+  h.root(10, 10, E);
+  h.steps = 1;
+  const tip = h.tips[0]!;
+  stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "branch");
+  const branch = h.tips.find((t) => t !== tip)!;
+  assert.equal(branch.heading, turn(E, 1), "the branch goes to the open side");
+});
+
+test("a tropism needs a strictly busier open side: busy ahead, equal sides and a rock side all grow straight", () => {
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const key = (c: readonly [number, number]) => cellKey(c[0], c[1]);
+  const at =
+    (...busy: [readonly [number, number], number][]) =>
+    (x: number, y: number) =>
+      busy.find(([c]) => c[0] === x && c[1] === y)?.[1] ?? 0;
+  const run = (traffic: Ground["traffic"], rock?: number) => {
+    const g: Ground = { topsoil: true, kind: (x, y) => (cellKey(x, y) === rock ? "rock" : "open"), traffic, tropism: 1 };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    const tip = h.tips[0]!;
+    tip.run = 0;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "grow");
+    return [...h.parent.keys()];
+  };
+  // Busy straight ahead (9) and to the left (4): ahead is busier than the side, so straight.
+  assert.ok(run(at([cell(0), 9], [cell(-1), 4])).includes(key(cell(0))), "ahead busier than the side");
+  // Both sides busy, equally, ahead empty: no side is busier, so straight.
+  assert.ok(run(at([cell(-1), 4], [cell(1), 4])).includes(key(cell(0))), "equal sides");
+  // The busier side is rock: straight.
+  const left = run(at([cell(-1), 9]), key(cell(-1)));
+  assert.ok(left.includes(key(cell(0))) && !left.includes(key(cell(-1))), "rock side: straight, not into rock");
+});

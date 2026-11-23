@@ -628,6 +628,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
   },
   {
+    note: "hyphal-traffic",
+    title: "Hyphae and ant traffic",
+    covers:
+      "Whether a hypha tip leans toward where ants walk: tips follow gradients and touch, but no insect-killing fungus is known to follow traffic. Built behind settings, off: leaning at side choices changed nothing P1 measures; a tropism shortens the slowest seeds.",
+  },
+  {
     note: "mycelial-transport",
     title: "Mass flow in a mycelium",
     covers: "How a mycelium feeds its tips: growth draws mass toward them, cords carry it fast, loops bring it to the edge.",

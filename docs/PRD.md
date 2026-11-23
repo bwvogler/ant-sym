@@ -7513,3 +7513,40 @@ In short, with the page's settings directed combat calms neutral play, defends a
 
 Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rule loses no ant on any of these seeds; the shipped answers lose 0 to 23 (74 in all over ten seeds). So Jev's weighted answers cost the colonies about 8 % of their stored food at the median, up to 31 % on the worst seed, and some ants, where the local rule loses none. One doctrine (`forage`), one size and 240 s, so it shows a direction, not a ship rule. **Owner's decision (2026-11-22, D1): keep the six lanes on** with these answers shipped.
 
+
+
+## 88. Hyphal tips lean toward ant traffic (design, ja-ogph, 2026-11-23)
+
+**Research basis:** [hyphal-traffic.md](hyphal-traffic.md) (abstracts only; entries marked unverified there).
+- Fungal tips re-orient to gradients and to touch (Brand & Gow 2009; Almeida & Brand 2017); soil pathogens grow toward host plant signals (Turrà et al. 2015).
+- No paper shows an insect-killing fungus growing toward insects or their traffic: the lean is **design**, not biology.
+- Ants keep walking over fungus-contaminated ground (Pereira et al. 2021) but dig around contamination (Leclerc et al. 2018), so traffic persists where the fungus is.
+
+**The problem (measured).** With six landing tips and mass flow on (#280), the curtain has 4 hyphae cells at 150 s against 21 with three tips, and progression seed 6 is 346 s against 250 s (+38 %). The owner accepted that and asked for a tip sense of traffic (2026-11-22). Today `sideFor` alternates `h.steps % 2` when both side cells are free, so no cue reaches it. Flowers then rooted no tips (#344, owner 2026-11-23).
+
+**Decisions.**
+- Keep six landing tips; a flower roots none (owner).
+- Option A, steering only, first; the probe (`ja-ogph.2`) before any behaviour change (owner, 2026-11-23). B (a `traffic` situation field, 96 to 192 situations) and C (footfall memory) wait.
+- The sense may be percent occupancy over a few distance bands, perhaps in levels, instead of one count within `r` (owner is considering it); the probe measures the bands to choose from.
+
+**The mechanic.** Cue: ant counts within r cells, read from the colony's `CountGrid`s. Response: when both side cells are free, `sideFor` picks the busier side. Off = `h.steps % 2`, bit for bit. It reads no global state a tip could not sense in the game's terms; whether ants count as a sensed cue for a tip is the open decision. A second response, the tropism (`trafficTropism` N), overrides the growth lane's `grow` answer on every N-th cell; see the Ablation and Tropism paragraphs below.
+
+**Play.** A fungus that thickens where ants walk, so the curtain and tunnels fill sooner; counterplay is routes away from the mat. See the note's Play section.
+
+**Assays and targets.** T1 share of hyphae near traffic (ablation); T2 P1 progression no seed more than 10 % slower and the worst seed not worse; T3 no cliff: no seed more than 25 % faster; T4 report the F2 curtain count (21 / 4) and flowers. Seeds 1-10, confirm 11-20; the probe lands first with no behaviour change.
+
+**Cost (estimated).** None for option A (steering is free); about $0.01 for one re-ask if option B is chosen.
+
+**Beads.** ja-ogph (epic), ja-ogph.1 research, ja-ogph.2 probe, ja-ogph.3 behaviour; the idea is ja-ob97.
+
+**Probe results (`ja-ogph.2`, 2026-11-23).** `progression.mjs --traffic` (reads only; seeds 1-2 at 600 s are bit-identical with it on and off), `progression.yml` runs 45204360900 (seeds 1-10) and 45204367290 (11-20), head `7b2acd2f`, flow and growth answers on. Details and tables in [hyphal-traffic.md](hyphal-traffic.md#probe-results-ja-ogph2-2026-11-23).
+- T2 baseline: quarter median 155.5 s, worst 350 s (seed 6) on seeds 1-10; median 168 s, worst 293 s (seed 20) on 11-20. Flowers: 1 in 1 of 10 games (1-10); 8 in 4 of 10 games (11-20).
+- Ants are sparse round a tip: 2-9 % of the six cells at distance 1 are occupied before a quarter, and 39 % of tips (median) have no ant in the 30 cells at distance 2-3 (61 % after). A band share above 10 % of the 30 cells at distance 2-3 is rare, so a banded sense needs low edges (none / one cell / up to 10 % / more).
+- The two side cells differ in ants within 1 cell on 30 % of tip samples before a quarter (14-45 %), within 3 cells on 52 % (30-72 %); after, 16 % and 32 %. Seed 6, the slowest, has the sparsest early traffic (14 %).
+- T1 is measured at distance 1: hyphae within 1 cell of an ant seen in the last 60 s are 85 % before a quarter (63-95 %) and 73 % after; within 3 cells it is 94-99 %, too coarse to move.
+
+**Ablation of option A (`ja-ogph.3`, 2026-11-23).** `trafficBias` count and levels, r 2 and r 3, off by default (goldens bit-exact), on `sideFor` and the branch side; eight `progression.yml` runs on `1e5bcc04`, seeds 1-10 and 11-20. **Result: quarter, half and queen times are identical to off on all 20 seeds in all four arms; T1 moves under 2 points; flowers change only at r 3 on seeds 11-20 (8 to 6).** The tips seldom have a choice: of 658 tip steps in 150 s of seed 1, 603 grow, 44 branch, 11 turn; `sideFor` never saw both sides open, and a whole game has only 14-251 side choices with both sides open, a fifth to a half decided by the ants. The probe's "sides differ 30 %" overstated option A. Details: [hyphal-traffic.md](hyphal-traffic.md#ablation-of-option-a-ja-ogph3-2026-11-23-it-changes-nothing-that-p1-measures). Options for a lean that acts (a tropism override, or option B's situation field) or to stop: the owner's call.
+
+**Tropism (`ja-ogph.3`, owner: "try the tropism").** `trafficTropism` N, off by default: a growing tip leans one turn toward the busier side on every N-th cell, if that side has more ants than straight ahead. Eight runs on `9b8ae679` (count r 3 at N = 1, 2, 4; levels r 3 at N = 2; seeds 1-20). **The slowest seeds get much faster, the median does not**: worst quarter 350 s to 192-219 s (seeds 1-10) and 293 s to 246-259 s (seeds 11-20); seeds 6, 18, 20 are 37-50 % faster; medians within 155.5-160 s and 159.5-168 s; no seed more than 10.3 % slower; T3's 25 % no-cliff bound broken on three seeds; T1 +1 to +4 points; flowers move (8 to 10-15 on seeds 11-20). Full table and unknowns in [hyphal-traffic.md](hyphal-traffic.md#tropism-ja-ogph3-2026-11-23-it-shortens-the-slowest-seeds-and-leaves-the-median-alone). **Off by default; whether to turn it on, and which N, is the owner's call.**
+
+**Still open.** Owner review of the plan; the research full texts; the band edges and levels (owner's pick from these numbers); whether ants count as a tip sense in the sense table.
