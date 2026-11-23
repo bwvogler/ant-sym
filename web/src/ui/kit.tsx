@@ -117,8 +117,8 @@ export function Icon({ name, className }: { name: IconName; className?: string }
 
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
- * Escape closes it unless something has already taken the key (the map unfollowing, the Go to menu closing: they
- * preventDefault) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
+ * Escape closes it unless something has already taken the key (the map unfollowing, or a layer of the Escape manager, escape.ts: the
+ * palette, a pinned card, the Go to menu, the notices: they settle the event) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({
@@ -219,7 +219,7 @@ export function Modal({
     };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [onClose]);
+  }, []);
   return (
     <div
       className="fixed inset-0 z-40 flex items-start justify-center bg-black/25 px-4 pt-[10dvh]"

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { useLatest } from "./useLatest.ts";
 
 // One Escape manager (ja-fnd.6.4.1, docs/refactor.md S5.4). Escape closes one thing: the palette or the shortcuts sheet, then a pinned lens
 // card, then the Go to menu (and the notices list), then the followed ant, then a drawer (PRD §69). Each surface that takes Escape used to
@@ -79,8 +80,7 @@ export function attachEscape(stack: EscapeStack, target: Pick<Window, "addEventL
 let detach: (() => void) | null = null;
 /** Claim Escape on `layer` while `active`. The claim may change between renders: the latest is the one asked. */
 export function useEscape(layer: number, claim: EscapeClaim, active = true): void {
-  const latest = useRef(claim);
-  latest.current = claim;
+  const latest = useLatest(claim);
   useEffect(() => {
     if (!active) return;
     detach ??= attachEscape(escapes, window);
@@ -92,5 +92,5 @@ export function useEscape(layer: number, claim: EscapeClaim, active = true): voi
         detach = null;
       }
     };
-  }, [layer, active]);
+  }, [layer, active, latest]);
 }
