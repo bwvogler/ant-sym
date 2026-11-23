@@ -66,6 +66,14 @@ export const BODY = { start: 4, growth: 0.03, sporeMass: 1 };
 /** Mutations per unit of new fungus (its growth on the ground and in hosts). */
 export const MUTATION = 0.25;
 
+/**
+ * Mutations the ants pool starts with: enough for its first two levels (price(0) + price(1) = 1 + 2). The ants' levels
+ * are what start the spread (infectivity above all), and the ants pool fills only from fungus passed between ants, which
+ * needs them: without a start it stalled (M3 assay, PRD §85: infectivity at 336 s on seed 1, four seeds never reaching a
+ * quarter of the colony in ten minutes); with it every seed 1–10 is at or ahead of the one-pool game.
+ */
+export const ANTS_START = 3;
+
 /** Seconds over which the panel's mutation rate is averaged. */
 const RATE_TAU = 20;
 
@@ -368,7 +376,7 @@ export class Evolution {
 
   /** Mutations its growth has given, kept or not (fractional: the panel shows whole ones). */
   get earned(): number {
-    return MUTATION * this.growth;
+    return ANTS_START + MUTATION * this.growth;
   }
 
   /** Mutations to give, over both pools. */
@@ -379,7 +387,7 @@ export class Evolution {
   /** Mutations to give in each pool: the ants' from fungus made in hosts, the free pool's from the ground and corpses. */
   get pools(): Pools {
     return {
-      ants: MUTATION * (this.growth - this.ground) - (this.spent - this.spentFree),
+      ants: ANTS_START + MUTATION * (this.growth - this.ground) - (this.spent - this.spentFree),
       free: MUTATION * this.ground - this.spentFree,
     };
   }

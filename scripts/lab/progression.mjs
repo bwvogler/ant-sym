@@ -13,7 +13,6 @@
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split]
-// --ants-start N gives the ants pool N mutations at landing (an M3 experiment).
 // --split reports where the growth that mutations come from was made: the mycelium on the ground, corpses, and hosts (PRD §85 M3).
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
@@ -53,7 +52,6 @@ if (isMainThread) {
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
-    antsStart: Number(opt("ants-start", 0)),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -114,7 +112,6 @@ if (isMainThread) {
     landing,
     rootRadius,
     split: wantSplit,
-    antsStart,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -178,8 +175,6 @@ if (isMainThread) {
       g.fungus.upgrade(x);
     }
   }
-  // --ants-start N: the ants pool starts with N mutations (an experiment for PRD §85 M3: the ants' first level needs fungus made in hosts, which needs the level).
-  if (antsStart > 0 && g.fungus.evolution) g.fungus.evolution.growth += antsStart / MUTATION;
   const DT = 1 / 30;
   const r = {
     seed,

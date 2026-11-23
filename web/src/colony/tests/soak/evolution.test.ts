@@ -3,7 +3,20 @@ import assert from "node:assert/strict";
 import { centreX, centreY, keyX, keyY } from "../../hex.ts";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { BODY, canKeep, checkTree, Evolution, MUTATION, pathTo, price, unmet, UPGRADES, upgrade, type Upgrade } from "../../evolution.ts";
+import {
+  ANTS_START,
+  BODY,
+  canKeep,
+  checkTree,
+  Evolution,
+  MUTATION,
+  pathTo,
+  price,
+  unmet,
+  UPGRADES,
+  upgrade,
+  type Upgrade,
+} from "../../evolution.ts";
 import { Fungus, INFECTED, SPORE_LAYER_STATE, STRAINS, type Strain } from "../../fungus.ts";
 import { fungalKey } from "../../fungusBrain.ts";
 import { Game } from "../../game.ts";
@@ -131,19 +144,23 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
 
 test("mutations: a fixed share of growth in two pools, each level costs its pool's price, which rises with each level kept in that pool (ja-52ui, PRD §85 M3)", () => {
   const e = new Evolution(GARDEN);
-  assert.equal(e.mutations, 0);
+  assert.equal(e.mutations, ANTS_START, "it lands with the ants' first two levels' worth, and nothing else");
+  assert.equal(e.pools.free, 0);
   assert.equal(e.cost("infectivity"), price(0), "the ants' first level costs the base price");
   assert.equal(e.cost("mycelium"), price(0), "so does the fungus's own first level: its own pool, its own count");
   e.replicate((price(0) + price(1)) / MUTATION);
-  assert.ok(Math.abs(e.pools.ants - (price(0) + price(1))) < 1e-9, "growth in hosts × MUTATION is the ants' pool");
+  assert.ok(
+    Math.abs(e.pools.ants - (ANTS_START + price(0) + price(1))) < 1e-9,
+    "growth in hosts × MUTATION, and the start, is the ants' pool",
+  );
   assert.equal(e.pools.free, 0, "and none of the free pool's");
-  assert.ok(Math.abs(e.mutations - (price(0) + price(1))) < 1e-9, "the total is both");
+  assert.ok(Math.abs(e.mutations - (ANTS_START + price(0) + price(1))) < 1e-9, "the total is both");
   assert.ok(e.buy("infectivity"), "a root: Infectivity fair");
   assert.equal(e.cost("persistence"), price(1), "one ants level kept: the next ants level costs the second price");
   assert.equal(e.cost("mycelium"), price(0), "the free pool's count has not moved");
   assert.ok(price(1) > price(0) && price(10) > price(9), "the price rises");
   assert.ok(e.buy("persistence"));
-  assert.ok(Math.abs(e.pools.ants) < 1e-9, "both prices paid");
+  assert.ok(Math.abs(e.pools.ants - ANTS_START) < 1e-9, "both prices paid, the start left");
   assert.equal(e.buy("mycelium"), false, "the ants' mutations do not pay for the fungus's own level");
   e.feed(price(0) / MUTATION);
   assert.ok(Math.abs(e.pools.free - price(0)) < 1e-9, "growth on the ground and corpses is the free pool's");
