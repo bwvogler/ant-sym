@@ -147,12 +147,12 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
       mode === RETURN &&
       !carrying &&
       !pellet &&
-      colony.queen &&
+      colony.housed &&
       colony.band(i) === 2 &&
       !colony.reverts(i)
     )
       colony.digBout[i] = p.forageDig;
-    if (carrying && !colony.queen && resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))) {
+    if (carrying && !colony.housed && resp.drop(touch(colony, i, toEnemy !== null, mode, item), colony.antDraw(i))) {
       colony.carrying[i] = 0;
       colony.stored++;
       colony.larder++;
@@ -248,7 +248,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
   if (ent) {
     // Zoned by age (slice 6): an ant not to go out that has just stepped up out of the hole onto the ground goes
     // back down (carriers aside: soil goes out to the mound; food is on its way in).
-    if (colony.queen && colony.under[i] && !carrying && !pellet && !colony.mayGoOut(i)) {
+    if (colony.housed && colony.under[i] && !carrying && !pellet && !colony.mayGoOut(i)) {
       colony.antCell(i);
       if (isSky(map, CELL[0], CELL[1])) h = pointDown(colony, i, x0, y0, h);
     }
@@ -263,7 +263,7 @@ export function arrive(colony: Colony, i: number, s: AntStep): boolean {
     )
       colony.odoNest[i] = colony.odoNest[i] * Math.exp(-dt / ROAD_SIGN);
     if (colony.map.chambers) layMark(colony, i, dt);
-    if (colony.queen) {
+    if (colony.housed) {
       nurse(colony, i, dt, toEnemy !== null);
       // Pickup happens after stanceStep's carry decision. Give a custom delivery
       // policy its ordinary next-tick choice before this new load can use foodTo.

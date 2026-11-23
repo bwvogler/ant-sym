@@ -1182,6 +1182,7 @@ export class Fungus {
             })
           : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
       stepRound(maps, level, budget, this.growthPolicy);
+      this.#settle();
       stepped = true;
     }
     // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
@@ -1385,6 +1386,40 @@ export class Fungus {
           py = qy;
         }
       h.root(px, py, aim);
+    }
+  }
+
+  /** patches a closed flower of hyphae has become, over the game (PRD §85, ja-vlla.5) */
+  flowers = 0;
+
+  /**
+   * A cell the hyphae have thickened round, whose six neighbours are all hyphae too, is a flower; it becomes a patch
+   * (PRD §85, ja-vlla.5) when none of its seven cells is in a patch already (base or sources: the landing's own cells
+   * never count): the seven are a base that sporulates and sources of mass, the patch count (room to grow) goes up by
+   * one with no start of its own (the mass is the hyphae's), and no tips of its own (owner, 2026-11-23: its seven cells
+   * are hyphae already, and the tips that closed it run on). Layer 0 only, as every root today. Nothing without an evolution.
+   */
+  #settle(): void {
+    const e = this.#evolution;
+    // Every map's list is emptied, so none grows without bound; only layer 0's is looked at.
+    const lists = this.#hyphae.map((h) => h?.takeThickened() ?? []);
+    const h = this.#hyphae[0];
+    if (!e || !h) return;
+    const L = this.#layers[0] as SporeLayer;
+    const base = new Set(L.base);
+    for (const k of lists[0]!) {
+      const [cx, cy] = keyCell(k);
+      const cells = [k];
+      for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
+      if (!cells.every((c) => h.parent.has(c))) continue;
+      if (cells.some((c) => base.has(c) || h.sources.has(c))) continue;
+      for (const c of cells) {
+        L.base.push(c);
+        base.add(c);
+        h.sources.add(c);
+      }
+      e.settle();
+      this.flowers++;
     }
   }
 
@@ -1728,6 +1763,8 @@ export class Fungus {
       menu: encode(this.#menu),
       clock: this.#clock,
       evolution: this.#evolution?.save() ?? null,
+      // Only once a flower has become a patch: a game with none saves as it always has (the goldens hash the save).
+      ...(this.flowers ? { flowers: this.flowers } : {}),
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
@@ -1758,6 +1795,7 @@ export class Fungus {
     const e = r.evolution as EvolutionSave | null | undefined;
     this.#evolution = e ? Evolution.load(e) : null;
     L.base = [...((r.base as number[] | undefined) ?? [])];
+    this.flowers = (r.flowers as number | undefined) ?? 0;
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
       if (layers.length !== this.#layers.length - 1)

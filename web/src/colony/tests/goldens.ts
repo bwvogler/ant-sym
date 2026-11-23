@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { ChunkLayer } from "../chunks.ts";
 import { PLANE } from "../colony.ts";
-import { MUTATION, pathTo } from "../evolution.ts";
+import { MUTATION, pathTo, poolOf } from "../evolution.ts";
 import { STRAINS } from "../fungus.ts";
 import { Game, GAME_REGROW, gameRng } from "../game.ts";
 import { generateOneWorld } from "../oneWorld.ts";
@@ -109,7 +109,9 @@ export function record(s: Scenario): OneSample[] {
       const e = game.fungus.evolution!;
       if (e.cost(id) === null) throw new Error(`${s.name}: can't grant ${id}`);
       for (const x of pathTo(e.save().levels, id)) {
-        e.growth += e.cost(x)! / MUTATION;
+        const made = e.cost(x)! / MUTATION;
+        e.growth += made;
+        if (poolOf(x) === "free") e.ground += made;
         if (!game.fungus.upgrade(x)) throw new Error(`${s.name}: grant ${x} not bought`);
       }
     }

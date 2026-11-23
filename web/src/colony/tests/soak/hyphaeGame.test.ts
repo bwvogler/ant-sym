@@ -379,7 +379,8 @@ test("in the game, a hypha dug through in the curtain regrows from its stump int
 test("with Knots bought, starved tips harden into knots in the game, paid from the body; dug open, a knot stays and fruits its store there (ja-2bw.9)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7; // mutations enough to buy it at once
+  e.growth = 2e7;
+  e.ground = 1e7; // mutations enough to buy it at once
   assert.ok(keep(g.fungus, "knots"));
   const moved: number[] = [];
   const lose = e.lose.bind(e);
@@ -410,7 +411,8 @@ test("with Knots bought, starved tips harden into knots in the game, paid from t
 test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps its store until a cell beside it is dug, then fruits there (review of #161 S1, S3)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   assert.ok(keep(g.fungus, "knots"));
   const curtain = () => g.fungus.hyphaeOn(CURTAIN);
   const map = g.world!.curtain;
@@ -452,7 +454,8 @@ test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps 
 function buried(level: number): Game {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   for (let k = 0; k < level; k++) assert.ok(keep(g.fungus, "stalks"));
   g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
   return g;
@@ -516,7 +519,8 @@ test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.d
 test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   assert.ok(keep(g.fungus, "stalks"));
   assert.ok(keep(g.fungus, "stalks"));
   // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
@@ -539,7 +543,8 @@ test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
 test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   // Down the hole first: a tall stalk needs a dense fruiting body (ja-52ui), which leaves less mycelium to grow there.
   crossDown(g);
   assert.ok(keep(g.fungus, "stalks"));
@@ -605,3 +610,100 @@ for (const flow of [false, true])
     assert.equal(mat(false), 0, "no corpse, no mat");
     assert.ok(mat(true) > 0, "no mat beside a colonised corpse");
   });
+
+// A flower becomes a patch (PRD §85, ja-vlla.5): a tip that thickens at a colonised corpse far from every patch closes a
+// flower of seven cells, which becomes a patch with no start of its own; at the landing's rim it makes none.
+
+/** A plane cell at least `far` cells from `from`, with its six neighbours open: a place for a corpse. */
+function openSpot(g: Game, from: { x: number; y: number }, far: number): [number, number] {
+  const plane = g.world!.plane;
+  for (let y = 5; y < 95; y++)
+    for (let x = 5; x < 155; x++) {
+      if (hexDistance(x, y, from.x, from.y) < far) continue;
+      let ok = rockAt(plane, x, y) === OPEN;
+      for (let d = 0; d < 6 && ok; d++) ok = rockAt(plane, nx(x, y, d), ny(y, d)) === OPEN;
+      if (ok) return [x, y];
+    }
+  throw new Error("no open spot");
+}
+
+test("thickening at a colonised corpse far from every patch closes a flower that becomes a patch, with no start of its own", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const e = g.fungus.evolution!;
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  const [x, y] = openSpot(g, tip, 25);
+  const patches = e.patches;
+  const base = g.fungus.patchOn(PLANE).length / 2;
+  g.fungus.colonise(PLANE, x, y);
+  const mass = e.mass;
+  // Tick to the round the flower closes, and look at once.
+  for (let k = 0; k < 30 * 10 && g.fungus.flowers === 0; k++) g.tick(1 / 30);
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  assert.equal(g.fungus.flowers, 1, "one flower closed");
+  const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
+  const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
+  // The flower roots no tips of its own (owner, 2026-11-23): only the corpse's own two (east and west) can still stand in it.
+  assert.ok(there <= 2, `no tip is rooted by the flower: at most the corpse's two stand in it (${there})`);
+  assert.equal(e.patches, patches + 1, "one more patch, room to grow");
+  assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
+  for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
+    assert.ok(h.sources.has(hyphaKey(c[0], c[1])), `source ${c}`);
+  assert.ok(e.mass - mass < 1, `no start of 4 for a flower (mass ${mass.toFixed(2)} to ${e.mass.toFixed(2)})`);
+  // A save keeps it.
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.equal(back.fungus.flowers, 1);
+  assert.equal(back.fungus.evolution!.patches, patches + 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
+});
+
+test("thickening beside the landing makes no flower: its cells are the landing's already", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  g.fungus.colonise(PLANE, nx(tip.x, tip.y, tip.heading), ny(tip.y, tip.heading));
+  const patches = g.fungus.evolution!.patches;
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 0);
+  assert.equal(g.fungus.evolution!.patches, patches);
+});
+
+test("a corpse with rock beside it closes no flower: its seven cells are not all hyphae, so nothing becomes a patch", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const plane = g.world!.plane;
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  let at: [number, number] | null = null;
+  for (let y = 5; y < 95 && !at; y++)
+    for (let x = 5; x < 155 && !at; x++) {
+      if (hexDistance(x, y, tip.x, tip.y) < 25 || rockAt(plane, x, y) !== OPEN) continue;
+      let rock = 0;
+      for (let d = 0; d < 6; d++) if (rockAt(plane, nx(x, y, d), ny(y, d)) !== OPEN) rock++;
+      if (rock >= 1 && rock <= 3) at = [x, y];
+    }
+  assert.ok(at, "no open cell with rock beside it");
+  const patches = g.fungus.evolution!.patches;
+  const base = g.fungus.patchOn(PLANE).length;
+  g.fungus.colonise(PLANE, ...at);
+  runFor(g, 20);
+  assert.ok(g.fungus.hyphaeOn(PLANE)!.mat.size > 0, "it did thicken");
+  assert.equal(g.fungus.flowers, 0);
+  assert.equal(g.fungus.evolution!.patches, patches);
+  assert.equal(g.fungus.patchOn(PLANE).length, base);
+});
+
+test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  crossDown(g);
+  const map = g.world!.curtain;
+  let at: [number, number] | null = null;
+  for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];
+  assert.ok(at);
+  g.fungus.colonise(CURTAIN, ...at);
+  runFor(g, 20);
+  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeThickened(), [], "nothing left over from the rounds before");
+  assert.equal(g.fungus.flowers, 0, "layer 0 only");
+});

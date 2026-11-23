@@ -12,12 +12,14 @@
 // must `check` clean (the scenes are built to be deterministic: a fresh game of seed 3 stepped a fixed number of ticks with the page paused, the
 // camera let to settle, the canvas read as pixels). Hashes depend on the browser and its fonts, so a baseline belongs to the machine and the
 // Chromium it was recorded on (hashes.json says which; `check` refuses another one); keep <dir> outside the repo and never commit one.
+// In CI: a PR with the `pixel-guard` label runs .github/workflows/pixels.yml, which does both on one runner (record on the merge base with this
+// script, check on the head) and names the scenes that differ; that is the proof a refactor PR cites instead of a run by hand.
 //
 // What a scene shows is in SCENES below: the generic ant's world above and below (each nest zoomed, so the minimap shows; a followed ant on each
 // layer; the queen's pen; chamber labels), the desert ant's day (noon, dusk, night), the dark scheme, a grown fungus (cords, stalks, knots, spores
 // on the curtain: the `grown` page), and a world with a third colony and an aphid clump (the line's bend, ants on the strip, a clump: the `built`
 // page). The last two are set up through the dev hook and the game itself. The `marks` page: the builder's tools by the real pointer (sugar, crumbs, rock, a crayon line, an aphid tap), a pinned specimen
-// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. The `built` page ends with the theme flipped after the first frame and the pointer resting in the queen's pen, and the `retina` page is the same world at two device pixels to a CSS pixel: what ColonyField reads each frame from the page. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). Not covered yet, to add with the slice that moves that layer: ants of every stance, a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on), the trace's run and dotted loops. (The lens card is DOM, and
+// and a moved ant's trace (its start ring: the page is paused, so the ant never walks and no run, loops or end dot are drawn); the `phone` page: 390 px wide, touch. The `built` page ends with the theme flipped after the first frame and the pointer resting in the queen's pen, and the `retina` page is the same world at two device pixels to a CSS pixel: what ColonyField reads each frame from the page. A scene whose mouse stroke does not land stops the run (never a record of a lost stroke). The `ants` page: every kind of ant at once (markAnts: odour bands, light and heavy infection, three qualities of food, soil, a corpse, brood), as strokes and as sprites (the scenes hold the stroke and sprite paths, the dots and the cargo the sheets draw; what is drawn only while a sheet is not ready, the grey cross for a carried corpse and the nest sheet's corpse and brood sprites, is held by ui/tests/ants.test.ts). Not covered yet, to add with the slice that moves that layer: a specimen on an underground ant, the no-entry paint (a pheromone channel, drawn only with smell vision on). (The trace's run and dotted loops and the followed ring at a low zoom are `marks-trace-walk` and `marks-followed-far`.) (The lens card is DOM, and
 // draw() paints no lens marks.) Known to hide from every scene: a corpse's stalk level on its ground sprite (the ground layer ignores it), and
 // stalks of the plane drawn on the curtain (they fall off screen at the zoom of the scenes), and the same for the plane's other marks (a specimen's
 // ring, a moved ant's trace) drawn on the curtain.
@@ -96,7 +98,8 @@ const growFungus = (page) =>
     const J = window.jevAnts;
     const f = J.game.fungus;
     const e = f.evolution;
-    e.growth = 1e7;
+    e.growth = 2e7;
+    e.ground = 1e7;
     const keep = (id) => pathTo(e.save().levels, id).every((x) => f.upgrade(x));
     keep("mycelium");
     keep("mycelium");
@@ -141,6 +144,40 @@ const buildWorld = (page) =>
     g.aphids.push({ layer: 0, cells, start: 3 * (cells.length / 2), eaten: 0, age: 100, owed: 0 });
     J.step(300);
     if (g.colonies.length < 3 || !g.aphids.length) throw new Error("the world was not built");
+  });
+
+/**
+ * Every kind of ant the field draws, in view at once (the game itself, through the dev hook; the page is paused, so nothing moves after): each
+ * alive ant takes an odour from five bands (the strokes and sprites are tinted by band) and one of nine kinds by its place in the colony: bare,
+ * lightly infected (the faint spore dot), heavily infected (the full dot), carrying food of three qualities (plain, sweet, crumb), carrying soil, carrying a corpse,
+ * carrying brood. Where each kind lands on screen depends on where the ants have walked (600 steps first).
+ */
+const markAnts = (page) =>
+  page.evaluate(() => {
+    const g = window.jevAnts.game;
+    for (const c of g.colonies) {
+      const alive = [];
+      for (let i = 0; i < c.n; i++) if (c.alive[i]) alive.push(i);
+      let brood = 0;
+      alive.forEach((i, n) => {
+        c.odour[i] = [0, 0.15, 0.4, 0.65, 0.9][n % 5];
+        const kind = n % 9;
+        if (kind === 1) c.load[i] = 0.3;
+        else if (kind === 2) c.load[i] = 1;
+        else if (kind === 3) ((c.carrying[i] = 1), (c.quality[i] = 1));
+        else if (kind === 4) ((c.carrying[i] = 1), (c.quality[i] = 2));
+        else if (kind === 5) c.pellet[i] = 1;
+        else if (kind === 6) {
+          c.pellet[i] = 1;
+          c.corpse[i] = 1;
+          c.corpses.push({ x: c.x[i], y: c.y[i], held: i, died: g.time - 5, load: 0, strain: 0 });
+        } else if (kind === 8) ((c.carrying[i] = 1), (c.quality[i] = 0.5));
+        else if (kind === 7 && brood < c.brood.items.length) {
+          c.broodHeld[i] = 1;
+          c.brood.items[brood++].held = i;
+        }
+      });
+    }
   });
 
 /** The canvas pixel (CSS px, as the mouse takes it) of colony `k`'s ant nearest the middle of the canvas on layer `layer`, or a thrown error. */
@@ -214,6 +251,13 @@ async function tool(page, name) {
   const button = page.getByRole("button", { name, exact: true });
   await button.click();
   await page.waitForFunction((el) => el.getAttribute("aria-pressed") === "true", await button.elementHandle());
+}
+
+/** Turn the mouse wheel over the middle of the canvas (deltaY < 0 zooms in), and let the camera settle. */
+async function zoomWheel(page, deltaY) {
+  const r = await page.evaluate(() => document.querySelector("canvas").getBoundingClientRect().toJSON());
+  await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+  await page.mouse.wheel(0, deltaY);
 }
 
 /** Game time of the desert day's phases, from the species' own numbers (colony/heat.ts dayPhase): sunrise 0, noon (1 - night) / 2, sunset 1 - night. */
@@ -358,12 +402,54 @@ const SCENES = [
       await tool(p, "Move");
     },
   },
+  // The moved ant then walks: a trace is recorded a point a drawn frame, so the page steps ten ticks and lets a frame draw, six times (the trace's solid
+  // run and, once its vector is out, its dotted search loops: the scene above holds only the start ring).
+  {
+    name: "marks-trace-walk",
+    page: "walk",
+    run: async (p) => {
+      // what the marks page has done by its trace scene: the world played, the camera at the nest with ants in view, the builder open
+      await ticks(p, 900);
+      await p.evaluate(() => window.jevAnts.goNest(0));
+      await sleep(1500);
+      await p.getByRole("button", { name: "Builder", exact: true }).click();
+      await tool(p, "Tweezers: pick up an ant");
+      const { sx, sy } = await antScreen(p, 0, 0);
+      await stroke(p, [sx, sy], [sx + 140, sy - 110]);
+      await tool(p, "Move");
+      for (let k = 0; k < 6; k++) {
+        await ticks(p, 10);
+        await sleep(150);
+      }
+    },
+  },
+  // The followed ant's ring at a low zoom, where its radius is the 9 device px floor (the scenes' zoom makes zoom * 1.6 win).
+  {
+    name: "marks-followed-far",
+    page: "marks",
+    run: async (p) => {
+      await followOn(p, 0, 0);
+      await zoomWheel(p, 1500);
+    },
+  },
   // A phone-sized page (390 x 844, touch): the field's size and the page's narrow layout
   { name: "phone-above", page: "phone", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "phone-below", page: "phone", run: (p) => view(p, "below") },
   // The same at two device pixels to a CSS pixel: the lines, dashes, labels and dots scale with it
   { name: "retina-above", page: "retina", run: (p) => ticks(p, 900).then(() => p.evaluate(() => window.jevAnts.goNest(0))) },
   { name: "retina-below", page: "retina", run: (p) => view(p, "below") },
+  // Every kind of ant (markAnts), above, and below at the whole curtain (strokes), at a nest, and zoomed in with the wheel (sprites)
+  {
+    name: "ants-above",
+    page: "ants",
+    run: (p) =>
+      ticks(p, 600)
+        .then(() => markAnts(p))
+        .then(() => p.evaluate(() => window.jevAnts.goNest(0))),
+  },
+  { name: "ants-below-wide", page: "ants", run: (p) => view(p, "below") },
+  { name: "ants-below-nest0", page: "ants", run: (p) => p.evaluate(() => window.jevAnts.goNest(0)) },
+  { name: "ants-below-near", page: "ants", run: (p) => zoomWheel(p, -900) },
   { name: "desert-noon", page: "desert", run: async (p) => toTime(p, await dayAt(p, 1 / 3)) },
   { name: "desert-dusk", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.62)) },
   { name: "desert-night", page: "desert", run: async (p) => toTime(p, await dayAt(p, 0.84)) },
@@ -377,6 +463,9 @@ const PAGES = {
   grown: { scheme: "light", species: null },
   built: { scheme: "light", species: null },
   marks: { scheme: "light", species: null },
+  ants: { scheme: "light", species: null },
+  // a page of its own: the tweezers' stroke needs an ant nothing has moved (the marks page's scene before it moved the same one)
+  walk: { scheme: "light", species: null },
   retina: { scheme: "light", species: null, scale: 2 },
   // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
   phone: { scheme: "light", species: null, phone: true },

@@ -46,7 +46,7 @@ export function chooseDelivery(c: Colony, i: number, answer: Carry): void {
   }
   const role = DELIVERY_ROLES.findIndex((r) => answer === `to ${r}`);
   if (role < 0) return;
-  if (!c.queen || !c.ph.has(DELIVERY_ROLES[role])) {
+  if (!c.housed || !c.ph.has(DELIVERY_ROLES[role])) {
     c.deliveryState[i] = DELIVERY_UNAVAILABLE;
     return;
   }

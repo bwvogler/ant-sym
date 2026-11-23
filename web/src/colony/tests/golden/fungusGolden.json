@@ -41,11 +41,11 @@
      "spores": "e9999b9f",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
-     "hosts": "18eb258b",
+     "hosts": "8ef29b12",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "cbbc1341",
+     "evolution": "5a4df69b",
      "base": "d2dabcb3",
      "hyphae": "53af221f",
      "corpses": "d08749ad",
@@ -100,11 +100,11 @@
      "spores": "5fc857c",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
-     "hosts": "15e8e23b",
+     "hosts": "8be5ca66",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "10e41d86",
+     "evolution": "378e5c1e",
      "base": "d2dabcb3",
      "hyphae": "dc674053",
      "corpses": "d08749ad",
@@ -113,7 +113,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     33,
+     44,
      0
     ]
    }
@@ -159,11 +159,11 @@
      "spores": "ca6a49fa",
      "sporeStrain": "e5be5bb5",
      "sporeCells": "71ef3918",
-     "hosts": "8ae5c8d3",
+     "hosts": "6933d7c2",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "f719450c",
+     "evolution": "fcf5b3ad",
      "base": "d2dabcb3",
      "hyphae": "bf1b14e1",
      "corpses": "d00cd414",
@@ -172,7 +172,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     20,
+     39,
      0
     ]
    }
@@ -215,23 +215,23 @@
    ],
    "fungus": {
     "state": {
-     "spores": "4c6da383",
-     "sporeStrain": "9646634b",
-     "sporeCells": "22bf6840",
-     "hosts": "8d01a276",
+     "spores": "e0f1246b",
+     "sporeStrain": "ed2c810d",
+     "sporeCells": "8462d6e1",
+     "hosts": "69361659",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "4af23019",
+     "evolution": "44df7d8d",
      "base": "d2dabcb3",
-     "hyphae": "4651a94",
-     "corpses": "56a6e70a",
-     "corpseAges": "d56d93ea",
+     "hyphae": "e4fe4a8f",
+     "corpses": "69cc1378",
+     "corpseAges": "553d9e4c",
      "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
-     5,
+     20,
      0
     ]
    }

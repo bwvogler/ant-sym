@@ -294,7 +294,7 @@ export class Recognition {
       let sum = 0;
       // In the side view with a queen, the ants in the colony's royal chambers (nest slice 8: the founding disc, r 3,
       // held few of them once the royal chamber had widened); else the ants within the nest's disc.
-      const ch = c.queen ? home.map.chambers : null;
+      const ch = c.housed ? home.map.chambers : null;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.layer[i] !== c.home) continue;
         if (ch) {

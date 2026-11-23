@@ -1,10 +1,10 @@
 // The Mutations drawer's upgrades as a tech tree (ja-52ui, PRD §80). Wide: tiers left to right, one box for each level you
 // can keep, a row for each upgrade, curves from a level to what it leads on to (owner 2026-11-16). A phone keeps the list:
-// the level an upgrade is at and its next level's button, or what that level still needs. The price is not on the boxes: it
-// is one price, and the drawer's header shows it beside the mutations in hand.
+// the level an upgrade is at and its next level's button, or what that level still needs. The price is not on the boxes: each
+// pool has one price, and the drawer's header shows it beside the mutations in hand in that pool (PRD §85 M3).
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { LETHAL_LEVERS, UPGRADES, canKeep, unmet, upgrade, type Upgrade } from "../colony/index.ts";
+import { LETHAL_LEVERS, UPGRADES, canKeep, unmet, upgrade, type Pools, type Upgrade } from "../colony/index.ts";
 import Tip from "./Tip.tsx";
 import { NextBody, UpgradeBody } from "./UpgradeTips.tsx";
 import { needText } from "./upgradeText.ts";
@@ -16,7 +16,8 @@ function nameClass(u: Upgrade): string {
 
 interface Props {
   levels: Readonly<Record<string, number>>;
-  mutations: number;
+  /** the mutations in hand in each pool: an upgrade is paid from its own */
+  pools: Pools;
   evolve: (id: string) => boolean;
   /** an upgrade whose levers are all lethal and off the menu: keeping it would do nothing yet */
   idle: (u: Upgrade) => boolean;
@@ -34,7 +35,7 @@ const links = UPGRADES.flatMap((u) =>
 );
 
 /** The upgrades: a tree when `wide`, else a list. */
-export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: Props) {
+export default function UpgradeTree({ levels, pools, evolve, idle, wide }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const [edges, setEdges] = useState<{ d: string; met: boolean }[]>([]);
   // The boxes move only when a level changes, not on every stats update (a fresh `levels` object each time).
@@ -95,7 +96,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
           type="button"
           data-level={`${u.id}:${k}`}
           className={`${box} disabled:pointer-events-none disabled:opacity-50`}
-          disabled={!canKeep(levels, mutations, u.id)}
+          disabled={!canKeep(levels, pools, u.id)}
           onClick={() => evolve(u.id)}
         >
           {body}
@@ -132,7 +133,7 @@ export default function UpgradeTree({ levels, mutations, evolve, idle, wide }: P
             <button
               type="button"
               className="rounded-md border border-accent bg-panel px-2 py-0.5 text-fg hover:bg-raised disabled:pointer-events-none disabled:opacity-40"
-              disabled={!canKeep(levels, mutations, u.id)}
+              disabled={!canKeep(levels, pools, u.id)}
               onClick={() => evolve(u.id)}
             >
               {u.steps[level + 1]}

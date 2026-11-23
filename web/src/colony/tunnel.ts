@@ -114,7 +114,7 @@ export function restFetches(col: Colony, i: number, mode: number, cx: number, cy
   return (
     col.params.restFetch > 0 &&
     mode === RETURN && // its one caller (port) asks only for ants not exploring: this keeps it to returners
-    col.queen !== null &&
+    col.housed &&
     !col.carrying[i] &&
     !col.pellet[i] &&
     !col.broodHeld[i] &&
@@ -334,7 +334,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     col.digAim[i] = NaN;
   } else if (
     mode === EXPLORE &&
-    col.queen &&
+    col.housed &&
     !col.carrying[i] &&
     !col.pellet[i] &&
     !col.broodHeld[i] &&
@@ -348,7 +348,7 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     col.digAim[i] = NaN;
   } else if (
     mode === EXPLORE &&
-    col.queen &&
+    col.housed &&
     (col.band(i) === 0 || col.reverts(i)) &&
     !isSky(map, cx, cy) &&
     toBrood(col, cx, cy, dir) >= 0
