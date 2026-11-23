@@ -43,16 +43,16 @@ on:
         type: boolean
         default: false
       bias:
-        description: "The tips' traffic bias (--bias, PRD §88): off, count or levels"
+        description: "The tips' traffic bias (--bias, PRD §88): default (the fungus's own: count), off, count or levels"
         type: choice
-        options: [off, count, levels]
-        default: off
+        options: [default, off, count, levels]
+        default: default
       radius:
-        description: "The bias's neighbourhood radius in cells (--radius)"
-        default: "3"
+        description: "The bias's neighbourhood radius in cells (--radius); empty: the default (3)"
+        default: ""
       tropism:
-        description: "A growing tip leans toward ants on every this-many-th cell (--tropism; 0: never)"
-        default: "0"
+        description: "A growing tip leans toward ants on every this-many-th cell (--tropism; 0: never); empty: the default (4)"
+        default: ""
       traffic:
         description: "Also sample the ants' occupancy round the hypha tips (--traffic; reads only, docs/hyphal-traffic.md)"
         type: boolean
@@ -92,9 +92,9 @@ jobs:
           [[ "$SEEDS" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]] || bad "seeds: e.g. 1-10 or 1-5,11"
           [[ "$SECONDS_IN" =~ ^[0-9]{1,4}$ ]] || bad "seconds: a whole number up to 9999 (a runner stops after 60 minutes)"
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
-          [[ "$BIAS" =~ ^(off|count|levels)$ ]] || bad "bias: off, count or levels"
-          [[ "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: 1 to 6"
-          [[ "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: 0 to 99"
+          [[ "$BIAS" =~ ^(default|off|count|levels)$ ]] || bad "bias: default, off, count or levels"
+          [[ -z "$RADIUS" || "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: empty or 1 to 6"
+          [[ -z "$TROPISM" || "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: empty or 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
           # later one ignores it.
           args="--map one --evolve --seconds $SECONDS_IN --aim $AIM"
@@ -102,7 +102,9 @@ jobs:
           [ "$GROWTH" = "true" ] && args="$args --growth"
           [ "$FLOW" = "true" ] && args="$args --flow"
           [ "$TRAFFIC" = "true" ] && args="$args --traffic"
-          [ "$BIAS" != "off" ] && args="$args --bias $BIAS --radius $RADIUS --tropism $TROPISM"
+          [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
+          [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
+          [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
             const s = process.argv[1].split(",").flatMap((p) => { const [a, b = a] = p.split("-").map(Number); return Array.from({ length: b - a + 1 }, (_, i) => a + i); });
             const u = [...new Set(s)];
