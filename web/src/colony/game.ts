@@ -25,10 +25,9 @@ export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
   return "plane" in m && "curtain" in m && "line" in m;
 }
 
-// The game, pure: two colonies (or one, solo) on one map, sharing its food.
-// The player is neither: the player is the fungus (fungus.ts). `player` and
-// `rival` are the first and second colony, named for history (the stack's
-// tests and scripts use them); the page calls them by colour, Ink and Amber. Each tick: the colonies move (each seeing the other's
+// The game, pure: a list of colonies (ColonySpec; two by default) on one map, sharing its food.
+// The player is none of them: the player is the fungus (fungus.ts). The page calls the first two
+// by colour, Ink and Amber. Each tick: the colonies move (each seeing the other's
 // ants through an enemy grid), then fights are resolved, then — every few
 // seconds — it looks for a living rival (whether the colonies may raid, and
 // whom). A colony with no ants and too little food for one more is beaten.
@@ -39,10 +38,6 @@ export function isOneWorld(m: WorldMap | OneWorld): m is OneWorld {
 // for a minute, the colonies are unified: the fungus's goal.
 
 export interface GameParams {
-  antCount: number;
-  /** a rival colony at the map's second nest */
-  rival: boolean;
-  rivalAnts: number;
   /** seconds between looks for a living rival (whether the colonies may raid, and whom) */
   rivalEvery: number;
   fight: FightParams;
@@ -64,9 +59,6 @@ export interface GameParams {
 }
 
 export const DEFAULT_GAME: GameParams = {
-  antCount: 800,
-  rival: true,
-  rivalAnts: 800,
   rivalEvery: 5,
   fight: DEFAULT_FIGHT,
   fungus: {},
@@ -79,9 +71,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); 14: the rival check's clock is `nextRivalCheck`, and the strategist's fields are gone (S2.3b: a 13 save would load with no clock and never refresh `raidable`); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); 14: the rival check's clock is `nextRivalCheck`, and the strategist's fields are gone (S2.3b: a 13 save would load with no clock and never refresh `raidable`); 15: the params no longer carry the pair's three fields, the first colony's count, the rival flag and the rival's count (S4, docs/game-colonies.md: the colonies a game starts with are a list, never saved; a 14 save would bring the three back into `params`); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -197,17 +189,6 @@ export const GAME_REGROW = 1800;
  */
 export type Outcome = "playing" | "unified" | "fallen";
 
-/** How each side plays: the first colony's policy and params, and the same for the second (default: the local rule). */
-export interface Sides {
-  policy?: Policy;
-  colony?: Partial<ColonyParams>;
-  rival?: Partial<ColonyParams>;
-  rivalPolicy?: Policy;
-  /** the first colony's responses (responses.ts; default the local ones), and the second's */
-  responses?: Responses;
-  rivalResponses?: Responses;
-}
-
 /**
  * One colony the game starts with (docs/game-colonies.md): how many ants, which of the world's start nests, its nest odour, its
  * own params, and how it plays. Runtime only, never saved: a game is rebuilt from its settings (`Game.load` pours state into a
@@ -227,19 +208,10 @@ export interface ColonySpec {
 }
 
 /**
- * The colonies the pair's words name, until the callers move onto a list (docs/game-colonies.md, stage A): the first at nest 0
- * from `antCount` and `Sides.colony`/`policy`/`responses`, and with `rival` and a second start nest, the second at nest 1 from
- * `rivalAnts` and `Sides.rival`/`rivalPolicy`/`rivalResponses`. A rival with no second nest is silently not built.
+ * The colonies a game starts with when none are named: a pair of 800, as the page's default game is. A world with one start nest
+ * builds the first only (a founding makes any more).
  */
-function pairSpecs(params: GameParams, sides: Sides, nests: number): ColonySpec[] {
-  const specs: ColonySpec[] = [{ antCount: params.antCount, colony: sides.colony, policy: sides.policy, responses: sides.responses }];
-  if (params.rival && nests > 1) {
-    // The second colony's nest is forced to 1 after its overrides (a `nest` in Sides.rival never counted).
-    const { nest: _ignored, ...colony } = sides.rival ?? {};
-    specs.push({ antCount: params.rivalAnts, nest: 1, colony, policy: sides.rivalPolicy, responses: sides.rivalResponses });
-  }
-  return specs;
-}
+export const DEFAULT_COLONIES: readonly ColonySpec[] = [{ antCount: 800 }, { antCount: 800 }];
 
 /**
  * The game's random numbers for a seed: one scheme for the page, the experiments and the side-view scripts, so a
@@ -383,7 +355,12 @@ export class Game {
    * the curtain, its nest, queen and brood, where every ant starts; it forages on the plane, and its ants cross between
    * the two at the holes.
    */
-  constructor(world: OneWorld, params: Partial<GameParams> = {}, rng: () => number = Math.random, how: Sides | ColonySpec[] = {}) {
+  constructor(
+    world: OneWorld,
+    params: Partial<GameParams> = {},
+    rng: () => number = Math.random,
+    specs: readonly ColonySpec[] = DEFAULT_COLONIES.slice(0, Math.max(1, world.curtain.nests.length)),
+  ) {
     const map = world.plane;
     // The colonies' home map: the curtain, where their nests are.
     const home = world.curtain;
@@ -401,12 +378,11 @@ export class Game {
     // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
     const tolerance = this.recognition.params.tolerance;
-    // Each colony starts at its own odour, as far apart as odours go (0 and 1 for two). The pair's words name the list unless a list is given.
-    const specs = Array.isArray(how) ? how : pairSpecs(this.params, how, home.nests.length);
+    // Each colony starts at its own odour, as far apart as odours go (0 and 1 for two).
     if (specs.length === 0) throw new Error("a game starts with at least one colony");
     if (specs.length > home.nests.length)
       throw new Error(`${specs.length} colonies, and the world has ${home.nests.length} start nests (a founding makes any more)`);
-    this.#firstAnts = specs[0]?.antCount ?? this.params.antCount;
+    this.#firstAnts = specs[0]!.antCount;
     this.colonies = specs.map((spec, k) => {
       const c = new Colony(
         home,
@@ -605,7 +581,7 @@ export class Game {
 
   /** A lost queen's body leaves the world with her: booked to her mother colony's `eaten`, as food that left its economy. Why is kept (lastLoss). */
   #lost(f: Flight, reason: string): void {
-    (this.colonies[f.mother] ?? this.player).eaten += f.food;
+    (this.colonies[f.mother] ?? (this.colonies[0] as Colony)).eaten += f.food;
     this.lastLoss = { flight: f, reason };
   }
 
@@ -717,7 +693,10 @@ export class Game {
     const at = { x: centreX(v.x, v.y) + FLIGHT_2D * ux, y: centreY(v.y) + FLIGHT_2D * uy };
     const s = this.settleAt(at);
     if (s.ok === false) return s;
-    return { ok: true, k: this.addColony({ ...at, antCount, odour: this.player.nestOdour, spot: { cell: s.cell, end: s.end } }) };
+    return {
+      ok: true,
+      k: this.addColony({ ...at, antCount, odour: (this.colonies[0] as Colony).nestOdour, spot: { cell: s.cell, end: s.end } }),
+    };
   }
 
   /** tryFoundBeyond, throwing ("addColony: " and the reason) where there is no room: for scripts and tests that expect a colony. */
@@ -798,16 +777,6 @@ export class Game {
   /** Food left on the map, every layer's (the plane's and the curtain's buried food), as each colony counts it. */
   get foodLeft(): number {
     return this.world.plane.foodLeft + this.world.curtain.foodLeft;
-  }
-
-  /** The first colony (Ink on the page). Not the player's: the player is the fungus. */
-  get player(): Colony {
-    return this.colonies[0] as Colony;
-  }
-
-  /** The second colony (Amber on the page), or null solo. */
-  get rival(): Colony | null {
-    return this.colonies[1] ?? null;
   }
 
   /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
@@ -1021,7 +990,7 @@ export class Game {
     { spores = LANDING.spores, evolve = false }: { spores?: number; evolve?: boolean } = {},
   ): { x: number; y: number } {
     if (this.landed) return this.landed;
-    const { x, y, toward } = this.#byHole(this.colonies[k] ?? this.player);
+    const { x, y, toward } = this.#byHole(this.colonies[k] ?? (this.colonies[0] as Colony));
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
     if (evolve) this.fungus.evolve(strain);
     this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);

@@ -27,9 +27,11 @@ import {
   aphidCount,
   type AphidClump,
 } from "../colony/index.ts";
-import { type Camera, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { type Camera, toScreen, toWorld, type Viewport, visible } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame } from "./field/prelude.ts";
+import { handleKey, handleWheel, type KeyHost } from "./field/keyboard.ts";
+import { PointerController, type PointerHost, type PointerInput } from "./field/pointer.ts";
 import { CameraRig, extentOf } from "./field/rig.ts";
 import { odourColour } from "./field/colour.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
@@ -170,23 +172,6 @@ function rgb(hex: string): [number, number, number] {
 const CLICK_SLOP_PX = 8;
 /** A click picks the nearest ant within this many CSS px. */
 const PICK_PX = 14;
-/** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
-type Gesture = {
-  kind: "pan" | "pinch" | "mini" | "paint" | "tweeze" | "none";
-  moved: number;
-  button: number;
-  sx: number;
-  sy: number;
-  /** the ant the tweezers hold */
-  ant?: Followed;
-  /**
-   * A finger's (or pen's) stroke or lift not begun yet: it starts once the finger has moved past a click's slop, or places on lifting
-   * as a tap. A second finger landing first makes it a pinch instead, and nothing was built (a pinch with a brush in hand used to
-   * drop the brush where the first finger landed).
-   */
-  pending?: boolean;
-};
-const NO_GESTURE: Gesture = { kind: "none", moved: 0, button: 0, sx: 0, sy: 0 };
 
 export default function ColonyField({
   colonies,
@@ -291,8 +276,6 @@ export default function ColonyField({
   const vc = () => rig.vc();
   /** The shown view's map: the plane or the curtain. */
   const shownMap = (): WorldMap => (shown.current === PLANE ? world.plane : world.curtain);
-  /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
-  const extent = () => rig.extent();
   // A new game starts zoomed out, in both views.
   useEffect(() => {
     rig.clear();
@@ -336,12 +319,8 @@ export default function ColonyField({
   useEffect(() => {
     buildRef.current = build;
   }, [build]);
-  /** pointers set aside as palms (builder on): never panned, painted or counted toward a pinch */
-  const palms = useRef(new Set<number>());
-
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesture = useRef<Gesture>(NO_GESTURE);
-
+  /** The pointer gestures (ui/field/pointer.ts): the pointers down, the gesture under way, the palms the builder set aside (never panned, painted or counted toward a pinch). */
+  const [ptr] = useState(() => new PointerController());
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -972,12 +951,7 @@ export default function ColonyField({
       const r = canvas.getBoundingClientRect();
       const k = canvas.width / r.width;
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: k };
-      rig.zoomAround(
-        v,
-        angled.current ? v.w / 2 : (e.clientX - r.left) * k,
-        angled.current ? v.h / 2 : (e.clientY - r.top) * k,
-        Math.exp(-e.deltaY * 0.0015),
-      );
+      handleWheel(rig, v, { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, deltaY: e.deltaY }, angled.current);
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
@@ -1105,49 +1079,41 @@ export default function ColonyField({
     );
   };
 
-  const panMap = (c: Camera, dx: number, dy: number) => pan(c, dx, angled.current ? dy / Math.cos(orbit.current.tilt) : dy);
-
+  /** What the pointer controller reads and does on the page (ui/field/pointer.ts): this render's, like the handlers' closures were. */
+  const ptrHost = (): PointerHost => ({
+    rig,
+    slop,
+    angled: () => angled.current,
+    tilt: () => orbit.current.tilt,
+    build: () => buildRef.current,
+    pick,
+    paint,
+    onPlane: () => shown.current === PLANE,
+    following: () => !!follow.current,
+    follow: (f) => {
+      follow.current = f;
+      onFollow(f);
+    },
+    setHover: (x, y) => {
+      hover.current = [x, y];
+    },
+    lensOn: () => lensRef.current,
+    probe: probeAt,
+    pen: () => penRef.current,
+    labelsOn: () => labelsOn.current,
+    chamberAt,
+    onChamber,
+    link,
+  });
+  const pointerInput = (e: PointerEvent<HTMLCanvasElement>): PointerInput => {
+    const [x, y] = devicePoint(e);
+    return { id: e.pointerId, pointerType: e.pointerType, button: e.button, buttons: e.buttons, x, y, palm: isPalm(e) };
+  };
   const onDown = (e: PointerEvent<HTMLCanvasElement>) => {
     if (e.button === 1) e.preventDefault(); // middle-drag pans; no autoscroll
-    // The builder sets a palm aside (a child's resting hand is no finger: docs/builder.md, design).
-    if (buildRef.current && isPalm(e)) {
-      palms.current.add(e.pointerId);
-      return;
-    }
+    if (!ptr.down(ptrHost(), pointerInput(e))) return; // a palm, set aside by the builder
     e.currentTarget.setPointerCapture(e.pointerId);
     e.currentTarget.focus({ preventScroll: true });
-    const [x, y] = devicePoint(e);
-    pointers.current.set(e.pointerId, { x, y });
-    if (pointers.current.size === 2) {
-      gesture.current = { ...NO_GESTURE, kind: "pinch", moved: Infinity };
-      return;
-    }
-    if (pointers.current.size > 2) return;
-    const start = { moved: 0, sx: x, sy: y };
-    if (e.button === 0 && rig.inMini(x, y)) {
-      gesture.current = { ...NO_GESTURE, ...start, kind: "mini" };
-      rig.jumpMini(x, y);
-    } else if (angled.current) {
-      gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
-    } else if (e.button === 0 && buildRef.current?.tool === "tweezers") {
-      // The tweezers lift the ant under the finger, on the top view only; with none there the finger pans as ever.
-      const ant = shown.current === PLANE ? pick(x, y) : null;
-      if (ant) {
-        // A finger waits to see whether a second joins it (a pinch); a mouse lifts at once.
-        const held = e.pointerType !== "mouse";
-        gesture.current = { ...NO_GESTURE, ...start, kind: "tweeze", ant, pending: held };
-        if (!held) {
-          const [wx, wy] = toWorld(camera(), viewport(), x, y);
-          buildRef.current.onTweeze?.(ant.k, ant.i, wx, wy, true);
-        }
-      } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
-    } else if (e.button === 0 && buildRef.current?.tool) {
-      // A tool in hand: a drag paints, and a tap places. A finger waits to see whether a second joins it (two fingers pan and
-      // zoom, as with no tool): it builds once it has moved past the slop, or on lifting as a tap. A mouse builds at once.
-      const held = e.pointerType !== "mouse";
-      gesture.current = { ...NO_GESTURE, ...start, kind: "paint", pending: held };
-      if (!held) paint([[x, y]], true);
-    } else gesture.current = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
   };
 
   /** Report canvas point (x, y) to the lens: the page's pixels, the world point and the ant there. */
@@ -1160,134 +1126,20 @@ export default function ColonyField({
     probeCb.current({ sx: r.left + x / k, sy: r.top + y / k, lv: shown.current, x: wx, y: wy, ant: pick(x, y), pinned });
   };
 
-  const onMove = (e: PointerEvent<HTMLCanvasElement>) => {
-    const [x, y] = devicePoint(e);
-    hover.current = [x, y];
-    // The lens follows a mouse over the map (no button down); a finger taps instead (onUp).
-    if (!angled.current && lensRef.current && e.pointerType === "mouse" && pointers.current.size === 0) probeAt(x, y, false);
-    const prev = pointers.current.get(e.pointerId);
-    if (!prev) return;
-    const g = gesture.current;
-    if (g.kind === "pinch" && pointers.current.size >= 2) {
-      let other = prev;
-      for (const [id, p] of pointers.current) if (id !== e.pointerId) other = p;
-      const before = Math.hypot(prev.x - other.x, prev.y - other.y);
-      const after = Math.hypot(x - other.x, y - other.y);
-      const v = viewport();
-      const sx = angled.current ? v.w / 2 : (x + other.x) / 2;
-      const sy = angled.current ? v.h / 2 : (y + other.y) / 2;
-      const c = zoomBy(camera(), extent(), v, sx, sy, before > 0 ? after / before : 1);
-      setCamera(panMap(c, (x - prev.x) / 2, (y - prev.y) / 2));
-    } else if (g.kind === "pan") {
-      const was = g.moved;
-      g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
-      if (g.moved > slop()) {
-        if (follow.current) unfollow();
-        // Crossing the slop, catch up from where the drag began, so the ground stays under the pointer.
-        setCamera(was <= slop() ? panMap(camera(), x - g.sx, y - g.sy) : panMap(camera(), x - prev.x, y - prev.y));
-      }
-    } else if (g.kind === "mini" && e.buttons & 1) rig.jumpMini(x, y);
-    else if (g.kind === "paint") {
-      if (g.pending) {
-        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
-        // Still within a click's slop: not yet a stroke (a second finger may be on its way).
-        if (g.moved > slop()) {
-          g.pending = false;
-          paint(
-            [
-              [g.sx, g.sy],
-              [x, y],
-            ],
-            true,
-          );
-        }
-      } else
-        paint(
-          [
-            [prev.x, prev.y],
-            [x, y],
-          ],
-          false,
-        );
-    } else if (g.kind === "tweeze" && g.ant) {
-      if (g.pending) {
-        g.moved += Math.abs(x - prev.x) + Math.abs(y - prev.y);
-        if (g.moved > slop()) {
-          g.pending = false;
-          const [sx, sy] = toWorld(camera(), viewport(), g.sx, g.sy);
-          buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, sx, sy, true);
-        }
-      }
-      if (!g.pending) {
-        const [wx, wy] = toWorld(camera(), viewport(), x, y);
-        buildRef.current?.onTweeze?.(g.ant.k, g.ant.i, wx, wy, false);
-      }
-    }
-    pointers.current.set(e.pointerId, { x, y });
-  };
+  const onMove = (e: PointerEvent<HTMLCanvasElement>) => ptr.move(ptrHost(), pointerInput(e));
 
-  const onUp = (e: PointerEvent<HTMLCanvasElement>) => {
-    if (palms.current.delete(e.pointerId)) return;
-    const g = gesture.current;
-    const p = pointers.current.get(e.pointerId);
-    pointers.current.delete(e.pointerId);
-    // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
-    if (e.type === "pointerup" && g.kind === "paint" && g.pending) paint([[g.sx, g.sy]], true);
-    if (!angled.current && e.type === "pointerup" && g.kind === "pan" && g.button === 0 && g.moved <= slop() && p) {
-      const pn = penRef.current;
-      if (lensRef.current && !(pn && shown.current === PLANE)) {
-        // The lens on: a click (a tap) says what is there, and keeps the card up; it follows nothing. The queen's pen keeps its click.
-        probeAt(p.x, p.y, true);
-      } else if (pn && shown.current === PLANE) {
-        // The queen's pen: a click on the top view is where she flies (the page founds there, or says why not).
-        const [wx, wy] = toWorld(camera(), viewport(), p.x, p.y);
-        pn.onPick({ x: wx, y: wy });
-      } else {
-        const f = pick(p.x, p.y);
-        follow.current = f;
-        onFollow(f);
-        const hit = !f && labelsOn.current && onChamber ? chamberAt(p.x, p.y) : null;
-        if (hit) onChamber!(hit.k, hit.id);
-        else if (!f) link(p.x, p.y);
-      }
-    }
-    if (pointers.current.size === 0) gesture.current = NO_GESTURE;
-    // A pinch stays a pinch while two fingers are down (a third lifted); the last finger left pans, and never clicks.
-    else if (g.kind === "pinch" && pointers.current.size === 1) gesture.current = { ...NO_GESTURE, kind: "pan", moved: Infinity };
-  };
+  const onUp = (e: PointerEvent<HTMLCanvasElement>) => ptr.up(ptrHost(), pointerInput(e), e.type !== "pointerup");
 
+  const keyHost = (): KeyHost => ({
+    rig,
+    angled: () => angled.current,
+    tilt: () => orbit.current.tilt,
+    following: () => !!follow.current,
+    unfollow,
+    nextNest: () => goNest((nestTurn.current + 1) % colonies.length),
+  });
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return; // browser and system shortcuts (Ctrl+0, Ctrl+S, …) pass through
-    if (e.key === " ") {
-      e.preventDefault(); // the focused field doesn't scroll the page
-      return;
-    }
-    const v = viewport();
-    const c = camera();
-    const step = Math.min(v.w, v.h) * 0.15;
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [step, 0],
-      a: [step, 0],
-      ArrowRight: [-step, 0],
-      d: [-step, 0],
-      ArrowUp: [0, step],
-      w: [0, step],
-      ArrowDown: [0, -step],
-      s: [0, -step],
-    };
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key; // Shift or Caps Lock still moves
-    const m = moves[key];
-    if (m) {
-      if (follow.current) unfollow();
-      setCamera(panMap(c, m[0], m[1]));
-    } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 1.25));
-    else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
-    else if (e.key === "0" || e.key === "Home") showAll();
-    else if (key === "n") goNest((nestTurn.current + 1) % colonies.length);
-    // Escape drops a follow; with nothing followed it is left for the drawer (review of #182, S7).
-    else if (e.key === "Escape" && follow.current && !e.defaultPrevented) unfollow();
-    else return;
-    e.preventDefault();
+    if (handleKey(keyHost(), e)) e.preventDefault();
   };
 
   const showAll = () => rig.showAll();

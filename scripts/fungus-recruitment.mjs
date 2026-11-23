@@ -17,8 +17,8 @@ const radius = 3;
 function run(seed, marked, trail) {
   const arena = new Arena(81, 51, true).pile(25, 25, radius, 100).pile(55, 25, radius, 100);
   const world = oneArena(arena.build([{ x: 40, y: 25, r: 2 }]), seed);
-  const game = new Game(world, { antCount: workers, rival: false }, gameRng(seed));
-  const colony = game.player;
+  const game = new Game(world, {}, gameRng(seed), [{ antCount: workers }]);
+  const colony = game.colonies[0];
   game.fungus.menu = ["trail"];
   const baseline = encodeLevels({}, ["trail"]);
   const answer = encodeLevels({ trail }, ["trail"]);

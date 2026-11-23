@@ -573,7 +573,10 @@ test("F2 (ja-tgw9): with flow on, the hyphae and their loads hold the body's mas
   assert.ok(worst < 0.06, `the hyphae held ${(worst * 100).toFixed(1)} % off the body's mass`);
   assert.ok(curtainFed, "no mass reached the curtain");
   const down = g.fungus.hyphaeOn(CURTAIN)!;
-  assert.ok(down.length > 6, `the curtain's hyphae grew to ${down.length} cells`);
+  // Past the hole's mouth: 21 cells at 150 s while the landing rooted three tips, 4 with six (owner, 2026-11-22: six tips share
+  // the mass, so less of it goes down the hole; accepted after the progression comparison, PR #280). The test holds that tips
+  // do grow on mass that reaches the curtain, not how many.
+  assert.ok(down.length > 3, `the curtain's hyphae grew to ${down.length} cells`);
   // Mass flows out to the tips rather than sitting where it entered: most of the body is hypha, not load in transit
   // (with the patch's mass spread over cells no hypha grows from, two thirds of it sat stuck).
   const loaded = g.fungus.hyphaeOn(PLANE)!.loaded + down.loaded;
@@ -602,3 +605,99 @@ for (const flow of [false, true])
     assert.equal(mat(false), 0, "no corpse, no mat");
     assert.ok(mat(true) > 0, "no mat beside a colonised corpse");
   });
+
+// A flower becomes a patch (PRD §85, ja-vlla.5): a tip that thickens at a colonised corpse far from every patch closes a
+// flower of seven cells, which becomes a patch with no start of its own; at the landing's rim it makes none.
+
+/** A plane cell at least `far` cells from `from`, with its six neighbours open: a place for a corpse. */
+function openSpot(g: Game, from: { x: number; y: number }, far: number): [number, number] {
+  const plane = g.world!.plane;
+  for (let y = 5; y < 95; y++)
+    for (let x = 5; x < 155; x++) {
+      if (hexDistance(x, y, from.x, from.y) < far) continue;
+      let ok = rockAt(plane, x, y) === OPEN;
+      for (let d = 0; d < 6 && ok; d++) ok = rockAt(plane, nx(x, y, d), ny(y, d)) === OPEN;
+      if (ok) return [x, y];
+    }
+  throw new Error("no open spot");
+}
+
+test("thickening at a colonised corpse far from every patch closes a flower that becomes a patch, with no start of its own", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const e = g.fungus.evolution!;
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  const [x, y] = openSpot(g, tip, 25);
+  const patches = e.patches;
+  const base = g.fungus.patchOn(PLANE).length / 2;
+  g.fungus.colonise(PLANE, x, y);
+  const mass = e.mass;
+  // Tick to the round the flower closes, and look at once.
+  for (let k = 0; k < 30 * 10 && g.fungus.flowers === 0; k++) g.tick(1 / 30);
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  assert.equal(g.fungus.flowers, 1, "one flower closed");
+  const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
+  const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
+  assert.ok(there >= 5, `the corpse's two tips and the flower's three stand in it (${there})`);
+  assert.equal(e.patches, patches + 1, "one more patch, room to grow");
+  assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
+  for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
+    assert.ok(h.sources.has(hyphaKey(c[0], c[1])), `source ${c}`);
+  assert.ok(e.mass - mass < 1, `no start of 4 for a flower (mass ${mass.toFixed(2)} to ${e.mass.toFixed(2)})`);
+  // A save keeps it.
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true);
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.equal(back.fungus.flowers, 1);
+  assert.equal(back.fungus.evolution!.patches, patches + 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(back.save())), saved);
+});
+
+test("thickening beside the landing makes no flower: its cells are the landing's already", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  g.fungus.colonise(PLANE, nx(tip.x, tip.y, tip.heading), ny(tip.y, tip.heading));
+  const patches = g.fungus.evolution!.patches;
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 0);
+  assert.equal(g.fungus.evolution!.patches, patches);
+});
+
+test("a corpse with rock beside it closes no flower: its seven cells are not all hyphae, so nothing becomes a patch", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  const plane = g.world!.plane;
+  const tip = g.fungus.hyphaeOn(PLANE)!.tips[0]!;
+  let at: [number, number] | null = null;
+  for (let y = 5; y < 95 && !at; y++)
+    for (let x = 5; x < 155 && !at; x++) {
+      if (hexDistance(x, y, tip.x, tip.y) < 25 || rockAt(plane, x, y) !== OPEN) continue;
+      let rock = 0;
+      for (let d = 0; d < 6; d++) if (rockAt(plane, nx(x, y, d), ny(y, d)) !== OPEN) rock++;
+      if (rock >= 1 && rock <= 3) at = [x, y];
+    }
+  assert.ok(at, "no open cell with rock beside it");
+  const patches = g.fungus.evolution!.patches;
+  const base = g.fungus.patchOn(PLANE).length;
+  g.fungus.colonise(PLANE, ...at);
+  runFor(g, 20);
+  assert.ok(g.fungus.hyphaeOn(PLANE)!.mat.size > 0, "it did thicken");
+  assert.equal(g.fungus.flowers, 0);
+  assert.equal(g.fungus.evolution!.patches, patches);
+  assert.equal(g.fungus.patchOn(PLANE).length, base);
+});
+
+test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "thicken");
+  crossDown(g);
+  const map = g.world!.curtain;
+  let at: [number, number] | null = null;
+  for (let y = 45; y < 80 && !at; y++) for (let x = 0; x < 40 && !at; x++) if (rockAt(map, x, y) === OPEN) at = [x, y];
+  assert.ok(at);
+  g.fungus.colonise(CURTAIN, ...at);
+  runFor(g, 20);
+  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeThickened(), [], "nothing left over from the rounds before");
+  assert.equal(g.fungus.flowers, 0, "layer 0 only");
+});

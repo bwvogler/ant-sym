@@ -37,16 +37,16 @@ function play(seed, shipped) {
   const g = new Game(
     generateOneWorld(seed),
     {
-      antCount: ants,
-      rivalAnts: ants,
-      rival: true,
       regrow: GAME_REGROW,
       autoFound: false,
       fungus: { hyphae: true },
       fight: { ...DEFAULT_FIGHT, intent: true, attackDistance: 0.65, counterattack: true },
     },
     gameRng(seed, 0),
-    { responses: r, rivalResponses: r },
+    [
+      { antCount: ants, responses: r },
+      { antCount: ants, responses: r },
+    ],
   );
   for (let t = 0; t < seconds; t += 1 / 30) g.tick(1 / 30);
   const [a, b] = g.colonies;

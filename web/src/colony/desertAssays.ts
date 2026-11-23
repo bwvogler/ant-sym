@@ -31,7 +31,7 @@ function desertSpec(seed: number, probe: Probe): RunSpec {
 
 /** Cells of the plane at or above a faint trail on `channel`. */
 function trailCells(game: Game, channel: Channel): number {
-  const L = game.player.layers[PLANE] as Layer;
+  const L = game.colonies[0]!.layers[PLANE] as Layer;
   const { w, h } = L.map.size;
   let n = 0;
   for (let y = 0; y < h; y++) for (let x = L.map.x0; x < L.map.x0 + w; x++) if (L.ph.fields[channel].get(x, y) >= FAINT) n++;
@@ -78,7 +78,7 @@ function crossingsProbe(
   const died: { t: number; ant: number }[] = [];
   return {
     tick(game) {
-      const c = game.player;
+      const c = game.colonies[0]!;
       if (was.length < c.n) {
         // New slots start as "no ant" (255), not as PLANE (0), so a slot filled later is not read as a return (review of #134).
         const grown = new Uint8Array(Math.max(c.n, 64)).fill(255);
@@ -126,7 +126,7 @@ export const desertInvitation: Assay = {
     let wasCarrying = new Uint8Array(0);
     return desertSpec(seed, {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         if (wasHeld.length < c.n) {
           const grow = <T extends Uint8Array | Int8Array>(a: T, make: (n: number) => T) => {
             const b = make(Math.max(c.n, 64));
@@ -257,7 +257,7 @@ export const desertChamber: Assay = {
     const spec = desertSpec(seed, {
       tick() {},
       summary(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         const rng = mulberry32(seed * 7919 + 17);
         const out: Record<string, number> = {};
         const rateAfter: Record<number, number> = {};
@@ -295,7 +295,7 @@ export const desertFirstFind: Assay = {
     let held: Uint8Array = new Uint8Array(0);
     return desertSpec(seed, {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         if (held.length < c.n) {
           const grown = new Uint8Array(Math.max(c.n, 64));
           grown.set(held);
@@ -400,7 +400,7 @@ export const desertHeat: Assay = {
     const bins: number[] = [];
     const spec = desertSpec(seed, {
       tick(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         const day = c.params.heatDay;
         if (held.length < c.n) {
           const grown = new Uint8Array(Math.max(c.n, 64));
@@ -446,7 +446,7 @@ export const desertHeat: Assay = {
         }
       },
       summary(game) {
-        const c = game.player;
+        const c = game.colonies[0]!;
         const days = c.params.heatDay > 0 ? game.time / c.params.heatDay : NaN;
         const outNoon = noon / Math.max(1, noonN);
         const outDawn = dawn / Math.max(1, dawnN);

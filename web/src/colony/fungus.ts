@@ -32,7 +32,7 @@ import {
   type Reach,
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
-import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NW, SE, SW, W } from "./hex.ts";
+import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
   cellKey,
@@ -229,8 +229,12 @@ export const DEFAULT_FUNGUS: FungusParams = {
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
 
-/** The headings of the tips a landing's hyphae set out on: three, a third of the way round from each other (hex.ts E, SW, NW). */
-const ROOT_HEADINGS = [E, SW, NW];
+/**
+ * The headings of the tips a landing's hyphae set out on: all six ways (hex.ts E, SE, SW, W, NW, NE), so no direction is
+ * forced out and none held back; which of them push is the growth rule's (or the growth lane's) to say, tip by tip (owner,
+ * 2026-11-18). Before, three: a third of the way round from each other.
+ */
+const ROOT_HEADINGS = [E, SE, SW, W, NW, NE];
 /**
  * A corpse the fungus grows out of (ja-2bw.7, docs/hyphal-growth.md §6): the spores it puts out on its cell, free (paid
  * by the cadaver, not the mycelium: Khun et al. 2021 counted about 1.3 × 10⁸ conidia a cadaver; the amount is design),
@@ -1178,6 +1182,7 @@ export class Fungus {
             })
           : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
       stepRound(maps, level, budget, this.growthPolicy);
+      this.#settle();
       stepped = true;
     }
     // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
@@ -1342,8 +1347,8 @@ export class Fungus {
     });
     this.#evolution.root();
     if (!this.params.hyphae) return;
-    // As hyphae: the patch is the hyphae's first cells, and three tips set out from its rim, going outward (a weak start):
-    // one heading at `toward` (one world: the hole, ja-2bw.14) and the others a third of the way round each side.
+    // As hyphae: the patch is the hyphae's first cells, and a tip sets out from its rim in each of the six ways, going outward:
+    // the first at `toward` (one world: the hole, ja-2bw.14), then round from it. Which push is the growth answers' to decide.
     const h = (this.#hyphae[layer] ??= new Hyphae());
     for (const key of L.base) {
       h.addCell(keyX(key), keyY(key));
@@ -1354,7 +1359,7 @@ export class Fungus {
     const cy = CELL[1];
     if (rockAt(map, cx, cy)) return;
     const first = toward ? dirOf(Math.atan2(toward.y - y, toward.x - x)) : null;
-    const headings = first === null ? ROOT_HEADINGS : [first, (first + 2) % 6, (first + 4) % 6];
+    const headings = first === null ? ROOT_HEADINGS : ROOT_HEADINGS.map((_, k) => (first + k) % 6);
     for (const d of headings) {
       // Out from the middle along d to the patch's last cell that way.
       let px = cx;
@@ -1381,6 +1386,52 @@ export class Fungus {
           py = qy;
         }
       h.root(px, py, aim);
+    }
+  }
+
+  /** patches a closed flower of hyphae has become, over the game (PRD §85, ja-vlla.5) */
+  flowers = 0;
+
+  /**
+   * A cell the hyphae have thickened round, whose six neighbours are all hyphae too, is a flower; it becomes a patch
+   * (PRD §85, ja-vlla.5) when none of its seven cells is in a patch already (base or sources: the landing's own cells
+   * never count): the seven are a base that sporulates and sources of mass, the patch count (room to grow) goes up by
+   * one with no start of its own (the mass is the hyphae's), and three tips set out from it as at a landing. Layer 0
+   * only, as every root today. Nothing without an evolution.
+   */
+  #settle(): void {
+    const e = this.#evolution;
+    // Every map's list is emptied, so none grows without bound; only layer 0's is looked at.
+    const lists = this.#hyphae.map((h) => h?.takeThickened() ?? []);
+    const h = this.#hyphae[0];
+    if (!e || !h) return;
+    const L = this.#layers[0] as SporeLayer;
+    const base = new Set(L.base);
+    for (const k of lists[0]!) {
+      const [cx, cy] = keyCell(k);
+      const cells = [k];
+      for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
+      if (!cells.every((c) => h.parent.has(c))) continue;
+      if (cells.some((c) => base.has(c) || h.sources.has(c))) continue;
+      for (const c of cells) {
+        L.base.push(c);
+        base.add(c);
+        h.sources.add(c);
+      }
+      e.settle();
+      this.flowers++;
+      for (const d of ROOT_HEADINGS) {
+        let px = cx;
+        let py = cy;
+        for (let i = 0; i < 2; i++) {
+          const qx = nx(px, py, d);
+          const qy = ny(py, d);
+          if (!h.has(qx, qy)) break;
+          px = qx;
+          py = qy;
+        }
+        h.root(px, py, d);
+      }
     }
   }
 
@@ -1724,6 +1775,8 @@ export class Fungus {
       menu: encode(this.#menu),
       clock: this.#clock,
       evolution: this.#evolution?.save() ?? null,
+      // Only once a flower has become a patch: a game with none saves as it always has (the goldens hash the save).
+      ...(this.flowers ? { flowers: this.flowers } : {}),
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
@@ -1754,6 +1807,7 @@ export class Fungus {
     const e = r.evolution as EvolutionSave | null | undefined;
     this.#evolution = e ? Evolution.load(e) : null;
     L.base = [...((r.base as number[] | undefined) ?? [])];
+    this.flowers = (r.flowers as number | undefined) ?? 0;
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
       if (layers.length !== this.#layers.length - 1)

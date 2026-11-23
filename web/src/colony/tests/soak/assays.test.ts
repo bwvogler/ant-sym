@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CURTAIN, LIFESPAN } from "../../colony.ts";
 import { centreX, centreY } from "../../hex.ts";
-import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withOverrides } from "../../experiment.ts";
+import { deplete, gameOf, nurseZoneProbe, onPlane, oneAssay, runAssay, runGame, withFirstColony, withOverrides } from "../../experiment.ts";
 import { Game, gameRng } from "../../game.ts";
 import { localResponses } from "../../responses.ts";
 import { generateOneWorld } from "../../oneWorld.ts";
@@ -48,10 +48,10 @@ test("overrides: channel params merge per field and reach the pheromone fields",
   assert.equal(c.ph.params.alarm.evaporation, 0.25);
 });
 
-test("overrides: a fight override keeps the other fight params; rival params reach the second colony", () => {
+test("overrides: a fight override keeps the other fight params; second-colony params reach the second colony", () => {
   const spec = withOverrides(
     { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 10 }] },
-    { game: { fight: { rate: 3 } }, rival: { deposit: 7 } },
+    { game: { fight: { rate: 3 } }, second: { deposit: 7 } },
   );
   assert.equal(spec.game?.fight?.rate, 3);
   assert.equal(spec.game?.fight?.alarm, 8);
@@ -60,7 +60,7 @@ test("overrides: a fight override keeps the other fight params; rival params rea
   assert.equal(g.colonies[0]!.params.deposit, 4);
 });
 
-test("overrides on a listed spec: both reaches every colony, rivalPolicy only the second, game.antCount/rival/rivalAnts are refused, gameOf builds the list", () => {
+test("overrides on a listed spec: both reaches every colony, secondPolicy only the second, gameOf builds the list", () => {
   const base = { ...deplete.spec(1), colonies: [{ antCount: 10 }, { antCount: 12 }, { antCount: 14 }] };
   const both = withOverrides(base, { both: { deposit: 6 } });
   assert.deepEqual(
@@ -68,18 +68,30 @@ test("overrides on a listed spec: both reaches every colony, rivalPolicy only th
     [6, 6, 6],
   );
   const pol = (() => 0) as never;
-  const rp = withOverrides(base, { policy: pol, rivalPolicy: pol });
+  const rp = withOverrides(base, { policy: pol, secondPolicy: pol });
   assert.equal(rp.colonies?.[0]?.policy, pol);
   assert.equal(rp.colonies?.[1]?.policy, pol);
   assert.equal(rp.colonies?.[2]?.policy, undefined);
-  assert.equal(withOverrides(base, { rivalPolicy: pol }).colonies?.[0]?.policy, undefined);
-  for (const game of [{ antCount: 5 }, { rival: false }, { rivalAnts: 5 }])
-    assert.throws(() => withOverrides(base, { game }), /name no colony/);
+  assert.equal(withOverrides(base, { secondPolicy: pol }).colonies?.[0]?.policy, undefined);
   const { game } = gameOf({ seed: 1, seconds: 0, map: () => smallOne(1), colonies: [{ antCount: 10 }, { antCount: 12 }] });
   assert.deepEqual(
     game.colonies.map((c) => c.params.antCount),
     [10, 12],
   );
+});
+
+test("overrides on a spec with no colony list keep the default's clamp: a one-nest world builds one colony (review of #321, S1)", () => {
+  const map = () => generateOneWorld(2, { plane: { size: { w: 160, h: 100 }, nestCount: 1 } });
+  const base = { seed: 2, seconds: 0, map };
+  assert.equal(gameOf(base).game.colonies.length, 1, "the default alone");
+  for (const spec of [withOverrides(base, { both: { deposit: 6 } }), withOverrides(base, { colony: { deposit: 6 } })]) {
+    const { game } = gameOf(spec);
+    assert.equal(game.colonies.length, 1);
+    assert.equal(game.colonies[0]!.params.deposit, 6);
+  }
+  assert.equal(gameOf(withFirstColony(base, { colony: { deposit: 7 } })).game.colonies[0]!.params.deposit, 7);
+  // On a two-nest world the same specs build the pair.
+  assert.equal(gameOf({ ...base, map: () => generateOneWorld(2, { plane: { size: { w: 160, h: 100 } } }) }).game.colonies.length, 2);
 });
 
 test("overrides: responses replace the assay's own hook by hook", () => {
