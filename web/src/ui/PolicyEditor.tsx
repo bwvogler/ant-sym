@@ -1,9 +1,10 @@
 import { useState } from "react";
+import Segmented from "./Segmented.tsx";
 import {
+  chipClass,
+  chipRowClass,
   growShape,
   type Preset,
-  presetButtonClass,
-  presetRowClass,
   type PresetStyle,
   wordsBoxClass,
   wordsRules,
@@ -39,25 +40,33 @@ export function PresetPicker({
   /** more buttons at the end of a row of chips (the pen's "her mother's") */
   extra?: { name: string; onPick: () => void }[];
 }) {
+  if (style !== "chips")
+    return (
+      <Segmented
+        label={label}
+        className={`${style === "compact" ? "shrink-0 text-[13px]" : "text-sm"}${className ? ` ${className}` : ""}`}
+        options={presets.map((p) => ({
+          key: p.id,
+          label: p.name,
+          on: active(p),
+          onPick: () => onPick(p),
+          disabled,
+          className: style === "compact" ? "px-2.5 py-1" : undefined,
+        }))}
+      />
+    );
   return (
-    <div className={presetRowClass(style, className)} role="group" aria-label={label}>
+    <div className={chipRowClass(className)} role="group" aria-label={label}>
       {presets.map((p) => {
         const on = active(p);
         return (
-          <button
-            key={p.id}
-            type="button"
-            className={presetButtonClass(style, on)}
-            aria-pressed={on}
-            disabled={disabled}
-            onClick={() => onPick(p)}
-          >
+          <button key={p.id} type="button" className={chipClass(on)} aria-pressed={on} disabled={disabled} onClick={() => onPick(p)}>
             {p.name}
           </button>
         );
       })}
       {extra?.map((x) => (
-        <button key={x.name} type="button" className={presetButtonClass("chips", false)} disabled={disabled} onClick={x.onPick}>
+        <button key={x.name} type="button" className={chipClass(false)} disabled={disabled} onClick={x.onPick}>
           {x.name}
         </button>
       ))}

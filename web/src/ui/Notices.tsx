@@ -15,7 +15,7 @@ import {
   unreadNotices,
   useNoticeLevel,
 } from "./toasts.ts";
-import { seg } from "./styles.ts";
+import Segmented from "./Segmented.tsx";
 
 // The bell at the top right (owner, 2026-11-15; ja-mvo9.5's notification stack): every notice raised this visit, newest
 // first, so a toast swiped away can be read later. A badge counts those not yet seen; opening the list marks them seen.
@@ -91,19 +91,17 @@ export default function Notices() {
             )}
           </div>
           <div className="border-b border-line px-3 py-2">
-            <div className="flex overflow-hidden rounded-md border border-line text-xs" role="group" aria-label="notices over the map">
-              {NOTICE_LEVELS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  className={`flex-1 ${seg(level === l)}`}
-                  aria-pressed={level === l}
-                  onClick={() => setNoticeLevel(l)}
-                >
-                  {NOTICE_LEVEL_LABEL[l]}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="notices over the map"
+              className="text-xs"
+              fill
+              options={NOTICE_LEVELS.map((l) => ({
+                key: l,
+                label: NOTICE_LEVEL_LABEL[l],
+                on: level === l,
+                onPick: () => setNoticeLevel(l),
+              }))}
+            />
             <p className="mt-1 text-[11px] text-fg-3">
               {level === "all"
                 ? "Every notice floats over the map for a few seconds."
