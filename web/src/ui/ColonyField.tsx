@@ -2,7 +2,6 @@ import { mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.
 import { MAP_ORBIT_READY_ZOOM, MapVoxelPass } from "./mapVoxel.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
-  type ChunkLayer,
   type Colony,
   CURTAIN,
   PLANE,
@@ -19,9 +18,10 @@ import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame } from "./field/prelude.ts";
 import { handleKey, handleWheel, type KeyHost } from "./field/keyboard.ts";
 import { PointerController, type PointerHost, type PointerInput } from "./field/pointer.ts";
-import { CameraRig, extentOf } from "./field/rig.ts";
-import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
+import { CameraRig } from "./field/rig.ts";
+import type { FieldCtx, FieldInputs, FieldPen } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
+import { FieldBinding } from "./field/binding.ts";
 import { Ground } from "./field/ground.ts";
 import { Minimap } from "./field/minimap.ts";
 import { beginFrame, type FieldParts, FieldRenderer } from "./field/renderer.ts";
@@ -137,11 +137,6 @@ const NO_SPECIMENS: readonly Specimen[] = [];
 
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-function rgb(hex: string): [number, number, number] {
-  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
-  return m ? [parseInt(m[1]!, 16), parseInt(m[2]!, 16), parseInt(m[3]!, 16)] : [128, 128, 128];
 }
 
 /** A click (or a finger's tap) that moved less than this many CSS px is a click, not a drag. */
@@ -303,137 +298,46 @@ export default function ColonyField({
     const ctx = canvas.getContext("2d")!;
     // What the frame takes from the outside world: the clock, the pixel ratio, the dev flag, reduced motion and the sprite sets (field/env.ts).
     const env = browserEnv(import.meta.env.DEV);
-    const sprites = env.sprites();
-    const { cadaver: cadaverSprites, worker: workerSprites, nest: nestSprites, resource: resourceSprites } = sprites;
     const voxelMap = new MapVoxelPass(() => draw());
     const ground = new Ground(env);
     const sinks: FrameSinks = { dataset: canvas.dataset, orbit, orbitAxes, angled, flatOrbit: mapOrbit, dev: env.dev };
-    // The shown map, read each frame (bind): which layer (`lv`: PLANE or CURTAIN), its map, every
-    // colony's alarm and the fungus's spores on it, and whether the side view's strip is drawn from the plane.
-    // placeholders: bind() sets all of these before the first frame draws
-    let lv = -1;
-    let m: WorldMap = anyColony.map;
-    let alarms: ChunkLayer<Float32Array>[] = [];
-    let spores: ChunkLayer<Float32Array> = fungus.spores;
-    let strip = false;
-    // Each colony's trails on the shown layer; a cell shows them as strongly as a host sensed it lately (PRD §65).
-    let trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array>; odour: number }[] = [];
-    // Smell vision (the builder's, PRD §73): every trail and alarm shown everywhere, each food trail in its colony's tone.
-    let smellAll = false;
-    let sensedLayer: ChunkLayer<Float32Array> | null = null;
-    // The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column
-    // is the line's s), and the extent the camera fits; set again (rebuild) when the map or its size changes.
-    let gx0 = m.x0;
-    let gw = m.size.w;
-    let gh = m.size.h;
-    let ext = extentOf(m);
-    let geoMap: WorldMap | null = null;
     // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants (field/minimap.ts).
     const minimap = new Minimap(env);
-    /** The shown map is another, or has grown (a founding widens one world's curtain): its size, extent, chunks and minimap afresh. */
-    const rebuild = (map: WorldMap) => {
-      geoMap = map;
-      gx0 = map.x0;
-      gw = map.size.w;
-      gh = map.size.h;
-      ext = extentOf(map);
-      ground.clear();
-      minimap.resize(ext);
-    };
-    /** Read the shown view: its layer, map, scent and spores (each frame). */
-    const bind = () => {
-      lv = shown.current;
-      m = lv === PLANE ? world.plane : world.curtain;
-      if (m !== geoMap || m.x0 !== gx0 || m.size.w !== gw || m.size.h !== gh) rebuild(m);
-      spores = fungus.sporesOn(lv)?.spores ?? fungus.spores;
-      strip = lv === CURTAIN;
-      trails = [];
-      alarms = [];
-      sensedLayer = sensed.layer(lv);
-      smellAll = !!buildRef.current?.smell;
-      for (const col of colonies) {
-        const p = col.layers[lv]?.ph;
-        if (!p) continue;
-        alarms.push(p.fields.alarm);
-        trails.push({ food: p.fields.food, home: p.fields.home, odour: col.nestOdour });
-      }
-    };
-    bind();
-
-    let theme: FieldTheme = {
-      paper: "",
-      ink: "",
-      accent: "",
-      warn: "",
-      line: "",
-      fg3: "",
-      rock: rgb("#c9c2b5"),
-      soil: rgb("#e3d5bf"),
-      sky: rgb("#e4edf1"),
-      spoil: rgb("#c8b28c"),
-      mound: "#6e6250",
-      trail: [31, 111, 92],
-      alarm: rgb("#8a5300"),
-      accentRgb: rgb("#1f6f5c"),
-      paperRgb: rgb("#f6f4ef"),
-      inkRgb: rgb("#1c1b19"),
-      warnRgb: rgb("#8a5300"),
-      spore: "#7a4fa0",
-      aphid: "#5a9a2c",
-      sporeRgb: rgb("#7a4fa0"),
-      chamber: rgb("#a39a8a"),
-    };
-    const retheme = () => {
-      ground.clearTiles();
-      workerSprites.clearTints();
-      nestSprites.clearTints();
-      theme = {
-        paper: cssVar("--paper"),
-        ink: cssVar("--ink"),
-        accent: cssVar("--accent"),
-        warn: cssVar("--warn"),
-        line: cssVar("--line-strong"),
-        fg3: cssVar("--fg-3"),
-        rock: rgb(cssVar("--line-strong")),
-        soil: rgb(cssVar("--soil")),
-        sky: rgb(cssVar("--sky")),
-        spoil: rgb(cssVar("--spoil")),
-        mound: cssVar("--mound"),
-        trail: cssVar("--heat").split(/\s+/).map(Number),
-        alarm: rgb(cssVar("--warn")),
-        accentRgb: rgb(cssVar("--accent")),
-        paperRgb: rgb(cssVar("--paper")),
-        inkRgb: rgb(cssVar("--ink")),
-        warnRgb: rgb(cssVar("--warn")),
-        spore: cssVar("--spore"),
-        aphid: cssVar("--aphid"),
-        sporeRgb: rgb(cssVar("--spore")),
-        chamber: rgb(cssVar("--mound")),
-      };
-      minimap.invalidate();
-    };
-    retheme();
+    // The shown map, theme and sprite sets, bound each frame (field/binding.ts).
+    const binding = new FieldBinding(
+      env,
+      world,
+      colonies,
+      fungus,
+      sensed,
+      ground,
+      minimap,
+      { shown: () => shown.current, smell: () => !!buildRef.current?.smell },
+      cssVar,
+      anyColony,
+    );
+    const retheme = () => binding.retheme();
     // What the layers share and read (field/ctx.ts): filled each frame below, once the camera is known.
     const fctx: FieldCtx = {
       ctx,
-      theme,
+      theme: binding.theme,
       d: 1,
       v: { w: 0, h: 0 },
       c: { x: 0, y: 0, zoom: 1 },
-      lv,
-      m,
-      ext,
+      lv: binding.lv,
+      m: binding.m,
+      ext: binding.ext,
       world,
       colonies,
       fungus,
       env,
-      sprites,
-      smellAll,
-      strip,
-      trails,
-      alarms,
-      spores,
-      sensedLayer,
+      sprites: binding.sprites,
+      smellAll: binding.smellAll,
+      strip: binding.strip,
+      trails: binding.trails,
+      alarms: binding.alarms,
+      spores: binding.spores,
+      sensedLayer: binding.sensedLayer,
       sensedNow: sensed.now,
     };
     const inputs: FieldInputs = { hover: null, pen: null, penSeen: { current: null }, show: layers.current };
@@ -462,17 +366,18 @@ export default function ColonyField({
     const renderer = new FieldRenderer();
     const draw = () => {
       const started = env.dev ? env.now() : 0;
-      bind();
+      binding.bind();
       const d = env.dpr();
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
       ground.beginFrame();
       // The followed ant as it stood when the frame began (the prelude below ends the follow of an ant that is gone).
       const f = follow.current;
       const fcol = f ? followedColony(colonies, f) : null;
-      const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
+      const fHere = f !== null && fcol !== null && fcol.layer[f.i] === binding.lv;
       // The follow, the crossing through a hole and the camera's ease (field/prelude.ts), then the frame draws with the camera it gives.
-      const c = prepareFrame(colonies, lv, ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
-      Object.assign(fctx, { theme, d, v, c, lv, m, ext, smellAll, strip, trails, alarms, spores, sensedLayer, sensedNow: sensed.now });
+      const c = prepareFrame(colonies, binding.lv, binding.ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
+      binding.fill(fctx);
+      Object.assign(fctx, { d, v, c });
       inputs.show = layers.current;
       inputs.hover = hover.current;
       inputs.pen = penRef.current;
@@ -493,10 +398,7 @@ export default function ColonyField({
         ),
       );
     };
-    cadaverSprites.load(draw);
-    workerSprites.load(draw);
-    nestSprites.load(draw);
-    resourceSprites.load(draw);
+    binding.load(draw);
     const off = onFrame(draw);
     draw();
 
@@ -512,10 +414,7 @@ export default function ColonyField({
     return () => {
       off();
       voxelMap.dispose();
-      cadaverSprites.dispose();
-      workerSprites.dispose();
-      nestSprites.dispose();
-      resourceSprites.dispose();
+      binding.dispose();
       ro.disconnect();
       mq.removeEventListener("change", retheme);
       themeWatch.disconnect();

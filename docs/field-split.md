@@ -154,4 +154,5 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | #326 |
 | 2026-11-23 | `ja-fnd.6.3.16`: the marks stage (`marks.ts`: `drawAphids`, `drawTraces`, `drawSpecimens`, `drawFollowed`, `drawInspection`; 38 scenes match; 9 log tests) | #333 |
 | 2026-11-23 | `ja-fnd.6.3.18`: the pixel guard in CI (`pixels.yml`: a `pixel-guard` label records the scenes on the merge base and checks them on the head, on one runner) | #336 |
-| 2026-11-23 | `ja-fnd.6.3.8`, part 1 of 2: `FieldRenderer` and the stage list (`renderer.ts`: `beginFrame`, ten stages, `FrameState`; `draw()` is a frame of stages; 38 scenes match; 14 log tests) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.8`, part 1 of 2: `FieldRenderer` and the stage list (`renderer.ts`: `beginFrame`, ten stages, `FrameState`; `draw()` is a frame of stages; 38 scenes match; 14 log tests) | #335 |
+| 2026-11-23 | `ja-fnd.6.3.8`, part 2 of 2: the binding (`binding.ts`: `FieldBinding` holds the shown layer and map, the colonies' scent and spores on it, the theme read from the CSS, the sprite sets and their load/dispose; the render effect is wiring; 7 log tests) | (this PR) |
