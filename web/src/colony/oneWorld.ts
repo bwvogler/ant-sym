@@ -93,7 +93,7 @@ export function oneWorldOn(seed: number, plane: WorldMap): OneWorld {
 }
 
 /** The salt of the curtain's ground noise: the plane's rock uses `seed` itself. */
-const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
+export const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
 
 /** The curtain's ground: ~10 % rock, ~93 % of the rest diggable soil, buried food pockets (patchesPerChunk is per 64 columns here). */
 export const CURTAIN_WORLD = { rockiness: 0.1, soil: 0.93, patchesPerChunk: 0.8, foodPerCell: 12, foodMinDist: 16 } as const;
