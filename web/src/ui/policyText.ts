@@ -1,4 +1,18 @@
-import { modeSchema, type Mode, type Situation, type Species } from "../colony/index.ts";
+import {
+  AROUSALS,
+  CARRYING,
+  FUNGAL_PLACES,
+  HOMES,
+  MODES,
+  modeSchema,
+  STANCES,
+  TASKS,
+  TOUCHES,
+  TRAILS,
+  type Mode,
+  type Situation,
+  type Species,
+} from "../colony/index.ts";
 
 // The local rules in words, for Lab mode's Policy tab (PolicyTab.tsx). Each mode and
 // stance rule is a row the tab shows ("when …, then …") with the test it
@@ -98,3 +112,24 @@ export function ruleTextAgrees(species: Species): string[] {
   }
   return out;
 }
+
+/** What the generic senses rows say about each mode-lane field, by name: a species' own schema reuses them for the fields it keeps. */
+export const MODE_SENSES: Record<string, [values: string, about: string]> = {
+  mode: [MODES.join(" · "), "what it is doing now"],
+  tired: ["true · false", "it searched long outside without finding food"],
+  foodTrail: [TRAILS.join(" · "), "food scent just ahead"],
+  homeTrail: [HOMES.join(" · "), "home scent ahead on the ground; underground, the chamber it stands in"],
+  alarm: [TRAILS.join(" · "), "alarm scent just ahead"],
+  enemy: ["none · near", "an ant of the other colony within two steps (strangers it touches are the contact response's to answer)"],
+  stance: [STANCES.join(" · "), "the ant's own: defend while it senses a threat near its nest, raid once recruited"],
+};
+
+/** What the fungus senses in an ant, a row per field of FUNGAL_SCHEMA in its order: [name, the values, what it is]. policyText.test.ts keeps the rows in step with the schema. */
+export const FUNGAL_SENSES: [name: string, values: string, about: string][] = [
+  ["arousal", AROUSALS.join(" · "), "the host's arousal: it smells alarm, or strangers are close (amines rise with fighting)"],
+  ["touch", TOUCHES.join(" · "), "who touches its cuticle: a nestmate or an ant of another colony"],
+  ["place", FUNGAL_PLACES.join(" · "), "what is underfoot: open ground, a tunnel, a chamber's floor, the queen's mark"],
+  ["task", TASKS.join(" · "), "its body's stage of life (juvenile hormone tracks task): nurse, inside worker, forager"],
+  ["carrying", CARRYING.join(" · "), "what is in its jaws"],
+  ["groomed", "true · false", "its nestmates are grooming the fungus off it"],
+];
