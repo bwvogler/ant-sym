@@ -14,6 +14,7 @@ import {
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { journalLine } from "./journal.ts";
+import { LEVER_KIND, LEVER_KINDS } from "./leverKinds.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
 import { seg } from "./styles.ts";
@@ -623,9 +624,9 @@ export function LeverChips({
   const hasNest = useGameRead(() => game.fungus.hasNest);
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
-      {(["perceive", "emit", "lethal"] as const).map((kind) => (
+      {LEVER_KINDS.map((kind) => (
         <div key={kind} className="flex flex-wrap items-center gap-1">
-          <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
+          <span className="w-16 text-fg-3">{LEVER_KIND[kind].row}</span>
           {/* the nest's levers (floor marks, crown) only where there is a nest */}
           {LEVERS.filter((v) => v.kind === kind && (hasNest || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
@@ -639,7 +640,7 @@ export function LeverChips({
                 type="button"
                 aria-pressed={on}
                 disabled={locked}
-                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? LEVER_KIND[v.kind].chipOn : "border-line text-fg-3 hover:bg-raised"}`}
                 title={
                   locked
                     ? (lock ?? undefined)

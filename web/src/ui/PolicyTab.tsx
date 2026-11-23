@@ -22,6 +22,7 @@ import {
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import { followedColony, sideIndex, type Followed } from "./follow.ts";
 import { docUrl } from "./guide.ts";
+import { LEVER_KIND } from "./leverKinds.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import {
   byRows,
@@ -380,22 +381,16 @@ function FungusExplainer(props: Words) {
         <ul className="mt-1.5 flex flex-col gap-1 text-[13px]">
           {LEVERS.filter((v) => menu.has(v.id) || v.kind === "lethal").map((v) => (
             <li key={v.id} className={menu.has(v.id) ? "" : "opacity-60"}>
-              <span
-                className={`font-mono text-xs ${v.kind === "perceive" ? "text-spore" : v.kind === "lethal" ? "text-err" : "text-accent"}`}
-              >
-                {v.name}
-              </span>{" "}
+              <span className={`font-mono text-xs ${LEVER_KIND[v.kind].tone}`}>{v.name}</span>{" "}
               <span className="text-xs text-fg-3">
                 (
-                {v.kind === "perceive"
-                  ? "what it perceives"
-                  : v.kind === "emit"
-                    ? "what it gives off"
-                    : menu.has(v.id)
-                      ? reach?.[v.id] === 0
-                        ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}`
-                        : "lethal, on"
-                      : "lethal, off"}
+                {v.kind !== "lethal"
+                  ? LEVER_KIND[v.kind].what
+                  : menu.has(v.id)
+                    ? reach?.[v.id] === 0
+                      ? `lethal, on, held off until you keep ${upgradeFor(v.id)?.name ?? "its upgrade"}`
+                      : "lethal, on"
+                    : "lethal, off"}
                 )
               </span>{" "}
               — {v.blurb}. <span className="text-xs text-fg-3">{v.words.join(" · ")}</span>
