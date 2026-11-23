@@ -242,10 +242,12 @@ test("a carrier on its way to a destination keeps walking a cell stamped no-tunn
     c.noTunnel[0] = cellKey(CELL[0], CELL[1]);
   };
   chooseDelivery(c, 0, "to store");
+  assert.equal(localDelivery(c, 0), true, "the ant is delivering in the first half");
   stamp();
   assert.equal(walkTunnel(c, 0, RETURN, 0.1), true, "delivering: the stamp does not send it onto open ground");
   assert.notEqual(c.gx[0], NO_CELL);
   c.params.deliveryLane = 0; // the same ant, the same stamp, no longer delivering
+  assert.equal(localDelivery(c, 0), false, "and not in the second");
   stamp();
   assert.equal(walkTunnel(c, 0, RETURN, 0.1), false, "not delivering: it gives the cell up");
   assert.equal(c.gx[0], NO_CELL);
