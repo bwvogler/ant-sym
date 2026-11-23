@@ -80,6 +80,29 @@ test("foodWithin: the plane's fixed disc equals a brute-force sum of the generat
   assert.equal(new EndlessPlane(2).foodWithin(a.x, a.y, d), want, "a fresh plane, cold");
   const small = w.foodWithin(a.x, a.y, 50);
   assert.ok(small <= want && w.foodWithin(a.x, a.y, 140) >= want, "monotone in the radius");
+  // the production radius (2 U), at points across negative and positive coordinates: the chunk rows a disc covers are 1/R wider than the disc
+  const brute = (px: number, py: number, r: number) => {
+    let sum = 0;
+    for (let cy = Math.floor((py - r) / R / CHUNK) - 2; cy <= Math.ceil((py + r) / R / CHUNK) + 2; cy++)
+      for (let cx = Math.floor((px - r) / CHUNK) - 2; cx <= Math.ceil((px + r) / CHUNK) + 2; cx++) {
+        const { food } = w.chunk(cx, cy);
+        for (let j = 0; j < CHUNK; j++)
+          for (let i = 0; i < CHUNK; i++)
+            if (
+              food[local(i, j)] &&
+              Math.hypot(centreX((cx << CHUNK_BITS) + i, (cy << CHUNK_BITS) + j) - px, centreY((cy << CHUNK_BITS) + j) - py) <= r
+            )
+              sum += food[local(i, j)]!;
+      }
+    return sum;
+  };
+  for (const [px, py] of [
+    [a.x, a.y],
+    [-310, 240],
+    [150, -420],
+    [-200, -90],
+  ] as const)
+    assert.equal(w.foodWithin(px, py, 280), brute(px, py, 280), `2 U round ${px},${py}`);
   assert.equal(
     w.foodWithin(a.x, a.y, 0.4),
     0,
