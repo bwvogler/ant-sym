@@ -423,7 +423,8 @@ test("in the game, a hypha dug through in the curtain regrows from its stump int
 test("with Knots bought, starved tips harden into knots in the game, paid from the body; dug open, a knot stays and fruits its store there (ja-2bw.9)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7; // mutations enough to buy it at once
+  e.growth = 2e7;
+  e.ground = 1e7; // mutations enough to buy it at once
   assert.ok(keep(g.fungus, "knots"));
   const moved: number[] = [];
   const lose = e.lose.bind(e);
@@ -454,7 +455,8 @@ test("with Knots bought, starved tips harden into knots in the game, paid from t
 test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps its store until a cell beside it is dug, then fruits there (review of #161 S1, S3)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   assert.ok(keep(g.fungus, "knots"));
   const curtain = () => g.fungus.hyphaeOn(CURTAIN);
   const map = g.world!.curtain;
@@ -496,7 +498,8 @@ test("in the game a knot ages and sprouts after KNOT.sprout; a buried one keeps 
 function buried(level: number): Game {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   for (let k = 0; k < level; k++) assert.ok(keep(g.fungus, "stalks"));
   g.colonies[0]!.onBury!({ x: 60, y: 40, held: -1, died: g.time, load: 0.5, strain: e.strain }, PLANE);
   return g;
@@ -560,7 +563,8 @@ test("with Stalks bought, a corpse colonised outside grows a stalk after STALK.d
 test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   assert.ok(keep(g.fungus, "stalks"));
   assert.ok(keep(g.fungus, "stalks"));
   // (55, 30) on seed 7's small plane has rock within a tall stalk's radius (review of #178: 10 cells).
@@ -583,7 +587,8 @@ test("a stalk beside rock puts no spores on the rock (ja-2bw.10)", () => {
 test("a corpse colonised in the nest (a layer that is not topsoil) never grows a stalk (ja-2bw.10)", () => {
   const g = game(true);
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   // Down the hole first: a tall stalk needs a dense fruiting body (ja-52ui), which leaves less mycelium to grow there.
   crossDown(g);
   assert.ok(keep(g.fungus, "stalks"));
@@ -682,7 +687,8 @@ test("thickening at a colonised corpse far from every patch closes a flower that
   assert.equal(g.fungus.flowers, 1, "one flower closed");
   const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
   const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
-  assert.ok(there >= 9, `the corpse's six tips and the flower's three stand in it (${there})`);
+  // The flower roots no tips of its own (owner, 2026-11-23): only the corpse's own six can still stand in it.
+  assert.ok(there <= 6, `no tip is rooted by the flower: at most the corpse's six stand in it (${there})`);
   assert.equal(e.patches, patches + 1, "one more patch, room to grow");
   assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
   for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])

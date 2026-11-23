@@ -12,7 +12,7 @@ const SRC = join(new URL("../../", import.meta.url).pathname);
 
 const components = [
   ...readdirSync(join(SRC, "ui"))
-    .filter((f) => f.endsWith(".tsx"))
+    .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
     .map((f) => `ui/${f}`),
   "ColonyApp.tsx",
 ];
@@ -25,18 +25,42 @@ const NAMED: { file: string; line: string; why: string }[] = [
   { file: "ui/Notices.tsx", line: "tick((n) => n + 1), 30_000", why: "the bell's ages are wall-clock minutes, which no stats tick tells" },
   { file: "ui/Toasts.tsx", line: "dismissToast(t.id), TOAST_MS", why: "a toast's own life, in wall-clock time" },
   { file: "ui/Toasts.tsx", line: "dismissToast(t.id), 150", why: "a toast's exit animation" },
-  { file: "ColonyApp.tsx", line: "setDemo(null), 1700", why: "a tool demo's own length, in wall-clock time" },
+  { file: "ui/useBuilder.ts", line: "setDemo(null), 1700", why: "a tool demo's own length, in wall-clock time" },
   {
-    file: "ColonyApp.tsx",
+    file: "ui/useBuilder.ts",
     line: "const timer = setInterval(() => {",
     why: "the builder's watch of its ants: it acts, it does not redraw by itself",
   },
   {
-    file: "ColonyApp.tsx",
+    file: "ui/useSpecimens.ts",
     line: "const t = setInterval(() => {",
     why: "the specimens' watch for the dead: it sets state only when one died",
   },
   { file: "ColonyApp.tsx", line: "void save(AUTOSAVE), AUTOSAVE_MS", why: "the autosave, in wall-clock time" },
+  // The engine's own clocks (not components: the page's loop, and Jev's calls); named so that a new one in a hook or module is seen.
+  { file: "ui/colonyJev.ts", line: "#timer: ReturnType<typeof setInterval>", why: "Jev's batching cycle: its field" },
+  {
+    file: "ui/colonyJev.ts",
+    line: "this.#timer = setInterval(",
+    why: "Jev's batching cycle: asks for the situations the game has met, in wall-clock time, not a redraw",
+  },
+  { file: "ui/colonyJev.ts", line: "#saveTimer: ReturnType<typeof setTimeout>", why: "the answers cache's debounced save: its field" },
+  { file: "ui/colonyJev.ts", line: "this.#saveTimer ??= setTimeout(", why: "the answers cache's debounced save, in wall-clock time" },
+  {
+    file: "ui/gameLoop.ts",
+    line: "request: (cb) => requestAnimationFrame(cb),",
+    why: "the one clock: the game loop's own frame source (GameLoop takes it as its env)",
+  },
+  {
+    file: "ui/voxelFieldReview.ts",
+    line: "  frame = requestAnimationFrame(tick);",
+    why: "the review page's own render loop (a dev page, not the game's)",
+  },
+  {
+    file: "ui/voxelFieldReview.ts",
+    line: "if (playing) frame = requestAnimationFrame(tick);",
+    why: "the review page's own render loop (a dev page, not the game's)",
+  },
 ];
 
 /** The lines of a component that call something in TIMING (comments left out). */
@@ -56,12 +80,13 @@ test("every timer, frame request and reducer in the page's components is named: 
 });
 
 test("every named timer is still where it was named: a stale name would let a new one through", () => {
-  const stale = NAMED.filter((n) => !timingLines(n.file).some((l) => l.includes(n.line))).map((n) => `${n.file}: ${n.line}`);
+  // exactly one line each: a second copy of a named line would pass as the first one's, unnamed
+  const stale = NAMED.filter((n) => timingLines(n.file).filter((l) => l.includes(n.line)).length !== 1).map((n) => `${n.file}: ${n.line}`);
   assert.deepEqual(stale, []);
   const files = new Set(components);
   assert.ok(
     NAMED.every((n) => files.has(n.file)),
-    "named files are page components",
+    "named files are page components, hooks and the engine's own modules",
   );
 });
 

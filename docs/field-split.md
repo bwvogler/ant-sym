@@ -118,12 +118,39 @@ Each is its own small PR that **merges the day it opens**, with a fresh review, 
 | s | `ja-fnd.6.3.12` | `ColonyField.tsx` is a shell under about 300 lines (`Hud.tsx` and `GoToMenu.tsx` extracted); docs; the epic closes | acceptance above |
 | any | `ja-fnd.6.3.18` | optional: a label-triggered workflow that records on the base and checks on the head on one runner (about 3 minutes a slice) | the next slice's PR can cite it |
 
+## What was built (the epic's close, 2026-11-23)
+
+`ColonyField.tsx` is a shell of about 320 lines: the props' refs, the page's handle on the cameras (`FieldApi`), the pointer and key glue, and the canvas with its two small components. Everything else is in files that say what they are. `ui/field/` is plain TypeScript (no React, no DOM global, no clock: `fieldPlain.test.ts` holds that), so a Node test runs each; the React and the browser's observers are beside the shell in `ui/`.
+
+| file | what it is | tested by |
+|---|---|---|
+| `field/env.ts` | `FieldEnv`: the clock, the pixel ratio, the dev flag, reduced motion, new paths and canvases, the sprite sets | `ground.test.ts`, the scenes |
+| `field/ctx.ts` | `FieldCtx`, `FieldInputs`, `FieldTheme`: what a frame's layers share and read | (types) |
+| `field/api.ts` | `FieldProps`, `FieldBuild`, `FieldApi`: what the page gives the field and may ask of it | (types) |
+| `field/binding.ts` | `FieldBinding`: the shown layer and map, each colony's trails and alarm on it, the spores, the theme from the CSS, the sprite sets and their load | `binding.test.ts` |
+| `field/prelude.ts` | the follow, the crossing through a hole and the camera's ease, before a frame draws | `prelude.test.ts` |
+| `field/rig.ts` | `CameraRig`: the cameras, one per view, `centreOn`, fit, `goTo` | `rig` tests |
+| `field/pointer.ts`, `field/keyboard.ts` | the pointer gestures (`PointerController`) and the keys and wheel | `pointer.test.ts`, `fieldKeyboard.test.ts` |
+| `field/hit.ts` | what is under a point: the ant to pick (`PICK_PX`), the chamber, where a click on the line or strip asks to look | `hit.test.ts` |
+| `field/orbit.ts` | the inspection tilt of the close map: `tiltMap`, `orbitKey`, `resetOrbit` | `orbit.test.ts` |
+| `field/ground.ts`, `field/minimap.ts` | the ground a chunk at a time, the strip, the minimap | `ground.test.ts`, `minimap` tests |
+| `field/fungus.ts`, `field/overlays.ts`, `field/nests.ts`, `field/ants.ts`, `field/marks.ts` | the layers: the hyphae and stalks; the line, the hole names, the pen; the nests; the ants; the specimens, traces, aphids and inspection | each its own test file |
+| `field/renderer.ts` | `FieldRenderer`: a frame is a list of stages, each started from the same stroke state | `renderer.test.ts`, `scenes.test.ts` |
+| `useFieldFrame.ts` | the frame loop: builds the parts, watches the canvas, the theme and the wheel, draws on every tick (a hook: the observers are the browser's) | the e2e, the pixel guard |
+| `useCameraRig.ts`, `useLatest.ts` | the rig built once from the shell's refs; a ref that holds a prop as of the last commit | the e2e |
+| `FieldGoToMenu.tsx`, `FieldOrbitHandle.tsx` | the Go to menu with its Escape and outside-press, and the tilt handle | the e2e |
+
+The React-compiler rules (`eslint-plugin-react-hooks`, the recommended set) are not in CI: the repo lints with oxlint only. They were run once by hand on the shell and the new components and hooks (none reported; on the shell before the split they reported five: refs read in render, `api.current` mutated, `goNest` used before it is declared). `useFieldFrame`'s effect still carries the `eslint-disable react-hooks/exhaustive-deps` the old effect had: it reads the shell's refs on purpose, and its dependency list is `[colonies, count, fungus, onFrame, world, sensed]` as before.
+
+One deviation from the plan above: the bead named `field/Hud.tsx` and `field/GoToMenu.tsx`. They are in `ui/` as `FieldOrbitHandle.tsx` and `FieldGoToMenu.tsx`, because `field/` is the plain-TypeScript folder and a component in it would break the line `fieldPlain.test.ts` holds. The shell is a little over the 300 lines the bead aimed at (320): what is left is the pointer and key glue, which reads the page's props and cannot be plain.
+
 ## Decisions taken (and what overturns them)
 
 These were open in the review of #291; I took them so work can start, and each is one line to change.
 
 - **The order above**, as the review recommended: scenes land with or just before the slice that needs them (not one PR adding eleven groups); the ports and the prelude get their own slice before the first move so `FieldCtx` has its real shape from the start; the recording fake context starts at the first move instead of waiting for the last; `draw()` is split into three stage moves and the renderer; the camera and input slice runs alongside.
 - **The canvas state (`ja-fnd.6.3.17`, then `ja-fnd.6.3.10`).** The moves keep the state exactly as it is, so they stay pixel-identical. Making it explicit changes pixels, so it is an owner decision with its own bead, **before** the stage slices; if declined, the slice is dropped and the epic closes without it (the epic's close does not depend on it). The leak, measured in the review of #282: resetting `lineCap` to `butt` at the start of a frame changed 6 of 8 scenes; resetting `lineJoin`, `lineWidth`, alpha, text, dash or styles changed none of those 8 (which never had labels on); resetting everything changed 16 of 18, including the labels scene. `lineJoin` and `lineWidth` leak only after chamber labels have been on (the labels scene is therefore last on its page); `lineCap` leaks always. It is cosmetic in play, and a new stage can look wrong depending on whether labels were toggled.
+  **Decided and built (owner, 2026-11-23; `ja-fnd.6.3.10`).** `FieldRenderer.frame` sets the same stroke state at the start of every stage: round caps, mitred joins, a 1 px line. A stage (or a function in it) that wants another sets its own, as before, and the next stage starts clean. The alpha, the smoothing and the styles are still handed from stage to stage (the paper stage's smoothing-off is relied on by the ground and the sprites, so a save/restore round each stage would have moved every scene). What this fixes: the frame's first strokes were butt-capped and every later frame's round-capped (the baseline is the second frame's, so it does not move), and after the chamber labels, the pen or a walking trace had been shown (each sets a round join and never put it back) every stroke of the later stages, and of the next frame's early ones, was round-joined for good (that is what moves). The pixel guard names the scenes: `below-nest1-labels`, `built-strip`, `built-theme-flip`, `built-pen-hover`, `marks-trace`, and the two new ones, `marks-trace-walk` and `marks-followed-far` (the 7 of 40; the other 33 match bit for bit). Held by `scenes.test.ts` ("a frame's strokes are drawn the same whatever the frame before it left set": two frames on one context, the cap, join and width at every stroke equal) and a stage-entry test in `renderer.test.ts`. Within a stage a function still leaves its state to the next function (the callees' own tests pin that).
 - **Where the pixel proof runs.** By hand for now, with the recording fake context as the everyday proof from the first move; the label-triggered workflow is an optional bead (`ja-fnd.6.3.18`).
 
 ## Risks
@@ -152,5 +179,10 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-23 | `ja-fnd.6.3.15`: the ants stage (`ants.ts`: `drawAnts`, one colony's ants: a stroke or sprite a body by odour band, the spore dots, what each carries; four `ants` scenes, 38 in all; 15 log tests) | #330 |
 | 2026-11-23 | `ja-fnd.6.3.11`, part 2 of 3: the pointer's gestures (`pointer.ts`: `PointerController` over a `PointerHost`, with 20 unit tests) | #324 |
 | 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | #326 |
-| 2026-11-23 | `ja-fnd.6.3.16`: the marks stage (`marks.ts`: `drawAphids`, `drawTraces`, `drawSpecimens`, `drawFollowed`, `drawInspection`; 38 scenes match; 9 log tests) | (this PR) |
-| 2026-11-23 | `ja-fnd.6.3.18`: the pixel guard in CI (`pixels.yml`: a `pixel-guard` label records the scenes on the merge base and checks them on the head, on one runner) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.16`: the marks stage (`marks.ts`: `drawAphids`, `drawTraces`, `drawSpecimens`, `drawFollowed`, `drawInspection`; 38 scenes match; 9 log tests) | #333 |
+| 2026-11-23 | `ja-fnd.6.3.18`: the pixel guard in CI (`pixels.yml`: a `pixel-guard` label records the scenes on the merge base and checks them on the head, on one runner) | #336 |
+| 2026-11-23 | `ja-fnd.6.3.8`, part 1 of 2: `FieldRenderer` and the stage list (`renderer.ts`: `beginFrame`, ten stages, `FrameState`; `draw()` is a frame of stages; 38 scenes match; 14 log tests) | #335 |
+| 2026-11-23 | `ja-fnd.6.3.8`, part 2 of 2: the binding (`binding.ts`: `FieldBinding` holds the shown layer and map, the colonies' scent and spores on it, the theme read from the CSS, the sprite sets and their load/dispose; the render effect is wiring; 7 log tests) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.9`: the headless scenes (`tests/sceneHarness.ts`, `scenes.test.ts`: 29 scenes of FieldRenderer over a real small game, sprites ready, goldens as hashes of the call log and of the images' pixels; every stage drop and neighbour swap fails; ~8 s) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.10`: the canvas state explicit: `FieldRenderer.frame` starts every stage from round caps, mitred joins and a 1 px line; two scenes added (a walking trace; the followed ring at a low zoom); the headless scenes re-recorded (a stage now sets three properties); the pixel guard names the scenes that move | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.12`: the shell (`ColonyField.tsx` 722 → 320 lines; about 2,600 when the split was planned): `field/hit.ts`, `field/orbit.ts`, `field/api.ts` (plain, 11 tests); `useFieldFrame`, `useCameraRig`, `useLatest`, `FieldGoToMenu`, `FieldOrbitHandle` beside it; `api` prop renamed `apiRef`; 40 scenes match, the e2e passes; the epic closes | (this PR) |

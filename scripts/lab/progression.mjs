@@ -163,13 +163,15 @@ if (isMainThread) {
     wrap("feed", "corpses");
     wrap("replicate", "hosts");
   }
-  const { MUTATION, pathTo } = await import("../../web/src/colony/evolution.ts");
-  // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then.
+  const { MUTATION, pathTo, poolOf } = await import("../../web/src/colony/evolution.ts");
+  // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then, from its own pool (PRD §85 M3).
   for (const id of grant) {
     const e = g.fungus.evolution;
     if (!e || e.cost(id) === null) continue;
     for (const x of pathTo(e.save().levels, id)) {
-      e.growth += e.cost(x) / MUTATION;
+      const made = e.cost(x) / MUTATION;
+      e.growth += made;
+      if (poolOf(x) === "free") e.ground += made;
       g.fungus.upgrade(x);
     }
   }

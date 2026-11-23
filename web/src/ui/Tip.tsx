@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { place, type Placement } from "./tipPosition.ts";
 
 /**
@@ -6,7 +7,9 @@ import { place, type Placement } from "./tipPosition.ts";
  * focusing it (Tab); a finger by tapping it, which toggles it, and a tap anywhere else closes it. Escape closes it. It
  * is placed so it stays in the window and follows its anchor when the page scrolls or resizes. `tip` is the content; the
  * children are what it explains. The anchor takes focus (tabIndex 0) and describes itself by the tip; a dotted underline
- * marks what has one. `tapToOpen` false (for a button, whose tap must do its own job) leaves touch to open it no other way.
+ * marks what has one. The bubble is drawn on the page body, not inside its anchor: a surface with a backdrop filter (every
+ * drawer) makes itself the containing block of `position: fixed` children, which put a tooltip in the drawer's own
+ * coordinates instead of the window's (it covered its anchor, and a second tap hit the bubble). `tapToOpen` false (for a button, whose tap must do its own job) leaves touch to open it no other way.
  */
 export default function Tip({
   tip,
@@ -54,7 +57,8 @@ export default function Tip({
     if (!open) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && hide();
     const outside = (e: PointerEvent) => {
-      if (!anchor.current?.contains(e.target as Node)) hide();
+      const t = e.target as Node;
+      if (!anchor.current?.contains(t) && !bubble.current?.contains(t)) hide();
     };
     window.addEventListener("keydown", key);
     window.addEventListener("pointerdown", outside, true);
@@ -83,17 +87,19 @@ export default function Tip({
       onClick={(e) => tapToOpen && pointer.current !== "mouse" && !bubble.current?.contains(e.target as Node) && setOpen((o) => !o)}
     >
       {children}
-      {open && (
-        <span
-          ref={bubble}
-          id={id}
-          role="tooltip"
-          style={{ position: "fixed", left: at?.left ?? 0, top: at?.top ?? 0, visibility: at ? "visible" : "hidden" }}
-          className="z-50 block max-h-[calc(100vh-16px)] w-72 max-w-[calc(100vw-16px)] cursor-auto overflow-y-auto overscroll-contain rounded-md border border-line-strong bg-raised px-3 py-2 text-left text-[11px] leading-snug font-normal whitespace-normal text-fg shadow-lg"
-        >
-          {tip}
-        </span>
-      )}
+      {open &&
+        createPortal(
+          <span
+            ref={bubble}
+            id={id}
+            role="tooltip"
+            style={{ position: "fixed", left: at?.left ?? 0, top: at?.top ?? 0, visibility: at ? "visible" : "hidden" }}
+            className="z-50 block max-h-[calc(100vh-16px)] w-72 max-w-[calc(100vw-16px)] cursor-auto overflow-y-auto overscroll-contain rounded-md border border-line-strong bg-raised px-3 py-2 text-left text-[11px] leading-snug font-normal whitespace-normal text-fg shadow-lg"
+          >
+            {tip}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

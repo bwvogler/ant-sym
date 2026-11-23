@@ -58,6 +58,9 @@ export class RecordedPath {
   quadraticCurveTo(a: number, b: number, c: number, d: number): void {
     this.add("quadraticCurveTo", [a, b, c, d]);
   }
+  rect(x: number, y: number, w: number, h: number): void {
+    this.add("rect", [x, y, w, h]);
+  }
   closePath(): void {
     this.cmds.push("closePath()");
   }
@@ -68,6 +71,8 @@ export class RecordedPath {
 
 /** An ImageData: a colour buffer of width x height pixels, four bytes each; it prints as `ImageData(64x64)`. */
 export class RecordedImage {
+  /** every image made since the last `made.length = 0`: a scene hashes their pixels (the call log prints only their size) */
+  static made: RecordedImage[] = [];
   readonly width: number;
   readonly height: number;
   readonly data: Uint8ClampedArray;
@@ -75,6 +80,7 @@ export class RecordedImage {
     this.width = width;
     this.height = height;
     this.data = new Uint8ClampedArray(width * height * 4);
+    RecordedImage.made.push(this);
   }
   toString(): string {
     return `ImageData(${this.width}x${this.height})`;
