@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { LETHAL_LEVERS, LEVERS } from "../../colony/index.ts";
-import { LEVER_KIND, LEVER_KINDS } from "../leverKinds.ts";
+import { LEVER_KIND, LEVER_KINDS, leverNameClass } from "../leverKinds.ts";
 
 // How a lever's kind looks and reads, once (ja-fnd.6.4.4): the ant card, the Policy tab and the Lab's levers used to choose each for themselves.
 
@@ -16,18 +16,18 @@ test("every kind of lever has a row, and the list names them all in the Levers t
 
 test("the colours and words of each kind are as the three places had them", () => {
   assert.deepEqual(LEVER_KIND.perceive, {
-    tone: "text-spore",
+    nameClass: "text-spore",
     row: "perceives",
     what: "what it perceives",
     chipOn: "border-accent bg-accent-soft text-accent",
   });
   assert.deepEqual(LEVER_KIND.emit, {
-    tone: "text-accent",
+    nameClass: "text-accent",
     row: "gives off",
     what: "what it gives off",
     chipOn: "border-accent bg-accent-soft text-accent",
   });
-  assert.deepEqual(LEVER_KIND.lethal, { tone: "text-err", row: "lethal", what: "lethal", chipOn: "border-err bg-err-soft text-err" });
+  assert.deepEqual(LEVER_KIND.lethal, { nameClass: "text-err", row: "lethal", what: "lethal", chipOn: "border-err bg-err-soft text-err" });
 });
 
 test("a chip is in the lethal colours exactly when the lever is lethal (the Lab used the set of lethal ids, this uses the kind)", () => {
@@ -85,21 +85,41 @@ const READS: [file: string, fields: string[]][] = [
   ["ui/LabCards.tsx", ["row", "chipOn"]],
 ];
 
-/** The places that show a lever's name: each hands `LeverName` the lever's kind, and none writes the colour. */
-const NAMES = ["ui/AntCard.tsx", "ui/PolicyTab.tsx", "ui/UpgradeTips.tsx"];
+/** The places that show a lever's name: each hands `LeverName` the lever's kind (`kind={x.kind}`, not a literal) and keeps what it passed before. */
+const NAMES: [file: string, keeps: RegExp[]][] = [
+  ["ui/AntCard.tsx", [/title=\{/, /stale \? "opacity-50"/, /rounded bg-raised px-1\.5 py-0\.5 font-mono/]],
+  ["ui/PolicyTab.tsx", [/className="font-mono text-xs"/]],
+  ["ui/UpgradeTips.tsx", []],
+];
 
 test("the ant card, the Policy tab and the Lab's levers each read the table, each field they used to choose", () => {
   for (const [file, fields] of READS)
     for (const f of fields) assert.match(read(file), new RegExp(`LEVER_KIND\\[[^\\]]+\\]\\.${f}\\b`), `${file} reads .${f}`);
 });
 
-test("every place that shows a lever's name does it with LeverName, giving it the lever's kind", () => {
-  for (const file of NAMES) assert.match(read(file), /<LeverName\s[^>]*\bkind=\{/, `${file} uses <LeverName kind=…>`);
+test("every place that shows a lever's name does it with LeverName, giving it the lever's kind, and keeps its own title and classes", () => {
+  for (const [file, keeps] of NAMES) {
+    assert.match(read(file), /<LeverName\s[^>]*\bkind=\{\w+\.kind\}/, `${file} uses <LeverName kind={x.kind}>`);
+    for (const re of keeps) assert.match(read(file), re, `${file} keeps ${re}`);
+  }
 });
 
-test("a lever name's colour is read from the table in LeverName.tsx and nowhere else", () => {
-  const readers = [...sources("ui"), "ColonyApp.tsx"].filter((f) => /LEVER_KIND\[[^\]]+\]\.tone\b/.test(read(f)));
-  assert.deepEqual(readers, ["ui/LeverName.tsx"], "show a lever's name with <LeverName kind={…}>");
+test("a name's classes are its kind's colour first, then the place's own", () => {
+  for (const k of LEVER_KINDS) {
+    assert.equal(leverNameClass(k), LEVER_KIND[k].nameClass);
+    assert.equal(leverNameClass(k, "font-mono text-xs"), `${LEVER_KIND[k].nameClass} font-mono text-xs`);
+  }
+});
+
+test("LeverName gives the span its kind's classes and the caller's props: through leverNameClass(kind, className) and the rest", () => {
+  const text = read("ui/LeverName.tsx");
+  assert.match(text, /className=\{leverNameClass\(kind, className\)\}/);
+  assert.match(text, /\{\.\.\.rest\}/);
+});
+
+test("a lever name's colour class is read from the table in leverKinds.ts only: no `.nameClass` anywhere else in the page", () => {
+  const readers = [...sources("ui"), "ColonyApp.tsx"].filter((f) => /\.nameClass\b/.test(read(f)));
+  assert.deepEqual(readers, ["ui/leverKinds.ts"], "show a lever's name with <LeverName kind={…}> (it calls leverNameClass)");
 });
 
 test("what the upgrade tooltip is handed for a lever is its kind (not a flag made from it), so it can use the table like the rest", () => {
