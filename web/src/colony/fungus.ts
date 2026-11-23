@@ -205,6 +205,14 @@ export interface FungusParams {
    * shares the body's free mass, as before
    */
   flow: boolean;
+  /**
+   * a tip that may turn either way leans toward ants (docs/hyphal-traffic.md, PRD §88, ja-ogph.3), read from the occupancy grids:
+   * "count" takes the side with more ants within `trafficRadius` cells of it, "levels" the side whose neighbourhood has the
+   * higher level of occupied cells (none, one cell, up to a tenth, more); "off" is the alternating choice as before
+   */
+  trafficBias: "off" | "count" | "levels";
+  /** the radius in cells of that neighbourhood */
+  trafficRadius: number;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -224,6 +232,8 @@ export const DEFAULT_FUNGUS: FungusParams = {
   hyphae: false,
   // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §72.1).
   flow: true,
+  trafficBias: "off",
+  trafficRadius: 3,
 };
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
@@ -408,6 +418,8 @@ export class Fungus {
   #made = 0;
   /** each map's hyphae (params.hyphae): null until the evolving fungus roots there */
   readonly #hyphae: (Hyphae | null)[];
+  /** the occupancy grids of the step under way, per layer and colony (what a tip's traffic bias reads); null between games */
+  #seen: readonly (readonly CountGrid[])[] | null = null;
   /** each map's spore spots: its patch and the dug spots its tips fruited on, refreshed each round of tip steps */
   #sporeSpots: (number[] | null)[] = [];
   /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
@@ -530,13 +542,37 @@ export class Fungus {
    */
   #ground(layer: number): Ground {
     const map = (this.#layers[layer] as SporeLayer).map;
-    return {
+    const ground: Ground = {
       topsoil: !map.sky,
       kind: (x, y) => {
         const t = rockAt(map, x, y);
         return t === OPEN ? "open" : t === SOIL ? "soil" : "rock";
       },
     };
+    const { trafficBias: bias, trafficRadius: r } = this.params;
+    const grids = this.#seen?.[layer];
+    if (bias === "off" || !grids) return ground;
+    // The ants round a cell, from this step's occupancy grids of every colony (a rival's ants count too, as in a host's contact).
+    const offsets = discOffsets(r);
+    ground.traffic = (x, y) => {
+      const o = offsets[y & 1] as Int16Array;
+      let ants = 0;
+      let occupied = 0;
+      let cells = 0;
+      for (let k = 0; k < o.length; k += 2) {
+        const cx = x + (o[k] as number);
+        const cy = y + (o[k + 1] as number);
+        if (!inBounds(map, cx, cy)) continue;
+        cells++;
+        let n = 0;
+        for (const g of grids) n += g.get(cx, cy);
+        ants += n;
+        if (n > 0) occupied++;
+      }
+      if (bias === "count") return ants;
+      return occupied === 0 ? 0 : occupied === 1 ? 1 : occupied <= 0.1 * cells ? 2 : 3;
+    };
+    return ground;
   }
 
   /** Whether there is anything for a step to do: spores on the ground or load in any ant. */
@@ -613,6 +649,7 @@ export class Fungus {
   step(colonies: readonly Colony[], grids: readonly CountGrid[], dt: number, rec: Recognition | null = null): void {
     if (!this.active) return;
     this.#made = 0;
+    this.#seen = [grids];
     const hosts = this.#stepLayer(this.#layers[0] as SporeLayer, -1, colonies, grids, dt, rec);
     this.#grow(dt);
     this.hosts = hosts;
@@ -631,6 +668,7 @@ export class Fungus {
   ): void {
     if (!this.active) return;
     this.#made = 0;
+    this.#seen = grids;
     let hosts = 0;
     this.#layers.forEach((L, l) => {
       hosts += this.#stepLayer(L, l, colonies, grids[l] as readonly CountGrid[], dt, recs?.[l] ?? null);

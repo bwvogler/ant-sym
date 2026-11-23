@@ -13,6 +13,8 @@
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
+//          [--bias count|levels] [--radius 3]
+// --bias plays the tips' traffic bias (fungus.ts trafficBias, PRD §88, ja-ogph.3): count (more ants within --radius cells of a side) or levels (the higher level of occupied cells); unset, off, as on main.
 // --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
 // the plane, for docs/hyphal-traffic.md (ja-ogph.2, PRD §88): the share of cells occupied in three distance bands (1, 2-3, 4-6),
 // how often the two cells a tip could turn into differ in the ants round them, and the share of hyphae near ant traffic.
@@ -56,6 +58,8 @@ if (isMainThread) {
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
     traffic: flag("traffic"),
+    bias: opt("bias", "off"),
+    radius: Number(opt("radius", 3)),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -78,11 +82,11 @@ if (isMainThread) {
   });
   results.sort((x, y) => x.seed - y.seed);
   console.log(
-    `one world${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}${job.landing !== null ? `, landing radius ${job.landing}` : ""}${job.rootRadius !== null ? `, patch radius ${job.rootRadius}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
+    `one world${job.hyphae ? ", hyphae" : ""}${job.growth ? " (growth answers)" : ""}${job.flow ? ", mass flow" : ""}${job.bias === "off" ? "" : `, traffic bias ${job.bias} r ${job.radius}`}${job.sun === null ? "" : `, sun ×${job.sun}`}${job.price ? `, price ${job.price}` : ""}${job.landing !== null ? `, landing radius ${job.landing}` : ""}${job.rootRadius !== null ? `, patch radius ${job.rootRadius}` : ""}, aim ${job.aim}, ${job.evolve ? `evolving (${job.buy ? "buys" : "buys nothing"})` : "as listed"}, ${job.strain}, ${job.seconds} s`,
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})${job.bias === "off" ? "" : ` · traffic leans ${r.leans} side choices`}`,
     );
     if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
@@ -118,6 +122,8 @@ if (isMainThread) {
     rootRadius,
     split: wantSplit,
     traffic: wantTraffic,
+    bias,
+    radius,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -130,7 +136,7 @@ if (isMainThread) {
     {
       regrow: GAME_REGROW,
       autoFound: false,
-      fungus: { hyphae, flow, ...(sun === null ? {} : { sun }) },
+      fungus: { hyphae, flow, ...(sun === null ? {} : { sun }), trafficBias: bias, trafficRadius: radius },
     },
     gameRng(seed, 0),
     [{ antCount: 600 }, { antCount: 600 }],
@@ -198,6 +204,7 @@ if (isMainThread) {
     flowers: 0,
     patches: 0,
     mat: 0,
+    leans: "",
     split,
   };
   const share = (c) => {
@@ -241,6 +248,7 @@ if (isMainThread) {
   r.flowers = g.fungus.flowers;
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
+  r.leans = `${g.fungus.hyphaeOn(0)?.trafficLeans ?? 0} of ${g.fungus.hyphaeOn(0)?.sideChoices ?? 0}`;
   if (probe) r.traffic = probe.result();
   parentPort.postMessage(r);
 }

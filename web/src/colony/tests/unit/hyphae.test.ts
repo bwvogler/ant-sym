@@ -1204,3 +1204,41 @@ test("thicken in flow mode pays from the tip's own load, and keeps what is left"
   assert.equal(h.mat.size, 2, "two cells' mass in the load, two cells");
   assert.ok(Math.abs((h.loads.get(k) ?? 0) - HYPHA_MASS * 0.5) < 1e-9, "the half cell's mass stays in the load");
 });
+
+// A tip in the open soil of a flat plane, heading east: both sides (NE, SE) free (docs/hyphal-traffic.md, ja-ogph.3).
+test("a tip that may turn either way takes the side with more traffic, and a tie or no traffic is the alternating choice", () => {
+  const plane = (traffic?: Ground["traffic"]): Ground => ({ topsoil: true, kind: () => "open", traffic });
+  const side = (g: Ground, steps: number) => {
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    h.steps = steps;
+    const tip = h.tips[0]!;
+    return sideFor(h, g, tip, situationOf(h, g, tip, 0, 1e9, 1), 0);
+  };
+  const left = [nx(10, 10, turn(E, -1)), ny(10, turn(E, -1))] as const;
+  const right = [nx(10, 10, turn(E, 1)), ny(10, turn(E, 1))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 5 : 0);
+  // No traffic on the ground: the alternating choice, one way on an odd step, the other on an even one.
+  assert.equal(side(plane(), 1), "left");
+  assert.equal(side(plane(), 2), "right");
+  // Traffic round one side: that side, whatever the step.
+  for (const steps of [1, 2]) {
+    assert.equal(side(plane(at(left)), steps), "left", `left busy, step ${steps}`);
+    assert.equal(side(plane(at(right)), steps), "right", `right busy, step ${steps}`);
+  }
+  // Equal traffic round both: back to the alternating choice.
+  assert.equal(
+    side(
+      plane(() => 3),
+      1,
+    ),
+    "left",
+  );
+  assert.equal(
+    side(
+      plane(() => 3),
+      2,
+    ),
+    "right",
+  );
+});
