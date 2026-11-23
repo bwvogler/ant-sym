@@ -1,3 +1,4 @@
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { setMapInspection } from "./mapInspection.ts";
 import { useEffect, useState } from "react";
 import type { AphidClump, Colony, Fungus, WorldMap } from "../colony/index.ts";
@@ -50,18 +51,16 @@ export default function LensLayer({
     setMapInspection(pinned && inspecting && at ? { lv: at.lv, x: at.x, y: at.y } : null);
     return () => setMapInspection(null);
   }, [pinned, inspecting, at]);
-  // A pinned card: Escape closes it first (before a follow or a drawer), unless a dialog is over it.
-  useEffect(() => {
-    if (!pinned) return;
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
-      e.preventDefault();
+  // A pinned card: Escape closes it first (before a follow or a drawer; a dialog over it takes the key before it: escape.ts).
+  useEscape(
+    ESCAPE_LAYER.card,
+    () => {
       if (inspecting) setInspectedPin(null);
       else unpin();
-    };
-    window.addEventListener("keydown", key, true);
-    return () => window.removeEventListener("keydown", key, true);
-  }, [pinned, inspecting]);
+      return true;
+    },
+    pinned,
+  );
   // The card says it afresh about three times a second while it is up: the ants move under a still pointer.
   const shown = at !== null;
   useSimTick(250, shown);

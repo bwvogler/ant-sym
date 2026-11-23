@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Game } from "../colony/index.ts";
 import { clock, clockTicks } from "./clock.ts";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
 import { Icon } from "./kit.tsx";
@@ -79,18 +80,24 @@ export default function LabBench(
   // A queen in flight waits for the page to found her (the pen), as play does.
   const flying = useGameRead(() => game.flights.length > 0);
   const tabs = TABS.filter(([t]) => t !== "journal" || journal);
+  // Escape, with focus in the Lab, closes it (the owner, D1 on #237): only for a key pressed with focus in it (else the claim passes, to a
+  // drawer or the builder), and one Escape, one thing, so not when a chart's crosshair took it (it settles the event) or a tooltip or the Codex
+  // is open above (escape.ts). The map takes the focus back (the effect above).
+  const section = useRef<HTMLElement>(null);
+  useEscape(
+    ESCAPE_LAYER.lab,
+    (e) => {
+      if (!section.current?.contains(e.target as Node)) return false;
+      closeLab();
+      return true;
+    },
+    true,
+    "below",
+  );
   return (
     <section
+      ref={section}
       aria-label="lab"
-      // Escape, with focus in the Lab, closes it (the owner, D1 on #237): one Escape, one thing, so not when a chart's
-      // crosshair took it (defaultPrevented) or a tooltip or dialog that takes Escape is open above (not the tutorial's
-      // coach card, which takes none: review of #237, S1). The map takes the focus back (the effect above).
-      onKeyDown={(e) => {
-        if (e.key !== "Escape" || e.defaultPrevented) return;
-        if (document.querySelector('[role="tooltip"], [role="dialog"]:not([aria-label="tutorial"])')) return;
-        e.preventDefault();
-        closeLab();
-      }}
       className="absolute inset-x-0 bottom-0 z-10 flex h-[42dvh] flex-col border-t border-line bg-ground"
     >
       <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5">

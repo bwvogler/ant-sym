@@ -5,6 +5,7 @@
 
 import type { BuildTool } from "../colony/index.ts";
 import { iconUrl } from "./iconUrl.ts";
+import { persisted } from "./storage.ts";
 
 /** A tray tool: Move pans the map with one finger; the rest are the builder's. */
 /** A tray tool: Move pans the map with one finger; the tweezers lift an ant; the rest are strokes. */
@@ -139,23 +140,21 @@ export function isPalm(e: { pointerType: string; width: number; height: number }
 /** The tools whose first use has been shown (per browser; the page works without it). */
 const SEEN_KEY = "jevants.builder.seen";
 
+const seen = persisted(SEEN_KEY);
+
 export function seenTools(): Set<string> {
   try {
-    const raw = localStorage.getItem(SEEN_KEY);
+    const raw = seen.get();
     return new Set(raw ? (JSON.parse(raw) as string[]) : []);
   } catch {
-    return new Set();
+    return new Set(); // something else was stored there
   }
 }
 
 export function markSeen(tool: TrayTool): void {
-  try {
-    const s = seenTools();
-    s.add(tool);
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...s]));
-  } catch {
-    // no storage: the demonstration shows again next time
-  }
+  const s = seenTools();
+  s.add(tool);
+  seen.set(JSON.stringify([...s])); // no storage: the demonstration shows again next time
 }
 
 /** A colony's tone on the page: its odour mixed from ink (0) to the warn tone (1), as its ants are drawn. */

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { type Colony, type Game } from "../colony/index.ts";
 import { UNLOCK } from "./codex.ts";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { docUrl, guideFor, guideNote, NOTES, type GuideEntry } from "./guide.ts";
 import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
@@ -40,17 +41,19 @@ export default function LearnDrawer(props: Props) {
   // is the field's alone (review: one key did both). A doctrine or aim being typed is committed first: its onBlur
   // would not run once the textarea unmounts, leaving Jev on the old words while both panels show the new.
   useEffect(() => {
-    if (!open) return;
-    panel.current?.focus({ preventScroll: true });
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (open) panel.current?.focus({ preventScroll: true });
+  }, [open]);
+  useEscape(
+    ESCAPE_LAYER.codex,
+    () => {
       const a = document.activeElement;
       if (a instanceof HTMLElement && panel.current?.contains(a)) a.blur();
       closeLearn();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [open]);
+      return true;
+    },
+    open,
+    "below",
+  );
   // A target entry is scrolled to once its tab has rendered.
   useEffect(() => {
     if (!target) return;

@@ -42,11 +42,18 @@ test("its tolerance reaches recognition, where fights are judged; the generic an
 });
 
 test("one supercolony: the two colonies never fight, where the generic ant's do", () => {
-  const losses = (sp: typeof GENERIC_ANT) => {
-    const g = game(sp);
-    for (let k = 0; k < 30 * 180; k++) g.tick(1 / 30);
-    return g.colonies.reduce((s, c) => s + c.losses, 0);
-  };
-  assert.ok(losses(GENERIC_ANT) > 0, "the generic ant fights here (the test is not vacuous)");
-  assert.equal(losses(NEGLECTUS_ANT), 0);
+  // Retune (brood-odour climb on by default, which moved every game's stream): whether the two colonies meet inside 180 s is a property of the
+  // world and the stream, and on world 1 / seed 1 (the old fixture) the generic ant no longer fights (it also does not on seeds 3 and 7). It
+  // fights on seeds 2, 4, 5, 6 and 8 (first loss at 23, 48, 55, 42 and 61 s; 16, 3, 16, 24 and 12 losses by 180 s). So the check is played on
+  // seeds 2, 4 and 6, each of which must hold the same bounds: the generic ant loses ants (not vacuous), the invasive garden ant none. Each run is 100 s,
+  // not 180 (a 180 s game now takes ~23 s, and six of them would near the file's 120 s limit); the generic ant's first loss on these seeds is at 23, 48 and 42 s.
+  for (const seed of [2, 4, 6]) {
+    const losses = (sp: typeof GENERIC_ANT, seconds: number) => {
+      const g = new Game(generateOneWorld(seed), { species: sp }, gameRng(seed), [{ antCount: 200 }, { antCount: 200 }]);
+      for (let k = 0; k < 30 * seconds; k++) g.tick(1 / 30);
+      return g.colonies.reduce((s, c) => s + c.losses, 0);
+    };
+    assert.ok(losses(GENERIC_ANT, 100) > 0, `seed ${seed}: the generic ant fights here (the test is not vacuous)`);
+    assert.equal(losses(NEGLECTUS_ANT, 100), 0, `seed ${seed}`);
+  }
 });
