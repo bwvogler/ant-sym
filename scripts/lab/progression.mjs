@@ -17,7 +17,6 @@
 // --grant gives the named upgrades' first levels at landing, paid with mutations granted for them (ja-2bw.9: a
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
-// --flower-anywhere (ja-vlla.9) lets a flower close at any hypha cell, not only where a tip thickened (hyphae.ts FLOWER.anywhere; off in the game).
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
@@ -53,7 +52,6 @@ if (isMainThread) {
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
-    flowerAnywhere: flag("flower-anywhere"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -80,7 +78,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat})`,
     );
     if (job.split)
       console.log(
@@ -114,9 +112,7 @@ if (isMainThread) {
     landing,
     rootRadius,
     split: wantSplit,
-    flowerAnywhere,
   } = workerData;
-  if (flowerAnywhere) (await import("../../web/src/colony/hyphae.ts")).FLOWER.anywhere = true;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
     const { PRICE } = await import("../../web/src/colony/evolution.ts");
@@ -194,6 +190,7 @@ if (isMainThread) {
     growth: 0,
     mass: 0,
     flowers: 0,
+    spread: 0,
     patches: 0,
     mat: 0,
     split,
@@ -235,6 +232,7 @@ if (isMainThread) {
   r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
   r.mass = (g.fungus.evolution?.mass ?? 0).toFixed(1);
   r.flowers = g.fungus.flowers;
+  r.spread = g.fungus.spread;
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
   parentPort.postMessage(r);

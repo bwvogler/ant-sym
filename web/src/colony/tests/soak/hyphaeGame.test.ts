@@ -641,9 +641,7 @@ test("thickening at a colonised corpse far from every patch closes a flower that
   for (let k = 0; k < 30 * 10 && g.fungus.flowers === 0; k++) g.tick(1 / 30);
   const h = g.fungus.hyphaeOn(PLANE)!;
   assert.equal(g.fungus.flowers, 1, "one flower closed");
-  const inFlower = new Set([hyphaKey(x, y), ...[0, 1, 2, 3, 4, 5].map((d) => hyphaKey(nx(x, y, d), ny(y, d)))]);
-  const there = h.tips.filter((t) => inFlower.has(hyphaKey(t.x, t.y))).length;
-  assert.ok(there >= 5, `the corpse's two tips and the flower's three stand in it (${there})`);
+  // The flower sends out no tips of its own: it is surrounded by the tips that closed it (owner 2026-11-23).
   assert.equal(e.patches, patches + 1, "one more patch, room to grow");
   assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
   for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
@@ -669,7 +667,7 @@ test("thickening beside the landing makes no flower: its cells are the landing's
   assert.equal(g.fungus.evolution!.patches, patches);
 });
 
-test("a corpse with rock beside it closes no flower: its seven cells are not all hyphae, so nothing becomes a patch", () => {
+test("a corpse with rock beside it: no flower takes a rock cell, and the corpse's own cell, with rock beside it, is no flower's middle", () => {
   const g = game(true);
   g.fungus.bindPolicy("growth", () => "thicken");
   const plane = g.world!.plane;
@@ -683,14 +681,14 @@ test("a corpse with rock beside it closes no flower: its seven cells are not all
       if (rock >= 1 && rock <= 3) at = [x, y];
     }
   assert.ok(at, "no open cell with rock beside it");
-  const patches = g.fungus.evolution!.patches;
-  const base = g.fungus.patchOn(PLANE).length;
   g.fungus.colonise(PLANE, ...at);
   runFor(g, 20);
   assert.ok(g.fungus.hyphaeOn(PLANE)!.mat.size > 0, "it did thicken");
-  assert.equal(g.fungus.flowers, 0);
-  assert.equal(g.fungus.evolution!.patches, patches);
-  assert.equal(g.fungus.patchOn(PLANE).length, base);
+  const patch = g.fungus.patchOn(PLANE);
+  for (let i = 0; i < patch.length; i += 2) assert.equal(rockAt(plane, patch[i]!, patch[i + 1]!), OPEN, "no rock cell is base");
+  const near = new Set<number>();
+  for (let i = 0; i < patch.length; i += 2) near.add(hyphaKey(patch[i]!, patch[i + 1]!));
+  assert.ok(!near.has(hyphaKey(...at)), "the corpse's own cell, with rock beside it, is in no flower");
 });
 
 test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
@@ -703,6 +701,6 @@ test("tips thickening in the curtain leave no list growing: every map's thickene
   assert.ok(at);
   g.fungus.colonise(CURTAIN, ...at);
   runFor(g, 20);
-  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeThickened(), [], "nothing left over from the rounds before");
+  assert.deepEqual(g.fungus.hyphaeOn(CURTAIN)!.takeGrown(), [], "nothing left over from the rounds before");
   assert.equal(g.fungus.flowers, 0, "layer 0 only");
 });

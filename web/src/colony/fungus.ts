@@ -36,7 +36,6 @@ import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, 
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
   cellKey,
-  FLOWER,
   type Ground,
   type GrowthAnswer,
   type GrowthSituation,
@@ -1392,46 +1391,47 @@ export class Fungus {
 
   /** patches a closed flower of hyphae has become, over the game (PRD §85, ja-vlla.5) */
   flowers = 0;
+  /** cells a closed flower has added to a patch that was there already, over the game */
+  spread = 0;
 
   /**
-   * A cell the hyphae have thickened round, whose six neighbours are all hyphae too, is a flower; it becomes a patch
-   * (PRD §85, ja-vlla.5) when none of its seven cells is in a patch already (base or sources: the landing's own cells
-   * never count): the seven are a base that sporulates and sources of mass, the patch count (room to grow) goes up by
-   * one with no start of its own (the mass is the hyphae's), and three tips set out from it as at a landing. Layer 0
-   * only, as every root today. Nothing without an evolution.
+   * A flower is a cell and its six neighbours, all hyphae (PRD §85, ja-vlla.5; owner 2026-11-23: anywhere, and one
+   * may touch a patch). A cell the hyphae have just grown closes a flower round itself or round any of its six
+   * neighbours. The seven's cells not yet in a patch (base or sources) join it: when none of the seven were, they are a
+   * new patch (the count, room to grow, goes up by one, with no start of its own: the mass is the hyphae's); when some
+   * were, the patch spreads over them and the count stays. Layer 0 only, as every root today. Nothing without an
+   * evolution.
    */
   #settle(): void {
     const e = this.#evolution;
     // Every map's list is emptied, so none grows without bound; only layer 0's is looked at.
-    const lists = this.#hyphae.map((h) => h?.takeThickened() ?? []);
+    const lists = this.#hyphae.map((h) => h?.takeGrown() ?? []);
     const h = this.#hyphae[0];
     if (!e || !h) return;
     const L = this.#layers[0] as SporeLayer;
     const base = new Set(L.base);
-    for (const k of FLOWER.anywhere ? [...h.parent.keys()] : lists[0]!) {
-      const [cx, cy] = keyCell(k);
-      const cells = [k];
-      for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
-      if (!cells.every((c) => h.parent.has(c))) continue;
-      if (cells.some((c) => base.has(c) || h.sources.has(c))) continue;
-      for (const c of cells) {
-        L.base.push(c);
-        base.add(c);
-        h.sources.add(c);
-      }
-      e.settle();
-      this.flowers++;
-      for (const d of ROOT_HEADINGS) {
-        let px = cx;
-        let py = cy;
-        for (let i = 0; i < 2; i++) {
-          const qx = nx(px, py, d);
-          const qy = ny(py, d);
-          if (!h.has(qx, qy)) break;
-          px = qx;
-          py = qy;
+    const inPatch = (c: number): boolean => base.has(c) || h.sources.has(c);
+    for (const g of lists[0]!) {
+      const [gx, gy] = keyCell(g);
+      for (let j = -1; j < 6; j++) {
+        const cx = j < 0 ? gx : nx(gx, gy, j);
+        const cy = j < 0 ? gy : ny(gy, j);
+        const cells = [cellKey(cx, cy)];
+        for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
+        if (!cells.every((c) => h.parent.has(c))) continue;
+        const fresh = cells.filter((c) => !inPatch(c));
+        if (fresh.length === 0) continue;
+        for (const c of fresh) {
+          L.base.push(c);
+          base.add(c);
+          h.sources.add(c);
         }
-        h.root(px, py, d);
+        if (fresh.length < cells.length) {
+          this.spread += fresh.length;
+          continue;
+        }
+        e.settle();
+        this.flowers++;
       }
     }
   }
@@ -1778,6 +1778,7 @@ export class Fungus {
       evolution: this.#evolution?.save() ?? null,
       // Only once a flower has become a patch: a game with none saves as it always has (the goldens hash the save).
       ...(this.flowers ? { flowers: this.flowers } : {}),
+      ...(this.spread ? { spread: this.spread } : {}),
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
@@ -1809,6 +1810,7 @@ export class Fungus {
     this.#evolution = e ? Evolution.load(e) : null;
     L.base = [...((r.base as number[] | undefined) ?? [])];
     this.flowers = (r.flowers as number | undefined) ?? 0;
+    this.spread = (r.spread as number | undefined) ?? 0;
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
       if (layers.length !== this.#layers.length - 1)
