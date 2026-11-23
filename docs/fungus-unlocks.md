@@ -85,10 +85,40 @@ For every milestone, off is today bit for bit and the goldens stay exact until a
 - **Cost:** none in M1. M2 re-asks the growth lane (about $0.002–0.004 an aim today, PRD §54.4, once; cached games spend nothing; more with a fifth field), and a fifth situation field would raise the lane's tokens a question (to be measured with `scripts/colony-cost.mjs`). M3 and M4 are not asked of Jev unless they add a lane.
 - **Risks:** a **cliff** early (M1 shrinks spores and capacity at the start: worst seed of P1); a **runaway** (capacity grows with patches, so a patch that is cheap to make would snowball: it takes its seven cells' mass from the hyphae and only forms where a flower of hyphae stands outside every patch, and the rate is the number to watch); an **invisible** rule (a patch forming with no sign: it needs a mark and a notice); a **free lever** (the partner skipping the slope: it is unlocked by contact and starts weak); a mat rule with only species-level support, which a reviewer can fairly call design (it is marked so).
 
+## 6. M3: the two budgets, options (2026-11-23, for the owner)
+
+**What the literature gives, and what it does not.** *For a fungus with two lives:* *Metarhizium* is rhizosphere-competent (Hu & St. Leger 2002) and persists in soil for months to a year or more (field summaries, unverified: §5 of `fungus-body.md`); as a root endophyte it passes insect nitrogen to plants (28 % and 32 % of a bean's and a switchgrass's nitrogen in microcosms, Behie et al. 2012) and receives plant carbon, more when an insect is present (Behie et al. 2017, *Nat Commun* 8:14245, from search summaries only, not read in full). *For ant-facing traits coming from ants:* lines passed through grooming ant groups for ten cycles evolved more spores and less of the cue groomers detect (*Nat Ecol Evol* 2023, press summary only). *For a rising price:* a hundredfold more mutation supply bought far less than a hundredfold faster adaptation (de Visser et al. 1999, bacterial). *Not found:* any source that ties an upgrade to where its growth was made (soil growth buying soil traits), or a trade-off between soil competence and virulence (the queries on in-host growth and virulence were refused by the search tool's filter, so they were **not read**), or an unlock that fires when a stock passes a level. The two budgets are design, as the TL;DR says; the repo's licence stays that a mutation can arise in any replication (`fungus-body.md` §3).
+
+**What the game does today.** One pool: mutations = `MUTATION` (0.25) × growth, where growth is credited by `Evolution.grow` (the mycelium on the ground), `feed` (a colonised corpse) and `replicate` (load passed on by contact in hosts); one price, `round(1.5^kept)` over every level kept. The fourteen upgrades fall into two groups: **ant-facing**, 18 levels (infectivity 3, persistence 2, evasion 2, stealth 2, senses 1, recognition 2, trails 2, royal 2, odour weapon 1, crown 1), and **the fungus's own**, 8 levels (mycelium 2, knots 2, stalks 2, fruiting 2).
+
+**Measured** (`progression.mjs --evolve --hyphae --growth --flow --split --seconds 600`, seeds 1–8, on main; where the growth that mutations come from was made):
+
+| seed | ground | corpses | hosts | outside, of all |
+|---|---|---|---|---|
+| 1 | 385 | 5 | 11,537 | 3.3 % |
+| 2 | 691 | 26 | 23,653 | 2.9 % |
+| 3 | 421 | 21 | 20,150 | 2.1 % |
+| 4 | 403 | 26 | 25,500 | 1.7 % |
+| 5 | 2,091 | 94 | 31,004 | 6.6 % |
+| 6 | 942 | 82 | 20,327 | 4.8 % |
+| 7 | 410 | 0 | 13,155 | 3.0 % |
+| 8 | 398 | 70 | 22,323 | 2.1 % |
+
+So **98 % of today's mutations come from load passed on in hosts** (a rate of passing, not a stock of fungus in ants), and 2–7 % from the ground. The mycelium's growth stops at what its patches hold, which is why it is small. Priced with its own kept count, the fungus's own 8 levels cost 1 + 2 + 2 + 3 + 5 + 8 + 11 + 17 = **49 mutations**, and the ground's 10-minute earnings are 98 to 546 mutations (0.25 × 390 to 2,185): every seed could buy all eight in ten minutes, and the ant-facing 18 levels cost 2,954, which the hosts' 2,884 to 7,751 mutations reach on seven of eight seeds. With **one shared price** the fungus's own levels would cost `round(1.5^kept)` over all kept levels, which is thousands once the ant levels are bought: unaffordable from 98 mutations.
+
+**Options.**
+- **A. Two pools, each spent like mutations today, each with its own rising price (recommended).** Ant-facing levels cost the ants pool (0.25 × growth in hosts); the fungus's own levels cost the free pool (0.25 × growth on the ground and from corpses). Each price counts only its own kept levels, so each tree is sized to its pool (49 against 98–546; 2,954 against 2,884–7,751). *For:* it is the owner's wording (budgets, spent); it reuses `Evolution`'s spend, keep and price; each budget buys what its growth site suggests. *Against:* the free pool is a few percent of the whole and nearly all of it is the landing's logistic growth, so the *Mycelium* upgrade (capacity) is also what feeds it, a flywheel (seed 5, which grows seven patches, earns four times seed 1); two meters in the drawer; the early game moves (ant levels come from their own cheaper price, the fungus's own from a small pool), so P1 must be re-assayed.
+- **B. Stocks: unlock a level when the stock passes a threshold** (fungus in ants; mycelium mass outside, 42 to 279 at ten minutes). *For:* visible, no spending, no pool to run dry. *Against:* no choice (everything unlocks in time), which drops the player's say in what to grow; the owner's own word was "budgets"; no source gives thresholds; the "fungus in ants" stock is not what the game counts (it counts load passed on).
+- **C. One pool as today, but split the price by group** (the ant levels and the fungus's own levels each priced by their own kept count, one currency). *For:* the smallest change; no second meter. *Against:* it does not separate the budgets, so the owner's ask is not met; the ants pool would still buy the fungus's own levels cheaply.
+
+**Questions for the owner:** (1) Option A, B or C; (2) with A, do *fruiting* (spores on the patch) and *stalks* (a corpse's spores) belong to the free pool, as listed, or to the ants pool (they act on ants walking through the spores); (3) should a colonised corpse's substance (`feed`) go to the free pool, as measured here, or the ants pool (it is a host's body)?
+
+**Build, if A** (`ja-vlla.7`): `Evolution` gains a second `growth` and `spent` (saved only when above 0 so a one-pool save loads), a `budget` field on each upgrade, the drawer shows two meters, `progression.mjs` buys from both pools; the assays are P1 by the worst seed on 1–20 and the first-purchase times; goldens re-recorded and said so.
+
 ## Open questions
 
 - ~~**Owner (M2):** the cue for "rich"~~ Decided (owner, 2026-11-22): a colonised corpse beside the tip, the best supported (a new focus at a resource); anywhere well supplied and only-when-the-aim-asks were not taken.
-- **Owner (M3):** are the budgets a *stock* (unlock when mass in ants or outside passes a level) or *earnings* spent like mutations? One rising price or one per budget?
+- **Owner (M3):** are the budgets a *stock* (unlock when mass in ants or outside passes a level) or *earnings* spent like mutations? One rising price or one per budget? Options, the measured growth split and a recommendation: §6.
 - **Owner (M4):** what the partner is (algae on rock, a plant with roots, a lichen), what contact means on the map, what senses it brings.
 - **To measure:** P1 with radius 1 (`ja-vlla.2`); flowers per game with a thicken answer (`ja-vlla.6`); the cost of a fifth situation field.
 - **To read:** the sources this search could not (`ja-vlla.1`).
