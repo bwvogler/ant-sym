@@ -33,7 +33,7 @@ import {
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
-import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
+import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
 import {
   cellKey,
   type Ground,
@@ -235,6 +235,30 @@ export const DEFAULT_FUNGUS: FungusParams = {
   trafficBias: "off",
   trafficRadius: 3,
 };
+
+/**
+ * The ants round cell (x, y) within `r` cells, from the step's occupancy grids of every colony (a rival's ants count too, as
+ * in a host's contact), as a number to compare (docs/hyphal-traffic.md, ja-ogph.3): `count` is the ants in all, `levels` the
+ * level of the share of occupied cells in the disc (0 none, 1 one cell, 2 up to a tenth of the cells on the map, 3 more).
+ */
+export function trafficAt(grids: readonly CountGrid[], map: Bounds, bias: "count" | "levels", r: number, x: number, y: number): number {
+  const o = discOffsets(r)[y & 1] as Int16Array;
+  let ants = 0;
+  let occupied = 0;
+  let cells = 0;
+  for (let k = 0; k < o.length; k += 2) {
+    const cx = x + (o[k] as number);
+    const cy = y + (o[k + 1] as number);
+    if (!inBounds(map, cx, cy)) continue;
+    cells++;
+    let n = 0;
+    for (const g of grids) n += g.get(cx, cy);
+    ants += n;
+    if (n > 0) occupied++;
+  }
+  if (bias === "count") return ants;
+  return occupied === 0 ? 0 : occupied === 1 ? 1 : occupied <= 0.1 * cells ? 2 : 3;
+}
 
 /** A host the policy has chosen to keep dormant shows this share of its strain's visibility: lying low is how it hides from grooming. */
 export const DORMANT_SHOW = 0.25;
@@ -552,26 +576,7 @@ export class Fungus {
     const { trafficBias: bias, trafficRadius: r } = this.params;
     const grids = this.#seen?.[layer];
     if (bias === "off" || !grids) return ground;
-    // The ants round a cell, from this step's occupancy grids of every colony (a rival's ants count too, as in a host's contact).
-    const offsets = discOffsets(r);
-    ground.traffic = (x, y) => {
-      const o = offsets[y & 1] as Int16Array;
-      let ants = 0;
-      let occupied = 0;
-      let cells = 0;
-      for (let k = 0; k < o.length; k += 2) {
-        const cx = x + (o[k] as number);
-        const cy = y + (o[k + 1] as number);
-        if (!inBounds(map, cx, cy)) continue;
-        cells++;
-        let n = 0;
-        for (const g of grids) n += g.get(cx, cy);
-        ants += n;
-        if (n > 0) occupied++;
-      }
-      if (bias === "count") return ants;
-      return occupied === 0 ? 0 : occupied === 1 ? 1 : occupied <= 0.1 * cells ? 2 : 3;
-    };
+    ground.traffic = (x, y) => trafficAt(grids, map, bias, r, x, y);
     return ground;
   }
 

@@ -1242,3 +1242,50 @@ test("a tip that may turn either way takes the side with more traffic, and a tie
     "right",
   );
 });
+
+test("with both near sides blocked, the two-turn sides lean the same way: toward the cell two turns off with more traffic", () => {
+  // A tip heading east on a flat wall: NE, SE and E blocked; the cells two turns off (NW-ish SW side and the other) free.
+  const h = new Hyphae();
+  h.root(10, 10, E);
+  const tip = h.tips[0]!;
+  const near = new Set([-1, 0, 1].map((k) => cellKey(nx(10, 10, turn(E, k)), ny(10, turn(E, k)))));
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 4 : 0);
+  const ground = (traffic: Ground["traffic"]): Ground => ({
+    topsoil: true,
+    kind: (x, y) => (near.has(cellKey(x, y)) ? "rock" : "open"),
+    traffic,
+  });
+  for (const steps of [1, 2]) {
+    h.steps = steps;
+    const g = ground(at(cell(-2)));
+    assert.equal(sideFor(h, g, tip, situationOf(h, g, tip, 0, 1e9, 1), 0), "left", `traffic two turns left, step ${steps}`);
+    const g2 = ground(at(cell(2)));
+    assert.equal(sideFor(h, g2, tip, situationOf(h, g2, tip, 0, 1e9, 1), 0), "right", `traffic two turns right, step ${steps}`);
+  }
+});
+
+test("a branch takes the side with more traffic when both are open, else the alternating side", () => {
+  const sideOfBranch = (traffic: Ground["traffic"], steps: number): number => {
+    const g: Ground = { topsoil: true, kind: () => "open", traffic };
+    const h = new Hyphae();
+    h.root(10, 10, E);
+    h.steps = steps;
+    const tip = h.tips[0]!;
+    stepTips(h, g, 0, { free: 1e9, tips: 1 }, () => "branch");
+    const branch = h.tips.find((t) => t !== tip)!;
+    return branch.heading;
+  };
+  const cell = (k: number) => [nx(10, 10, turn(E, k)), ny(10, turn(E, k))] as const;
+  const at = (c: readonly [number, number]) => (x: number, y: number) => (x === c[0] && y === c[1] ? 4 : 0);
+  for (const steps of [1, 2]) {
+    assert.equal(sideOfBranch(at(cell(-1)), steps), turn(E, -1), `traffic on the left, step ${steps}`);
+    assert.equal(sideOfBranch(at(cell(1)), steps), turn(E, 1), `traffic on the right, step ${steps}`);
+  }
+  assert.notEqual(sideOfBranch(undefined, 1), sideOfBranch(undefined, 2), "no traffic: it alternates");
+  assert.notEqual(
+    sideOfBranch(() => 2, 1),
+    sideOfBranch(() => 2, 2),
+    "equal traffic: it alternates",
+  );
+});
