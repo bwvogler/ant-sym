@@ -63,8 +63,10 @@ import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
-import { GUIDE, guideFor, REPO } from "./ui/guide.ts";
-import { MOD_K, pageKey } from "./ui/keys.ts";
+import { GUIDE, REPO } from "./ui/guide.ts";
+import { MOD_K } from "./ui/keys.ts";
+import { useKeys } from "./ui/useKeys.ts";
+import { paletteCommands as buildPaletteCommands } from "./ui/paletteCommands.ts";
 import LensLayer from "./ui/LensLayer.tsx";
 import { clock } from "./ui/clock.ts";
 import Specimens from "./ui/Specimens.tsx";
@@ -78,7 +80,7 @@ import { openLearn } from "./ui/learn.ts";
 import { openLab, toggleLab, useLab } from "./ui/labStore.ts";
 import Toasts from "./ui/Toasts.tsx";
 import Notices from "./ui/Notices.tsx";
-import { NOTICE_LEVEL_LABEL, NOTICE_LEVELS, pushToast, setNoticeLevel, toastPlace, useNoticeLevel } from "./ui/toasts.ts";
+import { pushToast, toastPlace, useNoticeLevel } from "./ui/toasts.ts";
 import { useBuilder } from "./ui/useBuilder.ts";
 import QueenPen from "./ui/QueenPen.tsx";
 import { useFlight } from "./ui/useFlight.ts";
@@ -96,11 +98,6 @@ type DrawerId = "fungus" | "evolve" | "colonies" | "saves" | "settings";
 
 /** The speeds the HUD offers (4× is the game's default; PRD §50); the Lab's World tab has the slider for the rest. */
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
-
-/** A dialog that has the page: the game's keys wait while one is open (the palette's key still works). */
-const BLOCKING = ['[aria-modal="true"]', ...["Codex", "Start", "The queen's pen"].map((l) => `[role="dialog"][aria-label="${l}"]`)].join(
-  ", ",
-);
 
 export default function ColonyApp() {
   const colony = useColony();
@@ -218,16 +215,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     },
     [setView],
   );
-  // S2b (PRD §69.3): the command palette, the shortcuts sheet and the lens, and the keys that open them.
-  const [palette, setPalette] = useState(false);
-  const [sheet, setSheet] = useState(false);
-  const [lensOn, setLensOn] = useState(false);
-  // Where the lens looks lives in a store (ui/lensStore.ts) the map reports to and LensLayer reads: the page doesn't
-  // re-render as the pointer moves (review of #196, N3).
-  const toggleLens = useCallback(() => {
-    setLensOn((on) => !on);
-    clearProbe();
-  }, []);
   /** Follow ant f, the camera taken to whichever view it is in. */
   const goTo = useCallback(
     (f: Followed) => {
@@ -251,43 +238,16 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     }
     goTo(hosts[hostTurn.current++ % hosts.length]!);
   }, [game, goTo]);
-  // The page's keys (ui/keys.ts): one handler, one table, which the shortcuts sheet reads.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      const t = e.target instanceof HTMLElement ? e.target : null;
-      const toggleInput = t instanceof HTMLInputElement && (t.type === "checkbox" || t.type === "radio");
-      const a = pageKey(
-        {
-          key: e.key,
-          ctrl: e.ctrlKey,
-          meta: e.metaKey,
-          alt: e.altKey,
-          typing: !!t && (t.isContentEditable || (!toggleInput && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))),
-          control:
-            toggleInput || !!t?.closest("button, a[href], summary, [role='button'], [role='option'], [role='tab'], [role='menuitem']"),
-        },
-        SPEEDS,
-      );
-      if (!a) return;
-      // Over a dialog that has the page (the palette, the sheet, the Codex, the start, the queen's pen) only the
-      // palette's key works: the game's keys wait.
-      if (a.kind !== "palette" && document.querySelector(BLOCKING)) return;
-      e.preventDefault();
-      if (a.kind === "palette") {
-        setSheet(false);
-        setPalette((o) => !o);
-      } else if (a.kind === "shortcuts") setSheet(true);
-      else if (a.kind === "lens") toggleLens();
-      else if (a.kind === "lab") toggleLab();
-      else if (a.kind === "play") update({ playing: !controls.playing });
-      else if (a.kind === "speed") update({ speed: a.speed });
-      else if (a.kind === "view") {
-        if (oneWorld) setView(controls.view === "above" ? "below" : "above");
-      } else followHost();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [controls.playing, controls.view, update, oneWorld, setView, followHost, toggleLens]);
+  // S2b (PRD §69.3): the command palette, the shortcuts sheet and the lens, and the keys that open them (ui/useKeys.ts).
+  const { palette, setPalette, sheet, setSheet, lensOn, toggleLens } = useKeys({
+    playing: controls.playing,
+    view: controls.view,
+    speeds: SPEEDS,
+    update,
+    oneWorld: !!oneWorld,
+    setView,
+    followHost,
+  });
   const games = useSaves(
     game,
     settings,
@@ -353,99 +313,26 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jev.lock, jev.state.phase);
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
-  // The palette's commands (ui/commands.ts ranks them): everything the HUD, the rail, the map's menu and the keys do,
-  // and every guide entry. Built only while the palette is open (review of #196, N3); running one closes a pinned lens
-  // card, which would otherwise stay over what the command opens (N4).
+  // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
-    [
-      {
-        id: "play",
-        label: controls.playing ? "Pause" : "Play",
-        group: "Game",
-        key: "Space",
-        words: "pause play stop go",
-        run: () => update({ playing: !controls.playing }),
-      },
-      ...SPEEDS.map((v, j) => ({
-        id: `speed-${v}`,
-        label: `Speed ${v}×`,
-        group: "Game",
-        key: String(j + 1),
-        words: "fast slow",
-        ...(controls.speed === v ? { off: "now" } : {}),
-        run: () => update({ speed: v }),
-      })),
-      ...(oneWorld
-        ? (["above", "below"] as const).map((v) => ({
-            id: `view-${v}`,
-            label: `View ${v}`,
-            group: "Game",
-            key: "v",
-            words: v === "above" ? "surface top" : "underground nest side",
-            ...(controls.view === v ? { off: "shown" } : {}),
-            run: () => setView(v),
-          }))
-        : []),
-      { id: "host", label: "Follow a host of yours", group: "Game", key: "f", words: "infected ant", run: followHost },
-      { id: "whole", label: "Whole map", group: "Map", key: "0", words: "zoom out fit", run: () => field.current?.showAll() },
-      ...game.colonies.map((_, k) => ({
-        id: `nest-${k}`,
-        label: `Go to ${colonyName(k)}'s nest`,
-        group: "Map",
-        words: "colony hole",
-        run: () => field.current?.goNest(k),
-      })),
-      ...(
-        [
-          ["fungus", "The fungus", "infection aim"],
-          ["evolve", "Mutations", "evolve body upgrades"],
-          ["colonies", "Colonies", "numbers"],
-          ["saves", "Saved games", "save load continue"],
-          ["settings", "Settings", "trails passphrase"],
-        ] as const
-      ).map(([d, label, words]) => ({ id: `drawer-${d}`, label, group: "Panels", words, run: () => setDrawer(d) })),
-      { id: "learn", label: "Codex: the field guide", group: "Panels", words: "help guide learn", run: () => openLearn({ tab: "guide" }) },
-      {
-        id: "lab",
-        label: lab ? "Close the Lab" : "Lab mode: history, policy, world, Jev, levers, steps",
-        group: "Panels",
-        key: "l",
-        words: "details debug seed world jev spend history charts step numbers journal policy doctrine",
-        run: toggleLab,
-      },
-      {
-        id: "lens",
-        label: lensOn ? "Lens off" : "Lens: say what is under the pointer",
-        group: "Help",
-        key: "i",
-        words: "explain inspect what",
-        run: toggleLens,
-      },
-      { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", key: "?", words: "keys", run: () => setSheet(true) },
-      ...NOTICE_LEVELS.map((l) => ({
-        id: `notices-${l}`,
-        label: `Notices over the map: ${NOTICE_LEVEL_LABEL[l].toLowerCase()}`,
-        group: "Help",
-        words: "toasts notifications quiet mute kid bell",
-        off: noticeLevel === l ? "in use" : undefined,
-        run: () => setNoticeLevel(l),
-      })),
-      ...THEMES.map((t) => ({
-        id: `theme-${t}`,
-        label: `Appearance: ${THEME_LABEL[t].toLowerCase()}${t === "system" ? " (follow the device)" : ""}`,
-        group: "Help",
-        words: "theme dark light mode night day colour",
-        off: theme === t ? "in use" : undefined,
-        run: () => setTheme(t),
-      })),
-      ...guideFor((c) => game.colonies[0]!.ph.has(c), game.params.species.id).map((e) => ({
-        id: `learn-${e.id}`,
-        label: `Codex: ${e.title}`,
-        group: "Codex",
-        words: "learn guide",
-        run: () => openLearn({ tab: "guide", id: e.id }),
-      })),
-    ].map((c) => ({ ...c, run: () => (clearProbe(), c.run()) }));
+    buildPaletteCommands({
+      game,
+      controls,
+      speeds: SPEEDS,
+      oneWorld: !!oneWorld,
+      lab,
+      lensOn,
+      noticeLevel,
+      theme,
+      field,
+      update,
+      setView,
+      setDrawer,
+      followHost,
+      toggleLab,
+      toggleLens,
+      openSheet: () => setSheet(true),
+    });
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
       {/* The stage: the map and all over it. In Lab mode it gives the workbench the bottom of the screen (PRD §69.7). */}
