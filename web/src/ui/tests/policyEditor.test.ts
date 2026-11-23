@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AIMS, DOCTRINES } from "../../colony/index.ts";
-import { growShape, type Preset, presetButtonClass, presetRowClass, wordsBoxClass, wordsRules } from "../policyEditing.ts";
-import { seg } from "../styles.ts";
+import { chipClass, chipRowClass, growShape, type Preset, wordsBoxClass, wordsRules } from "../policyEditing.ts";
 
 // The one editor for a policy's words (ja-fnd.6.4.3): the aim bar, a colony's doctrine in the Lab and the new queen's pen use it.
 
@@ -54,19 +53,12 @@ test("elsewhere (a doctrine) Enter is a new line", () => {
   assert.deepEqual([e.prevented, e.blurred], [0, 0]);
 });
 
-test("a preset button: the Lab's and the bar's by the shared segment style (the bar's smaller), the pen's as chips, active or not", () => {
-  assert.equal(presetButtonClass("segmented", true), seg(true));
-  assert.equal(presetButtonClass("segmented", false), seg(false));
-  assert.equal(presetButtonClass("compact", true), `${seg(true)} px-2.5 py-1`);
-  assert.match(presetButtonClass("chips", true), /border-accent text-accent/);
-  assert.match(presetButtonClass("chips", false), /border-line text-fg-2 hover:bg-raised/);
-  assert.doesNotMatch(presetButtonClass("chips", false), /border-accent/);
-});
-
-test("a row of presets: the three looks, with the place's own classes added", () => {
-  assert.equal(presetRowClass("segmented"), "flex overflow-hidden rounded-md border border-line text-sm");
-  assert.equal(presetRowClass("compact"), "flex shrink-0 overflow-hidden rounded-md border border-line text-[13px]");
-  assert.equal(presetRowClass("chips", "mt-4"), "flex flex-wrap gap-2 mt-4");
+test("a chip: outlined, the accent when its words are in the box; a row of chips wraps, with the place's own classes added", () => {
+  assert.match(chipClass(true), /border-accent text-accent/);
+  assert.match(chipClass(false), /border-line text-fg-2 hover:bg-raised/);
+  assert.doesNotMatch(chipClass(false), /border-accent/);
+  assert.equal(chipRowClass(), "flex flex-wrap gap-2");
+  assert.equal(chipRowClass("mt-4"), "flex flex-wrap gap-2 mt-4");
 });
 
 test("the shipped aims and doctrines are presets the editor can show", () => {

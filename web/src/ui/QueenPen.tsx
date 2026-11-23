@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { DOCTRINES, FLIGHT, type Flight } from "../colony/index.ts";
 import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
+import Segmented from "./Segmented.tsx";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // The queen's pen (ja-lo8.9): a new queen has flown with the fungus in her, from a colony whose queen it reached. The
@@ -126,19 +127,16 @@ export default function QueenPen({
         {editor("h-32")}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-fg-2">
           <span>She lands</span>
-          <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="side">
-            {([-1, 1] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`px-2 py-1 text-xs ${side === s ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`}
-                onClick={() => setSide(s)}
-                aria-pressed={side === s}
-              >
-                {s < 0 ? "west" : "east"}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="side"
+            soft
+            options={([-1, 1] as const).map((s) => ({
+              key: String(s),
+              label: s < 0 ? "west" : "east",
+              on: side === s,
+              onPick: () => setSide(s),
+            }))}
+          />
           <input
             type="range"
             min={16}

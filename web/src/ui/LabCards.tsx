@@ -17,7 +17,7 @@ import { journalLine } from "./journal.ts";
 import { LEVER_KIND, LEVER_KINDS } from "./leverKinds.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
-import { seg } from "./styles.ts";
+import Segmented from "./Segmented.tsx";
 import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
 import { useJev, useJevSession } from "./jevContext.tsx";
 import { TOKENS_PER_SITUATION, useJevState } from "./useColonyJev.ts";
@@ -308,24 +308,26 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
           Trails drawn {/* the guide's trail entries are left out for a species that lays no food trail (ja-rf5.11): no link to nowhere */}
           {game.colonies[0]!.ph.has("food") && <Help to={{ tab: "guide", id: "food-trail" }} label="trails" />}
         </span>
-        <div className="flex overflow-hidden rounded-md border border-line text-sm">
-          <button
-            type="button"
-            className={seg(controls.showFoodTrail)}
-            onClick={() => update({ showFoodTrail: !controls.showFoodTrail })}
-            title="Laid by ants carrying food home: it leads to food"
-          >
-            to food
-          </button>
-          <button
-            type="button"
-            className={seg(controls.showHomeTrail)}
-            onClick={() => update({ showHomeTrail: !controls.showHomeTrail })}
-            title="Laid by ants walking out: it leads home"
-          >
-            to home
-          </button>
-        </div>
+        <Segmented
+          label="trails drawn"
+          className="text-sm"
+          options={[
+            {
+              key: "food",
+              label: "to food",
+              on: controls.showFoodTrail,
+              onPick: () => update({ showFoodTrail: !controls.showFoodTrail }),
+              title: "Laid by ants carrying food home: it leads to food",
+            },
+            {
+              key: "home",
+              label: "to home",
+              on: controls.showHomeTrail,
+              onPick: () => update({ showHomeTrail: !controls.showHomeTrail }),
+              title: "Laid by ants walking out: it leads home",
+            },
+          ]}
+        />
       </div>
     </Card>
   );
