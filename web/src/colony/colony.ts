@@ -329,6 +329,15 @@ export class Colony {
   // The queen and brood (nest slice 4; the curtain only: elsewhere the larder still becomes ants directly).
   /** the colony's queen, in its royal chamber (null on the plane); a colony whose queen is dead is orphaned */
   queen: Queen | null = null;
+  /**
+   * Whether the colony lives in a nest: chambers with brood and stores, its workers zoned by age (the curtain, where the queen lies on the
+   * royal chamber's floor; a bare colony on a field has none). The nest-life gate (docs/nest-kind.md): every read that asks "is there a nest
+   * to live in" asks this, and a read of the queen herself (her cell, her load, whether she is alive) asks `queen`. Today the two are the same
+   * boolean.
+   */
+  get housed(): boolean {
+    return this.queen !== null;
+  }
   readonly brood = new Brood();
   /** seconds owed toward the queen's next egg */
   layT = 0;
@@ -641,9 +650,9 @@ export class Colony {
     if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);
     for (let k = 0; k < this.params.antCount; k++) placeNewborn(this, k);
     // The founders carry the colony's steady share of the queen's scent (else every nurse perceives none at the start).
-    if (this.queen) this.scent.fill(scentShare(this.params.antCount), 0, this.params.antCount);
+    if (this.housed) this.scent.fill(scentShare(this.params.antCount), 0, this.params.antCount);
     // The founding workers are of all ages (from birth to half a lifespan), so they don't all die at once.
-    if (this.queen) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.rng() * 0.5 * this.lifespan[k];
+    if (this.housed) for (let k = 0; k < this.params.antCount; k++) this.age[k] = this.rng() * 0.5 * this.lifespan[k];
   }
 
   /**
@@ -806,7 +815,7 @@ export class Colony {
    * what her brood will be fed, and fills while the colony grows: only food beyond that, at the cap, is spare.
    */
   spare(): number {
-    if (!this.queen) return this.larder;
+    if (!this.housed) return this.larder;
     if (!this.orphaned && this.population + this.brood.size < this.params.maxAnts) return 0; // orphaned, it will never grow: its food is spare
     return this.larder + this.inJaws + this.inCrops - this.brood.owed();
   }
@@ -821,7 +830,7 @@ export class Colony {
    * 1 middle-aged (dig and carry inside), 2 old (forage). Shares of the mean lifespan; on the plane every ant is old.
    */
   band(i: number): 0 | 1 | 2 {
-    if (!this.queen) return 2;
+    if (!this.housed) return 2;
     const a = this.age[i] / this.params.lifespan;
     return a < this.params.youngShare ? 0 : a < this.params.middleShare ? 1 : 2;
   }
@@ -842,7 +851,7 @@ export class Colony {
    */
   reverts(i: number): boolean {
     const share = this.params.revert;
-    if (share <= 0 || this.queen === null || this.under[i] !== 1 || this.youngMet[i] >= REVERT_BELOW || this.broodMet[i] < BROOD_MET_MIN)
+    if (share <= 0 || !this.housed || this.under[i] !== 1 || this.youngMet[i] >= REVERT_BELOW || this.broodMet[i] < BROOD_MET_MIN)
       return false;
     if (this.band(i) !== 2) return false;
     return ((i + 1) * 0.6180339887498949) % 1 < share;
@@ -974,17 +983,17 @@ export class Colony {
 
   /** Whether ant i, exploring, is a forager on its way out: the old (in the curtain with a queen). */
   outbound(i: number): boolean {
-    return this.queen !== null && this.band(i) === 2 && !this.forageDigs(i) && !this.reverts(i);
+    return this.housed && this.band(i) === 2 && !this.forageDigs(i) && !this.reverts(i);
   }
 
   /** Whether ant i is an inside worker now: underground, carrying nothing, not allowed out (zoned by age). */
   staysIn(i: number): boolean {
-    return this.queen !== null && this.under[i] === 1 && !this.carrying[i] && !this.pellet[i] && !this.mayGoOut(i);
+    return this.housed && this.under[i] === 1 && !this.carrying[i] && !this.pellet[i] && !this.mayGoOut(i);
   }
 
   /** Whether ant i digs: in the curtain with a queen, the middle-aged (the young nurse, the old forage); elsewhere, any explorer. */
   digs(i: number): boolean {
-    return !this.queen || this.band(i) === 1 || this.forageDigs(i);
+    return !this.housed || this.band(i) === 1 || this.forageDigs(i);
   }
 
   /**
@@ -993,7 +1002,7 @@ export class Colony {
    * digs alone and whatever the nest's room (move.ts and hug's start still damp it); it builds no chambers.
    */
   forageDigs(i: number): boolean {
-    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.queen !== null && this.band(i) === 2 && !this.reverts(i);
+    return this.params.forageDig > 0 && this.digBout[i] > 0 && this.housed && this.band(i) === 2 && !this.reverts(i);
   }
 
   /** Whether the colony has lost its queen (a curtain colony; a bare field's has none to lose). */
@@ -1401,7 +1410,7 @@ export class Colony {
       this.holeIn = 0;
     }
     // Energy and felt hunger (ja-xu6.1): the curtain, where there is a queen and brood.
-    if (this.queen) body(this, dt);
+    if (this.housed) body(this, dt);
     // Heat (ja-rf5.5): only a species with a day of heat.
     if (this.params.heatDay > 0) heatStep(this, dt);
     const s = new AntStep();
@@ -1471,7 +1480,7 @@ export class Colony {
     for (const L of this.layers) L.ph.advance(dt);
     for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
-    if (this.queen) {
+    if (this.housed) {
       nestLife(this, dt);
       middenSmell(this, dt);
     } else if (p.mortalWithoutQueen) ageWorkers(this, dt);
