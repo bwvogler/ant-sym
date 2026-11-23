@@ -38,6 +38,7 @@ import { PER_REQUEST, requestFor, SAMPLE_FUNGAL, SAMPLE_SITUATION, tokensPerQues
 import { openLab } from "./labStore.ts";
 import { useGameRead, useStats } from "./session.ts";
 import { sameList, sameRecord, situationsSeenOf } from "./statSelect.ts";
+import { useJev, useJevSession } from "./jevContext.tsx";
 import { TOKENS_PER_SITUATION, type DoctrineChoice } from "./useColonyJev.ts";
 
 // Lab mode's Policy tab (PRD §69.8, ja-mvo9.4): the words each colony's ants and the fungus follow, then how each decides
@@ -47,17 +48,24 @@ import { TOKENS_PER_SITUATION, type DoctrineChoice } from "./useColonyJev.ts";
 export interface PolicyProps {
   colonies: readonly Colony[];
   followed: Followed | null;
-  /** each colony's doctrine (read here: a colony's nature, ja-lo8.2) and the fungus's aim (useColonyJev) */
+  game: Game;
+  /** the fungus's menu (useColony controls): which levers the explainer lists */
+  menu: readonly string[];
+}
+
+/** What the tab reads from the Jev session (jevContext.tsx), each part drawing the tab again only when it changes. */
+interface PolicyWords {
+  /** each colony's doctrine (read here: a colony's nature, ja-lo8.2) and the fungus's aim */
   doctrines: DoctrineChoice[];
   aim: DoctrineChoice;
   /** why no policy can change now (policyLock), or null */
   lock: string | null;
-  game: Game;
   /** the fungus's answers so far (ColonyJev.fungusAnswers): the table behind "show the table" */
   fungusAnswers: () => { key: string; answer: string; stale: boolean }[];
-  /** the fungus's menu (useColony controls): which levers the explainer lists */
-  menu: readonly string[];
 }
+
+/** The tab's own and the session's, as the explainers below read them. */
+type Words = PolicyProps & PolicyWords;
 
 /** What re-asking under a new doctrine costs now, in words: the situations the colonies have met, at the generic ant's tokens each. */
 function Retune() {
@@ -78,7 +86,12 @@ const h3 = "text-xs font-medium uppercase tracking-wide text-fg-3";
  * each. The legend Jev reads is shown, not edited: the owner's call (PRD §47). `focus` is a section to open and scroll to;
  * `ping` is a new object each time a "?" aims at one (the Lab's target).
  */
-export default function PolicyTab(props: PolicyProps & { focus?: string; ping: object }) {
+export default function PolicyTab(own: PolicyProps & { focus?: string; ping: object }) {
+  const session = useJevSession();
+  const doctrines = useJev((s) => s.doctrines) as DoctrineChoice[];
+  const aim = useJev((s) => s.aim);
+  const lock = useJev((s) => s.lock);
+  const props: Words & { focus?: string; ping: object } = { ...own, doctrines, aim, lock, fungusAnswers: session.fungusAnswers };
   const sides = props.colonies.length;
   // A doctrine is closed until its colony's queen is reached: a tick sets that, outside the stats.
   const revealed = useGameRead(() => [...props.game.revealed], sameList);
@@ -256,7 +269,7 @@ function followedFungal(colonies: readonly Colony[], f: Followed | null): { i: n
   return code >= 0 ? { i: fol.i, s: decodeFungal(code) } : null;
 }
 
-function ModeExplainer(props: PolicyProps) {
+function ModeExplainer(props: Words) {
   const fol = followedSituation(props.colonies, props.followed);
   const s = fol?.s ?? SAMPLE_SITUATION;
   // The game's species (ja-fnd.5.13): its own fields, choices and local rule where it has them; the generic ant's otherwise.
@@ -319,7 +332,7 @@ function ModeExplainer(props: PolicyProps) {
   );
 }
 
-function FungusExplainer(props: PolicyProps) {
+function FungusExplainer(props: Words) {
   const fungal = followedFungal(props.colonies, props.followed);
   const [table, setTable] = useState(false);
   const menu = new Set(props.menu);
@@ -451,7 +464,7 @@ function AnswerTable({ rows }: { rows: { key: string; answer: string; stale: boo
 }
 
 /** The legend Jev reads (fixed), and the exact request for the followed ant, or a sample. */
-function SentExplainer(props: PolicyProps) {
+function SentExplainer(props: Words) {
   const fol = followedSituation(props.colonies, props.followed);
   const fungal = followedFungal(props.colonies, props.followed);
   const k = fol?.k ?? 0;

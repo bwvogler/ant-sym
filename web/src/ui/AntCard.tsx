@@ -3,14 +3,12 @@ import {
   type Colony,
   MODES,
   type Mode,
-  type Situation,
   INFECTED,
   STRAINS,
   type Fungus,
   pulled,
   UPGRADES,
   decodeFungal,
-  type FungalSituation,
   decodeSteering,
   STEER_NEUTRAL,
   STEER_WEIGHTS,
@@ -22,6 +20,8 @@ import Help from "./Help.tsx";
 import { situationChips } from "./helpLinks.ts";
 import { openLearn } from "./learn.ts";
 import { cachedActionTrace, type DecidedBy } from "./colonyJev.ts";
+import { useJevSession } from "./jevContext.tsx";
+import type { JevSession } from "./jevSession.ts";
 import { useSimTick } from "./session.ts";
 
 // The followed ant, up close: what it is doing, the situation it was in
@@ -37,8 +37,6 @@ interface Props {
   colonies: readonly Colony[];
   fungus: Fungus;
   /** who decided, for an ant of colony k */
-  explain: (s: Situation, k: number) => { mode: Mode; by: DecidedBy; weights?: [Mode, number][] };
-  explainFungus: (s: FungalSituation) => { answer: string; by: DecidedBy };
   onClose: () => void;
   /** the fields the game's species asks about (LaneWords.schema), or the generic ones: the chips show only these (review of #132) */
   fields?: readonly string[];
@@ -54,7 +52,8 @@ const BY: Record<DecidedBy, string> = {
   local: "the local rule",
 };
 
-export default function AntCard({ followed, colonies, fungus, explain, explainFungus, onClose, fields, pinned = false, onPin }: Props) {
+export default function AntCard({ followed, colonies, fungus, onClose, fields, pinned = false, onPin }: Props) {
+  const { explain, explainFungus } = useJevSession();
   useSimTick(250);
   const col = followedColony(colonies, followed);
   const i = followed.i;
@@ -164,7 +163,7 @@ const FUNGUS_BY: Record<DecidedBy, string> = {
   local: "the strain's default",
 };
 
-function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: Props["explainFungus"] }) {
+function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: Fungus; explain: JevSession["explainFungus"] }) {
   const load = col.load[i];
   const resist = col.resist[i];
   if (load < INFECTED)

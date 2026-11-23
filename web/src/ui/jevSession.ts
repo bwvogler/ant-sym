@@ -107,14 +107,21 @@ export class JevSession {
   }
 
   /** Start Jev by hand (Lab → Jev → Resume). */
-  start(): void {
+  start = (): void => {
     this.#setStarting(true);
     this.#run();
-  }
+  };
 
-  stop(): void {
+  stop = (): void => {
     void this.client.stop();
-  }
+  };
+
+  /** How a colony's ant decided, for the ant card (the client's explain). */
+  explain: JevClient["explain"] = (s, k) => this.client.explain(s, k);
+  /** How the fungus decided, for the ant card. */
+  explainFungus: JevClient["explainFungus"] = (s) => this.client.explainFungus(s);
+  /** The fungus's answers so far (the Policy tab's table). */
+  fungusAnswers: JevClient["fungusAnswers"] = () => this.client.fungusAnswers();
 
   /** The words a colony starts with, and the first aim: given to the client, not a change the player made. */
   initWords(): void {

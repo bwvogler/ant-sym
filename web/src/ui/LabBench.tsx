@@ -170,7 +170,7 @@ export default function LabBench(
         {tab !== "history" && tab !== "policy" && (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
             {tab === "world" && <World {...props} />}
-            {tab === "jev" && <JevCard {...props} />}
+            {tab === "jev" && <JevCard />}
             {tab === "levers" && <Levers {...props} />}
             {tab === "numbers" && (
               <>

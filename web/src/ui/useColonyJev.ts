@@ -1,16 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import {
-  SPECIES,
-  type Colony,
-  type Situation,
-  DOCTRINES,
-  type FungalSituation,
-  AIMS,
-  type Fungus,
-  type Journal,
-  GENERIC_ANT,
-  type Species,
-} from "../colony/index.ts";
+import { SPECIES, type Colony, DOCTRINES, AIMS, type Fungus, type Journal, GENERIC_ANT, type Species } from "../colony/index.ts";
 import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, PAGE_ASKS_RESPONSE_LANES, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
@@ -45,20 +34,24 @@ export function useJevState(client: { state: ColonyJevState; subscribe: ColonyJe
   return useSyncExternalStore(subscribe, () => client.state);
 }
 
+/**
+ * The page's Jev session, built once and given its lifecycle (the backend it is told, its words, the precache, the colonies and the fungus it drives).
+ * It does not subscribe: the page reads the session through ui/jevContext.tsx (`useJev(select)`), so a change of the lock or the aim draws only
+ * the readers of it. Called once, in ColonyApp, which provides the session to the page.
+ */
 export function useColonyJev(
   colonies: readonly Colony[],
   fungus: Fungus,
   backend: Backend | null = null,
   journal: Journal | null = null,
   species: Species = GENERIC_ANT,
-) {
+): JevSession {
   // One session for the page's life (ui/jevSession.ts): it keeps what the page holds about Jev and decides, synchronously, the lock and whether a
-  // miss may start a run. This hook is its React face: it feeds it the backend, follows it with useSyncExternalStore, and runs its lifecycle.
+  // miss may start a run. This hook is its React face: it feeds it the backend and runs its lifecycle.
   const session = useMemo(() => new JevSession(new ColonyJev({}, browserCache)), []);
   const jev = session.client as ColonyJev;
   jev.journal = journal;
   useEffect(() => session.setBackend(backend), [session, backend]);
-  const snap = useSyncExternalStore(session.subscribe, session.snapshot);
 
   useEffect(() => {
     const close = session.open();
@@ -95,32 +88,5 @@ export function useColonyJev(
   // The fungus spans the game: the lane drives each new game's, under the menu the fungus holds (useColony configures it).
   useEffect(() => jev.attachFungus(fungus), [jev, fungus]);
 
-  const start = useCallback(() => session.start(), [session]);
-  const stop = useCallback(() => session.stop(), [session]);
-  const explain = useCallback((s: Situation, k: number) => jev.explain(s, k), [jev]);
-  const explainFungus = useCallback((s: FungalSituation) => jev.explainFungus(s), [jev]);
-  const fungusAnswers = useCallback(() => jev.fungusAnswers(), [jev]);
-
-  return {
-    /** the client itself: a reader that needs its whole state takes it with useJevState(client) */
-    client: jev,
-    phase: snap.phase,
-    /** the daily budget the page loaded with: today's spend is the last run's figure when there is one (the Lab's Jev card) */
-    backendBudget: snap.backendBudget,
-    start,
-    stop,
-    lock: snap.lock,
-    resumable: snap.resumable,
-    fungusAnswers,
-    restore: session.restore,
-    doctrines: snap.doctrines as DoctrineChoice[],
-    setDoctrine: session.setDoctrine,
-    draftDoctrine: session.draftDoctrine,
-    foundWith: session.foundWith,
-    explain,
-    aim: snap.aim,
-    setAim: session.setAim,
-    draftAim: session.draftAim,
-    explainFungus,
-  };
+  return session;
 }
