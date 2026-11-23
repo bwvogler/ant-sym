@@ -51,6 +51,35 @@ Today a hyphal tip senses nothing about the ants. Its situation has five fields 
 - **Recommendation: A first**, with `r` and the strength as **design** parameters (no paper gives them). B and C only if A shows the cue does work and the lane should be able to choose it.
 - **Assays and targets.** There is no literature number to reproduce (see above), so the targets are **design** and the gate is "does no harm": (T1) an ablation, bias on against off, over seeds 1–10 then 11–20: the share of hyphae cells within 3 cells of a cell an ant stood on in the last 60 s (a new probe), higher with the bias; (T2) P1 with flow on and the shipped growth answers: no seed more than 10 % slower to a quarter and the worst seed not worse (`progression.yml`); (T3) no cliff: no seed more than 25 % faster to a quarter, a **design** bound; (T4) reported, not gated: the F2 curtain count at 150 s (21 with three landing tips, 4 with six) and flowers per game (14 in 7 of 20 games).
 
+## Probe results (`ja-ogph.2`, 2026-11-23)
+
+`scripts/lab/progression.mjs --traffic` reads the game and changes nothing: seeds 1 and 2 at 600 s give the same times, mycelium and mat cells with it on and off. Runs: `progression.yml`, branch head `7b2acd2f`, seeds 1-10 ([run 45204360900](https://github.com/bwvogler/ant-sym/actions/runs/45204360900)) and 11-20 ([run 45204367290](https://github.com/bwvogler/ant-sym/actions/runs/45204367290)), unite, hyphae, growth answers, flow on, 600 s, local rule, no Jev. A sample is every 5 s of game time with tips on the plane; "before a quarter" is until a quarter of the colony is infected (the progression's chapter), "after" is the rest.
+
+**T2 baseline (what option A is held to).** Seeds 1-10: quarter median 155.5 s, worst 350 s (seed 6); seeds 11-20: median 168 s, worst 293 s (seed 20). Flowers: 1 in 1 of 10 games on seeds 1-10, 8 in 4 of 10 on seeds 11-20.
+
+**How full the ground is round a tip** (ants of both colonies on the plane; the tip's cell is the centre; bands are the hex distances 1, 2-3 and 4-6, 6, 30 and 90 cells):
+
+| over 20 seeds | before a quarter | after |
+|---|---|---|
+| cells occupied by ants, band 1 | 2-9 % | 1-6 % |
+| tips with no ant anywhere in band 2-3 | median 39 % (20-64 %) | median 61 % (38-74 %) |
+| tips with more than 10 % of band 2-3 occupied (4 or more of its 30 cells) | 3-30 % of tips | 0-17 % |
+| hyphae within 1 cell of a cell an ant stood on in the last 60 s | median 85 % (63-95 %) | median 73 % (59-90 %) |
+| hyphae within 3 cells of the same | 93-97 % | 94-99 % |
+
+So the ground is sparse: three quarters of all cells near a tip hold no ant. A radius of 3 is too coarse to mean anything for the T1 measure (it is 94-99 % everywhere, so the bias could not raise it); **T1 is measured at distance 1** (85 % before a quarter, 73 % after, in play today).
+
+**How often a traffic cue would change a side choice** (the two cells a tip could turn into have different ant counts within r of them, per tip sample, not only when both are free):
+
+| r | before a quarter (median, range over 20 seeds) | after |
+|---|---|---|
+| 1 | 30 % (14-45 %) | 16 % (10-34 %) |
+| 3 | 52 % (30-72 %) | 32 % (21-50 %) |
+
+Seed 6, the slowest, has the sparsest early traffic (14 % at r = 1, a long wait of 70 samples before a quarter): a lean has the least to work with where P1 is slowest.
+
+**What this says about the sense.** A banded occupancy sense has real spread to work with, but its bands must be low: a share above 10 % of the 30 cells at distance 2-3 is rare (3-30 % of tips before a quarter, under 17 % after), so levels such as *none / one cell (about 3 %) / up to 10 % / more* split the tips usefully (before a quarter, medians over seeds: 39 / 26 / 22 / 12 % of tips), where 10 / 30 / 60 % levels would leave most tips in one level. The tip's own disc is mostly empty, so the cue to steer by is the difference between the two side cells' neighbourhoods, not the level at the tip.
+
 ## Play
 
 - **See:** hyphae on the surface lean toward the ants' paths and the hole instead of fanning out evenly; at 4× it shows as threads that follow a trail for some cells. The Learn text must say the lean is a guess ("no one has shown an insect-killing fungus doing this"), and the Codex entry should call it design.

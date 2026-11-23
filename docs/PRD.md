@@ -7525,4 +7525,10 @@ Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rul
 
 **Beads.** ja-ogph (epic), ja-ogph.1 research, ja-ogph.2 probe, ja-ogph.3 behaviour; the idea is ja-ob97.
 
-**Still open.** Owner review of the plan; the research full texts; the radius r; whether ants count as a tip sense in the sense table.
+**Probe results (`ja-ogph.2`, 2026-11-23).** `progression.mjs --traffic` (reads only; seeds 1-2 at 600 s are bit-identical with it on and off), `progression.yml` runs 45204360900 (seeds 1-10) and 45204367290 (11-20), head `7b2acd2f`, flow and growth answers on. Details and tables in [hyphal-traffic.md](hyphal-traffic.md#probe-results-ja-ogph2-2026-11-23).
+- T2 baseline: quarter median 155.5 s, worst 350 s (seed 6) on seeds 1-10; median 168 s, worst 293 s (seed 20) on 11-20. Flowers: 1 in 1 of 10 games (1-10); 8 in 4 of 10 games (11-20).
+- Ants are sparse round a tip: 2-9 % of the six cells at distance 1 are occupied before a quarter, and 39 % of tips (median) have no ant within distance 3 (61 % after). A band share above 10 % of the 30 cells at distance 2-3 is rare, so a banded sense needs low edges (none / one cell / up to 10 % / more).
+- The two side cells differ in ants within 1 cell on 30 % of tip samples before a quarter (14-45 %), within 3 cells on 52 % (30-72 %); after, 16 % and 32 %. Seed 6, the slowest, has the sparsest early traffic (14 %).
+- T1 is measured at distance 1: hyphae within 1 cell of an ant seen in the last 60 s are 85 % before a quarter (63-95 %) and 73 % after; within 3 cells it is 94-99 %, too coarse to move.
+
+**Still open.** Owner review of the plan; the research full texts; the band edges and levels (owner's pick from these numbers); whether ants count as a tip sense in the sense table.
