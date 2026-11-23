@@ -407,6 +407,7 @@ const SCENES = [
     name: "marks-trace-walk",
     page: "walk",
     run: async (p) => {
+      await p.getByRole("button", { name: "Builder", exact: true }).click();
       await tool(p, "Tweezers: pick up an ant");
       const { sx, sy } = await antScreen(p, 0, 0);
       await stroke(p, [sx, sy], [sx + 140, sy - 110]);
