@@ -28,6 +28,12 @@ export interface Tip {
 }
 
 /** No parent: a cell the mycelium rooted in. */
+/**
+ * Lab switch (ja-vlla.9): when set, Fungus.settle looks for a flower at every hypha cell, not only where a tip
+ * thickened, so a densely webbed patch of ground can close into a new patch with no corpse. Off in the game.
+ */
+export const FLOWER = { anywhere: false };
+
 export const ROOT = -1;
 
 /** Mass one cell of hypha embodies (design: docs/hyphal-growth.md §4). */

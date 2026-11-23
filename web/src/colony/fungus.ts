@@ -36,6 +36,7 @@ import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, 
 import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type WorldMap } from "./world.ts";
 import {
   cellKey,
+  FLOWER,
   type Ground,
   type GrowthAnswer,
   type GrowthSituation,
@@ -1407,7 +1408,7 @@ export class Fungus {
     if (!e || !h) return;
     const L = this.#layers[0] as SporeLayer;
     const base = new Set(L.base);
-    for (const k of lists[0]!) {
+    for (const k of FLOWER.anywhere ? [...h.parent.keys()] : lists[0]!) {
       const [cx, cy] = keyCell(k);
       const cells = [k];
       for (let d = 0; d < 6; d++) cells.push(cellKey(nx(cx, cy, d), ny(cy, d)));
