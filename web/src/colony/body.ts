@@ -49,7 +49,7 @@ export function placeNewborn(col: Colony, i: number): void {
   // A newborn smells of its colony as the colony smells now.
   col.odour[i] = col.nestOdour;
   col.layer[i] = col.home; // born in the nest, on its layer
-  col.lifespan[i] = col.queen || col.params.mortalWithoutQueen ? col.params.lifespan * (0.7 + 0.6 * col.rng()) : Infinity;
+  col.lifespan[i] = col.housed || col.params.mortalWithoutQueen ? col.params.lifespan * (0.7 + 0.6 * col.rng()) : Infinity;
   col.gen[i] = (col.gen[i] + 1) >>> 0;
   col.alive[i] = 1;
 }
@@ -109,7 +109,7 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
   // In the side view with a queen, the dead lie where they fall until an undertaker takes them out (slice 7). One world:
   // only underground, the nest's layer; the dead on the plane leave no corpse, as top-down (U3c: only the corpses
   // undertakers carry up go to the plane's midden).
-  const bodies = col.queen && col.layer[i] === col.home ? col.corpses : col.remains;
+  const bodies = col.housed && col.layer[i] === col.home ? col.corpses : col.remains;
   bodies.push({
     x: CELL[0],
     y: CELL[1],
@@ -132,7 +132,7 @@ export function killOn(col: Colony, i: number, lost: boolean): void {
 /** feed, with the home layer bound. */
 export function feedHome(col: Colony, n: number): void {
   const ch = col.map.chambers;
-  if (!col.queen || !ch) {
+  if (!col.housed || !ch) {
     col.larder += n;
     return;
   }
@@ -176,7 +176,7 @@ export function body(col: Colony, dt: number): void {
   const ch = col.map.chambers;
   const { felt, donors, energy, scent, scentSum, perceived, youngs } = col;
   // Task reversion (ja-7r7x): where the young are, so each old ant at home senses whether it meets any.
-  const revert = col.params.revert > 0 && col.queen !== null;
+  const revert = col.params.revert > 0 && col.housed;
   const broods = col.broods;
   if (revert) {
     youngs.reset();
@@ -186,7 +186,7 @@ export function body(col: Colony, dt: number): void {
   }
   // Larval feeding by mouth (ja-638i): crops filled at the stores, passed to the needy, fed to larvae.
   const cap = col.params.cropFeed;
-  const crops = cap > 0 && col.queen !== null && !!ch;
+  const crops = cap > 0 && col.housed && !!ch;
   const crop = col.crop;
   const cropDonors = col.cropDonors;
   if (crops) cropDonors.reset();

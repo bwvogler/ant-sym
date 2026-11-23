@@ -467,7 +467,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     // Food in sight, unless soil stands between (it touched soil a moment ago): then keep a hand on the wall.
     if (seen && !(col.hugT[i] > 0)) h += climb(fl, ff, fr, p.turnRate * dt);
     else if (walkTunnel(col, i, EXPLORE, p.speed * dt)) h = col.towardTarget(i);
-    else if (p.restFetch > 0 && col.queen && col.under[i] && !carrying && !pellet && !col.broodHeld[i] && fetches(col, i)) {
+    else if (p.restFetch > 0 && col.housed && col.under[i] && !carrying && !pellet && !col.broodHeld[i] && fetches(col, i)) {
       // Fetching in a chamber (ja-4rfr): toward the stores' marks its antennae meet (as toFood in a tunnel), through
       // open ground; none in reach, it searches the nest (it is not leaving: a hungry old forager headed for the hole).
       const l = marksAt(col, i, h - a, STORE_MARKS);

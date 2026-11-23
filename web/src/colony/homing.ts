@@ -536,7 +536,7 @@ export function trueDestMark(c: Colony, i: number): Mark {
   const chosen = requestedDelivery(c, i);
   if (chosen) return chosen;
   if (c.broodHeld[i]) return "brood";
-  if (c.carrying[i] && c.queen) {
+  if (c.carrying[i] && c.housed) {
     const role = c.map.chambers?.list[c.foodTo(i)]?.role;
     if (role && role !== "none") return role;
   }

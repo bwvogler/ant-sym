@@ -51,7 +51,8 @@ export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObse
   if (nursing && goal === col.nest && col.entrance) goal = chamberGoal(col, col.broodTo[i]);
   // Food flow (slice 5): food goes to a chamber, not to "the nest": underground, a carrier heads for the one it takes
   // its food to (a forager: reception, or the royal chamber until there is one).
-  else if (carrying && col.queen && goal === col.nest && col.entrance && !requestedDelivery(col, i)) goal = chamberGoal(col, col.foodTo(i));
+  else if (carrying && col.housed && goal === col.nest && col.entrance && !requestedDelivery(col, i))
+    goal = chamberGoal(col, col.foodTo(i));
   let nest = goal;
   const x0 = col.x[i];
   const y0 = col.y[i];
@@ -154,7 +155,7 @@ export function decide(col: Colony, i: number, s: AntStep, observer?: CombatObse
       // Zoned by age: an ant that may not go out is no raider. Sent raiding, a young one climbed to its hole, was put
       // back down the shaft, and climbed again (review of #26: 70–93 of ~110 young raiders parked at the hole). With
       // no enemy near, it explores (with one near, it fights where it is).
-      if (mode === FIGHT && !enemy && col.stanceOf(i) === "raid" && col.queen && !col.mayGoOut(i)) mode = EXPLORE;
+      if (mode === FIGHT && !enemy && col.stanceOf(i) === "raid" && col.housed && !col.mayGoOut(i)) mode = EXPLORE;
       if (mode === RETURN && col.mode[i] !== RETURN) col.homeAfresh(i);
       col.mode[i] = mode;
       // Its steering weights (ja-ykmu; docs/steering.md): asked for the situation with the mode it now has, when that
