@@ -12,6 +12,14 @@ const yml = readFileSync(join(ROOT, ".github/workflows/pixels.yml"), "utf8");
 const script = readFileSync(join(ROOT, "scripts/field-shots.mjs"), "utf8");
 const e2e = readFileSync(join(ROOT, ".github/workflows/e2e.yml"), "utf8");
 
+/** The text of the workflow's step called `name` (from its `- name:` line to the next step). */
+const step = (name: string): string => {
+  const at = yml.indexOf(`      - name: ${name}\n`);
+  assert.ok(at >= 0, `a step called ${name}`);
+  const next = yml.indexOf("\n      - ", at + 1);
+  return yml.slice(at, next < 0 ? undefined : next);
+};
+
 const pathsOf = (text: string): string[] => {
   const block =
     /^ {2}pull_request:\n(?: {4}types:.*\n)? {4}paths:\n((?: {6}- .+\n)+)/m.exec(text)?.[1] ?? assert.fail("no pull_request paths");
@@ -31,6 +39,32 @@ test("the workflow records on the base and checks on the head with the script's 
     "record runs in the base's checkout",
   );
   assert.ok(!/--any-browser/.test(yml), "one runner, one Chromium: the check must not skip the browser comparison");
+});
+
+test("the two sides are the PR's own: BASE is its base sha, HEAD its head sha, and the base's checkout is the merge base, not the head", () => {
+  assert.match(yml, /BASE: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(yml, /HEAD: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const base = step("the base, at the merge base");
+  assert.match(base, /base=\$\(git merge-base "\$BASE" "\$HEAD"\)/);
+  assert.match(base, /git worktree add -q "\$RUNNER_TEMP\/base" "\$base"\n/, "the merge base is checked out, not the head");
+  const ci = base.indexOf('npm --prefix "$RUNNER_TEMP/base/web" ci');
+  const cpScript = base.indexOf("cp scripts/field-shots.mjs");
+  assert.ok(ci > 0 && ci < cpScript, "the base installs its own dependencies (the dev server serves its web/)");
+  // cp -r into an existing folder would nest lib/lib and leave the base's own helpers: the old ones go first
+  const rm = base.indexOf('rm -rf "$RUNNER_TEMP/base/scripts/lib"');
+  const cpLib = base.indexOf('cp -r scripts/lib "$RUNNER_TEMP/base/scripts/lib"');
+  assert.ok(rm > 0 && rm < cpLib, "the base's helpers are removed before the head's are copied");
+});
+
+test("the check runs in the head, and a differing scene fails the job even through the pipe to tee", () => {
+  const check = step("check the scenes on the head");
+  assert.ok(!/working-directory:/.test(check), "no working-directory: the head's checkout, not the base's");
+  assert.ok(
+    check.indexOf("set -o pipefail") > 0 && check.indexOf("set -o pipefail") < check.indexOf("| tee"),
+    "pipefail before the pipe (the step's shell has none): tee's 0 must not hide the check's 1",
+  );
+  const summary = step("which scenes differ");
+  assert.match(summary, /if: \$\{\{ !cancelled\(\) \}\}/, "the summary and the ::error line run after a failed check");
 });
 
 test("the base is the merge base, and the head's script and helpers record it", () => {

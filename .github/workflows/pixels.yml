@@ -6,7 +6,7 @@
 # On a pull request that carries the `pixel-guard` label (like `slow-guards`: the PR's author adds it for a change that should not move a pixel,
 # and the run repeats on every push while the label stays) and touches what the page draws with (the paths of e2e.yml, and the script itself).
 # - Base: the merge base of the PR and its base branch, not the base branch's tip (main may have moved the scenes since). The head's
-#   scripts/field-shots.mjs and scripts/lib/ are copied into that checkout, so a PR that adds a scene records it on both sides.
+#   scripts/field-shots.mjs and scripts/lib/ are copied into that checkout, so a PR that adds a scene records it on both sides (while the scene needs nothing the PR adds to the app: one that does fails the record on the base, loudly).
 # - A scene that differs fails the check, named in an ::error line and the job summary; every scene's picture (the baseline's, and `<scene>.now.png`
 #   for a scene that differs) goes up as the `pixels` artifact.
 # Cost: the 38 scenes take 5 to 11 minutes a run (record, then check), so a run is 14 to 22 minutes on a runner (the first passing run took 14, the first failing run 22:
