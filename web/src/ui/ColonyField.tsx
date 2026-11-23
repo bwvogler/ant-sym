@@ -1,27 +1,20 @@
-import { mapCameraOrbit, mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.ts";
-import { MAP_ORBIT_READY_ZOOM, MapVoxelPass, canTiltMap } from "./mapVoxel.ts";
+import { mapOrbit, tiltFromDrag, type InspectionOrbit } from "./inspectionOrbit.ts";
+import { MAP_ORBIT_READY_ZOOM, MapVoxelPass } from "./mapVoxel.ts";
 import { type KeyboardEvent, type PointerEvent, type RefObject, useEffect, useRef, useState } from "react";
 import {
   type ChunkLayer,
   type Colony,
   CURTAIN,
   PLANE,
-  groundHeat,
-  sunDown,
   CELL,
   cellOf,
-  centreX,
-  centreY,
-  R,
   type Fungus,
   type OneWorld,
-  OPEN,
-  rockAt,
   type WorldMap,
   type BuildTool,
   type AphidClump,
 } from "../colony/index.ts";
-import { type Camera, toScreen, toWorld, type Viewport, visible } from "./camera.ts";
+import { type Camera, toWorld, type Viewport } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame } from "./field/prelude.ts";
 import { handleKey, handleWheel, type KeyHost } from "./field/keyboard.ts";
@@ -29,15 +22,10 @@ import { PointerController, type PointerHost, type PointerInput } from "./field/
 import { CameraRig, extentOf } from "./field/rig.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "./field/ctx.ts";
 import { browserEnv } from "./field/env.ts";
-import { drawFungusGround, drawStalksRaised } from "./field/fungus.ts";
-import { Ground, groundPaper } from "./field/ground.ts";
+import { Ground } from "./field/ground.ts";
 import { Minimap } from "./field/minimap.ts";
-import { type AntFrame, drawAnts } from "./field/ants.ts";
-import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./field/marks.ts";
-import { drawNest, type NestFrame } from "./field/nests.ts";
-import { BRICK_ZOOM, HEX_ZOOM } from "./field/zoom.ts";
-import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./field/overlays.ts";
-import { publishDrawMs, publishFrame, type FrameSinks } from "./field/result.ts";
+import { beginFrame, type FieldParts, FieldRenderer } from "./field/renderer.ts";
+import type { FrameSinks } from "./field/result.ts";
 import { columnNear, planePoint, stripColumn, stripPoint } from "./link.ts";
 import { colonyName } from "./names.ts";
 import type { SensedMap } from "./fungusSight.ts";
@@ -45,9 +33,6 @@ import { isPalm } from "./build.ts";
 import type { Specimen } from "./specimens.ts";
 import type { AntTraces } from "./trace.ts";
 import type { FieldProbe } from "./lensStore.ts";
-import { workerLod } from "./workerSprites.ts";
-import { drawMapTerrainGrain } from "./mapTerrain.ts";
-import { FOOD_SPOTS, foodDensity, foodKind, drawResourceSprite } from "./resourceSprites.ts";
 
 export type { FieldProbe };
 
@@ -319,14 +304,7 @@ export default function ColonyField({
     // What the frame takes from the outside world: the clock, the pixel ratio, the dev flag, reduced motion and the sprite sets (field/env.ts).
     const env = browserEnv(import.meta.env.DEV);
     const sprites = env.sprites();
-    const {
-      cadaver: cadaverSprites,
-      worker: workerSprites,
-      nest: nestSprites,
-      resource: resourceSprites,
-      surfaceLeaves,
-      mapLeaves,
-    } = sprites;
+    const { cadaver: cadaverSprites, worker: workerSprites, nest: nestSprites, resource: resourceSprites } = sprites;
     const voxelMap = new MapVoxelPass(() => draw());
     const ground = new Ground(env);
     const sinks: FrameSinks = { dataset: canvas.dataset, orbit, orbitAxes, angled, flatOrbit: mapOrbit, dev: env.dev };
@@ -479,6 +457,9 @@ export default function ColonyField({
     ro.observe(canvas);
     fitCanvas();
 
+    // What the renderer draws with, and the renderer (field/renderer.ts): a frame is its stages, in order.
+    const parts: FieldParts = { ground, minimap, voxelMap, sinks };
+    const renderer = new FieldRenderer();
     const draw = () => {
       const started = env.dev ? env.now() : 0;
       bind();
@@ -495,211 +476,22 @@ export default function ColonyField({
       inputs.show = layers.current;
       inputs.hover = hover.current;
       inputs.pen = penRef.current;
-      ctx.fillStyle = theme.paper;
-      ctx.fillRect(0, 0, v.w, v.h);
-      ctx.imageSmoothingEnabled = false;
-      const [left, top] = toScreen(c, v, gx0, 0);
-      const [right, bottom] = toScreen(c, v, gx0 + ext.w, ext.h);
-      ctx.fillStyle = `rgb(${groundPaper(fctx).join(",")})`;
-      ctx.fillRect(left, top, right - left, bottom - top);
-
-      // The rows of hexagons in view, and the chunks they fall in. Every chunk in view is painted
-      // into its 64×64 colour buffer (one pixel a cell); then drawn as bricks or as hexagons.
-      const vis = visible(c, v);
-      const ry0 = Math.max(0, Math.floor(vis.y0 / R) - 1);
-      const ry1 = Math.min(gh - 1, Math.ceil(vis.y1 / R) + 1);
-      const rx0 = Math.max(gx0, Math.floor(vis.x0) - 1);
-      const rx1 = Math.min(gx0 + gw - 1, Math.ceil(vis.x1) + 1);
-      const zoom = c.zoom / d;
-      const hexes = zoom >= HEX_ZOOM;
-      const blend = Math.max(0, Math.min(1, (zoom - BRICK_ZOOM) / (16 - BRICK_ZOOM)));
-      const hexMix = blend * blend * (3 - 2 * blend);
-      const resourceLod = workerLod(c.zoom, d);
-      const darkSprites = theme.paperRgb[0] * 0.2126 + theme.paperRgb[1] * 0.7152 + theme.paperRgb[2] * 0.0722 < 100;
-      // Read-only browser diagnostics: actual CSS scale and the available worker representation.
-      const cssHex = (c.zoom / d).toFixed(2),
-        workerStyle = hexes && workerSprites.ready(resourceLod) ? "voxel" : "ink";
-      // Both maps face the ants' walking plane: aerial above, straight onto the back wall below.
-      const resourceImage = hexes ? resourceSprites.get(resourceLod) : null;
-      const cellWindow = { rx0, rx1, ry0, ry1 };
-      ground.draw(fctx, inputs.show, cellWindow, hexMix, !!resourceImage);
-      if (hexMix > 0) {
-        ctx.save();
-        ctx.globalAlpha = hexMix;
-        drawMapTerrainGrain(
-          ctx,
-          c.zoom,
-          v.w / 2 - c.x * c.zoom,
-          v.h / 2 - c.y * c.zoom,
-          [rx0, rx1, ry0, ry1],
-          (x, y) => rockAt(m, x, y),
-          (x, y) => ground.isBare(x, y),
-          theme.ink,
-          theme.paper,
-        );
-        ctx.restore();
-      }
-      const nestImage = hexes ? nestSprites.get(resourceLod) : null;
-      const nestStyle = nestImage ? "voxel" : "symbols";
-      // Surface plain-food cells join into tissue; carried food and other qualities stay separate morsels.
-      if (resourceImage) {
-        for (let y = ry0; y <= ry1; y++)
-          for (let x = rx0; x <= rx1; x++) {
-            const amount = m.food.get(x, y);
-            if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
-            const density = foodDensity(amount),
-              kind = foodKind(m.quality?.get(x, y) ?? 1);
-            if (lv === PLANE && kind === "plain") {
-              const tiles = surfaceLeaves.get(x, y, (a, b) =>
-                rockAt(m, a, b) === OPEN && foodKind(m.quality?.get(a, b) ?? 1) === "plain" ? m.food.get(a, b) : 0,
-              );
-              mapLeaves.draw(ctx, tiles, c.zoom, v.w / 2 - c.x * c.zoom, v.h / 2 - c.y * c.zoom);
-              continue;
-            }
-            ctx.globalAlpha = density.alpha;
-            for (let j = 0; j < density.marks; j++) {
-              const [ox, oy] = FOOD_SPOTS[j]!;
-              const [sx, sy] = toScreen(c, v, centreX(x, y) + ox, centreY(y) + oy);
-              drawResourceSprite(ctx, resourceImage, resourceLod, kind, 0, sx, sy, c.zoom);
-            }
-          }
-        ctx.globalAlpha = 1;
-      }
-      // Heat (ja-rf5.5): the plane's ground warms toward noon and cools by dawn; a warm wash over it shows how hot it is now.
-      const hp = colonies[0]?.params;
-      if (hp && hp.heatDay > 0 && lv === PLANE) {
-        const k = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
-        ctx.globalAlpha = 0.28 * k;
-        ctx.fillStyle = theme.warn;
-        ctx.fillRect(0, 0, v.w, v.h);
-        // Night (the sun down): a dark wash; the desert ants are in. Black in both themes: the ink is pale in dark mode (review of #155, S1).
-        if (sunDown(hp, colonies[0]!.time)) {
-          ctx.globalAlpha = 0.3;
-          ctx.fillStyle = "#000";
-          ctx.fillRect(0, 0, v.w, v.h);
-        }
-        ctx.globalAlpha = 1;
-      }
-      // The fungus on the ground: this layer's hyphae, and the corpses it has colonised (field/fungus.ts).
-      const fungusFrame = drawFungusGround(fctx, cellWindow);
-
-      // Nests and ants in view, coloured by odour (recognition.ts): the first colony (Ink) starts in ink, the second (Amber) in the
-      // warn tone, and as the fungus brings them to one odour they meet in between. A jade crumb at the head of a carrier,
-      // an earth one at the head of an ant carrying soil. Round each nest, the mound of the soil it dug.
-      const len = Math.max(3, Math.min(22, c.zoom * 0.9));
-      const half = len / 2;
-      const crumb = Math.max(1.5, len * 0.35);
-      const inView = (wx: number, wy: number) => wx >= vis.x0 - 2 && wx <= vis.x1 + 2 && wy >= vis.y0 - 2 && wy <= vis.y1 + 2;
-      if (lv === PLANE) drawLine(fctx);
-      if (lv === CURTAIN) drawBends(fctx);
-      const alateOverlays: (() => void)[] = [];
-      const nestFrame: NestFrame = { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage };
-      const antFrame: AntFrame = { ...nestFrame, half, crumb };
-      const markFrame: MarkFrame = nestFrame;
-      for (const col of [...colonies].reverse()) {
-        const alates = drawNest(fctx, nestFrame, col);
-        if (alates) alateOverlays.push(alates);
-        drawAnts(fctx, antFrame, col);
-      }
-      if (strip) drawStripAnts(fctx, len, crumb, inView);
-
-      drawStalksRaised(fctx, cellWindow, fungusFrame);
-
-      // Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen.
-      const voxel = voxelMap.draw(
-        ctx,
-        { colonies, fungus, world },
-        sensed,
-        lv,
-        c,
-        v,
-        d,
-        layers.current,
-        aphidsRef.current?.() ?? [],
-        theme,
-        !smellAll,
-        mapCameraOrbit(lv, orbit.current),
+      renderer.frame(
+        beginFrame(
+          fctx,
+          inputs,
+          parts,
+          {
+            orbit: orbit.current,
+            labelsOn: labelsOn.current,
+            aphids: aphidsRef.current?.() ?? [],
+            traces: tracesRef.current,
+            specimens: pinnedRef.current,
+            sensed,
+          },
+          { started, f, fcol, fHere },
+        ),
       );
-      const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
-      const frameAngled = "angled" in voxel && voxel.angled === true;
-      // What the frame found out about itself goes to the shell's refs and the canvas's data attributes (field/result.ts).
-      publishFrame(
-        {
-          hexCssPx: cssHex,
-          workerStyle,
-          nestStyle,
-          renderer: voxel.renderer,
-          voxelAlpha: voxel.alpha,
-          angled: frameAngled,
-          canRotate,
-          chunkPaints: ground.paints,
-          chunkCacheHits: ground.hits,
-        },
-        sinks,
-      );
-      if (frameAngled) {
-        minimap.draw(fctx, vis);
-        return; // Map labels and hit targets use the overhead projection.
-      }
-      if (voxel.alpha > 0) {
-        // Alates keep their existing body/wing atlas until the shared mesh contains their separate wings.
-        for (const drawAlates of alateOverlays) drawAlates();
-        if (hp && hp.heatDay > 0 && lv === PLANE) {
-          const heat = Math.max(0, Math.min(1, (groundHeat(hp, colonies[0]!.time) - hp.heatDawn) / (hp.heatNoon - hp.heatDawn)));
-          ctx.globalAlpha = voxel.alpha * 0.28 * heat;
-          ctx.fillStyle = theme.warn;
-          ctx.fillRect(0, 0, v.w, v.h);
-          if (sunDown(hp, colonies[0]!.time)) {
-            ctx.globalAlpha = voxel.alpha * 0.3;
-            ctx.fillStyle = "#000";
-            ctx.fillRect(0, 0, v.w, v.h);
-          }
-          ctx.globalAlpha = 1;
-        }
-        if (world && lv === PLANE) drawLine(fctx, false);
-        if (world && lv === CURTAIN) drawBends(fctx);
-      }
-      if (labelsOn.current && m.chambers) {
-        const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
-        ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.lineJoin = "round";
-        ctx.lineWidth = Math.max(2, px / 4);
-        for (const ch of m.chambers.list) {
-          if (ch.cells === 0 || ch.role === "none") continue;
-          const cy = ch.sumY / ch.cells;
-          const wx = centreX(Math.round(ch.sumX / ch.cells), Math.round(cy));
-          const wy = centreY(cy);
-          if (!inView(wx, wy)) continue;
-          const text = ch.role;
-          const room = (ch.x1 - ch.x0 + 1) * c.zoom;
-          if (ctx.measureText(text).width > room * 1.6) continue;
-          const [x, y] = toScreen(c, v, wx, wy);
-          ctx.strokeStyle = theme.paper;
-          ctx.globalAlpha = 0.85;
-          ctx.strokeText(text, x, y);
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = theme.ink;
-          ctx.fillText(text, x, y);
-        }
-        ctx.textAlign = "start";
-        ctx.textBaseline = "alphabetic";
-      }
-
-      drawAphids(fctx, markFrame, aphidsRef.current?.() ?? [], voxel.alpha);
-      drawTraces(fctx, tracesRef.current);
-      drawSpecimens(fctx, pinnedRef.current, f);
-      drawFollowed(fctx, f, fcol, fHere);
-      // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-      if (lv === PLANE) drawHoleNames(fctx, inView);
-      const pn = penRef.current;
-      if (lv === PLANE && pn) drawPen(fctx, inputs);
-
-      drawInspection(fctx);
-
-      minimap.draw(fctx, vis);
-      publishDrawMs(env.now() - started, sinks);
     };
     cadaverSprites.load(draw);
     workerSprites.load(draw);
