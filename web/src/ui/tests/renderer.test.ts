@@ -49,6 +49,8 @@ interface Opts {
   chambers?: unknown[];
   colony?: Record<string, unknown> | null;
   world?: null;
+  x0?: number;
+  at?: [number, number];
   labelsOn?: boolean;
   voxel?: { alpha: number; renderer: string; angled?: boolean };
   dev?: boolean;
@@ -60,7 +62,7 @@ function setup(o: Opts = {}) {
   const calls: string[] = [];
   const table = (t: Record<string, number> | undefined, dflt: number) => ({ get: (x: number, y: number) => t?.[`${x},${y}`] ?? dflt });
   const m = {
-    x0: 0,
+    x0: o.x0 ?? 0,
     size: { w: 200, h: 100 },
     rock: { get: () => 0 },
     food: table(o.food, 0),
@@ -68,15 +70,16 @@ function setup(o: Opts = {}) {
     chambers: o.chambers ? { list: o.chambers } : undefined,
   } as unknown as WorldMap;
   const leaves: unknown[] = [];
+  const drawArgs: unknown[][] = [];
   const fc = {
     ctx: rec.ctx,
     theme: { ...THEME, paperRgb: o.paperRgb ?? THEME.paperRgb },
     d: o.d ?? 1,
     v: { w: 800, h: 600, dpr: o.d ?? 1 },
-    c: { x: 50, y: 40, zoom: o.zoom ?? 20 },
+    c: { x: o.at?.[0] ?? 50, y: o.at?.[1] ?? 40, zoom: o.zoom ?? 20 },
     lv: o.lv ?? PLANE,
     m,
-    ext: { x0: 0, w: 200, h: 100 },
+    ext: { x0: o.x0 ?? 0, w: 200, h: 100 },
     world: o.world === null ? null : {},
     colonies: o.colony === null ? [] : [{ params: { heatDay: 0 }, time: 0, ...(o.colony ?? {}) }],
     fungus: {},
@@ -100,7 +103,7 @@ function setup(o: Opts = {}) {
   };
   const parts = {
     ground: {
-      draw: (...a: unknown[]) => calls.push(`ground.draw ${a.length}`),
+      draw: (...a: unknown[]) => (calls.push(`ground.draw ${a.length}`), drawArgs.push(a)),
       isBare: () => false,
       paints: 3,
       hits: 5,
@@ -125,7 +128,7 @@ function setup(o: Opts = {}) {
     sensed: {} as never,
   };
   const fs = beginFrame(fc, inputs, parts, refs, { started: 400, f: null, fcol: null, fHere: false });
-  return { fc, fs, rec, calls, dataset, sink, leaves, inputs, parts };
+  return { fc, fs, rec, calls, dataset, sink, leaves, inputs, parts, drawArgs };
 }
 
 test("a frame derives the cells in view, whether the zoom is the hexagons', and how far the bricks have turned into them", () => {
@@ -148,6 +151,19 @@ test("a frame derives the cells in view, whether the zoom is the hexagons', and 
   assert.equal(fmt(setup({ zoom: quarter }).fs.hexMix), fmt(0.25 * 0.25 * (3 - 2 * 0.25)));
 });
 
+test("the cells in view are clipped to the map: at its first and last columns and rows the window ends there", () => {
+  const top = setup({ zoom: 20, at: [0, 0] });
+  assert.equal(top.fs.cellWindow.rx0, 0, "not before the first column");
+  assert.equal(top.fs.cellWindow.ry0, 0, "not before the first row");
+  const bottom = setup({ zoom: 20, at: [199, 99] });
+  assert.equal(bottom.fs.cellWindow.rx1, 199, "not past the last column");
+  assert.equal(bottom.fs.cellWindow.ry1, 99, "not past the last row");
+  const curtain = setup({ zoom: 20, x0: -30, at: [-30, 50] });
+  assert.equal(curtain.fs.cellWindow.rx0, -30, "a map that starts left of zero starts there");
+  const far = setup({ zoom: 20, x0: -30, at: [169, 50] });
+  assert.equal(far.fs.cellWindow.rx1, 169, "and ends at its width from it");
+});
+
 test("a frame asks for the sprite sheets only at the hexagon zoom, and says what it drew with", () => {
   const near = setup({ zoom: 40 });
   assert.equal(near.fs.resourceImage !== null && near.fs.nestImage !== null, true);
@@ -166,6 +182,11 @@ test("a frame asks for the sprite sheets only at the hexagon zoom, and says what
   assert.equal(setup({ paperRgb: [240, 240, 240] }).fs.darkSprites, false);
   assert.equal(setup({ paperRgb: [99, 99, 99] }).fs.darkSprites, true, "luminance under 100");
   assert.equal(setup({ paperRgb: [101, 101, 101] }).fs.darkSprites, false);
+  // each channel weighs as luminance does: red and blue are dark, green is light, and exactly 100 is not under 100
+  assert.equal(setup({ paperRgb: [255, 0, 0] }).fs.darkSprites, true, "red");
+  assert.equal(setup({ paperRgb: [0, 255, 0] }).fs.darkSprites, false, "green");
+  assert.equal(setup({ paperRgb: [0, 0, 255] }).fs.darkSprites, true, "blue");
+  assert.equal(setup({ paperRgb: [0, 139.82102908277406, 0] }).fs.darkSprites, false, "a luminance of exactly 100");
 });
 
 test("an ant's length, half of it and a crumb follow the zoom, within bounds; a point is in view a little beyond the edge", () => {
@@ -224,7 +245,26 @@ test("the paper fills the canvas, then the ground's own paper the map's rectangl
   ]);
 });
 
+test("the ground's paper starts at the map's first column, which is left of zero on a curtain", () => {
+  const s = setup({ zoom: 20, x0: -30, at: [-30, 50] });
+  paperStage(s.fs);
+  const left = (-30 - -30) * 20 + 400;
+  const right = (-30 + 200 - -30) * 20 + 400;
+  const rect = s.rec.log.at(-1)!;
+  assert.ok(rect.startsWith(`fillRect(${fmt(left)}, `), rect);
+  assert.ok(rect.includes(`, ${fmt(right - left)}, `), rect);
+});
+
 test("the ground stage draws the chunks, and lays the terrain's grain over them only where hexagons show", () => {
+  const withPath2D = <T>(f: () => T): T => {
+    const had = (globalThis as { Path2D?: unknown }).Path2D;
+    (globalThis as { Path2D?: unknown }).Path2D = RecordedPath;
+    try {
+      return f();
+    } finally {
+      (globalThis as { Path2D?: unknown }).Path2D = had;
+    }
+  };
   const bricks = setup({ zoom: BRICK_ZOOM });
   groundStage(bricks.fs);
   assert.deepEqual(
@@ -232,24 +272,32 @@ test("the ground stage draws the chunks, and lays the terrain's grain over them 
     ["ground.draw 5"],
     "fc, the layers, the window, the mix, whether a sheet is ready",
   );
+  assert.deepEqual(
+    bricks.drawArgs[0]!.slice(1),
+    [bricks.inputs.show, bricks.fs.cellWindow, bricks.fs.hexMix, false],
+    "no sheet below the hexagon zoom",
+  );
   assert.equal(bricks.rec.log.includes("save()"), false, "no grain over bricks");
-  const hexes = setup({ zoom: 20 });
-  const had = (globalThis as { Path2D?: unknown }).Path2D;
-  (globalThis as { Path2D?: unknown }).Path2D = RecordedPath;
-  try {
-    groundStage(hexes.fs);
-  } finally {
-    (globalThis as { Path2D?: unknown }).Path2D = had;
-  }
-  assert.ok(hexes.rec.log.includes("save()") && hexes.rec.log.includes("restore()"));
+  const sheet = setup({ zoom: 40 });
+  withPath2D(() => groundStage(sheet.fs));
+  assert.equal(sheet.drawArgs[0]![4], true, "a sheet at the hexagon zoom");
+  const hexes = setup({ zoom: 14 });
+  assert.ok(hexes.fs.hexMix > 0 && hexes.fs.hexMix < 1, "between bricks and hexagons");
+  withPath2D(() => groundStage(hexes.fs));
+  assert.ok(hexes.rec.log.includes("save()"));
+  assert.equal(
+    hexes.rec.log.filter((l) => l === "save()").length,
+    hexes.rec.log.filter((l) => l === "restore()").length,
+    "every save has its restore: the state is put back after the grain",
+  );
   assert.ok(hexes.rec.log.includes(`globalAlpha = ${fmt(hexes.fs.hexMix)}`), "faded in with the hexagons");
 });
 
 test("surface food: nothing without the resource sheet; plain food on the plane joins into tissue, any other is marks, a cell with none or rock is left out", () => {
-  const none = setup({ zoom: 2, food: { [FOOD_CELL]: 4 } });
+  const none = setup({ zoom: 2, food: { [FOOD_CELL]: 0.5 } });
   foodStage(none.fs);
   assert.deepEqual(none.rec.log, [], "no sheet below the hexagon zoom");
-  const plane = setup({ zoom: 30, food: { [FOOD_CELL]: 4 }, lv: PLANE });
+  const plane = setup({ zoom: 30, food: { [FOOD_CELL]: 0.5 }, lv: PLANE });
   foodStage(plane.fs);
   assert.deepEqual(
     plane.calls.filter((c) => c.startsWith("leaves")),
@@ -257,13 +305,14 @@ test("surface food: nothing without the resource sheet; plain food on the plane 
     "plain food on the plane is tissue",
   );
   assert.equal(plane.rec.log.filter((l) => l.startsWith("drawImage(")).length, 0);
-  const below = setup({ zoom: 30, food: { [FOOD_CELL]: 4 }, lv: CURTAIN });
+  const below = setup({ zoom: 30, food: { [FOOD_CELL]: 0.5 }, lv: CURTAIN });
   foodStage(below.fs);
-  const d = foodDensity(4);
+  const d = foodDensity(0.5);
+  assert.ok(d.alpha < 1, "a thin patch is faint");
   assert.equal(below.rec.log.filter((l) => l.startsWith("drawImage(resource")).length, d.marks, "a mark each");
   assert.ok(below.rec.log.includes(`globalAlpha = ${fmt(d.alpha)}`));
   assert.equal(below.rec.log.at(-1), "globalAlpha = 1");
-  const sweet = setup({ zoom: 30, food: { [FOOD_CELL]: 4 }, quality: { [FOOD_CELL]: 2 }, lv: PLANE });
+  const sweet = setup({ zoom: 30, food: { [FOOD_CELL]: 0.5 }, quality: { [FOOD_CELL]: 2 }, lv: PLANE });
   foodStage(sweet.fs);
   assert.deepEqual(
     sweet.calls.filter((c) => c.startsWith("leaves")),
@@ -271,7 +320,7 @@ test("surface food: nothing without the resource sheet; plain food on the plane 
     "sweet food is marks, even on the plane",
   );
   assert.equal(sweet.rec.log.filter((l) => l.startsWith("drawImage(resource")).length, d.marks);
-  const rock = setup({ zoom: 30, food: { [FOOD_CELL]: 4 } });
+  const rock = setup({ zoom: 30, food: { [FOOD_CELL]: 0.5 } });
   (rock.fc.m as unknown as { rock: { get: () => number } }).rock = { get: () => 1 };
   foodStage(rock.fs);
   assert.deepEqual(rock.rec.log, ["globalAlpha = 1"], "under rock: nothing drawn, the alpha put back");
@@ -314,6 +363,12 @@ test("the voxel stage reports what the frame found out, and a tilted map ends th
   assert.equal(flat.dataset.chunkPaints, "3");
   assert.equal(flat.dataset.chunkCacheHits, "5");
   assert.equal(flat.sink.angled.current, false);
+  assert.equal(flat.sink.axes.current.hidden, true, "too far out to tilt: the control is hidden");
+  assert.deepEqual(flat.sink.orbit.current, { yaw: 0, tilt: 0 }, "and the tilt put back");
+  const close = setup({ zoom: 130, voxel: { alpha: 0, renderer: "sprites" } });
+  voxelStage(close.fs);
+  assert.equal(close.sink.axes.current.hidden, false, "close enough to tilt: the control shows");
+  assert.deepEqual(close.sink.orbit.current, { yaw: 1, tilt: -1 }, "and the tilt is kept");
   assert.equal(flat.fs.voxel?.renderer, "sprites", "left for the stages after it");
   assert.deepEqual(
     flat.calls.filter((c) => c === "minimap.draw"),
@@ -323,6 +378,8 @@ test("the voxel stage reports what the frame found out, and a tilted map ends th
   const tilted = setup({ voxel: { alpha: 1, renderer: "voxel-webgl", angled: true }, dev: true });
   assert.equal(voxelStage(tilted.fs), false, "ends the frame");
   assert.equal(tilted.sink.angled.current, true);
+  assert.equal(tilted.dataset.mapRenderer, "voxel-webgl", "the renderer the pass used");
+  assert.equal(tilted.dataset.voxelAlpha, "1.000");
   assert.deepEqual(
     tilted.calls.filter((c) => c === "minimap.draw"),
     ["minimap.draw"],
@@ -346,6 +403,13 @@ test("over a voxel mesh the alates draw again, and the heat over it is faded wit
   const k = Math.max(0, Math.min(1, (groundHeat(params as never, 50) - params.heatDawn) / (params.heatNoon - params.heatDawn)));
   assert.ok(over.rec.log.includes(`globalAlpha = ${fmt(0.5 * 0.28 * k)}`), "the heat, faded with the mesh");
   assert.ok(over.rec.log.includes("fillStyle = #warn"));
+  const night = [...Array(100).keys()].find((t) => sunDown(params as never, t))!;
+  const dark = setup({ voxel: { alpha: 0.5, renderer: "voxel-webgl" }, colony: { params, time: night }, world: null });
+  voxelStage(dark.fs);
+  assert.ok(
+    dark.rec.log.includes("globalAlpha = 0.15") && dark.rec.log.includes("fillStyle = #000"),
+    "the night's wash, faded with the mesh",
+  );
   const bare = run(0);
   assert.equal(drawn, 0, "no mesh, no second draw");
   assert.equal(bare.rec.log.filter((l) => l.startsWith("fillRect(")).length, 0);
@@ -364,6 +428,11 @@ test("chamber labels: a role at each chamber's centre in the paper's outline and
   assert.equal(log.at(-1), "textBaseline = alphabetic");
   assert.ok(log.includes(`font = 600 ${Math.round(Math.max(10, Math.min(14, 20 * 0.9)))}px ui-sans-serif, system-ui, sans-serif`));
   assert.ok(log.includes("strokeStyle = #paper") && log.includes("fillStyle = #ink"));
+  assert.ok(log.includes("globalAlpha = 0.85"), "a faint outline");
+  assert.ok(
+    run({ d: 2 }).includes(`font = 600 ${Math.round(Math.max(10, Math.min(14, 20 * 0.9)) * 2)}px ui-sans-serif, system-ui, sans-serif`),
+    "scaled by the device ratio",
+  );
   assert.deepEqual(run({ labelsOn: false }), [], "off");
   assert.deepEqual(run({ chambers: undefined }), [], "no chambers");
   assert.equal(run({ chambers: [chamber({ cells: 0 })] }).filter((l) => l.startsWith("fillText(")).length, 0, "no cells");
@@ -378,12 +447,18 @@ test("chamber labels: a role at each chamber's centre in the paper's outline and
 
 test("the minimap stage draws the minimap, then reports how long the frame took (dev builds)", () => {
   const dev = setup({ dev: true, now: 1250 });
+  Object.defineProperty(dev.dataset, "fieldDrawMs", {
+    set: (v: string) => {
+      dev.calls.push(`ms ${v}`);
+    },
+    get: () => undefined,
+  });
   minimapStage(dev.fs);
   assert.deepEqual(
-    dev.calls.filter((c) => c === "minimap.draw"),
-    ["minimap.draw"],
+    dev.calls.filter((c) => c === "minimap.draw" || c.startsWith("ms ")),
+    ["minimap.draw", "ms 850.00"],
+    "the minimap first, then the time: now less the start of the frame",
   );
-  assert.equal(dev.dataset.fieldDrawMs, "850.00", "now less the start of the frame");
   const prod = setup({ dev: false, now: 1250 });
   minimapStage(prod.fs);
   assert.equal(prod.dataset.fieldDrawMs, undefined);
