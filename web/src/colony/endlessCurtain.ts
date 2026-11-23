@@ -176,4 +176,24 @@ export class EndlessCurtain {
     for (const c of this.#block(bs)) for (const v of c.food) t += v;
     return t;
   }
+  /**
+   * The buried food first generated within `d` of the crust at column `s` (a hole): every row's cells whose centres lie within `d` of that point.
+   * A fixed disc, the same in any order of generation, as the plane's `foodWithin` (`foodHome`'s denominator, docs/endless-world.md §3).
+   */
+  foodWithin(s: number, d: number): number {
+    let total = 0;
+    const hx = centreX(s, CRUST);
+    const hy = centreY(CRUST);
+    for (let bs = Math.floor((s - d - 1) / CHUNK); bs <= Math.floor((s + d + 1) / CHUNK); bs++)
+      for (let by = 0; by < CURTAIN_BANDS; by++) {
+        const { food } = this.chunk(bs, by);
+        for (let j = 0; j < CHUNK; j++)
+          for (let i = 0; i < CHUNK; i++) {
+            const v = food[local(i, j)]!;
+            const y = by * CHUNK + j;
+            if (v && Math.hypot(centreX(bs * CHUNK + i, y) - hx, centreY(y) - hy) <= d) total += v;
+          }
+      }
+    return total;
+  }
 }

@@ -73,7 +73,10 @@ export interface OutField {
 /** Half the width of a fresh out-field's window, in columns: a nest's tunnels rarely spread wider; if they do, the window grows. */
 const OUT_HALF = 96;
 
-/** Steps from cell (x, y) to the hole in field `f`, or −1: outside its window or rows, or not joined to the hole. */
+/**
+ * Steps from cell (x, y) to the hole in field `f`, or −1: outside its window or rows, or not joined to the hole. The row bound (`y * f.w <
+ * dist.length`) never fires in play (every row of the map is in the window); it is defensive.
+ */
 function stepsAt(f: OutField, x: number, y: number): number {
   const col = x - f.x0;
   return col >= 0 && col < f.w && y >= 0 && y * f.w < f.dist.length ? f.dist[y * f.w + col] : -1;
@@ -84,8 +87,8 @@ function stepsAt(f: OutField, x: number, y: number): number {
  * Cached for the colony, and rebuilt when the ground has changed (cells dug or filled), at most every OUT_FIELD_EVERY
  * seconds, or at once when the map has grown (one world's curtain, Game.addColony): a breadth-first walk over the nest's
  * own tunnels, a few thousand cells. The walk stays inside the window; one that would step out of it widens the window
- * (twice as wide, within the map) and walks again, so the field holds every cell the hole reaches, as one over the
- * whole map would.
+ * (to three times its width, a width more on each side, within the map) and walks again, so the field holds every cell
+ * the hole reaches, as one over the whole map would.
  */
 export function outField(c: Colony): OutField {
   const map = c.map;
@@ -93,6 +96,8 @@ export function outField(c: Colony): OutField {
   const { w: mw, h } = map.size;
   const mx0 = map.x0;
   const kept = c.outDist;
+  // The map's origin, width and the window's length never differ from the kept field's in play: the curtain grows only by `addColony`, which
+  // rebuilds; this check is defensive, so a stale window is never read.
   const have = kept && kept.mapX0 === mx0 && kept.mapW === mw && kept.dist.length === kept.w * h ? kept : null;
   if (have && (c.outVersion === version || c.time - c.outAt < OUT_FIELD_EVERY)) return have;
   // A fresh window over columns [lo, hi), within the map: every cell −1, nothing reached yet.
