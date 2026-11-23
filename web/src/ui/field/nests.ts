@@ -68,7 +68,7 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
   ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
   ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.7;
+  ctx.globalAlpha = 0.75;
   ctx.stroke();
   if (nest.entrance) {
     // The side view: the entrance, a small ring on the ground line where the shaft comes up.
