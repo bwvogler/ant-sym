@@ -280,9 +280,30 @@ const ROOT_HEADINGS = [E, SE, SW, W, NW, NE];
 /**
  * A corpse the fungus grows out of (ja-2bw.7, docs/hyphal-growth.md §6): the spores it puts out on its cell, free (paid
  * by the cadaver, not the mycelium: Khun et al. 2021 counted about 1.3 × 10⁸ conidia a cadaver; the amount is design),
- * how fast, the mass it adds to the mycelium, and the tips that set out from it (east and west).
+ * how fast, the mass it adds to the mycelium, and the tips that set out from it: one in each of the six hex ways, as at the
+ * landing, so a corpse's hyphae fan out and not only along one line. `headings` is their order when the body's direction
+ * is not known (corpseHeadings says the order when it is).
  */
-export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: [E, W] as readonly number[] };
+export const CORPSE = { spores: 12, rate: 0.2, mass: 1, headings: ROOT_HEADINGS as readonly number[] };
+
+/**
+ * The order a corpse's six tips are rooted in (the first rooted steps first and so draws first on the mass): the body's own
+ * axis, snapped to the nearest hex axis, then the other two axes in pairs. The two ways along one axis go in the same order
+ * whichever way the body faced, so turning a cadaver round does not change which tip has priority (PRD §63.2). With no
+ * recorded heading, CORPSE.headings.
+ *
+ * A heading and its reverse are folded to the same half-turn before they are snapped, with a tie rule: a heading on the line
+ * between two axes (straight up or down, 30 degrees off the hex ways) is rounded the same way for both, even when the
+ * stored heading is a Float32 and so a hair off (#288's review: the two orientations of a vertical body gave [2,5] and [1,4]).
+ */
+/** How far past the line between two axes still counts as the far side: well over a Float32's rounding (1e-7), well under a degree. */
+const AXIS_TIE = 1e-4;
+export function corpseHeadings(heading?: number): readonly number[] {
+  if (heading === undefined) return CORPSE.headings;
+  const half = ((heading % Math.PI) + Math.PI) % Math.PI;
+  const axis = Math.floor(half / (Math.PI / 3) + 0.5 + AXIS_TIE) % 3;
+  return [0, 3, 1, 4, 2, 5].map((k) => (axis + k) % 6);
+}
 
 /**
  * Stalks (synnemata, ja-2bw.10, PRD §63.12), by the *Stalks* upgrade's level (none, a stalk, a tall stalk): a colonised
@@ -1495,9 +1516,10 @@ export class Fungus {
    * The fungus grows out of a corpse at cell (x, y) on map `layer` (ja-2bw.7, owner 2026-11-12): a new start, whose
    * tips set out from it; the cadaver's substance joins the mycelium (Evolution.feed); and it fruits there for free,
    * CORPSE.spores in all at CORPSE.rate a second, paid by the corpse. Another corpse on a cell already colonised adds its
-   * spores. Nothing without hyphae and an evolving fungus, or on rock.
+   * spores. Nothing without hyphae and an evolving fungus, or on rock. `heading` is the body's direction when it is known
+   * (a death, a burial): its axis is rooted first (corpseHeadings); a tip that reaches a midden's corpses has none.
    */
-  colonise(layer: number, x: number, y: number): void {
+  colonise(layer: number, x: number, y: number, heading?: number): void {
     const e = this.#evolution;
     if (!e || !this.params.hyphae) return;
     const L = this.#layers[layer];
@@ -1511,7 +1533,7 @@ export class Fungus {
     e.feed(CORPSE.mass);
     if (!fresh) return;
     if (!h.has(x, y)) h.addCell(x, y);
-    for (const d of CORPSE.headings) h.root(x, y, d);
+    for (const d of corpseHeadings(heading)) h.root(x, y, d);
     // With flow on, the cadaver's substance enters the hyphae at its own cell (ja-tgw9).
     if (this.params.flow) h.addLoad(k, CORPSE.mass);
   }

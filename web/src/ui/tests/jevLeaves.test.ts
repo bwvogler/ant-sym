@@ -89,3 +89,10 @@ test("the session's commands are bound: a leaf hands them to an event handler (o
   fungusAnswers();
   assert.deepEqual(log, ["start", "stop", "explain s 2", "explainFungus f", "fungusAnswers"]);
 });
+
+test("the page reads no Jev value that changes as the player types: no whole-snapshot view, no aim or doctrines read in a component body", () => {
+  const page = readFileSync(join(SRC, "ColonyApp.tsx"), "utf8");
+  assert.doesNotMatch(page, /useJevView/);
+  assert.doesNotMatch(page, /\bjev\.(aim|doctrines|phase|lock)\b/);
+  assert.doesNotMatch(readFileSync(join(SRC, "ui/useFlight.ts"), "utf8"), /\bjev\.(aim|lock)\b|JevView/);
+});
