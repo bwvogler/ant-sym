@@ -48,11 +48,12 @@ test("a reach upgrade's tooltip lists every lever it widens, each with its words
     }
     assert.match(t.reachNote ?? "", /costs no tokens/);
   }
-  // Lethal levers are marked so the panel shows them in the danger colour.
+  // Each lever carries its kind, so the panel colours it as every other place does (LeverName), the lethal ones in the danger colour.
   assert.deepEqual(
-    upgradeTip(UPGRADES.find((u) => u.id === "weapon")!).levers.map((l) => l.lethal),
-    [true],
+    upgradeTip(UPGRADES.find((u) => u.id === "weapon")!).levers.map((l) => l.kind),
+    ["lethal"],
   );
+  for (const u of UPGRADES) for (const l of upgradeTip(u).levers) assert.equal(l.kind, LEVERS.find((x) => x.id === l.id)?.kind, l.id);
 });
 
 test("a lethal reach upgrade reads as off or free, a graded one as none, one step or the full range", () => {

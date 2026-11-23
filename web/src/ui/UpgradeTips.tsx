@@ -1,4 +1,5 @@
 import type { Upgrade } from "../colony/index.ts";
+import LeverName from "./LeverName.tsx";
 import { needText, nextLevelTip, upgradeTip } from "./upgradeText.ts";
 
 /** The tooltip body for an upgrade: what it is, why it matters, each level (the current one marked), and the levers a reach upgrade widens. */
@@ -26,7 +27,7 @@ export function UpgradeBody({ u, level }: { u: Upgrade; level: number }) {
           <span className="block text-fg-3">Levers it widens:</span>
           {t.levers.map((l) => (
             <span key={l.id} className="block">
-              <span className={l.lethal ? "text-err" : "text-accent"}>{l.name}</span>
+              <LeverName kind={l.kind}>{l.name}</LeverName>
               <span className="text-fg-2">: {l.blurb}.</span>
             </span>
           ))}
