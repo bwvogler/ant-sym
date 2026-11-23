@@ -69,7 +69,7 @@ Today a hyphal tip senses nothing about the ants. Its situation has five fields 
 
 So the ground is sparse: three quarters of all cells near a tip hold no ant. A radius of 3 is too coarse to mean anything for the T1 measure (it is 94-99 % everywhere, so the bias could not raise it); **T1 is measured at distance 1** (85 % before a quarter, 73 % after, in play today).
 
-**How often a traffic cue would change a side choice** (the two cells a tip could turn into have different ant counts within r of them, per tip sample, not only when both are free):
+**How often a traffic cue would change a side choice** (the two cells a tip could turn into have different ant counts within r of them, per tip sample, not only when both are free; **this overstates what a side-choice lean can do, because a tip growing straight has no side to choose: see the ablation below**):
 
 | r | before a quarter (median, range over 20 seeds) | after |
 |---|---|---|
@@ -79,6 +79,19 @@ So the ground is sparse: three quarters of all cells near a tip hold no ant. A r
 Seed 6, the slowest, has the sparsest early traffic (14 % at r = 1, a long wait of 70 samples before a quarter): a lean has the least to work with where P1 is slowest.
 
 **What this says about the sense.** A banded occupancy sense has real spread to work with, but its bands must be low: a share above 10 % of the 30 cells at distance 2-3 is rare (3-30 % of tips before a quarter, under 17 % after), so levels such as *none / one cell (about 3 %) / up to 10 % / more* split the tips usefully (before a quarter, medians over seeds: 39 / 26 / 22 / 12 % of tips), where 10 / 30 / 60 % levels would leave most tips in one level. The tip's own disc is mostly empty, so the cue to steer by is the difference between the two side cells' neighbourhoods, not the level at the tip.
+
+## Ablation of option A (`ja-ogph.3`, 2026-11-23): it changes nothing that P1 measures
+
+Built as `trafficBias` (`count` or `levels`) over `trafficRadius` (2 or 3), off by default (goldens bit-exact), applied where a tip has both sides open: `sideFor` (turns and slides) and, added after the first test showed `sideFor` is almost never reached with both sides open, the side a new branch takes. Eight `progression.yml` runs on head `1e5bcc04` (count and levels, r 2 and r 3, seeds 1-10 and 11-20; flow, growth answers, 600 s), compared with the off runs of the probe section. Run ids 45214083776, 45214090729, 45214098495, 45214105668, 45214114379, 45214124627, 45214130773, 45214137500.
+
+- **Quarter, half and queen times are identical to the off runs on all 20 seeds in all four arms** (seeds 1-10: median 155.5 s, worst 350 s on seed 6; seeds 11-20: median 168 s, worst 293 s on seed 20). T2 and T3 hold trivially: no seed moved.
+- **Flowers**: seeds 1-10 unchanged (1 in 1 of 10 games). Seeds 11-20: r 2 unchanged (8 in 4 of 10); r 3 gives 6 in 4 of 10 in both arms, so the lean did change the plane on some seed, but not the progression.
+- **T1** (hyphae within 1 cell of an ant seen in the last 60 s, medians over seeds): unchanged to within about 1 point before a quarter (about 82 % on seeds 1-10, about 86-87 % on 11-20) and after (about 73 %); the arms differ from each other by under 2 points. The lean does not put the hyphae measurably nearer the ants.
+- **Why: the tips seldom have a choice to lean on.** In a seed-1 game of 150 s with the shipped growth answers the tips took 658 steps: 603 `grow`, 44 `branch`, 11 `turn`; `sideFor` ran 11 times and never with both sides open (a turn happens where the ground blocks the way). Over a whole 600 s game the counters give only 14-251 side choices per game with both sides open (seed 1: 22 of 111 decided by the ants at r 3 `count`, 14 of 111 at r 2; seed 6: 8 of 19; seed 11: 53 of 251), and about a fifth to a half of those are decided by the ants. A few tens of branch sides cannot move a game of thousands of cells.
+
+**So the probe's "the two sides differ in ants on 30 % of tip samples" overstated what option A could do**: it counted every tip sample, and a tip that is growing straight (92 % of its steps) has no side to choose. The lean is real but has almost nothing to act on. Steering the choices a tip already makes is the wrong lever for this effect.
+
+**What would act** (owner's call; none built): (1) **a tropism**: a growing tip, with some chance per step set by the traffic reading, veers one cell toward the busier side. This is a new response (the tip turns when the lane said `grow`), so it overrides the lane's answer and needs a strength and a cap, like thigmotropism. (2) **Option B**: put the traffic level into the growth situation so the lane itself chooses `left`, `right` or `turn` when ants are near; costs a re-ask (96 to 192 situations, about $0.01) and depends on the lane choosing it. (3) **Stop**: keep the setting, off, as an assay hook, and close `ja-ob97` as measured: no effect.
 
 ## Play
 
