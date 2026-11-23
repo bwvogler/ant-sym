@@ -101,15 +101,59 @@ test("one capture listener on the target carries the key to the stack, and can b
   assert.equal(heard[1]![1], heard[0]![1], "the same function comes off");
 });
 
-// The page used to decide who owned Escape by asking the document (a [aria-modal] in it, a [role=tooltip]). The group above the field is on the
-// stack now; the surfaces below the field still ask, and are named here until they are on it too (ja-fnd.6.4.1, slice 2).
-const UI = new URL("../", import.meta.url).pathname;
-const STILL_ASKING = ["kit.tsx", "LabBench.tsx", "useBuilder.ts"];
+test("below the field the listener is a bubble one, so a control's own handler and the field's come first", () => {
+  const s = new EscapeStack();
+  s.register(ESCAPE_LAYER.drawer, () => true);
+  const calls: [string, unknown][] = [];
+  const target = {
+    addEventListener: (t: string, _f: unknown, c: unknown) => void calls.push([t, c]),
+    removeEventListener: (t: string, _f: unknown, c: unknown) => void calls.push([`off ${t}`, c]),
+  };
+  attachEscape(s, target as unknown as Window, false)();
+  assert.deepEqual(calls, [
+    ["keydown", false],
+    ["off keydown", false],
+  ]);
+});
 
-test("no surface above the field asks the DOM whether it owns Escape; the ones that still do are named", () => {
+test("below the field: a tooltip, then the Codex, then the Lab (with focus in it) or a drawer, then the builder: one at a time", () => {
+  const s = new EscapeStack();
+  const closed: string[] = [];
+  const offs: Record<string, () => void> = {};
+  const focusInLab = false;
+  for (const [name, layer, wants] of [
+    ["builder", ESCAPE_LAYER.builder, true],
+    ["drawer", ESCAPE_LAYER.drawer, true],
+    ["lab", ESCAPE_LAYER.lab, focusInLab],
+    ["codex", ESCAPE_LAYER.codex, true],
+    ["tooltip", ESCAPE_LAYER.tooltip, true],
+  ] as const)
+    offs[name] = s.register(layer, () => {
+      if (!wants) return false; // the Lab: the key was not pressed with focus in it
+      closed.push(name);
+      offs[name]!();
+      return true;
+    });
+  for (let i = 0; i < 6; i++) s.handle(press());
+  assert.deepEqual(closed, ["tooltip", "codex", "drawer", "builder"], "the Lab passed the key on: its focus was elsewhere");
+});
+
+test("a control that took the key itself (a chart's crosshair, the aim box) keeps it from the stack below the field", () => {
+  const s = new EscapeStack();
+  let asked = 0;
+  s.register(ESCAPE_LAYER.drawer, () => (asked++, true));
+  assert.equal(s.handle(press("Escape", true)), false);
+  assert.equal(asked, 0);
+});
+
+// The page used to decide who owned Escape by asking the document (a [aria-modal] in it, a [role=tooltip]). Every surface is on the stack now:
+// no source asks (ja-fnd.6.4).
+const UI = new URL("../", import.meta.url).pathname;
+
+test("no surface asks the DOM whether it owns Escape", () => {
   const asking = readdirSync(UI)
     .filter((f) => /\.tsx?$/.test(f))
     .filter((f) => /querySelector\([^)]*(aria-modal|role="(tooltip|dialog)")/.test(readFileSync(join(UI, f), "utf8")))
     .sort();
-  assert.deepEqual(asking, [...STILL_ASKING].sort());
+  assert.deepEqual(asking, []);
 });

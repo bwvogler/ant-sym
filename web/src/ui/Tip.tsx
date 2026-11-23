@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { place, type Placement } from "./tipPosition.ts";
 
 /**
@@ -52,20 +53,27 @@ export default function Tip({
     if (open) placeIt();
   }, [open, tip, placeIt]);
 
-  // Open: Escape closes; a tap outside closes; the page scrolling or resizing moves it with its anchor.
+  // Open: Escape closes (the top layer below the field, escape.ts: a tooltip is closed before the surface it sits in); a tap outside
+  // closes; the page scrolling or resizing moves it with its anchor.
+  useEscape(
+    ESCAPE_LAYER.tooltip,
+    () => {
+      hide();
+      return true;
+    },
+    open,
+    "below",
+  );
   useEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && hide();
     const outside = (e: PointerEvent) => {
       const t = e.target as Node;
       if (!anchor.current?.contains(t) && !bubble.current?.contains(t)) hide();
     };
-    window.addEventListener("keydown", key);
     window.addEventListener("pointerdown", outside, true);
     window.addEventListener("scroll", placeIt, true);
     window.addEventListener("resize", placeIt);
     return () => {
-      window.removeEventListener("keydown", key);
       window.removeEventListener("pointerdown", outside, true);
       window.removeEventListener("scroll", placeIt, true);
       window.removeEventListener("resize", placeIt);
