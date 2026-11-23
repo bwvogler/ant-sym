@@ -54,7 +54,7 @@ const key = (k: string, o: Partial<KeyInput> = {}): KeyInput => ({
   ...o,
 });
 
-test("the arrows and WASD pan by a seventh of the smaller side the other way, and the key is the field's", () => {
+test("the arrows and WASD pan by 0.15 of the smaller side the other way, and the key is the field's", () => {
   const moves: [string, number, number][] = [
     ["ArrowLeft", STEP, 0],
     ["a", STEP, 0],
