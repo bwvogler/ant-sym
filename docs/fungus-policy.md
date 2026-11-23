@@ -406,6 +406,7 @@ A fungus lives in and on the host's body. What it can read is what is in that bo
 | `carrying` | nothing · food · brood | what is in the host's crop or jaws | **design** |
 | `groomed` | no · yes | nestmates grooming the host's cuticle, taking the fungus off | grooming removes spores (Konrad et al. 2012, §3) |
 
+- **The tips of the mycelium sense a different thing, not a host's body:** the ground ahead, their own supply, and the ants near the cells they could grow into (the growth lane's situation, not this one; the ant cue is **design**: [hyphal-traffic](hyphal-traffic.md#mechanism-what-a-tip-could-sense-of-a-passing-ant-2026-11-23), the sense-table row in [vision](vision.md#what-an-ant-can-sense)).
 - **That is 3 × 3 × 4 × 3 × 3 × 2 = 648 situations.** They are asked lazily, as hosts meet them; a game meets far fewer.
 - **Two senses the built situation had are gone:**
   - **The host's mode.** What an ant *is doing* is a decision, not something in its body. `arousal`, `task` and `carrying` are the body states that go with modes.
