@@ -130,6 +130,25 @@ export function drawHyphae(k: FieldCtx, h: Hyphae, under: boolean, win: CellWind
       path.moveTo(sx, sy);
       path.quadraticCurveTo((sx + tx) / 2 - (ty - sy) * bow, (sy + ty) / 2 + (tx - sx) * bow, tx, ty);
     }
+    // A patch's own cells (a landing's, a flower's): roots with no hypha between them, so they would show as separate islands beside
+    // hyphae that run out of them. Each pair of neighbouring cells of the patch that no hypha joins already gets the same short
+    // bowed curve as a loop, so the patch reads as connected (owner, 2026-11-23). Drawing only: the tree is unchanged.
+    for (const a of h.sources) {
+      const [ax, ay] = hyphaCell(a);
+      for (let dir = 0; dir < 6; dir++) {
+        const bx = neighbourX(ax, ay, dir);
+        const by = neighbourY(ay, dir);
+        const b = cellKey(bx, by);
+        if (b <= a || !h.sources.has(b)) continue;
+        if (h.parent.get(a) === b || h.parent.get(b) === a) continue;
+        if (!inView(ax, ay) && !inView(bx, by)) continue;
+        const [sx, sy] = at(ax, ay);
+        const [tx, ty] = at(bx, by);
+        const bow = (hash(a, b, 4) - 0.5) * 0.7;
+        path.moveTo(sx, sy);
+        path.quadraticCurveTo((sx + tx) / 2 - (ty - sy) * bow, (sy + ty) / 2 + (tx - sx) * bow, tx, ty);
+      }
+    }
     ctx.save();
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
