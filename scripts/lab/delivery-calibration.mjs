@@ -74,10 +74,10 @@ for (const name of requested.split(",")) {
   const v = variants[name];
   if (!v) throw Error(`unknown variant ${name}`);
   const started = performance.now();
-  const g = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), { antCount: ants, rival: false }, gameRng(seed), {
-    colony: { deliveryLane: v.lane, deliveryReconsider: v.limit },
-  });
-  const c = g.player;
+  const g = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(seed), [
+    { antCount: ants, colony: { deliveryLane: v.lane, deliveryReconsider: v.limit } },
+  ]);
+  const c = g.colonies[0];
   const chambers = c.map.chambers;
   // A harness-only intervention, applied before ticks and only to this colony's
   // home-layer royal channel. Copy parameters; never mutate shared defaults.
