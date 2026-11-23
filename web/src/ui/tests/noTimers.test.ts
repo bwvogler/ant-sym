@@ -25,9 +25,9 @@ const NAMED: { file: string; line: string; why: string }[] = [
   { file: "ui/Notices.tsx", line: "tick((n) => n + 1), 30_000", why: "the bell's ages are wall-clock minutes, which no stats tick tells" },
   { file: "ui/Toasts.tsx", line: "dismissToast(t.id), TOAST_MS", why: "a toast's own life, in wall-clock time" },
   { file: "ui/Toasts.tsx", line: "dismissToast(t.id), 150", why: "a toast's exit animation" },
-  { file: "ColonyApp.tsx", line: "setDemo(null), 1700", why: "a tool demo's own length, in wall-clock time" },
+  { file: "ui/useBuilder.ts", line: "setDemo(null), 1700", why: "a tool demo's own length, in wall-clock time" },
   {
-    file: "ColonyApp.tsx",
+    file: "ui/useBuilder.ts",
     line: "const timer = setInterval(() => {",
     why: "the builder's watch of its ants: it acts, it does not redraw by itself",
   },
