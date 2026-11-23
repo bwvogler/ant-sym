@@ -75,8 +75,11 @@ export class JevSession {
   };
   readonly snapshot = (): JevSnapshot => this.#snap;
 
-  /** Why no policy can change now, worked out from what is true now. */
-  get lock(): string | null {
+  /**
+   * Why no policy can change now, worked out from what is true now: for the session's own setters and a test. Not for a component: it reads once and
+   * never draws again when the lock flips (a component takes `useJev((s) => s.lock)`; jevLeaves.test.ts holds that no component calls this).
+   */
+  lockNow(): string | null {
     return policyLock(this.#backend, this.client.state, this.#starting);
   }
 
@@ -137,7 +140,7 @@ export class JevSession {
 
   /** Colony k's words taken: not while Jev can't read them (a lock). */
   setDoctrine = (k: number, d: DoctrineChoice): void => {
-    if (this.lock !== null) return;
+    if (this.lockNow() !== null) return;
     this.draftDoctrine(k, d);
     this.client.setDoctrineFor(k, d.text);
   };
@@ -159,7 +162,7 @@ export class JevSession {
 
   /** The fungus's aim taken: not while Jev can't read it. A player's change: Jev asks what the new aim lacks at once (ja-lo8.21). */
   setAim = (a: DoctrineChoice): void => {
-    if (this.lock !== null) return;
+    if (this.lockNow() !== null) return;
     this.draftAim(a);
     this.client.setAim(a.text, { askNow: true });
   };

@@ -31,6 +31,26 @@ test("no component takes `jev` as a prop: the leaves read the session from the c
   );
 });
 
+/** A component reading the session's live lock: `session.lockNow()` (or the old getter, `session.lock`, `jev.session.lock`). It reads once and never draws again. */
+const LIVE_LOCK = /\b(session|jev\.session)\.(lockNow\(|lock\b)/;
+
+test("no component reads the session's live lock: it takes `useJev((s) => s.lock)`, which draws again when the lock flips", () => {
+  const found = components.flatMap((file) =>
+    readFileSync(join(SRC, file), "utf8")
+      .split("\n")
+      .map((l, i) => ({ file, n: i + 1, l }))
+      .filter(({ l }) => LIVE_LOCK.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)),
+  );
+  assert.deepEqual(
+    found.map((f) => `${f.file}:${f.n}: ${f.l.trim()}`),
+    [],
+  );
+  for (const l of ["const lock = session.lock;", "if (session.lockNow() !== null) return;", "const l = jev.session.lock;"])
+    assert.match(l, LIVE_LOCK, l);
+  for (const l of ["const lock = useJev((s) => s.lock);", "const lock = jev.lock; // the page's view: the snapshot's"])
+    assert.doesNotMatch(l, LIVE_LOCK, l);
+});
+
 test("the guard sees each way of taking it as a prop, and not the context's hooks", () => {
   for (const l of [
     "  jev: Jev;",
