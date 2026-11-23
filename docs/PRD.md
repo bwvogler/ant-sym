@@ -6926,7 +6926,19 @@ Sweep of the limit (assays run 45059781592, branch `dc6d23d5`, seeds 1–20, cli
 | 3 | **19/20** (≤ 2 waiting) | 13/20 / +0.52 | 13/20 | 4 held, 2 porting |
 | 6 | 17/20 | 10/20 / −0.04 | 16/20 | **52 porting** |
 
-By the worst seed, 3. Its game1 misses hold 3–4 against a limit of 2; main's worst seed holds 5. Not yet confirmed on a second set of seeds.
+By the worst seed, 3 of those two. Its game1 misses held 3–4 against a limit of 2; main's worst seed held 5.
+
+**Limits 2–5 at the merged head** (`a9da7987`, after main's flower landing #312 and #318, seeds 1–20, climb 1, channel 0.03/0.5; assays run 45085721900):
+
+| `broodCrowd` | larvae pass / most waiting / most starved | nurse zone pass / median margin / worst porting | game1 pass / worst held / worst porting (you; rival) |
+|---|---|---|---|
+| 2 | 16/20 / 14 / 14 | 11/20 / +0.14 / 7 | 11/20 / 4 (5) / 1 (1) |
+| **3** | **19/20 / 2 / 2** | 13/20 / +0.52 / 1 | 14/20 / 7 (3) / 7 (9) |
+| 4 | 17/20 / 5 / 5 | 7/20 / −0.48 / **66** | 15/20 / 4 (4) / 1 (0) |
+| 5 | 15/20 / 25 / 25 | 14/20 / +0.63 / **117** | 17/20 / 3 (5) / 1 (33) |
+
+No limit is clean: porters holding food over 120 s stall on some seed at every setting (7, 66, 117 or 33; main's `game1` had 0), and the seed moves with the limit, so it is a hazard of the climb that a per-cell limit lowers and does not remove (the physics step, `ja-k4k.15.7.1`, is the answer). 3 has the best larvae (no seed over 2 waiting; 2, 4 and 5 starve 14, 5 and 25 workers on a seed), the same nurse zone as 5, and the smallest porter stall outside 2. The earlier claim of "no seed over 4 held or 2 porting" held at the pre-merge head only; here `game1` seed 20 at limit 3 has 0 held and 7 porting, and another seed holds 7.
+
 
 **The fuller rule and the fungus knobs (design, `ja-k4k.15.7`).** The owner asked for the fungus to have knobs here, as PR #281's ant actions (a draft) give it cues, not commands. Four layers: physics fixed (bodies limit a cell, speed falls as it fills with a floor), decisions the ant's (press on, wait, yield, sidestep, idle as response-lane answers, after #281's foundation is on `main`), knobs the fungus's (crowd-feel gain, yield threshold, contact pause, idle fraction, a gather scent, mycelium CO₂, hyphal narrowing; see the note's table), colony counters (retreat, idling; digging once `ja-k4k.3.1` is done). Order: physics behind a setting, then crowd-feel gain, then the policy answers, then the emission and world knobs. Test any rule at 10 times the colony on a fixed map. Crowding is where a knob meets spread: S1 is contact transmission, so a crowd is where the fungus spreads fastest.
 
