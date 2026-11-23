@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   SPECIES,
   type Colony,
@@ -16,7 +16,7 @@ import { browserCache } from "./cacheStore.ts";
 import { ColonyJev, PAGE_ASKS_RESPONSE_LANES, type ColonyJevState } from "./colonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import type { Backend } from "./backend.ts";
-import { canResume, policyLock, shouldStart } from "./policyLock.ts";
+import { applyJevFlags, canResume, policyLock, shouldStart } from "./policyLock.ts";
 import { loadPrecache } from "./precache.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
@@ -47,6 +47,12 @@ export interface DoctrineChoice {
 /** Every colony starts foraging: one doctrine, one shared cache, no extra spend. */
 const FIRST_DOCTRINES: DoctrineChoice[] = COLONY_NAMES.map(() => ({ id: DOCTRINES[0]!.id, text: DOCTRINES[0]!.text }));
 
+/** The client's whole state, drawn again on every change of it (the Lab's Jev card: its counters tick with each batch). */
+export function useJevState(client: ColonyJev): ColonyJevState {
+  const subscribe = useCallback((fn: () => void) => client.subscribe(fn), [client]);
+  return useSyncExternalStore(subscribe, () => client.state);
+}
+
 export function useColonyJev(
   colonies: readonly Colony[],
   fungus: Fungus,
@@ -56,14 +62,12 @@ export function useColonyJev(
 ) {
   const jev = useMemo(() => new ColonyJev({}, browserCache), []);
   jev.journal = journal;
-  const [state, setState] = useState<ColonyJevState>(jev.state);
   const [doctrines, setDoctrinesState] = useState<DoctrineChoice[]>(FIRST_DOCTRINES);
   const [aim, setAimState] = useState<DoctrineChoice>({ id: AIMS[0]!.id, text: AIMS[0]!.text });
   /** Why no policy can change now (policyLock), read by the setters: words Jev can't read are not taken. */
   const lockRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const off = jev.subscribe(setState);
     FIRST_DOCTRINES.forEach((d, k) => jev.setDoctrineFor(k, d.text));
     jev.setAim(AIMS[0]!.text);
     // Answers are written to the store a second after the last reply: a tab hidden or closed in that second writes them now.
@@ -72,7 +76,6 @@ export function useColonyJev(
     document.addEventListener("visibilitychange", hidden);
     window.addEventListener("pagehide", flush);
     return () => {
-      off();
       document.removeEventListener("visibilitychange", hidden);
       window.removeEventListener("pagehide", flush);
       // Leaving the page: end the run on the server (stop and dispose write what the replies brought).
@@ -105,16 +108,16 @@ export function useColonyJev(
     void jev.start().finally(() => setStarting(false));
   }, [jev]);
   const stop = useCallback(() => void jev.stop(), [jev]);
-  const lock = policyLock(backend, state, starting);
+  // What the page reads of the client's state is a few small values derived from it, each read from the client (useSyncExternalStore) so the page
+  // draws again when one of them changes and not on every counter the client ticks: the Lab's Jev card reads the whole state itself (useJevState).
+  const subscribe = useCallback((fn: () => void) => jev.subscribe(fn), [jev]);
+  const phase = useSyncExternalStore(subscribe, () => jev.state.phase);
+  const lock = useSyncExternalStore(subscribe, () => policyLock(backend, jev.state, starting));
+  const startable = useSyncExternalStore(subscribe, () => shouldStart(backend, jev.state, starting));
+  const resumable = useSyncExternalStore(subscribe, () => canResume(backend, jev.state, starting));
   /** Whether a miss should start a run now, read on every miss (so a ref, not state). */
   const startRef = useRef(false);
-  useEffect(() => {
-    lockRef.current = lock;
-    startRef.current = shouldStart(backend, state, starting);
-    // While Jev can answer, a miss plays the local rule until the answer comes; earlier words' answers only while it can't (ja-lo8.15).
-    jev.canAsk = lock === null;
-  }, [jev, lock, backend, state, starting]);
-  const resumable = canResume(backend, state, starting);
+  useEffect(() => applyJevFlags(jev, { lockRef, startRef }, lock, startable), [jev, lock, startable]);
   // A situation with no answer under the current words, and no run on: start one (S7). Called on every such miss, from
   // the game's tick, so it only checks a ref, and starts after the tick.
   useEffect(() => {
@@ -177,12 +180,12 @@ export function useColonyJev(
     [jev],
   );
 
-  /** today's spend against the server's daily budget: the last run's figure, else the one the page loaded with */
-  const budget = state.run?.budget ?? backend?.budget ?? null;
-
   return {
-    state,
-    budget,
+    /** the client itself: a reader that needs its whole state takes it with useJevState(client) */
+    client: jev,
+    phase,
+    /** the daily budget the page loaded with: today's spend is the last run's figure when there is one (the Lab's Jev card) */
+    backendBudget: backend?.budget ?? null,
     start,
     stop,
     lock,

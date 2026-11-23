@@ -311,7 +311,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   };
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
-  useNotices(loop, affordable, jev.lock, jev.state.phase);
+  useNotices(loop, affordable, jev.lock, jev.phase);
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
   // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
