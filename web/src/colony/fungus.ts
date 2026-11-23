@@ -237,9 +237,11 @@ export const DEFAULT_FUNGUS: FungusParams = {
   hyphae: false,
   // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §72.1).
   flow: true,
-  trafficBias: "off",
+  // On since 2026-11-23 (owner: turn it on with N = 4, PRD §88): a growing tip leans toward ants on every 4th cell. It shortens
+  // the slowest progression seeds (seed 6: 350 s to 219 s) and leaves the median alone; the side-choice lean it rides on is inert.
+  trafficBias: "count",
   trafficRadius: 3,
-  trafficTropism: 0,
+  trafficTropism: 4,
 };
 
 /**
