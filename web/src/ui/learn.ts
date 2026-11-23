@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from "react";
 import { openLab } from "./labStore.ts";
+import { createStore, useStore } from "./store.ts";
 
 // Where the Learn drawer is open, if anywhere: one small store, so a "?"
 // anywhere on the page (the follow card, the panels, a chamber on the field)
@@ -14,28 +14,17 @@ export interface LearnTarget {
   id?: string;
 }
 
-let current: LearnTarget | null = null;
-const listeners = new Set<() => void>();
-
-function set(t: LearnTarget | null): void {
-  current = t;
-  for (const fn of listeners) fn();
-}
+const store = createStore<LearnTarget | null>(null);
 
 export const openLearn = (t: LearnTarget): void => {
   if (t.tab === "policy") {
-    set(null);
+    store.set(null);
     openLab({ tab: "policy", id: t.id });
-  } else set({ ...t });
+  } else store.set({ ...t });
 };
-export const closeLearn = (): void => set(null);
-export const learnTarget = (): LearnTarget | null => current;
-
-function subscribe(fn: () => void): () => void {
-  listeners.add(fn);
-  return () => void listeners.delete(fn);
-}
+export const closeLearn = (): void => store.set(null);
+export const learnTarget = (): LearnTarget | null => store.get();
 
 export function useLearn(): LearnTarget | null {
-  return useSyncExternalStore(subscribe, learnTarget, learnTarget);
+  return useStore(store);
 }
