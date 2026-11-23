@@ -406,6 +406,13 @@ export interface ColonyParams {
    * about 10 a floor cell, so a cap needs more floor). **Design.** Nest only: the plane has no count. 0: no limit.
    */
   cellCap: number;
+  /**
+   * Seconds a forager carrying food in the nest searches for its destination's road signs (the reception chamber's, once it has
+   * RECEPTION_MIN cells) before it tries the royal chamber's instead, whose signs run through the whole nest (docs/nurse-crowding.md,
+   * PRD §77.7). Without it a carrier whose destination has no signs where it stands wall-follows for ever: on one-world G1 seed 10
+   * 16 foragers held food over two minutes. Its own timer only. 0: never (the search runs on).
+   */
+  deliveryFallback: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -558,6 +565,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   broodClimb: 1,
   broodCrowd: 3,
   cellCap: 0,
+  deliveryFallback: 60,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,
