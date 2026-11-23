@@ -17,18 +17,27 @@ const sources = readdirSync(UI)
   .filter((f) => /\.tsx?$/.test(f))
   .concat("../ColonyApp.tsx");
 
-/** The string after each match of `re` (one capture group), in every source of the page, with its file. */
+/**
+ * The quoted ids in the value after each match of `re` (one capture group: the rest of the value), in every source of the page, with its
+ * file. A value may be a ternary (`entry: ant.infected ? "fungus" : "jobs"`): each quoted string in its branches is an id (not one in the condition). A value with no quoted
+ * string (a variable, null, a type) names none here; those come from data the tests below read.
+ */
 function found(re: RegExp): { file: string; id: string }[] {
   const out: { file: string; id: string }[] = [];
-  for (const f of sources) for (const m of read(f).matchAll(re)) out.push({ file: f, id: m[1]! });
+  for (const f of sources)
+    for (const m of read(f).matchAll(re)) {
+      const value = m[1]!;
+      const branches = value.includes("?") ? value.slice(value.indexOf("?")) : value; // not the condition's own strings
+      for (const q of branches.matchAll(/"([^"]+)"/g)) out.push({ file: f, id: q[1]! });
+    }
   return out;
 }
 
 test("every guide id the page links to is an entry in the field guide", () => {
   const ids = [
-    ...found(/tab: "guide", id: "([a-z-]+)"/g), // a "?" or an openLearn
-    ...found(/\blearn: "([a-z-]+)"/g), // a tutorial card's link
-    ...found(/\bentry: "([a-z-]+)"/g), // a lens line's link
+    ...found(/tab: "guide", id: ([^}\n]*)/g), // a "?" or an openLearn
+    ...found(/\blearn: ([^,}\n]*)/g), // a tutorial card's link
+    ...found(/\bentry: ([^,}\n]*)/g), // a lens line's link (a ternary has two ids)
   ];
   assert.ok(ids.length >= 15, `the scan finds the links (${ids.length})`);
   for (const { file, id } of [...ids, ...Object.values(ROLE_ENTRY).map((id) => ({ file: "lens.ts ROLE_ENTRY", id }))])
@@ -36,7 +45,7 @@ test("every guide id the page links to is an entry in the field guide", () => {
 });
 
 test("every policy section the page links to is one the Policy tab has, and the tab's sections are the ones named", () => {
-  const linked = found(/tab: "policy", id: "([a-z]+)"/g);
+  const linked = found(/tab: "policy", id: ([^}\n]*)/g);
   assert.ok(linked.length >= 5, `the scan finds the links (${linked.length})`);
   for (const { file, id } of linked)
     assert.ok((POLICY_SECTIONS as readonly string[]).includes(id), `${file}: "${id}" is not a Policy section`);
