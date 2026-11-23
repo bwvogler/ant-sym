@@ -1,0 +1,197 @@
+# Fog of war: the player sees only what its organisms sense
+
+*Research and design note, 2026-11-23, epic `ja-1ypq`. Nothing here is built. It answers the owner's request (2026-11-23), made in preparation for the endless world ([endless-world](endless-world.md), `ja-qpv`): the player sees only what the fungus and its infected ants have sensed, and where an infected organism has left, the page stops drawing updates. Other organisms will be observers later. Decisions: PRD §89. Code references are to `web/src/` on main at 96832d4.*
+
+## TL;DR
+
+- **Three states per cell**, as in strategy games since Warcraft II: *unknown* (never sensed), *remembered* (sensed before, nobody there now) and *live* (an observer senses it this step).
+- **The observers** are the fungus's hosts (infected ants of the player's strain, at their antennae's reach) and the fungus's living body (every hypha cell, mat, patch and flower, about 2 cells round it). Spores and corpses see nothing (owner, 2026-11-23). Later organisms join through the same interface, each with the reach from its own sense table.
+- **Remembered ground shows the last-seen state, never ants** (owner, 2026-11-23): rock, tunnels, food, spoil, mounds, chambers, hyphae and nests as they were when the last observer left, with "last seen N s ago". Ants, brood and queens show only where live.
+- **The readouts follow the fog** (owner, 2026-11-23): a colony enters the stats, badges and the go-to menu once the fungus has sensed its nest or holds a host in it. Its numbers are live while hosts are inside, otherwise as of when the last one left.
+- **The start reveals only the landing patch** and its sight (owner, 2026-11-23).
+- **A picture only.** The simulation never reads it: golden masters stay bit-exact and Jev costs nothing. The cost is CPU per step and memory per explored chunk, both measured in the build.
+- **Eight stages, F1–F8** (§8). F7 is the fog's share of the endless world's page stage E5 (`ja-qpv.4`).
+
+## 1. Where we are
+
+**What sees today.** `SensedMap` (`ui/fungusSight.ts`, PRD §65) is stamped once per render frame (`ColonyApp.tsx`, `onFrame`). Each living ant of any colony and any strain with `load >= INFECTED` marks the cells within `sensorDistance + REACH_MARGIN` (3 + 1 cells) with the sim time. Trails and alarm show in a cell as strongly as that mark is fresh, fading over `SENSED_FADE` = 20 s. A chunk faded right out is dropped and leaves a per-chunk `revealed` bit (E1.3, PRD §66), which nothing reads yet. The fungus's own body stamps nothing.
+
+**What the page shows regardless.** The renderer and every card read the live `Game` objects directly. Only trails and alarm are gated. Everything else shows everywhere:
+
+| Surface | What it shows of the truth |
+|---|---|
+| Ground chunks (`field/ground.ts`), hexagon mode, food sprites | rock, soil, food, quality, spoil and mound, spores, chamber tints |
+| `drawNest`, `drawAnts`, `drawStripAnts` (`field/nests.ts`, `ants.ts`, `overlays.ts`) | every nest, brood pile, queen, alate, corpse and living ant of every colony |
+| The voxel pass (`mapVoxel.ts` through `inspectViewport`) | every cell in view, ants and brood included |
+| The curtain strip (`stripAt`) | the plane under the line, repainted every frame |
+| The minimap (`field/minimap.ts`) | the whole map, every ant coloured by odour |
+| Picking, `AntCard`, following (`field/hit.ts`, `follow.ts`) | any ant anywhere, its mode, position and Jev answer |
+| Lens and cell inspection (`lens.ts`, `cellInspection.ts`) | workers, queens, brood, chamber food, midden, hole owner |
+| Nest badges (`badges.ts`) | each nest's infection share and queen state |
+| Stats, history, `FungusStatus`, goal toasts (`stats.ts`, `history.ts`) | every colony's population, brood, losses, infection share |
+| Go-to menu and `n` (`FieldGoToMenu.tsx`) | every colony's nest, seen or not |
+| Chamber labels and the nest tab (`LearnDrawer.tsx`) | every colony's chamber table |
+| Specimens (`useSpecimens.ts`) | a pinned ant's death wherever it happens |
+
+**What can be reused.** `MapChunkPaintCache` (`ui/mapChunkPaintCache.ts`) keeps a byte copy of each chunk's paint inputs to decide when to repaint. That is the snapshot's format already. The sim's clock is `Game.time`, saved with the game.
+
+## 2. How games do it
+
+**Three states.** Warcraft II (1995) is usually credited with the two-tier fog: a black shroud where nothing has been explored, and grey terrain where you explored but no unit sees now, with enemy units shown only in sight ([retrospective](https://www.gamedev.net/tutorials/game-design/game-design-and-theory/retro-mortis-rts-part-3-forged-in-steel-r3898); who was first is disputed). StarCraft II greys explored ground out of sight and darkens the unexplored ([Blizzard's guide](https://news.blizzard.com/en-us/article/4546768/game-guide-map-elements)). 0 A.D. names the three states shroud, fog and line of sight in its manual and codes them as `LosState { UNEXPLORED, EXPLORED, VISIBLE }` ([source](https://docs.wildfiregames.com/pyrogenesis/Los_8h_source.html)). All **unverified**: seen in search summaries, not read (the hosts are outside this session's network).
+
+**What is remembered.** Buildings and terrain are kept as last seen, units are not:
+- Age of Empires II's manual says a building in the fog shows "in its current state" as last seen until a unit returns ([manual](https://www.scribd.com/document/36345894/Age-of-Empires-II-Manual-PC), **unverified**). Players report ghosts: destroyed buildings that reappear or are doubled ([forum](https://forums.ageofempires.com/t/double-building-in-fog-bug-fog/72440)).
+- OpenRA calls them "frozen actors" ([traits](https://docs.openra.net/en/release/traits/), **unverified**). Warzone 2100 tickets ask that a remembered object leak no change, such as a vanished tree or new damage ([#3959](https://developer.wz2100.net/ticket/3959), **unverified**).
+- Factorio keeps a chart per force, one image per chunk. A chunk not re-charted for about 10 s keeps its last image. Trains are left off the chart because they move on ([radar](https://wiki.factorio.com/Radar), **unverified**). A save grows with the chunks revealed (forum, **unverified**).
+- Dwarf Fortress's adventure mode forgets explored ground over time, by a Memory attribute ([wiki](https://dwarffortresswiki.org/index.php/Adventure), **unverified**): a memory that depends on the organism.
+
+**Who sees.** In Pikmin (2001) the map shows only where the *leaders* went, not the Pikmin ([wiki](https://pikminwiki.com/Radar_Map), **unverified**): only some of your agents are observers. StarCraft II's Zerg creep gives no vision of its own; the tumours on it do ([guide](https://news.blizzard.com/en-us/starcraft2/5838584/game-guide-zerg-creep), **unverified**). Factorio's roboports chart the area their network covers. **No shipped game was found where a parasite sees through its infected hosts**: nine queries found none (Plague Inc., Carrion, Empires of the Undergrowth and fungus-network games have no such fog that a search turned up). The space looks open; an absence found by search is **unverified**.
+
+**Techniques.**
+- **Counts per cell.** Catlike Coding's hex map counts observers per cell and marks a cell explored on its first increment; visibility and explored state go to the shader in a per-cell texture ([part 21](https://catlikecoding.com/unity/tutorials/hex-map/part-21), **unverified**). 0 A.D. packs two bits per player per vertex and also counts observers. The risk of counts is a missed decrement that leaves a cell lit for good; rebuilding the set from the observers each step cannot drift.
+- **Discs, not lines of sight.** 0 A.D. reveals plain discs and declined terrain occlusion.
+- **Drawing it.** League of Legends keeps fog on a 128 × 128 grid, upscales it to 512 × 512, blurs it and darkens the world with it; more blur did not fix jagged edges, upscaling did ([Riot](https://technology.riotgames.com/node/39), **unverified**). Snapping the camera to the fog's texels cures edge flicker (forum).
+- **The simulation never reads the fog.** Age of Empires ran lockstep by sending only players' commands ([Bettner & Terrano 2001](https://www.gamedeveloper.com/programming/1500-archers-on-a-28-8-network-programming-in-age-of-empires-and-beyond), **unverified**), so every client holds the whole state and a map hack only reads memory. Here there is one player on localhost: hiding data from the player doesn't matter, keeping the player's view out of the simulation does.
+
+**In the game:** three states per cell; a per-cell explored bit; live rebuilt from the observers each step rather than counted; remembered chunks hold the paint inputs as last seen and change only when an observer returns; ants are never remembered (Factorio's trains); the fog mask drawn at low resolution, upscaled and blurred. A remembered chunk says how old it is, so a ghost doesn't pass for the present.
+
+## 3. Can a fungus see?
+
+**What the parasite does inside an ant.** Fredericksen et al. (2017, PNAS) imaged *Ophiocordyceps unilateralis* s.l. in manipulated *Camponotus castaneus* in 3-D. "Fungal cells were found throughout the host body but not in the brain", and they formed connected networks around the muscles. The authors conclude that the fungus's control of the body "occurs peripherally", perhaps by chemical means, and call the networks a possible "collective foraging behavior" of the parasite ([PMC5703306](https://pmc.ncbi.nlm.nih.gov/articles/PMC5703306), read in full; the discussion only through a summary). Nothing there shows the fungus reading its host's senses. Will, Attardo & de Bekker (2023, Sci. Rep.) point at disrupted neurotransmitter signalling during summiting and name the clock and olfaction genes as possible targets ([paper](https://www.nature.com/articles/s41598-023-40065-0.pdf), **unverified**): the fungus changes what the host senses and when it acts, it does not use it as eyes.
+
+**What a fungus senses of its own.** An entomopathogen meets its host by contact: "Infection begins with attachment of single-celled dispersive forms of the fungus" to the cuticle, by "non-specific passive adsorption" then consolidation, through hydrophobins and the MAD1 adhesin, and the cuticle's lipids and hydrocarbons "promote or inhibit fungal attachment" (Ortiz-Urquiza & Keyhani 2013, *Insects*, [PMC4553469](https://pmc.ncbi.nlm.nih.gov/articles/PMC4553469), read in full). Hyphal tips steer toward chemical gradients at short range ([hyphal-traffic](hyphal-traffic.md#mechanism-what-a-tip-could-sense-of-a-passing-ant-2026-11-23)). **No measured sensing distance for mycelium was found** in this search or in hyphal-traffic's nine.
+
+**In the game:** the player is the fungus, and "seeing through the hosts" is a game abstraction, marked **design**: the parasite's cells reach every part of its host (Fredericksen 2017), and the player is shown what the host's antennae reach. The body's own sight of about 2 cells is **design** too, the order of contact plus short-range chemistry, below the 3 cells of the tip's traffic sense ([vision.md](vision.md), sense table). Neither is a policy input: no ant and no fungal lane reads the fog.
+
+## 4. The model
+
+### 4.1 Observers
+
+One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
+
+- **Hosts:** living ants of the player's strain (`fungus.evolution.strain`) with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Today's `SensedMap` takes every strain; the lab's painted strains are not the player's. A queen or alate host sees as an ant does.
+- **The body:** every hypha cell (`hyphaeOn(l).parent`), mat, patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
+- **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
+
+**In the game:** sight is a property of the player's organism and its hosts, read from what the simulation already holds. It adds no sense, no action and no situation field.
+
+### 4.2 Three states per cell
+
+- **Explored:** a bitset per layer and chunk, one bit a cell (512 B a chunk), set on first sight and never cleared. Per cell rather than per chunk (the endless note's first proposal): a chunk is 64 cells across, about 16 host reaches, so a per-chunk bit would show far more than was sensed.
+- **Live:** stamped by an observer at the current step, or within a short grace (proposed 0.5 s) so the edge of a walking host's disc doesn't flicker.
+- **Remembered:** explored and not live.
+
+### 4.3 Last-seen snapshots
+
+- When a chunk's last live cell goes out, its paint inputs are copied as its snapshot, with the time: rock, food and quality, spoil, chambers, the hyphae and spore cells. That is `MapChunkPaintCache`'s format.
+- Live cells in a remembered chunk write through to its snapshot, so a host at a chunk's corner updates that corner only.
+- A chunk never sensed has no snapshot. One whose snapshot equals the truth draws the same either way.
+- Ants, brood, queens and alates are never in a snapshot (owner). Corpses on the ground are an open call (§10).
+
+### 4.4 Known colonies
+
+A colony is **known** once an observer has sensed a cell of its nest disc or it holds a host. From then on the readouts list it. Its numbers are live while it holds a host, and frozen at the step its last host left, with "as of". An observer that senses its nest again without a host learns that the nest is there (and, if it is gone, that it is gone), not its counts.
+
+**Scent stays as §65 has it:** trails and alarm show where sensed within 20 s. In remembered cells they have faded; in live cells they are the truth.
+
+## 5. The picture
+
+### 5.1 The field (`ja-1ypq.3`)
+- **Behind a setting.** `fog` off draws today's field pixel for pixel (`scripts/field-shots.mjs`).
+- Ground, hexagon mode, the voxel pass, the strip and the minimap draw remembered cells from the snapshot, greyed, and unknown cells as fog.
+- Ants, the queen, brood and alates draw only in live cells.
+- The fog mask is drawn per cell at low resolution, upscaled and blurred, and snapped to the grid (§2).
+
+### 5.2 Picking and cards (`ja-1ypq.4`)
+- Only ants in live cells can be picked.
+- Following a non-host ends with "lost sight" when it leaves; hosts stay followable.
+- The lens and cell inspection show the snapshot on a remembered cell with "last seen N s ago", and "unexplored" on an unknown one.
+- Specimens lose track out of sight.
+- Chamber labels appear only for known nests.
+
+### 5.3 Readouts (`ja-1ypq.5`)
+- Stats, history, goal toasts, nest badges and the go-to menu list known colonies only, live or as of (§4.4).
+- **Proposed:** the Lab's cards and the dev hook stay omniscient, since they are tools rather than play.
+
+### 5.4 The start and the builder (`ja-1ypq.6`)
+- At landing only the patch and its `BODY_SIGHT` are explored. The landing colony's hole shows only if it lies within reach.
+- **Proposed:** fog is off while the builder is on, as smell vision already overrides §65 there (PRD §73).
+- The page's default flips to fog on once the owner has played it.
+
+## 6. On the endless world (`ja-1ypq.7`, in E5 `ja-qpv.4`)
+- **The camera** may go anywhere explored, plus a margin. That replaces the map's clamp, as [endless-world §8](endless-world.md#8-saves-and-the-page) asks.
+- **Lines.** Knowledge is keyed by layer, so each line's curtain keeps its own.
+- **Frozen colonies** need nothing special. A frozen colony is where the fungus is not, so it is remembered ground showing its last-seen state, which is what the endless note asks for.
+- **Memory** grows with ground explored: 512 B a chunk for the bits, which is 5 MB at 10,000 chunks, plus snapshots. A snapshot of a chunk unchanged since it was seen can be dropped and drawn from the seed plus the chunk's delta, so snapshots grow with ground changed out of sight. A soak measures it: a host walks 50 U out and back.
+- **Saves** carry the explored bits and the snapshots. No backward compatibility is needed (owner, 2026-11-10).
+
+## 7. Other organisms (`ja-1ypq.8`)
+
+[vision.md](vision.md#the-ladder)'s ladder gives each new organism its own sense table. The fog takes an observer's reach from that table: a termite host from its antennae, a lichen partner (PRD §85) from whatever its note finds it senses. The first one writes the contract test: an observer stamps only its reach, only while alive, only on its layer. Several organisms of the player's are then several observer kinds feeding one knowledge model.
+
+## Play
+
+- **See:** the map starts dark round a small landing patch. It opens as the mycelium grows and as hosts walk, and stays behind them as remembered, greyed ground, with ants only where the fungus is. A nest the fungus left is shown as it was, aged; what happened there since is unknown until a host goes back.
+- **Choose:** where to spread now decides what the player can see. Infecting a forager that walks far is a scout. Growing the body toward a nest keeps it in sight. Which colony to work on is chosen from what is known, not from a map handed over.
+- **Progression:** the visible world grows with the fungus, a slope. On the endless world the fog is the frontier the endless note wants ("the fog makes the frontier something to push").
+- **Counterplay:** colonies that groom out their hosts blind the player there. Social immunity costs sight as well as hosts.
+- **Cost:** no Jev tokens: no legend, question or situation changes, and a cached game still spends nothing. The CPU cost is stamping per step plus the fog mask per frame; the memory cost is §6's.
+- **What could make it worse:**
+  - **Too dark to learn from.** A new player sees little before the first host. Watch the tutorial's first steps and the time to the first host (§61.2's measurements).
+  - **Ghosts that mislead.** A remembered nest that is long gone. "Last seen N s ago" says how old it is.
+  - **A blind spell.** When every host dies, only the body sees. That is honest, but the readouts must still say what is known.
+  - **Edge flicker** at a walking host's disc: the grace period and the blurred mask.
+  - **A cost that runs away** at a big mycelium: F1 measures it before choosing how to stamp the body.
+
+## 8. Stages
+
+| Stage | What | Guard |
+|---|---|---|
+| F1 observers (`ja-1ypq.1`) | one observer interface; player-strain hosts and the living body; stamped on the sim clock | goldens bit-exact; the same stamps at 30 and 60 fps; stamp under 0.5 ms a step at a big mycelium |
+| F2 knowledge (`ja-1ypq.2`) | `ui/fog/`: explored bits, live with grace, snapshots on leaving, known colonies, a `FogView` | a change while away is not shown; a snapshot equals the truth when its chunk left sight; bytes per chunk measured |
+| F3 the field (`ja-1ypq.3`) | ground, voxel, strip and minimap through the view; ants only where live; the fog mask | off is pixel-identical (`field-shots`); an e2e section; frame time within noise |
+| F4 picking and cards (`ja-1ypq.4`) | live picking, "lost sight", last-seen lens and inspection, specimens, chamber labels | a test per surface on a remembered and an unknown cell |
+| F5 readouts (`ja-1ypq.5`) | known colonies in stats, history, toasts, badges, go-to | an unknown colony is absent; numbers freeze and resume |
+| F6 start and builder (`ja-1ypq.6`) | the landing patch only; fog off while building; the default flips | the e2e landing section; the owner's go |
+| F7 endless (`ja-1ypq.7`, in `ja-qpv.4`) | camera to explored ground; per line; saves; the memory soak | the soak; a save and load keeps the fog |
+| F8 other organisms (`ja-1ypq.8`) | the observer contract | the contract test |
+
+F1 and F2 change nothing on the page and can land before the endless world. F3–F6 work on today's bounded world behind the setting. F7 waits for E3 and E4.
+
+## 9. Still open
+
+**Decided (owner, 2026-11-23):**
+1. The fungus's living body sees about 2 cells (hyphae, mats, patches, flowers); spores and corpses see nothing.
+2. Remembered ground is ground, without ants, with "last seen".
+3. Readouts cover known colonies, live or as of when they were last known.
+4. The start reveals only the landing patch.
+
+**Still open, each with a recommendation:**
+1. **Corpses in snapshots.** Recommend remembering them, as ground items: they don't move.
+2. **Fog while building.** Recommend off, as smell vision is.
+3. **The Lab and dev hook.** Recommend that they stay omniscient.
+4. **The grace period.** Recommend 0.5 s, set in F3 by eye and by an edge-flicker test.
+5. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
+6. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
+7. **Whether hosts of other strains see** (the lab's painted strains). Recommend no: only the player's strain.
+
+## Sources
+
+Read in full:
+- Fredericksen MA, Zhang Y, Hazen ML, Loreto RG, Mangold CA, Chen DZ, Hughes DP (2017). Three-dimensional visualization and a deep-learning model reveal complex fungal parasite networks in behaviorally manipulated ants. *PNAS* 114(47):12590–12595. https://pmc.ncbi.nlm.nih.gov/articles/PMC5703306
+- Ortiz-Urquiza A, Keyhani NO (2013). Action on the surface: entomopathogenic fungi versus the insect cuticle. *Insects* 4(3):357–374. https://pmc.ncbi.nlm.nih.gov/articles/PMC4553469
+
+Seen only in search summaries (**unverified**; the hosts were outside this session's network):
+- Will I, Attardo GM, de Bekker C (2023). *Sci. Rep.* https://www.nature.com/articles/s41598-023-40065-0.pdf
+- Blizzard, StarCraft II map elements: https://news.blizzard.com/en-us/article/4546768/game-guide-map-elements ; Zerg creep: https://news.blizzard.com/en-us/starcraft2/5838584/game-guide-zerg-creep
+- Wildfire Games, 0 A.D. `Los.h`: https://docs.wildfiregames.com/pyrogenesis/Los_8h_source.html ; manual terminology: https://trac.wildfiregames.com/wiki/Manual_Terminology?version=16 ; terrain occlusion declined: https://trac.wildfiregames.com/ticket/3634
+- Catlike Coding, Hex Map parts 21–22: https://catlikecoding.com/unity/tutorials/hex-map/part-21 , https://catlikecoding.com/unity/tutorials/hex-map/part-22/
+- Riot Games, the fog of war in League of Legends: https://technology.riotgames.com/node/39
+- Bettner P, Terrano M (2001). 1500 archers on a 28.8: https://www.gamedeveloper.com/programming/1500-archers-on-a-28-8-network-programming-in-age-of-empires-and-beyond
+- Factorio wiki, Radar: https://wiki.factorio.com/Radar
+- Age of Empires II manual: https://www.scribd.com/document/36345894/Age-of-Empires-II-Manual-PC ; ghost reports: https://forums.ageofempires.com/t/double-building-in-fog-bug-fog/72440
+- OpenRA traits: https://docs.openra.net/en/release/traits/ ; Warzone 2100 ticket 3959: https://developer.wz2100.net/ticket/3959
+- Pikmin radar map: https://pikminwiki.com/Radar_Map ; Dwarf Fortress adventure mode: https://dwarffortresswiki.org/index.php/Adventure
+- Gamedev.net, RTS retrospective part 3: https://www.gamedev.net/tutorials/game-design/game-design-and-theory/retro-mortis-rts-part-3-forged-in-steel-r3898
+
+Not found: a measured sensing distance for mycelium; a shipped game where a parasite sees through its hosts; Factorio's own write-up on charting; StarCraft II's official snapshot rules.

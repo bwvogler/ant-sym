@@ -185,7 +185,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 - `#outField` becomes a window round the colony's own hole on its own line, 193 columns wide and widened only when a tunnel reaches its edge, not the whole curtain (E1.4, `OutField` in `homing.ts`);
 - `cellKey` widens to the chunk key's range (E1.3: one key in `hex.ts`, where `grid.ts`, `hyphae.ts`, `transect.ts` and the forks each had their own).
 
-**`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit for the fog (§8).
+**`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit (§8); the fog keeps its own explored bits per cell ([fog-of-war §4.2](fog-of-war.md#42-three-states-per-cell)).
 
 **The memory budget**, a soak test (E4):
 - a host walks 50 U out and back;
@@ -202,7 +202,7 @@ The numbers are set from E1's measurements. Nothing measures memory today.
 - **Camera:** no hard clamp. The view can go anywhere revealed, plus a margin, with a fixed least zoom instead of "the whole map". "Zoomed in", which turns the minimap on, becomes a zoom level.
 - **Chunk canvases** (`ColonyField.tsx`): evicted when far off-screen, and repainted only when their chunk changed (a dirty flag per chunk), not every frame.
 - **The minimap:** a window of a fixed number of chunks round the camera, drawn from the same chunk canvases, with nests marked beyond its edge by arrows.
-- **Fog of war:** one revealed bit per chunk. **Proposed:** revealed where `SensedMap` says a host has sensed (PRD §65 already draws trails only there), plus a disc round the start nests. The fog then shows the fungus's own reach, and spreading it is the way to see. A frozen region shows its last-seen state. The owner decides (§10).
+- **Fog of war:** designed in [fog-of-war](fog-of-war.md) (PRD §89, `ja-1ypq`; owner, 2026-11-23). An explored bit per cell rather than per chunk, revealed by the fungus's hosts and its living body (no disc round the start nests: the start reveals only the landing patch), with remembered ground drawn as last seen and no ants. A frozen region is remembered ground. The fog's share of this stage is `ja-1ypq.7`.
 - **The side view:** the line under the click, or the followed ant's line.
 
 ## 9. Building it: stages and guards
@@ -248,7 +248,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 **Still open, each with a recommendation:**
 1. **Wild density.** Recommend one site per 4 × 4 chunks to start, tuned at E6.
 2. **A wild colony's size on waking.** Recommend the size a start colony reaches in 10 minutes, measured in E4.
-3. **What reveals the fog.** Recommend where `SensedMap` says hosts sensed, plus the start nests.
+3. ~~**What reveals the fog.**~~ Decided (owner, 2026-11-23): the fungus's hosts and its living body, from the landing patch only; see [fog-of-war](fog-of-war.md).
 4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
 5. **The flight distance.** Recommend 2 U to start, set at E6.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.

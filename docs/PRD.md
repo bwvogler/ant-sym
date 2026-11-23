@@ -7699,3 +7699,64 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 **Sense table and mechanism (owner, 2026-11-23: "Yes, add it to the sense table - maybe need to do 'add mechanism' research").** "Ants near a hypha tip" is a row of vision.md's sense table (design), and fungus-policy §11.2 points at it. The mechanism research ([hyphal-traffic.md](hyphal-traffic.md#mechanism-what-a-tip-could-sense-of-a-passing-ant-2026-11-23), abstracts only): fungal tips steer by chemical gradients through receptors (Fusarium Ste2/Ste3 toward host peroxidase, Aspergillus to nutrients and pH, Trichoderma at a distance), CO₂ is a conserved fungal signal, and touch steers at a point; **none found in the abstracts of nine Europe PMC queries (and six of the reviewer's): a tip sensing an ant or traffic, a CO₂ gradient steering a tip, or vibration**, so the cue stays design. What the game's count stands for, and what it simplifies (specific ligand; persistence, which is option C), is in the note. Still open: the full texts, an entomopathogen-specific search that found nothing so far, and a measured range for an ant's plume in soil (`ja-ogph.1`).
 
 **Still open.** The research full texts and an entomopathogen-specific mechanism search (`ja-ogph.1`); a measured range for an ant's plume in soil; a footfall memory (option C) as the closer stand-in for a deposited cue; the band edges and levels of a banded sense if the lean is ever moved off the plain count.
+
+## 89. The player sees only what its organisms sense (design, ja-1ypq, 2026-11-23)
+
+**Research basis:** [fog-of-war.md](fog-of-war.md).
+- Strategy games use three states per cell: unknown, remembered (explored, nobody there now) and live. Buildings and terrain are remembered as last seen; units are not (Warcraft II, Age of Empires II, OpenRA, Factorio's chart, which leaves trains off). All from search summaries (**unverified**).
+- *Ophiocordyceps* forms networks through its host's body but not inside the brain, and controls the body "peripherally" (Fredericksen et al. 2017, read in full). Entomopathogens meet a host by contact with its cuticle (Ortiz-Urquiza & Keyhani 2013, read in full). No paper shows a fungus reading its host's senses, and no measured sensing distance for mycelium was found. The fungus's sight is therefore **design**.
+- No shipped game was found where a parasite sees through its hosts.
+
+**The problem.** The owner asked (2026-11-23) for groundwork, ahead of the endless world (§66, `ja-qpv`), toward a fog of war. The player should see only what the fungus and its infected ants have sensed, and where they leave, the page should draw no updates. Today `SensedMap` (§65) gates only trails and alarm. The renderer and every card read the live `Game`: every ant, nest, chamber, badge, stat and toast shows everywhere ([fog-of-war §1](fog-of-war.md#1-where-we-are)).
+
+**Decisions** (owner, 2026-11-23):
+1. **The fungus's living body sees about 2 cells:** hyphae, mats, patches and flowers. Spores and corpses see nothing.
+2. **Remembered ground shows the last-seen state, never ants:** rock, tunnels, food, spoil, mounds, chambers, hyphae and nests, with "last seen N s ago". Ants, brood and queens show only where live.
+3. **Readouts cover known colonies.** A colony is known once its nest has been sensed or it holds a host. Its numbers are live while it holds hosts, otherwise as of when the last one left. The go-to menu lists only nests already seen.
+4. **The start reveals only the landing patch** and its sight. This replaces endless-world §8's start-nest discs.
+
+**Proposed** (needs the owner): fog off while the builder is on; the Lab and dev hook stay omniscient; corpses remembered as ground items; a grace of 0.5 s against edge flicker; only the player's strain sees.
+
+**The mechanic.**
+- **Observers:**
+  - hosts of the player's strain, at `sensorDistance + REACH_MARGIN`;
+  - the living body, at `BODY_SIGHT` = 2;
+  - stamped on the sim clock, not per frame.
+- **Knowledge** (`ui/fog/`, pure TS):
+  - an explored bit per cell (512 B a chunk);
+  - live = stamped this step, plus the grace;
+  - a snapshot of a chunk's paint inputs (`MapChunkPaintCache`'s format) copied when its last live cell goes out, with live cells writing through;
+  - known colonies with their last-known numbers.
+- **The picture** draws through a `FogView` behind a `fog` setting whose "off" is today's field pixel for pixel.
+- **What the simulation reads:** nothing. Goldens stay bit-exact. It retires no gap and adds none.
+
+**Play.** The map opens as the mycelium grows and as hosts walk, and stays behind them as greyed, last-seen ground. Infecting a far forager is scouting. Grooming that clears hosts also blinds the player. On the endless world the fog is the frontier ([fog-of-war, Play](fog-of-war.md#play)).
+
+**Guards** (no behaviour assays: it is a picture only):
+- goldens bit-exact at every stage;
+- the same stamps at 30 and 60 fps;
+- a snapshot equals the truth at the step its chunk left sight;
+- with fog off, `field-shots` hashes are unchanged;
+- an e2e section for a host walking away;
+- the memory soak (F7).
+
+**Cost.** Jev: none. No legend, question or situation changes, and a cached game spends nothing.
+- CPU: stamping per step (budget 0.5 ms at a big mycelium) and the fog mask per frame.
+- Memory: 512 B per explored chunk, plus snapshots of chunks changed out of sight.
+- Each is measured in its stage and written here.
+
+**Beads.** `ja-1ypq` (epic). Children:
+- `ja-1ypq.1` F1 observers;
+- `ja-1ypq.2` F2 knowledge;
+- `ja-1ypq.3` F3 the field;
+- `ja-1ypq.4` F4 picking and cards;
+- `ja-1ypq.5` F5 readouts;
+- `ja-1ypq.6` F6 start and builder;
+- `ja-1ypq.7` F7 endless (blocks `ja-qpv.4`);
+- `ja-1ypq.8` F8 other organisms.
+
+**Still open.**
+- The proposals above.
+- How the body is stamped (F1 measures).
+- A fading memory (not now).
+- The game sources' full texts: their hosts were outside this session's network.
