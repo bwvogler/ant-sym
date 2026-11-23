@@ -165,6 +165,7 @@ test("mutations: a fixed share of growth in two pools, each level costs its pool
   e.feed(price(0) / MUTATION);
   assert.ok(Math.abs(e.pools.free - price(0)) < 1e-9, "growth on the ground and corpses is the free pool's");
   assert.ok(e.buy("mycelium"), "paid from the free pool");
+  assert.ok(Math.abs(e.pools.free) < 1e-9, "and the free pool is down by its price");
   assert.equal(e.cost("knots"), price(1), "one free level kept: the next free level costs the second price");
   assert.equal(e.cost("senses"), price(2), "and the ants' count is two");
   assert.equal(e.traits().transmission, upgrade("infectivity").values![1]);
@@ -222,6 +223,8 @@ test("the tree: a level that needs another can't be kept before it, and says wha
   const c = e.cost("trails")!;
   assert.equal(canKeep(e.save().levels, { ants: c, free: 0 }, "trails"), true, "exactly the price is enough");
   assert.equal(canKeep(e.save().levels, { ants: c - 1, free: 0 }, "trails"), false, "one short is not");
+  assert.equal(canKeep(e.save().levels, { ants: 0, free: 1e6 }, "infectivity"), false, "the free pool does not pay an ants level");
+  assert.equal(canKeep(e.save().levels, { ants: 1e6, free: 0 }, "mycelium"), false, "the ants pool does not pay a free level");
   assert.ok(e.buy("trails") && e.buy("senses"));
   assert.deepEqual(
     pathTo({}, "crown"),

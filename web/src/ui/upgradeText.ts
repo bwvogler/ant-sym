@@ -2,7 +2,19 @@
 // (colony/evolution.ts UPGRADES) and the lever table (colony/levers.ts LEVERS), so a level's numbers and a lever's name
 // can't drift from what the game does; only the "why it matters" lines are written here. `ui/tests/upgradeText.test.ts`
 // fails when an upgrade, a level or a lever has no explanation.
-import { KNOT, LEVERS, STALK, nextCost, unmet, upgrade, type Lever, type Need, type Trait, type Upgrade } from "../colony/index.ts";
+import {
+  ANTS_START,
+  KNOT,
+  LEVERS,
+  STALK,
+  nextCost,
+  unmet,
+  upgrade,
+  type Lever,
+  type Need,
+  type Trait,
+  type Upgrade,
+} from "../colony/index.ts";
 
 /** One level of an upgrade: its name, and what it means (the numbers are the table's). */
 export interface LevelText {
@@ -135,9 +147,8 @@ export function nextLevelTip(
 /** Tooltips for the panel's two top figures. */
 export const MUTATION_TIP =
   "A mutation is one change the fungus can keep. Every bit of new fungus (its mycelium growing on the ground, and load passing from ant to ant) is a chance to mutate, so the faster it grows, the faster they come. They come in two pools: fungus made in ants pays for the levels that act on ants, and fungus made on the ground and in corpses pays for the fungus's own (mycelium, knots, stalks, fruiting). You choose which upgrade gets them. Some levels need others kept first (a level of one pool can need a level of the other), and each pool has its own price, which rises with each level you keep from it. In real fungi mutations are random and selection keeps what works; here you do the keeping. The figure after is how many a minute it is making now, in both pools.";
-export const ANTS_TIP =
-  "Mutations from fungus made in ants (load passed from ant to ant): they pay for infectivity, persistence, immune evasion, stealth, senses, recognition, trails, royal, the odour weapon and the crown. Their price rises with each of those levels you keep. The fungus lands with three of them, the first two levels' worth: the spread starts with these levels, and this pool fills only from fungus passed between ants.";
+export const ANTS_TIP = `Mutations from fungus made in ants (load passed from ant to ant): they pay for infectivity, persistence, immune evasion, stealth, senses, recognition, trails, royal, the odour weapon and the crown. Their price rises with each of those levels you keep. The fungus lands with ${ANTS_START} of them, so the spread can start; after that this pool fills only from fungus passed between ants.`;
 export const FREE_TIP =
-  "Mutations from fungus made on the ground and in corpses: they pay for the fungus's own levels: mycelium, knots, stalks and fruiting. Their price rises with each of those levels you keep. This pool is small next to the ants': most fungus is made in ants.";
+  "Mutations from fungus made on the ground and in corpses: they pay for the fungus's own levels: mycelium, knots, stalks and fruiting. Their price rises with each of those levels you keep. This pool earns less than the ants': most fungus is made in ants.";
 export const BODY_TIP =
   "Mycelium: the fungus growing on the ground by the hole, which puts out spores. In ants: the fungus carried by hosts, in all. Both are in units of fungus; the mycelium's mass is capped by the Mycelium upgrade.";
