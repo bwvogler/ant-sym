@@ -70,6 +70,6 @@ const assay = {
   },
 };
 const t0 = Date.now();
-const res = runAssay(assay, Number(seedS), { colony: set, rival: set }, Number(secS));
+const res = runAssay(assay, Number(seedS), { colony: set, second: set }, Number(secS));
 writeFileSync(out, JSON.stringify({ seed: Number(seedS), law: set.piErrorLaw, at: set.piErrorAt, metrics: res.metrics, lost, rows }));
 console.log(`seed ${seedS} law ${lawS}: ${((Date.now() - t0) / 1000).toFixed(0)} s, lost ${lost}, maxHeld ${res.metrics.maxHeld}`);
