@@ -14,7 +14,9 @@ import {
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import Help from "./Help.tsx";
 import { journalLine } from "./journal.ts";
+import { LEVER_KIND, LEVER_KINDS } from "./leverKinds.ts";
 import { colonyName, colonyTone } from "./names.ts";
+import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
 import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
 import { useJev, useJevSession } from "./jevContext.tsx";
@@ -387,28 +389,22 @@ export function Lab({ game, controls, update }: Props) {
               <div key={k} className="mt-2">
                 <div className="flex items-center justify-between">
                   <span className={colonyTone(k)}>{colonyName(k)}</span>
-                  <div className="flex overflow-hidden rounded-md border border-line text-sm">
-                    {DOCTRINES.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className={seg(d.id === p.id)}
-                        disabled={locked}
-                        onClick={() => jev.setDoctrine(k, { id: p.id, text: p.text })}
-                      >
-                        {p.name}
-                      </button>
-                    ))}
-                  </div>
+                  <PresetPicker
+                    label={`${colonyName(k)} doctrine presets`}
+                    presets={DOCTRINES}
+                    active={(p) => d.id === p.id}
+                    disabled={locked}
+                    onPick={(p) => jev.setDoctrine(k, { id: p.id, text: p.text })}
+                  />
                 </div>
-                <textarea
-                  className="mt-1 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+                <WordsBox
+                  label={`${colonyName(k)} doctrine`}
+                  className="mt-1 w-full px-2 py-1.5 text-xs"
                   rows={3}
                   value={d.text}
                   disabled={locked}
-                  onChange={(e) => jev.draftDoctrine(k, { id: "custom", text: e.target.value })}
-                  onBlur={(e) => jev.setDoctrine(k, { id: d.id, text: e.target.value })}
-                  aria-label={`${colonyName(k)} doctrine`}
+                  onDraft={(text) => jev.draftDoctrine(k, { id: "custom", text })}
+                  onCommit={(text) => jev.setDoctrine(k, { id: d.id, text })}
                 />
               </div>
             ))
@@ -628,9 +624,9 @@ export function LeverChips({
   const hasNest = useGameRead(() => game.fungus.hasNest);
   return (
     <div className="mt-1 flex flex-col gap-1 text-xs">
-      {(["perceive", "emit", "lethal"] as const).map((kind) => (
+      {LEVER_KINDS.map((kind) => (
         <div key={kind} className="flex flex-wrap items-center gap-1">
-          <span className="w-16 text-fg-3">{kind === "perceive" ? "perceives" : kind === "emit" ? "gives off" : "lethal"}</span>
+          <span className="w-16 text-fg-3">{LEVER_KIND[kind].row}</span>
           {/* the nest's levers (floor marks, crown) only where there is a nest */}
           {LEVERS.filter((v) => v.kind === kind && (hasNest || !NEST_ONLY.has(v.id))).map((v) => {
             const on = menu.includes(v.id);
@@ -644,7 +640,7 @@ export function LeverChips({
                 type="button"
                 aria-pressed={on}
                 disabled={locked}
-                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? (lethal ? "border-err bg-err-soft text-err" : "border-accent bg-accent-soft text-accent") : "border-line text-fg-3 hover:bg-raised"}`}
+                className={`rounded-md border px-2 py-0.5 font-mono ${nothing ? "line-through" : ""} disabled:cursor-not-allowed disabled:opacity-60 ${on ? LEVER_KIND[v.kind].chipOn : "border-line text-fg-3 hover:bg-raised"}`}
                 title={
                   locked
                     ? (lock ?? undefined)
