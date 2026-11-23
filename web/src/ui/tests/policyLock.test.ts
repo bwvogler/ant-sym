@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canResume, policyLock, shouldStart, type JevStatus } from "../policyLock.ts";
+import { readFileSync } from "node:fs";
+import { applyJevFlags, canResume, policyLock, shouldStart, type JevStatus } from "../policyLock.ts";
 
 const server = { hasBackend: true, hasKey: true };
 const caps = { capUsd: 0.1, capSeconds: 1800 };
@@ -68,4 +69,38 @@ test("Resume is offered only where a run could start", () => {
   assert.equal(canResume(server, off, true), false);
   assert.equal(canResume({ hasBackend: true, hasKey: false }, off, false), false);
   assert.equal(canResume({ hasBackend: false, hasKey: false }, off, false), false);
+});
+
+// The effect that tells the client and the page's setters whether Jev can run (useColonyJev): the paid-run path's last step before a miss starts one.
+
+test("applyJevFlags: the client may ask exactly when there is no lock, and the page's refs hold the lock and whether a miss may start a run", () => {
+  const jev = { canAsk: false };
+  const refs = { lockRef: { current: "x" as string | null }, startRef: { current: false } };
+  applyJevFlags(jev, refs, null, true);
+  assert.deepEqual([jev.canAsk, refs.lockRef.current, refs.startRef.current], [true, null, true]);
+  applyJevFlags(jev, refs, "No Jev server", false);
+  assert.deepEqual([jev.canAsk, refs.lockRef.current, refs.startRef.current], [false, "No Jev server", false]);
+  applyJevFlags(jev, refs, null, false);
+  assert.deepEqual(
+    [jev.canAsk, refs.lockRef.current, refs.startRef.current],
+    [true, null, false],
+    "unlocked, with a run on: asks, and a miss starts none",
+  );
+});
+
+test("whether a miss may start a run changes while the lock stays null (a run's time cap), so the effect depends on both", () => {
+  const during = { lock: policyLock(server, running), startable: shouldStart(server, running, false) };
+  const after = { lock: policyLock(server, stopped("time-cap")), startable: shouldStart(server, stopped("time-cap"), false) };
+  assert.deepEqual(during, { lock: null, startable: false }, "a run is on: no start");
+  assert.deepEqual(after, { lock: null, startable: true }, "its time cap ended it: the lock is still null and a miss may start another");
+});
+
+test("useColonyJev's flags effect depends on every input it passes (a stale one would leave a miss unable to start a run, or starting one it should not)", () => {
+  const src = readFileSync(new URL("../useColonyJev.ts", import.meta.url), "utf8");
+  const m = /useEffect\(\(\) => applyJevFlags\(([^)]*)\), \[([^\]]*)\]\)/.exec(src.replace(/\s+/g, " "));
+  assert.ok(m, "the effect is where the test looks for it");
+  const inputs = ["jev", "lock", "startable"];
+  for (const i of inputs) assert.ok(new RegExp(`\\b${i}\\b`).test(m![1]!), `${i} is an input`);
+  const deps = m![2]!.split(",").map((d) => d.trim());
+  assert.deepEqual([...deps].sort(), [...inputs].sort(), "the dependency list is the inputs, no more, no fewer");
 });
