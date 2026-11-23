@@ -407,6 +407,10 @@ const SCENES = [
     name: "marks-trace-walk",
     page: "walk",
     run: async (p) => {
+      // what the marks page has done by its trace scene: the world played, the camera at the nest with ants in view, the builder open
+      await ticks(p, 900);
+      await p.evaluate(() => window.jevAnts.goNest(0));
+      await sleep(1500);
       await p.getByRole("button", { name: "Builder", exact: true }).click();
       await tool(p, "Tweezers: pick up an ant");
       const { sx, sy } = await antScreen(p, 0, 0);
