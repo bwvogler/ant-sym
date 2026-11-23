@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { Colony } from "../../colony/index.ts";
+import { INFECTED, type Colony } from "../../colony/index.ts";
 import { decayStage } from "../cadaverVisual.ts";
 import { toScreen } from "../camera.ts";
 import { odourColour } from "../field/colour.ts";
@@ -57,6 +57,7 @@ interface Opts {
   nestImage?: boolean;
   cadaverDraws?: boolean;
   died?: number;
+  reduced?: boolean;
 }
 
 function setup(ants: Ant[], o: Opts = {}) {
@@ -93,7 +94,7 @@ function setup(ants: Ant[], o: Opts = {}) {
     v: V,
     c: { ...CAM, zoom: o.zoom ?? CAM.zoom },
     lv: o.lv ?? 1,
-    env: { reducedMotion: () => false },
+    env: { reducedMotion: () => !!o.reduced },
     sprites: {
       worker: { get: (_lod: string, tint: number[]) => (tints.push(tint), o.workerImage ? { toString: () => "worker" } : null) },
       gait: { update: () => gaitCalls.push("update"), pose: (_c: unknown, i: number) => (gaitCalls.push(`pose ${i}`), i + 1) },
@@ -302,4 +303,48 @@ test("a carried corpse asks for the dead's stage of decay at its head; the tail 
   const [, y] = screen(50, 40);
   const tail = wide.rec.log.filter((l) => l.startsWith("moveTo("))[1]!;
   assert.equal(tail, `moveTo(${fmt(screen(50, 40)[0] - HALF * 0.45)}, ${fmt(y + 2)})`);
+});
+
+test("a band with only the dead in it is not stroked; a sheet that is ready is not used below the hexagon zoom; reduced motion has no walking pose", () => {
+  const dead = run([
+    { x: 50, y: 40, odour: 0 },
+    { x: 51, y: 40, odour: 0.95, alive: false },
+  ]);
+  assert.equal(dead.rec.log.filter((l) => l === "stroke()").length, 3, "one band: its body and tail strokes, and the pellets' stroke");
+  const flat = run([{ x: 50, y: 40 }], { hexes: false, workerImage: true, zoom: 40 });
+  assert.equal(flat.rec.log.filter((l) => l.startsWith("drawImage(")).length, 0, "not hexagon zoom: strokes");
+  assert.deepEqual(flat.tints, [], "and the sheet is not even asked for");
+  const exact = run([{ x: 50, y: 40 }], { hexes: true, workerImage: true, zoom: 12 });
+  assert.equal(exact.rec.log.filter((l) => l.startsWith("drawImage(")).length, 0, "at the hexagon zoom exactly the fade has not begun");
+  assert.ok(exact.rec.log.filter((l) => l.startsWith("moveTo(")).length > 0);
+  const still = run([{ x: 50, y: 40 }], { hexes: true, workerImage: true, zoom: 40, reduced: true });
+  assert.deepEqual(still.gaitCalls, ["update"], "reduced motion: no pose");
+  assert.equal(still.rec.log.filter((l) => l.startsWith("drawImage(worker")).length, 1, "but the sprite");
+});
+
+test("the sprite fades in as the stroke fades out: a quarter in at 12.5, the stroke at three quarters", () => {
+  const s = run([{ x: 50, y: 40 }], { hexes: true, workerImage: true, zoom: 12.5 });
+  const log = s.rec.log;
+  const sprite = log.indexOf("globalAlpha = 0.25");
+  assert.ok(sprite >= 0 && log[sprite + 1]!.startsWith("drawImage(worker"), "the sprite at a quarter");
+  assert.ok(log.includes("globalAlpha = 0.75"), "the stroke at three quarters");
+});
+
+test("a load exactly at the infection threshold shows its faint dot", () => {
+  const s = run([{ x: 50, y: 40, load: INFECTED }]);
+  const [x, y] = screen(50, 40);
+  assert.ok(s.rec.log.includes(`fillRect(${fmt(x - DOT / 2)}, ${fmt(y - DOT / 2)}, ${fmt(DOT)}, ${fmt(DOT)})`));
+});
+
+test("a soil crumb's sprite is the crumb column, as a crumb of food is; the cross and soil stroke at a device pixel's worth, 0.8 of it above 1.25", () => {
+  const sx = (log: string[]) => log.find((l) => l.startsWith("drawImage(resource"))!.split(", ")[1];
+  const soil = run([{ x: 50, y: 40, pellet: 1 }], { resourceImage: true, hexes: true, zoom: 40 }).rec.log;
+  const crumbFood = run([{ x: 50, y: 40, carrying: 1, quality: 0.5 }], { resourceImage: true, hexes: true, zoom: 40 }).rec.log;
+  const plainFood = run([{ x: 50, y: 40, carrying: 1, quality: 1 }], { resourceImage: true, hexes: true, zoom: 40 }).rec.log;
+  assert.equal(sx(soil), sx(crumbFood));
+  assert.notEqual(sx(soil), sx(plainFood));
+  const one = run([{ x: 50, y: 40, pellet: 1 }], { d: 1 }).rec.log;
+  assert.equal(one[one.indexOf("strokeStyle = #mound") + 1], "lineWidth = 1");
+  const two = run([{ x: 50, y: 40, pellet: 1 }], { d: 2 }).rec.log;
+  assert.equal(two[two.indexOf("strokeStyle = #mound") + 1], "lineWidth = 1.6");
 });
