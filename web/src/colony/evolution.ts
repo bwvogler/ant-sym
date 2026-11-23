@@ -77,10 +77,29 @@ export function price(kept: number): number {
   return Math.round(PRICE.base * PRICE.ratio ** kept);
 }
 
-/** Levels kept over all upgrades. */
-export function keptLevels(levels: Readonly<Record<string, number>>): number {
+/**
+ * The two pools mutations are earned and spent in (PRD §85 M3, owner 2026-11-23): `ants` for the levels that act on
+ * hosts, from fungus made in them (`Evolution.replicate`); `free` for the fungus's own, from growth on the ground and
+ * from corpses (`grow`, `feed`). Each pool has its own rising price, counting only its own kept levels.
+ */
+export const POOLS = ["ants", "free"] as const;
+export type Pool = (typeof POOLS)[number];
+
+/** The fungus's own upgrades: what its mycelium makes outside a living host. Every other upgrade is the ants'. */
+const FREE_UPGRADES: ReadonlySet<string> = new Set(["mycelium", "knots", "stalks", "fruiting"]);
+
+/** The pool that pays for upgrade `id`. */
+export function poolOf(id: string): Pool {
+  return FREE_UPGRADES.has(id) ? "free" : "ants";
+}
+
+/** Mutations in hand in each pool. */
+export type Pools = Readonly<Record<Pool, number>>;
+
+/** Levels kept over the upgrades of `pool`, or over all of them when none is named. */
+export function keptLevels(levels: Readonly<Record<string, number>>, pool?: Pool): number {
   let n = 0;
-  for (const u of UPGRADES) n += levels[u.id] ?? 0;
+  for (const u of UPGRADES) if (pool === undefined || poolOf(u.id) === pool) n += levels[u.id] ?? 0;
   return n;
 }
 
@@ -90,9 +109,9 @@ export function unmet(levels: Readonly<Record<string, number>>, id: string): Nee
   return (u.needs[levels[id] ?? 0] ?? []).filter((n) => (levels[n.id] ?? 0) < n.level);
 }
 
-/** Mutations the next level of `id` takes at these levels, or null at its last level. */
+/** Mutations the next level of `id` takes at these levels (its own pool's price), or null at its last level. */
 export function nextCost(levels: Readonly<Record<string, number>>, id: string): number | null {
-  return (levels[id] ?? 0) < upgrade(id).steps.length - 1 ? price(keptLevels(levels)) : null;
+  return (levels[id] ?? 0) < upgrade(id).steps.length - 1 ? price(keptLevels(levels, poolOf(id))) : null;
 }
 
 /** The upgrades to keep, in order, so that the next level of `id` is kept with everything it needs first (the last is `id`). */
@@ -108,10 +127,10 @@ export function pathTo(levels: Readonly<Record<string, number>>, id: string): st
   return out;
 }
 
-/** Whether the next level of `id` can be kept now: there is one, nothing it needs is missing, and there are mutations enough. */
-export function canKeep(levels: Readonly<Record<string, number>>, mutations: number, id: string): boolean {
+/** Whether the next level of `id` can be kept now: there is one, nothing it needs is missing, and its pool holds mutations enough. */
+export function canKeep(levels: Readonly<Record<string, number>>, mutations: Pools, id: string): boolean {
   const c = nextCost(levels, id);
-  return c !== null && c <= mutations && unmet(levels, id).length === 0;
+  return c !== null && c <= mutations[poolOf(id)] && unmet(levels, id).length === 0;
 }
 
 export const UPGRADES: readonly Upgrade[] = [
@@ -312,6 +331,9 @@ export interface EvolutionSave {
   spent: number;
   rate: number;
   levels: Record<string, number>;
+  /** the part of `growth` made on the ground and from corpses, and of `spent` paid from that pool (PRD §85 M3); absent when 0 */
+  ground?: number;
+  spentFree?: number;
 }
 
 /** One fungus's body and evolution: the strain it evolves, its mycelium's mass, the fungus it has made, and what it has chosen. */
@@ -324,8 +346,12 @@ export class Evolution {
   patches = 0;
   /** new fungus over the game, on the ground and in hosts: what mutations come from */
   growth = 0;
-  /** mutations given to upgrades */
+  /** the part of `growth` made on the ground and from corpses (`grow`, `feed`): what the free pool's mutations come from; the rest was made in hosts */
+  ground = 0;
+  /** mutations given to upgrades, over both pools */
   spent = 0;
+  /** the part of `spent` paid from the free pool */
+  spentFree = 0;
   /** mutations a second, averaged over the last RATE_TAU seconds: what the panel shows */
   rate = 0;
   readonly #levels: Record<string, number>;
@@ -345,9 +371,17 @@ export class Evolution {
     return MUTATION * this.growth;
   }
 
-  /** Mutations to give. */
+  /** Mutations to give, over both pools. */
   get mutations(): number {
     return this.earned - this.spent;
+  }
+
+  /** Mutations to give in each pool: the ants' from fungus made in hosts, the free pool's from the ground and corpses. */
+  get pools(): Pools {
+    return {
+      ants: MUTATION * (this.growth - this.ground) - (this.spent - this.spentFree),
+      free: MUTATION * this.ground - this.spentFree,
+    };
   }
 
   /** Mutations the next level of `id` takes, or null when it is at its last. */
@@ -362,14 +396,16 @@ export class Evolution {
 
   /** Whether the next level of `id` can be chosen now. */
   affordable(id: string): boolean {
-    return canKeep(this.#levels, this.mutations, id);
+    return canKeep(this.#levels, this.pools, id);
   }
 
   /** Give mutations to the next level of `id`; false (nothing given) when it is at its last, locked, or there are too few. */
   buy(id: string): boolean {
     const c = this.cost(id);
-    if (c === null || c > this.mutations || this.locked(id).length > 0) return false;
+    const pool = poolOf(id);
+    if (c === null || c > this.pools[pool] || this.locked(id).length > 0) return false;
     this.spent += c;
+    if (pool === "free") this.spentFree += c;
     this.#levels[id] = this.level(id) + 1;
     return true;
   }
@@ -398,6 +434,7 @@ export class Evolution {
     const grown = Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt);
     this.mass += grown;
     this.growth += grown;
+    this.ground += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
     this.mass -= spores * BODY.sporeMass;
     return spores;
@@ -417,6 +454,7 @@ export class Evolution {
   feed(mass: number): void {
     this.mass += mass;
     this.growth += mass;
+    this.ground += mass;
   }
 
   /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */
@@ -454,6 +492,9 @@ export class Evolution {
       spent: this.spent,
       rate: this.rate,
       levels: { ...this.#levels },
+      // The free pool's share, only once there is one: an evolution that never grew on the ground saves as it did with one pool.
+      ...(this.ground > 0 ? { ground: this.ground } : {}),
+      ...(this.spentFree > 0 ? { spentFree: this.spentFree } : {}),
     };
   }
 
@@ -463,6 +504,9 @@ export class Evolution {
     e.patches = r.patches;
     e.growth = r.growth;
     e.spent = r.spent;
+    // A save from the one-pool days has neither: every mutation it earned counts as the ants' (its kept free levels stay kept).
+    e.ground = r.ground ?? 0;
+    e.spentFree = r.spentFree ?? 0;
     e.rate = r.rate;
     for (const u of UPGRADES) e.#levels[u.id] = Math.max(0, Math.min(u.steps.length - 1, Math.floor(r.levels[u.id] ?? 0)));
     return e;

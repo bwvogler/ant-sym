@@ -31,7 +31,8 @@ test("at a web (the Mycelium upgrade's third level) the hyphae feeding many tips
   const cordsAfter = (levels: number): number => {
     const g = game();
     const e = g.fungus.evolution!;
-    e.growth = 1e7; // mutations enough to buy the levels at once
+    e.growth = 2e7;
+    e.ground = 1e7; // mutations enough to buy the levels at once
     for (let k = 0; k < levels; k++) assert.ok(g.fungus.upgrade("mycelium"), `level ${k + 1} not bought`);
     runFor(g, 150); // cords come once a lineage feeds CORD_FLOW tips: about 120 s in
 
@@ -52,7 +53,8 @@ test("at a web (the Mycelium upgrade's third level) the hyphae feeding many tips
 test("at a web the game fades dead ends but keeps a corpse's cell; cords survive a save (review of #119, S1, N3)", () => {
   const g = game();
   const e = g.fungus.evolution!;
-  e.growth = 1e7;
+  e.growth = 2e7;
+  e.ground = 1e7;
   g.fungus.upgrade("mycelium");
   g.fungus.upgrade("mycelium");
   runFor(g, 150);

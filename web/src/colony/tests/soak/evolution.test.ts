@@ -129,21 +129,30 @@ test("the game's step holds a lethal answer too: a policy that culls estranges n
   assert.ok(c.estrange[0] > 0, `freed: ${c.estrange[0]}`);
 });
 
-test("mutations: a fixed share of growth, and every level costs one price, which rises with each level kept (ja-52ui)", () => {
+test("mutations: a fixed share of growth in two pools, each level costs its pool's price, which rises with each level kept in that pool (ja-52ui, PRD §85 M3)", () => {
   const e = new Evolution(GARDEN);
   assert.equal(e.mutations, 0);
-  assert.equal(e.cost("infectivity"), price(0), "the first level costs the base price");
+  assert.equal(e.cost("infectivity"), price(0), "the ants' first level costs the base price");
+  assert.equal(e.cost("mycelium"), price(0), "so does the fungus's own first level: its own pool, its own count");
   e.replicate((price(0) + price(1)) / MUTATION);
-  assert.ok(Math.abs(e.mutations - (price(0) + price(1))) < 1e-9, "growth × MUTATION");
+  assert.ok(Math.abs(e.pools.ants - (price(0) + price(1))) < 1e-9, "growth in hosts × MUTATION is the ants' pool");
+  assert.equal(e.pools.free, 0, "and none of the free pool's");
+  assert.ok(Math.abs(e.mutations - (price(0) + price(1))) < 1e-9, "the total is both");
   assert.ok(e.buy("infectivity"), "a root: Infectivity fair");
-  assert.equal(e.cost("persistence"), price(1), "one level kept: every next level now costs the second price");
-  assert.equal(e.cost("mycelium"), price(1));
+  assert.equal(e.cost("persistence"), price(1), "one ants level kept: the next ants level costs the second price");
+  assert.equal(e.cost("mycelium"), price(0), "the free pool's count has not moved");
   assert.ok(price(1) > price(0) && price(10) > price(9), "the price rises");
   assert.ok(e.buy("persistence"));
-  assert.ok(Math.abs(e.mutations) < 1e-9, "both prices paid");
-  assert.equal(e.buy("mycelium"), false, "too few left");
+  assert.ok(Math.abs(e.pools.ants) < 1e-9, "both prices paid");
+  assert.equal(e.buy("mycelium"), false, "the ants' mutations do not pay for the fungus's own level");
+  e.feed(price(0) / MUTATION);
+  assert.ok(Math.abs(e.pools.free - price(0)) < 1e-9, "growth on the ground and corpses is the free pool's");
+  assert.ok(e.buy("mycelium"), "paid from the free pool");
+  assert.equal(e.cost("knots"), price(1), "one free level kept: the next free level costs the second price");
+  assert.equal(e.cost("senses"), price(2), "and the ants' count is two");
   assert.equal(e.traits().transmission, upgrade("infectivity").values![1]);
   e.replicate(1e7);
+  e.feed(1e7);
   for (let moved = true; moved;) {
     moved = false;
     for (const u of UPGRADES) while (e.buy(u.id)) moved = true;
@@ -152,6 +161,21 @@ test("mutations: a fixed share of growth, and every level costs one price, which
   assert.equal(e.buy("infectivity"), false);
   const back = Evolution.load(JSON.parse(JSON.stringify(e.save())));
   assert.deepEqual(back.save(), e.save(), "a save round-trips");
+  assert.deepEqual(back.pools, e.pools, "and keeps both pools");
+});
+
+test("a save from the one-pool days loads: every mutation it earned counts as the ants', and its kept levels stay kept", () => {
+  const e = new Evolution(GARDEN);
+  e.replicate(1e5);
+  assert.ok(e.buy("infectivity"), "kept before the save");
+  const old = e.save();
+  delete (old as { ground?: number }).ground;
+  delete (old as { spentFree?: number }).spentFree;
+  const back = Evolution.load(JSON.parse(JSON.stringify(old)));
+  assert.equal(back.ground, 0);
+  assert.equal(back.spentFree, 0);
+  assert.equal(back.pools.free, 0);
+  assert.ok(Math.abs(back.pools.ants - back.mutations) < 1e-9, "all of it is the ants'");
 });
 
 test("the tree: a level that needs another can't be kept before it, and says what it needs (ja-52ui)", () => {
@@ -177,10 +201,10 @@ test("the tree: a level that needs another can't be kept before it, and says wha
   assert.ok(e.buy("recognition"));
   assert.deepEqual(e.locked("senses"), [{ id: "trails", level: 1 }], "one need met, one still missing");
   assert.deepEqual(unmet(e.save().levels, "senses"), e.locked("senses"), "the pure form the page uses agrees");
-  assert.equal(canKeep(e.save().levels, e.mutations, "senses"), false);
+  assert.equal(canKeep(e.save().levels, e.pools, "senses"), false);
   const c = e.cost("trails")!;
-  assert.equal(canKeep(e.save().levels, c, "trails"), true, "exactly the price is enough");
-  assert.equal(canKeep(e.save().levels, c - 1, "trails"), false, "one short is not");
+  assert.equal(canKeep(e.save().levels, { ants: c, free: 0 }, "trails"), true, "exactly the price is enough");
+  assert.equal(canKeep(e.save().levels, { ants: c - 1, free: 0 }, "trails"), false, "one short is not");
   assert.ok(e.buy("trails") && e.buy("senses"));
   assert.deepEqual(
     pathTo({}, "crown"),
@@ -336,7 +360,9 @@ test("the queen's levels are held too: Stealth decides how far she can hide (PR 
   };
   settle();
   assert.equal(q.show, 1, "Stealth at none: she shows as she is");
-  f.evolution!.replicate(1e6);
+  // Stealth's second level needs Fruiting's first, which the free pool pays for (PRD §85 M3): give both pools mutations.
+  f.evolution!.growth += 2e6;
+  f.evolution!.ground += 1e6;
   assert.ok(keep(f, "stealth") && keep(f, "stealth"));
   settle();
   assert.equal(q.show, 0.25, "Stealth at its most: hidden");

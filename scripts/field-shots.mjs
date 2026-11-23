@@ -96,7 +96,8 @@ const growFungus = (page) =>
     const J = window.jevAnts;
     const f = J.game.fungus;
     const e = f.evolution;
-    e.growth = 1e7;
+    e.growth = 2e7;
+    e.ground = 1e7;
     const keep = (id) => pathTo(e.save().levels, id).every((x) => f.upgrade(x));
     keep("mycelium");
     keep("mycelium");
