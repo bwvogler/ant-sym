@@ -63,11 +63,6 @@ const KEPT: { file: string; line: string; why: string }[] = [
     line: 'v.kind !== "lethal"',
     why: "the Policy tab's wording for a lethal lever depends on the menu and the upgrade, not on a table",
   },
-  {
-    file: "ui/upgradeText.ts",
-    line: 'l.kind === "lethal"',
-    why: "an upgrade tooltip's lever list: a fourth place that colours a lethal name its own way (ja-fnd.6.4.4, D1 on #365)",
-  },
 ];
 
 test("no source compares a lever's kind to a literal, but for the ones named here; and each name still matches a line", () => {
@@ -85,14 +80,32 @@ test("no source compares a lever's kind to a literal, but for the ones named her
 
 /** What each place reads of the table: a place that hard-codes one of these fails, though it reads another. */
 const READS: [file: string, fields: string[]][] = [
-  ["ui/AntCard.tsx", ["tone", "what"]],
-  ["ui/PolicyTab.tsx", ["tone", "what"]],
+  ["ui/AntCard.tsx", ["what"]],
+  ["ui/PolicyTab.tsx", ["what"]],
   ["ui/LabCards.tsx", ["row", "chipOn"]],
 ];
+
+/** The places that show a lever's name: each hands `LeverName` the lever's kind, and none writes the colour. */
+const NAMES = ["ui/AntCard.tsx", "ui/PolicyTab.tsx", "ui/UpgradeTips.tsx"];
 
 test("the ant card, the Policy tab and the Lab's levers each read the table, each field they used to choose", () => {
   for (const [file, fields] of READS)
     for (const f of fields) assert.match(read(file), new RegExp(`LEVER_KIND\\[[^\\]]+\\]\\.${f}\\b`), `${file} reads .${f}`);
+});
+
+test("every place that shows a lever's name does it with LeverName, giving it the lever's kind", () => {
+  for (const file of NAMES) assert.match(read(file), /<LeverName\s[^>]*\bkind=\{/, `${file} uses <LeverName kind=…>`);
+});
+
+test("a lever name's colour is read from the table in LeverName.tsx and nowhere else", () => {
+  const readers = [...sources("ui"), "ColonyApp.tsx"].filter((f) => /LEVER_KIND\[[^\]]+\]\.tone\b/.test(read(f)));
+  assert.deepEqual(readers, ["ui/LeverName.tsx"], "show a lever's name with <LeverName kind={…}>");
+});
+
+test("what the upgrade tooltip is handed for a lever is its kind (not a flag made from it), so it can use the table like the rest", () => {
+  const text = read("ui/upgradeText.ts");
+  assert.match(text, /\bkind: LeverKind\b/, "the tooltip's lever carries its kind");
+  assert.doesNotMatch(text, /\blethal:\s*\w+\.kind/, "no flag derived from the kind");
 });
 
 test("the branch scan sees either operator, either quote and a branch on a variable's kind", () => {

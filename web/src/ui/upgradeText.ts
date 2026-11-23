@@ -11,6 +11,7 @@ import {
   unmet,
   upgrade,
   type Lever,
+  type LeverKind,
   type Need,
   type Trait,
   type Upgrade,
@@ -31,7 +32,7 @@ export interface UpgradeTip {
   why: string;
   levels: LevelText[];
   /** reach upgrades: the levers it widens, with what each does to a host */
-  levers: { id: string; name: string; blurb: string; words: readonly string[]; lethal: boolean }[];
+  levers: { id: string; kind: LeverKind; name: string; blurb: string; words: readonly string[] }[];
   /** reach upgrades: what reach means (the table's, in words) */
   reachNote?: string;
 }
@@ -118,7 +119,7 @@ export function upgradeTip(u: Upgrade): UpgradeTip {
     what: u.blurb,
     why: WHY[u.id] ?? "",
     levels: levelTexts(u),
-    levers: levers.map((l) => ({ id: l.id, name: l.name, blurb: l.blurb, words: l.words, lethal: l.kind === "lethal" })),
+    levers: levers.map((l) => ({ id: l.id, kind: l.kind, name: l.name, blurb: l.blurb, words: l.words })),
     reachNote:
       u.kind === "reach"
         ? "Jev is still asked every lever on its full scale and its answers are cached that way; reach only limits where they take effect, so keeping it costs no tokens."
