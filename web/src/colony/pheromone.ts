@@ -59,12 +59,12 @@ export const DEFAULT_CHANNELS: Record<Channel, ChannelParams> = {
   store: { evaporation: 0.01, diffusion: 0 },
   reception: { evaporation: 0.01, diffusion: 0 },
   midden: { evaporation: 0.01, diffusion: 0 },
-  // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Fading at 0.1 and
-  // spreading at 0.5 it reaches across a chamber (design; no range is measured). 0.03 and 0.5 took the nurse zone furthest (13/20
-  // against main's 8/20) but left the odour in every tunnel, and soil carriers stalled there on some seeds (175 and 194 at 180 s in
-  // the chambers game against main's 61 and 94); 0.1 and 0.5 matches main on game1 (17/20) and A12 (19/20), keeps the chambers
-  // trend, and still beats main on the nurse zone (10/20) and A13 (11/20). PRD §77.6.
-  broodOdour: { evaporation: 0.1, diffusion: 0.5 },
+  // Brood odour (ja-k4k.15, docs/brood-odour.md): given off by the brood itself where it lies, not laid by ants. Fading at 0.03 and
+  // spreading at 0.5 it reaches furthest (design; no range is measured) and took the nurse zone furthest (13/20 against main's
+  // 8/20). It leaves the odour in every tunnel; carriers that lost their road signs there stalled before `deliveryFallback`
+  // (G1 over seeds 1-20 with the fallback: no seed over 7 held or 9 porting; 0.1/0.5 had 66 porters stalled on seed 20).
+  // The history is 0.03/0.5, then 0.1/0.5 and 0.1/0.3 (the stall), then 0.03/0.5 again. PRD §77.6-77.7.
+  broodOdour: { evaporation: 0.03, diffusion: 0.5 },
 };
 
 /** A record with one entry per channel. */

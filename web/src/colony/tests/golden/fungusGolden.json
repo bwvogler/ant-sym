@@ -62,20 +62,20 @@
   {
    "t": 20,
    "food": [
-    "9b74849d",
-    "e527a86e"
+    "b21d166d",
+    "a7453c2e"
    ],
    "colonies": [
     {
      "stored": 20,
      "births": 0,
      "losses": 0,
-     "decisions": 12696,
+     "decisions": 12723,
      "population": 600,
-     "ants": "cf66a752",
+     "ants": "a430552a",
      "fields": [
-      "a6fb23f8",
-      "704059ca"
+      "2c65ea35",
+      "93551b7b"
      ],
      "crossedUp": 314,
      "crossedDown": 28
@@ -84,12 +84,12 @@
      "stored": 29,
      "births": 0,
      "losses": 0,
-     "decisions": 16434,
+     "decisions": 16477,
      "population": 600,
-     "ants": "166342b3",
+     "ants": "c0fed3f",
      "fields": [
-      "21e25dbe",
-      "a33b7d1"
+      "1e2b3ebc",
+      "c7679e71"
      ],
      "crossedUp": 357,
      "crossedDown": 35
@@ -97,14 +97,14 @@
    ],
    "fungus": {
     "state": {
-     "spores": "5fc857c",
+     "spores": "ed209a60",
      "sporeStrain": "3f88afb8",
      "sporeCells": "10de22b",
      "hosts": "8be5ca66",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "378e5c1e",
+     "evolution": "ec678660",
      "base": "d2dabcb3",
      "hyphae": "dc674053",
      "corpses": "d08749ad",
@@ -113,7 +113,7 @@
      "layers": "7eb63dca"
     },
     "infected": [
-     44,
+     42,
      0
     ]
    }
@@ -121,58 +121,58 @@
   {
    "t": 30,
    "food": [
-    "7770e52f",
-    "21a3ac65"
+    "89a7d41b",
+    "79866e85"
    ],
    "colonies": [
     {
-     "stored": 84,
+     "stored": 92,
      "births": 0,
-     "losses": 1,
-     "decisions": 24253,
-     "population": 599,
-     "ants": "5a96cb7f",
+     "losses": 2,
+     "decisions": 24248,
+     "population": 598,
+     "ants": "8e237866",
      "fields": [
-      "5321b9b7",
-      "ac9b22d8"
+      "c63b8525",
+      "aad5a80b"
      ],
-     "crossedUp": 395,
-     "crossedDown": 80
+     "crossedUp": 393,
+     "crossedDown": 86
     },
     {
-     "stored": 144,
+     "stored": 143,
      "births": 0,
-     "losses": 1,
-     "decisions": 23285,
-     "population": 599,
-     "ants": "fe0264b1",
+     "losses": 7,
+     "decisions": 23420,
+     "population": 593,
+     "ants": "1edf5d2c",
      "fields": [
-      "440bffb1",
-      "bae14094"
+      "78319601",
+      "d8ff206e"
      ],
-     "crossedUp": 478,
-     "crossedDown": 161
+     "crossedUp": 481,
+     "crossedDown": 157
     }
    ],
    "fungus": {
     "state": {
-     "spores": "ca6a49fa",
-     "sporeStrain": "e5be5bb5",
-     "sporeCells": "71ef3918",
-     "hosts": "6933d7c2",
+     "spores": "6f20e63d",
+     "sporeStrain": "a2a17900",
+     "sporeCells": "14792d2e",
+     "hosts": "efe9d85",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "fcf5b3ad",
+     "evolution": "fed3ae9c",
      "base": "d2dabcb3",
-     "hyphae": "bf1b14e1",
-     "corpses": "d00cd414",
-     "corpseAges": "9f99996",
+     "hyphae": "c3584a1d",
+     "corpses": "fca20cac",
+     "corpseAges": "6951c900",
      "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
-     39,
+     36,
      0
     ]
    }
@@ -180,58 +180,58 @@
   {
    "t": 40,
    "food": [
-    "4a9610dd",
-    "61eea9f5"
+    "84063b1d",
+    "c74487ee"
    ],
    "colonies": [
     {
-     "stored": 193,
+     "stored": 198,
      "births": 0,
-     "losses": 5,
-     "decisions": 33612,
-     "population": 595,
-     "ants": "6e64d18c",
+     "losses": 3,
+     "decisions": 34786,
+     "population": 597,
+     "ants": "4bf40241",
      "fields": [
-      "8e0f5a16",
-      "bc44f29f"
+      "5bbb2070",
+      "3bc6a9fa"
      ],
-     "crossedUp": 499,
-     "crossedDown": 188
+     "crossedUp": 505,
+     "crossedDown": 184
     },
     {
-     "stored": 271,
+     "stored": 250,
      "births": 0,
-     "losses": 5,
-     "decisions": 29734,
-     "population": 595,
-     "ants": "d825c98f",
+     "losses": 8,
+     "decisions": 29739,
+     "population": 592,
+     "ants": "28889ca2",
      "fields": [
-      "ba8285f6",
-      "61ef6106"
+      "5ee794a",
+      "aab5a72f"
      ],
-     "crossedUp": 602,
-     "crossedDown": 301
+     "crossedUp": 598,
+     "crossedDown": 276
     }
    ],
    "fungus": {
     "state": {
-     "spores": "e0f1246b",
-     "sporeStrain": "ed2c810d",
-     "sporeCells": "8462d6e1",
-     "hosts": "69361659",
+     "spores": "14b31d0d",
+     "sporeStrain": "7677cf10",
+     "sporeCells": "d46e9f68",
+     "hosts": "6b36197f",
      "rule": "335c169b",
      "menu": "aa6cc2a7",
      "clock": "350ca8af",
-     "evolution": "44df7d8d",
+     "evolution": "8b40b457",
      "base": "d2dabcb3",
-     "hyphae": "e4fe4a8f",
-     "corpses": "69cc1378",
-     "corpseAges": "553d9e4c",
+     "hyphae": "a424845a",
+     "corpses": "3885bb26",
+     "corpseAges": "ec1824a0",
      "links": "741638a5",
      "layers": "7eb63dca"
     },
     "infected": [
-     20,
+     24,
      0
     ]
    }
