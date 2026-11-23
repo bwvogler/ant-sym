@@ -8,7 +8,7 @@ import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import { css, ROLE_RGB } from "./palette.ts";
-import { seg } from "./styles.ts";
+import Segmented from "./Segmented.tsx";
 import { forgetSeen, markViewed, setShowAll, useCodex } from "./useCodex.ts";
 import { useSimTick } from "./session.ts";
 
@@ -73,20 +73,11 @@ export default function LearnDrawer(props: Props) {
     >
       <div className="flex items-center gap-2 border-b border-line bg-panel px-4 py-3">
         <h2 className="font-semibold text-fg">Codex</h2>
-        <div className="ml-2 flex overflow-hidden rounded-md border border-line text-sm" role="tablist">
-          {TABS.map(([t, name]) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={target.tab === t}
-              className={seg(target.tab === t)}
-              onClick={() => openLearn({ tab: t })}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          role="tablist"
+          className="ml-2 text-sm"
+          options={TABS.map(([t, name]) => ({ key: t, label: name, on: target.tab === t, onPick: () => openLearn({ tab: t }) }))}
+        />
         <button
           type="button"
           className="ml-auto rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"

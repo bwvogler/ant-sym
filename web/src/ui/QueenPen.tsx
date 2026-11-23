@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { DOCTRINES, FLIGHT, type Flight } from "../colony/index.ts";
+import { PresetPicker, WordsBox } from "./PolicyEditor.tsx";
+import Segmented from "./Segmented.tsx";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // The queen's pen (ja-lo8.9): a new queen has flown with the fungus in her, from a colony whose queen it reached. The
@@ -57,35 +59,25 @@ export default function QueenPen({
     onWords?.({ id, text: words });
   }, [onWords, id, words]);
   const presets = (
-    <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="presets">
-      {DOCTRINES.map((d) => (
-        <button
-          key={d.id}
-          type="button"
-          className={`rounded-md border px-2 py-1 text-xs ${id === d.id && text === d.text ? "border-accent text-accent" : "border-line text-fg-2 hover:bg-raised"}`}
-          onClick={() => pick({ id: d.id, text: d.text })}
-        >
-          {d.name}
-        </button>
-      ))}
-      <button
-        type="button"
-        className="rounded-md border border-line px-2 py-1 text-xs text-fg-2 hover:bg-raised"
-        onClick={() => pick(doctrine)}
-      >
-        her mother's
-      </button>
-    </div>
+    <PresetPicker
+      style="chips"
+      className="mt-4"
+      label="presets"
+      presets={DOCTRINES}
+      active={(d) => id === d.id && text === d.text}
+      onPick={(d) => pick({ id: d.id, text: d.text })}
+      extra={[{ name: "her mother's", onPick: () => pick(doctrine) }]}
+    />
   );
   const editor = (height: string) => (
-    <textarea
-      className={`mt-2 ${height} w-full resize-none rounded-md border border-line bg-paper p-2 text-sm text-fg outline-none focus:border-accent`}
+    <WordsBox
+      label="her doctrine"
+      className={`mt-2 ${height} w-full p-2 text-sm`}
       value={text}
-      onChange={(e) => {
-        setText(e.target.value);
-        setId(DOCTRINES.find((d) => d.text === e.target.value)?.id ?? "custom");
+      onDraft={(words) => {
+        setText(words);
+        setId(DOCTRINES.find((d) => d.text === words)?.id ?? "custom");
       }}
-      aria-label="her doctrine"
     />
   );
   if (place)
@@ -135,19 +127,16 @@ export default function QueenPen({
         {editor("h-32")}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-fg-2">
           <span>She lands</span>
-          <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="side">
-            {([-1, 1] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`px-2 py-1 text-xs ${side === s ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised"}`}
-                onClick={() => setSide(s)}
-                aria-pressed={side === s}
-              >
-                {s < 0 ? "west" : "east"}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            label="side"
+            soft
+            options={([-1, 1] as const).map((s) => ({
+              key: String(s),
+              label: s < 0 ? "west" : "east",
+              on: side === s,
+              onPick: () => setSide(s),
+            }))}
+          />
           <input
             type="range"
             min={16}

@@ -33,7 +33,8 @@ import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
 import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
-import { seg } from "./ui/styles.ts";
+import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
+import Segmented from "./ui/Segmented.tsx";
 import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
@@ -396,39 +397,37 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
               label={controls.playing ? "Pause" : "Play"}
               onClick={() => update({ playing: !controls.playing })}
             />
-            <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="speed">
-              {SPEEDS.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`${seg(controls.speed === v)} max-sm:px-1.5 max-sm:text-[13px]`}
-                  onClick={() => update({ speed: v })}
-                  aria-pressed={controls.speed === v}
-                >
-                  {v}×
-                </button>
-              ))}
-            </div>
+            <Segmented
+              label="speed"
+              options={SPEEDS.map((v) => ({
+                key: String(v),
+                label: `${v}×`,
+                on: controls.speed === v,
+                onPick: () => update({ speed: v }),
+                className: "max-sm:px-1.5 max-sm:text-[13px]",
+              }))}
+            />
             {oneWorld && (
-              <div className="ml-1 flex overflow-hidden rounded-md border border-line" role="group" aria-label="view">
-                {(["above", "below"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={`${seg(controls.view === v)} flex items-center justify-center gap-1 max-sm:px-1.5`}
-                    onClick={() => setView(v)}
-                    aria-pressed={controls.view === v}
-                    title={
-                      v === "above"
-                        ? "The surface from above: foraging, trails, the mound and the line through the holes (v)"
-                        : "Underground: the curtain under the line, unrolled, with every nest (v)"
-                    }
-                  >
-                    <Icon name={v} className="size-5" />
-                    <span className="max-sm:sr-only">{v}</span>
-                  </button>
-                ))}
-              </div>
+              <Segmented
+                label="view"
+                className="ml-1"
+                options={(["above", "below"] as const).map((v) => ({
+                  key: v,
+                  label: (
+                    <>
+                      <Icon name={v} className="size-5" />
+                      <span className="max-sm:sr-only">{v}</span>
+                    </>
+                  ),
+                  on: controls.view === v,
+                  onPick: () => setView(v),
+                  className: "flex items-center justify-center gap-1 max-sm:px-1.5",
+                  title:
+                    v === "above"
+                      ? "The surface from above: foraging, trails, the mound and the line through the holes (v)"
+                      : "Underground: the curtain under the line, unrolled, with every nest (v)",
+                }))}
+              />
             )}
             <IconButton icon="lens" label="Lens: say what is under the pointer (i)" active={lensOn} onClick={toggleLens} className="ml-1" />
             <IconButton icon="search" label={`Commands (${MOD_K})`} onClick={() => setPalette(true)} className="max-sm:hidden" />
@@ -690,26 +689,27 @@ function Settings({
       )}
       <div>
         <SectionHead>Trails drawn</SectionHead>
-        <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="trails drawn">
-          <button
-            type="button"
-            className={`flex-1 ${seg(controls.showFoodTrail)}`}
-            aria-pressed={controls.showFoodTrail}
-            onClick={() => update({ showFoodTrail: !controls.showFoodTrail })}
-            title="Laid by ants carrying food home: it leads to food"
-          >
-            to food
-          </button>
-          <button
-            type="button"
-            className={`flex-1 ${seg(controls.showHomeTrail)}`}
-            aria-pressed={controls.showHomeTrail}
-            onClick={() => update({ showHomeTrail: !controls.showHomeTrail })}
-            title="Laid by ants walking out: it leads home"
-          >
-            to home
-          </button>
-        </div>
+        <Segmented
+          label="trails drawn"
+          className="mt-2 text-sm"
+          fill
+          options={[
+            {
+              key: "food",
+              label: "to food",
+              on: controls.showFoodTrail,
+              onPick: () => update({ showFoodTrail: !controls.showFoodTrail }),
+              title: "Laid by ants carrying food home: it leads to food",
+            },
+            {
+              key: "home",
+              label: "to home",
+              on: controls.showHomeTrail,
+              onPick: () => update({ showHomeTrail: !controls.showHomeTrail }),
+              title: "Laid by ants walking out: it leads home",
+            },
+          ]}
+        />
         <p className="mt-1.5 text-xs text-fg-3">Only where your hosts have smelled them lately.</p>
       </div>
       <ThemeSetting />
@@ -749,13 +749,12 @@ function ThemeSetting() {
   return (
     <div>
       <SectionHead>Appearance</SectionHead>
-      <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="appearance">
-        {THEMES.map((t) => (
-          <button key={t} type="button" className={`flex-1 ${seg(theme === t)}`} aria-pressed={theme === t} onClick={() => setTheme(t)}>
-            {THEME_LABEL[t]}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="appearance"
+        className="mt-2 text-sm"
+        fill
+        options={THEMES.map((t) => ({ key: t, label: THEME_LABEL[t], on: theme === t, onPick: () => setTheme(t) }))}
+      />
       <p className="mt-1.5 text-xs text-fg-3">System follows the device&apos;s light or dark setting.</p>
     </div>
   );
@@ -767,19 +766,17 @@ function SoundSetting() {
   return (
     <div>
       <SectionHead>Sounds</SectionHead>
-      <div className="mt-2 flex overflow-hidden rounded-md border border-line text-sm" role="group" aria-label="sounds">
-        {([true, false] as const).map((v) => (
-          <button
-            key={String(v)}
-            type="button"
-            className={`flex-1 ${seg(on === v)}`}
-            aria-pressed={on === v}
-            onClick={() => (setSoundOn(v), setOn(v))}
-          >
-            {v ? "on" : "off"}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="sounds"
+        className="mt-2 text-sm"
+        fill
+        options={([true, false] as const).map((v) => ({
+          key: String(v),
+          label: v ? "on" : "off",
+          on: on === v,
+          onPick: () => (setSoundOn(v), setOn(v)),
+        }))}
+      />
       <p className="mt-1.5 text-xs text-fg-3">The builder&apos;s tool sounds, and each tool&apos;s name said aloud.</p>
     </div>
   );
@@ -892,28 +889,22 @@ function Aim() {
         <SectionHead>
           Aim <Help to={{ tab: "policy", id: "fungus" }} label="how the fungus decides" />
         </SectionHead>
-        <div className="flex overflow-hidden rounded-md border border-line text-sm">
-          {AIMS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={seg(aim.id === a.id)}
-              disabled={locked}
-              onClick={() => session.setAim({ id: a.id, text: a.text })}
-            >
-              {a.name}
-            </button>
-          ))}
-        </div>
+        <PresetPicker
+          presets={AIMS}
+          active={(a) => aim.id === a.id}
+          disabled={locked}
+          label="aim presets"
+          onPick={(a) => session.setAim({ id: a.id, text: a.text })}
+        />
       </div>
-      <textarea
-        className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
+      <WordsBox
+        label="aim"
+        className="mt-2 w-full px-2 py-1.5 text-xs"
         rows={4}
         value={aim.text}
         disabled={locked}
-        onChange={(e) => session.draftAim({ id: "custom", text: e.target.value })}
-        onBlur={(e) => session.setAim({ id: aim.id, text: e.target.value })}
-        aria-label="aim"
+        onDraft={(text) => session.draftAim({ id: "custom", text })}
+        onCommit={(text) => session.setAim({ id: aim.id, text })}
       />
       {locked ? (
         <p className="mt-1 text-xs text-warn">{lock}</p>
