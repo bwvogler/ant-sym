@@ -22,6 +22,20 @@ function played(trafficBias: "off" | "count" | "levels") {
   return g.fungus.hyphaeOn(0)!;
 }
 
+test("the default game has the traffic lean on (count, r 3, tropism 4 since 2026-11-23): its tips veer toward ants", () => {
+  const g = new Game(
+    generateOneWorld(3, { plane: { size: { w: 160, h: 100 } } }),
+    { autoFound: false, fungus: { hyphae: true, flow: true } },
+    gameRng(3),
+    [{ antCount: 120 }, { antCount: 120 }],
+  );
+  g.land(0, GARDEN, { evolve: true });
+  while (g.time < 150) g.tick(1 / 30);
+  const h = g.fungus.hyphaeOn(0)!;
+  assert.ok(h.tropismChoices > 0, `${h.tropismChoices} grow steps had a traffic reading: the default reads the ants`);
+  assert.ok(h.tropisms > 0, `${h.tropisms} of them veered toward ants`);
+});
+
 test("with the bias on, the tips' side choices read the ants and some are decided by them; off, none do", () => {
   const off = played("off");
   assert.equal(off.sideChoices, 0, "off: no side choice has a traffic reading");

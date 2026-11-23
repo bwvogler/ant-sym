@@ -643,7 +643,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "hyphal-traffic",
     title: "Hyphae and ant traffic",
     covers:
-      "Whether a hypha tip leans toward where ants walk: tips follow gradients and touch, but no insect-killing fungus is known to follow traffic. Built behind settings, off: leaning at side choices changed nothing P1 measures; a tropism shortens the slowest seeds.",
+      "Whether a hypha tip leans toward where ants walk: tips follow gradients and touch, but no insect-killing fungus is known to follow traffic. On by default (a tropism: every fourth cell it grows, a tip leans toward the busier side), a design, not biology: it shortens the slowest starts and leaves the median alone; leaning at side choices alone changed nothing P1 measures.",
   },
   {
     note: "mycelial-transport",
