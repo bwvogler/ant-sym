@@ -40,6 +40,8 @@ export interface EndlessOptions {
   wildGap: number;
   /** the share of regions whose candidate is kept (the density draw): 1 is one site per region where the ground allows */
   density: number;
+  /** how many chunks, patch lists and sites each cache holds before it is dropped (the caches only save work; a small number is for tests) */
+  cacheChunks: number;
 }
 
 /** The plane's numbers (PRD §12's plane), and the wild sites' proposed ones (docs/endless-world.md §4, set by E6's assay). */
@@ -52,6 +54,7 @@ export const ENDLESS_PLANE: EndlessOptions = {
   regionChunks: 4,
   wildGap: 140,
   density: 1,
+  cacheChunks: 2048,
 };
 
 /** A wild colony's nest before it wakes (§4): a point, and the heading of the one-hole line it will start (radians, a line has no direction). */
@@ -120,8 +123,6 @@ function startLine(a: Nest, b: Nest): Segment {
   return [a.x - ux, a.y - uy, b.x + ux, b.y + uy];
 }
 
-const CACHE_CHUNKS = 2048;
-
 /**
  * One seed's endless plane. Everything it returns is a pure function of the seed and the question; the caches only save work, and are
  * dropped when they grow (so a long walk does not hold the world).
@@ -139,7 +140,14 @@ export class EndlessPlane {
   constructor(seed: number, opts: Partial<EndlessOptions> = {}) {
     this.seed = seed;
     this.options = { ...ENDLESS_PLANE, ...opts };
-    if (this.options.regionChunks < 3) throw new Error("EndlessPlane: a region is at least 3 chunks on a side");
+    // A region is judged by its eight neighbours alone, which holds while everything it can conflict with lies within a region's span: another
+    // site within `wildGap`, or a reserved line (margin each way, plus the clearance) near this one's.
+    const span = this.options.regionChunks * CHUNK * R;
+    const reach = Math.max(this.options.wildGap, 2 * LINE_MARGIN + LINE_CLEARANCE);
+    if (this.options.regionChunks < 3 || reach > span)
+      throw new Error(
+        `EndlessPlane: a region (${span.toFixed(0)} cells across) must hold the ${reach} a site's conflicts reach; use at least 3 chunks, and more as wildGap grows`,
+      );
     this.#cut = rockCut(this.options.rockiness);
   }
 
@@ -148,7 +156,7 @@ export class EndlessPlane {
     const k = chunkKey(cx, cy);
     let r = this.#rocks.get(k);
     if (!r) {
-      if (this.#rocks.size >= CACHE_CHUNKS) this.#rocks.clear();
+      if (this.#rocks.size >= this.options.cacheChunks) this.#rocks.clear();
       r = chunkRock(this.seed, cx, cy, this.#cut);
       this.#rocks.set(k, r);
     }
@@ -216,10 +224,8 @@ export class EndlessPlane {
       const d = Math.hypot(n.x - first.x, n.y - first.y);
       const s = Math.abs(d - nestGap);
       if (d < 0.7 * nestGap || s >= score || !ok(n)) continue; // the cheap tests first: a walk-out search is the costly one
-      {
-        score = s;
-        second = n;
-      }
+      score = s;
+      second = n;
     }
     if (!second) throw new Error(`EndlessPlane: no second start nest (seed ${this.seed})`);
     this.#start = [first, second];
@@ -244,7 +250,7 @@ export class EndlessPlane {
     if (hash01(this.seed, 96, rx, ry) >= density || !this.walksOut(x, y, NEST_ESCAPE)) site = null;
     else if (this.startNests().some((n) => Math.hypot(n.x - x, n.y - y) <= NEW_LINE_GAP)) site = null;
     else if (segmentGap(holeLine(x, y, site.heading), this.startSegment()) < LINE_CLEARANCE) site = null;
-    if (this.#candidates.size >= CACHE_CHUNKS) this.#candidates.clear();
+    if (this.#candidates.size >= this.options.cacheChunks) this.#candidates.clear();
     this.#candidates.set(key, site);
     return site;
   }
@@ -274,7 +280,7 @@ export class EndlessPlane {
           if (theirs > mine || (theirs === mine && (o.ry < ry || (o.ry === ry && o.rx < rx)))) keep = null;
         }
     }
-    if (this.#sites.size >= CACHE_CHUNKS) this.#sites.clear();
+    if (this.#sites.size >= this.options.cacheChunks) this.#sites.clear();
     this.#sites.set(key, keep);
     return keep;
   }
@@ -364,15 +370,10 @@ export class EndlessPlane {
         break;
       }
     }
-    if (this.#patches.size >= CACHE_CHUNKS) this.#patches.clear();
+    if (this.#patches.size >= this.options.cacheChunks) this.#patches.clear();
     this.#patches.set(key, out);
     return out;
   }
-
-  /** @internal the reach window's type, for patchesOf */
-  _reach!: ReturnType<EndlessPlane["_reachType"]>;
-  /** @internal */
-  _reachType!: () => { mask: Uint8Array; x0: number; y0: number; w: number };
 
   /** Chunk (cx, cy) as generated: the seed's terrain, cleared under every nest and patch that touches it, with the patches' food. */
   chunk(cx: number, cy: number): PlaneChunk {
