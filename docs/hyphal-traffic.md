@@ -95,6 +95,26 @@ The probe's occupancy levels read the 30 cells of band 2-3 round the tip; the sh
 
 **What would act** (owner's call; none built): (1) **a tropism**: a growing tip, with some chance per step set by the traffic reading, veers one cell toward the busier side. This is a new response (the tip turns when the lane said `grow`), so it overrides the lane's answer and needs a strength and a cap, like thigmotropism. (2) **Option B**: put the traffic level into the growth situation so the lane itself chooses `left`, `right` or `turn` when ants are near; costs a re-ask (96 to 192 situations, about $0.01) and depends on the lane choosing it. (3) **Stop**: keep the setting, off, as an assay hook, and close `ja-ob97` as measured: no effect.
 
+## Tropism (`ja-ogph.3`, 2026-11-23): it shortens the slowest seeds and leaves the median alone
+
+Owner: "try the tropism". Built as `trafficTropism` N (off, 0, by default): with the traffic bias on, a tip that answers `grow` leans one turn toward the side with more ants than straight ahead on every N-th cell it grows (`tip.run`), if that side's cell is open. It overrides the lane's `grow` answer; it never overrides a `left`, `right`, `turn` or `branch`. Eight `progression.yml` runs on head `9b8ae679` (count r 3 at N = 1, 2 and 4; levels r 3 at N = 2; seeds 1-10 and 11-20; flow, growth answers, 600 s), against the off runs of the probe section.
+
+| arm | seeds 1-10: median / worst quarter | flowers | seeds 11-20: median / worst quarter | flowers |
+|---|---|---|---|---|
+| off (baseline) | 155.5 s / 350 s (seed 6) | 1 in 1 game | 168 s / 293 s (seed 20) | 8 in 4 games |
+| count N=1 | 160 s / 192 s (seed 1) | 0 | 168 s / 259 s (seed 11) | 8 in 4 |
+| count N=2 | 155.5 s / 219 s (seed 6) | 1 in 1 | 159.5 s / 246 s (seed 19) | 15 in 3 |
+| count N=4 | 155.5 s / 219 s (seed 6) | 1 in 1 | 164 s / 246 s (seed 19) | 10 in 4 |
+| levels N=2 | 155.5 s / 219 s (seed 6) | 1 in 1 | 165 s / 246 s (seed 19) | 12 in 4 |
+
+- **Seeds that move are the slow ones.** Seed 6 goes from 350 s to 219 s (-37 %) in three arms and to 175 s (-50 %) at N = 1; on seeds 11-20, seed 20 goes from 293 s to 177 s (-40 %) in all four arms and seed 18 from 187 s to about 112 s (-40 %) at N = 2 and 4 and with levels. Every other seed is within about 8 % either way, except two slower ones: seed 8 at N = 1 (+12 s, +7.5 %), seed 11 at N = 1 (+17 s, +7.0 %), and seed 7 with levels N = 2 (+18 s, +10.3 %, just over P1's 10 % bound).
+- **P1 targets.** T2 (no seed more than 10 % slower, worst seed not worse) holds in seven of the eight runs and is missed by 0.3 points by one seed in the eighth; the worst seed is better in all eight (350 to 175-219 s; 293 to 246-259 s). **T3 (no seed more than 25 % faster, a design bound against a cliff) is broken on seeds 6, 18 and 20**, but only where the baseline was slowest, and the medians barely move (155.5 to 155.5-160 s; 168 to 159.5-168 s): the lean shortens the tail, it does not speed up a typical game.
+- **T1** (hyphae within 1 cell of an ant seen in the last 60 s, median over seeds): before a quarter 82.3-84.7 % (baseline 82.3 %) and 86.4-87.8 % (baseline about 86.5 %), after a quarter 74-77.7 % (baseline 73.3 %): +1 to +4 points, small.
+- **Flowers** change with it (seeds 11-20: 8 to 15 at N = 2, to 10 at N = 4), so the lean moves hyphae near ants onto spots where flowers close.
+- **How often it acts**: the tropism veered on about a fifth of the grow steps it looked at (seed 1: 142 of 707 at N = 2, 962 of 5792 at N = 1; seed 6: 104 of 682 at N = 2): hundreds to thousands of veers a game, against a handful of side choices before.
+- **What we do not know.** Why seeds 6, 18 and 20 gain so much (the early hyphae there may be far from any traffic; not checked); that the half and queen times follow the quarter (they do, in every seed, by tens of seconds); whether the gain survives the colonies' counterplay in a full game, or the other aims (only `unite` was run); the tick cost of the traffic closure on every tip (not measured).
+- **Decision for the owner**: the lean stays **off by default**. Turning it on shortens the worst progression seed by 25-50 % and breaks the no-cliff bound T3 on three of twenty seeds; whether that is the progression the game wants (a more even slope) or a loss of the slow starts is the owner's call (PRD §63 P1).
+
 ## Play
 
 - **See:** hyphae on the surface lean toward the ants' paths and the hole instead of fanning out evenly; at 4× it shows as threads that follow a trail for some cells. The Learn text must say the lean is a guess ("no one has shown an insect-killing fungus doing this"), and the Codex entry should call it design.
