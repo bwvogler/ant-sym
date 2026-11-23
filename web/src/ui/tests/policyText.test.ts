@@ -12,27 +12,38 @@ test("the mode rule in words gives localPolicy's answer in every situation", () 
   }
 });
 
-// The senses rows say what each field of a lane's situation is: a field with no row, or a row for a field that is gone, is drift.
+// The senses rows say what each field of a lane's situation is: a field with no row, a row for a field that is gone, or a changed value list
+// (its order too) is drift. A boolean is the one exception: the drawer says "true · false", the schema lists false first.
 
-test("the mode lane's senses rows name each field of its schema, with its values", () => {
+/** Whether the words' value list matches the schema's: in order, but a boolean field in either order. */
+function sameValues(said: string, values: readonly unknown[]): boolean {
+  const want = values.map(String);
+  const got = said.split(" · ");
+  const bool = want.length === 2 && want.every((v) => v === "true" || v === "false");
+  return JSON.stringify(bool ? got.slice().sort() : got) === JSON.stringify(bool ? want.slice().sort() : want);
+}
+
+test("the mode lane's senses rows name each field of its schema, with its values in order", () => {
   const fields = modeSchema(GENERIC_ANT.lanes.mode).fields;
   assert.deepEqual(
     Object.keys(MODE_SENSES),
     fields.map((f) => String(f.name)),
   );
-  // A boolean is said "true · false", the schema lists false first: compare as sets.
   for (const f of fields)
-    assert.deepEqual(MODE_SENSES[String(f.name)]![0].split(" · ").sort(), f.values.map(String).sort(), String(f.name));
+    assert.ok(sameValues(MODE_SENSES[String(f.name)]![0], f.values), `${String(f.name)}: ${MODE_SENSES[String(f.name)]![0]}`);
 });
 
-test("the fungus's senses rows name each field of its schema, in its order, with its values", () => {
+test("the fungus's senses rows name each field of its schema, in its order, with its values in order", () => {
   assert.deepEqual(
     FUNGAL_SENSES.map((r) => r[0]),
     FUNGAL_SCHEMA.fields.map((f) => String(f.name)),
   );
-  // groomed is boolean: the drawer says "true · false", the schema lists false first.
-  for (const [i, f] of FUNGAL_SCHEMA.fields.entries()) {
-    const said = FUNGAL_SENSES[i]![1].split(" · ").sort();
-    assert.deepEqual(said, f.values.map(String).sort(), String(f.name));
-  }
+  for (const [i, f] of FUNGAL_SCHEMA.fields.entries())
+    assert.ok(sameValues(FUNGAL_SENSES[i]![1], f.values), `${String(f.name)}: ${FUNGAL_SENSES[i]![1]}`);
+});
+
+test("the values check fails a reversed list but not a boolean's other order", () => {
+  assert.equal(sameValues("a · b · c", ["a", "b", "c"]), true);
+  assert.equal(sameValues("c · b · a", ["a", "b", "c"]), false);
+  assert.equal(sameValues("true · false", [false, true]), true);
 });
