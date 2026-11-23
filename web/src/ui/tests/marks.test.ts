@@ -4,7 +4,7 @@ import { type AphidClump, aphidCount, centreX, centreY, type Colony, CURTAIN, PL
 import { toScreen } from "../camera.ts";
 import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "../field/marks.ts";
-import { setMapInspection } from "../mapInspection.ts";
+import { drawMapInspection, mapInspectionNow, setMapInspection } from "../mapInspection.ts";
 import { APHID_SPOTS, aphidDensity } from "../resourceSprites.ts";
 import { specimenLabel } from "../specimens.ts";
 import { type AntTraces, traceAlpha } from "../trace.ts";
@@ -56,7 +56,7 @@ const clump = (cells: number[], start: number, eaten = 0): AphidClump =>
   ({ layer: PLANE, cells, start, eaten, age: 0, owed: 0 }) as AphidClump;
 
 test("an aphid clump is dots in the aphid green on the plane, a few to a cell by its density and as faint as it is thin, at least a pixel and a tenth of a unit", () => {
-  const cl = clump([10, 10, 11, 10], 8);
+  const cl = clump([10, 10, 11, 10], 3);
   const s = setup({ zoom: 20 });
   drawAphids(s.fc, frame(), [cl], 0);
   const n = aphidCount(cl);
@@ -70,6 +70,7 @@ test("an aphid clump is dots in the aphid green on the plane, a few to a cell by
       want.push("beginPath()", `arc(${fmt(x)}, ${fmt(y)}, ${fmt(r)}, 0, 6.283)`, "fill()");
     }
   want.push("globalAlpha = 1");
+  assert.ok(density.alpha < 1 && density.alpha > 0, "a thin clump: faint");
   assert.deepEqual(s.rec.log, want);
   const small = setup({ zoom: 2, d: 2 });
   drawAphids(small.fc, frame(), [cl], 0);
@@ -77,6 +78,24 @@ test("an aphid clump is dots in the aphid green on the plane, a few to a cell by
     small.rec.log.some((l) => l.endsWith(`, ${fmt(Math.max(2.4, 0.26))}, 0, 6.283)`)),
     "a pixel's worth first, at two device pixels",
   );
+});
+
+test("a dense clump has several marks to a cell, each at its own offset in the cell", () => {
+  const cl = clump([10, 10], 40);
+  const s = setup({ zoom: 20 });
+  drawAphids(s.fc, frame(), [cl], 0);
+  const density = aphidDensity(aphidCount(cl), 1);
+  assert.ok(density.marks >= 3, "dense");
+  const arcs = s.rec.log.filter((l) => l.startsWith("arc("));
+  assert.deepEqual(
+    arcs,
+    Array.from({ length: density.marks }, (_, j) => {
+      const [ox, oy] = APHID_SPOTS[j]!;
+      const [x, y] = screen(centreX(10, 10) + ox, centreY(10) + oy);
+      return `arc(${fmt(x)}, ${fmt(y)}, ${fmt(Math.max(1.2, 0.13 * 20))}, 0, 6.283)`;
+    }),
+  );
+  assert.equal(new Set(arcs).size, density.marks, "each its own place");
 });
 
 test("aphids are not drawn on the curtain, under the voxel pass's full cover, for a clump that is gone, or out of view; none draws nothing", () => {
@@ -91,8 +110,14 @@ test("aphids are not drawn on the curtain, under the voxel pass's full cover, fo
   assert.equal(on({}, frame(), [cl], 1), 0, "under the voxel pass's full cover");
   assert.equal(on({ lv: CURTAIN }, frame(), [cl], 0), 0, "the curtain");
   assert.equal(on({}, frame(), [], 0), 0, "no clump");
-  assert.equal(on({}, frame(), [clump([10, 10], 8, 100)], 0), 0, "eaten away");
-  assert.equal(on({}, frame(), [clump([], 8)], 0), 0, "no cells");
+  const log = (clumps: AphidClump[]) => {
+    const s = setup();
+    drawAphids(s.fc, frame(), clumps, 0);
+    return s.rec.log;
+  };
+  assert.deepEqual(log([]), [], "no clump: nothing at all, not even the style");
+  assert.deepEqual(log([clump([10, 10], 8, 100)]), ["fillStyle = #aphid", "globalAlpha = 1"], "eaten away: skipped, no alpha set for it");
+  assert.deepEqual(log([clump([], 8)]), ["fillStyle = #aphid", "globalAlpha = 1"], "no cells: skipped");
   assert.equal(on({}, frame({ inView: () => false }), [cl], 0), 0, "out of view");
 });
 
@@ -103,6 +128,16 @@ test("with the resource sheet ready a clump's marks are its sprites, one a mark,
   const density = aphidDensity(aphidCount(cl), 1);
   assert.equal(s.rec.log.filter((l) => l.startsWith("drawImage(resource")).length, density.marks);
   assert.equal(s.rec.log.filter((l) => l.startsWith("arc(")).length, 0);
+  // each cell picks its sprite variant from its place, so neighbours differ
+  const two = setup();
+  drawAphids(
+    two.fc,
+    frame({ resourceImage: { toString: () => "resource" } as unknown as HTMLImageElement }),
+    [clump([10, 10, 11, 10], 8)],
+    0,
+  );
+  const sx = two.rec.log.filter((l) => l.startsWith("drawImage(resource")).map((l) => l.split(", ")[1]);
+  assert.notEqual(sx[0], sx[aphidDensity(aphidCount(clump([10, 10, 11, 10], 8)), 2).marks]);
 });
 
 type T = { xs: number[]; ys: number[]; search: number[]; end: string | null; done: number | null };
@@ -122,6 +157,7 @@ test("a moved ant's trace is its way in solid and its search loops dotted, a rin
   assert.equal(log[0], "globalAlpha = 0.85");
   assert.ok(log.includes("strokeStyle = #accent") && log.includes("fillStyle = #accent"));
   assert.ok(log.includes(`lineWidth = ${fmt(Math.max(1.5, 0.25 * 20))}`));
+  assert.ok(log.includes("lineJoin = round") && log.includes("lineCap = round"));
   // the run: from point 0 through points 1 (solid), then 2 and 3 (dotted, a path of its own from point 1)
   const body = log.slice(log.indexOf("setLineDash([])"));
   assert.deepEqual(body.slice(0, 7), [
@@ -142,6 +178,16 @@ test("a moved ant's trace is its way in solid and its search loops dotted, a rin
   const lost = setup();
   drawTraces(lost.fc, fakeTraces([{ ...t, end: "lost" }]));
   assert.equal(lost.rec.log.filter((l) => l.startsWith("arc(")).length, 1, "no end dot unless it went home");
+  const walking = setup();
+  drawTraces(walking.fc, fakeTraces([{ ...t, end: null }]));
+  assert.equal(walking.rec.log.filter((l) => l.startsWith("arc(")).length, 1, "nor while it still walks");
+  const small = setup({ zoom: 2, d: 2 });
+  drawTraces(small.fc, fakeTraces([t]));
+  const [ox, oy] = screen(t.xs[0]!, t.ys[0]!, 2);
+  const [ex, ey] = screen(t.xs[3]!, t.ys[3]!, 2);
+  assert.ok(small.rec.log.includes(`arc(${fmt(ox)}, ${fmt(oy)}, 10, 0, 6.283)`), "the ring is at least 5 device pixels");
+  assert.ok(small.rec.log.includes(`arc(${fmt(ex)}, ${fmt(ey)}, 8, 0, 6.283)`), "the dot at least 4");
+  assert.ok(small.rec.log.includes("lineWidth = 4") && small.rec.log.includes("setLineDash([4, 8])"), "scaled by the device ratio");
 });
 
 test("a trace fades with its age, is left out when it has faded or has no points, and is drawn on the plane only", () => {
@@ -207,10 +253,11 @@ test("a specimen is a dashed ring round its ant and its label above, on the ant'
     "setLineDash([])",
   ]);
   assert.equal(s.rec.log.filter((l) => l.startsWith("arc(")).length, 1, "only specimen 1: 2 is followed, 3 below, 4 gone, 5 in no colony");
-  assert.ok(
-    s.rec.log.some((l) => l.startsWith(`fillText(${specimenLabel(1)},`)),
-    "its label",
-  );
+  const text = s.rec.log.findIndex((l) => l.startsWith(`fillText(${specimenLabel(1)},`));
+  assert.ok(text > 0, "its label");
+  assert.equal(s.rec.log[text - 1], "fillStyle = #ink", "in the ink");
+  assert.ok(s.rec.log.includes("font = 600 10px ui-sans-serif, system-ui, sans-serif"), "10 px");
+  assert.equal(Number(s.rec.log[text]!.split(", ").at(-1)!.replace(")", "")), Math.round((y - r - 10) * 1000) / 1000, "above the ring");
   const small = setup({ colonies: [col], zoom: 2, d: 2 });
   drawSpecimens(small.fc, [specimens[0]!], null);
   assert.ok(
@@ -234,10 +281,11 @@ test("the followed ant has a ring in the accent and its tag above it, while it i
     "lineWidth = 2",
     "stroke()",
   ]);
-  assert.ok(
-    s.rec.log.some((l) => l.startsWith("fillText(#0 ·")),
-    "its tag",
-  );
+  const tag = s.rec.log.findIndex((l) => l.startsWith("fillText(#0 ·"));
+  assert.ok(tag > 0, "its tag");
+  assert.equal(s.rec.log[tag - 1], "fillStyle = #accent", "in the accent");
+  assert.ok(s.rec.log.includes("font = 600 11px ui-sans-serif, system-ui, sans-serif"), "11 px");
+  assert.equal(Number(s.rec.log[tag]!.split(", ").at(-1)!.replace(")", "")), Math.round((y - r - 11) * 1000) / 1000, "above the ring");
   for (const [ff, cc, here] of [
     [null, col, true],
     [f, null, true],
@@ -265,6 +313,17 @@ test("the inspection overlay is drawn where the map was tapped, on its layer, bo
     const b = setup({ now: 2000 });
     drawInspection(b.fc);
     assert.notDeepEqual(a.rec.log, b.rec.log, "it bobs with the clock");
+    // what the overlay's own function draws with the clock in seconds (and with none when motion is reduced)
+    const direct = (seconds: number) => {
+      const s = setup();
+      drawMapInspection(s.fc.ctx, mapInspectionNow(), PLANE, s.fc.c, V, 1, seconds);
+      return s.rec.log;
+    };
+    assert.deepEqual(a.rec.log, direct(1), "the clock in seconds");
+    assert.deepEqual(b.rec.log, direct(2));
+    const still = setup({ now: 2000, reduced: true });
+    drawInspection(still.fc);
+    assert.deepEqual(still.rec.log, direct(0), "no clock when motion is reduced");
     const r1 = setup({ now: 1000, reduced: true });
     const r2 = setup({ now: 2000, reduced: true });
     drawInspection(r1.fc);
