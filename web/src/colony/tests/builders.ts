@@ -129,11 +129,18 @@ export const editPrivate = (c: Colony, keys: readonly string[], edit: (r: Record
 
 /**
  * Fights on the plane are rare in a short run, and which game brings two colonies' ants together moves with every change to
- * the scent streams (the brood-odour channel's fade and spread did it): colony 1's plane ants are put on colony 0's, one each,
- * so a fight death follows by construction. A test still asserts that one happened.
+ * the scent streams (the brood-odour channel's fade and spread did it, twice): the game runs on (at most 40 s) until each
+ * colony has 8 ants on the plane, then colony 1's plane ants are put on colony 0's, one each, so a fight death follows by
+ * construction (with one or two ants a side it did not). A test still asserts that one happened.
  */
 export function stageFight(g: Game): void {
   const [a, b] = [g.colonies[0]!, g.colonies[1]!];
+  const onPlane = (c: typeof a) => {
+    let n = 0;
+    for (let i = 0; i < c.n; i++) if (c.alive[i] && c.layer[i] === PLANE) n++;
+    return n;
+  };
+  for (let k = 0; k < Math.round(40 / DT) && Math.min(onPlane(a), onPlane(b)) < 8; k++) g.tick(DT);
   const mine: number[] = [];
   for (let i = 0; i < a.n && mine.length < 8; i++) if (a.alive[i] && a.layer[i] === PLANE) mine.push(i);
   let k = 0;

@@ -78,8 +78,12 @@ test("N3 plays the seed's odour distance on its trial's world, on band centres: 
   // at the same share of its width (8.6-11.0 = 9.93 x 0.867-1.105, the ratios of the 12.4-15.8 band round 14.3). It stays a fingerprint of this one
   // run, kept because it is the only guard on a miscount of meetings (PRD §79) and a stream-free bound cannot catch one. What does not depend on the
   // stream is looped over more alike seeds below: each must meet above N3_MIN_MEET (so its trial counts) and never fight (seeds 1 and 2 met 13.9 and 12.2; a third seed was left out to keep the file under the soak tier's limit).
-  assert.ok(near.meetings > 8.6 && near.meetings < 11.0, `meetings ${near.meetings}`);
-  for (const seed of [1, 2]) {
+  // Retune 3 (the odour channel's reach went back to 0.03/0.5, with the delivery fallback): seed 27 meets 14.27 again, so the band is the first retune's
+  // 12.4-15.8 (14.27 x 0.867-1.105), the same share of its width.
+  assert.ok(near.meetings > 12.4 && near.meetings < 15.8, `meetings ${near.meetings}`);
+  // At 0.03/0.5 seeds 1-4 meet only 3-7 ant-seconds, where an alike check proves little; seeds 9-12 meet 30-41, so the loop plays 9 and 10 (all eight alike
+  // seeds measured on this stream, 1-4, 9-12 and 17, had no fight; two are played to keep the file under the soak tier's limit).
+  for (const seed of [9, 10]) {
     const alike = runAssay(neglectusTolerance, seed).metrics;
     assert.ok(alike.meetings > N3_MIN_MEET, `seed ${seed}: meetings ${alike.meetings}`);
     assert.equal(alike.fought, 0, `seed ${seed} alike: ${alike.deaths} deaths`);
