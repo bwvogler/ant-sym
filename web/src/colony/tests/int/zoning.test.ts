@@ -171,11 +171,12 @@ test("a young ant in a chamber turns toward the brood's odour, not the queen's p
   // ja-k4k.15.6: with 6 nestmates already in its cell (7 counting itself) and the limit at 6, it stops climbing; with 5, it still does;
   // the limit off (0) it climbs however many stand there.
   const full = turn(1, 50, 6, 7);
+  const fullRms = lastRms; // read now: the later calls overwrite it
   const room = turn(1, 50, 6, 6);
   const off = turn(1, 50, 0, 40);
   assert.ok(Math.abs(full) < 0.005, `a full cell: no climb ${full.toFixed(4)}`);
   // It wanders on (noise only) instead of standing still, so it spreads out and does not queue in the cell.
-  assert.ok(lastRms > 0.005, `a full cell: it still wanders (turn spread ${lastRms.toFixed(4)})`);
+  assert.ok(fullRms > 0.005, `a full cell: it still wanders (turn spread ${fullRms.toFixed(4)})`);
   assert.ok(room < -0.005, `one short of full: still climbs ${room.toFixed(4)}`);
   assert.ok(off < -0.005, `no limit: climbs ${off.toFixed(4)}`);
 });
