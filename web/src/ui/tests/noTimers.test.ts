@@ -10,12 +10,20 @@ import { join } from "node:path";
 
 const SRC = join(new URL("../../", import.meta.url).pathname);
 
-const components = [
-  ...readdirSync(join(SRC, "ui"))
-    .filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))
-    .map((f) => `ui/${f}`),
-  "ColonyApp.tsx",
-];
+/** Every .ts and .tsx under ui/, folders below it included (ui/field/ is plain TypeScript, but a timer there would escape just as well), tests left out. */
+function sources(dir: string): string[] {
+  return readdirSync(join(SRC, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory()
+      ? e.name === "tests" || e.name === "node_modules"
+        ? []
+        : sources(`${dir}/${e.name}`)
+      : e.name.endsWith(".ts") || e.name.endsWith(".tsx")
+        ? [`${dir}/${e.name}`]
+        : [],
+  );
+}
+
+const components = [...sources("ui"), "ColonyApp.tsx"];
 
 /** The call sites of anything that makes a component draw or act on a schedule. */
 const TIMING = /\b(setInterval|setTimeout|requestAnimationFrame|useReducer)\b/;
@@ -88,6 +96,11 @@ test("every named timer is still where it was named: a stale name would let a ne
     NAMED.every((n) => files.has(n.file)),
     "named files are page components, hooks and the engine's own modules",
   );
+});
+
+test("the scan reaches the folders below ui/", () => {
+  assert.ok(components.includes("ui/field/renderer.ts"), "ui/field/ is scanned");
+  assert.ok(!components.some((f) => f.includes("/tests/")), "tests are not");
 });
 
 test("the guard sees each shape of a forced redraw, and not a comment", () => {
