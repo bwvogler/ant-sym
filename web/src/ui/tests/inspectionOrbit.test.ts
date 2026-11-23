@@ -24,7 +24,7 @@ test("tiltFromDrag: dragging up tilts the map (a negative stored tilt, 0.01 rad 
   assert.equal(tiltFromDrag({ yaw: 0, tilt: -0.5 }, 50), 0, "exactly back to flat");
   assert.equal(tiltFromDrag({ yaw: 0, tilt: -0.5 }, 5000), 0, "dragging far down stops at flat");
   assert.equal(tiltFromDrag(mapOrbit(), 5000), 0, "and from flat, down tilts nothing (never positive)");
-  assert.ok(Object.is(tiltFromDrag(mapOrbit(), 1), 0) || tiltFromDrag(mapOrbit(), 1) === 0);
+  assert.ok(Object.is(tiltFromDrag(mapOrbit(), 1), 0), "and the flat map it stops at is +0, not -0");
   near(tiltFromDrag(mapOrbit(), -5000), -1.15, "far up stops at the orbit's limit");
   near(tiltFromDrag({ yaw: 0, tilt: -1.1 }, -20), -1.15, "and from near it");
 });

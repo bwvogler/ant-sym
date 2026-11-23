@@ -135,8 +135,8 @@ export class MapVoxelPass {
           trails,
           clumps,
         ),
-        // A tilted frame on the software renderer (no WebGL: it rasterises on the CPU) takes a third of the device resolution, not a half,
-        // to keep its frame time (#287, "Reduce tilted map work on the software renderer").
+        // A tilted frame on the software renderer (no WebGL: it rasterises on the CPU) takes a third of the map's CSS size (the canvas's device
+        // size over `dpr`, over 3), not a half, to keep its frame time (#287, "Reduce tilted map work on the software renderer").
         scale = 1 / (dpr * (angled && !scene.accelerated ? 3 : 2)),
         width = Math.max(1, Math.round(view.w * scale)),
         height = Math.max(1, Math.round(view.h * scale));

@@ -184,31 +184,79 @@ test("the scene draws with the camera the orbit and the viewport give: its pose,
       putImageData: () => undefined,
     }),
   } as unknown as HTMLCanvasElement;
+  const scenes: InspectionScene[] = [];
   try {
-    const scene = await InspectionScene.create(canvas, "surface", true);
-    const g = buildGame({ species: "generic", seed: 3, antCount: 20, rival: false, generation: 0 });
-    const patch = inspectViewport(g, new SensedMap(), PLANE, centreX(50, 50), centreY(50), 6, 4, { food: false, home: false });
-    for (const orbit of [
-      { yaw: 0, tilt: 0.65 },
-      { yaw: 0.3, tilt: 1.1 },
-    ]) {
-      scene.setViewport({ width: 480, height: 300, pixelsPerWorld: 60, x: 0.12, y: -0.3, orbit });
-      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
-      const pose = inspectionCameraPose(patch.mode, orbit, { x: 0.12, y: -0.3 });
-      assert.deepEqual(scene.camera.position.toArray(), pose.position, `the camera's position (tilt ${orbit.tilt})`);
-      assert.deepEqual(scene.camera.up.toArray(), pose.up, "its up");
+    // a game long enough that the nest has a mound and the surface cells near it have stalks and heaps for the patch's frame to fit
+    const g = buildGame({ species: "generic", seed: 3, antCount: 40, rival: false, generation: 0 });
+    for (let t = 0; t < 2400; t++) g.tick(1 / 30);
+    const sensed = new SensedMap();
+    for (const [mode, layer] of [
+      ["surface", PLANE],
+      ["below", CURTAIN],
+    ] as const) {
+      const nest = g.colonies[0]!.layers[layer]!.nest;
+      const patch = inspectViewport(g, sensed, layer, nest.x, nest.y, 6, 4, { food: false, home: false });
+      assert.equal(patch.mode, mode);
+      const scene = await InspectionScene.create(canvas, mode, true);
+      scenes.push(scene);
+      const draw = () => scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
       const forward = new T.Vector3();
-      scene.camera.getWorldDirection(forward);
-      const toTarget = new T.Vector3(...pose.target).sub(scene.camera.position).normalize();
-      assert.ok(forward.distanceTo(toTarget) < 1e-9, "looking at the target");
+      const looksAt = (target: [number, number, number], what: string) => {
+        scene.camera.getWorldDirection(forward);
+        const toTarget = new T.Vector3(...target).sub(scene.camera.position).normalize();
+        assert.ok(forward.distanceTo(toTarget) < 1e-9, what);
+      };
+      // a live viewport: the pose about the ground under the map's centre, and the raster's size in world units
+      for (const orbit of [
+        { yaw: 0, tilt: 0.65 },
+        { yaw: 0.3, tilt: 1.1 },
+      ]) {
+        scene.setViewport({ width: 480, height: 300, pixelsPerWorld: 60, x: 0.12, y: -0.3, orbit });
+        draw();
+        const pose = inspectionCameraPose(mode, orbit, { x: 0.12, y: -0.3 });
+        assert.deepEqual(scene.camera.position.toArray(), pose.position, `${mode}: the camera's position (tilt ${orbit.tilt})`);
+        assert.deepEqual(scene.camera.up.toArray(), pose.up, `${mode}: its up`);
+        looksAt(pose.target, `${mode}: looking at the target`);
+        assert.deepEqual(
+          [scene.camera.left, scene.camera.right, scene.camera.top, scene.camera.bottom],
+          [-4, 4, 2.5, -2.5],
+          "480 by 300 pixels at 60 a world unit",
+        );
+      }
+    }
+    // no viewport (the cell inspection's own camera): the scene's own orbit about the patch's own centre, a frustum that fits the patch
+    for (const [mode, layer] of [
+      ["surface", PLANE],
+      ["below", CURTAIN],
+    ] as const) {
+      const nest = g.colonies[0]!.layers[layer]!.nest;
+      const patch = inspectViewport(g, sensed, layer, nest.x, nest.y, 6, 4, { food: false, home: false });
+      const scene = await InspectionScene.create(canvas, mode, true);
+      scenes.push(scene);
+      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const flatFrame = scene.camera.right / 2.15;
+      scene.orbit = { yaw: 0.2, tilt: 0.65 };
+      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const pose = inspectionCameraPose(mode, scene.orbit);
+      assert.deepEqual(pose.target, mode === "surface" ? [0, 0, 0.15] : [0, 0.6, 0]);
+      assert.deepEqual(scene.camera.position.toArray(), pose.position, `${mode}: the scene's own orbit, about the patch's centre`);
+      assert.deepEqual(scene.camera.up.toArray(), pose.up);
+      const frame = scene.camera.right / 2.15;
       assert.deepEqual(
         [scene.camera.left, scene.camera.right, scene.camera.top, scene.camera.bottom],
-        [-4, 4, 2.5, -2.5],
-        "480 by 300 pixels at 60 a world unit",
+        [-2.15 * frame, 2.15 * frame, 1.792 * frame, -1.792 * frame],
       );
+      if (mode === "surface") {
+        assert.ok(frame > 1.5, `the surface patch's mound and stalks widen the frame (${frame})`);
+        assert.notEqual(
+          frame,
+          flatFrame,
+          "the frame fits the patch as the scene's own orbit sees it (a tilted view needs another frame than a flat one)",
+        );
+      } else assert.equal(frame, 1, "nothing to fit below: the unit frame");
     }
-    scene.dispose();
   } finally {
+    for (const scene of scenes) scene.dispose();
     globalThis.fetch = realFetch;
     delete g0.getComputedStyle;
   }
