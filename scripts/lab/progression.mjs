@@ -52,6 +52,7 @@ if (isMainThread) {
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
+    trace: flag("trace"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -85,6 +86,7 @@ if (isMainThread) {
         `  growth made: ground ${r.split.ground.toFixed(0)} · corpses ${r.split.corpses.toFixed(0)} · hosts ${r.split.hosts.toFixed(0)}`,
       );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
+    if (r.trace?.length) console.log(`  trace: ${r.trace.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
   const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
@@ -112,6 +114,7 @@ if (isMainThread) {
     landing,
     rootRadius,
     split: wantSplit,
+    trace,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -194,7 +197,9 @@ if (isMainThread) {
     patches: 0,
     mat: 0,
     split,
+    trace: [],
   };
+  let seen = [0, 0];
   const share = (c) => {
     const f = g.fungus.census(c);
     return {
@@ -216,6 +221,12 @@ if (isMainThread) {
           break;
         }
       }
+    }
+    if (trace && (g.fungus.spread !== seen[0] || g.fungus.flowers !== seen[1])) {
+      seen = [g.fungus.spread, g.fungus.flowers];
+      r.trace.push(
+        `${g.time.toFixed(1)}s spread ${seen[0]} flowers ${seen[1]} base ${g.fungus.patchOn(0).length / 2} hyphae ${g.fungus.hyphaeOn(0)?.parent.size}`,
+      );
     }
     if (k % 15) continue;
     const t = Math.round(g.time);
