@@ -3,6 +3,9 @@
 // each seed's whole output as seed-N.txt, its first line `commit <sha>` the code it measured). "never" is a seed that
 // didn't get there in the game's time, and counts as slower than any time. Offline, no key, no spend.
 //
+// Where every seed's line also says `patches P (flowers F, mat cells M)` (a game with hyphae), the table adds those three
+// columns and a line counting the flowers.
+//
 // Usage: node scripts/progression-table.mjs <dir with seed-N.txt files>
 // Prints a Markdown table, then the worst seed and the median for the quarter and the queen. Exit 0; 1 when a file has no
 // result line (an ::error line says which); 2 on bad usage.
@@ -42,12 +45,29 @@ for (const { seed, file } of files) {
     failed = true;
     continue;
   }
-  rows.push({ seed, first: secs(m[2]), quarter: secs(m[3]), half: secs(m[4]), queen: secs(m[5]) });
+  const extra = /patches (\d+) \(flowers (\d+), mat cells (\d+)\)/.exec(text);
+  rows.push({
+    seed,
+    first: secs(m[2]),
+    quarter: secs(m[3]),
+    half: secs(m[4]),
+    queen: secs(m[5]),
+    ...(extra ? { patches: Number(extra[1]), flowers: Number(extra[2]), mat: Number(extra[3]) } : {}),
+  });
 }
+const withExtra = rows.length > 0 && rows.every((r) => r.patches !== undefined);
 
 if (commits.size) console.log(`Commit${commits.size > 1 ? "s" : ""} measured: ${[...commits].join(", ")}\n`);
-console.log("| seed | first host | quarter | half | queen |\n|---:|---:|---:|---:|---:|");
-for (const r of rows) console.log(`| ${r.seed} | ${show(r.first)} | ${show(r.quarter)} | ${show(r.half)} | ${show(r.queen)} |`);
+console.log(
+  withExtra
+    ? "| seed | first host | quarter | half | queen | patches | flowers | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|"
+    : "| seed | first host | quarter | half | queen |\n|---:|---:|---:|---:|---:|",
+);
+for (const r of rows)
+  console.log(
+    `| ${r.seed} | ${show(r.first)} | ${show(r.quarter)} | ${show(r.half)} | ${show(r.queen)} |` +
+      (withExtra ? ` ${r.patches} | ${r.flowers} | ${r.mat} |` : ""),
+  );
 
 /** The worst (largest, "never" worst) and the median of a column, with the seeds that reached it. */
 function summary(key) {
@@ -59,5 +79,8 @@ function summary(key) {
   const reached = v.filter((x) => x !== Infinity).length;
   return `${key}: worst ${show(worst)} (seed${at.length > 1 ? "s" : ""} ${at.join(", ")}), median ${show(median)}, reached on ${reached} of ${v.length} seeds`;
 }
-console.log(`\n- ${summary("quarter")}\n- ${summary("queen")}`);
+const flowerLine = withExtra
+  ? `\n- flowers: ${rows.reduce((s, r) => s + r.flowers, 0)} in all, in ${rows.filter((r) => r.flowers > 0).length} of ${rows.length} games; patches: median ${[...rows.map((r) => r.patches)].sort((a, b) => a - b)[Math.floor(rows.length / 2)]}`
+  : "";
+console.log(`\n- ${summary("quarter")}\n- ${summary("queen")}${flowerLine}`);
 process.exit(failed ? 1 : 0);
