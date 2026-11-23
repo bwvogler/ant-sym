@@ -1,4 +1,5 @@
 import type { CacheStore } from "./colonyJev.ts";
+import { browserStorage } from "./storage.ts";
 
 // Where the colony client's cached answers outlive the page: localStorage, one
 // key per context. Pure apart from the storage it is handed, so node --test
@@ -52,4 +53,4 @@ export function storageCache(storage: () => Storage | null, prefix = STORE_PREFI
 }
 
 /** The page's store: the browser's localStorage, when there is one. */
-export const browserCache: CacheStore = storageCache(() => (typeof localStorage === "undefined" ? null : localStorage));
+export const browserCache: CacheStore = storageCache(browserStorage);

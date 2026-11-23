@@ -8,6 +8,7 @@
 // the player can ask for the important ones only, or none on the field at all (the bell still counts them).
 
 import { useSyncExternalStore } from "react";
+import { persisted } from "./storage.ts";
 
 export type ToastTone = "info" | "warn" | "good";
 
@@ -115,26 +116,16 @@ export function showsAt(level: NoticeLevel, t: { important: boolean }): boolean 
   return level === "all" || (level === "important" && t.important);
 }
 
+const kept = persisted(NOTICE_LEVEL_KEY);
 let level: NoticeLevel | null = null;
 
 export function noticeLevel(): NoticeLevel {
-  if (level === null)
-    try {
-      level = parseNoticeLevel(localStorage.getItem(NOTICE_LEVEL_KEY));
-    } catch {
-      level = "all";
-    }
-  return level;
+  return (level ??= parseNoticeLevel(kept.get()));
 }
 
 export function setNoticeLevel(next: NoticeLevel): void {
-  level = next;
-  try {
-    if (next === "all") localStorage.removeItem(NOTICE_LEVEL_KEY);
-    else localStorage.setItem(NOTICE_LEVEL_KEY, next);
-  } catch {
-    // no storage: it holds for this page only
-  }
+  level = next; // held for this page where the browser keeps nothing
+  kept.set(next === "all" ? null : next);
   emit();
 }
 

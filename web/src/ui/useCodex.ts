@@ -2,19 +2,14 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Game } from "../colony/index.ts";
 import { codexNumbers, cues, listed, loadAll, loadSeen, newlyOpen, saveAll, saveSeen, UNLOCK } from "./codex.ts";
 import { guideFor } from "./guide.ts";
+import { browserStorage } from "./storage.ts";
 import { pushToast } from "./toasts.ts";
 import type { ColonyStats } from "./useColony.ts";
 
 // The Codex on the page (PRD §69.4): what this browser has seen, a store any surface reads (the guide, the rail's badge),
 // and the watch that opens entries as the game shows their cues. Kept across games: it is the player's notebook.
 
-const storage = (): Storage | null => {
-  try {
-    return typeof localStorage === "undefined" ? null : localStorage;
-  } catch {
-    return null;
-  }
-};
+const storage = browserStorage;
 
 interface CodexState {
   /** entries seen in this browser */

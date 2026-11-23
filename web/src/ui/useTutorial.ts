@@ -16,18 +16,13 @@ import {
   type Effect,
   type Tutorial,
 } from "./tutorial.ts";
+import { browserStorage } from "./storage.ts";
 import type { ColonyControls } from "./useColony.ts";
 
 // The tutorial on the page (ja-7x4, PRD §61): the machine (tutorial.ts) read every frame, its effects applied through
 // the page's own controls, follow and camera; the Learn-style highlight set on the root (index.css `data-tutorial`).
 
-const store = (): Storage | null => {
-  try {
-    return typeof localStorage === "undefined" ? null : localStorage;
-  } catch {
-    return null;
-  }
-};
+const store = browserStorage;
 
 /** Whether a first Start should run the tutorial: never finished or skipped in this browser. */
 export const firstGame = (): boolean => !tutorialDone(store());

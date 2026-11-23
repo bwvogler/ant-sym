@@ -1,4 +1,5 @@
 import { PASS_HEADER, readHealth, type Budget } from "../../shared/jev.ts";
+import { persisted } from "./storage.ts";
 export { PASS_HEADER };
 
 // Where the API is. In dev it is middleware on the Vite server, same origin.
@@ -26,27 +27,16 @@ export function apiUrl(path: string, env: ViteEnv = viteEnv()): string {
 }
 
 const PASS_KEY = "jev-ants:pass";
-/** Kept for this page when localStorage is blocked. */
-let memoryPass: string | null = null;
+// Kept for this page when localStorage is blocked (the memory option).
+const pass = persisted(PASS_KEY, { memory: true });
 
 /** The passphrase this browser keeps for the hosted proxy, or null. */
 export function passphrase(): string | null {
-  try {
-    if (typeof localStorage !== "undefined") return localStorage.getItem(PASS_KEY) ?? memoryPass;
-  } catch {
-    // blocked storage: fall back to this page's copy
-  }
-  return memoryPass;
+  return pass.get();
 }
 
 export function setPassphrase(p: string | null): void {
-  memoryPass = p;
-  try {
-    if (p) localStorage.setItem(PASS_KEY, p);
-    else localStorage.removeItem(PASS_KEY);
-  } catch {
-    // blocked storage: memoryPass holds it until the page closes
-  }
+  pass.set(p || null);
 }
 
 /** Headers for an API call: JSON, plus the passphrase when the build talks to the hosted proxy. */

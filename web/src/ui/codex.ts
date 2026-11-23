@@ -1,5 +1,6 @@
 import { type Colony, CURTAIN, INFECTED, PLANE } from "../colony/index.ts";
 import { ALARM_FULL, ALARM_SHOWN } from "./lens.ts";
+import { type KeyStore, persisted } from "./storage.ts";
 
 // The Codex (PRD §69.4, ja-mvo9.3): the field guide's entries open as the player first sees what each is about, through
 // the hosts the fungus lives in. Pure: `cues` reads the game, `UNLOCK` says which cue opens which entry, and the seen
@@ -113,42 +114,28 @@ export function newlyOpen(ids: readonly string[], seen: ReadonlySet<string>, now
 export const listed = (xs: readonly string[]): string =>
   xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
-type Storage = Pick<globalThis.Storage, "getItem" | "setItem" | "removeItem">;
 export const SEEN_KEY = "jev-ants:codex-seen";
 export const ALL_KEY = "jev-ants:codex-all";
 
 /** The entries this browser has seen (an empty set where storage is missing, blocked or holds something else). */
-export function loadSeen(storage: () => Storage | null): Set<string> {
+export function loadSeen(storage: () => KeyStore | null): Set<string> {
   try {
-    const v = JSON.parse(storage()?.getItem(SEEN_KEY) ?? "[]") as unknown;
+    const v = JSON.parse(persisted(SEEN_KEY, { store: storage }).get() ?? "[]") as unknown;
     return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
   } catch {
     return new Set();
   }
 }
 
-export function saveSeen(storage: () => Storage | null, seen: ReadonlySet<string>): void {
-  try {
-    storage()?.setItem(SEEN_KEY, JSON.stringify([...seen]));
-  } catch {
-    // Blocked storage: the Codex forgets at the end of the page, nothing worse.
-  }
+export function saveSeen(storage: () => KeyStore | null, seen: ReadonlySet<string>): void {
+  persisted(SEEN_KEY, { store: storage }).set(JSON.stringify([...seen])); // blocked storage: the Codex forgets at the end of the page, nothing worse
 }
 
 /** Whether the guide shows every entry, seen or not (the player's switch). */
-export function loadAll(storage: () => Storage | null): boolean {
-  try {
-    return storage()?.getItem(ALL_KEY) === "1";
-  } catch {
-    return false;
-  }
+export function loadAll(storage: () => KeyStore | null): boolean {
+  return persisted(ALL_KEY, { store: storage }).get() === "1";
 }
 
-export function saveAll(storage: () => Storage | null, all: boolean): void {
-  try {
-    if (all) storage()?.setItem(ALL_KEY, "1");
-    else storage()?.removeItem(ALL_KEY);
-  } catch {
-    // as saveSeen
-  }
+export function saveAll(storage: () => KeyStore | null, all: boolean): void {
+  persisted(ALL_KEY, { store: storage }).set(all ? "1" : null);
 }
