@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { segButtonClass, segRowClass } from "../segmented.ts";
+import { segButtonAttrs, segButtonClass, segRowAttrs, segRowClass } from "../segmented.ts";
 import { seg } from "../styles.ts";
 
 // One joined group of buttons (ja-fnd.6.4.5): nine hand-written copies, now Segmented. The classes of each place as it wrote them, as sets
@@ -55,6 +55,33 @@ test("the segment look: the one that is on takes the accent; the rest are the pa
   assert.match(seg(true), /bg-accent text-accent-ink/);
   assert.match(seg(false), /bg-panel text-fg-2 hover:bg-raised/);
   assert.match(seg(false), /disabled:opacity-60/);
+});
+
+test("in a group a button is a toggle (aria-pressed, no role); in a tablist it is a tab (role=tab, aria-selected, no aria-pressed)", () => {
+  const on = segButtonAttrs({ on: true });
+  assert.equal(on["aria-pressed"], true);
+  assert.ok(!("role" in on) && !("aria-selected" in on));
+  assert.equal(segButtonAttrs({ on: false })["aria-pressed"], false, "off is false, not absent: a screen reader says 'not pressed'");
+  const tab = segButtonAttrs({ on: true }, { role: "tablist" });
+  assert.deepEqual([tab.role, tab["aria-selected"]], ["tab", true]);
+  assert.ok(!("aria-pressed" in tab));
+  assert.equal(segButtonAttrs({ on: false }, { role: "tablist" })["aria-selected"], false);
+});
+
+test("a button carries its title, its disabled state and the place's classes; fill and soft come from the group", () => {
+  const a = segButtonAttrs({ on: false, title: "why", disabled: true, className: "px-2.5 py-1" }, { fill: true });
+  assert.equal(a.title, "why");
+  assert.equal(a.disabled, true);
+  assert.equal(a.className, `flex-1 ${seg(false)} px-2.5 py-1`);
+  assert.equal(segButtonAttrs({ on: true }, { soft: true }).className, "px-2 py-1 text-xs bg-accent-soft text-accent");
+  assert.equal(segButtonAttrs({ on: true }).disabled, undefined, "enabled unless said otherwise");
+});
+
+test("the frame: a group by default (named for a screen reader), a tablist when asked, the place's classes added", () => {
+  assert.deepEqual(segRowAttrs({ label: "speed" }), { className: segRowClass(), role: "group", "aria-label": "speed" });
+  assert.equal(segRowAttrs({ role: "tablist" }).role, "tablist");
+  assert.equal(segRowAttrs({ role: "tablist" })["aria-label"], undefined, "the Codex's tabs are unnamed, as before");
+  assert.equal(segRowAttrs({ className: "mt-2 text-sm" }).className, segRowClass("mt-2 text-sm"));
 });
 
 // One group: no source repeats the frame, or the segment look, outside the kit.

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { segButtonClass, segRowClass } from "./segmented.ts";
+import { segButtonAttrs, segRowAttrs } from "./segmented.ts";
 
 // A joined group of buttons (ja-fnd.6.4.5): see segmented.ts for what it looks like. Each option says for itself whether it is on and what
 // picking it does, so a choice among several (the speed) and a set of independent switches (the trails drawn) are the same thing.
@@ -34,21 +34,10 @@ export default function Segmented({
   /** the group's own classes (a text size, a margin) */
   className?: string;
 }) {
-  const tabs = role === "tablist";
   return (
-    <div className={segRowClass(className)} role={role} aria-label={label}>
+    <div {...segRowAttrs({ label, role, className })}>
       {options.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          role={tabs ? "tab" : undefined}
-          aria-selected={tabs ? o.on : undefined}
-          aria-pressed={tabs ? undefined : o.on}
-          className={segButtonClass(o.on, { fill, soft, more: o.className })}
-          title={o.title}
-          disabled={o.disabled}
-          onClick={o.onPick}
-        >
+        <button key={o.key} type="button" {...segButtonAttrs(o, { role, fill, soft })} onClick={o.onPick}>
           {o.label}
         </button>
       ))}
