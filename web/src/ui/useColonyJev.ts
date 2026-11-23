@@ -19,10 +19,10 @@ import { type DoctrineChoice, JevSession } from "./jevSession.ts";
 import { loadPrecache } from "./precache.ts";
 
 // React face of the colonies' Jev client: one client for the page's life
-// (the colonies change with the world, the caches do not), its state mirrored
-// into React, each colony's doctrine (its nature: a scenario setting, not the
-// player's lever) and the fungus's aim (the player's). Cached answers live in
-// localStorage under their context (cacheStore.ts).
+// (the colonies change with the world, the caches do not) and the session over it
+// (jevSession.ts), which keeps the lock, whether a miss may start a run, each colony's doctrine (its nature: a scenario
+// setting, not the player's lever) and the fungus's aim (the player's). Cached answers live in localStorage under their
+// context (cacheStore.ts).
 //
 // Jev in the fungus game (ja-lo8.2; PR #42 review S6–S8): spend nothing while answers are cached, and ask Jev only for
 // the situations that aren't. The page plays the answers it ships and those Jev gave before; a situation with no answer

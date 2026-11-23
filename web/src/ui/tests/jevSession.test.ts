@@ -296,3 +296,25 @@ test("the daily budget the page loaded with is in the snapshot, and a different 
   session.setBackend(server);
   assert.equal(session.snapshot().backendBudget, null);
 });
+
+test("the setters see the lock with a start on the wire: after Resume from a Stop, new words are taken, and refused again once it ends without a run", async () => {
+  const { c, session, log } = fake();
+  session.setBackend(server);
+  c.tick({ phase: "stopped", run: { stopReason: "user", caps } });
+  session.setAim({ id: "a", text: "refused: stopped" });
+  assert.deepEqual(log, [], "stopped by the player: refused");
+  session.start(); // Resume
+  session.setAim({ id: "b", text: "taken: starting" });
+  session.setDoctrine(0, { id: "b", text: "taken too" });
+  assert.deepEqual(log, ["start", "aim taken: starting now", "doctrine 0 taken too"], "starting: the lock is gone");
+  c.finishStart();
+  await microtasks();
+  session.setAim({ id: "c", text: "refused again" });
+  assert.deepEqual(log, ["start", "aim taken: starting now", "doctrine 0 taken too"], "the start ended, still stopped: refused");
+});
+
+test("stop ends the run on the client", () => {
+  const { session, log } = fake();
+  session.stop();
+  assert.deepEqual(log, ["stop"]);
+});
