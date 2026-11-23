@@ -61,6 +61,7 @@ import { useWideTree } from "./ui/upgradeBranches.ts";
 import { ANTS_TIP, BODY_TIP, FREE_TIP, MUTATION_TIP } from "./ui/upgradeText.ts";
 import { recheckBackend, useBackend } from "./ui/useBackend.ts";
 import { TOKENS_PER_FUNGAL_SITUATION, useColonyJev } from "./ui/useColonyJev.ts";
+import { JevContext, useJev, useJevSession, useJevView } from "./ui/jevContext.tsx";
 import LearnDrawer from "./ui/LearnDrawer.tsx";
 import Help from "./ui/Help.tsx";
 import { GUIDE, REPO } from "./ui/guide.ts";
@@ -101,10 +102,16 @@ const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
 
 export default function ColonyApp() {
   const colony = useColony();
+  const { game, journal } = colony;
+  // The Jev session (ui/useColonyJev.ts, jevSession.ts): built here, above the page, and given to it through a context, so each component reads its
+  // own slice of it (ui/jevContext.tsx) and nothing here draws again when the lock or the aim changes.
+  const jevSession = useColonyJev(game.colonies, game.fungus, useBackend(), journal, game.params.species);
   // The loop reaches the components below through a context, so each reads its own slice of the stats (ui/session.ts).
   return (
     <SessionContext.Provider value={colony.loop}>
-      <Page colony={colony} />
+      <JevContext.Provider value={jevSession}>
+        <Page colony={colony} />
+      </JevContext.Provider>
     </SessionContext.Provider>
   );
 }
@@ -112,7 +119,9 @@ export default function ColonyApp() {
 function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const { game, loop, controls, update, onFrame, restart, newWorld, start, loadSave, settings, evolve, journal, step } = colony;
   const backend = useBackend();
-  const jev = useColonyJev(game.colonies, game.fungus, backend, journal, game.params.species);
+  // What the page-level code still reads of Jev (saves, the pen, the notices): the whole snapshot with the commands. The leaves take theirs from the
+  // context, each its own slice (ui/jevContext.tsx).
+  const jev = useJevView();
   // Lab mode (PRD §69.7–69.8): the map shares the screen with a workbench of the game's history, policy, numbers, levers
   // and steps. Open at a tab, from the Lab store (a "?" on the policy opens it too).
   const lab = useLab() !== null;
@@ -304,7 +313,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     update,
     restart,
     newWorld,
-    jev,
     journal,
     saves: games,
     onLoad: (r) => (continueFrom(r), setDrawer(null)),
@@ -501,8 +509,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
         {drawer === "fungus" && (
           <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
             <FungusStatus />
-            <Aim jev={jev} />
-            {jev.lock && <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {jev.lock}</p>}
+            <Aim />
+            <AimLockNote />
           </Drawer>
         )}
         {drawer === "evolve" && (
@@ -568,8 +576,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                     followed={followed}
                     colonies={game.colonies}
                     fungus={game.fungus}
-                    explain={jev.explain}
-                    explainFungus={jev.explainFungus}
                     onClose={() => setFollowed(null)}
                     fields={game.params.species.lanes.mode?.schema?.fields.map((f) => String(f.name))}
                     pinned={specimens.some((s) => sameAnt(s, followed))}
@@ -581,16 +587,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           </div>
         )}
 
-        {!building && (
-          <AimBar
-            aim={jev.aim}
-            setAim={jev.setAim}
-            draftAim={jev.draftAim}
-            lock={jev.lock}
-            tokens={TOKENS_PER_FUNGAL_SITUATION}
-            leftOpen={drawer !== null}
-          />
-        )}
+        {!building && <AimBar tokens={TOKENS_PER_FUNGAL_SITUATION} leftOpen={drawer !== null} />}
 
         {!building && tut.tutorial && tut.card && (
           <TutorialCard
@@ -650,11 +647,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           policy={{
             colonies: game.colonies,
             followed,
-            doctrines: jev.doctrines,
-            aim: jev.aim,
-            lock: jev.lock,
             game,
-            fungusAnswers: jev.fungusAnswers,
             menu: controls.menu,
           }}
         />
@@ -879,8 +872,11 @@ function FungusStatus() {
 }
 
 /** The fungus's aim: the player's words, which Jev reads to decide what the fungus does in each host. */
-function Aim({ jev }: { jev: ReturnType<typeof useColonyJev> }) {
-  const locked = jev.lock !== null;
+function Aim() {
+  const session = useJevSession();
+  const lock = useJev((s) => s.lock);
+  const aim = useJev((s) => s.aim);
+  const locked = lock !== null;
   return (
     <div className="mt-5 lg:hidden" aria-label="fungus aim">
       <div className="flex items-center justify-between">
@@ -892,9 +888,9 @@ function Aim({ jev }: { jev: ReturnType<typeof useColonyJev> }) {
             <button
               key={a.id}
               type="button"
-              className={seg(jev.aim.id === a.id)}
+              className={seg(aim.id === a.id)}
               disabled={locked}
-              onClick={() => jev.setAim({ id: a.id, text: a.text })}
+              onClick={() => session.setAim({ id: a.id, text: a.text })}
             >
               {a.name}
             </button>
@@ -904,14 +900,14 @@ function Aim({ jev }: { jev: ReturnType<typeof useColonyJev> }) {
       <textarea
         className="mt-2 w-full resize-none rounded-md border border-line bg-paper px-2 py-1.5 text-xs text-fg outline-none focus:border-accent disabled:opacity-60"
         rows={4}
-        value={jev.aim.text}
+        value={aim.text}
         disabled={locked}
-        onChange={(e) => jev.draftAim({ id: "custom", text: e.target.value })}
-        onBlur={(e) => jev.setAim({ id: jev.aim.id, text: e.target.value })}
+        onChange={(e) => session.draftAim({ id: "custom", text: e.target.value })}
+        onBlur={(e) => session.setAim({ id: aim.id, text: e.target.value })}
         aria-label="aim"
       />
       {locked ? (
-        <p className="mt-1 text-xs text-warn">{jev.lock}</p>
+        <p className="mt-1 text-xs text-warn">{lock}</p>
       ) : (
         <p className="mt-1 text-xs text-fg-3">
           What the fungus wants, in your words. Jev reads it and decides what the fungus does inside each ant it lives in: what that ant
@@ -920,6 +916,12 @@ function Aim({ jev }: { jev: ReturnType<typeof useColonyJev> }) {
       )}
     </div>
   );
+}
+
+/** Why the aim can't change now, under the fungus drawer's aim (from 1024 px the aim bar says it itself). */
+function AimLockNote() {
+  const lock = useJev((s) => s.lock);
+  return lock ? <p className="mt-4 hidden text-xs text-warn lg:block">The aim is locked: {lock}</p> : null;
 }
 
 /** Sim time as m:ss (h:mm:ss past an hour). */

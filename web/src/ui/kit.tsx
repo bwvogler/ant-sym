@@ -118,7 +118,7 @@ export function Icon({ name, className }: { name: IconName; className?: string }
 /**
  * A surface beside the map: on a desktop a column at the left, under the HUD; on a phone a bottom sheet over the tab bar.
  * Escape closes it unless something has already taken the key (the map unfollowing, or a layer of the Escape manager, escape.ts: the
- * palette, a pinned card, the Go to menu, the notices: they settle the event) or something above it is open (a tooltip, the Codex). Closing it gives focus back to
+ * palette, a pinned card, the Go to menu, the notices, a tooltip, the Codex, the Lab: they settle the event). Closing it gives focus back to
  * what had it when it opened (its rail button).
  */
 export function Drawer({
@@ -141,15 +141,15 @@ export function Drawer({
       if (opener?.isConnected && (document.activeElement === document.body || document.activeElement === null)) opener.focus();
     };
   }, []);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector('[role="tooltip"], [role="dialog"][aria-label="Codex"]')) return;
+  useEscape(
+    ESCAPE_LAYER.drawer,
+    () => {
       onClose();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [onClose]);
+      return true;
+    },
+    true,
+    "below",
+  );
   return (
     <section
       aria-label={label}

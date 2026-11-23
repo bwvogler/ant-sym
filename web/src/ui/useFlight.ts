@@ -9,7 +9,8 @@ import type { Landing } from "./QueenPen.tsx";
 import { useLoopStats } from "./session.ts";
 import { flightInAir } from "./statSelect.ts";
 import { pushToast } from "./toasts.ts";
-import type { DoctrineChoice, useColonyJev } from "./useColonyJev.ts";
+import type { JevView } from "./jevContext.tsx";
+import type { DoctrineChoice } from "./useColonyJev.ts";
 import type { ColonyControls } from "./useColony.ts";
 
 // The queen's flight and her pen, as the page runs them (ja-fnd.6.2, docs/refactor.md S5.2): what ColonyApp's Page did inline. A new queen has
@@ -50,7 +51,7 @@ export function useFlight({
 }: {
   game: Game;
   loop: GameLoop;
-  jev: ReturnType<typeof useColonyJev>;
+  jev: JevView;
   update: (patch: Partial<ColonyControls>) => void;
   setFollowed: (f: null) => void;
   setView: (view: "above" | "below") => void;

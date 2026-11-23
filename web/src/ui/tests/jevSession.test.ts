@@ -69,7 +69,7 @@ test("the backend answering unlocks it at once: the lock, `canAsk` and the snaps
   const { c, session, told } = fake();
   session.setBackend(server);
   assert.equal(session.snapshot().lock, null);
-  assert.equal(session.lock, null);
+  assert.equal(session.lockNow(), null);
   assert.equal(c.canAsk, true);
   assert.equal(told.length, 1);
   const was = session.snapshot();
