@@ -95,7 +95,24 @@ if (isMainThread) {
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
   const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
-  const { seed, seconds, aim, evolve, buy, order, strain, hyphae, growth, grant, sun, flow, price, landing, rootRadius } = workerData;
+  const {
+    seed,
+    seconds,
+    aim,
+    evolve,
+    buy,
+    order,
+    strain,
+    hyphae,
+    growth,
+    grant,
+    sun,
+    flow,
+    price,
+    landing,
+    rootRadius,
+    split: wantSplit,
+  } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
     const { PRICE } = await import("../../web/src/colony/evolution.ts");
@@ -131,7 +148,7 @@ if (isMainThread) {
   // --split: where the growth that mutations come from was made (evolution.ts): the mycelium on the ground (grow), a corpse's
   // substance (feed), and load passed on in hosts (replicate). The three methods are wrapped on this game's evolution only.
   const split = { ground: 0, corpses: 0, hosts: 0 };
-  if (job.split && g.fungus.evolution) {
+  if (wantSplit && g.fungus.evolution) {
     const e = g.fungus.evolution;
     const wrap = (name, key) => {
       const f = e[name].bind(e);
