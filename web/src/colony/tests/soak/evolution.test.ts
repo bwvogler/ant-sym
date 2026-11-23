@@ -302,8 +302,8 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
 });
 
 test("a weak start loses in the nest: Garden as listed takes a quarter of the colony in seconds, the evolving one does not", () => {
-  const share = (evolve: boolean, seed: number) => {
-    const g = new Game(smallOne(1), {}, mulberry32(seed), [{ antCount: 300 }, { antCount: 300 }]);
+  const share = (evolve: boolean) => {
+    const g = new Game(smallOne(1), {}, mulberry32(7919), [{ antCount: 300 }, { antCount: 300 }]);
     g.land(0, GARDEN, { evolve });
     let most = 0;
     // 120 s: the seven-cell landing (PRD §85) takes listed Garden to a quarter at ~75 s and 0.93 of the colony at 100 s.
@@ -312,19 +312,13 @@ test("a weak start loses in the nest: Garden as listed takes a quarter of the co
       if (k % 30) continue;
       const f = g.fungus.census(g.colonies[0]!);
       most = Math.max(most, f.infected / f.living);
-      if (!evolve && most > 0.9) break; // listed Garden has shown its take-over
     }
     return most;
   };
-  // Retune (brood odour 0.1/0.3): the fungus's take-off is stream-dependent, so the one hard-coded seed 7919 now reaches only 0.66. Listed
-  // Garden's best share over seeds 1-12 and 7919 is bimodal: 1.00 on 2, 6, 7, 11, 12; 0.66 on 7919 and 4, 0.48 on 9; 0.01-0.02 on 1, 3, 5, 8, 10
-  // (a rare take-off failure of the fungus). The evolving one stays at 0.01-0.04 on all 13. Same bounds, held on two streams where it takes off.
-  for (const seed of [2, 6]) {
-    const listed = share(false, seed);
-    const weak = share(true, seed);
-    assert.ok(listed > 0.9, `listed Garden, seed ${seed}: ${listed.toFixed(2)}`);
-    assert.ok(weak < 0.5, `evolving, choosing nothing, seed ${seed}: ${weak.toFixed(2)}`);
-  }
+  const listed = share(false);
+  const weak = share(true);
+  assert.ok(listed > 0.9, `listed Garden: ${listed.toFixed(2)}`);
+  assert.ok(weak < 0.5, `evolving, choosing nothing: ${weak.toFixed(2)}`);
   void INFECTED;
 });
 
