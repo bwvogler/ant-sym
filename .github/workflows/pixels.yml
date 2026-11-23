@@ -1,0 +1,131 @@
+# The map's pixel guard on a pull request (ja-fnd.6.3.18, docs/field-split.md): scripts/field-shots.mjs renders fixed scenes of the one world's
+# canvas in Chromium and hashes each. A change that should not move a pixel (splitting ColonyField into layers, a refactor of the sprites) is proved
+# by recording the scenes on the code it started from and checking them on the new code. Done by hand that is two runs a reviewer has to repeat, on a
+# machine whose Chromium and fonts match (a baseline refuses another Chromium); here both runs are on one runner, so the hashes are comparable.
+#
+# On a pull request that carries the `pixel-guard` label (like `slow-guards`: the PR's author adds it for a change that should not move a pixel,
+# and the run repeats on every push while the label stays) and touches what the page draws with (the paths of e2e.yml, and the script itself).
+# - Base: the merge base of the PR and its base branch, not the base branch's tip (main may have moved the scenes since). The head's
+#   scripts/field-shots.mjs and scripts/lib/ are copied into that checkout, so a PR that adds a scene records it on both sides.
+# - A scene that differs fails the check, named in an ::error line and the job summary; every scene's picture (the baseline's, and `<scene>.now.png`
+#   for a scene that differs) goes up as the `pixels` artifact.
+# A change that moves pixels on purpose (a new scene, ja-fnd.6.3.10's canvas state) leaves the label off and says which scenes move in its PR.
+# Chromium and the system font are set up as e2e.yml does (the scenes' text is the system stack's Inter). ui/tests/pixelsWorkflow.test.ts holds this
+# file to the script's usage.
+name: Pixel guard
+
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    paths:
+      - "web/src/**"
+      - "web/shared/**"
+      - "web/server/**"
+      - "web/public/**"
+      - "web/index.html"
+      - "web/vite.config.ts"
+      - "web/package.json"
+      - "web/package-lock.json"
+      - "web/tsconfig*.json"
+      - "package.json"
+      - "scripts/field-shots.mjs"
+      - "scripts/lib/**"
+      - ".github/workflows/pixels.yml"
+      - "!web/src/**/tests/**"
+      - "!web/server/tests/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  # A `labeled` event for another label gets a group of its own (concurrency applies before the job's if:, as in slow.yml).
+  group: pixels-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'pixel-guard' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: true
+
+jobs:
+  pixels:
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'pixel-guard') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'pixel-guard')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_VERSION: 1.63.0
+      BASE: ${{ github.event.pull_request.base.sha }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm --prefix web ci
+      - name: playwright and chromium
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      # The same system font as the e2e run and the sessions (see e2e.yml): the runner's default is wider.
+      - name: inter as the system font, as in sessions
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends fonts-inter
+          sudo tee /etc/fonts/conf.d/56-prefer-inter.conf > /dev/null <<'EOF'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+          <fontconfig>
+            <alias><family>system-ui</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>ui-sans-serif</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>-apple-system</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>Segoe UI</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>Roboto</family><prefer><family>Inter</family></prefer></alias>
+            <alias><family>sans-serif</family><prefer><family>Inter</family></prefer></alias>
+          </fontconfig>
+          EOF
+          fc-cache -f > /dev/null
+      - name: the base, at the merge base
+        run: |
+          base=$(git merge-base "$BASE" "$HEAD")
+          echo "base: $base (merge base of $BASE and $HEAD)"
+          git worktree add -q "$RUNNER_TEMP/base" "$base"
+          npm --prefix "$RUNNER_TEMP/base/web" ci
+          # The head's script and helpers record the base too: the same scenes on both sides, a new scene included.
+          cp scripts/field-shots.mjs "$RUNNER_TEMP/base/scripts/field-shots.mjs"
+          rm -rf "$RUNNER_TEMP/base/scripts/lib"
+          cp -r scripts/lib "$RUNNER_TEMP/base/scripts/lib"
+          echo "BASE_SHA=$base" >> "$GITHUB_ENV"
+      - name: record the scenes on the base
+        working-directory: ${{ runner.temp }}/base
+        run: node scripts/field-shots.mjs record "$RUNNER_TEMP/pixels"
+      - name: check the scenes on the head
+        run: |
+          set -o pipefail
+          node scripts/field-shots.mjs check "$RUNNER_TEMP/pixels" 2>&1 | tee "$RUNNER_TEMP/check.txt"
+      - name: which scenes differ
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo "### Pixel guard"
+            echo "Recorded on \`${BASE_SHA:-?}\` (the merge base), checked on \`$HEAD\`."
+            echo
+            echo '```'
+            tail -n 5 "$RUNNER_TEMP/check.txt" 2>/dev/null || echo "the check did not run"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if grep -q "scenes differ" "$RUNNER_TEMP/check.txt" 2>/dev/null; then
+            echo "::error title=Pixel guard::$(grep 'scenes differ' "$RUNNER_TEMP/check.txt" | head -1 | sed 's/^field-shots: //')"
+          fi
+      - name: the pictures
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: pixels
+          path: ${{ runner.temp }}/pixels/
+          retention-days: 14
+          if-no-files-found: ignore
+          overwrite: true

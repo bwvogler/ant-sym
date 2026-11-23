@@ -153,3 +153,4 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-23 | `ja-fnd.6.3.11`, part 2 of 3: the pointer's gestures (`pointer.ts`: `PointerController` over a `PointerHost`, with 20 unit tests) | #324 |
 | 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | #326 |
 | 2026-11-23 | `ja-fnd.6.3.16`: the marks stage (`marks.ts`: `drawAphids`, `drawTraces`, `drawSpecimens`, `drawFollowed`, `drawInspection`; 38 scenes match; 9 log tests) | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.18`: the pixel guard in CI (`pixels.yml`: a `pixel-guard` label records the scenes on the merge base and checks them on the head, on one runner) | (this PR) |
