@@ -86,7 +86,7 @@ One source interface, so later organisms plug in without touching the fog (`ja-1
 - When a chunk's last live cell goes out, its paint inputs are copied as its snapshot, with the time: rock, food and quality, spoil, chambers, the hyphae and spore cells. That is `MapChunkPaintCache`'s format.
 - Live cells in a remembered chunk write through to its snapshot, so a host at a chunk's corner updates that corner only.
 - A chunk never sensed has no snapshot. One whose snapshot equals the truth draws the same either way.
-- Ants, brood, queens and alates are never in a snapshot (owner). Corpses on the ground are an open call (§10).
+- Ants, brood, queens and alates are never in a snapshot (owner). Corpses on the ground are remembered as ground items, since they don't move (owner, 2026-11-23).
 
 ### 4.4 Known colonies
 
@@ -111,11 +111,11 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 
 ### 5.3 Readouts (`ja-1ypq.5`)
 - Stats, history, goal toasts, nest badges and the go-to menu list known colonies only, live or as of (§4.4).
-- **Proposed:** the Lab's cards and the dev hook stay omniscient, since they are tools rather than play.
+- The Lab's cards and the dev hook stay omniscient, since they are tools rather than play (owner, 2026-11-23).
 
 ### 5.4 The start and the builder (`ja-1ypq.6`)
 - At landing only the patch and its `BODY_SIGHT` are explored. The landing colony's hole shows only if it lies within reach.
-- **Proposed:** fog is off while the builder is on, as smell vision already overrides §65 there (PRD §73).
+- Fog is off while the builder is on, as smell vision already overrides §65 there (PRD §73) (owner, 2026-11-23).
 - The page's default flips to fog on once the owner has played it.
 
 ## 6. On the endless world (`ja-1ypq.7`, in E5 `ja-qpv.4`)
@@ -165,15 +165,15 @@ F1 and F2 change nothing on the page and can land before the endless world. F3�
 2. Remembered ground is ground, without ants, with "last seen".
 3. Readouts cover known colonies, live or as of when they were last known.
 4. The start reveals only the landing patch.
+5. Fog is off while the builder is on.
+6. The Lab's cards and the dev hook stay omniscient.
+7. Corpses are remembered in snapshots, as ground items.
 
 **Still open, each with a recommendation:**
-1. **Corpses in snapshots.** Recommend remembering them, as ground items: they don't move.
-2. **Fog while building.** Recommend off, as smell vision is.
-3. **The Lab and dev hook.** Recommend that they stay omniscient.
-4. **The grace period.** Recommend 0.5 s, set in F3 by eye and by an edge-flicker test.
-5. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
-6. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
-7. **Whether hosts of other strains see** (the lab's painted strains). Recommend no: only the player's strain.
+1. **The grace period.** Recommend 0.5 s, set in F3 by eye and by an edge-flicker test.
+2. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
+3. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
+4. **Whether hosts of other strains see** (the lab's painted strains). Recommend no: only the player's strain.
 
 ## Sources
 

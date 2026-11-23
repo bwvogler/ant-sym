@@ -7715,7 +7715,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 3. **Readouts cover known colonies.** A colony is known once its nest has been sensed or it holds a host. Its numbers are live while it holds hosts, otherwise as of when the last one left. The go-to menu lists only nests already seen.
 4. **The start reveals only the landing patch** and its sight. This replaces endless-world §8's start-nest discs.
 
-**Proposed** (needs the owner): fog off while the builder is on; the Lab and dev hook stay omniscient; corpses remembered as ground items; a grace of 0.5 s against edge flicker; only the player's strain sees.
+5. **Fog is off while the builder is on; the Lab's cards and the dev hook stay omniscient; corpses are remembered in snapshots as ground items** (owner, 2026-11-23).
+
+**Proposed** (needs the owner): a grace of 0.5 s against edge flicker; only the player's strain sees.
 
 **The mechanic.**
 - **Observers:**
@@ -7756,7 +7758,7 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 - `ja-1ypq.8` F8 other organisms.
 
 **Still open.**
-- The proposals above.
+- The two proposals above.
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.
