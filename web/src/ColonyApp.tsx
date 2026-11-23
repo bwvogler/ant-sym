@@ -313,7 +313,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jev.lock, jev.state.phase);
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
-  // The palette's commands (ui/paletteCommands.ts ranks nothing: commands.ts does): built only while the palette is open (review of #196, N3).
+  // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
     buildPaletteCommands({
       game,
