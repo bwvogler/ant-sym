@@ -94,3 +94,4 @@ What Prettier (`npm run format`) and oxlint (`npm run lint`) enforce is not repe
 
 ### Reporting
 - Say what you measured and with which command; say what you did not run. "Tests pass" is a count and a tier. A mutation that was not caught is a finding, not something to leave out.
+- Anything you start on GitHub (a workflow dispatch, an assay run, a PR's slow guards by the `slow-guards` label, a rerun of a failed job) gets a link in your next message, so the owner can watch it without asking you (owner, 2026-11-23). Take the link from the tool's own result (`html_url`, `details_url`), never type it: the repo is `bwvogler/ant-sym`, its old name `scalefreegan/jev-ants` (and the wrong guess `jev-ant`) still shows up in old notes, and a link under it is dead. A PR is `https://github.com/bwvogler/ant-sym/pull/<n>`, a run `https://github.com/bwvogler/ant-sym/actions/runs/<id>`.

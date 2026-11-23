@@ -274,11 +274,17 @@ export const GUIDE: GuideEntry[] = [
     id: "brood",
     title: "Brood",
     swatch: BROOD_RGB,
-    onScreen: "Small squares in the chambers: eggs pale, larvae cream, pupae tan.",
-    realAnts: "Workers move brood to the queen, and up and down the nest to the best temperature. Where brood lies is where ants dig.",
-    inGame: "Eggs hatch into larvae; nurses feed larvae in brood chambers; pupae become workers.",
+    onScreen: "Small squares in the chambers: eggs pale, larvae cream, pupae tan. The youngest ants gather on them.",
+    realAnts:
+      "Workers move brood to the queen, and up and down the nest to the best temperature. Where brood lies is where ants dig. Young workers keep to the brood by its smell, not the queen's position, and bodies limit how many can sit on it.",
+    inGame:
+      "Eggs hatch into larvae; nurses feed larvae in brood chambers; pupae become workers. Brood gives off an odour the young climb; a young ant stops climbing where three nestmates already share its cell (a design limit).",
     scripted: { bead: "ja-k4k.4", reads: "the least-tended brood chamber colony-wide and every chamber's need" },
-    sources: [{ note: "nest-and-home", anchor: "places-with-jobs", label: "Places with jobs" }],
+    sources: [
+      { note: "nest-and-home", anchor: "places-with-jobs", label: "Places with jobs" },
+      { note: "brood-odour", anchor: "workers-are-drawn-to-brood-odour-over-a-short-distance", label: "Brood odour" },
+      { note: "nurse-crowding", anchor: "the-mechanic", label: "Nurse crowding: the mechanic" },
+    ],
   },
   {
     id: "jobs",
@@ -599,6 +605,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "brood-odour",
     title: "Brood odour",
     covers: "The young keep to the brood by its smell, not to the queen: queen pheromones are mostly contact signals.",
+  },
+  {
+    note: "nurse-crowding",
+    title: "Nurse crowding",
+    covers:
+      "What limits how many young workers pile onto the brood, and how crowding could carry fungus knobs: bodies and slowing, not a sensed crowd (a design limit, built off).",
   },
   {
     note: "activation",

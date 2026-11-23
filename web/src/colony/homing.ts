@@ -536,6 +536,10 @@ export function trueDestMark(c: Colony, i: number): Mark {
   const chosen = requestedDelivery(c, i);
   if (chosen) return chosen;
   if (c.broodHeld[i]) return "brood";
+  // A forager that has held its food this long without finding its destination (the reception chamber's road signs may not reach
+  // where it is) tries the royal chamber, whose signs run through the whole nest (docs/nurse-crowding.md, PRD §77.7). Its own timer only.
+  if (c.carrying[i] && c.housed && c.porter[i] === 0 && c.params.deliveryFallback > 0 && c.since[i] > c.params.deliveryFallback)
+    return "royal";
   if (c.carrying[i] && c.housed) {
     const role = c.map.chambers?.list[c.foodTo(i)]?.role;
     if (role && role !== "none") return role;

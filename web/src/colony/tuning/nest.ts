@@ -56,3 +56,11 @@ export const CHAMBER_SPREAD = 10;
 
 /** A roomy nest digs this share as often as before (tunnels at dead ends, starts off walls, head-on). */
 export const ROOMY_DIG = 0.15;
+
+/**
+ * Ants in the nest are bodies (docs/nurse-crowding.md, ja-k4k.15.7.1): with `cellCap` on, a step into a cell already at the cap
+ * is refused, and the ant waits and turns aside. Between the cap and twice it an ant squeezes in at this rate a second (so no
+ * ant waits for ever and a ring of full cells cannot deadlock): `1 - exp(-CELL_SQUEEZE dt)` a tick; at twice the cap never. **Design**: the rate; no
+ * measurement was found of how long a nest ant waits at a full cell. Slowing with density was tried and cost throughput.
+ */
+export const CELL_SQUEEZE = 0.3;
