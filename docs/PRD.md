@@ -7513,3 +7513,23 @@ In short, with the page's settings directed combat calms neutral play, defends a
 
 Stored food, shipped ÷ local: worst 0.69, median 0.92, best 1.48. The local rule loses no ant on any of these seeds; the shipped answers lose 0 to 23 (74 in all over ten seeds). So Jev's weighted answers cost the colonies about 8 % of their stored food at the median, up to 31 % on the worst seed, and some ants, where the local rule loses none. One doctrine (`forage`), one size and 240 s, so it shows a direction, not a ship rule. **Owner's decision (2026-11-22, D1): keep the six lanes on** with these answers shipped.
 
+**Per lane (2026-11-23, `response-replay.mjs --per-lane`, same games, one hook's shipped answers at a time against the local rule; stored food shipped ÷ local, losses in parentheses).**
+
+| seed | get | carry | drop | trail | contact | leave |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.95 | 0.91 | 0.67 | 0.71 | 0.95 (2) | 0.81 |
+| 2 | 1.55 | 1.00 | 1.00 | 1.13 | 1.08 (13) | 1.47 |
+| 3 | 0.99 | 0.94 | 0.94 | 0.96 | 1.05 | 0.97 |
+| 4 | 0.94 | 0.96 | 0.91 | 0.84 | 0.92 (6) | 0.91 |
+| 5 | 0.99 | 1.02 | 1.02 (1) | 0.95 | 0.84 (13) | 1.14 |
+| 6 | 0.63 | 0.69 | 0.62 | 0.65 | 0.85 (16) | 0.65 |
+| 7 | 0.90 | 0.81 | 0.94 | 1.01 | 1.00 | 1.04 |
+| 8 | 0.95 | 0.91 | 0.84 | 0.89 | 0.91 (6) | 0.94 |
+| 9 | 1.26 | 1.01 | 1.44 | 0.93 | 1.02 (3) | 1.11 |
+| 10 | 0.75 | 0.96 | 0.80 | 0.95 | 1.02 | 0.84 |
+| median | 0.95 | 0.95 | 0.93 | 0.94 | 0.98 | 0.96 |
+| worst | 0.63 (6) | 0.69 (6) | 0.62 (6) | 0.65 (6) | 0.84 (5) | 0.65 (6) |
+| losses, summed | 0 | 0 | 1 | 0 | 59 | 0 |
+
+No lane stands out. Each lane's shipped answers alone store a median 0.93–0.98 of the local rule's food; seed 6 is low on five of the six lanes (0.62–0.69) and ratios pass 1 on other seeds (seed 2: get 1.55, leave 1.47; seed 9: drop 1.44), so the spread is one run per seed, not a lane. The ant losses are the contact lane's (59 of 60), as directed combat makes them. So no lane is sharpened or dropped on food grounds, and the answers and defaults are unchanged (owner's D1 stands).
+
