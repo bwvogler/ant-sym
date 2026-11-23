@@ -12,14 +12,12 @@ export const BODY_EVERY = 1;
 /** Where an observer's sight goes: layer `l`, world point (x, y), reach `r` in cells. */
 export type Sight = (l: number, x: number, y: number, r: number) => void;
 
-/** The hosts the player sees through: living ants of its strain with a load at or past INFECTED, at their sensors' reach plus `margin`. */
-export function hostSight(colonies: readonly Colony[], strain: number, margin: number, see: Sight): void {
+/** The hosts the player sees through: every living ant, of any colony, with a load at or past INFECTED, at its sensors' reach plus `margin`. */
+export function hostSight(colonies: readonly Colony[], margin: number, see: Sight): void {
   for (const c of colonies) {
     const r = c.params.sensorDistance + margin;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.load[i] < INFECTED) continue;
-      // The lab and the tests have no evolving fungus: every strain is then the player's.
-      if (strain >= 0 && c.strain[i] !== strain) continue;
       see(c.layer[i] ?? 0, c.x[i], c.y[i], r);
     }
   }

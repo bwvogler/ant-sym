@@ -5,7 +5,7 @@
 ## TL;DR
 
 - **Three states per cell**, as in strategy games since Warcraft II: *unknown* (never sensed), *remembered* (sensed before, nobody there now) and *live* (an observer senses it this step).
-- **The observers** are the fungus's hosts (infected ants of the player's strain, at their antennae's reach) and the fungus's living body (every hypha cell, mat, patch and flower, about 2 cells round it). Spores and corpses see nothing (owner, 2026-11-23). Later organisms join through the same interface, each with the reach from its own sense table.
+- **The observers** are the fungus's hosts (every infected ant, of any colony, at its antennae's reach) and the fungus's living body (every hypha cell, mat, patch and flower, about 2 cells round it). Spores and corpses see nothing (owner, 2026-11-23). Later organisms join through the same interface, each with the reach from its own sense table.
 - **Remembered ground shows the last-seen state, never ants** (owner, 2026-11-23): rock, tunnels, food, spoil, mounds, chambers, hyphae and nests as they were when the last observer left, with "last seen N s ago". Ants, brood and queens show only where live.
 - **The readouts follow the fog** (owner, 2026-11-23): a colony enters the stats, badges and the go-to menu once the fungus has sensed its nest or holds a host in it. Its numbers are live while hosts are inside, otherwise as of when the last one left.
 - **The start reveals only the landing patch** and its sight (owner, 2026-11-23).
@@ -69,7 +69,7 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** living ants of the player's strain (`fungus.evolution.strain`) with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Today's `SensedMap` takes every strain; the lab's painted strains are not the player's. Queens and alates are hosts too, but today's stamp skips them: F1 adds them (`ja-1ypq.1`).
+- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, but today's stamp skips them: F1 adds them (`ja-1ypq.1`).
 - **The body:** every hypha cell (`hyphaeOn(l).parent`), mat, patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
@@ -108,7 +108,7 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - The lens and cell inspection show the snapshot on a remembered cell with "last seen N s ago", and "unexplored" on an unknown one.
 - Specimens lose track out of sight.
 - Chamber labels appear only for known nests. The nest tab (`LearnDrawer.tsx` `NestCard`: queen, brood and ant counts per colony) follows §5.3.
-- **Open (D1):** for a known colony with no host in it, do the nest tab and stats show queen and brood counts "as of N s ago", or hide those rows? Decision 2 (no queens or brood on remembered ground) and decision 3 (live or as-of readouts) meet here; recommend as-of for counts and none on the map. Settle before F4 and F5.
+- **Decided (D1, owner, 2026-11-23):** for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of N s ago", and nothing is drawn on the map.
 
 ### 5.3 Readouts (`ja-1ypq.5`)
 - Stats, history, goal toasts, nest badges, the nest tab and the go-to menu list known colonies only, live or as of (§4.4).
@@ -148,7 +148,7 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 
 | Stage | What | Guard |
 |---|---|---|
-| F1 observers (`ja-1ypq.1`) | one observer interface; player-strain hosts and the living body; stamped on the sim clock | goldens bit-exact; the same stamps at 30 and 60 fps; stamp under 0.5 ms a step at a big mycelium |
+| F1 observers (`ja-1ypq.1`) | one observer interface; every host and the living body; stamped on the sim clock | goldens bit-exact; the same stamps at 30 and 60 fps; stamp under 0.5 ms a step at a big mycelium |
 | F2 knowledge (`ja-1ypq.2`) | `ui/fog/`: explored bits, live with grace, snapshots on leaving, known colonies, a `FogView` | a change while away is not shown; a snapshot equals the truth when its chunk left sight; bytes per chunk measured |
 | F3 the field (`ja-1ypq.3`) | ground, voxel, strip and minimap through the view; ants only where live; the fog mask | off is pixel-identical (`field-shots`); an e2e section; frame time within noise |
 | F4 picking and cards (`ja-1ypq.4`) | live picking, "lost sight", last-seen lens and inspection, specimens, chamber labels | a test per surface on a remembered and an unknown cell |
@@ -166,15 +166,15 @@ F1 and F2 change nothing on the page and can land before the endless world. F3�
 2. Remembered ground is ground, without ants, with "last seen".
 3. Readouts cover known colonies, live or as of when they were last known.
 4. The start reveals only the landing patch.
-5. Fog is off while the builder is on.
-6. The Lab's cards and the dev hook stay omniscient.
-7. Corpses are remembered in snapshots, as ground items.
+5. Every host sees, of any ant kind; strain doesn't matter.
+6. Fog is off while the builder is on.
+7. The Lab's cards and the dev hook stay omniscient.
+8. Corpses are remembered in snapshots, as ground items.
 
 **Still open, each with a recommendation:**
 1. **The grace period.** Recommend 0.5 s, set in F3 by eye and by an edge-flicker test.
 2. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
 3. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
-4. **Whether hosts of other strains see** (the lab's painted strains). Recommend no: only the player's strain.
 
 ## Sources
 

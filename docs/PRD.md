@@ -7717,11 +7717,13 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 5. **Fog is off while the builder is on; the Lab's cards and the dev hook stay omniscient; corpses are remembered in snapshots as ground items** (owner, 2026-11-23).
 
-**Proposed** (needs the owner): a grace of 0.5 s against edge flicker; only the player's strain sees.
+6. **Every host sees, of any ant kind: strain doesn't matter** (owner, 2026-11-23). D1: for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of"; nothing is drawn on the map (owner, 2026-11-23).
+
+**Proposed** (needs the owner): a grace of 0.5 s against edge flicker.
 
 **The mechanic.**
 - **Observers:**
-  - hosts of the player's strain, at `sensorDistance + REACH_MARGIN`;
+  - every host, at `sensorDistance + REACH_MARGIN`;
   - the living body, at `BODY_SIGHT` = 2;
   - stamped on the sim clock, not per frame.
 - **Knowledge** (`ui/fog/`, pure TS):
@@ -7758,7 +7760,7 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 - `ja-1ypq.8` F8 other organisms.
 
 **Still open.**
-- The two proposals above.
+- The grace proposal above.
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.

@@ -24,21 +24,20 @@ const sight = (s: SensedMap, x: number, y: number) => {
   return s.sight(PLANE, CELL[0], CELL[1]);
 };
 
-test("only hosts of the player's strain see; with no evolving fungus every strain does", () => {
+test("every host sees, whatever its strain; a clean ant does not", () => {
   const c = colony([
     { x: 30, y: 30, load: INFECTED, strain: 1 },
     { x: 80, y: 30, load: INFECTED, strain: 2 },
+    { x: 120, y: 30, load: INFECTED * 0.5, strain: 1 },
   ]);
   const seen: number[] = [];
-  hostSight([c], 1, REACH_MARGIN, (_l, x) => seen.push(x));
-  assert.deepEqual(seen, [30], "strain 1 only");
-  seen.length = 0;
-  hostSight([c], -1, REACH_MARGIN, (_l, x) => seen.push(x));
-  assert.deepEqual(seen, [30, 80], "no player strain: both");
+  hostSight([c], REACH_MARGIN, (_l, x) => seen.push(x));
+  assert.deepEqual(seen, [30, 80], "both strains; the clean one not");
   const s = new SensedMap();
-  s.stamp([c], 5, 1);
+  s.stamp([c], 5);
   assert.equal(sight(s, 30, 30), 1);
-  assert.equal(sight(s, 80, 30), 0, "a host of another strain lights nothing");
+  assert.equal(sight(s, 80, 30), 1);
+  assert.equal(sight(s, 120, 30), 0);
 });
 
 test("the body sees BODY_SIGHT round each hypha cell and patch cell, and nothing else", () => {
