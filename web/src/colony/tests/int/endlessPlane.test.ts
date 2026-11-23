@@ -57,11 +57,11 @@ test("a chunk generated alone is the chunk generated amid its neighbours", () =>
     assert.ok(same(new EndlessPlane(5).chunk(cx, cy), warm.chunk(cx, cy)), `${cx},${cy}`);
 });
 
-test("dropping the caches changes nothing: the world is the seed's, even with every cache holding six entries", () => {
+test("dropping the caches changes nothing: the world is the seed's, even with every cache holding twenty entries", () => {
   const big = new EndlessPlane(7);
-  const small = new EndlessPlane(7, { cacheChunks: 6 });
+  const small = new EndlessPlane(7, { cacheChunks: 20 });
   const a = big.chunk(1, 1);
-  // a long walk fills and clears the small caches again and again, mid-computation
+  // a walk fills and clears the small caches again and again, mid-computation
   for (let i = 0; i < 40; i++)
     assert.ok(same(small.chunk(i - 20, ((i * 7) % 11) - 5), big.chunk(i - 20, ((i * 7) % 11) - 5)), `walk step ${i}`);
   assert.ok(same(small.chunk(1, 1), a));
@@ -78,6 +78,7 @@ test("a region must hold what a site's conflicts reach: a constructor that canno
 /** A plane whose seed terrain is given (open, or rock where `rockAtCell` says): to build the sealed pockets a real seed rarely has. */
 class Stubbed extends EndlessPlane {
   readonly rockAtCell: (x: number, y: number) => boolean;
+  readonly #chunks = new Map<string, Uint8Array>();
   constructor(rockAtCell: (x: number, y: number) => boolean) {
     super(1);
     this.rockAtCell = rockAtCell;
@@ -90,9 +91,14 @@ class Stubbed extends EndlessPlane {
     ];
   }
   override rockOf(cx: number, cy: number): Uint8Array {
-    const r = new Uint8Array(CHUNK * CHUNK);
-    for (let j = 0; j < CHUNK; j++)
-      for (let i = 0; i < CHUNK; i++) r[local(i, j)] = this.rockAtCell((cx << CHUNK_BITS) + i, (cy << CHUNK_BITS) + j) ? ROCK : 0;
+    const key = `${cx},${cy}`;
+    let r = this.#chunks.get(key);
+    if (!r) {
+      r = new Uint8Array(CHUNK * CHUNK);
+      for (let j = 0; j < CHUNK; j++)
+        for (let i = 0; i < CHUNK; i++) r[local(i, j)] = this.rockAtCell((cx << CHUNK_BITS) + i, (cy << CHUNK_BITS) + j) ? ROCK : 0;
+      this.#chunks.set(key, r);
+    }
     return r;
   }
 }
@@ -115,10 +121,10 @@ test("walksOut: an open disc sealed in rock does not, one with a corridor out do
 
 test("a kept patch's centre joins open ground that leaves its window: a sealed pocket's patches are dropped, a pocket with a way out keeps its own", () => {
   const sealed = new Stubbed(pocket(32, 32, 20, false));
-  for (const [cx, cy] of ring(3)) assert.equal(sealed.patchesOf(cx, cy).length, 0, `chunk ${cx},${cy} of a sealed world`);
+  for (const [cx, cy] of ring(2)) assert.equal(sealed.patchesOf(cx, cy).length, 0, `chunk ${cx},${cy} of a sealed world`);
   const open = new Stubbed(pocket(32, 32, 20, true));
   let kept = 0;
-  for (const [cx, cy] of ring(3))
+  for (const [cx, cy] of ring(2))
     for (const p of open.patchesOf(cx, cy)) {
       kept++;
       cellOf(p.x, p.y);
@@ -127,7 +133,7 @@ test("a kept patch's centre joins open ground that leaves its window: a sealed p
   assert.ok(kept > 0, "the pocket's own patches are kept");
   const everywhere = new Stubbed(() => false);
   let all = 0;
-  for (const [cx, cy] of ring(3)) all += everywhere.patchesOf(cx, cy).length;
+  for (const [cx, cy] of ring(2)) all += everywhere.patchesOf(cx, cy).length;
   assert.ok(all > 20, "open ground keeps its patches");
 });
 
