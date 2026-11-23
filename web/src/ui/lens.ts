@@ -149,7 +149,7 @@ const ROLE_NAME: Record<Role, string> = {
   midden: "Midden",
   none: "Chamber",
 };
-const ROLE_ENTRY: Record<Role, string> = {
+export const ROLE_ENTRY: Record<Role, string> = {
   royal: "queen",
   brood: "brood",
   store: "chambers",
