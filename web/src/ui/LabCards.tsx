@@ -17,7 +17,7 @@ import { journalLine } from "./journal.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import { seg } from "./styles.ts";
 import { MAX_SPEED, type ColonyControls, type SideStats } from "./useColony.ts";
-import { TOKENS_PER_SITUATION, type useColonyJev } from "./useColonyJev.ts";
+import { TOKENS_PER_SITUATION, type useColonyJev, useJevState } from "./useColonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import { useFps, useGameRead, useStats } from "./session.ts";
 import { sameRecord, wholeStats } from "./statSelect.ts";
@@ -119,12 +119,13 @@ export function Colonies() {
 }
 
 export function JevCard({ jev }: Props) {
-  const running = jev.state.phase === "running";
-  const run = jev.state.run;
-  const choices = jev.state.hits + jev.state.misses;
+  const state = useJevState(jev.client);
+  const running = state.phase === "running";
+  const run = state.run;
+  const choices = state.hits + state.misses;
   const perHour = run && run.elapsedSeconds > 5 ? (run.usd / run.elapsedSeconds) * 3600 : null;
   /** today's spend against the server's overall budget (PR #42 review S8) */
-  const budget = jev.budget;
+  const budget = state.run?.budget ?? jev.backendBudget;
   return (
     <Card
       label="colony jev"
@@ -172,20 +173,20 @@ export function JevCard({ jev }: Props) {
         <Stat label="this run" value={run ? usd(run.usd) : "—"} />
         <Stat label="avg $ / hour" value={perHour === null ? "—" : `$${perHour.toFixed(3)}`} />
         <Stat label="tokens" value={run ? run.inputTokens.toLocaleString() : "—"} />
-        <Stat label="situations asked" value={String(jev.state.lanes.mode.asked)} />
+        <Stat label="situations asked" value={String(state.lanes.mode.asked)} />
         <Stat
           label="answers cached"
-          value={`${jev.state.lanes.mode.cached} · ${jev.state.lanes.fungus.cached} fungus · ${jev.state.lanes.growth.cached} growth`}
+          value={`${state.lanes.mode.cached} · ${state.lanes.fungus.cached} fungus · ${state.lanes.growth.cached} growth`}
         />
-        <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * jev.state.hits) / choices)}%` : "—"} />
+        <Stat label="from cache" value={choices > 0 ? `${Math.round((100 * state.hits) / choices)}%` : "—"} />
         <span className={`ml-auto font-mono text-xs ${running ? "text-accent" : "text-fg-3"}`}>
           {running ? "jev on" : "jev not running · cached answers"}
         </span>
       </div>
       {jev.lock && <p className="mt-3 rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn">{jev.lock}</p>}
-      {jev.state.lastError && (
-        <p className="mt-2 truncate rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn" title={jev.state.lastError}>
-          {jev.state.lastError}
+      {state.lastError && (
+        <p className="mt-2 truncate rounded-md bg-warn-soft px-3 py-1.5 text-xs text-warn" title={state.lastError}>
+          {state.lastError}
         </p>
       )}
     </Card>
