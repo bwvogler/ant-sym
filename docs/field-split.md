@@ -123,6 +123,7 @@ Each is its own small PR that **merges the day it opens**, with a fresh review, 
 These were open in the review of #291; I took them so work can start, and each is one line to change.
 
 - **The order above**, as the review recommended: scenes land with or just before the slice that needs them (not one PR adding eleven groups); the ports and the prelude get their own slice before the first move so `FieldCtx` has its real shape from the start; the recording fake context starts at the first move instead of waiting for the last; `draw()` is split into three stage moves and the renderer; the camera and input slice runs alongside.
+- **The canvas state: decided 2026-11-23 (owner): make it explicit** (`ja-fnd.6.3.17` closed; `ja-fnd.6.3.10` runs after `FieldRenderer` and its headless test, with the moved scenes named). The stage moves keep the state as it is.
 - **The canvas state (`ja-fnd.6.3.17`, then `ja-fnd.6.3.10`).** The moves keep the state exactly as it is, so they stay pixel-identical. Making it explicit changes pixels, so it is an owner decision with its own bead, **before** the stage slices; if declined, the slice is dropped and the epic closes without it (the epic's close does not depend on it). The leak, measured in the review of #282: resetting `lineCap` to `butt` at the start of a frame changed 6 of 8 scenes; resetting `lineJoin`, `lineWidth`, alpha, text, dash or styles changed none of those 8 (which never had labels on); resetting everything changed 16 of 18, including the labels scene. `lineJoin` and `lineWidth` leak only after chamber labels have been on (the labels scene is therefore last on its page); `lineCap` leaks always. It is cosmetic in play, and a new stage can look wrong depending on whether labels were toggled.
 - **Where the pixel proof runs.** By hand for now, with the recording fake context as the everyday proof from the first move; the label-triggered workflow is an optional bead (`ja-fnd.6.3.18`).
 
@@ -148,4 +149,5 @@ These were open in the review of #291; I took them so work can start, and each i
 | 2026-11-22 | `ja-fnd.6.3.19`: the minimap (`minimap.ts`: `Minimap`, its canvas, buffer and clock) | #317 |
 | 2026-11-22 | `ja-fnd.6.3.11`, part 1 of 3: the cameras (`rig.ts`: `CameraRig`, the per-view cameras and what moves them) | #322 |
 | 2026-11-23 | `ja-fnd.6.3.11`, part 2 of 3: the pointer's gestures (`pointer.ts`: `PointerController` over a `PointerHost`, with 20 unit tests) | #324 |
-| 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | (this PR) |
+| 2026-11-23 | `ja-fnd.6.3.11`, part 3 of 3: the keys and the wheel (`keyboard.ts`: `handleKey`, `handleWheel`), `panGround` shared with the pointer; the bead closes | #326 |
+| 2026-11-23 | `ja-fnd.6.3.14`: the nests stage (`nests.ts`: `drawNest` over `FieldCtx` and a `NestFrame`; 34 scenes match; 7 log tests) | (this PR) |
