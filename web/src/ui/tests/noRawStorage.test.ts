@@ -14,7 +14,7 @@ function* sources(dir: string): Generator<string> {
     const p = join(dir, e.name);
     if (e.isDirectory()) {
       if (e.name !== "tests") yield* sources(p);
-    } else if (/\.tsx?$/.test(e.name)) yield p;
+    } else if (/\.[mc]?[jt]sx?$/.test(e.name)) yield p;
   }
 }
 

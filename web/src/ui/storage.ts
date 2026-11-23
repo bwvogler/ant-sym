@@ -1,7 +1,7 @@
 // The page's one way to keep a value in the browser (ja-fnd.6.1.2, docs/refactor.md S5.1). Storage may be missing, blocked (reading the
-// `localStorage` property itself can throw) or full: a value then lives for this page only and nothing breaks. Every store that outlives a
-// page (the theme, the sound, the notice level, the Codex's notebook, the passphrase) reads and writes through `persisted`, so the guard is
-// written once. Key names stay as each store chose them.
+// `localStorage` property itself can throw) or full: a value then lives for this page only and nothing breaks. Every key-value store that
+// outlives a page (the theme, the sound, the notice level, the Codex's notebook, the passphrase) reads and writes through `persisted`, so the
+// guard is written once (the answers cache takes only `browserStorage`; saved games are in IndexedDB). Key names stay as each store chose them.
 
 /** What a key's store must have; the browser's localStorage does, and a test's stand-in. */
 export type KeyStore = Pick<Storage, "getItem" | "setItem" | "removeItem">;

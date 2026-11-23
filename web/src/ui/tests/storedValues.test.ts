@@ -17,7 +17,7 @@ const working = {
   setItem: (k: string, v: string) => void (ops.push(`set ${k}=${v}`), kept.set(k, v)),
   removeItem: (k: string) => void (ops.push(`remove ${k}`), kept.delete(k)),
 };
-const use = (storage: unknown) => Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+const install = (storage: unknown) => Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
 const blocked = (): never => {
   throw new Error("blocked");
 };
@@ -31,7 +31,7 @@ const none = () => void delete g.localStorage;
 // Read when first asked for, so what is stored before the first read is what the store starts from.
 kept.set("jevants.theme", "dark");
 kept.set("jevants.notices", "bell");
-use(working);
+install(working);
 const { getTheme, setTheme, THEME_KEY, useTheme } = await import("../theme.ts");
 const { createElement } = await import("react");
 const { renderToString } = await import("react-dom/server");
