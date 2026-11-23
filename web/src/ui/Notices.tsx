@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { FLOAT, IconButton } from "./kit.tsx";
 import {
   ago,
@@ -34,28 +35,28 @@ export default function Notices() {
     if (!open) return;
     markNoticesRead();
     const timer = setInterval(() => tick((n) => n + 1), 30_000);
-    // Escape closes it (first, so a drawer under it stays open), and so does a press anywhere outside it.
-    const key = (e: KeyboardEvent) => {
-      // One Escape closes one thing: not this under a dialog opened over it (the palette, the shortcuts sheet).
-      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setOpen(false);
-    };
+    // A press anywhere outside it closes it, as Escape does (below).
     const press = (e: Event) => {
       if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
     };
-    window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", press, true);
     return () => {
       clearInterval(timer);
       // What the list showed has been read: none of it comes back onto the field for a fresh 7 s (review of #219, N5).
       clearToasts();
       setNoticesOpen(false);
-      window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", press, true);
     };
   }, [open]);
+  // Escape closes it, first, so a drawer under it stays open: a popover layer of the Escape manager (escape.ts), under a dialog opened over it.
+  useEscape(
+    ESCAPE_LAYER.popover,
+    () => {
+      setOpen(false);
+      return true;
+    },
+    open,
+  );
   // New notices while it is open are seen at once.
   useEffect(() => {
     if (open && unread) markNoticesRead();
