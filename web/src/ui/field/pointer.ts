@@ -4,7 +4,8 @@
 // handlers closed over them before), and does what only an event can do (capture the pointer, focus the canvas, stop a middle-click's
 // scroll). A unit test drives it with a fake host; e2e proves the real page.
 
-import { pan, toWorld, zoomBy, type Camera, type Extent, type Viewport } from "../camera.ts";
+import { toWorld, zoomBy, type Camera, type Extent, type Viewport } from "../camera.ts";
+import { panGround } from "./rig.ts";
 import type { Followed } from "../follow.ts";
 
 /** The pointer gesture under way; `moved` is how far it has travelled (device px), (sx, sy) where it started. */
@@ -244,6 +245,6 @@ export class PointerController {
 
   /** A pan on the ground: on a tilted map a vertical drag covers more ground than it shows. */
   private panMap(host: PointerHost, c: Camera, dx: number, dy: number): Camera {
-    return pan(c, dx, host.angled() ? dy / Math.cos(host.tilt()) : dy);
+    return panGround(c, dx, dy, host.angled() ? host.tilt() : null);
   }
 }

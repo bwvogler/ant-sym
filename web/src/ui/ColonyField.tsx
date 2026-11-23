@@ -29,9 +29,10 @@ import {
   aphidCount,
   type AphidClump,
 } from "../colony/index.ts";
-import { type Camera, pan, toScreen, toWorld, type Viewport, visible, zoomBy } from "./camera.ts";
+import { type Camera, toScreen, toWorld, type Viewport, visible } from "./camera.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { prepareFrame } from "./field/prelude.ts";
+import { handleKey, handleWheel, type KeyHost } from "./field/keyboard.ts";
 import { PointerController, type PointerHost, type PointerInput } from "./field/pointer.ts";
 import { CameraRig, extentOf } from "./field/rig.ts";
 import { odourColour, odourRgb } from "./field/colour.ts";
@@ -276,8 +277,6 @@ export default function ColonyField({
   const vc = () => rig.vc();
   /** The shown view's map: the plane or the curtain. */
   const shownMap = (): WorldMap => (shown.current === PLANE ? world.plane : world.curtain);
-  /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
-  const extent = () => rig.extent();
   // A new game starts zoomed out, in both views.
   useEffect(() => {
     rig.clear();
@@ -1108,12 +1107,7 @@ export default function ColonyField({
       const r = canvas.getBoundingClientRect();
       const k = canvas.width / r.width;
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: k };
-      rig.zoomAround(
-        v,
-        angled.current ? v.w / 2 : (e.clientX - r.left) * k,
-        angled.current ? v.h / 2 : (e.clientY - r.top) * k,
-        Math.exp(-e.deltaY * 0.0015),
-      );
+      handleWheel(rig, v, { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k, deltaY: e.deltaY }, angled.current);
     };
     canvas.addEventListener("wheel", wheel, { passive: false });
     return () => {
@@ -1241,8 +1235,6 @@ export default function ColonyField({
     );
   };
 
-  const panMap = (c: Camera, dx: number, dy: number) => pan(c, dx, angled.current ? dy / Math.cos(orbit.current.tilt) : dy);
-
   /** What the pointer controller reads and does on the page (ui/field/pointer.ts): this render's, like the handlers' closures were. */
   const ptrHost = (): PointerHost => ({
     rig,
@@ -1294,38 +1286,16 @@ export default function ColonyField({
 
   const onUp = (e: PointerEvent<HTMLCanvasElement>) => ptr.up(ptrHost(), pointerInput(e), e.type !== "pointerup");
 
+  const keyHost = (): KeyHost => ({
+    rig,
+    angled: () => angled.current,
+    tilt: () => orbit.current.tilt,
+    following: () => !!follow.current,
+    unfollow,
+    nextNest: () => goNest((nestTurn.current + 1) % colonies.length),
+  });
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return; // browser and system shortcuts (Ctrl+0, Ctrl+S, …) pass through
-    if (e.key === " ") {
-      e.preventDefault(); // the focused field doesn't scroll the page
-      return;
-    }
-    const v = viewport();
-    const c = camera();
-    const step = Math.min(v.w, v.h) * 0.15;
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [step, 0],
-      a: [step, 0],
-      ArrowRight: [-step, 0],
-      d: [-step, 0],
-      ArrowUp: [0, step],
-      w: [0, step],
-      ArrowDown: [0, -step],
-      s: [0, -step],
-    };
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key; // Shift or Caps Lock still moves
-    const m = moves[key];
-    if (m) {
-      if (follow.current) unfollow();
-      setCamera(panMap(c, m[0], m[1]));
-    } else if (e.key === "+" || e.key === "=") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 1.25));
-    else if (e.key === "-" || e.key === "_") setCamera(zoomBy(c, extent(), v, v.w / 2, v.h / 2, 0.8));
-    else if (e.key === "0" || e.key === "Home") showAll();
-    else if (key === "n") goNest((nestTurn.current + 1) % colonies.length);
-    // Escape drops a follow; with nothing followed it is left for the drawer (review of #182, S7).
-    else if (e.key === "Escape" && follow.current && !e.defaultPrevented) unfollow();
-    else return;
-    e.preventDefault();
+    if (handleKey(keyHost(), e)) e.preventDefault();
   };
 
   const showAll = () => rig.showAll();

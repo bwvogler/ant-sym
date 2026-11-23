@@ -4,7 +4,7 @@
 // this holds the state the maths is applied to.
 
 import { worldExtent, type WorldMap } from "../../colony/index.ts";
-import { clamp, fit, fitZoom, fromMinimap, minimapRect, type Camera, type Extent, type Viewport, zoomBy } from "../camera.ts";
+import { clamp, fit, fitZoom, fromMinimap, minimapRect, pan, type Camera, type Extent, type Viewport, zoomBy } from "../camera.ts";
 import type { ViewCam } from "./prelude.ts";
 
 /** A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. */
@@ -14,6 +14,11 @@ export const extentOf = (m: WorldMap): Extent & { x0: number } => ({ x0: m.x0, .
 export const LINK_ZOOM = 8;
 /** `n` goes to a nest at least this close (CSS px a cell). */
 export const NEST_ZOOM = 8;
+
+/** A pan on the ground by a drag or a key of (dx, dy) device pixels: on a tilted map (the inspection orbit's tilt, radians) a vertical move covers more ground than it shows. */
+export function panGround(c: Camera, dx: number, dy: number, tilt: number | null): Camera {
+  return pan(c, dx, tilt === null ? dy : dy / Math.cos(tilt));
+}
 
 export const NEW_CAM = (): ViewCam => ({ cam: null, fitted: true, zoomedIn: false, aim: null });
 
