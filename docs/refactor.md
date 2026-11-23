@@ -216,6 +216,7 @@ Each step keeps the golden masters bit-exact and the random draws in order; a sc
    - The palette follows light and dark.
    - The colony colours come from one source for the canvas and the text.
 6. **Content as data.** Sense tables, lane prose and the chip-to-Learn maps hang off the lane and species registry, as `guide.ts` and `policyText.ts` already do.
+   Built, `ja-fnd.6.6` part 1: the Policy tab's two inline sense tables (the mode lane's `MODE_SENSES`, the fungus's six rows) moved to `policyText.ts` as `MODE_SENSES` and `FUNGAL_SENSES`; `policyText.test.ts` holds each to its schema (a field with no row, a row for a gone field, a changed value list or order fails). The Learn drawer already has none (its one table is the live chambers). Not done: lane prose in `LearnDrawer`/`AntCard`, the chip-to-Learn maps, and rows built from a lane's own field legend (the prose is editorial). Jev cost: none.
 
 ## Stage 6: server, worker, wire (any time after stage 0)
 
