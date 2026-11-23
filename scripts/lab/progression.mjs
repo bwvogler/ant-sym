@@ -76,7 +76,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, mat cells ${r.mat})`,
     );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
@@ -146,6 +146,9 @@ if (isMainThread) {
     spent: 0,
     growth: 0,
     mass: 0,
+    flowers: 0,
+    patches: 0,
+    mat: 0,
   };
   const share = (c) => {
     const f = g.fungus.census(c);
@@ -183,6 +186,9 @@ if (isMainThread) {
   r.spent = g.fungus.evolution?.spent ?? 0;
   r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
   r.mass = (g.fungus.evolution?.mass ?? 0).toFixed(1);
+  r.flowers = g.fungus.flowers;
+  r.patches = g.fungus.evolution?.patches ?? 0;
+  r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
   parentPort.postMessage(r);
 }
 
