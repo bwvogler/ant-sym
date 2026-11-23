@@ -7,7 +7,8 @@ import { smallOne } from "../builders.ts";
 
 // A forager carrying food in the nest heads for the reception chamber once it has RECEPTION_MIN cells, else the royal chamber (foodTo). If
 // the reception chamber's road signs don't reach where it stands it searches on; after `deliveryFallback` seconds of holding the food it
-// tries the royal chamber's signs instead (PRD §77.7: G1 seed 10 held 16 foragers over two minutes without it). Its own timer only.
+// tries the royal chamber's signs instead (PRD §77.7: G1 seed 10 held 16 foragers over two minutes without it). Its own timer only. These tests
+// check which mark is chosen, not that a stuck carrier gets out in a game: G1 seed 10 on CI is the end-to-end guard.
 
 /** A colony whose nest has a reception chamber of at least 4 cells (the smallest that takes food), and one ant carrying food at `since` seconds. */
 function carrier(deliveryFallback: number, since: number, porter = 0) {
