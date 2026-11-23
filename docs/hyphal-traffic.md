@@ -130,6 +130,24 @@ Owner: "try the tropism". Built as `trafficTropism` N (off, 0, by default): with
 - **What we do not know.** Why seeds 6, 18 and 20 gain so much (the early hyphae there may be far from any traffic; not checked); that the half and queen times follow the quarter (they do, in every seed, by tens of seconds); whether the gain survives the colonies' counterplay in a full game, or the other aims (only `unite` was run); the tick cost of the traffic closure on every tip (not measured).
 - **Decision (owner, 2026-11-23): turned on by default with N = 4** (`DEFAULT_FUNGUS`: `trafficBias` `count`, `trafficRadius` 3, `trafficTropism` 4); the gentlest arm above (the same three seeds speed up, every other seed within +4.3 %). The text that follows is the trade-off as it was put to the owner: the lean was **off by default**. Turning it on shortens the worst progression seed by 25-50 % and breaks the no-cliff bound T3 on three of twenty seeds; whether that is the progression the game wants (a more even slope) or a loss of the slow starts is the owner's call (PRD §63 P1).
 
+## Baselines re-taken after #320, #327 and #363 (2026-11-23)
+
+The earlier arms above were measured on main before three colony changes: #320 (the young keep to the brood by its odour, the climb on), #327 (a corpse roots six tips, the body's axis first) and #363 (a flower may close wherever hyphae grow and may touch a patch). Four `progression.yml` runs on main `96832d41` (`unite`, hyphae, growth answers, flow, 600 s, seeds 1-20; runs 45283033456, 45283040802 default; 45283046991, 45283053302 `bias off`) are the baselines now. Quarter of the colony infected, seconds:
+
+| arm | seeds 1-10 | median / worst | seeds 11-20 | median / worst |
+|---|---|---|---|---|
+| **default** (tropism on) | 144 157 169 102 178 357 156 220 274 145 | 163 / 357 (seed 6) | 195 131 254 127 181 151 146 156 313 171 | 163.5 / 313 (seed 19) |
+| `bias off` (the old game) | 144 157 169 100 178 357 176 220 274 145 | 172.5 / 357 (seed 6) | 195 133 254 138 181 152 184 173 313 361 | 182.5 / 361 (seed 20) |
+
+Flowers and patches (default): seeds 1-10, 30 flowers in 6 games, 40 patches; seeds 11-20, 6 flowers in 2 games, 16 patches. Off: 17 flowers in 4 games and 27 patches; 2 flowers in 1 game and 12 patches. Hyphae within 1 cell of an ant seen in the last 60 s (T1, median over seeds, before / after a quarter): default 83.3 / 74.7 % and 86.2 / 73.8 %; off 83.5 / 72.8 % and 84.4 / 71.6 %.
+
+**What each change moved, measured by running the code before it** (the quarter, half and queen times of all 20 seeds; #327 and #363 by main as it stood just before each, #320 by the older arm, which is the pre-squash tip of #358 on #345's merge, so its colony code is main's before #320 plus the tropism default, not a commit of main):
+- **#327 moved none of them** (main just before it, `58e3caa5`, and main after it give identical times on all 20 seeds). It changed patch, flower and mat counts on 8 seeds.
+- **#363 moved none of them either**, in either arm (all 20 seeds identical to the colony code of `e6fd4f64`, the main before it: the default arm ran on `e6fd4f64` itself, the off arm on `79214313`, a branch commit whose colony code, precache and `progression.mjs` are `e6fd4f64`'s, only `progression.yml` differing). It changed patches, flowers or mat cells on default seeds 4, 5, 6, 8, 9, 14 and 20 (flowers 28 to 30 on seeds 1-10; 6 to 6 on seeds 11-20, the totals cancelling).
+- **#320 moved every seed** (0 of 20 identical to the older default arm, `51d50708`). The older default arm's quarters were 192 148 152 148 113 219 175 159 185 129 and 244 145 116 132 169 167 161 113 246 177 (worst 219 s on seed 6, 246 s on seed 19); now the worst are 357 s and 313 s, seed 13 went from 116 s to 254 s and seed 9 from 185 s to 274 s, seed 4 the other way from 148 s to 102 s, and the medians barely moved (155.5 to 163 s; 164 to 163.5 s). #320's own PR is not the subject here: the P1 target "the worst seed is not worse" fails against the older numbers because of it, and the older arms above are not comparable with these.
+
+**The tropism on the same code (default against off):** no seed is slower. Seed 20 goes 361 to 171 s (-53 %), seed 17 184 to 146 s (-21 %), seed 7 176 to 156 s (-11 %); seeds 4, 12, 14 and 18 move by 2 to 17 s; 13 of 20 seeds are within 1 s. So T2 holds, and T3's 25 % no-cliff bound is broken on seed 20 only; seed 6 (357 s either way) no longer gains, which it did before #320.
+
 ## Play
 
 - **What is built** (the tropism on by default since 2026-11-23 with N = 4; the side-choice lean it rides on is inert): a side-choice lean (inert) and a tropism that overrides the growth lane's `grow` answer on every N-th cell; the Tropism and Ablation sections above say what each did. The text below is the design as first written.

@@ -3,7 +3,7 @@
 // each seed's whole output as seed-N.txt, its first line `commit <sha>` the code it measured). "never" is a seed that
 // didn't get there in the game's time, and counts as slower than any time. Offline, no key, no spend.
 //
-// Where every seed's line also says `patches P (flowers F, mat cells M)` (a game with hyphae), the table adds those three
+// Where every seed's line also says `patches P (flowers F, [spread S,] mat cells M)` (a game with hyphae), the table adds those three (four with spread)
 // columns and a line counting the flowers.
 //
 // Usage: node scripts/progression-table.mjs <dir with seed-N.txt files>
@@ -45,28 +45,43 @@ for (const { seed, file } of files) {
     failed = true;
     continue;
   }
-  const extra = /patches (\d+) \(flowers (\d+), mat cells (\d+)\)/.exec(text);
+  const extra = /patches (\d+) \(flowers (\d+)(?:, spread (\d+))?, mat cells (\d+)\)/.exec(text);
   rows.push({
     seed,
     first: secs(m[2]),
     quarter: secs(m[3]),
     half: secs(m[4]),
     queen: secs(m[5]),
-    ...(extra ? { patches: Number(extra[1]), flowers: Number(extra[2]), mat: Number(extra[3]) } : {}),
+    ...(extra
+      ? {
+          patches: Number(extra[1]),
+          flowers: Number(extra[2]),
+          spread: extra[3] === undefined ? undefined : Number(extra[3]),
+          mat: Number(extra[4]),
+        }
+      : {}),
   });
 }
 const withExtra = rows.length > 0 && rows.every((r) => r.patches !== undefined);
+// `spread` (a flower that touched a patch and extended it, #363) is its own column only where every seed says it.
+const withSpread = withExtra && rows.every((r) => r.spread !== undefined);
 
 if (commits.size) console.log(`Commit${commits.size > 1 ? "s" : ""} measured: ${[...commits].join(", ")}\n`);
 console.log(
-  withExtra
-    ? "| seed | first host | quarter | half | queen | patches | flowers | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|"
-    : "| seed | first host | quarter | half | queen |\n|---:|---:|---:|---:|---:|",
+  withSpread
+    ? "| seed | first host | quarter | half | queen | patches | flowers | spread | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
+    : withExtra
+      ? "| seed | first host | quarter | half | queen | patches | flowers | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|"
+      : "| seed | first host | quarter | half | queen |\n|---:|---:|---:|---:|---:|",
 );
 for (const r of rows)
   console.log(
     `| ${r.seed} | ${show(r.first)} | ${show(r.quarter)} | ${show(r.half)} | ${show(r.queen)} |` +
-      (withExtra ? ` ${r.patches} | ${r.flowers} | ${r.mat} |` : ""),
+      (withSpread
+        ? ` ${r.patches} | ${r.flowers} | ${r.spread} | ${r.mat} |`
+        : withExtra
+          ? ` ${r.patches} | ${r.flowers} | ${r.mat} |`
+          : ""),
   );
 
 /** The worst (largest, "never" worst) and the median of a column, with the seeds that reached it. */
