@@ -6956,6 +6956,26 @@ No limit is clean: every limit from 2 to 5 has a seed with 7 or more porters hol
 
 **Cost:** no legend, question or brain-version change, but the offline estimate (`pr-notes`) moves with fewer distinct situations: modes $0.16464 to $0.15627 an hour (−5.1 %, 751 to 749 tokens a question), the response lanes (not asked yet) $0.33451 to $0.31805, the fungus $0.03650 to $0.03492 (1050 to 1004 tokens a question). The wider odour field costs tick time: `colony-bench 600 120 1` median 8.71 ms before, 9.41 ms after (+8%; mean 9.55 to 10.28); the assays' `ms/tick` rose 10–18% on the nurse-zone run.
 
+### 77.5 Crowd physics: a per-cell cap, built off, measured negative (ja-k4k.15.7.1, 2026-11-23)
+
+`cellCap` (0 = off, goldens bit-exact; `move.ts`, `CELL_SQUEEZE`): in the nest, a step into a cell already holding that many of the colony's ants (the contact count `friends`, kept true as ants move within a tick) is refused and sidestepped; between the cap and twice it an ant squeezes in at 0.3 a second, past twice never. Tests in `tests/int/crowdCap.test.ts`. Two earlier forms failed in a small test: slowing as the cell fills cut food stored from about 8 to 1–2, and a per-tick refusal let a queue through in about a second (cells of 10–13 against a cap of 3).
+
+Sweep of caps 3, 4, 6, 8 and 10 on seeds 1–20 (assays runs 45101471689 and 45102261132, head `ad63c37e`, climb on with `broodCrowd` 3; the override applies to the first colony only). Baselines on the same seeds: main larvae 17/20, nurse zone 8/20, `game1` 17/20, A12 19/20, A6 4/20, A13 9/20; head with no cap 19/20, 13/20, 14/20, 17/20, 2/20, 11/20.
+
+| `cellCap` | larvae | nurse zone | `game1` (worst held; porters) | A12 | A6 | A13 |
+|---|---|---|---|---|---|---|
+| 3 | 0/20 | 1/20 | 2/20 (38; 0) | 0/20 | 5/20 | 0/20 |
+| 4 | 1/20 | 3/20 | 0/20 (43; 1) | 0/20 | 3/20 | 0/20 |
+| 6 | 0/20 | 4/20 | 0/20 (148; 14) | 2/20 | 6/20 | 1/20 |
+| 8 | 1/20 | 6/20 | 1/20 (103; 4) | 5/20 | 4/20 | 0/20 |
+| 10 | 11/20 | 8/20 | 2/20 (111; 150) | 3/20 | 2/20 | 1/20 |
+
+**It breaks the colony at every value.** `game1` median held foragers rise from 1–2 to 6–27 and the worst seed to 38–148; A12 and A13 fall to near 0/20; larvae fail on every seed below cap 10. The chambers depth trend (games 4–12, head, `broodCrowd` 3): cap 3 shows it in 1 of 12 games with 1–2 stacked chambers; cap 4 in 3 of 12; cap 6 in 7 of 9; cap 10 in 9 of 9 (3–6 stacked, more than main's mean 3.6), so only a cap near the nest's own density (about 10 ants a floor cell) leaves digging alone, and at that cap the other guards still fail.
+
+**Why (read, not traced):** a refused ant waits and re-aims at the same cell, so carriers and porters queue at full cells and stop delivering (held foragers, stalled porters), where the real traffic data show flow holding as density rises (Poissonnier et al. 2019: no decline to 80% occupancy). A cap is the wrong shape for tunnels one ant wide (Gravish et al. 2013).
+
+**Decision:** the setting stays off and is not promoted. The next step is not a tighter cap. Candidates, untried: capacity by corridor width (the throughput of a corridor cell, not its occupancy), a refused ant retreating or going idle instead of re-aiming at once (Aguilar et al. 2018), carriers with priority over nurses (**design**), and a chamber that grows with the ants in it (blocked on `ja-k4k.3.1`).
+
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 
 **Research basis:** [aphids.md](aphids.md):
