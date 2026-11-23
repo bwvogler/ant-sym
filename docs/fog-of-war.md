@@ -69,7 +69,7 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** living ants of the player's strain (`fungus.evolution.strain`) with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Today's `SensedMap` takes every strain; the lab's painted strains are not the player's. A queen or alate host sees as an ant does.
+- **Hosts:** living ants of the player's strain (`fungus.evolution.strain`) with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Today's `SensedMap` takes every strain; the lab's painted strains are not the player's. Queens and alates are hosts too, but today's stamp skips them: F1 adds them (`ja-1ypq.1`).
 - **The body:** every hypha cell (`hyphaeOn(l).parent`), mat, patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
@@ -107,10 +107,11 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Following a non-host ends with "lost sight" when it leaves; hosts stay followable.
 - The lens and cell inspection show the snapshot on a remembered cell with "last seen N s ago", and "unexplored" on an unknown one.
 - Specimens lose track out of sight.
-- Chamber labels appear only for known nests.
+- Chamber labels appear only for known nests. The nest tab (`LearnDrawer.tsx` `NestCard`: queen, brood and ant counts per colony) follows §5.3.
+- **Open (D1):** for a known colony with no host in it, do the nest tab and stats show queen and brood counts "as of N s ago", or hide those rows? Decision 2 (no queens or brood on remembered ground) and decision 3 (live or as-of readouts) meet here; recommend as-of for counts and none on the map. Settle before F4 and F5.
 
 ### 5.3 Readouts (`ja-1ypq.5`)
-- Stats, history, goal toasts, nest badges and the go-to menu list known colonies only, live or as of (§4.4).
+- Stats, history, goal toasts, nest badges, the nest tab and the go-to menu list known colonies only, live or as of (§4.4).
 - The Lab's cards and the dev hook stay omniscient, since they are tools rather than play (owner, 2026-11-23).
 
 ### 5.4 The start and the builder (`ja-1ypq.6`)

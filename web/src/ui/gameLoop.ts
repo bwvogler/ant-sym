@@ -51,6 +51,7 @@ export class GameLoop {
   #stats: ColonyStats | null = null;
   #fps = 0;
   #subs = new Set<() => void>();
+  #steps = new Set<() => void>();
   #last = 0;
   #lastStats = 0;
   #frames = 0;
@@ -73,6 +74,12 @@ export class GameLoop {
       this.#fps = o.carry.fps();
     }
   }
+
+  /** Called after every sim step (not every frame); returns the way to stop. What the page keeps up with the sim, such as the fog's sight, goes here. */
+  onStep = (fn: () => void): (() => void) => {
+    this.#steps.add(fn);
+    return () => void this.#steps.delete(fn);
+  };
 
   /** The latest stats (null until the first is taken). */
   stats = (): ColonyStats | null => this.#stats;
@@ -135,6 +142,7 @@ export class GameLoop {
       const steps = Math.max(1, Math.ceil(total / MAX_STEP));
       for (let k = 0; k < steps; k++) {
         game.tick(total / steps);
+        for (const fn of this.#steps) fn();
         this.#journal?.observe(game);
         // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
         if (game.flights.length) {

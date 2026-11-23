@@ -5552,7 +5552,7 @@ The owner saw one colony's trails all the time and disliked that Ink (colony 0) 
   - Every colony's food trail, home trail and alarm show in a cell as strongly as that mark is fresh, fading to nothing over `SENSED_FADE` = 20 sim-seconds.
   - Before any host there is no scent on the field. Paths light up as infected foragers walk them, and fade once they move on. Amber's trails appear the moment an Amber ant carries the fungus.
   - It is a picture only: the game never reads it, and the golden masters are bit-exact.
-  - The spores, the fungus's own body, show as before.
+  - The spores, the fungus's own body, show as before. (Superseded by §89, 2026-11-23: the fog hides them where nothing senses.)
 - **The seed chooses the landing colony** (`landingColony(seed, colonies)` in `ui/useColony.ts`, ja-pc72.2).
   - With two colonies it is `seed % 2`: odd seeds land by Amber, even by Ink. With one colony, that colony.
   - The start screen names it as the seed is typed, and the chapters, notices and tutorial follow `game.landed.colony`.
@@ -5633,7 +5633,7 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 **Still open** (endless-world §10, each with a recommendation):
 1. wild density: one site per 4 × 4 chunks to start;
 2. a wild colony's size on waking: a start colony's at 10 minutes;
-3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests;
+3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests (decided otherwise, §89: hosts and the living body, from the landing patch only);
 4. W, T and the awake cap: 2 U, 60 s and 6;
 5. the flight distance: 2 U to start;
 6. lines joining: not yet;

@@ -201,7 +201,7 @@ The numbers are set from E1's measurements. Nothing measures memory today.
 **The page:**
 - **Camera:** no hard clamp. The view can go anywhere revealed, plus a margin, with a fixed least zoom instead of "the whole map". "Zoomed in", which turns the minimap on, becomes a zoom level.
 - **Chunk canvases** (`ColonyField.tsx`): evicted when far off-screen, and repainted only when their chunk changed (a dirty flag per chunk), not every frame.
-- **The minimap:** a window of a fixed number of chunks round the camera, drawn from the same chunk canvases, with nests marked beyond its edge by arrows.
+- **The minimap:** a window of a fixed number of chunks round the camera, drawn from the same chunk canvases, with known nests marked beyond its edge by arrows (only nests the fungus has sensed: [fog-of-war §4.4](fog-of-war.md#44-known-colonies)).
 - **Fog of war:** designed in [fog-of-war](fog-of-war.md) (PRD §89, `ja-1ypq`; owner, 2026-11-23). An explored bit per cell rather than per chunk, revealed by the fungus's hosts and its living body (no disc round the start nests: the start reveals only the landing patch), with remembered ground drawn as last seen and no ants. A frozen region is remembered ground. The fog's share of this stage is `ja-1ypq.7`.
 - **The side view:** the line under the click, or the followed ant's line.
 
@@ -224,7 +224,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 
 ## Play
 
-- **See:** the world opens outward as the fungus spreads. Wild nests show as discs in the fog's edge. Following a host out past the start's ground reveals new ground. A side view of each nest group shows its own curtain.
+- **See:** the world opens outward as the fungus spreads. Wild nests the fungus has sensed show as discs at the fog's edge; unsensed ones stay hidden. Following a host out past the start's ground reveals new ground. A side view of each nest group shows its own curtain.
 - **Choose:** the player's levers don't change, but where to spread now matters: towards a wild colony (more hosts, a stronger stranger) or away (room for daughters to found). A daughter's landing click, 2 U out, usually starts a new line. A daughter that lands beyond the fungus's reach freezes after T, a lone queen, until the fungus follows her.
 - **Progression:** a slope, not a cliff. Wild colonies wake mature and are stronger than foundings, so reaching them takes the levers the fungus earns. The fog makes the frontier something to push, not a map handed over. The fungus's reach is the frontier: what it hasn't reached stays still.
 - **Cost:** none in Jev while answers are cached. Wild colonies use a preset doctrine whose answers ship, and no situation field changes. The cost is the tick and memory, bounded by the awake cap.
