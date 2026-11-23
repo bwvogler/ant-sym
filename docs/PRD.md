@@ -7459,15 +7459,29 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 
 **Built, experimental.** Attack intent is recorded per ant/layer, resolved through reusable odour-band pressure grids, and cleared on the next decision or slot reuse. Ignore continues work without attack or load release. Response cache version 13 when built; the response brain is at 16 now (PRD §87). The 20-seed 120 s contact sweep reduced median losses from 33.5 to 0 and raised median food from 532.5 to 593.5; worst paired food fell to 0.898 (seed 5). `DEFAULT_FIGHT` stays legacy (`intent` off); only the page's new games turn it on (see the owner's decision below). See the [note and paired results](contact-actions.md#implemented-and-measured-2026-11-18).
 
-**Directed-combat validation on stanceless main (2026-11-22, `contact-validation.yml`, `workflow_dispatch` on #281 head c29dd92, GitHub, seeds 1-20, standard length; no Jev).** `game.fight.intent` off against on:
+**Directed-combat validation on stanceless main (2026-11-22).** Two configurations were measured, and only the second is what the page ships.
 
-| Assay | intent off | intent on | What moves |
+*Plain `intent` only* (`contact-validation.yml`, `workflow_dispatch` on #281 head c29dd92, GitHub, seeds 1-20, standard length, `--set game.fight.intent=false,true`; no Jev). This is **not** the page's setting (it has no `attackDistance` and no `counterattack`):
+
+| Assay | intent off | plain intent on | What moves |
 |---|---|---|---|
-| A9 strangers meet at food (neutral contact) | pass 8/20 | **pass 20/20** | peaceful meetings no longer end in fights |
+| A9 strangers meet at food (neutral contact) | pass 8/20 | pass 20/20 | peaceful meetings no longer end in fights |
 | G1 the one-world game, held food | pass 17/20 (failing 3, 4, 20) | pass 15/20 (failing 3, 12, 14, 19, 20) | median losses a colony 74 → 1; stored food 2746 → 2559 (you), 2807 → 2731 (rival) |
 | A13 defence from senses, the war party walked at the hole | pass 9/20 | **pass 4/20** | the defended colony: median losses 35.5 → 144, stored 265 → 117, ants alive 222 → 94; raiders' losses 40.5 → 36 |
 
-So directed combat makes neutral play much calmer and makes defending against a raid much worse: the defenders lose four times the ants and store less food, while the raiders lose no more. The entrance-defence variants of §86 (`defendEntrance`, `defendAlarmEntrance`, `defendThreatEntrance`) are the answer being tried and are not on by default. **Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games**, knowing A13 raid defence is worse with it on (9/20 → 4/20) and A9 and G1 are better; the entrance-defence variants stay the way to recover it.
+*The page's settings* (`game.fight.intent=true attackDistance=0.65 counterattack=true`, the `useColony.ts` fight settings; GitHub `assays.yml`, one world, no Jev; `github.com/bwvogler/ant-sym/actions/runs/<id>`). Each arm is paired by seed with an intent-off run: A13 and A9 on runs 45123855840 (off) and 45199179642 (page) for seeds 1-10 and 45202286738 (off) and 45202279633 (page) for seeds 11-20; G1 on 45207629815 (off) and 45207623679 (page) for seeds 1-10 and the same 45202286738 / 45202279633 for seeds 11-20. The seeds 1-10 A13 and A9 pair ran on two commits of `main` (99ea51d and 6ada438): the A13 control row (797 / 189 / 1070) and the intent-off failing seeds are the same in both and in the c29dd92 run above, so the drift did not move them; every other run is on one commit (fbd1c83). Runs are deterministic per seed, so the open uncertainty is the seed sample, not run-to-run noise.
+
+| Assay | intent off, seeds 1-10 / 11-20 | the page's settings, seeds 1-10 / 11-20 | What moves |
+|---|---|---|---|
+| A13 raid defence | pass 3/10, 6/10 (9/20) | pass **7/10, 8/10 (15/20)** | defender losses a median 30.5 / 36.5 → 43.5 / 40; stored 512 / 224 → 551 / 288; raiders' losses 37 / 41.5 → 42 / 42 |
+| A9 neutral contact | pass 3/10, 5/10 (8/20) | pass **10/10, 10/10 (20/20)** | losses a colony 37.5 / 32 → 0 |
+| G1 the one-world game | pass 8/10 (failing 3, 4), 9/10 (failing 20) (17/20) | pass 9/10 (failing 1), **4/10** (failing 12, 14, 15, 17, 19, 20) (**13/20**) | losses a colony 74 / 74 → 0 / 0.5; stored food 2813 / 2573 → 2710 / 2785 (you), 2890 / 2791 → 2495 / 2624 (rival); `maxHeld` |
+
+G1 passes when the worse colony's `maxHeld` (foragers holding food over 120 s) is at most 2. With the page's settings its median is 2 on seeds 1-10 (max 5 → 3) and 3 on seeds 11-20 (max 4 → 5; per colony you 2 → 2, rival 1 → 2), so G1 fails on 6 of 10 seeds on the second half against 1 of 10 for legacy, and on 1 of 10 on the first half against 2 of 10: the held-food cost is not stable across the two halves of the seeds. Plain `intent` passes G1 on 15 of 20 seeds (above), more than the page's 13.
+
+In short, with the page's settings directed combat calms neutral play, defends a raid better than legacy by A13's pass rule (at a few more defender losses), and loses far fewer ants over the whole game, with about the same stored food (you +8 % and rival -6 % on seeds 11-20, you -4 % and rival -14 % on seeds 1-10); its cost is G1's held-food bound, 13/20 against legacy's 17/20 and plain `intent`'s 15/20. Plain `intent` is weaker on A13 (4/20 against 15/20) and better on G1 (15/20 against 13/20); the page's settings are worse than plain `intent` on G1, not only than legacy. `defendEntrance` does not help the page's settings (A13 2/10 on seeds 1-10, against 7/10); the alarm- and odds-gated entrance variants were not run with them.
+
+**Owner's decision (2026-11-22, D2, review of 797bfb6): keep `intent` on in the page's new games.** It was taken on the plain-`intent` table above. The page's settings were then measured (this section), with A13 15/20 and A9 20/20 against legacy's 9/20 and 8/20 and G1 13/20 against 17/20 (the held-food bound). **Owner's re-confirmation (2026-11-23): keep the page's settings on.** Open, not blocking: look at what the extra foragers holding food in G1 (seeds 12, 14, 15, 17, 19) are doing.
 
 
 ## 87. Local delivery actions (ja-g7nz)
