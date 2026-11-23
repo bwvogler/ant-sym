@@ -8,8 +8,10 @@ import { voxelFrustum } from "../voxelViewport.ts";
 import { PLANE, CURTAIN, STRIP, centreX, centreY, cellKey } from "../../colony/index.ts";
 import { InspectionSoftware } from "../inspectionSoftware.ts";
 import * as T from "three";
-import { mapTiltTarget, orbitCamera } from "../inspectionOrbit.ts";
-import { inspectionColour } from "../InspectionScene.ts";
+import { inspectionCameraPose, mapCameraOrbit } from "../inspectionOrbit.ts";
+import { InspectionScene, inspectionColour } from "../InspectionScene.ts";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { css, HOME_RGB, ROLE_RGB } from "../palette.ts";
 
 test("voxel overlays retain the map palette's space-separated RGB colours", () => {
@@ -46,14 +48,14 @@ test("tilting keeps the center ground line fixed in either map projection", () =
   const y = -0.31;
   for (const mode of ["surface", "below"] as const) {
     const ground = new T.Vector3(x, mode === "surface" ? -y : 1.08, mode === "surface" ? 0 : -y);
-    const target = new T.Vector3(...mapTiltTarget(mode, x, y));
     const camera = new T.OrthographicCamera(-3, 3, 2, -2, 0.05, 50);
     for (const angle of [0, 0.3, 0.65, 1.15]) {
-      const tilt = mode === "surface" ? angle : -angle;
-      const orbit = orbitCamera(mode, { yaw: 0, tilt });
-      camera.position.copy(target).add(new T.Vector3(...orbit.position));
-      camera.up.set(...orbit.up);
-      camera.lookAt(target);
+      const tilt = mode === "surface" ? angle : -angle; // what the camera turns by: Above up from the ground, Below down
+      // the scene's own camera: the same pose InspectionScene.draw takes, from the stored (never positive) tilt through mapCameraOrbit
+      const pose = inspectionCameraPose(mode, mapCameraOrbit(mode === "surface" ? PLANE : CURTAIN, { yaw: 0, tilt: -angle }), { x, y });
+      camera.position.set(...pose.position);
+      camera.up.set(...pose.up);
+      camera.lookAt(new T.Vector3(...pose.target));
       camera.updateMatrixWorld();
       for (const dx of [-1, 0, 1]) {
         const point = ground
@@ -163,4 +165,51 @@ test("software viewport resizing resets depth and idle caches without stretching
   renderer.render(scene, camera);
   assert.equal(writes, 2);
   renderer.dispose();
+});
+
+test("the scene draws with the camera the orbit and the viewport give: its pose, and a frustum of the raster in world units (InspectionScene.draw)", async () => {
+  const realFetch = globalThis.fetch;
+  const g0 = globalThis as unknown as { getComputedStyle?: unknown };
+  g0.getComputedStyle = () => ({ getPropertyValue: () => "" }); // the scene reads the page's colours; none here: its defaults
+  // the model file is a file: URL that Node's fetch does not read
+  globalThis.fetch = (async (url: string | URL | Request) => ({
+    ok: true,
+    json: async () => JSON.parse(await readFile(fileURLToPath(String(url)), "utf8")),
+  })) as unknown as typeof fetch;
+  const canvas = {
+    width: 32,
+    height: 32,
+    getContext: () => ({
+      createImageData: (width: number, height: number) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }),
+      putImageData: () => undefined,
+    }),
+  } as unknown as HTMLCanvasElement;
+  try {
+    const scene = await InspectionScene.create(canvas, "surface", true);
+    const g = buildGame({ species: "generic", seed: 3, antCount: 20, rival: false, generation: 0 });
+    const patch = inspectViewport(g, new SensedMap(), PLANE, centreX(50, 50), centreY(50), 6, 4, { food: false, home: false });
+    for (const orbit of [
+      { yaw: 0, tilt: 0.65 },
+      { yaw: 0.3, tilt: 1.1 },
+    ]) {
+      scene.setViewport({ width: 480, height: 300, pixelsPerWorld: 60, x: 0.12, y: -0.3, orbit });
+      scene.draw(patch, { scents: true, markers: false, selection: false, chambers: true });
+      const pose = inspectionCameraPose(patch.mode, orbit, { x: 0.12, y: -0.3 });
+      assert.deepEqual(scene.camera.position.toArray(), pose.position, `the camera's position (tilt ${orbit.tilt})`);
+      assert.deepEqual(scene.camera.up.toArray(), pose.up, "its up");
+      const forward = new T.Vector3();
+      scene.camera.getWorldDirection(forward);
+      const toTarget = new T.Vector3(...pose.target).sub(scene.camera.position).normalize();
+      assert.ok(forward.distanceTo(toTarget) < 1e-9, "looking at the target");
+      assert.deepEqual(
+        [scene.camera.left, scene.camera.right, scene.camera.top, scene.camera.bottom],
+        [-4, 4, 2.5, -2.5],
+        "480 by 300 pixels at 60 a world unit",
+      );
+    }
+    scene.dispose();
+  } finally {
+    globalThis.fetch = realFetch;
+    delete g0.getComputedStyle;
+  }
 });

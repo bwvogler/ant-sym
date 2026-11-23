@@ -14,7 +14,14 @@ import { leafTiles, LEAF_STEP, LEAF_BOTTOM, LEAF_TOP, LEAF_VEIN_TOP } from "./su
 import { inspectionScents, inspectionMarkers, SCENT_STYLES, type InspectionOverlays } from "./inspectionOverlays.ts";
 import { hyphaShape, HYPHA_COLOURS } from "./hyphaVisual.ts";
 import { fungalPrimitives, STALK_HEIGHT } from "./fungalStructures.ts";
-import { mapOrbit, orbitCamera, inspectionFrameScale, mapTiltTarget, BELOW_WALK_PLANE, type InspectionOrbit } from "./inspectionOrbit.ts";
+import {
+  mapOrbit,
+  inspectionCameraPose,
+  inspectionFrameScale,
+  inspectionFrustumHalf,
+  BELOW_WALK_PLANE,
+  type InspectionOrbit,
+} from "./inspectionOrbit.ts";
 type V = [number, number, number];
 interface Part {
   positions: number[];
@@ -630,10 +637,10 @@ export class InspectionScene {
       }
     }
     const view = this.viewport,
-      orbit = orbitCamera(mode, view?.orbit ?? this.orbit),
-      target = new T.Vector3(...(view ? mapTiltTarget(mode, view.x, view.y) : mode === "surface" ? [0, 0, 0.15] : [0, 0.6, 0]));
-    this.camera.position.copy(target).add(new T.Vector3(...orbit.position));
-    this.camera.up.set(...orbit.up);
+      pose = inspectionCameraPose(mode, view?.orbit ?? this.orbit, view),
+      target = new T.Vector3(...pose.target);
+    this.camera.position.set(...pose.position);
+    this.camera.up.set(...pose.up);
     this.camera.lookAt(target);
     const bounds: V[] = [];
     if (mode === "surface" && !view)
@@ -645,8 +652,7 @@ export class InspectionScene {
             for (const y of [c.y - 0.2, c.y + 0.29]) for (const z of [0, h + 0.04]) bounds.push(this.point(x, y, z));
         }
     const frame = inspectionFrameScale(bounds, mode, this.orbit),
-      halfWidth = view ? view.width / view.pixelsPerWorld / 2 : 2.15 * frame,
-      halfHeight = view ? view.height / view.pixelsPerWorld / 2 : 1.792 * frame;
+      { halfWidth, halfHeight } = inspectionFrustumHalf(view, frame);
     this.camera.left = -halfWidth;
     this.camera.right = halfWidth;
     this.camera.top = halfHeight;
