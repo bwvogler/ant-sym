@@ -45,7 +45,7 @@ on:
       bias:
         description: "The tips' traffic bias (--bias, PRD §88): default (the fungus's own: count), off, count or levels"
         type: choice
-        options: [default, off, count, levels]
+        options: [default, "off", count, levels] # "off" quoted: bare, YAML reads it as false and GitHub refuses the value
         default: default
       radius:
         description: "The bias's neighbourhood radius in cells (--radius); empty: the default (3)"
