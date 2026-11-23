@@ -405,7 +405,7 @@ const SCENES = [
   // run and, once its vector is out, its dotted search loops: the scene above holds only the start ring).
   {
     name: "marks-trace-walk",
-    page: "marks",
+    page: "walk",
     run: async (p) => {
       await tool(p, "Tweezers: pick up an ant");
       const { sx, sy } = await antScreen(p, 0, 0);
@@ -458,6 +458,8 @@ const PAGES = {
   built: { scheme: "light", species: null },
   marks: { scheme: "light", species: null },
   ants: { scheme: "light", species: null },
+  // a page of its own: the tweezers' stroke needs an ant nothing has moved (the marks page's scene before it moved the same one)
+  walk: { scheme: "light", species: null },
   retina: { scheme: "light", species: null, scale: 2 },
   // a phone: 390 px wide, touch (the layout and the field's size differ, so the page's own rules for a narrow screen show)
   phone: { scheme: "light", species: null, phone: true },
