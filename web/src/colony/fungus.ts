@@ -479,8 +479,8 @@ export class Fungus {
   #corpses: Map<number, number>[];
   /** seconds since each colonised corpse was colonised (stalks, ja-2bw.10), by map and cell */
   #corpseAge: Map<number, number>[];
-  /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, and the curtain cells it feeds */
-  #links: { from: number; to: number[] }[] = [];
+  /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, the curtain cells it feeds, and the curtain (the game's layer; one per line) */
+  #links: { from: number; to: number[]; layer: number }[] = [];
   /**
    * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
    * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
@@ -1320,9 +1320,7 @@ export class Fungus {
         plane.tips = plane.tips.filter((u) => u !== t);
         const layer = down.layer ?? CURTAIN;
         const to = this.rootShaft(layer, down.x, down.y);
-        // Mass flows down a hole only into the first line's curtain (#placeMass and #sinks read that one mat): a link into another line's would take
-        // the mass off the plane and set it down nowhere. The other lines' hyphae grow on, without the flow, until the flow is made per line.
-        if (p.flow && layer === CURTAIN && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to });
+        if (p.flow && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to, layer });
       }
     }
     // A tip that has reached a corpse (the midden's) colonises it.
@@ -1607,14 +1605,18 @@ export class Fungus {
    */
   #placeMass(e: Evolution): void {
     const plane = this.#hyphae[0];
-    const down = this.#hyphae[CURTAIN];
-    if (plane && down && this.#links.length > 0) {
+    // Each line's curtain is its own mat: the mass that came down its holes goes to its walls, never to another line's.
+    const curtains = [...new Set(this.#links.map((k) => k.layer))].sort((a, b) => a - b);
+    for (const layer of curtains) {
+      const down = this.#hyphae[layer];
+      const links = this.#links.filter((k) => k.layer === layer);
+      if (!plane || !down || links.length === 0) continue;
       // The shaft's walls are one mat too: mass that came down the hole gathers on the wall roots a growing tip leads back to.
       const feeds = down.feedingCells();
-      const walls = [...new Set(this.#links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
+      const walls = [...new Set(links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
       const outlets = walls.filter((k) => feeds.has(k));
       let came = 0;
-      for (const { from } of this.#links) {
+      for (const { from } of links) {
         came += plane.loads.get(from) ?? 0;
         plane.loads.delete(from);
       }
@@ -1627,7 +1629,7 @@ export class Fungus {
         }
         for (const k of outlets) down.addLoad(k, came / outlets.length);
       } else if (walls.length > 0) for (const k of walls) down.addLoad(k, came / walls.length);
-      else for (const { from } of this.#links) plane.addLoad(from, came / this.#links.length);
+      else for (const { from } of links) plane.addLoad(from, came / links.length);
     }
     let held = 0;
     for (const h of this.#hyphae) if (h) held += h.length * HYPHA_MASS + h.loaded;
@@ -1680,10 +1682,13 @@ export class Fungus {
   /** The plane cells where hyphae crossed down a hole, each weighted by its share of the curtain's tips (flow's sinks). */
   #sinks(): Map<number, number> {
     const out = new Map<number, number>();
-    const down = this.#hyphae[CURTAIN];
-    if (!down || this.#links.length === 0) return out;
-    const w = Math.max(1, down.tips.length / this.#links.length);
-    for (const { from } of this.#links) out.set(from, (out.get(from) ?? 0) + w);
+    for (const layer of new Set(this.#links.map((k) => k.layer))) {
+      const down = this.#hyphae[layer];
+      const links = this.#links.filter((k) => k.layer === layer);
+      if (!down || links.length === 0) continue;
+      const w = Math.max(1, down.tips.length / links.length);
+      for (const { from } of links) out.set(from, (out.get(from) ?? 0) + w);
+    }
     return out;
   }
 
@@ -1893,6 +1898,8 @@ export class Fungus {
       corpses: this.#corpses.map((m) => [...m]),
       corpseAges: this.#corpseAge.map((m) => [...m]),
       links: this.#links.map(({ from, to }) => [from, ...to]),
+      // The curtain of each link, only when one is not the first line's: a one-line game saves as it always has (the goldens hash the save).
+      ...(this.#links.some((k) => k.layer !== CURTAIN) ? { linkLayers: this.#links.map((k) => k.layer) } : {}),
     };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
     if (this.#layers.length > 1)
@@ -1948,7 +1955,12 @@ export class Fungus {
       m.clear();
       for (const [k, v] of ages[l] ?? []) m.set(k, v);
     });
-    this.#links = ((r.links as number[][] | undefined) ?? []).map(([from, ...to]) => ({ from: from!, to }));
+    const linkLayers = (r.linkLayers as number[] | undefined) ?? [];
+    this.#links = ((r.links as number[][] | undefined) ?? []).map(([from, ...to], i) => ({
+      from: from!,
+      to,
+      layer: linkLayers[i] ?? CURTAIN,
+    }));
     this.#evolved();
   }
 }
