@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -119,6 +119,22 @@ test("a seed line that says how much mycelium and how many spore cells the game 
   // a game with no hyphae says 0 cells and still gets the columns
   const none = run({ "seed-1.txt": withSize(1, 0, 0) });
   assert.match(none.out, /\| 1 \| 5 s \| 100 s \| never \| 200 s \| 2 \| 1 \| 0 \| 7 \| 0 \| 0 \|/);
+});
+
+test("the wording progression.mjs prints is the wording the table reads: a reword on one side fails here, not silently in CI", () => {
+  // The line's text is taken from progression.mjs itself, not retyped, so the two cannot drift apart unseen.
+  const source = readFileSync(new URL("../../../../scripts/lab/progression.mjs", import.meta.url).pathname, "utf8");
+  const template = /hyphae \$\{r\.cells\} cells, spores on \$\{r\.spores\} cells/.exec(source);
+  assert.ok(template, "progression.mjs still prints 'hyphae ${r.cells} cells, spores on ${r.spores} cells'");
+  const printed = template[0].replace("${r.cells}", "123").replace("${r.spores}", "45");
+  const text = seedText(1, "100 s", "200 s").replace(
+    "mycelium 8.6",
+    `mycelium 8.6, patches 2 (flowers 1, spread 0, mat cells 7) · ${printed} · traffic leans 0 of 0 side choices`,
+  );
+  const { out, status } = run({ "seed-1.txt": text });
+  assert.equal(status, 0);
+  assert.match(out, /\| hyphae cells \| spore cells \|/);
+  assert.match(out, /\| 7 \| 123 \| 45 \|/, "the numbers the line printed are the numbers in the row");
 });
 
 test("two commits are both named, so a table that mixes arms shows it", () => {
