@@ -3,7 +3,7 @@
 *Research and design note for epic `ja-vlla.11` (M4 of `ja-vlla`, PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
 - *Read status:* every source is marked full text (**FT**), abstract only (**ABS**, its numbers **unverified**) or not read (**NR**).
 - *Not reachable:* many society journals (Wiley, Springer, Elsevier) were behind a bot wall. Their numbers are abstract-only and gathered for reading in `ja-vlla.11.1`.
-- *Second read (`ja-vlla.11.1`, 2026-11-24):* no full text of the eleven sources could be reached. Wiley, Springer, Cambridge, BioOne and Elsevier answered with bot walls, and the session's network refused the open copies on iforest.sisef.org and flore.unifi.it (Di Nuzzo), publishup.uni-potsdam.de (Heinken) and publications.aston.ac.uk (Armstrong). The abstracts and citing papers were read instead, and the claims are restated to what they say. Allowing those four hosts would let three of them be read in full. Chen et al. 2000 and Stretch & Viles 2002 still give no rate (no abstract online).
+- *Second read (`ja-vlla.11.1`, 2026-11-24):* no full text of the eleven sources could be reached. Wiley, Springer, Cambridge, BioOne and Elsevier answered with bot walls, and the session's network refused the open copies on iforest.sisef.org and flore.unifi.it (Di Nuzzo), publishup.uni-potsdam.de (Heinken) and publications.aston.ac.uk (Armstrong). The abstracts and citing papers were read instead, and the claims are restated to what they say. After the owner allowed those hosts, Armstrong 2005 and Di Nuzzo et al. 2022 were read in full; Heinken et al. 2007 has no open copy (the Potsdam record holds metadata only), so it stays abstract-only. Chen et al. 2000 and Stretch & Viles 2002 still give no rate (no abstract online).
 
 **Today**, nothing on the map is a plant, an alga, light or water, and rock is permanent:
 - Hyphae never enter rock (`enterable`, `hyphae.ts`).
@@ -58,7 +58,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - The model's ceiling is about 26 mm a year, against about 13 mm a year for the fastest reported *Parmelia*. The 13 mm figure is **unverified**: it comes second-hand from the paper's references.
   - 33 of the tracked thalli died during the survey.
 - **Crustose lichens are the slowest:**
-  - *Rhizocarpon* averaged 0.07 mm a year over six years, ranging 0–0.19 (SD 0.06); 7 of 39 thalli did not grow measurably, and growth was below lichenometric estimates (Armstrong 2005, ABS: numbers stated in the abstract).
+  - *Rhizocarpon* averaged 0.07 mm a year over six years, ranging 0–0.19 (SD 0.06), on 39 thalli 3–102 mm across on 12 boulders at about 940 m (1988–1994). 7 of 39 did not grow measurably: 6 of them were disintegrating and one's edge retreated, so a lichen can shrink. Growth did not depend on size (only 2 thalli over 55 mm), was slowest on WNW faces and fastest on ESE and SSE, and was far below lichenometric estimates (0.06 mm a year measured on 3–10 mm thalli against 0.57 implied by lichenometry) (Armstrong 2005, FT).
   - Crustose growth can decline in large thalli (Armstrong & Bradwell 2010, *Geogr Ann A* 92:3, ABS).
 - **A fruticose lichen,** *Usnea aurantiacoatra*, grew 4.3–5.5 mm a year in Antarctica (Li et al. 2014, *PLoS One* 9:e100735, FT).
 - **Not found:** a measured ring, where the centre of a lichen dies and leaves a ring. The nearest support is Seminara's poorer CO₂ supply to the centre.
@@ -121,8 +121,8 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 ## 6. Ants carry fragments
 
 - **Red wood ants.** Across 25 mounds of the *Formica rufa* group in five pine and spruce forest types in Germany, there were fragments of 20 moss and 10 lichen species, on almost all mounds and often many. The species matched the **ground** vegetation round the nests, so the ants gather fragments from the ground nearby. Fragments "may" regrow where dropped on the way (over several metres) or on an abandoned mound: inferred, not observed (Heinken, Rohner & Hoppert 2007, *Nova Hedwigia Beihefte* 131:147, ABS).
-  - Where *F. paralugubris* was introduced over 50 years ago, lichens on silver fir differed in composition (not in richness) from trees without ants, and asexually reproducing species "seemed to be associated" with ants (Di Nuzzo et al. 2022, *iForest* 15:71, ABS).
-  - That ants move propagules is the authors' argument there, with herbivore exclusion as the alternative; it is not shown.
+  - Where *F. paralugubris* was introduced in the Apennines since the late 1950s (two sites, 72 silver firs, 65 lichen species), the lichen composition differed beside ant nests but richness did not (P = 0.567). Asexually reproducing lichens rose and crustose lichens fell with ants at both sites; foliose and fruticose rose at one (Di Nuzzo et al. 2022, *iForest* 15:71, FT).
+  - That ants move propagules is the authors' argument: "they unintentionally transport lichen propagules during their movements", along the trails to aphid trees. No ant was seen carrying lichen; herbivore exclusion, the alternative, is inferred from another study, not measured here. The population was introduced, which may differ from native ones.
 - **Other animals disperse living propagules:**
   - 25 % of the mites *Humerobates arborea* carried soredia and left them 0.1–7.1 cm away (Stubbs 1995, *Mycologia* 87:454, ABS).
   - Lichens regrew from 29 % and 41 % of snail droppings (Boch et al. 2011, *PLoS One* 6:e18770, FT).
@@ -258,12 +258,12 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
 ## Sources
 
 - Armstrong RA, Bradwell T (2010). Growth of crustose lichens: a review. *Geogr Ann A* 92:3–17. [doi:10.1111/j.1468-0459.2010.00374.x](https://doi.org/10.1111/j.1468-0459.2010.00374.x) (ABS)
-- Armstrong RA (2005). Radial growth of *Rhizocarpon* section *Rhizocarpon* lichen thalli over six years at Snoqualmie Pass. *Arct Antarct Alp Res* 37:411–415. [doi:10.1657/1523-0430(2005)037[0411:RGORSR]2.0.CO;2](https://doi.org/10.1657/1523-0430(2005)037%5B0411:RGORSR%5D2.0.CO;2) (ABS)
+- Armstrong RA (2005). Radial growth of *Rhizocarpon* section *Rhizocarpon* lichen thalli over six years at Snoqualmie Pass. *Arct Antarct Alp Res* 37:411–415. [doi:10.1657/1523-0430(2005)037[0411:RGORSR]2.0.CO;2](https://doi.org/10.1657/1523-0430(2005)037%5B0411:RGORSR%5D2.0.CO;2), [Aston repository](https://publications.aston.ac.uk/id/eprint/38458/) (FT)
 - Beck A, Friedl T, Rambold G (1998). Selectivity of photobiont choice in a defined lichen community: inferences from cultural and molecular studies. *New Phytol* 139:709–720. [doi:10.1046/j.1469-8137.1998.00231.x](https://doi.org/10.1046/j.1469-8137.1998.00231.x) (ABS)
 - Bhatt U, Singh H, Kalaji HM, Strasser RJ, Soni V (2024). Decoding the physicochemical basis of resurrection: the journey of lichen *Flavoparmelia caperata*. *BMC Plant Biol* 24:1268. [PMC11681686](https://pmc.ncbi.nlm.nih.gov/articles/PMC11681686/), [doi:10.1186/s12870-024-05751-9](https://doi.org/10.1186/s12870-024-05751-9) (FT)
 - Boch S, Prati D, Werth S, Rüetschi J, Fischer M (2011). Lichen endozoochory by snails. *PLoS One* 6:e18770. [PMC3076439](https://pmc.ncbi.nlm.nih.gov/articles/PMC3076439/) (FT)
 - Chen J, Blume HP, Beyer L (2000). Weathering of rocks induced by lichen colonization: a review. *Catena* 39:121–146. [doi:10.1016/S0341-8162(99)00085-5](https://doi.org/10.1016/S0341-8162(99)00085-5) (NR)
-- Di Nuzzo L et al. (2022). Red wood ants shape epiphytic lichen assemblages in montane silver fir forests. *iForest* 15:71. [doi:10.3832/ifor3897-014](https://doi.org/10.3832/ifor3897-014) (ABS)
+- Di Nuzzo L et al. (2022). Red wood ants shape epiphytic lichen assemblages in montane silver fir forests. *iForest* 15:71–76. [doi:10.3832/ifor3897-014](https://doi.org/10.3832/ifor3897-014), [FLORE](https://flore.unifi.it/handle/2158/1258402) (FT)
 - Duisembecov BA, Dubovskiy IM, Glupov VV (2017). Effect of plant secondary metabolites on susceptibility of insects to entomopathogenic microorganisms. *Contemp Probl Ecol* 10:286. [doi:10.1134/s1995425517030052](https://doi.org/10.1134/s1995425517030052) (ABS)
 - Friedl T (1987). Thallus development and phycobionts of the parasitic lichen *Diploschistes muscorum*. *Lichenologist* 19:183. [doi:10.1017/s002428298700015x](https://doi.org/10.1017/s002428298700015x) (ABS)
 - Gasulla F, del Campo EM, Casano LM, Guéra A (2021). Advances in understanding of desiccation tolerance of lichens and lichen-forming algae. *Plants* 10:807. [doi:10.3390/plants10040807](https://doi.org/10.3390/plants10040807) (FT)
