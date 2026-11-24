@@ -1041,6 +1041,7 @@ export class Game {
     this.#wire();
     this.#refresh();
     this.#syncFrozen();
+    this.feedSites(); // a new hole reserves the sites round it, with the awake rule on or not (a bounded game: nothing)
     const q = c.queen;
     if (f.fungus && f.fungus.load > 0 && q) {
       q.load = Math.min(1, f.fungus.load);

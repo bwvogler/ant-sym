@@ -63,7 +63,9 @@ test("a species' food plume far from the origin is a window round its hole and r
   const sy = CELL[1]! + 2;
   plane.food.set(sx, sy, 3);
   plane.foodLeft += 3;
+  const made = plane.food.count;
   const plume = updatePlume(c, plane, 12, 0, frame);
+  assert.equal(plane.food.count, made, "a plume reads the chunks that exist and makes none (the tick must not generate for a smell)");
   assert.equal(plume.length, frame.w * frame.h);
   assert.equal(plumeAt(plume, plane, 12, sx, sy, frame), 1, "1 on the food, at a row below 0");
   assert.ok(
@@ -189,4 +191,12 @@ test("a game far from the origin plays: ants forage and bring food home, the fun
       if (c.alive[i] && c.layer[i] === PLANE) {
         assert.ok(Math.abs(c.x[i]! - 40000) < 3000 && Math.abs(c.y[i]! + 40000) < 3000, `ant at ${c.x[i]}, ${c.y[i]}`);
       }
+});
+
+test("the fungus's body is found by Fungus.bodyNear far past 131,072 cells, where 16-bit bucket keys alias", () => {
+  const { game, plane } = farGame(3, 200_000, -200_000, 4);
+  const h = plane.nests[0]!;
+  game.fungus.paint(game.colonies, h.x + 100, h.y, 3, 2, 0, 0, 0);
+  assert.deepEqual(game.fungus.bodyNear(PLANE, [{ x: h.x + 100, y: h.y }], 280), [true], "spores at the point");
+  assert.deepEqual(game.fungus.bodyNear(PLANE, [{ x: h.x + 100 + 1000, y: h.y }], 280), [false], "and none a thousand cells off");
 });

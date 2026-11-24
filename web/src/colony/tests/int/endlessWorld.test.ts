@@ -60,6 +60,11 @@ test("feeding sites generates no chunk; a sleeping colony's box is dropped, the 
   const made = plane.rock.count; // the brush reads the ground it paints on
   g.feedSites();
   assert.ok(g.sites.length > 0, "sites near the fungus's body are listed");
+  // exactly the plane's sites in the squares of side W round the body's buckets (frozen colonies add none)
+  const exact = new Set<string>();
+  for (const [bx, by] of g.fungus.bodyBuckets(PLANE, 280))
+    for (const s of plane.plane.sitesIn((bx - 1) * 280, (by - 1) * 280, (bx + 2) * 280, (by + 2) * 280)) exact.add(`${s.rx},${s.ry}`);
+  assert.deepEqual(new Set(g.sites.map((s) => `${s.rx},${s.ry}`)), exact, "the exact set, not a subset");
   for (const s of g.sites) assert.ok(Math.abs(s.x - (h.x + 1400)) <= 3 * 280 + 280, `site at ${s.x} is within a few W of the body`);
   assert.equal(plane.rock.count, made, "and still no chunk made by the feed");
 });
@@ -89,4 +94,19 @@ test("a founding on the endless plane asks a local rule 4 (no whole-plane pass) 
   } else assert.ok(far.reason.length > 0);
   const k = g.tryFoundBeyond("end", 20);
   if (k.ok) for (let i = 0; i < 30 * 3; i++) g.tick(DT);
+});
+
+test("with the awake rule off the sites round a new hole are listed too: a woken site's surroundings join the reserved lines", () => {
+  const g = game();
+  assert.equal(g.sleepRule, null);
+  const plane = (g.world as EndlessWorld).plane;
+  const first = g.sites[0]! as { x: number; y: number; rx: number; ry: number; heading: number };
+  const k = g.wakeSite(first);
+  const holes = g.colonies.map((c) => (c.layers[PLANE] as { nest: { x: number; y: number } }).nest);
+  const want = new Set<string>();
+  for (const h of holes) for (const s of plane.plane.sitesIn(h.x - 560, h.y - 560, h.x + 560, h.y + 560)) want.add(`${s.rx},${s.ry}`);
+  want.delete(`${first.rx},${first.ry}`);
+  assert.ok(!g.sites.some((s) => s.rx === first.rx && s.ry === first.ry), "the woken site is a colony, not a reserved line");
+  assert.deepEqual(new Set(g.sites.map((s) => `${s.rx},${s.ry}`)), want);
+  assert.equal(k, g.colonies.length - 1);
 });
