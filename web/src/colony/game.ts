@@ -1735,8 +1735,17 @@ export class Game {
       throw new Error(
         `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
       );
+    // What the replay of the foundings would make, checked before it starts (ja-baxa): a save of more lines or colonies than this game can grow to is refused
+    // with this game as it was. (A refusal after the replay, below, a line whose holes were moved, still leaves the foundings made: a failed load of that kind
+    // voids the game, and the page drops it.)
+    const founded = saved.founded ?? [];
+    const willHave = world.lines.length + founded.filter((f) => f.spot?.newLine).length;
+    if (willHave !== 1 + (sw.more ?? []).length)
+      throw new Error(`save: ${1 + (sw.more ?? []).length} lines, this game's world has ${willHave}`);
+    if (saved.colonies.length !== this.colonies.length + founded.length)
+      throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length + founded.length}`);
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
-    for (const f of saved.founded ?? []) this.addColony(f);
+    for (const f of founded) this.addColony(f);
     // The line grown again must be the one saved: else the curtain poured below would lie under another line.
     const line = world.line;
     const sameLine = (t: Transect, sl: { holes: Cell[]; s0: number; margin: number }): boolean =>
