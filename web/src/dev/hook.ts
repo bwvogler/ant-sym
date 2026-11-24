@@ -62,6 +62,8 @@ export function devHook(d: DevDeps) {
     },
     /** The fog's state of the cell at (x, y) of a view (0 unknown, 1 remembered, 2 live), or null while the page runs without the fog. */
     fogState: (v: View, x: number, y: number): number | null => d.sensed.knowledge?.stateAt(layerOf(v), x, y) ?? null,
+    /** The fog's state of cell (gx, gy) of a view, or null with no fog (or while the builder has it off). */
+    fogCell: (v: View, gx: number, gy: number): number | null => d.sensed.knowledge?.state(layerOf(v), gx, gy) ?? null,
     nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(d.settings), maxSeconds, minTicks),
     step: (n = 1) => {
       for (let t = 0; t < n; t++) {

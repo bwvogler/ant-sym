@@ -207,3 +207,15 @@ test("fogState reads the fog's state of the cell under (x, y) on the view's laye
   assert.equal(hook.fogState("above", 2, 3), 2);
   assert.deepEqual(asked.at(-1), [PLANE, 2, 3]);
 });
+
+test("fogCell reads the fog's state of a cell by its coordinates, and is null with no fog or while the builder has it off (F6)", () => {
+  assert.equal(make().hook.fogCell("above", 2, 3), null);
+  const asked: [number, number, number][] = [];
+  const sensed = new SensedMap();
+  sensed.knowledge = { state: (l: number, x: number, y: number) => (asked.push([l, x, y]), 1) } as unknown as Knowledge;
+  const { hook } = make({ sensed });
+  assert.equal(hook.fogCell("below", 4, 5), 1);
+  assert.deepEqual(asked.at(-1), [CURTAIN, 4, 5]);
+  sensed.suspended = true;
+  assert.equal(hook.fogCell("above", 4, 5), null, "suspended: no fog");
+});

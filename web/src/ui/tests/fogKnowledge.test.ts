@@ -174,3 +174,38 @@ test("known colonies: by a host or by the hole; live while it holds a host, as o
   assert.deepEqual(known.get(1), { readout: null, asOf: 2, live: false });
   assert.equal(known.get(0), null, "colony 0's host has gone: forgotten");
 });
+
+test("suspended (the builder is on): knowledge, corpses and known read null, the memory goes on, and it all comes back as it was (F6)", () => {
+  const w = world();
+  const s = new SensedMap();
+  const kn = new Knowledge(s, [w.source]);
+  s.knowledge = kn;
+  s.known = new KnownColonies<number>(() => 1) as never;
+  assert.ok(s.knowledge && s.known, "on");
+  s.stamp([hostAt(40, 40)], 1);
+  s.suspended = true;
+  assert.equal(s.knowledge, null, "knowledge: none, so the field draws everything");
+  assert.equal(s.known, null, "known: none, so the readouts cover every colony");
+  assert.equal(s.corpses, null);
+  s.stamp([hostAt(90, 90)], 5); // sight goes on while building
+  s.suspended = false;
+  assert.equal(kn.state(PLANE, 90, 90), LIVE, "what was sensed while building was kept");
+  assert.equal(kn.state(PLANE, 40, 40), REMEMBERED, "and what was left behind is remembered, not forgotten");
+  assert.ok(s.known, "known is back");
+});
+
+test("suspended: the corpse and known memories are still updated while building, and read null (review of #417, S1)", () => {
+  const s = new SensedMap();
+  const kn = new Knowledge(s, []);
+  s.knowledge = kn;
+  const calls: string[] = [];
+  s.corpses = { update: () => calls.push("corpses"), clear: () => {} } as never;
+  s.known = { update: () => calls.push("known"), clear: () => {} } as never;
+  const game = { time: 1, colonies: [], layers: [0], fungus: { patchOn: () => [], hyphaeOn: () => undefined } } as unknown as Game;
+  s.suspended = true;
+  assert.equal(s.corpses, null);
+  s.stampGame(game);
+  assert.deepEqual(calls, ["corpses", "known"], "kept up while the fog is off");
+  s.suspended = false;
+  assert.ok(s.corpses, "and back after");
+});
