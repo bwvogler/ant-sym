@@ -25,6 +25,10 @@ import {
 } from "../field/renderer.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "../field/zoom.ts";
 import { foodDensity } from "../resourceSprites.ts";
+import { Knowledge } from "../fog/knowledge.ts";
+import { SNAP } from "../fog/sources.ts";
+import { SensedMap } from "../fungusSight.ts";
+import { centreX, centreY, INFECTED } from "../../colony/index.ts";
 import { RecordedPath, recordingContext } from "./recordingContext.ts";
 
 // The renderer on a recording fake context (ja-fnd.6.3.8): what a frame derives once (beginFrame), the stage list and its early exit, and the stages the
@@ -509,3 +513,55 @@ test("the minimap stage draws the minimap, then reports how long the frame took 
 });
 
 void ({} as FrameState);
+
+test("under the fog the food sprites show the snapshot: none where nothing was sensed, what was last seen where it was, not what is there now", () => {
+  const cell = FOOD_CELL.split(",").map(Number) as [number, number];
+  const truth = new Float32Array(64 * 64);
+  const at = (cx: number, cy: number) => (cx === 0 && cy === 0 ? truth : undefined);
+  const s = setup({ zoom: 30, food: { [FOOD_CELL]: 0.5 }, lv: CURTAIN });
+  const sensed = new SensedMap();
+  s.fc.fog = new Knowledge(sensed, [{ name: SNAP.food, layer: CURTAIN, at }]);
+  truth[cell[1] * 64 + cell[0]] = 0.5;
+  foodStage(s.fs);
+  assert.equal(s.rec.log.filter((l) => l.startsWith("drawImage(resource")).length, 0, "unexplored: nothing");
+  const host = {
+    n: 1,
+    params: { sensorDistance: 3 },
+    alive: Uint8Array.of(1),
+    load: Float32Array.of(INFECTED),
+    layer: Uint8Array.of(CURTAIN),
+    x: Float32Array.of(centreX(cell[0], cell[1])),
+    y: Float32Array.of(centreY(cell[1])),
+  };
+  sensed.stamp([host as never], 1);
+  truth[cell[1] * 64 + cell[0]] = 0.9; // eaten or grown a moment later, while still sensed: the snapshot follows
+  sensed.stamp([host as never], 2);
+  const seen = setup({ zoom: 30, food: { [FOOD_CELL]: 0.9 }, lv: CURTAIN });
+  seen.fc.fog = s.fc.fog;
+  foodStage(seen.fs);
+  assert.equal(seen.rec.log.filter((l) => l.startsWith("drawImage(resource")).length, foodDensity(0.9).marks, "live: the value there");
+  truth[cell[1] * 64 + cell[0]] = 0.2; // changed after the host left
+  sensed.stamp([{ ...host, n: 0 } as never], 60);
+  const away = setup({ zoom: 30, food: { [FOOD_CELL]: 0.2 }, lv: CURTAIN });
+  away.fc.fog = s.fc.fog;
+  foodStage(away.fs);
+  assert.equal(
+    away.rec.log.filter((l) => l.startsWith("drawImage(resource")).length,
+    foodDensity(0.9).marks,
+    "remembered: the last seen, not the 0.2",
+  );
+});
+
+test("the voxel pass is not allowed under the fog, and is without it", () => {
+  const args: unknown[][] = [];
+  const draw = (...a: unknown[]) => (args.push(a), { alpha: 0, renderer: "sprites" });
+  const off = setup();
+  (off.parts.voxelMap as { draw: unknown }).draw = draw;
+  voxelStage(off.fs);
+  const on = setup();
+  (on.parts.voxelMap as { draw: unknown }).draw = draw;
+  on.fc.fog = new Knowledge(new SensedMap(), []);
+  voxelStage(on.fs);
+  assert.equal(args[0]![10], true, "without the fog the 3-D pass may draw");
+  assert.equal(args[1]![10], false, "with it, 2-D only");
+});

@@ -189,6 +189,7 @@ export class FieldBinding {
     fc.spores = this.spores;
     fc.sensedLayer = this.sensedLayer;
     fc.sensedNow = this.#sensed.now;
+    fc.fog = this.#sensed.knowledge;
   }
 
   /** Start loading the sprite images; each calls `redraw` when its images arrive. */

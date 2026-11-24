@@ -12,6 +12,7 @@ import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite } from "../resourceSprites.ts";
 import { workerLod } from "../workerSprites.ts";
 import { odourColour, odourRgb } from "./colour.ts";
+import { UNKNOWN } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
 
 /** What the shell works out once a frame that the nests (and the ants after them) read. */
@@ -43,8 +44,10 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
   const home = lv === col.home;
   const [nx, ny] = toScreen(c, v, nest.x, nest.y);
+  // Under the fog the nest's structure (its disc, mound and entrance) shows once its place has been sensed; what lives in it, only where live.
+  const structure = !k.fog || k.fog.stateAt(lv, nest.x, nest.y) !== UNKNOWN;
   // The side view's top-down mound ring; one world's mound is its plane's spoil, painted as ground.
-  if (col.soilOut > 0 && !nest.entrance && !m.spoil) {
+  if (structure && col.soilOut > 0 && !nest.entrance && !m.spoil) {
     // The mound is on the surface, above this slice: every pellet brought out, heaped round the
     // entrance (its area holds them all, loosened by SWELL). A faint fill and an outline, so the
     // tunnels under it still show.
@@ -65,12 +68,12 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
     ctx.globalAlpha = 1;
   }
   ctx.beginPath();
-  ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
+  if (structure) ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
   ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.7;
   ctx.stroke();
-  if (nest.entrance) {
+  if (structure && nest.entrance) {
     // The side view: the entrance, a small ring on the ground line where the shaft comes up.
     const [ex, ey] = toScreen(c, v, nest.entrance.x, nest.entrance.y);
     ctx.beginPath();

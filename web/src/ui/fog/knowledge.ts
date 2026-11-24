@@ -1,4 +1,4 @@
-import { CHUNK, CHUNK_BITS, chunkKey } from "../../colony/index.ts";
+import { CELL, CHUNK, CHUNK_BITS, cellOf, chunkKey } from "../../colony/index.ts";
 import { SENSED_FADE, type SensedMap } from "../fungusSight.ts";
 
 // What the fungus knows of the ground (docs/fog-of-war.md §4.2-4.3, PRD §89, ja-1ypq.2). Three states per cell: unknown (never
@@ -24,7 +24,7 @@ export const LIVE = 2;
 export type FogState = typeof UNKNOWN | typeof REMEMBERED | typeof LIVE;
 
 /** A cell array a chunk of layer `layer` holds: its flat chunk array of 64 × 64 cells, or undefined where the truth has none. */
-type Cells = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
+export type Cells = Uint8Array | Int8Array | Uint16Array | Int16Array | Uint32Array | Int32Array | Float32Array | Float64Array;
 export interface Source {
   /** what the renderer asks for the snapshot by */
   name: string;
@@ -106,6 +106,18 @@ export class Knowledge {
     const c = this.#layers.get(l)?.get(chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS));
     if (!c) return -1;
     return c.seen[(((gy & (CHUNK - 1)) >> 3) << (CHUNK_BITS - 3)) | ((gx & (CHUNK - 1)) >> 3)]!;
+  }
+
+  /** A chunk's explored bits and snapshots for painting it whole; undefined while none of it has been sensed. */
+  view(l: number, cx: number, cy: number): { bits: Uint32Array; snap(name: string): Cells | undefined } | undefined {
+    const c = this.#layers.get(l)?.get(chunkKey(cx, cy));
+    return c && { bits: c.bits, snap: (name) => c.snaps.get(name) };
+  }
+
+  /** The state at world point (x, y) of layer `l`: what the actors drawn there (ants, brood, a queen) ask. */
+  stateAt(l: number, x: number, y: number): FogState {
+    cellOf(x, y);
+    return this.state(l, CELL[0], CELL[1]);
   }
 
   /** Chunks with any explored cell on layer `l`. */
