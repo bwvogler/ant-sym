@@ -4,7 +4,8 @@
 // didn't get there in the game's time, and counts as slower than any time. Offline, no key, no spend.
 //
 // Where every seed's line also says `patches P (flowers F, [spread S,] mat cells M)` (a game with hyphae), the table adds those three (four with spread)
-// columns and a line counting the flowers.
+// columns and a line counting the flowers. Where every seed also says `hyphae C cells, spores on S cells` (ja-kura: how much mycelium and how many
+// cells with spores the game ended with), it adds those two columns and a line with their medians and ranges.
 //
 // Usage: node scripts/progression-table.mjs <dir with seed-N.txt files>
 // Prints a Markdown table, then the worst seed and the median for the quarter and the queen. Exit 0; 1 when a file has no
@@ -46,6 +47,7 @@ for (const { seed, file } of files) {
     continue;
   }
   const extra = /patches (\d+) \(flowers (\d+)(?:, spread (\d+))?, mat cells (\d+)\)/.exec(text);
+  const size = /hyphae (\d+) cells, spores on (\d+) cells/.exec(text);
   rows.push({
     seed,
     first: secs(m[2]),
@@ -60,29 +62,31 @@ for (const { seed, file } of files) {
           mat: Number(extra[4]),
         }
       : {}),
+    ...(size ? { cells: Number(size[1]), sporeCells: Number(size[2]) } : {}),
   });
 }
 const withExtra = rows.length > 0 && rows.every((r) => r.patches !== undefined);
 // `spread` (a flower that touched a patch and extended it, #363) is its own column only where every seed says it.
 const withSpread = withExtra && rows.every((r) => r.spread !== undefined);
+// How much mycelium and how many spore cells the game ended with are columns only where every seed says them.
+const withSize = rows.length > 0 && rows.every((r) => r.cells !== undefined);
 
 if (commits.size) console.log(`Commit${commits.size > 1 ? "s" : ""} measured: ${[...commits].join(", ")}\n`);
-console.log(
-  withSpread
-    ? "| seed | first host | quarter | half | queen | patches | flowers | spread | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|"
-    : withExtra
-      ? "| seed | first host | quarter | half | queen | patches | flowers | mat cells |\n|---:|---:|---:|---:|---:|---:|---:|---:|"
-      : "| seed | first host | quarter | half | queen |\n|---:|---:|---:|---:|---:|",
-);
-for (const r of rows)
-  console.log(
-    `| ${r.seed} | ${show(r.first)} | ${show(r.quarter)} | ${show(r.half)} | ${show(r.queen)} |` +
-      (withSpread
-        ? ` ${r.patches} | ${r.flowers} | ${r.spread} | ${r.mat} |`
-        : withExtra
-          ? ` ${r.patches} | ${r.flowers} | ${r.mat} |`
-          : ""),
-  );
+// One list of columns, so a column that only some outputs have is one line, not another branch of a ternary.
+/** @type {[string, (r: any) => string | number][]} */
+const cols = [
+  ["seed", (r) => r.seed],
+  ["first host", (r) => show(r.first)],
+  ["quarter", (r) => show(r.quarter)],
+  ["half", (r) => show(r.half)],
+  ["queen", (r) => show(r.queen)],
+];
+if (withExtra) cols.push(["patches", (r) => r.patches], ["flowers", (r) => r.flowers]);
+if (withSpread) cols.push(["spread", (r) => r.spread]);
+if (withExtra) cols.push(["mat cells", (r) => r.mat]);
+if (withSize) cols.push(["hyphae cells", (r) => r.cells], ["spore cells", (r) => r.sporeCells]);
+console.log(`| ${cols.map(([name]) => name).join(" | ")} |\n|${cols.map(() => "---:").join("|")}|`);
+for (const r of rows) console.log(`| ${cols.map(([, get]) => get(r)).join(" | ")} |`);
 
 /** The worst (largest, "never" worst) and the median of a column, with the seeds that reached it. */
 function summary(key) {
@@ -97,5 +101,12 @@ function summary(key) {
 const flowerLine = withExtra
   ? `\n- flowers: ${rows.reduce((s, r) => s + r.flowers, 0)} in all, in ${rows.filter((r) => r.flowers > 0).length} of ${rows.length} games; patches: median ${[...rows.map((r) => r.patches)].sort((a, b) => a - b)[Math.floor(rows.length / 2)]}`
   : "";
-console.log(`\n- ${summary("quarter")}\n- ${summary("queen")}${flowerLine}`);
+/** The median and the range of a count that is never "never", over the seeds. */
+const spanOf = (key) => {
+  const v = rows.map((r) => r[key]).sort((a, b) => a - b);
+  const median = v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+  return `median ${median}, ${v[0]} to ${v[v.length - 1]}`;
+};
+const sizeLine = withSize ? `\n- hyphae cells: ${spanOf("cells")}; cells with spores: ${spanOf("sporeCells")}` : "";
+console.log(`\n- ${summary("quarter")}\n- ${summary("queen")}${flowerLine}${sizeLine}`);
 process.exit(failed ? 1 : 0);
