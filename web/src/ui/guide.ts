@@ -770,13 +770,13 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "endless-world",
     title: "Endless world",
     covers:
-      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. Planned (not built, PRD §66).",
+      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. In progress (PRD §66): many lines and waking wild colonies are in the simulation; the page still plays a bounded world.",
   },
   {
     note: "fog-of-war",
     title: "Fog of war",
     covers:
-      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Planned (not built, PRD §89).",
+      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, behind ?fog=1; off by default.",
   },
   {
     note: "new-queens",

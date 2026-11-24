@@ -5784,6 +5784,8 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 
 **What is left to deploy the endless world (2026-11-24 wrap-up).** Built and merged: storage (E1), local generation (E2), many lines (E3), freezing, the awake rule, wild colonies waking from sites, regrowth that follows the awake, and the tick at the awake cap (E4.1–E4.5a), and the page reading every line (E5.1). **Not yet built, and the critical path:** nothing plays on an `EndlessPlane` yet (`EndlessPlane` is used only by its own module and tests; every game is a bounded `OneWorld`, `newLines` off, no sites). The capstone is **E6.0** (`ja-qpv.6`): `ja-qpv.7` an unbounded plane map generating chunks on a miss, `ja-qpv.8` the edges the colony assumes (homing, belief, search, grid clamps, the camera), `ja-qpv.9` `generateEndlessWorld` with the sites feed and saves; then E5.2–E5.5 (the camera without a clamp, the minimap window, canvas eviction, sleeping colonies drawn) and E6 (`ja-qpv.5`: the flight and founding radius, wild density, assays). Owner answers still open before new lines go on (beads): `ja-dv98` (the E4 numbers; the cap recommendation is on it), `ja-ocf4` (cross-line contact), `ja-xv54`, `ja-xfny`, `ja-s37s`, `ja-y4eg`, `ja-u5s8`. The pixel guard is broken on main (`ja-5n8b`) and the memory soak waits for `ja-qpv.7`–`.9` (`ja-hacj`).
 
+**Bead audit (2026-11-24).** `ja-qpv.7` closed (built in #395 above); `.7`–`.9` now sit under the E6.0 epic `ja-qpv.6`. New beads: no chunk generation inside the tick (E6.0.4, `ja-qpv.9.1`: a chunk with patches costs about 70 ms), the two `endlessMap` defects (`ja-qpv.8.1`: `ledger.left` stale after the first take; `dropClean` on an unread chunk generates it and counts its food), line picking (E5.6, `ja-qpv.4.6`), and the owner question of whether the bounded game stays (`ja-jqws`; item 7 of "Still open" in [endless-world §10](endless-world.md)). The memory soak is `ja-qpv.3.5` (E4.5b), now waiting on `ja-qpv.9` and `ja-hacj`. Loose follow-ups now parented: `ja-ko75`, `ja-beem` (E4), `ja-baxa` (E6.0.3), `ja-juwb`, `ja-bof4` (E5); `ja-23io` folded into E5.4. Still owner calls: `ja-7ng6` (the chunk-key range: recommend a documented limit) and `ja-s994`, and `ja-8e7t` (who calls `dropClean`). The camera bound is built once in E5.2 for both this and the fog's F7.
+
 **E5.1 built, the page reads every line (`ja-qpv.4.1`, 2026-11-24).** The page no longer assumes one curtain: a layer id of 1 or more is some line's curtain (layer = 1 + the line's index), and a game of one line draws and reads exactly as before (the scene goldens, the unit tier and the golden masters pass unchanged: goldens 4/4, unit 1132: the 7 new tests, then 14 more after the review of #393).
 - **One place for the words.** `colony/oneWorld.ts` exports `isCurtainLayer`, `lineIndexOfLayer`, `lineOfLayer`, `curtainOfLayer`, `mapOfLayer` and `curtainLayerOf`; the page reads them instead of `world.line`, `world.curtain` and `=== CURTAIN` (the lens, the cell and patch inspection, the voxel map, the binding, the renderer, the camera rig's map, the Go to menu, stats, the codex, the specimens, the rehearsal). A layer the world lacks reads as line 0.
 - **The below view is a line.** `ColonyControls.line` (an index) says which curtain the below view shows. A linked click, a followed ant crossing a hole, "follow", and Go to a colony's nest (when below, the colony's own line) set it; the rig already kept a camera per layer id, so each line has its own camera. A click on the plane picks the nearest line within reach (`lineNear`), not line 0.
@@ -7930,8 +7932,11 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F3.3 built (`ja-1ypq.3.3`, 2026-11-24, same flag):** aphids, chamber labels, hole names, the line and its holes, the bends, the fungus's colonised corpses and stalks, the remembered chamber tint, and the dead kept as ground items (`fog/corpses.ts`) go through the fog; `fogMarks.test.ts` and `fogGround.test.ts` hold each (a mutation of every switch fails a test). The line and holes are fogged on the recommendation; the owner may still say they are always known. The hexagon terrain grain's snapshot read is untested.
 
+**F1's stamp, measured** (bead note, 2026-11-24): stamping the body costs 0.01–0.02 ms a step at 92 hypha cells, well inside the 0.5 ms budget; a big mycelium is re-measured with the queens-and-alates observers (`ja-1ypq.9`).
+
+**What is left** (bead audit, 2026-11-24): the voxel pass through the fog (F3.4, `ja-1ypq.3.4`; today it falls back to 2D), the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
+
 **Still open.**
-- How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.
 
@@ -7978,7 +7983,7 @@ A table of cue, response, rule and off is in the note. No rule reads state the f
 - **With L5,** the colonies carry the lichen themselves.
 - **Risks:** a host-free runaway, a cliff when lichen appears, and new routes between nests (L3b).
 
-**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): `progression.mjs` reports time to first lichen, lichen cells, growth from light and weathered cells. Then for each milestone:
+**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): a read-only contact probe in `progression.mjs`, run with `--evolve --hyphae`: the plane's rock cells beside open ground, how many of them hyphae lie beside and when first, and mutations a minute over the last three minutes. It proposes L1's alga density. Time to first lichen, lichen cells, growth from light and weathered cells are added by L1–L3 with their code, since nothing exists to count before. Best built together with `ja-kura` (hyphae cell and spore columns), which is related, not a blocker. Then for each milestone:
 - **P1** by the worst seed on 1–20 (§63.4).
 - **Runaway check:** mutations per minute in minutes 8–10 against L1, for L2.
 - **Routes:** A3 (mills) and raid times against baseline, for L3b.
@@ -7986,7 +7991,7 @@ A table of cue, response, rule and off is in the note. No rule reads state the f
 
 **Cost (estimated).** None in Jev: no lane changes, and cached games spend nothing. The parked growth-lane value `resource: alga` (`ja-5ush`) would take the lane's 96 situations to 144 (tokens to measure) and is not planned.
 
-**Beads.** `ja-vlla.11` (this, child of `ja-vlla`; from `ja-vlla.8`, closed). Children:
+**Beads.** `ja-vlla.11` (this, a top-level epic since 2026-11-24; it grew from `ja-vlla.8` under `ja-vlla`, which closed with M1–M4). Children:
 - `.1` research full texts;
 - `.2` assay;
 - `.3` L1 partner and crust;
@@ -7995,10 +8000,13 @@ A table of cue, response, rule and off is in the note. No rule reads state the f
 - `.6` L3b rock to ants;
 - `.7` L4 bitter crust;
 - `.8` L5 ant carriers;
-- `.9` Learn entries and drawings.
+- `.9` Learn entries and drawings;
+- `.10` lichen in the endless world's chunk generator, kept through saves and freeze/thaw;
+- `.11` lichen under the fog (shown as remembered ground);
+- `.12` owner: does the trait need the borer or the web first (blocks L1).
 
 Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the lichen as a refuge `ja-g8zo`, growth forms `ja-419b`, tips steered to an alga `ja-5ush`.
 
 **Still open.**
-- **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; whether the trait needs the borer or the web first.
+- **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; whether the trait needs the borer or the web first (`.12`).
 - **To read:** the sources marked unverified (`.1`).
