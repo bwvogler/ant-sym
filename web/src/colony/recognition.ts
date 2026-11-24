@@ -72,6 +72,12 @@ export class SumGrid {
     t.length = 0;
   }
 
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.layer.dropEmpty();
+    this.#blocks.dropEmpty();
+  }
+
   add(x: number, y: number, v: number): void {
     const was = this.layer.get(x, y);
     if (was === 0) this.#touched.push(x, y);
@@ -169,6 +175,12 @@ export class Recognition {
   #clock = 0;
   /** whether the last odour step found anything to move: false means the gestalt is at rest */
   #moving = true;
+
+  /** Free the chunks of every band's grids that hold nothing (see SumGrid.trim). */
+  trim(): void {
+    for (const g of this.bins) g.trim();
+    for (const g of this.#everyone) g.trim();
+  }
 
   constructor(params: Partial<RecognitionParams> = {}) {
     this.params = { ...DEFAULT_RECOGNITION, ...params };
