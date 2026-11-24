@@ -269,6 +269,13 @@ test("Colony.extinct: no ant, no brood, no alate and no living queen; any one of
   c.brood.items.length = 0;
   c.alates.push({ x: 0, y: 0, t: 0, step: 1, load: 0, strain: 0, resist: 0, food: 1 });
   assert.equal(c.extinct, false, "one alate");
+  // A colony with no queen at all (the bare field): extinct only once its larder is empty too, for the larder still becomes ants.
+  c.alates.length = 0;
+  c.queen = null;
+  c.larder = 5;
+  assert.equal(c.extinct, false, "a queen-less colony with food in its larder");
+  c.larder = 0;
+  assert.equal(c.extinct, true, "a queen-less colony with an empty larder");
 });
 
 test("a colony that has died out is frozen at once and frees its place under the cap; the living colony is not frozen for it", () => {
