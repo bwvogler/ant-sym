@@ -26,6 +26,7 @@ const host = (x: number, y: number): Colony =>
   ({
     n: 1,
     params: { sensorDistance: 3 },
+    alates: [],
     alive: Uint8Array.of(1),
     load: Float32Array.of(INFECTED),
     layer: Uint8Array.of(PLANE),

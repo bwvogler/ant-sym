@@ -48,6 +48,11 @@ const REGION_MASK = REGION - 1;
  * fills a chunk the first time anything reads or writes it.
  */
 export class ChunkLayer<A extends Cells> {
+  /**
+   * Chunks held by every layer in this process right now (allocated less dropped): the memory-budget soak reads it to see growth in layers it cannot
+   * name (the games' scratch grids). A layer let go without `dropAll` leaves its chunks counted, so a reader takes differences within one game.
+   */
+  static live = 0;
   /** what a cell in a chunk never written reads as */
   readonly empty: number;
   readonly #make: (n: number) => A;
@@ -140,6 +145,7 @@ export class ChunkLayer<A extends Cells> {
     r[i] = a;
     if (old === undefined) {
       this.#count++;
+      ChunkLayer.live++;
       this.#live[ti] = this.#live[ti]! + 1;
     }
     return old;
@@ -160,6 +166,7 @@ export class ChunkLayer<A extends Cells> {
     const old = r[i];
     if (old !== undefined) {
       this.#count--;
+      ChunkLayer.live--;
       r[i] = undefined;
       const live = this.#live[ti]! - 1;
       this.#live[ti] = live;
@@ -214,7 +221,24 @@ export class ChunkLayer<A extends Cells> {
     this.#table.fill(undefined);
     this.#live.fill(0);
     this.#regions = 0;
+    ChunkLayer.live -= this.#count;
     this.#count = 0;
+  }
+
+  /**
+   * Free every chunk whose cells all read `empty`, returning how many: a chunk of nothing reads the same as no chunk, so only the memory changes. For a
+   * layer without a generator (the games' scratch grids and fading fields, which zero cells and leave the chunk), so memory follows what is held now and
+   * not where the layer has ever been (endless-world §7). A generated layer is not for this: its absent chunk reads as the generated one, not `empty`.
+   */
+  dropEmpty(): number {
+    const empty = this.empty;
+    const none: [number, number][] = [];
+    this.forEach((cx, cy, a) => {
+      for (let i = 0; i < a.length; i++) if (a[i] !== empty) return;
+      none.push([cx, cy]);
+    });
+    for (const [cx, cy] of none) this.drop(cx, cy);
+    return none.length;
   }
 
   /** Every cell back to what it was made as (`empty`, or generated afresh), keeping the chunks allocated. */

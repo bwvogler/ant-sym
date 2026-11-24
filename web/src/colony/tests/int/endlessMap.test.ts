@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CHUNK, CHUNK_BITS, local } from "../../chunks.ts";
+import { CHUNK, CHUNK_BITS, ChunkLayer, local } from "../../chunks.ts";
 import { dropClean, ENDLESS_HALF, generateEndlessPlane, isEndless } from "../../endlessMap.ts";
 import { EndlessPlane } from "../../endlessPlane.ts";
 import { cellOf, CELL, centreX, centreY } from "../../hex.ts";
@@ -373,4 +373,36 @@ test("the ledger keeps no running left that can go stale: the map's foodLeft is 
   assert.equal(map.ledger.generatedTotal, total, "generated food is the ledger's one figure, and a take never moves it");
   assert.equal("left" in map.ledger, false);
   assert.equal("total" in map.ledger, false);
+});
+
+test("a chunk made again after dropClean tells the regenHooks, not the foodHooks, and adds no food (E4.4b)", () => {
+  const map = generateEndlessPlane(2);
+  const first: number[] = [];
+  const again: number[] = [];
+  map.foodHooks.push((cx) => first.push(cx));
+  map.regenHooks.push((cx) => again.push(cx));
+  foodIn(map, 5, 5);
+  const total = map.foodTotal;
+  assert.deepEqual([first.length, again.length], [1, 0]);
+  assert.equal(dropClean(map, 0, 0), true);
+  foodIn(map, 5, 5);
+  assert.deepEqual([first.length, again.length], [1, 1]);
+  assert.equal(map.foodTotal, total);
+});
+
+test("dropEmpty frees the chunks that hold nothing and keeps the rest; `live` follows every layer's chunks", () => {
+  const layer = new ChunkLayer((n) => new Float32Array(n), 0);
+  const live = ChunkLayer.live;
+  layer.set(5, 5, 1);
+  layer.set(70, 5, 2);
+  layer.set(200, 5, 3);
+  layer.set(70, 5, 0);
+  layer.set(200, 5, 0);
+  assert.equal(ChunkLayer.live - live, 3);
+  assert.equal(layer.dropEmpty(), 2);
+  assert.equal(layer.count, 1);
+  assert.equal(ChunkLayer.live - live, 1);
+  assert.equal(layer.get(5, 5), 1);
+  layer.dropAll();
+  assert.equal(ChunkLayer.live, live);
 });

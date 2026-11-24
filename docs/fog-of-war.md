@@ -69,7 +69,7 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, and see (owner, 2026-11-24; `ja-1ypq.9`, not yet built: `hostSight` still loops over workers only).
+- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, and see (owner, 2026-11-24; `ja-1ypq.9`, built: `hostSight` adds an infected queen and the infected alates still in the nest, on the colony's nest layer, at a worker's reach).
 - **The body:** every hypha cell (`hyphaeOn(l).parent`, mats included), patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
