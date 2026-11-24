@@ -11,6 +11,8 @@
 // lives. Today that is the nominal box (the limit of correctness of the chunk and cell keys); the fog (ja-1ypq.7) will set `Extent.reach` to the
 // explored ground plus a margin and change nothing else here.
 
+import { CHUNK, R } from "../colony/index.ts";
+
 /** The map's extent in world units: x from x0 (default 0) to x0 + w, y from 0 to h. */
 export interface Extent {
   x0?: number;
@@ -142,10 +144,39 @@ export function zoomBy(c: Camera, world: Extent, view: Viewport, sx: number, sy:
   return clamp(zoomAt(c, view, sx, sy, zoom / c.zoom), world, view);
 }
 
-/** The world point under minimap pixel (mx, my) (device px, as pointer events give them): where a click there jumps. */
-export function fromMinimap(world: Extent, view: Viewport, dpr: number, mx: number, my: number): [number, number] {
-  const r = minimapRect(world, view, dpr);
-  return [(world.x0 ?? 0) + ((mx - r.x) / r.w) * world.w, ((my - r.y) / r.h) * world.h];
+/** The endless plane's minimap window, in chunks (E5.3, docs/endless-world.md §8): a fixed number, whatever the size of the plane. */
+export const MINI_CHUNKS_W = 16;
+export const MINI_CHUNKS_H = 12;
+
+/**
+ * The rectangle of the plane the minimap shows, in world units. A bounded map: the whole map. An endless plane: a window of MINI_CHUNKS_W x MINI_CHUNKS_H
+ * chunks whose chunk-aligned corner is set by the camera, the camera's own chunk lying a little right of and below the middle: so the window follows the
+ * camera a chunk at a time, and a jump on it (a click or drag) puts the clicked place in the middle. A pure function of the camera, so the picture,
+ * the camera's rectangle on it and a click all agree (`c` is required on an endless plane).
+ */
+export function miniFrame(world: Extent, c?: { x: number; y: number }): Reach {
+  if (!world.endless) return { x0: world.x0 ?? 0, y0: 0, w: world.w, h: world.h };
+  if (!c) throw new Error("miniFrame: an endless plane's window follows the camera");
+  const cx = Math.floor(c.x / CHUNK) - MINI_CHUNKS_W / 2;
+  const cy = Math.floor(c.y / R / CHUNK) - MINI_CHUNKS_H / 2;
+  return { x0: cx * CHUNK, y0: cy * CHUNK * R, w: MINI_CHUNKS_W * CHUNK, h: MINI_CHUNKS_H * CHUNK * R };
+}
+
+/**
+ * The world point under minimap pixel (mx, my) (device px, as pointer events give them): where a click there jumps. On an endless plane the minimap
+ * is the window round the camera `c` (miniFrame).
+ */
+export function fromMinimap(
+  world: Extent,
+  view: Viewport,
+  dpr: number,
+  mx: number,
+  my: number,
+  c?: { x: number; y: number },
+): [number, number] {
+  const f = miniFrame(world, c);
+  const r = minimapRect(f, view, dpr);
+  return [f.x0 + ((mx - r.x) / r.w) * f.w, f.y0 + ((my - r.y) / r.h) * f.h];
 }
 
 /** Move the view by a drag of (dx, dy) device pixels: the ground follows the pointer. */
@@ -161,7 +192,7 @@ export function visible(c: Camera, view: Viewport): { x0: number; y0: number; x1
 }
 
 /** The minimap's place in the corner: its rectangle in device px, sized to the map's shape. */
-export function minimapRect(world: Extent, view: Viewport, dpr: number): { x: number; y: number; w: number; h: number } {
+export function minimapRect(world: { w: number; h: number }, view: Viewport, dpr: number): { x: number; y: number; w: number; h: number } {
   const margin = 8 * dpr;
   const w = Math.min(view.w * 0.28, 180 * dpr);
   const h = (w * world.h) / world.w;
