@@ -206,6 +206,12 @@ test("endless: the bound is reachOf, one seam: a smaller reach (the fog's explor
   const wide = clamp({ x: 99999, y: 100, zoom: ENDLESS_MIN_ZOOM }, fogged, view);
   assert.equal(wide.x, 200, "a reach narrower than the view is centred on that axis, as a small map is");
   assert.equal(wide.zoom, ENDLESS_MIN_ZOOM, "and the least zoom does not follow it");
+  // the start view is the home view held to the reach: this is the fog's path (a small explored patch holds the start view and key 0)
+  const unbounded = { ...endless, reach: undefined };
+  assert.deepEqual(fit(fogged, view), clamp(fit(unbounded, view), fogged, view), "fit holds the start view to the reach");
+  const patch = { ...endless, reach: { x0: 0, y0: 0, w: 150, h: 100 } };
+  assert.deepEqual(fit(patch, view), clamp(fit(unbounded, view), patch, view), "a small explored patch too");
+  assert.notDeepEqual(fit(patch, view), fit(unbounded, view), "and it moves the start view off the home centre");
   assert.deepEqual(reachOf(world), { x0: 0, y0: 0, w: 512, h: 320 }, "a bounded map's reach is the map");
   assert.deepEqual(reachOf({ x0: -64, w: 300, h: 320 }), { x0: -64, y0: 0, w: 300, h: 320 });
 });

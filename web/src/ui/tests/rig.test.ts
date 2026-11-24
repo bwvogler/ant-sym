@@ -287,9 +287,15 @@ test("an endless plane's extent carries its flag and a home on the start nests; 
   assert.equal(r.camera().x, c.x + 50000, "no clamp to a map");
   assert.equal(r.vc().fitted, false);
   assert.equal(r.vc().zoomedIn, true, "zoomed in is a level: the start view is past it");
+  r.zoomAround(v, 400, 300, 1e6);
+  assert.equal(r.vc().zoomedIn, true);
+  assert.equal(
+    r.inMini(790, 590),
+    false,
+    "no minimap on an endless plane until E5.3, even zoomed in (a point inside the nominal box's corner rectangle)",
+  );
   r.zoomAround(v, 400, 300, 1e-6);
   assert.equal(r.camera().zoom, 0.5, "the least zoom is fixed");
-  assert.equal(r.inMini(790, 590), false, "no minimap on an endless plane until E5.3");
   r.showAll();
   assert.deepEqual(r.camera(), c, "key 0 returns to the start nests");
   assert.equal(r.vc().fitted, true);
