@@ -2462,6 +2462,8 @@ try {
   check((await lnp.evaluate(() => window.jevAnts.view())) === "above", "above before the click");
   await lnp.mouse.click(spot2.sx, spot2.sy);
   await until(async () => (await lnp.evaluate(() => window.jevAnts.view())) === "below", "below after a click on line 2");
+  // the page's own record of which line the side view shows (the click's controls, ColonyApp showAt): line 2 is index 1
+  check((await lnp.evaluate(() => window.jevAnts.line())) === 1, "the side view shows line 2 (controls.line is 1)");
   const c2 = await until(() => lnp.evaluate(() => window.jevAnts.camera("below", 1)), "line 2's curtain has a camera", 5000, 60);
   const cur2 = await lnp.evaluate(() => {
     const m = window.jevAnts.game.world.lines[1].curtain;

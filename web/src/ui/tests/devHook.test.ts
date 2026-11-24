@@ -39,6 +39,7 @@ function make(over: Partial<DevDeps> = {}) {
     notify: (text, tone) => calls.notices.push([text, tone]),
     traces: { traces: [{ colony: 1, i: 4, xs: [0, 1, 2], end: "home" }] } as unknown as AntTraces,
     view: "above",
+    line: 1,
     followed,
     setFollowed: (f) => calls.followed.push(f),
     sensed: new SensedMap(),
@@ -99,6 +100,11 @@ test("view and followed read what the page gave; notify passes the text and tone
     ["hello", "good"],
     ["again", undefined],
   ]);
+});
+
+test("line reads the line whose curtain the side view shows (E5.6: the page's own record of a pick)", () => {
+  const { hook } = make();
+  assert.equal(hook.line(), 1);
 });
 
 test("camera asks the field for the plane above and the curtain below, and null before the field is there; goNest passes the colony on", () => {

@@ -26,6 +26,8 @@ export interface DevDeps {
   traces: AntTraces;
   /** the view shown when the hook was installed (ColonyApp installs it again when the view changes) */
   view: View;
+  /** the line whose curtain the side view shows, when the hook was installed (ColonyApp installs it again when it changes) */
+  line: number;
   /** the followed ant, read when the guard asks */
   followed: { readonly current: Followed | null };
   setFollowed(f: Followed | null): void;
@@ -52,6 +54,7 @@ export function devHook(d: DevDeps) {
       return true;
     },
     view: () => d.view,
+    line: () => d.line,
     followed: () => d.followed.current,
     sensed: (v: View, x: number, y: number) => {
       cellOf(x, y);

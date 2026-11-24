@@ -325,6 +325,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       notify: (text, tone) => pushToast(text, tone),
       traces,
       view: controls.view,
+      line: controls.line,
       followed: followedNow,
       setFollowed,
       sensed,
@@ -332,7 +333,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       openPen: openDevPen,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, controls.view, setFollowed, sensed, traces]);
+  }, [game, controls.view, controls.line, setFollowed, sensed, traces]);
   // The page (PRD §69, ja-mvo9.1): the map fills the screen; a HUD over its top; a rail of drawers at its left (a tab bar
   // on a phone); the followed ant in an inspector at its right (a sheet on a phone).
   const labProps: LabProps = {
