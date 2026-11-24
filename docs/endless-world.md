@@ -252,4 +252,4 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
 5. **The flight distance.** Recommend 2 U to start, set at E6.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.
-7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55).
+7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.
