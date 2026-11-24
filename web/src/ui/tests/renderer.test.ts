@@ -25,6 +25,7 @@ import {
 } from "../field/renderer.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "../field/zoom.ts";
 import { foodDensity } from "../resourceSprites.ts";
+import { fogRgb } from "../field/fogCull.ts";
 import { Knowledge } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import { SensedMap } from "../fungusSight.ts";
@@ -570,6 +571,19 @@ test("the voxel pass runs flat under the fog and is covered by it: unknown cells
   const veils = (r: { rec: { log: string[] } }) => r.rec.log.filter((l) => l === "fill()").length;
   assert.equal(veils(off), 0, "no cover without the fog");
   assert.ok(veils(on) > 0, "the cells nothing has sensed are covered");
+  const fills = (log: string[]) => {
+    let a = "",
+      st = "";
+    const out: string[] = [];
+    for (const l of log) {
+      if (l.startsWith("globalAlpha = ")) a = l.slice(14);
+      else if (l.startsWith("fillStyle = ")) st = l.slice(12);
+      else if (l === "fill()") out.push(`${a} ${st}`);
+    }
+    return out;
+  };
+  const F = fogRgb(on.fc.theme);
+  assert.deepEqual(fills(on.rec.log), [`1 rgb(${F.join(",")})`], "unknown: one fill, the fog's colour, opaque");
   // Every cell in view live: nothing to cover.
   const lit = setup({ zoom: 130, world: null });
   (lit.parts.voxelMap as { draw: unknown }).draw = draw;
@@ -594,7 +608,7 @@ test("the voxel pass runs flat under the fog and is covered by it: unknown cells
   (remembered.parts.voxelMap as { draw: unknown }).draw = draw;
   remembered.fc.fog = lit.fc.fog;
   voxelStage(remembered.fs);
-  assert.equal(veils(remembered), 1, "remembered: one veil");
+  assert.deepEqual(fills(remembered.rec.log), [`0.35 rgb(${F.join(",")})`], "remembered: one fill, the fog's colour, at 0.35");
 });
 
 test("the bends are drawn over every curtain's view (layer 1 or more), in the actors stage and over a voxel mesh, from that layer's own line", () => {
