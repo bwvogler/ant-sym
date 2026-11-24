@@ -171,9 +171,12 @@ export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boo
       continue;
     }
     const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
+    // Under the fog a remembered hole shows its colony's name only: how far the fungus is into it and its queen are live numbers (docs/fog-of-war.md §4.4).
+    const parts = badgeParts(nestBadge(col, n, fungus));
+    const shown = k.fog && k.fog.state(PLANE, h.x, h.y) !== LIVE ? parts.slice(0, 1) : parts;
     pill(
       k,
-      badgeParts(nestBadge(col, n, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+      shown.map((p) => ({ text: p.text, fill: tone[p.tone] })),
       x,
       above - px * 0.2,
       px,

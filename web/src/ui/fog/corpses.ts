@@ -13,8 +13,6 @@ export interface RememberedCorpse {
   heading: number | undefined;
   /** the decay stage when last seen (cadaverVisual decayStage) */
   stage: DecayStage;
-  /** the colony it belonged to, for the nest sprite's colour */
-  colony: number;
 }
 
 export class CorpseMemory {
@@ -28,13 +26,13 @@ export class CorpseMemory {
       if (!cells) this.#layers.set(l, (cells = new Map()));
       // What an observer senses now replaces what was remembered there.
       for (const [key, list] of cells) if (knowledge.state(l, list[0]!.x, list[0]!.y) === LIVE) cells.delete(key);
-      game.colonies.forEach((col: Colony, n) => {
+      game.colonies.forEach((col: Colony) => {
         for (const d of visibleCadavers(col, l)) {
           if (knowledge.state(l, d.x, d.y) !== LIVE) continue;
           const key = cellKey(d.x, d.y);
           let list = cells.get(key);
           if (!list) cells.set(key, (list = []));
-          list.push({ x: d.x, y: d.y, heading: d.heading, stage: decay(col.time, d.died), colony: n });
+          list.push({ x: d.x, y: d.y, heading: d.heading, stage: decay(col.time, d.died) });
         }
       });
     });

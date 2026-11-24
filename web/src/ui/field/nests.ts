@@ -214,10 +214,10 @@ export function drawRememberedCorpses(k: FieldCtx, f: NestFrame): void {
   ctx.globalAlpha = 0.6;
   ctx.beginPath();
   for (const corpse of corpses.on(lv)) {
-    if (fog.state(lv, corpse.x, corpse.y) === LIVE) continue; // sensed now: the nest stage draws it as it is
     const wx = centreX(corpse.x, corpse.y);
     const wy = centreY(corpse.y);
     if (!inView(wx, wy)) continue;
+    if (fog.state(lv, corpse.x, corpse.y) === LIVE) continue; // sensed now: the nest stage draws it as it is
     const [x, y] = toScreen(c, v, wx, wy);
     if (k.sprites.cadaver.draw(ctx, resourceLod, corpse.stage, x, y, c.zoom, corpse.heading)) continue;
     if (nestImage) {

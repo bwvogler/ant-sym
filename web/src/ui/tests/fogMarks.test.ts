@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { centreX, centreY, cellKey, CURTAIN, INFECTED, PLANE, type Colony, type Game } from "../../colony/index.ts";
 import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
-import { drawFungusGround } from "../field/fungus.ts";
+import { exploredCull } from "../field/fogCull.ts";
+import { drawFungusGround, drawStalksRaised } from "../field/fungus.ts";
 import { drawAphids } from "../field/marks.ts";
 import { drawRememberedCorpses } from "../field/nests.ts";
-import { drawBends, drawLine } from "../field/overlays.ts";
+import { drawBends, drawHoleNames, drawLine } from "../field/overlays.ts";
 import { CorpseMemory } from "../fog/corpses.ts";
 import { GRACE, Knowledge, REMEMBERED } from "../fog/knowledge.ts";
 import { sensedFor } from "../fog/sources.ts";
@@ -198,4 +199,98 @@ test("aphids draw only where an observer senses them now", () => {
   assert.ok(draws() > 0, "live");
   sensed.stamp([none()], 1 + GRACE + 1);
   assert.equal(draws(), 0, "remembered: a clump's size changes, so it is not drawn from memory");
+});
+
+test("the dead of another layer are not remembered on this one, and time going back forgets them", () => {
+  const sensed = new SensedMap();
+  sensed.knowledge = new Knowledge(sensed, []);
+  const memory = (sensed.corpses = new CorpseMemory());
+  const corpses = [{ x: 20, y: 20, held: -1, died: 0, heading: 1, layer: CURTAIN }];
+  const host = hostAt(centreX(20, 20), centreY(20));
+  const colony = { ...host, time: 5, home: PLANE, corpses, remains: [] } as unknown as Colony;
+  const game = {
+    time: 5,
+    colonies: [colony],
+    layers: [{}, {}],
+    fungus: { evolution: null, patchOn: () => [], hyphaeOn: () => null },
+  } as unknown as Game;
+  sensed.stampGame(game);
+  assert.equal([...memory.on(PLANE)].length, 0, "a curtain corpse is not a plane corpse, though the plane cell is sensed");
+  assert.equal([...memory.on(CURTAIN)].length, 0, "and the curtain was not sensed");
+  corpses[0]!.layer = PLANE;
+  sensed.stampGame(game);
+  assert.equal([...memory.on(PLANE)].length, 1, "a plane corpse in a sensed plane cell is remembered");
+  (colony as { n: number }).n = 0;
+  game.time = 9;
+  sensed.stampGame(game);
+  assert.equal([...memory.on(PLANE)].length, 1, "kept after the host leaves");
+  game.time = 2; // a restart, a load
+  sensed.stampGame(game);
+  assert.equal([...memory.on(PLANE)].length, 0, "time went back: forgotten");
+});
+
+test("remembered corpses are fainter than live ones", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  game.colonies[0]!.corpses.push({ x: 30, y: 30, held: -1, died: game.colonies[0]!.time, heading: 0, load: 0, strain: 0, layer: PLANE });
+  sensed.stamp([at(30, 30)], 1);
+  sensed.corpses!.update(game, sensed.knowledge!, () => 2);
+  sensed.stamp([none()], 1 + GRACE + 1);
+  const g = ctxFor(game, sensed);
+  drawRememberedCorpses(g.k, { len: 6, inView: () => true, resourceLod: "walk", nestImage: null } as never);
+  assert.ok(g.rec.log.includes("globalAlpha = 0.6"), "drawn at 0.6");
+  assert.equal(g.rec.log.at(-1), "globalAlpha = 1", "and put back");
+});
+
+test("the line under the fog: a stretch only between two sensed holes, and a remembered hole still counts", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  const holes = game.world.line.holes;
+  assert.ok(holes.length >= 2, "two holes at least");
+  const strokes = () => {
+    const g = ctxFor(game, sensed);
+    drawLine(g.k);
+    return { strokes: g.rec.log.filter((l) => l === "stroke()").length, dots: g.rec.log.filter((l) => l.startsWith("arc(")).length };
+  };
+  sensed.stamp([at(holes[0]!.x, holes[0]!.y)], 1);
+  assert.deepEqual(strokes(), { strokes: 1, dots: 1 }, "one sensed hole: its margin and its dot, no stretch to the unsensed one");
+  const both = (host: Colony) => host;
+  void both;
+  sensed.stamp(
+    [at(holes[0]!.x, holes[0]!.y), at(holes[1]!.x, holes[1]!.y)].map(
+      (c, i) => ({ ...c, n: 1, x: Float32Array.of(c.x[0]!), y: Float32Array.of(c.y[0]!), i }) as never,
+    ),
+    2,
+  );
+  const lit = strokes();
+  sensed.stamp([none()], 2 + GRACE + 1);
+  assert.deepEqual(strokes(), lit, "remembered holes draw the same stretches and dots as live ones");
+  assert.ok(lit.dots >= 2 && lit.strokes >= 2, "both sensed: both dots and a stretch between");
+});
+
+test("the hole badge under the fog: the whole badge where live, the colony's name only where remembered; and the raised stalks only where sensed", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  const h = game.world.line.holes.find((x) => game.colonies.some((c) => c.holeCells.some((hc) => hc.px === x.x && hc.py === x.y)))!;
+  const texts = () => {
+    const g = ctxFor(game, sensed);
+    drawHoleNames(
+      g.k,
+      exploredCull(g.k, () => true),
+    ); // as the marks stage calls it
+    return g.rec.log.filter((l) => l.startsWith("fillText(")).length;
+  };
+  sensed.stamp([at(h.x, h.y)], 1);
+  const live = texts();
+  assert.ok(live >= 2, "live: name and queen at least");
+  sensed.stamp([none()], 1 + GRACE + 1);
+  assert.equal(texts(), 1, "remembered: the name alone");
+  const stalks = () => {
+    const g = ctxFor(game, sensed);
+    drawStalksRaised(g.k, { rx0: 0, rx1: 100, ry0: 0, ry1: 100 }, { stalks: new Set([cellKey(60, 60)]), stalkLevel: 1 });
+    return g.calls.length;
+  };
+  assert.equal(stalks(), 0, "a stalk in a place nothing has sensed is not drawn");
+  sensed.stamp([at(60, 60)], 1 + GRACE + 2);
+  assert.equal(stalks(), 1, "sensed: drawn");
 });
