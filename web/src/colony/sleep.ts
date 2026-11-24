@@ -13,6 +13,7 @@
 // The numbers are the design's proposals (§6, §10), parameters here; the owner's answer is `ja-dv98`.
 
 export interface SleepParams {
+  // `distance`, `nestGround` and `every` are read by the game, which makes the inputs; the rule itself reads only `delay` and `cap`.
   /** W: how near the awake fungus must come to a hole to wake its colony, and to keep it awake, in cells (2 U) */
   distance: number;
   /** T: seconds of contact memory, of the fungus's absence before a colony freezes, and of a cap-frozen colony's lock */
@@ -50,7 +51,8 @@ export interface SleepVerdict {
 export interface SleepState {
   lastNear: number[];
   touched: number[];
-  capUntil: number[];
+  /** null: not held by the cap (-Infinity, which JSON cannot carry) */
+  capUntil: (number | null)[];
   nearBefore: boolean[];
   contacts: [number, number, number][];
   over: number;
@@ -113,28 +115,30 @@ export class SleepRule {
       }
       this.#nearBefore[k] = !!inp.near[k];
     }
+    // A group asleep stays a group (it freezes and wakes together): entries between sleeping members stay fresh; the others expire after T.
+    for (const [key, at] of this.#contacts) {
+      if (time - at >= p.delay) this.#contacts.delete(key);
+      else {
+        const [a, b] = key.split(",").map(Number) as [number, number];
+        if (inp.asleep[a] && inp.asleep[b]) this.#contacts.set(key, time);
+      }
+    }
     for (let a = 0; a < n; a++)
       for (let b = a + 1; b < n; b++) if (!inp.asleep[a] && !inp.asleep[b] && inp.contact(a, b)) this.#contacts.set(`${a},${b}`, time);
     const groups = this.#groups(n, time);
     const asleep = [...inp.asleep];
-    const thaw = new Set<number>();
-    const freeze = new Set<number>();
     const rank = (g: number[]) => Math.max(...g.map((k) => this.#touched[k]!));
     const awakeCount = () => asleep.filter((s) => !s).length;
 
     const wake = (g: number[]): void => {
       for (const k of g) {
         asleep[k] = false;
-        thaw.add(k);
-        freeze.delete(k);
       }
     };
     const sleep = (g: number[], capUntil?: number): void => {
       for (const k of g) {
         asleep[k] = true;
         if (capUntil !== undefined) this.#capUntil[k] = capUntil;
-        if (thaw.has(k)) thaw.delete(k);
-        else freeze.add(k);
       }
     };
 
@@ -144,7 +148,11 @@ export class SleepRule {
       if (g.some((k) => time < this.#capUntil[k]!)) continue;
       if (g.some((k) => inp.near[k] || inp.entered[k])) {
         // a wake is a touch: the group just woken outranks those awake the longer, so over the cap the awake set rotates
-        for (const k of g) this.#touched[k] = time;
+        // and it is no longer cap-frozen: a later ordinary freeze must not look like one
+        for (const k of g) {
+          this.#touched[k] = time;
+          this.#capUntil[k] = -Infinity;
+        }
         wake(g);
       }
     }
@@ -171,11 +179,22 @@ export class SleepRule {
       .sort((x, y) => rank(y) - rank(x) || x[0]! - y[0]!);
     for (const g of capFrozen) {
       if (awakeCount() + g.length > p.cap) continue;
-      for (const k of g) this.#capUntil[k] = -Infinity;
+      // it wakes on the strength of holding the fungus, so it stays awake for T on that
+      for (const k of g) {
+        this.#capUntil[k] = -Infinity;
+        this.#lastNear[k] = time;
+      }
       wake(g);
       break;
     }
-    return { freeze: [...freeze].sort((a, b) => a - b), thaw: [...thaw].sort((a, b) => a - b) };
+    // The verdict is the difference from what the game said: a colony only freezes if it was awake and thaws if it was asleep.
+    const freeze: number[] = [];
+    const thaw: number[] = [];
+    for (let k = 0; k < n; k++) {
+      if (asleep[k] && !inp.asleep[k]) freeze.push(k);
+      else if (!asleep[k] && inp.asleep[k]) thaw.push(k);
+    }
+    return { freeze, thaw };
   }
 
   /** The rule's memory, for a save. */
@@ -183,7 +202,7 @@ export class SleepRule {
     return {
       lastNear: [...this.#lastNear],
       touched: [...this.#touched],
-      capUntil: [...this.#capUntil],
+      capUntil: this.#capUntil.map((v) => (v === -Infinity ? null : v)),
       nearBefore: [...this.#nearBefore],
       contacts: [...this.#contacts].map(
         ([key, at]) => [...(key.split(",").map(Number) as [number, number]), at] as [number, number, number],

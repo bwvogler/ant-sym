@@ -144,7 +144,7 @@ test("the cap freezes the lowest-ranked group: the colony the fungus touched lon
   assert.deepEqual(at.thaw, [2]);
 });
 
-test("room comes back: a cap-frozen colony that holds the fungus wakes when a slot frees, once its T has passed", () => {
+test("room comes back: a sleeper the cap never froze does not wake for room, though it holds the fungus", () => {
   const rule = new SleepRule(3, { ...P, cap: 2 });
   // 0 and 1 near, 2 frozen by the cap and holding the fungus; at t = 150 the fungus leaves colony 1, which freezes T later; then 2 wakes
   rule.step({ time: 0, asleep: all(3, false), near: all(3, true), entered: all(3, false), holds: all(3, false), contact: () => false });
@@ -197,4 +197,151 @@ test("the rule's memory saves and loads: the same facts give the same verdicts",
 
 test("the defaults are the design's proposals", () => {
   assert.deepEqual(DEFAULT_SLEEP, { distance: 280, delay: 90, nestGround: 16, cap: 6, every: 1 });
+});
+
+/** cap 2, three colonies; the fungus near all three until `until`, then nowhere; holds is true for sleepers only, as the game gives it */
+function roomScenario(until: number, seconds: number, rule = new SleepRule(3, { ...P, cap: 2 })) {
+  return play(rule, 3, seconds, (t, asleep) => ({ near: all(3, t < until), holds: asleep.map((s) => s) }));
+}
+
+test("a cap-frozen colony that wakes into room stays awake for T on that, then freezes: no flip-flop", () => {
+  const log = roomScenario(200, 600);
+  const flips = log.flatMap((e) => [...e.freeze.map((k) => ({ t: e.t, k })), ...e.thaw.map((k) => ({ t: e.t, k }))]);
+  for (let k = 0; k < 3; k++) {
+    const ts = flips.filter((f) => f.k === k).map((f) => f.t);
+    for (let i = 1; i < ts.length; i++) assert.ok(ts[i]! - ts[i - 1]! >= P.delay, `colony ${k} flipped at ${ts[i - 1]} and ${ts[i]}`);
+  }
+  const woke = log.find((e) => e.t >= 200 && e.thaw.length > 0)!;
+  const k = woke.thaw[0]!;
+  assert.equal(log.find((e) => e.t > woke.t && e.freeze.includes(k))?.t, woke.t + P.delay, "frozen again T after it woke");
+});
+
+test("a colony the cap froze once, later woken by nearness and frozen the ordinary way, does not wake as if cap-frozen", () => {
+  const rule = new SleepRule(3, { ...P, cap: 2 });
+  const log = roomScenario(200, 800, rule);
+  // after the fungus is gone every colony ends asleep and stays so: nothing wakes with no fungus near
+  const last = log.filter((e) => e.t > 200 + 3 * P.delay);
+  assert.ok(last.every((e) => e.thaw.length === 0 && e.asleep.every(Boolean)));
+});
+
+test("no verdict freezes a colony already asleep or thaws one already awake", () => {
+  for (const until of [150, 200, 250]) {
+    const rule = new SleepRule(3, { ...P, cap: 2 });
+    const asleep = all(3, false);
+    for (let t = 0; t < 700; t++) {
+      const v = rule.step({ time: t, asleep, near: all(3, t < until), entered: all(3, false), holds: all(3, true), contact: () => false });
+      for (const k of v.freeze) {
+        assert.ok(!asleep[k], `froze sleeper ${k} at ${t}`);
+        asleep[k] = true;
+      }
+      for (const k of v.thaw) {
+        assert.ok(asleep[k], `thawed awake ${k} at ${t}`);
+        asleep[k] = false;
+      }
+    }
+  }
+});
+
+test("a group frozen together wakes together, though it has slept longer than T", () => {
+  const rule = new SleepRule(2, P);
+  const log = play(rule, 2, 500, (t) => ({ near: [false, t >= 400], contact: () => t < 10 }));
+  assert.equal(first(log, 0), first(log, 1), "frozen together");
+  const woke = log.find((e) => e.thaw.length > 0)!;
+  assert.equal(woke.t, 400);
+  assert.deepEqual(woke.thaw, [0, 1]);
+});
+
+test("the cap-frozen colony the room returns to is the highest-ranked, and only after its T", () => {
+  const rule = new SleepRule(3, { ...P, cap: 2 });
+  // 0 and 1 near always; 2 cap-frozen at t = 0 (lowest rank, ties by index would take 0, so make 2 oldest: near from the start only for 0 and 1 later)
+  const log = play(rule, 3, 400, () => ({ near: [true, true, false], holds: [false, false, true] }), [false, false, true]);
+  assert.ok(
+    log.every((e) => e.thaw.length === 0),
+    "never cap-frozen, never woken by room",
+  );
+});
+
+test("an awake host entering a colony's nest ground wakes it, and counts as a touch: it freezes T after, not before", () => {
+  const rule = new SleepRule(1, P);
+  const log = play(rule, 1, 400, (t) => ({ entered: [t === 100] }));
+  assert.equal(log.find((e) => e.freeze.length > 0)?.t, P.delay);
+  assert.equal(log.find((e) => e.thaw.length > 0)?.t, 100);
+  assert.equal(log.filter((e) => e.freeze.length > 0)[1]?.t, 100 + P.delay);
+});
+
+test("a colony founded mid-game has the founding second as its touch, so over the cap the older freezes first", () => {
+  const rule = new SleepRule(2, { ...P, cap: 2 });
+  rule.addColony(5);
+  const log = play(rule, 3, 10, () => ({ near: all(3, true) }));
+  const at = log.find((e) => e.freeze.length > 0)!;
+  assert.deepEqual(at.freeze, [0]);
+});
+
+test("saved memory carries contacts and the fungus's nearness: a loaded rule decides as the saved one", () => {
+  const a = new SleepRule(3, { ...P, cap: 2 });
+  play(a, 3, 50, (t) => ({ near: [true, t < 20, true], contact: (x, y) => x === 0 && y === 1 }));
+  const b = new SleepRule(3, { ...P, cap: 2 });
+  b.loadState(JSON.parse(JSON.stringify(a.saveState())));
+  assert.deepEqual(b.saveState(), a.saveState());
+  const asleep = all(3, false);
+  for (let t = 51; t < 400; t++) {
+    const inp: SleepInputs = {
+      time: t,
+      asleep,
+      near: [true, false, t < 200],
+      entered: all(3, false),
+      holds: all(3, true),
+      contact: () => false,
+    };
+    assert.deepEqual(b.step(inp), a.step(inp), `at ${t}`);
+  }
+});
+
+test("room comes back only after the cap-frozen colony's T, and only for one that holds the fungus", () => {
+  const run = (holds: boolean[]) =>
+    play(new SleepRule(3, { ...P, cap: 2 }), 3, 200, (t) => ({ near: [t <= 10, false, t === 10], holds }), [false, false, true]);
+  const log = run([true, false, false]);
+  const at10 = log.find((e) => e.t === 10)!;
+  assert.deepEqual([at10.freeze, at10.thaw], [[0], [2]], "the cap freezes colony 0 as colony 2 wakes");
+  // colony 1 freezes at 90 and leaves room, but colony 0's lock runs to 100
+  assert.ok(log.filter((e) => e.t > 10 && e.t < 100).every((e) => !e.thaw.includes(0)));
+  assert.deepEqual(log.find((e) => e.t > 10 && e.thaw.includes(0))?.t, 100);
+  assert.ok(
+    run([false, false, false]).every((e) => e.t <= 10 || !e.thaw.includes(0)),
+    "holding nothing, it stays asleep",
+  );
+});
+
+test("room comes back for the highest-ranked of two cap-frozen colonies", () => {
+  const log = play(
+    new SleepRule(3, { ...P, cap: 1 }),
+    3,
+    200,
+    (t) => ({ near: [t === 5, t === 10, t === 15], holds: all(3, true) }),
+    all(3, true),
+  );
+  const woke = log.filter((e) => e.t > 15 && e.thaw.length > 0)[0]!;
+  assert.deepEqual([woke.t, woke.thaw], [105, [1]], "colony 1 was touched later than colony 0");
+});
+
+test("an awake host entering counts as a touch for rank", () => {
+  const log = play(
+    new SleepRule(3, { ...P, cap: 2 }),
+    3,
+    70,
+    (t) => ({ entered: [t === 50, false, false], near: [false, false, t === 60] }),
+    [false, false, true],
+  );
+  assert.deepEqual(log.find((e) => e.t === 60)!.freeze, [1], "colony 1, untouched, freezes; colony 0 was entered at 50");
+});
+
+test("a group ranks by its most recently touched member", () => {
+  const log = play(
+    new SleepRule(4, { ...P, cap: 3 }),
+    4,
+    70,
+    (t) => ({ entered: [false, t === 50, t === 20, false], near: [false, false, false, t === 60], contact: (a, b) => a === 0 && b === 1 }),
+    [false, false, false, true],
+  );
+  assert.deepEqual(log.find((e) => e.t === 60)!.freeze, [2], "the group's newest touch (50) outranks colony 2's (20)");
 });
