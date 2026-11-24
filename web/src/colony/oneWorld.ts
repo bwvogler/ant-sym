@@ -53,15 +53,27 @@ export const CRUST = CURTAIN_SKY + 1;
 /** Rows of ground below the crust: about as deep as the side view's ground (its 368 rows under a ground line at row 64 ± 5: 299–309). */
 export const CURTAIN_DEPTH = 300;
 
-/** The plane, the curtain under the line, and the line itself. */
+/**
+ * One line of the world (docs/endless-world.md §5): the holes in order and the plane cell over each curtain column (a new transect when the line
+ * grows, growWorld), the curtain under it, and the salt of its ground (0 for the first line: today's seeds).
+ */
+export interface WorldLine {
+  line: Transect;
+  curtain: WorldMap;
+  salt: number;
+}
+
+/** The plane, and the lines with the curtain under each (one line until the endless world: `line` and `curtain` are the first's). */
 export interface OneWorld {
   seed: number;
   /** the surface: a top-down map (today's open map) */
   plane: WorldMap;
-  /** everything underground, under the line, laid out as a side view (see the layout above) */
-  curtain: WorldMap;
-  /** the holes in order and the plane cell over each curtain column; a new line when the world grows (growWorld) */
-  line: Transect;
+  /** the lines, each with its curtain: the first is today's one */
+  lines: WorldLine[];
+  /** the first line's curtain: everything underground, under the line, laid out as a side view (see the layout above) */
+  readonly curtain: WorldMap;
+  /** the first line: the holes in order and the plane cell over each curtain column; a new line when the world grows (growWorld) */
+  readonly line: Transect;
 }
 
 /**
@@ -89,11 +101,22 @@ export function oneWorldOn(seed: number, plane: WorldMap): OneWorld {
   // The mound is the plane's (U3c): a height field of spoil, empty at the start.
   plane.spoil = new ChunkLayer((n) => new Uint16Array(n), 0);
   plane.moundCells = 0;
-  return { seed, plane, line, curtain: generateCurtain(seed, line) };
+  const first: WorldLine = { line, curtain: generateCurtain(seed, line), salt: 0 };
+  return {
+    seed,
+    plane,
+    lines: [first],
+    get curtain() {
+      return this.lines[0]!.curtain;
+    },
+    get line() {
+      return this.lines[0]!.line;
+    },
+  };
 }
 
 /** The salt of the curtain's ground noise: the plane's rock uses `seed` itself. */
-const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
+export const groundSeed = (seed: number): number => hash4(seed, 80, 0, 0);
 
 /** The curtain's ground: ~10 % rock, ~93 % of the rest diggable soil, buried food pockets (patchesPerChunk is per 64 columns here). */
 export const CURTAIN_WORLD = { rockiness: 0.1, soil: 0.93, patchesPerChunk: 0.8, foodPerCell: 12, foodMinDist: 16 } as const;
@@ -174,7 +197,7 @@ export function generateCurtain(seed: number, line: Transect, colonies: readonly
  * pocket's radius is up to 4), each from its own stream, as the side view's ground places them. `floor(s)`: no cell of a
  * pocket opens above that row of column s (Infinity: not at all, a column that keeps what it has).
  */
-function buryAlong(
+export function buryAlong(
   curtain: WorldMap,
   seed: number,
   lo: number,
@@ -220,15 +243,18 @@ function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
  * the curtain a shaft and royal chamber dug from its hole, from the stream keyed by the hole, before the new columns' food, which keeps its distance from every nest. Only food a colony can reach in the new columns is kept and
  * counted (foodTotal and foodLeft grow by it). Returns the new nest's index in both maps' nests.
  */
-export function growWorld(world: OneWorld, end: End, cell: Cell): number {
-  const { seed, plane, curtain } = world;
-  const old = world.line;
+export function growWorld(world: OneWorld, end: End, cell: Cell, at = 0): number {
+  const { seed, plane } = world;
+  const wl = world.lines[at];
+  if (!wl) throw new Error(`growWorld: no line ${at}`);
+  const { curtain } = wl;
+  const old = wl.line;
   const line = grow(old, end, cell);
   const fresh = (s: number) => s < old.sMin || s > old.sMax;
   curtain.x0 = line.sMin;
   curtain.size = { w: line.sMax - line.sMin + 1, h: curtain.size.h };
   for (let s = line.sMin; s <= line.sMax; s++) if (fresh(s)) curtainColumn(curtain, seed, s);
-  world.line = line;
+  wl.line = line;
   // The nest, on both layers: its index is the colony's that will live there (the maps' nests are indexed by colony).
   const k = curtain.nests.length;
   const sHole = line.sHole[end === "start" ? 0 : line.sHole.length - 1]!;

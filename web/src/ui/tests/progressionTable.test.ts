@@ -80,6 +80,23 @@ test("where every seed says patches, flowers and mat cells, the table gains thos
   assert.doesNotMatch(mixed.out, /flowers:/);
 });
 
+test("a seed line with spread (a flower that extended a patch, #363) gets a spread column where every seed has it; a mix keeps the three columns", () => {
+  const withSpread = (seed: number, flowers: number, spread: number) =>
+    seedText(seed, "100 s", "200 s").replace(
+      "mycelium 8.6",
+      `mycelium 8.6, patches ${1 + flowers} (flowers ${flowers}, spread ${spread}, mat cells ${flowers * 7})`,
+    );
+  const all = run({ "seed-1.txt": withSpread(1, 0, 0), "seed-2.txt": withSpread(2, 3, 5) });
+  assert.match(all.out, /\| seed \| first host \| quarter \| half \| queen \| patches \| flowers \| spread \| mat cells \|/);
+  assert.match(all.out, /\| 2 \| 5 s \| 100 s \| never \| 200 s \| 4 \| 3 \| 5 \| 21 \|/);
+  assert.match(all.out, /flowers: 3 in all, in 1 of 2 games/);
+  // one seed with spread and one with the older line: the three columns, no spread
+  const older = seedText(2, "100 s", "200 s").replace("mycelium 8.6", "mycelium 8.6, patches 2 (flowers 1, mat cells 7)");
+  const mixed = run({ "seed-1.txt": withSpread(1, 2, 1), "seed-2.txt": older });
+  assert.match(mixed.out, /\| patches \| flowers \| mat cells \|/);
+  assert.doesNotMatch(mixed.out, /spread/);
+});
+
 test("two commits are both named, so a table that mixes arms shows it", () => {
   const { out } = run({
     "seed-1.txt": seedText(1, "100 s", "200 s", "aaaaaaa000000000000000000000000000000000"),
