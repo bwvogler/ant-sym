@@ -119,13 +119,14 @@ export function canFoundIn(
 ): Founding {
   const px = cx(p);
   const py = cy(p);
-  // The nearest hole of any line, and the nearest site's.
+  // The nearest hole of any line, and the nearest site's. Whether the point is far from every hole only matters to a new line.
+  const wantFar = opts.newLines !== false;
   let farLines = true;
   let nearLine = -1;
   let nearD4 = Infinity;
   lines.forEach((l, i) => {
     for (const h of l.transect.holes) {
-      if (Math.hypot(cx(h) - px, cy(h) - py) <= NEW_LINE_GAP) farLines = false;
+      if (wantFar && Math.hypot(cx(h) - px, cy(h) - py) <= NEW_LINE_GAP) farLines = false;
       // exact (transect.ts dist4, as canFound compares): a tie between two lines' holes goes to the lower line index, never to float noise
       const d4 = dist4(h.x, h.y, p.x, p.y);
       if (d4 < nearD4) {

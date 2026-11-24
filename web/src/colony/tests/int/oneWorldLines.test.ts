@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Game } from "../../game.ts";
 import { canFoundIn, nearestValidIn } from "../../lines.ts";
-import { generateOneWorld, growWorld } from "../../oneWorld.ts";
+import { generateCurtain, generateOneWorld, growWorld } from "../../oneWorld.ts";
 import { cellOf, CELL } from "../../hex.ts";
-import { nearestValid } from "../../transect.ts";
+import { makeTransect, nearestValid } from "../../transect.ts";
 
 // The world holds a list of lines (docs/endless-world.md §5, PRD §66 E3.2): one line until the endless world, `line` and `curtain` its views, and
 // the founding rule asked through lines.ts with new lines off, so a game of one line settles exactly as transect.ts nearestValid says.
@@ -70,4 +70,61 @@ test("with new lines off a far point is never given a line of its own: it grows 
   assert.ok(!(off.ok && off.kind === "new"), JSON.stringify(off));
   assert.equal(nearestValidIn(lines, [], far, 20, () => true, 0.5, { newLines: false })?.founding.kind, "grow");
   assert.equal(nearestValidIn(lines, [], far, 20, () => true, 0.5)?.founding.kind, "new");
+});
+
+test("settleAt equals nearestValid on a grown line of five holes with a patchy ground, interior ties included", () => {
+  const g = new Game(generateOneWorld(2));
+  // grow the line by hand to five holes
+  for (const end of ["end", "start", "end"] as const) {
+    const t = g.world.line;
+    const v = end === "start" ? t.holes[0]! : t.holes[t.holes.length - 1]!;
+    const sign = end === "start" ? -1 : 1;
+    const s = nearestValid(t, { x: v.x + sign * 70, y: v.y }, 30, () => true);
+    assert.ok(s);
+    growWorld(g.world, s.end, s.cell);
+  }
+  assert.equal(g.world.line.holes.length, 5);
+  // a ground that refuses a third of the cells, by a fixed hash
+  const patchy = (x: number, y: number) => ((x * 73856093) ^ (y * 19349663)) % 3 !== 0;
+  let compared = 0;
+  let valid = 0;
+  for (let i = 0; i < g.world.line.holes.length; i++) {
+    const h = g.world.line.holes[i]!;
+    for (const [dx, dy] of [
+      [0, 0],
+      [5, 3],
+      [-9, 6],
+      [20, -10],
+      [-40, 30],
+    ] as const) {
+      const cell = { x: h.x + dx, y: h.y + dy };
+      const want = nearestValid(g.world.line, cell, 140, patchy);
+      const got = g.settleAt({ x: cell.x + 0.5 + 0.5 * (cell.y & 1), y: (cell.y + 0.5) * 0.866 }, patchy);
+      compared++;
+      if (want) {
+        valid++;
+        assert.ok(
+          got.ok && got.cell.x === want.cell.x && got.cell.y === want.cell.y && got.end === want.end && got.line === 0,
+          `hole ${i} +${dx},${dy}`,
+        );
+      } else assert.equal(got.ok, false);
+    }
+  }
+  assert.ok(compared === 25 && valid > 10, `${valid} of ${compared} had a spot`);
+});
+
+test("growWorld grows the line it is told to and leaves the others alone", () => {
+  const w = generateOneWorld(1);
+  // a second line by hand (the endless world makes them; here only its growth is under test), far from the first
+  const far = { x: w.line.holes[0]!.x + 1200, y: w.line.holes[0]!.y + 600 };
+  const second = makeTransect([far]);
+  w.lines.push({ line: second, curtain: generateCurtain(w.seed, second), salt: 7 });
+  const firstBefore = w.lines[0]!.line;
+  const spot = nearestValid(second, { x: far.x + 60, y: far.y }, 30, () => true);
+  assert.ok(spot);
+  growWorld(w, spot.end, spot.cell, 1);
+  assert.equal(w.lines[0]!.line, firstBefore, "the first line is untouched");
+  assert.equal(w.lines[1]!.line.holes.length, 2, "the second grew");
+  assert.equal(w.lines[1]!.salt, 7, "and kept its salt");
+  assert.equal(w.line, firstBefore, "the line view is still the first's");
 });
