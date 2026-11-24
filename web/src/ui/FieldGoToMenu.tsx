@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { type Colony, PLANE, type OneWorld } from "../colony/index.ts";
+import { type Colony, mapOfLayer, type OneWorld } from "../colony/index.ts";
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { colonyName } from "./names.ts";
 
@@ -81,7 +81,7 @@ export default function FieldGoToMenu({
               {colonyName(k)} nest
             </button>
           ))}
-          {(view === PLANE ? world.plane : world.curtain).chambers && (
+          {mapOfLayer(world, view).chambers && (
             <button
               type="button"
               className={labels ? `${item} text-accent` : item}

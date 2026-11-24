@@ -1,7 +1,7 @@
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { setMapInspection } from "./mapInspection.ts";
 import { useEffect, useState } from "react";
-import type { AphidClump, Colony, Fungus, WorldMap } from "../colony/index.ts";
+import type { AphidClump, Colony, Fungus, OneWorld } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import LensCard from "./LensCard.tsx";
@@ -30,7 +30,7 @@ export default function LensLayer({
   on: boolean;
   colonies: readonly Colony[];
   fungus: Fungus;
-  world: { plane: WorldMap; curtain: WorldMap };
+  world: OneWorld;
   sensed: SensedMap;
   /** the layer shown: PLANE or CURTAIN */
   layer: number;

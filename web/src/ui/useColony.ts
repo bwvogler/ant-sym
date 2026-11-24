@@ -51,6 +51,8 @@ export interface ColonyControls {
   rival: boolean;
   /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
   view: View;
+  /** which line's curtain the below view shows (docs/endless-world.md §8): the line clicked, chosen by Go to, or the followed ant's; an index into the world's lines */
+  line: number;
   /** the player pressed Start (the start screen, ja-lo8.5): every game from then on begins with the fungus landing */
   started: boolean;
   /** the Lab (ja-nan3): how sharply ants draw their mode from Jev's probabilities (ColonyParams.sampleTemp), and how often they draw again (reroll, s) */
@@ -85,6 +87,7 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   cull: false,
   rival: true,
   view: "above",
+  line: 0,
   sampleTemp: DEFAULT_COLONY.sampleTemp,
   reroll: DEFAULT_COLONY.reroll,
   // Off by default: main's steering, bit for bit. The Lab's switch turns the policy-set weights on (docs/steering.md).

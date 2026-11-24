@@ -12,7 +12,7 @@ function setup(shown = PLANE) {
   const log: string[] = [];
   const plane = map(0, 100) as ReturnType<typeof map>;
   const curtain = map(-10, 120);
-  const world = { plane, curtain };
+  const world = { plane, curtain, lines: [{ curtain }] };
   const layer = (name: string) => ({ name });
   const col = (id: string, has: boolean) => ({
     map: plane,

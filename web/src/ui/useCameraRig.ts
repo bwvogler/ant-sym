@@ -1,5 +1,5 @@
 import { useState, type RefObject } from "react";
-import { PLANE, type OneWorld } from "../colony/index.ts";
+import { mapOfLayer, type OneWorld } from "../colony/index.ts";
 import { CameraRig } from "./field/rig.ts";
 import type { Followed } from "./follow.ts";
 
@@ -18,7 +18,7 @@ export function useCameraRig(r: RigRefs): CameraRig {
     () =>
       new CameraRig({
         view: () => r.shown.current,
-        map: (v) => (v === PLANE ? r.worldRef.current.plane : r.worldRef.current.curtain),
+        map: (v) => mapOfLayer(r.worldRef.current, v),
         size: () => ({ w: r.canvasRef.current?.width ?? 1, h: r.canvasRef.current?.height ?? 1 }),
         dpr: () => Math.min(2, window.devicePixelRatio || 1),
         following: () => !!r.follow.current,

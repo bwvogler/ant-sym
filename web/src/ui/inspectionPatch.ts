@@ -1,6 +1,8 @@
 import {
   CELL,
-  CURTAIN,
+  isCurtainLayer,
+  lineOfLayer,
+  mapOfLayer,
   OPEN,
   SOIL,
   STRIP,
@@ -73,11 +75,11 @@ export function inspectViewport(
   const workers = indexInspectedWorkers(g, layer),
     selected = inspectCell(g, sensed, layer, x, y, trails, clumps, workers),
     [gx, gy] = selected.cell,
-    map = layer === CURTAIN ? g.world.curtain : g.world.plane,
+    map = mapOfLayer(g.world, layer),
     coords: [number, number][] = [[gx, gy]],
     bounds = voxelRegionBounds(x, y, width, height);
   // Surface piles can spill across cell edges. Read enough source cells for their supported bases.
-  const margin = layer === CURTAIN ? 1 : 3;
+  const margin = isCurtainLayer(layer) ? 1 : 3;
   for (
     let yy = Math.max(0, Math.floor(bounds.top / R) - margin);
     yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + margin);
@@ -112,7 +114,7 @@ function readPatch(
   workers?: ReturnType<typeof indexInspectedWorkers>,
 ): InspectionPatch {
   const [gx, gy] = selected.cell;
-  const map = layer === CURTAIN ? g.world.curtain : g.world.plane;
+  const map = mapOfLayer(g.world, layer);
   const mode = selected.place.view === "below" ? "below" : "surface";
   const cx = centreX(gx, gy),
     cy = centreY(gy);
@@ -124,9 +126,9 @@ function readPatch(
       x: centreX(xx, yy) - cx,
       y: centreY(yy) - cy,
       valid,
-      surfaceStrip: layer === CURTAIN && yy === STRIP,
+      surfaceStrip: isCurtainLayer(layer) && yy === STRIP,
     };
-    if (out.surfaceStrip && g.world.line && cellAt(g.world.line, xx)) {
+    if (out.surfaceStrip && cellAt(lineOfLayer(g.world, layer), xx)) {
       const px = CELL[0],
         py = CELL[1],
         kind = rockAt(g.world.plane, px, py);

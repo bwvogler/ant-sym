@@ -49,7 +49,7 @@ export interface PenCircle {
 }
 
 /** Where a click in the pen sends her: the cell she settles on and the end of the line it grows, or why not. */
-export type Settle = { ok: true; cell: Cell; end: End } | { ok: false; reason: string };
+export type Settle = { ok: true; cell: Cell; end: End; line?: number; newLine?: { heading: number } } | { ok: false; reason: string };
 
 /** The pen's circle for flight f in one world: FLIGHT_2D round her mother's hole on the plane; null off one world or with no hole. */
 export function flightCircle(game: Game, f: Flight): PenCircle | null {

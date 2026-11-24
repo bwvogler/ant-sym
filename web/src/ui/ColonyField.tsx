@@ -1,6 +1,6 @@
 import { mapOrbit } from "./inspectionOrbit.ts";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
-import { type Colony, CURTAIN, PLANE, type WorldMap } from "../colony/index.ts";
+import { type Colony, CURTAIN, mapOfLayer, PLANE, type WorldMap } from "../colony/index.ts";
 import { toWorld } from "./camera.ts";
 import type { Followed } from "./follow.ts";
 import { handleKey, type KeyHost } from "./field/keyboard.ts";
@@ -112,7 +112,7 @@ export default function ColonyField({
   const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb });
 
   /** The shown view's map: the plane or the curtain. */
-  const shownMap = (): WorldMap => (shown.current === PLANE ? world.plane : world.curtain);
+  const shownMap = (): WorldMap => mapOfLayer(world, shown.current);
   // A new game starts zoomed out, in both views.
   useEffect(() => {
     rig.clear();
@@ -167,6 +167,15 @@ export default function ColonyField({
   const goNest = (k: number) => {
     const col = colonies[k] ?? anyColony;
     nestTurn.current = k;
+    // Below, a colony's shaft is on its own line's curtain: the page is asked to show that line (docs/endless-world.md §8), as a linked click does.
+    if (shown.current !== PLANE && col.home !== shown.current && onLink) {
+      const n = col.layers[col.home]?.nest;
+      if (n) {
+        const e = n.entrance;
+        onLink(col.home, e ? (e.x + n.x) / 2 : n.x, e ? (e.y + n.y) / 2 : n.y);
+        return;
+      }
+    }
     rig.goTo((col.layers[shown.current] ?? col.layers[0]!).nest);
   };
 

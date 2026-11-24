@@ -14,9 +14,11 @@ import {
   STRIP,
   turnAt,
   PLANE,
+  lineOfLayer,
   type Transect,
 } from "../../colony/index.ts";
 import { toScreen, toWorld } from "../camera.ts";
+import { holeOwner } from "../lens.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
 import { LIVE } from "../fog/knowledge.ts";
 import { odourColour } from "./colour.ts";
@@ -82,10 +84,14 @@ export function traceColumns(k: FieldCtx, line: Transect, lo: number, hi: number
   }
 }
 
-/** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
+/** One world's top view: every line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
 export function drawLine(k: FieldCtx, holes = true): void {
+  for (const wl of k.world.lines) drawOneLine(k, wl.line, holes);
+}
+
+/** One line of the top view (drawLine's): its dashes, margins and hole markers. */
+function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
   const { ctx, theme, c, v, d } = k;
-  const line = k.world.line;
   const last = line.holes.length - 1;
   ctx.strokeStyle = theme.ink;
   ctx.lineWidth = Math.max(1, d * 1.2);
@@ -116,14 +122,12 @@ export function drawLine(k: FieldCtx, holes = true): void {
 /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
 export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boolean): void {
   const { theme, c, v, d, colonies, fungus } = k;
-  const holes = colonies[0]!.holeCells;
   const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
-  for (const h of k.world.line.holes) {
+  for (const h of k.world.lines.flatMap((l) => l.line.holes)) {
     const wx = centreX(h.x, h.y);
     const wy = centreY(h.y);
     if (!inView(wx, wy)) continue;
-    let n = -1;
-    for (let j = 0; j < holes.length && n < 0; j++) if (holes[j]!.px === h.x && holes[j]!.py === h.y) n = j;
+    const n = holeOwner(colonies, PLANE, h.x, h.y);
     const [x, y] = toScreen(c, v, wx, wy);
     const above = y - Math.max(12 * d, 4.5 * c.zoom);
     const col = n >= 0 ? colonies[n] : undefined;
@@ -145,7 +149,7 @@ export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boo
 /** One world's side view: a faint rule down the curtain at each bend (an interior hole's s), labelled with its turn. */
 export function drawBends(k: FieldCtx): void {
   const { ctx, theme, c, v, d } = k;
-  const line = k.world.line;
+  const line = lineOfLayer(k.world, k.lv);
   const px = Math.round(12 * d);
   for (let j = 1; j < line.holes.length - 1; j++) {
     const s = line.sHole[j]!;
@@ -172,7 +176,7 @@ export function drawBends(k: FieldCtx): void {
  */
 export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (x: number, y: number) => boolean): void {
   const { ctx, theme, c, v, colonies } = k;
-  const line = k.world.line;
+  const line = lineOfLayer(k.world, k.lv);
   const half = len / 2;
   const wy = centreY(STRIP);
   ctx.lineCap = "round";
@@ -256,7 +260,7 @@ export function drawPen(k: FieldCtx, inp: FieldInputs): void {
   const tx = centreX(at.cell.x, at.cell.y);
   const ty = centreY(at.cell.y);
   const [sx, sy] = toScreen(c, v, tx, ty);
-  const holes = k.world.line.holes;
+  const holes = k.world.lines[at.line ?? 0]!.line.holes;
   const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = Math.max(1.5, d * 1.5);

@@ -1,5 +1,8 @@
 import {
   CURTAIN,
+  curtainLayerOf,
+  isCurtainLayer,
+  lineIndexOfLayer,
   PLANE,
   UPGRADES,
   type Pool,
@@ -171,6 +174,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
+  // The layer shown: the plane, or the curtain of the line chosen (clamped: a new world may have fewer lines).
+  const belowLayer = oneWorld ? curtainLayerOf(Math.min(controls.line, oneWorld.lines.length - 1)) : CURTAIN;
   const setView = useCallback((view: View) => update({ view }), [update]);
   // The views linked (one-world §5, U5.2): the field's cameras, a click across, and an ant followed through a hole.
   const field = useRef<FieldApi | null>(null);
@@ -178,9 +183,9 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const showAt = useCallback(
     (view: number, x: number, y: number, close = false) => {
       field.current?.centreOn(view, x, y, { close });
-      setView(view === PLANE ? "above" : "below");
+      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
     },
-    [setView],
+    [update, oneWorld],
   );
   // The first game's tutorial (ja-7x4, PRD §61). A card that points at a drawer's panel opens that drawer.
   const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
@@ -204,7 +209,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     toggleSmell,
     demo,
     build,
-  } = useBuilder({ game, view: controls.view, field, closeDrawer });
+  } = useBuilder({ game, view: controls.view, belowLayer, field, closeDrawer });
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
     // From lg (1024 px) the aim is the bar under the map, outlined where it is; narrower it is in The fungus drawer, opened
@@ -233,16 +238,16 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const onCross = useCallback(
     (view: number, x: number, y: number) => {
       field.current?.centreOn(view, x, y, { keepFollow: true });
-      setView(view === PLANE ? "above" : "below");
+      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
     },
-    [setView],
+    [update, oneWorld],
   );
   /** Follow ant f, the camera taken to whichever view it is in. */
   const goTo = useCallback(
     (f: Followed) => {
       const c = game.colonies[f.k];
       if (!c) return;
-      if (oneWorld) showAt(c.layer[f.i] === CURTAIN ? CURTAIN : PLANE, c.x[f.i]!, c.y[f.i]!);
+      if (oneWorld) showAt(c.layer[f.i]!, c.x[f.i]!, c.y[f.i]!);
       setFollowed(f);
     },
     [game, oneWorld, showAt, setFollowed],
@@ -336,7 +341,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jevLock, jevPhase);
-  const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
+  const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : belowLayer) : -1;
   // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
     buildPaletteCommands({
@@ -373,7 +378,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             onFollow={setFollowed}
             onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
             world={oneWorld}
-            view={controls.view === "above" ? PLANE : CURTAIN}
+            view={controls.view === "above" ? PLANE : belowLayer}
             onLink={onLink}
             onCross={onCross}
             apiRef={field}
