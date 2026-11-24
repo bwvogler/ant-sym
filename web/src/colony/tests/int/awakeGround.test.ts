@@ -80,3 +80,52 @@ test("the awake fungus's body keeps far ground regrowing, and only its body: a p
   assert.ok(regrown(g, near) > 0, "a pile by the fungus regrows");
   assert.equal(regrown(g, away), 0, "one far from the fungus and every awake hole waits");
 });
+
+test("Fungus.bodyNear finds every point within the radius of the body and none beyond the radius plus a block (random bodies and points)", () => {
+  const rng = mulberry32(77);
+  for (const radius of [12, 30, 60, 140]) {
+    const f = fresh().fungus;
+    const body: { x: number; y: number }[] = [];
+    for (let k = 0; k < 6; k++) {
+      const x = 20 + rng() * 460;
+      const y = 20 + rng() * 320;
+      f.paint([], x, y, 2 + rng() * 6, 2, 0, 0, 0);
+      body.push({ x, y });
+    }
+    const points = Array.from({ length: 400 }, () => ({ x: rng() * 512, y: rng() * 368 }));
+    const near = f.bodyNear(0, points, radius);
+    // every cell the fungus holds, in world units
+    const cells: { x: number; y: number }[] = [];
+    const sp = f.sporesOn(0)!.spores;
+    for (let y = 0; y < 368; y++) for (let x = 0; x < 512; x++) if (sp.get(x, y) > 0) cells.push({ x: centreX(x, y), y: centreY(y) });
+    assert.ok(cells.length > 50);
+    points.forEach((p, i) => {
+      const d = Math.min(...cells.map((c) => Math.hypot(c.x - p.x, c.y - p.y)));
+      if (d <= radius) assert.ok(near[i], `radius ${radius}: a point ${d.toFixed(1)} from the body was missed`);
+      if (d > radius + 8 * Math.SQRT2 + 1) assert.ok(!near[i], `radius ${radius}: a point ${d.toFixed(1)} from the body was found`);
+    });
+  }
+});
+
+test("with the rule on, a save and a load regrow as the saved game would (the rng and clock are saved, and the awake set follows the frozen set)", () => {
+  const a = fresh();
+  a.enableSleep({ distance: W, delay: 1e9 });
+  eat(a);
+  a.freeze(1);
+  a.fungus.paint(a.colonies, 300, 250, 6, 2, 0, 0, 0);
+  run(a, 60);
+  const saved = JSON.parse(JSON.stringify(a.save())) as ReturnType<Game["save"]>;
+  const b = fresh();
+  b.load(saved);
+  run(a, 60);
+  run(b, 60);
+  assert.equal(b.regrown, a.regrown);
+  assert.ok(a.regrown > 0);
+  const food = (g: Game) => {
+    let sum = 0;
+    for (let y = 0; y < g.map.size.h; y++)
+      for (let x = g.map.x0; x < g.map.x0 + g.map.size.w; x++) sum += g.map.food.get(x, y) * (1 + ((x * 31 + y) % 7));
+    return sum;
+  };
+  assert.equal(food(b), food(a));
+});
