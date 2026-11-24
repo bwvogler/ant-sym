@@ -201,7 +201,7 @@ export function grow(t: Transect, end: End, cell: Cell): Transect {
 }
 
 /** 4 × the squared distance between two cells' centres: a whole number (half-cells across, rows of height √3/2 down), so ties are exact. */
-function dist4(ax: number, ay: number, bx: number, by: number): number {
+export function dist4(ax: number, ay: number, bx: number, by: number): number {
   const dx = 2 * (ax - bx) + (ay & 1) - (by & 1);
   const dy = ay - by;
   return dx * dx + 3 * dy * dy;
@@ -358,7 +358,7 @@ const rounds = new Map<string, Int16Array>();
  * (parity 0) or odd row (`strict`: nearer than it), nearest first, ties in discOffsets' order: a round disc, not a
  * hexagon of steps. Cached.
  */
-function roundDisc(radius: number, parity: number, strict = false): Int16Array {
+export function roundDisc(radius: number, parity: number, strict = false): Int16Array {
   const key = `${radius}:${parity}:${strict}`;
   const have = rounds.get(key);
   if (have) return have;

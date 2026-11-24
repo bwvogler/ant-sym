@@ -13,7 +13,19 @@
 import { centreX, centreY } from "./hex.ts";
 import { holeLine, pointGap, type Site } from "./endlessPlane.ts";
 import { hash4 } from "./world.ts";
-import { canFound, CLEARANCE, type Cell, type End, type FoundCheck, grow, makeTransect, type Refusal, type Transect } from "./transect.ts";
+import {
+  canFound,
+  CLEARANCE,
+  type Cell,
+  dist4,
+  type End,
+  type FoundCheck,
+  grow,
+  makeTransect,
+  type Refusal,
+  roundDisc,
+  type Transect,
+} from "./transect.ts";
 
 /** A new line starts only farther than this from every hole of every line and site (docs/endless-world.md §5): one unit. */
 export const NEW_LINE_GAP = 140;
@@ -104,13 +116,14 @@ export function canFoundIn(
   // The nearest hole of any line, and the nearest site's.
   let farLines = true;
   let nearLine = -1;
-  let nearD = Infinity;
+  let nearD4 = Infinity;
   lines.forEach((l, i) => {
     for (const h of l.transect.holes) {
-      const d = Math.hypot(cx(h) - px, cy(h) - py);
-      if (d <= NEW_LINE_GAP) farLines = false;
-      if (d < nearD) {
-        nearD = d;
+      if (Math.hypot(cx(h) - px, cy(h) - py) <= NEW_LINE_GAP) farLines = false;
+      // exact (transect.ts dist4, as canFound compares): a tie between two lines' holes goes to the lower line index, never to float noise
+      const d4 = dist4(h.x, h.y, p.x, p.y);
+      if (d4 < nearD4) {
+        nearD4 = d4;
         nearLine = i;
       }
     }
@@ -157,19 +170,11 @@ export function nearestValidIn(
   open: (x: number, y: number) => boolean,
   heading: number,
 ): { cell: Cell; founding: Founding & { ok: true } } | null {
-  // Candidates by distance: every cell within the radius, nearest first, ties in scan order.
-  const cands: [number, Cell][] = [];
-  const reach = Math.ceil(radius / (Math.sqrt(3) / 2)) + 1;
-  const px = cx(p);
-  const py = cy(p);
-  for (let dy = -reach; dy <= reach; dy++)
-    for (let dx = -reach; dx <= reach; dx++) {
-      const c = { x: p.x + dx, y: p.y + dy };
-      const d = Math.hypot(cx(c) - px, cy(c) - py);
-      if (d <= radius) cands.push([d, c]);
-    }
-  cands.sort((a, b) => a[0] - b[0] || a[1].y - b[1].y || a[1].x - b[1].x);
-  for (const [, cell] of cands) {
+  // The cells within `radius` as transect.ts nearestValid takes them: by exact distance, ties in its fixed order (roundDisc), so a game replays and
+  // the bounded game's landings do not move.
+  const offs = roundDisc(radius, p.y & 1);
+  for (let i = 0; i < offs.length; i += 2) {
+    const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };
     const f = canFoundIn(lines, sites, cell, open, heading);
     if (f.ok) return { cell, founding: f };
   }

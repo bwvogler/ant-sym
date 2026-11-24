@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { cellKey, cellOf, CELL, centreX, centreY } from "../../hex.ts";
 import { EndlessPlane, holeLine, LINE_CLEARANCE, LINE_MARGIN, pointGap } from "../../endlessPlane.ts";
 import { applyFounding, canFoundIn, type Line, lineSalt, NEW_LINE_GAP, nearestValidIn, oneHoleLine, type Reserved } from "../../lines.ts";
-import { CLEARANCE, type Cell, HOLE_GAP_2D, makeTransect, MARGIN } from "../../transect.ts";
+import { CLEARANCE, type Cell, HOLE_GAP_2D, makeTransect, MARGIN, nearestValid } from "../../transect.ts";
 
 // Many lines (docs/endless-world.md §5, PRD §66 E3.1): the founding rule over every line and every wild site.
 
@@ -293,4 +293,64 @@ test("a new line needs open ground: a far point on rock is refused for the groun
     canFoundIn([start], sites, far, () => false, 0.7),
     { ok: false, reason: "ground" },
   );
+});
+
+test("a tie between two lines' holes goes to the lower line index, in either order, by exact distance", () => {
+  const l0 = oneHoleLine(1, { x: 0, y: 100 }, Math.PI / 2);
+  const l1 = oneHoleLine(1, { x: 200, y: 100 }, Math.PI / 2);
+  const p = { x: 100, y: 100 };
+  const a = canFoundIn([l0, l1], [], p, () => true, 0);
+  assert.ok(a.ok && a.kind === "grow" && a.line === 0, JSON.stringify(a));
+  const b = canFoundIn([l1, l0], [], p, () => true, 0);
+  assert.ok(b.ok && b.kind === "grow" && b.line === 0, "the lower index wins whichever line it is");
+});
+
+test("a growing line is refused across a wild site: a far point whose new line fails the clearance falls to rule 2, and the grown line keeps off the site's line", () => {
+  // A: one hole. B: a long line. A site between A and p. p is 300 from A's hole, 150 from the site; a vertical new line at p would come within the
+  // clearance of B, so the point falls to rule 2, where A would grow 300 cells straight through the site's hole.
+  const a = oneHoleLine(1, { x: 0, y: 100 }, 0);
+  const b: Line = {
+    transect: makeTransect([
+      { x: -400, y: 173 },
+      { x: 700, y: 173 },
+    ]),
+    salt: 0,
+  };
+  const site = { x: 150, y: centreY(100), heading: 0 };
+  const p = { x: 300, y: 100 };
+  assert.deepEqual(
+    canFoundIn([a, b], [site], p, () => true, Math.PI / 2),
+    { ok: false, reason: "line-clearance" },
+  );
+  const noSite = canFoundIn([a, b], [], p, () => true, Math.PI / 2);
+  assert.ok(noSite.ok && noSite.kind === "grow", "without the site the line would grow through where it stands");
+});
+
+test("a far point that fails only the clearance is not given a new line: it falls to the growing rule, never refused for being far", () => {
+  const a = oneHoleLine(1, { x: 0, y: 100 }, 0);
+  const b: Line = {
+    transect: makeTransect([
+      { x: -400, y: 173 },
+      { x: 700, y: 173 },
+    ]),
+    salt: 0,
+  };
+  const f = canFoundIn([a, b], [], { x: 300, y: 100 }, () => true, Math.PI / 2);
+  assert.ok(f.ok && f.kind === "grow" && f.line === 0, JSON.stringify(f));
+});
+
+test("nearestValidIn lands where transect.ts nearestValid does on one line: the same cell at every crowded point, ties included", () => {
+  const { start, open } = world(1);
+  const r = stream(11);
+  let moved = 0;
+  for (let n = 0; n < 120; n++) {
+    const h = world2(hole(start, r() < 0.5 ? 0 : 1));
+    // points on or near a hole, where distance ties between landings are common
+    const p = cellAt(h.x + Math.round((r() * 2 - 1) * 12), h.y + Math.round((r() * 2 - 1) * 12));
+    const want = nearestValid(start.transect, p, 60, open);
+    const got = nearestValidIn([start], [], p, 60, open, 0);
+    assert.deepEqual(got?.cell ?? null, want?.cell ?? null, `crowded point ${p.x},${p.y}`);
+    if (want && (want.cell.x !== p.x || want.cell.y !== p.y)) moved++;
+  }
+  assert.ok(moved > 30, `${moved} points were moved`);
 });
