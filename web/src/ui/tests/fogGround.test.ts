@@ -95,7 +95,7 @@ function setup(fog: boolean) {
     ground.paintChunk(k(now), { food: true, home: true }, 0, 0, cc, rock, false);
     return cc.img;
   };
-  return { rock, sensed, paint };
+  return { rock, sensed, paint, ground };
 }
 
 test("a chunk nothing has sensed is fog, every cell opaque", () => {
@@ -150,4 +150,23 @@ test("the actors' cull: in the fog only where live; without it, in view alone", 
   assert.equal(cull(centreX(10, 10), centreY(10)), false, "sensed once, remembered: no ant is drawn there");
   assert.equal(actorCull({ lv: PLANE } as FieldCtx, () => false)(0, 0), false, "no fog: inView decides");
   assert.equal(actorCull({ lv: PLANE } as FieldCtx, () => true)(0, 0), true);
+});
+
+test("the paint cache: an unknown chunk is painted once, a sensed one repaints, and a remembered one is a hit at the same time", () => {
+  const { sensed, paint, ground } = setup(true);
+  const img = paint(1);
+  img.data[0] = 7; // scribble on the buffer: a repaint would put the fog back
+  paint(1);
+  assert.equal(img.data[0], 7, "a second paint of an unknown chunk is the cache's");
+  sensed.stamp([host(10, 10)], 1);
+  paint(1);
+  assert.notEqual(img.data[0], 7, "sensed: its explored bits changed, so it paints");
+  const hits = ground.hits;
+  paint(1);
+  assert.equal(ground.hits, hits + 1, "the same inputs at the same time: a hit");
+  sensed.stamp([{ ...host(60, 60), n: 0 } as Colony], 1 + GRACE + 1);
+  paint(1 + GRACE + 1);
+  const again = ground.hits;
+  paint(1 + GRACE + 1);
+  assert.equal(ground.hits, again + 1, "remembered, at the same time: a hit, not a repaint every frame");
 });
