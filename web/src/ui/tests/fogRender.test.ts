@@ -24,7 +24,7 @@ test("the fog hides the ants and the nests' discs; where every cell is sensed th
   assert.equal(count(lit, "arc("), count(off, "arc("), "every nest once all is explored");
 });
 
-test("the curtain's strip and the plane's ants over it are not drawn under the fog, and are where the fog is off", () => {
+test("the plane's ants over the curtain's strip are not drawn under the fog while nothing is sensed, and are where the fog is off", () => {
   const off = renderScene({ ...BASE, lv: CURTAIN }).log;
   const dark = renderScene({ ...BASE, lv: CURTAIN, fog: true }).log;
   assert.ok(count(off, "moveTo") > 100, "the strip's ants stroke without the fog");

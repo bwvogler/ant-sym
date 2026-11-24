@@ -179,7 +179,7 @@ export const paperStage: Stage = ({ fc }) => {
 
 /** The chunks in view, as bricks or as hexagons, and the terrain's grain over the hexagons. */
 export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, resourceImage }) => {
-  const { ctx, c, v, m, theme } = fc;
+  const { ctx, c, v, m, theme, lv } = fc;
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { ground } = parts;
   ground.draw(fc, inputs.show, cellWindow, hexMix, !!resourceImage);
@@ -192,7 +192,8 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
       v.w / 2 - c.x * c.zoom,
       v.h / 2 - c.y * c.zoom,
       [rx0, rx1, ry0, ry1],
-      (x, y) => rockAt(m, x, y),
+      // Under the fog the grain shows the rock last sensed, and none where nothing was.
+      (x, y) => (fc.fog ? (fc.fog.state(lv, x, y) === UNKNOWN ? 0 : (fc.fog.snapshot(lv, SNAP.rock, x, y) ?? 0)) : rockAt(m, x, y)),
       (x, y) => ground.isBare(x, y),
       theme.ink,
       theme.paper,

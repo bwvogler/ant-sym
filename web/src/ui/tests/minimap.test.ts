@@ -438,3 +438,33 @@ test("under the fog a pixel is fog where nothing was sensed, the snapshot while 
     "an ant in a remembered cell is not drawn: its pixel is the dimmed ground",
   );
 });
+
+test("under the fog the minimap's food and mound come from the snapshot too, not from what is there now", () => {
+  const food = new Float32Array(64 * 64);
+  const spoil = new Uint16Array(64 * 64);
+  const a = cellOfPixel(0, 1, 0).split(",").map(Number) as [number, number];
+  const b = cellOfPixel(0, 2, 0).split(",").map(Number) as [number, number];
+  food[a[1] * 64 + a[0]] = 0.5;
+  spoil[b[1] * 64 + b[0]] = 3;
+  const chunk = (arr: Float32Array | Uint16Array) => (cx: number, cy: number) => (cx === 0 && cy === 0 ? arr : undefined);
+  const sensed = new SensedMap();
+  const fog = new Knowledge(sensed, [
+    { name: SNAP.food, layer: PLANE, at: chunk(food) },
+    { name: SNAP.spoil, layer: PLANE, at: chunk(spoil) },
+  ]);
+  const hosts = {
+    n: 2,
+    nestOdour: 0,
+    alive: Uint8Array.of(1, 1),
+    layer: Uint8Array.of(PLANE, PLANE),
+    load: Float32Array.of(INFECTED, INFECTED),
+    params: { sensorDistance: 3 },
+    x: Float32Array.of(centreX(a[0], a[1]), centreX(b[0], b[1])),
+    y: Float32Array.of(centreY(a[1]), centreY(b[1])),
+  };
+  sensed.stamp([hosts as never], 1);
+  const s = setup({ over: { fog }, spoil: new Map(), colonies: [] });
+  s.minimap.paint(s.k);
+  assert.deepEqual(paintedPixel(s, 1, 0), [...THEME.accentRgb, 255], "food as sensed, though the map's table has none");
+  assert.deepEqual(paintedPixel(s, 2, 0), [...THEME.spoil, 255], "the mound as sensed");
+});

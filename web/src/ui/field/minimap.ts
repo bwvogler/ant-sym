@@ -63,6 +63,7 @@ export class Minimap {
     // Infected ants: the spore colour halfway to ink, so a host stands out on the spore wash as on bare ground, in
     // either theme (ink is light in dark mode) (ja-25sb).
     const host = [0, 1, 2].map((j) => Math.round((spore[j]! + theme.inkRgb[j]!) / 2)) as [number, number, number];
+    const fogPx = fogRgb(theme);
     for (let my = 0; my < this.canvas.height; my++)
       for (let mx = 0; mx < this.canvas.width; mx++) {
         cellOf(gx0 + mx * 2 + 1, my * 2 + 1);
@@ -72,17 +73,17 @@ export class Minimap {
         const o = (my * this.canvas.width + mx) * 4;
         // Under the fog a pixel is what was last sensed there: fog where nothing was, dimmed where nobody senses it now (docs/fog-of-war.md §5.1).
         const fs = fog && !off ? fog.state(lv, x, y) : LIVE;
-        if (fs === UNKNOWN && !strip) {
-          const f = fogRgb(theme);
-          px[o] = f[0];
-          px[o + 1] = f[1];
-          px[o + 2] = f[2];
+        // On the side view the pixels of the line's columns are the plane's (stripAt, which fogs its own); every other unexplored pixel is fog.
+        const cut = strip && !off ? stripAt(k, x, y) : null;
+        if (fs === UNKNOWN && !cut) {
+          px[o] = fogPx[0];
+          px[o + 1] = fogPx[1];
+          px[o + 2] = fogPx[2];
           px[o + 3] = 255;
           continue;
         }
         const t = off ? 1 : fog ? (fog.snapshot(lv, SNAP.rock, x, y) ?? 0) : m.rock.get(x, y);
         const fv = off ? 0 : fog ? (fog.snapshot(lv, SNAP.food, x, y) ?? 0) : m.food.get(x, y);
-        const cut = strip && !off ? stripAt(k, x, y) : null;
         const heap = !off && t === 0 && m.spoil ? (fog ? (fog.snapshot(lv, SNAP.spoil, x, y) ?? 0) : m.spoil.get(x, y)) : 0;
         const c =
           cut ??
@@ -94,7 +95,7 @@ export class Minimap {
         px[o + 1] = Math.round(c[1] + (spore[1] - c[1]) * a);
         px[o + 2] = Math.round(c[2] + (spore[2] - c[2]) * a);
         px[o + 3] = 255;
-        if (fs !== LIVE && !cut) dimPx(px, o, fogRgb(theme));
+        if (fs !== LIVE && !cut) dimPx(px, o, fogPx);
       }
     // Every colony's ants, then the infected over them, so a healthy nestmate on the same pixel doesn't hide one.
     for (const sick of [false, true])

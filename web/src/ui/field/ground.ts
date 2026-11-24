@@ -73,7 +73,7 @@ export function stripAt(k: FieldCtx, s: number, y: number): readonly number[] | 
   const { world, theme } = k;
   if (y > STRIP || !cellAt(world.line, s)) return null;
   const g = planeGround(k, CELL[0], CELL[1]);
-  if (g.state === UNKNOWN) return fogRgb(theme); // under the fog, a place nothing has sensed is fog, strip and cut alike
+  if (g.state === UNKNOWN) return y === STRIP ? fogRgb(theme) : null; // under the fog, a place nothing has sensed is fog on the strip; there is no cut above it
   const c =
     y === STRIP
       ? g.rock !== OPEN
