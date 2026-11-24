@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cellKey, centreX } from "../../hex.ts";
+import { STRAINS } from "../../fungus.ts";
 import { Game } from "../../game.ts";
 import { generateOneWorld, mainGround } from "../../oneWorld.ts";
 import { mulberry32 } from "../../world.ts";
@@ -117,14 +118,14 @@ test("the new line keeps off the first's: no plane cell lies over both curtains,
 });
 
 test("the same world and the same landing make the same line: its salt, heading and tiles do not depend on the game's stream", () => {
-  const make = () => {
-    const g = new Game(generateOneWorld(SEED), {}, mulberry32(99), specs);
+  const make = (stream: number) => {
+    const g = new Game(generateOneWorld(SEED), {}, mulberry32(stream), specs);
     const p = farPoint(g);
     found(g, p, 20, 0.4);
     return g.world.lines[1]!;
   };
-  const a = make();
-  const b = make();
+  const a = make(99);
+  const b = make(7); // another stream
   assert.equal(a.salt, b.salt);
   assert.deepEqual([...a.line.cells], [...b.line.cells]);
   assert.deepEqual(a.line.holes, b.line.holes);
@@ -134,4 +135,26 @@ test("a game over a line that began mid-game refuses to save, so no line is lost
   const g = fresh();
   found(g, farPoint(g), 20, 0.4);
   assert.throws(() => g.save(), /2 lines/);
+});
+
+test("with the fungus's hyphae on, a line that begins mid-game takes a landing and plays on: every per-layer structure of the fungus was made for it", () => {
+  const g = new Game(generateOneWorld(SEED), { autoFound: false, fungus: { hyphae: true } }, mulberry32(5), specs);
+  const p = farPoint(g);
+  const k = found(g, p, 30, 0.5);
+  const garden = STRAINS.findIndex((x) => x.id === "garden");
+  g.land(k, garden, { evolve: true });
+  for (let t = 0; t < 120 * 30; t++) g.tick(1 / 30);
+  assert.ok(g.fungus.hyphaeOn(2), "its hyphae grew on the new line's curtain");
+});
+
+test("an explicit spot that begins a line is checked again: a stale line index, and a hole already at its cell", () => {
+  const g = fresh();
+  const p = farPoint(g);
+  const s = settle(g, p);
+  assert.ok(s.ok && s.newLine);
+  const spot = { cell: s.cell, end: s.end, line: s.line, newLine: s.newLine };
+  assert.throws(() => g.addColony({ ...p, antCount: 10, odour: 0.4, spot: { ...spot, line: 5 } }), /next line is 1/);
+  g.addColony({ ...p, antCount: 10, odour: 0.4, spot });
+  // the same spot again: its cell now holds a hole (and its line index is stale)
+  assert.throws(() => g.addColony({ ...p, antCount: 10, odour: 0.4, spot: { ...spot, line: g.world.lines.length } }), /already has a hole/);
 });

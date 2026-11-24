@@ -717,6 +717,14 @@ export class Game {
       spot = { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
+    if (spot.newLine) {
+      // An explicit spot (one settleAt gave and was held across another founding, or made by hand) is checked again: it must still begin the next line,
+      // and no line may already have a hole at its cell.
+      if (spot.line !== undefined && spot.line !== world.lines.length)
+        throw new Error(`addColony: the spot begins line ${spot.line}, and the world's next line is ${world.lines.length}`);
+      if (world.lines.some((l) => l.line.holes.some((h) => h.x === spot!.cell.x && h.y === spot!.cell.y)))
+        throw new Error(`addColony: a line already has a hole at ${spot.cell.x},${spot.cell.y}`);
+    }
     // A landing that begins a line makes the line (its curtain's first nest is the colony's); else the line it grows.
     const li = spot.newLine ? this.#addLine(spot.cell, spot.newLine.heading) : (spot.line ?? 0);
     const wl = world.lines[li] as WorldLine;
