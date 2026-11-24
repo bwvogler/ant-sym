@@ -78,13 +78,12 @@ One source interface, so later organisms plug in without touching the fog (`ja-1
 ### 4.2 Three states per cell
 
 - **Explored:** a bitset per layer and chunk, one bit a cell (512 B a chunk), set on first sight and never cleared. Per cell rather than per chunk (the endless note's first proposal): a chunk is 64 cells across, about 16 host reaches, so a per-chunk bit would show far more than was sensed.
-- **Live:** stamped by an observer at the current step, or within a short grace (proposed 0.5 s) so the edge of a walking host's disc doesn't flicker.
+- **Live:** stamped by an observer at the current step, or within `GRACE` = 1.5 sim s of it, so the edge of a walking host's disc doesn't flicker and the body, stamped every `BODY_EVERY` = 1 s, stays live between stamps (`GRACE` must exceed `BODY_EVERY`; a test holds it).
 - **Remembered:** explored and not live.
 
 ### 4.3 Last-seen snapshots
 
-- When a chunk's last live cell goes out, its paint inputs are copied as its snapshot, with the time: rock, food and quality, spoil, chambers, the hyphae and spore cells. That is `MapChunkPaintCache`'s format.
-- Live cells in a remembered chunk write through to its snapshot, so a host at a chunk's corner updates that corner only.
+- **Built (F2, `ui/fog/knowledge.ts`):** a snapshot per chunk and source, kept up to date cell by cell while a cell is sensed: the cells an observer senses are copied from the truth in the same step. So a remembered cell keeps what it held when last sensed, and cells of one chunk that different hosts left at different times each keep their own last sight. A cell still live within the grace is at most `GRACE` stale, so the renderer draws every explored cell from its snapshot and nothing pops when it turns remembered. "Last seen" is kept per 8 Ã— 8 block (256 B a chunk).
 - A chunk never sensed has no snapshot. One whose snapshot equals the truth draws the same either way.
 - Ants, brood, queens and alates are never in a snapshot (owner). Corpses on the ground are remembered as ground items, since they don't move (owner, 2026-11-23).
 
@@ -172,7 +171,7 @@ F1 and F2 change nothing on the page and can land before the endless world. F3â€
 8. Corpses are remembered in snapshots, as ground items.
 
 **Still open, each with a recommendation:**
-1. **The grace period.** Recommend 0.5 s, set in F3 by eye and by an edge-flicker test.
+1. **The grace period.** Built as 1.5 s (it must exceed the body's 1 s stamp interval); F3 may tune it by eye.
 2. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
 3. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
 

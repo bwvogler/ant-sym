@@ -7753,7 +7753,7 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 6. **Every host sees, of any ant kind: strain doesn't matter** (owner, 2026-11-23). D1: for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of"; nothing is drawn on the map (owner, 2026-11-23).
 
-**Proposed** (needs the owner): a grace of 0.5 s against edge flicker.
+**Built choice** (not the owner's call): a grace of 1.5 s against edge flicker, because it must exceed the body's 1 s stamp interval.
 
 **The mechanic.**
 - **Observers:**
@@ -7793,8 +7793,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 - `ja-1ypq.7` F7 endless (blocks `ja-qpv.4`);
 - `ja-1ypq.8` F8 other organisms.
 
+**F2 built (`ja-1ypq.2`, 2026-11-24):** `ui/fog/knowledge.ts` (explored bit per cell, snapshots per source copied while sensed, last-seen per 8 × 8 block) and `ui/fog/known.ts` (known colonies, live or as of); `SensedMap.onSeen` and `onReset` feed it. Measured in `fogKnowledge.test.ts`: 512 B of explored bits plus 256 B of block times a chunk, and 4 KB a byte layer or 16 KB a float layer of snapshot. Which sources the renderer copies (rock, food, quality, spoil, spores, chambers) is F3's choice, and with all of them a chunk is tens of KB, which is why F7 drops snapshots of chunks unchanged since seen. A picture only; goldens untouched.
+
 **Still open.**
-- The grace proposal above.
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.

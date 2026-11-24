@@ -43,6 +43,10 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
+  /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
+  onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
+  /** told when time goes back and everything is forgotten */
+  onReset: (() => void) | null = null;
   /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
   #bodyAt = -Infinity;
 
@@ -95,6 +99,7 @@ export class SensedMap {
       this.#fresh.clear();
       this.#revealed.clear();
       this.#bodyAt = -Infinity;
+      this.onReset?.();
     }
     this.now = now;
   }
@@ -146,6 +151,7 @@ export class SensedMap {
         const end = Math.min(right + 1, (cx + 1) * CHUNK);
         const start = row + (gx & (CHUNK - 1));
         grid.ensure(cx, cy).fill(this.now, start, start + end - gx);
+        this.onSeen?.(l, cx, cy, start, start + end - gx);
         const key = chunkKey(cx, cy);
         if (fresh.get(key) !== this.now) {
           fresh.set(key, this.now);
