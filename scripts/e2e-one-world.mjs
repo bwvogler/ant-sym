@@ -44,6 +44,11 @@
 //     keeps only the guide and the nest; l closes it.
 //  16. Polish (PRD §69.9): Appearance (set, kept across a reload, the palette, System clears it), a drawer's motion and its
 //     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
+//  17. fewer notices (PRD §69.6): the same notice three times is one toast, counted (×3); Important only floats a warning and not a remark;
+//     Bell only floats none (they stay in the page for a screen reader); the choice is kept across a reload.
+//  18. the fog of war (PRD §89, ja-1ypq.3.6), on `?fog=1`: the cell under a host is live, ground no host has been near is unknown, a cell a
+//     host left is remembered and stays explored; a frame costs about what it does without the fog; and "no ants": a plain ant put on
+//     remembered ground is not drawn (the crop of the field is byte-identical with it and without it), where on live ground it is.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -2386,8 +2391,191 @@ try {
   await fp.reload();
   check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
   await fctx.close();
-  // ——— 18. Line picking: a click on a second line shows that line's curtain (E5.6, ja-qpv.4.6) ———
-  section("18. line picking");
+  // ——— 18. The fog of war (docs/fog-of-war.md, F3.6, `?fog=1`) ———
+  section("18. the fog of war");
+  // Two pages of one seed stepped the same by the hook: the sim is deterministic, so what differs is the page.
+  const fogPage = async (query) => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(`${url}${query}`);
+    await p.getByLabel("world seed").fill(String(SEED));
+    await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(() => p.evaluate(() => !!window.jevAnts?.game.world), "a game for the fog checks", 20_000, 100);
+    await p.getByRole("button", { name: "Pause", exact: true }).click();
+    return { c, p };
+  };
+  const { c: gctx, p: gp } = await fogPage("?fog=1");
+  // Every living host on the plane: its cell. The real frames before the Pause make which ant is first, and where, vary from run to run.
+  const hostCells = () =>
+    gp.evaluate(() => {
+      const out = [];
+      for (const c of window.jevAnts.game.colonies)
+        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 0.05 && (c.layer[i] ?? 0) === 0) out.push([c.x[i], c.y[i]]);
+      return out;
+    });
+  const stateAt = (x, y) => gp.evaluate(([a, b]) => window.jevAnts.fogState("above", a, b), [x, y]);
+  let seen = [];
+  for (let round = 0; round < 30 && seen.length === 0; round++) {
+    await gp.evaluate(() => window.jevAnts.step(100));
+    seen = await hostCells();
+  }
+  check(seen.length > 0, "a host is found on the plane");
+  check((await stateAt(...seen[0])) === 2, "the cell under a host is live");
+  check((await stateAt(0.5, 0.5)) === 0, "a cell nothing has sensed is unknown");
+  // Hosts walk away (or die): of the cells hosts have stood on, one turns remembered (live only while a host or the fungus's body is near), and none is unknown.
+  let left = null;
+  for (let round = 0; round < 200 && !left; round++) {
+    await gp.evaluate(() => window.jevAnts.step(30));
+    for (const c of await hostCells()) if (seen.length < 60) seen.push(c);
+    for (const c of seen) if ((await stateAt(...c)) === 1) left = c;
+  }
+  check(left !== null, `a cell a host stood on is remembered once nothing senses it (${seen.length} cells watched)`);
+  await gp.evaluate(() => window.jevAnts.step(300));
+  for (const c of seen) check((await stateAt(...c)) !== 0, "every cell a host stood on stays explored");
+  check((await stateAt(0.5, 0.5)) === 0, "while the ground no host has been near is still unknown");
+  const nofog = await fogPage("");
+  check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "without ?fog=1 the page has no fog");
+  // The frame time: the same game time on both pages (the sim is deterministic only from the Pause), zoomed in to hexagons, paused (so a frame
+  // draws alone), the CPU slowed 4× on both so a cost shows over vsync (a phone's frame rate was lost to it, PR #408). The mean, for the median sits on the vsync tick.
+  const timeOf = (p) => p.evaluate(() => window.jevAnts.game.time);
+  for (const [lag, p] of [
+    [(await timeOf(gp)) - (await timeOf(nofog.p)), nofog.p],
+    [(await timeOf(nofog.p)) - (await timeOf(gp)), gp],
+  ])
+    if (lag > 0) await p.evaluate((n) => window.jevAnts.step(n), Math.round(lag * 30)); // REHEARSE_DT is 1/30
+  const frames = async (p) => {
+    await (await p.context().newCDPSession(p)).send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    await p.mouse.move(640, 450);
+    for (let i = 0; i < 6; i++) await p.mouse.wheel(0, -300);
+    await p.waitForTimeout(800);
+    const zoom = await p.evaluate(() => window.jevAnts.camera("above").zoom);
+    const mean = await p.evaluate(
+      () =>
+        new Promise((done) => {
+          const ds = [];
+          let last = performance.now();
+          const t = () => {
+            const n = performance.now();
+            ds.push(n - last);
+            last = n;
+            if (ds.length < 61) requestAnimationFrame(t);
+            else done(ds.slice(1).reduce((a, b) => a + b, 0) / (ds.length - 1));
+          };
+          requestAnimationFrame(t);
+        }),
+    );
+    return { zoom, mean };
+  };
+  const fogF = await frames(gp);
+  const baseF = await frames(nofog.p);
+  console.log(`  mean frame, paused, zoomed in, CPU 4× slower: fog ${fogF.mean.toFixed(1)} ms, no fog ${baseF.mean.toFixed(1)} ms`);
+  check(
+    fogF.zoom >= 12 && baseF.zoom >= 12,
+    `both pages are zoomed in to hexagons (zoom ${fogF.zoom.toFixed(1)}, ${baseF.zoom.toFixed(1)}; HEX_ZOOM is 12)`,
+  );
+  check(
+    fogF.mean <= Math.max(baseF.mean * 1.5, baseF.mean + 15),
+    `the fog's frame time (${fogF.mean.toFixed(1)} ms) is within noise of the game without it (${baseF.mean.toFixed(1)} ms)`,
+  );
+  // "And no ants" (ja-1ypq.3.6): the checks above read the fog's state; this one reads the picture. A host that has left leaves remembered
+  // ground, and a plain ant standing on it is not drawn: a fixed crop at the middle of the field with the ant on the cell is byte-identical
+  // to the crop with it sent away. The control runs the same two crops on live ground, where the ant's being there changes the picture, so
+  // the check could have failed (and a cell the camera cannot centre on fails the control, not the check).
+  await (await gp.context().newCDPSession(gp)).send("Emulation.setCPUThrottlingRate", { rate: 1 }); // the frame check is done
+  const interior = (c) =>
+    gp.evaluate(([x, y]) => {
+      const m = window.jevAnts.game.world.plane;
+      return x > m.x0 + 30 && x < m.x0 + m.size.w - 30 && y > 30 && y < m.size.h - 30;
+    }, c);
+  let there = null;
+  for (const c of seen)
+    if ((await stateAt(...c)) === 1 && (await interior(c))) {
+      there = c;
+      break;
+    }
+  check(there !== null, "a remembered cell well inside the map is found to look at");
+  /** [colony, slot] of the first living ant on the plane that is a host, or of one that is not. */
+  const antWhere = (host) =>
+    gp.evaluate((host) => {
+      const cs = window.jevAnts.game.colonies;
+      for (let k = 0; k < cs.length; k++)
+        for (let i = 0; i < cs[k].n; i++) if (cs[k].alive[i] && cs[k].load[i] >= 0.05 === host) return [k, i];
+      return null;
+    }, host);
+  const putAnt = ([k, i], [x, y]) => gp.evaluate(([k, i, x, y]) => window.jevAnts.game.colonies[k].putAnt(i, 0, x, y), [k, i, x, y]);
+  const lone = await antWhere(false);
+  const hostAnt = await antWhere(true);
+  check(lone !== null && hostAnt !== null, "a plain ant and a host are found to move");
+  const far = [0.5, 0.5]; // unknown ground, out of the crop
+  const twoFrames = () => gp.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  // The picture of the field at the middle of the screen, once it holds still: two crops in a row are the same (the game is paused, so what
+  // moves is only the frame catching up with the change just made; two animation frames let the draw run, and no fixed wait guesses how long).
+  const crop = async (name) => {
+    let last = null;
+    return until(
+      async () => {
+        await twoFrames();
+        const b = await gp.screenshot({
+          clip: { x: 490, y: 300, width: 300, height: 300 },
+          ...(SHOTS ? { path: join(SHOTS, `fog-${name}.png`) } : {}),
+        });
+        const same = last !== null && b.equals(last);
+        last = b;
+        return same ? b : null;
+      },
+      `the field's picture (${name}) to hold still`,
+      8000,
+      50,
+    );
+  };
+  /** The fog page's camera once it has held still for three polls (as steadyCam does for the first page). */
+  const settledCam = async () => {
+    let last = "";
+    let same = 0;
+    return until(
+      async () => {
+        const cam = await gp.evaluate(() => window.jevAnts.camera("above"));
+        const key = JSON.stringify(cam);
+        same = key === last ? same + 1 : 0;
+        last = key;
+        return same >= 2 && cam ? cam : null;
+      },
+      "the fog page's camera to hold still",
+      5000,
+      60,
+    );
+  };
+  await gp.evaluate(() => window.jevAnts.goNest(1)); // the camera is the player's from here on
+  await settledCam();
+  await gp.evaluate(([x, y]) => {
+    const c = window.jevAnts.camera("above");
+    c.x = x;
+    c.y = y;
+    c.zoom = 30;
+  }, there);
+  const cam18 = await settledCam();
+  check(near(cam18.x, there[0], 1e-6) && near(cam18.y, there[1], 1e-6), "the camera is on the remembered cell");
+  check((await stateAt(...there)) === 1, "the cell is still remembered, not live");
+  await putAnt(lone, there);
+  const withAnt = await crop("remembered-with-ant");
+  await putAnt(lone, far);
+  const withoutAnt = await crop("remembered-without-ant");
+  check(withAnt.equals(withoutAnt), "an ant on remembered ground is not drawn: the picture is the same with it and without it");
+  await putAnt(hostAnt, there);
+  await gp.evaluate(() => window.jevAnts.step(1));
+  check((await stateAt(...there)) === 2, "a host put on the cell makes it live again");
+  await putAnt(lone, there);
+  const liveWith = await crop("live-with-ant");
+  await putAnt(lone, far);
+  const liveWithout = await crop("live-without-ant");
+  check(!liveWith.equals(liveWithout), "the same ant on live ground is drawn: the picture differs with it and without it");
+  check(!liveWith.equals(withAnt), "and live ground is drawn unlike remembered ground");
+  await gctx.close();
+  await nofog.c.close();
+  // ——— 19. Line picking: a click on a second line shows that line's curtain (E5.6, ja-qpv.4.6) ———
+  section("19. line picking");
   const lnctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
   const lnp = await lnctx.newPage();
   await lnp.addInitScript(`window.__onField = ${onField.toString()};`);

@@ -7,6 +7,7 @@ import { devHook, installDevHook, type DevDeps } from "../../dev/hook.ts";
 import { REHEARSE_DT } from "../rehearse.ts";
 import type { Followed } from "../follow.ts";
 import { SensedMap } from "../fungusSight.ts";
+import type { Knowledge } from "../fog/knowledge.ts";
 import { AntTraces } from "../trace.ts";
 
 // The dev hook on window.jevAnts (ja-fnd.6.2): what scripts/e2e-one-world.mjs calls, and what each call does. Until now only the e2e
@@ -193,4 +194,16 @@ test("installDevHook puts the hook on window.jevAnts, with the keys devHook buil
     if (had === undefined) delete w.window;
     else w.window = had;
   }
+});
+
+test("fogState reads the fog's state of the cell under (x, y) on the view's layer, and is null with no fog (F3.6)", () => {
+  assert.equal(make().hook.fogState("above", 2, 3), null);
+  const asked: [number, number, number][] = [];
+  const sensed = new SensedMap();
+  sensed.knowledge = { stateAt: (l: number, x: number, y: number) => (asked.push([l, x, y]), 2) } as unknown as Knowledge;
+  const { hook } = make({ sensed });
+  assert.equal(hook.fogState("below", 40, 50), 2);
+  assert.deepEqual(asked.at(-1), [CURTAIN, 40, 50]);
+  assert.equal(hook.fogState("above", 2, 3), 2);
+  assert.deepEqual(asked.at(-1), [PLANE, 2, 3]);
 });

@@ -656,7 +656,7 @@ for (const flow of [false, true])
   });
 
 // A flower becomes a patch (PRD §85, ja-vlla.5): a tip that thickens at a colonised corpse far from every patch closes a
-// flower of seven cells, which becomes a patch with no start of its own; at the landing's rim it makes none.
+// flower (seven hyphae cells, a patch under the middle one only, 2026-11-24), which becomes a patch with no start of its own; at the landing's rim it makes none.
 
 /** A plane cell at least `far` cells from `from`, with its six neighbours open: a place for a corpse. */
 function openSpot(g: Game, from: { x: number; y: number }, far: number): [number, number] {
@@ -690,9 +690,10 @@ test("thickening at a colonised corpse far from every patch closes a flower that
   // The flower roots no tips of its own (owner, 2026-11-23): only the corpse's own six can still stand in it.
   assert.ok(there <= 6, `no tip is rooted by the flower: at most the corpse's six stand in it (${there})`);
   assert.equal(e.patches, patches + 1, "one more patch, room to grow");
-  assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 7, "its seven cells are base");
-  for (const c of [[x, y], ...[0, 1, 2, 3, 4, 5].map((d) => [nx(x, y, d), ny(y, d)])] as [number, number][])
-    assert.ok(h.sources.has(hyphaKey(c[0], c[1])), `source ${c}`);
+  // Only the middle is patch (owner 2026-11-24): its six neighbours are hyphae, and patch later if each closes a flower of its own.
+  assert.equal(g.fungus.patchOn(PLANE).length / 2, base + 1, "its middle cell is base, and only that");
+  assert.ok(h.sources.has(hyphaKey(x, y)), "the middle is a source");
+  for (let d = 0; d < 6; d++) assert.ok(!h.sources.has(hyphaKey(nx(x, y, d), ny(y, d))), `neighbour ${d} is no source`);
   assert.ok(e.mass - mass < 1, `no start of 4 for a flower (mass ${mass.toFixed(2)} to ${e.mass.toFixed(2)})`);
   // A save keeps it.
   const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
@@ -738,7 +739,7 @@ test("a corpse with rock beside it: no flower takes a rock cell, and the corpse'
   assert.ok(!near.has(hyphaKey(...at)), "the corpse's own cell, with rock beside it, is in no flower");
 });
 
-test("a flower that touches a patch spreads it over its other cells, and the patch count stays; one centred in a patch counts for nothing", () => {
+test("a flower whose middle touches a patch extends it by that cell, and the patch count stays; one centred in a patch counts for nothing", () => {
   const g = game(true);
   g.fungus.bindPolicy("growth", () => "rest");
   const e = g.fungus.evolution!;
@@ -801,6 +802,48 @@ for (const last of ["a neighbour", "the middle"] as const) {
     assert.equal(e.patches, patches + 1, "a new patch");
   });
 }
+
+test("a neighbour of a flower's middle becomes patch when it is itself surrounded by hyphae, and extends that patch", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "rest");
+  const e = g.fungus.evolution!;
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  const [x, y] = openSpot(g, h.tips[0]!, 25);
+  const around = (cx: number, cy: number) => {
+    h.addCell(cx, cy);
+    for (let d = 0; d < 6; d++) h.addCell(nx(cx, cy, d), ny(cy, d));
+  };
+  const patches = e.patches;
+  around(x, y);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 1);
+  assert.equal(g.fungus.spread, 0);
+  // The neighbour's own six are hyphae: it is a middle now, beside the patch, so the patch extends and the count stays.
+  const [bx, by] = [nx(x, y, 0), ny(y, 0)];
+  around(bx, by);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 1, "no new patch");
+  assert.equal(g.fungus.spread, 1, "one cell added to the patch");
+  assert.equal(e.patches, patches + 1, "the count stays");
+  assert.ok(h.sources.has(hyphaKey(bx, by)), "the neighbour is a source");
+  assert.ok(!h.sources.has(hyphaKey(nx(x, y, 3), ny(y, 3))), "the far neighbour is not");
+});
+
+test("an infected queen's founding roots one tile and still sets out six tips (ja-64xl)", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "rest");
+  const e = g.fungus.evolution!;
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  const holes = g.world!.line.holes;
+  const last = holes[holes.length - 1]!;
+  const baseBefore = g.fungus.patchOn(PLANE).length / 2;
+  const tipsBefore = h.tips.length;
+  const patches = e.patches;
+  g.addColony({ x: centreX(last.x, last.y) + 20, y: centreY(last.y), antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } });
+  assert.equal(e.patches, patches + 1, "it roots by her hole");
+  assert.equal(g.fungus.patchOn(PLANE).length / 2, baseBefore + 1, "one tile");
+  assert.equal(h.tips.length, tipsBefore + 6, "six tips set out from it");
+});
 
 test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {
   const g = game(true);
