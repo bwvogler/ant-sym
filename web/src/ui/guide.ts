@@ -666,7 +666,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "lichen",
     title: "The lichen partner",
     covers:
-      "A plan for the fungus to take an alga on rock: lichens capture their alga by contact (free algae are scarce; some take another lichen's), spread over rock from the edge, fix carbon only while wet and lit, and turn rock into soil; usnic acid made insects die faster of Metarhizium; red wood ants carry lichen fragments. Not built.",
+      "A plan for the fungus to take an alga on rock: lichens capture their alga by contact (free algae are scarce; some take another lichen's), spread over rock from the edge, fix carbon only while wet and lit, and turn rock into soil; in two studies read only as abstracts, usnic acid made insect larvae die faster of Metarhizium and Beauveria; red wood ants carry lichen fragments. Not built.",
   },
   {
     note: "builder",

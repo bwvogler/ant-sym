@@ -7740,18 +7740,19 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
   - All four groups go into the epic: partner and crust on rock, light income, rock to soil, and the bitter crust and ant carriers last.
   - Partners come from both scarce alga films on rock edges and wild lichens to overgrow.
   - Weathering opens rock to the hyphae first. Rock the ants can dig is a later step, behind its own assay.
+- **Owner (2026-11-24, on the review of #377):** ants meet a lichen from the next cell (beside), as a hypha meets an alga; the crust stays on rock, so ants can't dig it away.
 - **Proposed:**
   - Contact, spread, light and weathering are body, not choice (no Jev situation field).
   - Light income goes to the free pool (§85 M3), capped by the crust's area.
   - Every rate is design, set from the assay.
 
 **The mechanic.** Each milestone is a PR behind a setting whose off is main bit for bit:
-- **L1:** alga films and wild lichens in world generation. A free-pool `lichen` trait lets a hypha touching one start a lichen, which grows one rock cell from its rim every interval. An overgrown wild lichen is captured.
+- **L1:** alga films and wild lichens in world generation. A free-pool `lichen` trait lets a hypha beside one turn the alga's rock cell into a lichen, which grows one rock cell from its rim every interval. An overgrown wild lichen is captured.
 - **L2:** lichen cells in light (the plane, and curtain cells beside the sky) feed the free pool.
 - **L3a:** rock under an old lichen becomes ground the hyphae enter.
 - **L3b:** that rock becomes soil the ants dig.
-- **L4:** a bitter crust; an ant on lichen loses resistance.
-- **L5:** ants carry fragments and start lichens where they drop them.
+- **L4:** a bitter crust; an ant beside a lichen cell loses resistance.
+- **L5:** an ant beside a lichen cell may scrape a fragment, carry it, and start a lichen where it drops it.
 
 A table of cue, response, rule and off is in the note. No rule reads state the fungus or an ant could not sense: there is a new fungus contact row in `vision.md`'s sense table, and no gap row.
 

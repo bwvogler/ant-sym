@@ -25,6 +25,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - All four groups go into the epic: partner and crust, light income, rock to soil, then bitter crust and ant carriers.
   - Partners come from alga films and from wild lichens to overgrow.
   - Rock opens to hyphae first. Rock the ants can dig is a later step.
+  - Owner, 2026-11-24: ants meet a lichen from the next cell (**beside**), as a hypha meets an alga; the crust stays on rock, out of the ants' reach.
 
 ## 1. Finding a partner: contact, a scarce free alga, theft
 
@@ -41,7 +42,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - Beck et al. (1998) found *Xanthoria*'s alga different from neighbouring *Physcia*'s, so they found no theft there.
   - Even lichens that disperse both partners together end up with algae unmatched to the fungus (Wornik & Grube 2010, *Microb Ecol* 59:150, ABS). Partners are swapped and shared.
 
-**In the game:** a hypha cell beside an alga film, or beside a wild lichen, becomes a lichen there.
+**In the game:** a hypha cell beside an alga film, or beside a wild lichen, is the contact: the alga's rock cell becomes lichen (the hypha's own open cell stays hypha).
 - **Body, not choice.** This is contact physiology, so it needs no situation field and costs no Jev.
 - **World content (design):**
   - **Alga films:** scarce, on rock cells beside open ground.
@@ -90,11 +91,11 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - Lichens colonise bedrock, break it into fragments, colonise those, and trap fine grains into a nascent soil.
   - The named processes are single hyphae drilling into the grit, and tunnels widened by the thallus swelling and shrinking with fog and dew.
   - Green algae release OH⁻ as they photosynthesise and raise the pH.
-  - Phosphatase activity was 140–221 µg p-nitrophenol g⁻¹ h⁻¹.
+  - On black grit stones, alkaline phosphatase, acid phosphatase and phosphodiesterase activities were 140, 165 and 221 µg p-nitrophenol g⁻¹ h⁻¹.
   - The authors call biocrust weathering rates a field "still in its infancy". No mm a year is given.
-- **Depth.** Hyphae went 4–5 mm into a medieval brick tower on wet faces and 2–3 mm on dry faces. Calcium oxalate formed at the contact (Zabihi, Sohrabi, Nortaghani & Favero-Longo 2025, *Sci Rep* 15:37391, FT). This is brick, not natural rock.
+- **Depth.** In a medieval brick tower, *Calogaya decipiens* hyphae went 4–5 mm deep on wet faces and 2–3 mm on dry faces, while *Verrucaria nigrescens* reached 1.0–2.5 mm on both. Calcium oxalate formed at the contact in some species (Zabihi, Sohrabi, Nortaghani & Favero-Longo 2025, *Sci Rep* 15:37391, FT). This is brick, not natural rock.
 - **Contrary.**
-  - The evidence on how much lichens weather rock is "contradictory": on schist, hyphae spread more on north-west faces, while oxalate (chemical weathering) was found only on south-east faces (Marques et al. 2016, *Ecology* 97:2844, ABS).
+  - The evidence on how much lichens weather rock is "contradictory": on schist, hyphal spread was higher in the species dominant on north-west faces (no species spread differently by orientation), while oxalate (chemical weathering) was found only on south-east faces (Marques et al. 2016, *Ecology* 97:2844, ABS).
   - Oxalate crusts can consolidate stone as well as break it (`fungus-unlocks.md` §3, Paiva et al. 2026).
 - **Not read:** two reviews with rates, Chen, Blume & Beyer 2000 (*Catena* 39:121) and Stretch & Viles 2002 (*Geomorphology* 47:87). Both are gathered in `ja-vlla.11.1`.
 
@@ -106,12 +107,12 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 ## 5. Usnic acid and the host
 
 - **Usnic acid helps the pathogen.** Usnic acid, a common lichen compound, **raised** deaths from *Metarhizium robertsii* and *Beauveria bassiana* in Colorado potato beetle and wax moth larvae. A reindeer-lichen extract acted in synergy with infection (Duisembecov, Dubovskiy & Glupov 2017, *Contemp Probl Ecol* 10:286, ABS, **unverified**).
-  - A fluorinated usnic acid with *B. bassiana* cut the median time to death threefold and lowered larval haemocyte counts, i.e. weakened immunity (Kryukov et al. 2018, *Pest Manag Sci* 74:598, ABS, **unverified**).
+  - A fluorinated usnic acid with *B. bassiana* cut the median time to death threefold in a field trial. It lowered larval haemocyte counts but raised phenoloxidase activity, and the authors attribute the synergy to toxicosis (Kryukov et al. 2018, *Pest Manag Sci* 74:598, ABS, **unverified**).
 - **It deters grazers.** Lichen compounds deter snails: removing them made *Parmeliaceae* palatable (Gauslaa 2005, *Oecologia* 143:94, ABS).
 - **Not found:** ants and lichen compounds, whether avoidance or harm. Nor any study of lichen compounds inhibiting entomopathogenic fungi; general antifungal screens were not reviewed.
 
 **In the game:**
-- **A "bitter crust" upgrade:** an ant standing on lichen loses some of its resistance to the fungus.
+- **A "bitter crust" upgrade:** an ant on a cell beside a lichen cell loses some of its resistance to the fungus (owner, 2026-11-24: ants meet lichen from the next cell; rock is closed to them).
 - **Body, not choice.** It is a body effect on the host: no new ant sense and no choice.
 - **Gated:** behind reading the two papers in full (`ja-vlla.11.1`).
 - **Design, for now:** ants are not beetle larvae, and contact on a cell is not eating, so the effect stays **design** until then.
@@ -127,7 +128,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - Mite droppings held living cells of both partners (Meier et al. 2002, ABS).
 
 **In the game:**
-- **Pickup:** an ant crossing lichen may pick up a fragment as load, as it picks up spores.
+- **Pickup:** an ant on a cell beside a lichen cell may scrape a fragment from it and carry it as load, as it picks up spores.
 - **Drop:** where it drops it on rock, or beside its mound, a new lichen starts. The colonies become the lichen's dispersers.
 - **Rates:** they are **design**.
 - **Gated:** behind reading Heinken in full.
@@ -196,12 +197,12 @@ Each milestone is its own PR behind a setting whose off is main bit for bit. **B
 | Milestone | Cue (sensed) | Response | Local rule (design) | Off | Bead |
 |---|---|---|---|---|---|
 | Assay | none | metrics only: time to first lichen, lichen cells, growth from light, weathered cells | none | main | `ja-vlla.11.2` |
-| L1 partner and crust | a hypha cell touching an alga film or a wild-lichen cell (the fungus's contact) | lichen there; a wild lichen overgrown is captured | one rock cell from the rim every interval; free-pool `lichen` trait after the mycelium levels | no world content, no trait level | `ja-vlla.11.3` |
+| L1 partner and crust | a hypha cell beside an alga film or a wild-lichen cell (the fungus's contact) | the alga's rock cell becomes lichen; a wild lichen overgrown is captured | one rock cell from the rim every interval; free-pool `lichen` trait after the mycelium levels | no world content, no trait level | `ja-vlla.11.3` |
 | L2 light | a lichen cell in light (plane, or curtain beside the sky) | growth into the free pool | a rate per lit cell, capacity by lichen area | rate 0 | `ja-vlla.11.4` |
 | L3a rock to hyphae | lichen age on a rock cell | rock becomes ground the hyphae enter | age threshold | never | `ja-vlla.11.5` |
 | L3b rock to ants | weathered rock | rock becomes soil the ants dig | age threshold | never | `ja-vlla.11.6` |
-| L4 bitter crust | a host on a lichen cell | its resistance falls | a factor per second on lichen; free-pool upgrade | factor 1 | `ja-vlla.11.7` |
-| L5 ant carriers | an ant on a lichen cell | it may carry a fragment; dropped on rock or by its mound, a lichen starts | a pickup chance, a drop rule | chance 0 | `ja-vlla.11.8` |
+| L4 bitter crust | a host on a cell beside a lichen cell | its resistance falls | a factor per second beside lichen; free-pool upgrade | factor 1 | `ja-vlla.11.7` |
+| L5 ant carriers | an ant on a cell beside a lichen cell | it may scrape and carry a fragment; dropped on rock or by its mound, a lichen starts | a pickup chance, a drop rule | chance 0 | `ja-vlla.11.8` |
 
 Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.11.9`). Nothing reads state an ant or the fungus could not sense, so the vision gap table gains no row.
 
@@ -256,7 +257,7 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
 ## Sources
 
 - Armstrong RA, Bradwell T (2010). Growth of crustose lichens: a review. *Geogr Ann A* 92:3–17. [doi:10.1111/j.1468-0459.2010.00374.x](https://doi.org/10.1111/j.1468-0459.2010.00374.x) (ABS)
-- Armstrong RA (2005). Radial growth of *Rhizocarpon* section *Rhizocarpon* lichen thalli over six years at Snoqualmie Pass. *Arct Antarct Alp Res* 37:411. [doi:10.1657/1523-0430(2005)037[0411:RGORSR]2.0.CO;2](https://doi.org/10.1657/1523-0430(2005)037%5B0411:RGORSR%5D2.0.CO;2) (ABS; title from the search, DOI not checked)
+- Armstrong RA (2005). Radial growth of *Rhizocarpon* section *Rhizocarpon* lichen thalli over six years at Snoqualmie Pass. *Arct Antarct Alp Res* 37:411–415. [doi:10.1657/1523-0430(2005)037[0411:RGORSR]2.0.CO;2](https://doi.org/10.1657/1523-0430(2005)037%5B0411:RGORSR%5D2.0.CO;2) (ABS)
 - Beck A, Friedl T, Rambold G (1998). Selectivity of photobiont choice in a defined lichen community: inferences from cultural and molecular studies. *New Phytol* 139:709–720. [doi:10.1046/j.1469-8137.1998.00231.x](https://doi.org/10.1046/j.1469-8137.1998.00231.x) (ABS)
 - Bhatt U, Singh H, Kalaji HM, Strasser RJ, Soni V (2024). Decoding the physicochemical basis of resurrection: the journey of lichen *Flavoparmelia caperata*. *BMC Plant Biol* 24:1268. [PMC11681686](https://pmc.ncbi.nlm.nih.gov/articles/PMC11681686/), [doi:10.1186/s12870-024-05751-9](https://doi.org/10.1186/s12870-024-05751-9) (FT)
 - Boch S, Prati D, Werth S, Rüetschi J, Fischer M (2011). Lichen endozoochory by snails. *PLoS One* 6:e18770. [PMC3076439](https://pmc.ncbi.nlm.nih.gov/articles/PMC3076439/) (FT)
@@ -267,9 +268,10 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
 - Gasulla F, del Campo EM, Casano LM, Guéra A (2021). Advances in understanding of desiccation tolerance of lichens and lichen-forming algae. *Plants* 10:807. [doi:10.3390/plants10040807](https://doi.org/10.3390/plants10040807) (FT)
 - Gauslaa Y (2005). Lichen palatability depends on investments in herbivore defence. *Oecologia* 143:94. [doi:10.1007/s00442-004-1768-z](https://doi.org/10.1007/s00442-004-1768-z) (ABS)
 - Heinken T, Rohner M-S, Hoppert M (2007). Red wood ants (*Formica rufa* group) disperse bryophyte and lichen fragments on a local scale. [Potsdam repository](https://publishup.uni-potsdam.de/frontdoor/index/index/docId/30639) (ABS; venue not confirmed)
-- Joneson S, Armaleo D, Lutzoni F (2011). Fungal and algal gene expression in early developmental stages of lichen-symbiosis. *Mycologia*. [doi:10.3852/10-064](https://doi.org/10.3852/10-064) (ABS)
+- Joneson S, Armaleo D, Lutzoni F (2011). Fungal and algal gene expression in early developmental stages of lichen-symbiosis. *Mycologia* 103:291–306. [doi:10.3852/10-064](https://doi.org/10.3852/10-064) (ABS)
 - Joneson S, Lutzoni F (2009). Compatibility and thigmotropism in the lichen symbiosis: a reappraisal. *Symbiosis* 47:109. [doi:10.1007/bf03182294](https://doi.org/10.1007/bf03182294) (NR)
 - Jung P et al. (2020). Lichens bite the dust: a bioweathering scenario in the Atacama Desert. *iScience* 23:101647. [PMC7578742](https://pmc.ncbi.nlm.nih.gov/articles/PMC7578742/) (FT)
+- Knowles RD, Pastor J, Biesboer DD (2006). Increased soil nitrogen associated with dinitrogen-fixing, terricolous lichens of the genus *Peltigera* in northern Minnesota. *Oikos* 114:37–48. [doi:10.1111/j.2006.0030-1299.14382.x](https://doi.org/10.1111/j.2006.0030-1299.14382.x) (ABS)
 - Kryukov VY et al. (2018). Effects of fluorine-containing usnic acid and fungus *Beauveria bassiana* on the survival and immune–physiological reactions of Colorado potato beetle larvae. *Pest Manag Sci* 74:598. [doi:10.1002/ps.4741](https://doi.org/10.1002/ps.4741) (ABS)
 - Lendemer JC et al. (2019). A taxonomically broad metagenomic survey of 339 species spanning 57 families suggests cystobasidiomycete yeasts are not ubiquitous across all lichens. *Am J Bot* 106:1090–1095. [doi:10.1002/ajb2.1339](https://doi.org/10.1002/ajb2.1339) (ABS)
 - Li Y, Kromer B, Schukraft G et al. (2014). Growth rate of *Usnea aurantiacoatra* (Jacq.) Bory on Fildes Peninsula, Antarctica and its climatic background. *PLoS One* 9:e100735. [PMC4072682](https://pmc.ncbi.nlm.nih.gov/articles/PMC4072682/) (FT)
