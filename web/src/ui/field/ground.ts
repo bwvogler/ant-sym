@@ -41,6 +41,12 @@ import { HEX_ZOOM } from "./zoom.ts";
 export const CUT_MAX = STRIP;
 /** No chunk column: drawHexes' "none yet" (−1 is a real chunk column on one world's curtain). */
 const NO_CHUNK = -0x80000000;
+
+/** Whether chunk pixel `o` is plain fog: never sensed (opaque) or remembered open ground (dimPx's 70). */
+function fogCell(data: Uint8ClampedArray, o: number, fogPx: readonly number[]): boolean {
+  const a = data[o + 3];
+  return (a === 255 || a === 70) && data[o] === fogPx[0] && data[o + 1] === fogPx[1] && data[o + 2] === fogPx[2];
+}
 /** The builder's sugar (candy pink, as its 🍬) and crumbs (biscuit brown, as its 🍪), drawn apart from the ground's food. */
 export const SUGAR_RGB: [number, number, number] = [214, 72, 140];
 export const CRUMB_RGB: [number, number, number] = [150, 100, 52];
@@ -147,7 +153,7 @@ export class Ground {
    * paints none.
    */
   draw(k: FieldCtx, show: GroundShow, win: CellWindow, hexMix: number, foodAsSprites: boolean): void {
-    const { ctx, c, v, m } = k;
+    const { m } = k;
     const { rx0, rx1, ry0, ry1 } = win;
     for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
       for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
@@ -156,18 +162,24 @@ export class Ground {
         const cc = this.chunkCanvas(cx, cy);
         this.paintChunk(k, show, cx, cy, cc, rc, foodAsSprites);
         if (hexMix > 0) continue;
-        const ly0 = Math.max(0, ry0 - cy * CHUNK);
-        const ly1 = Math.min(CHUNK - 1, ry1 - cy * CHUNK);
-        for (let ly = ly0; ly <= ly1; ly++) {
-          const y = cy * CHUNK + ly;
-          const [ax, ay] = toScreen(c, v, cx * CHUNK + 0.5 * (y & 1), y * R);
-          const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
-          const dx = Math.round(ax);
-          const dy = Math.round(ay);
-          ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
-        }
+        this.layBricks(k, win, cx, cy, cc);
       }
     if (hexMix > 0) this.drawHexes(k, win, hexMix);
+  }
+
+  /** Chunk (cx, cy)'s rows laid on the canvas as bricks: a strip a cell high for each row, odd rows shifted half a cell. */
+  private layBricks(k: FieldCtx, win: CellWindow, cx: number, cy: number, cc: ChunkCanvas): void {
+    const { ctx, c, v } = k;
+    const ly0 = Math.max(0, win.ry0 - cy * CHUNK);
+    const ly1 = Math.min(CHUNK - 1, win.ry1 - cy * CHUNK);
+    for (let ly = ly0; ly <= ly1; ly++) {
+      const y = cy * CHUNK + ly;
+      const [ax, ay] = toScreen(c, v, cx * CHUNK + 0.5 * (y & 1), y * R);
+      const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
+      const dx = Math.round(ax);
+      const dy = Math.round(ay);
+      ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
+    }
   }
 
   /** Paint chunk colours: rock/soil, trails, and legacy food washes unless aerial sprites will show the food. */
@@ -426,6 +438,15 @@ export class Ground {
     const [bx, by] = toScreen(c, v, m.x0 + ext.w, ext.h);
     ctx.fillRect(ax, ay, bx - ax, by - ay);
     this.paths.clear();
+    // Under the fog most cells in view are fog or remembered open ground: one strip a row lays them (a hexagon each, a path op a vertex, cost
+    // the phone its frame rate); hexagons then draw only the cells with something on them.
+    const fogPx = k.fog ? fogRgb(k.theme) : null;
+    if (fogPx)
+      for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
+        for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
+          const cc = this.chunks.get(`${cx},${cy}`);
+          if (cc) this.layBricks(k, win, cx, cy, cc);
+        }
     // At the distant end these six vertices describe the same staggered rectangles as the chunk pass.
     const x = c.zoom * 0.5 * (1 + 0.04 * hexMix);
     const shoulder = c.zoom * (R / 2 + (SIDE * 0.52 - R / 2) * hexMix);
@@ -465,6 +486,8 @@ export class Ground {
         }
         // The spoil wash fades out as the overhead pellets appear.
         const spoilWash = heap > 0 && data[o] === spoil[0] && data[o + 1] === spoil[1] && data[o + 2] === spoil[2];
+        // Under the fog a cell that is fog (opaque) or remembered open ground (the fog at 70) is the brick already laid.
+        if (fogPx && fogCell(data, o, fogPx)) continue;
         const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
         const a = spoilWash ? opacity * (1 - pelletAlpha * pelletAlpha) : opacity;
         const r = Math.round(data[o] * a + paper[0] * (1 - a));
