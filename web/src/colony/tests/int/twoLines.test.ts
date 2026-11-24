@@ -135,11 +135,6 @@ test("a colony on a line the world does not have is an error, and so are more co
   );
 });
 
-test("a save holds one line: a game over two refuses to save, so no line is lost without a word", () => {
-  assert.throws(() => game().save(), /2 lines/);
-  assert.doesNotThrow(() => new Game(generateOneWorld(SEED), {}, mulberry32(1)).save());
-});
-
 test("a colony's food left is its plane's and its own curtain's, not another line's", () => {
   const g = game();
   g.colonies.forEach((c, k) => assert.equal(c.foodLeft, g.world.plane.foodLeft + g.world.lines[k]!.curtain.foodLeft, `colony ${k}`));

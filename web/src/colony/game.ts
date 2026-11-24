@@ -11,7 +11,7 @@ import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, hash01, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
-import { cellAt, type Cell, type End, makeTransect, outward } from "./transect.ts";
+import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -174,7 +174,13 @@ export interface GameSave {
    * One world (U4b): its seed, the line as saved (its holes, V₀'s column and the margin: a check, since load grows the
    * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
    */
-  world: { seed: number; line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown };
+  world: {
+    seed: number;
+    line: { holes: Cell[]; s0: number; margin: number };
+    curtain: unknown;
+    /** the lines after the first (docs/endless-world.md §8): absent in a game of one line */
+    more?: { line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown }[];
+  };
   private: {
     fightDeaths: number;
     lastFightDeath: number;
@@ -1198,9 +1204,6 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
-    // A save holds the first line and its curtain: another line would be lost without a word (saves hold the lines: E3.4).
-    if (this.world.lines.length > 1)
-      throw new Error(`save: this world has ${this.world.lines.length} lines, and a save holds one (docs/endless-world.md §8, E3.4)`);
     // A map without its nests: the world (or a re-founding) makes them.
     const bare = (m: WorldMap) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== "nests" && k !== "nest"));
     const map = bare(this.map);
@@ -1228,6 +1231,15 @@ export class Game {
         seed: world.seed,
         line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin },
         curtain: encode(bare(world.curtain)),
+        // The lines after the first, each as the first is (holes, V₀'s column, margin, and its curtain as dug): a game of one line saves exactly as it always has.
+        ...(world.lines.length > 1
+          ? {
+              more: world.lines.slice(1).map((l) => ({
+                line: { holes: l.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: l.line.sHole[0]!, margin: l.line.margin },
+                curtain: encode(bare(l.curtain)),
+              })),
+            }
+          : {}),
       },
       private: {
         fightDeaths: this.#fightDeaths,
@@ -1263,9 +1275,19 @@ export class Game {
     for (const f of saved.founded ?? []) this.addColony(f);
     // The line grown again must be the one saved: else the curtain poured below would lie under another line.
     const line = world.line;
-    const same =
-      line.holes.length === sw.line.holes.length && line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
-    if (!same || line.sHole[0] !== sw.line.s0 || line.margin !== sw.line.margin) throw new Error("save: another world's line");
+    const sameLine = (t: Transect, sl: { holes: Cell[]; s0: number; margin: number }): boolean =>
+      t.holes.length === sl.holes.length &&
+      t.holes.every((c, k) => c.x === sl.holes[k]?.x && c.y === sl.holes[k]?.y) &&
+      t.sHole[0] === sl.s0 &&
+      t.margin === sl.margin;
+    if (!sameLine(line, sw.line)) throw new Error("save: another world's line");
+    // The lines a founding began are made again by the foundings above (a line that began is a spot with `newLine`); they must be the ones saved.
+    const more = sw.more ?? [];
+    if (world.lines.length !== 1 + more.length)
+      throw new Error(`save: ${1 + more.length} lines, this game's world has ${world.lines.length}`);
+    more.forEach((m, k) => {
+      if (!sameLine((world.lines[k + 1] as WorldLine).line, m.line)) throw new Error(`save: another world's line ${k + 1}`);
+    });
     if (saved.colonies.length !== this.colonies.length)
       throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
@@ -1280,6 +1302,11 @@ export class Game {
     fillLike(this.map, saved.map);
     qualityLike(world.curtain, sw.curtain);
     fillLike(world.curtain, sw.curtain);
+    more.forEach((m, k) => {
+      const curtain = (world.lines[k + 1] as WorldLine).curtain;
+      qualityLike(curtain, m.curtain);
+      fillLike(curtain, m.curtain);
+    });
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
     this.colonies.forEach((c, k) => {
       const t = this.colonies[saved.raids[k] ?? -1];
