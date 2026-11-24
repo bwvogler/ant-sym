@@ -201,7 +201,7 @@ export default function ColonyField({
   /** A click on nothing in one world: the other view, where the line or the strip says (field/hit.ts). */
   const link = (x: number, y: number) => {
     if (!onLink) return;
-    const t = linkTarget(world, shown.current, camera(), viewport(), x, y);
+    const t = linkTarget(world, shown.current, camera(), viewport(), x, y, dpr());
     if (t) onLink(t.view, t.x, t.y);
   };
   /** Stop following now: the ref at once (a rAF draw must not re-centre on the ant first), the parent's state after. */

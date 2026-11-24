@@ -1,8 +1,6 @@
 import {
   CURTAIN,
   curtainLayerOf,
-  isCurtainLayer,
-  lineIndexOfLayer,
   PLANE,
   UPGRADES,
   type Pool,
@@ -41,7 +39,7 @@ import type { SideStats } from "./ui/stats.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
-import { clampLine, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { clampLine, MAX_SPEED, viewShowing, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
@@ -156,7 +154,11 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // What the fungus's hosts (and, under the fog, its body) have sensed (ui/fungusSight.ts).
   const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
-  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken, sensed.knowledge);
+  const { specimens, setSpecimens, togglePin } = useSpecimens(
+    game,
+    gameToken,
+    useCallback(() => sensed.knowledge, [sensed]),
+  );
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -190,7 +192,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const showAt = useCallback(
     (view: number, x: number, y: number, close = false) => {
       field.current?.centreOn(view, x, y, { close });
-      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
+      update(viewShowing(oneWorld, view));
     },
     [update, oneWorld],
   );
@@ -217,6 +219,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     demo,
     build,
   } = useBuilder({ game, view: controls.view, belowLayer, field, closeDrawer });
+  // The fog is off while building (docs/fog-of-war.md §5.4, owner 2026-11-23); the page below reads it as it is set here.
+  sensed.suspended = building;
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
     // From lg (1024 px) the aim is the bar under the map, outlined where it is; narrower it is in The fungus drawer, opened
@@ -243,7 +247,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const onCross = useCallback(
     (view: number, x: number, y: number) => {
       field.current?.centreOn(view, x, y, { keepFollow: true });
-      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
+      update(viewShowing(oneWorld, view));
     },
     [update, oneWorld],
   );
@@ -327,6 +331,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       notify: (text, tone) => pushToast(text, tone),
       traces,
       view: controls.view,
+      line: controls.line,
       followed: followedNow,
       setFollowed,
       sensed,
@@ -334,7 +339,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       openPen: openDevPen,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, controls.view, setFollowed, sensed, traces]);
+  }, [game, controls.view, controls.line, setFollowed, sensed, traces]);
   // The page (PRD §69, ja-mvo9.1): the map fills the screen; a HUD over its top; a rail of drawers at its left (a tab bar
   // on a phone); the followed ant in an inspector at its right (a sheet on a phone).
   const labProps: LabProps = {
