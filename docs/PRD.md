@@ -7024,6 +7024,36 @@ Sweep of caps 3, 4, 6, 8 and 10 on seeds 1–20 (assays runs 45101471689 and 451
 
 **What this does not fix.** On seeds 11–20 0.1/0.5 has 4 of 10 within 2 (worst 6, seed 19) and 66 porters stalled on seed 20 (G1 judges seeds 1–10 only; `ja-k4k.15.8` stays open for the porters). The stall moves with every setting and stream; the fallback removes this cause of held foragers, not the heavy tail. 60 s is a design number, not measured; the trace showed carriers past 120 s, so any value in 30–90 s would have caught them (**unverified**: not swept).
 
+### 77.8 Floor marks that keep a slope: the max rule (`markMax`, `markDecay`; ja-k4k.15.8, 2026-11-24)
+
+**The question.** At the shipped reach 0.1/0.5 (§77.7) some seeds stall porters: seed 20 of one-world `game1` has 66 at 400 s (seed 10: 14), and seeds 11–20 have 4 of 10 within 2 held foragers. What holds them?
+
+**The trace (seed 20, 400 s; measured on that seed only).** All 72 stalled porters are in tunnels, none in the royal chamber, none with a refused drop, all bound for the royal chamber (a porter's own `HOLD_MAX` fallback sends it there). The royal mark under every one is present and saturated at 19.95, the level inside the chamber. They stand in 36 cells (up to 6 to a cell), 39–41 steps of open ground from the chamber though 5–8 cells away in a straight line. Main before #320 on the same seed has no stalled porters, the same chamber, and the same cells 4–10 steps away: below the chamber it dug a wide open region (1280 open cells within 60 steps against 1106 on the head), the head's rows there are mostly rock. Layouts diverge with every stream change, so this is a layout the climb happened to produce, not a mechanism the climb adds.
+
+**Why a mark does not lead out.** `layMark` added `deposit` (4/s) × e^(−seconds since the chamber / 30) to the cell the ant stands on every tick, capped at 20: a tunnel with any traffic reaches the cap within seconds whatever its distance from the chamber, so the "fainter the further" rule survives only in cells nobody walks.
+
+**The test of the cause (same state, four arms).** At 400 s on that game, new deposits off in every arm but the first; the royal field rewritten in place. Of the 72 stalled, still carrying 100 s later: untouched 46; deposits off only 46 (the stalled count falls 72 → 62: deposits keep re-saturating); a slope of e-fold 210 steps (the old 30 s at 7 cells a second) 13; e-fold 40 steps 4.
+
+**The rule.** `markMax` 1: the cell is raised to the ant's own level, `MAX_LEVEL` × e^(−seconds since its chamber / `markDecay`), never past it and never lowering a higher value; a cell records how recently a chamber lay behind it, not how crowded it is. `markMax` 0 (the old rule) adds per tick. `markDecay` is the e-fold in seconds (30 before).
+
+**Sweep** (`game1`, seeds 1–20; held foragers, the worse colony of a seed; runs 45435395857 baseline, 45435402070 decays 30/10/6, 45440765069 decays 3/4/8; `--set` overrides):
+
+| rule | 1–10 within 2 | worst (1–10) | 11–20 within 2 | worst (11–20) | porters over 2 | median losses |
+|---|---|---|---|---|---|---|
+| old | 9 | 4 | 4 | 6 | seed 10: 14, seed 20: 66 | 59 |
+| max, 30 s | 7 | 5 | 6 | 11 | none | 90 |
+| max, 10 s | 9 | 4 | 7 | 5 | seed 11: 25 | 70 |
+| max, 6 s | 9 | 3 | 8 | 4 | none | 86 |
+| max, 8 s | 7 | 76 | 8 | 7 | seeds 1, 7, 16 | 84 |
+| max, 4 s | 6 | 4 | 4 | 4 | none | 73 |
+| max, 3 s | 8 | 7 | 7 | 4 | seed 7: 12 | 79 |
+
+6 s is the best of the seven and not a proven optimum: its neighbours 4 s and 8 s are worse and noisy (8 s has a seed with 76 held).
+
+**The other assays** (seeds 1–20; the assays' controls follow the default, not `--set`: with `--set` the controls kept the old rule and A13 read 3/20 for that reason). Runs 45440744472 (old rule) and 45445269574 (6 s as default): larvae 16 → 17, nurse zone 10 → 10 (different seeds), A12 19 → 20, A6 2 → 5 (min gain 0.50 → 0.57), A13 10 → 6. The guards' floors hold: A13 seeds 1 and 2 food 1.11 and 1.14 of the no-defence colony's (floor 0.51) with 47 and 41 raiders killed (floor 24); worst over 20 seeds 0.63 and 32. game1 with the default (run 45445277300) matches the `--set` run.
+
+**What this does not show.** That the climb causes the sealing of the short route (layouts diverge with any change); why median losses (ants lost, as the assay counts) rise from 59 to 86; why A13's own pass mark (food ≥ 0.9 of the no-defence colony's and half the war party killed) falls from 10 to 6 (earlier reach changes moved it between 5 and 12); that 6 s is the best decay. The chambers trend and `economy.test` slow guards, the soak tests and the goldens were not run before this PR.
+
 ## 78. Aphids: a clump ants find by smell, milk, guard where they stand, and sometimes eat (design, ja-nzkg, 2026-11-15)
 
 **Research basis:** [aphids.md](aphids.md):
