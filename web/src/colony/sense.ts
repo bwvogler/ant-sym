@@ -6,9 +6,9 @@ import type { Colony, HoleCell, Layer } from "./colony.ts";
 import { inReachShared } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
-import { MARKS, swapBroodStore, type Mark } from "./pheromone.ts";
+import { MARKS, MAX_LEVEL, swapBroodStore, type Mark } from "./pheromone.ts";
 import { qualityOf, type Item, type Odds, type Touch, type DeliveryContextRole, type Where } from "./responses.ts";
-import { MARK_DECAY, RETURNS_MANY } from "./tuning.ts";
+import { RETURNS_MANY } from "./tuning.ts";
 import { ENEMY, MODES, PLANE, trailLevel, type CellCounts, type Mode } from "./vocab.ts";
 import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt } from "./world.ts";
 
@@ -171,7 +171,13 @@ export function layMark(c: Colony, i: number, dt: number): void {
   } else c.sinceRole[i] = c.sinceRole[i] + dt;
   const r = c.lastRole[i];
   if (r === 0) return;
-  const laid = c.params.deposit * Math.exp(-c.sinceRole[i] / MARK_DECAY) * dt * c.layGain[i];
+  if (c.params.markMax > 0) {
+    // Raised to its own level, the field's cap fading with the time since its chamber: the cell keeps a slope, not a count.
+    const level = MAX_LEVEL * Math.exp(-c.sinceRole[i] / c.params.markDecay) * c.layGain[i];
+    if (level > 1e-3) c.ph.raiseCell(MARKS[r - 1] as Mark, cx, cy, level);
+    return;
+  }
+  const laid = c.params.deposit * Math.exp(-c.sinceRole[i] / c.params.markDecay) * dt * c.layGain[i];
   if (laid > 1e-4) c.ph.depositCell(MARKS[r - 1] as Mark, cx, cy, laid);
 }
 

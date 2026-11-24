@@ -413,6 +413,17 @@ export interface ColonyParams {
    * 16 foragers held food over two minutes. Its own timer only. 0: never (the search runs on).
    */
   deliveryFallback: number;
+  /**
+   * How a floor mark is laid (nest slice 3, `layMark`). 0: each ant adds to the cell it stands on every tick, up to the field's
+   * cap, so a busy tunnel saturates at the cap whatever its distance from the chamber and the mark gives no slope to follow
+   * (PRD §77.8: on one-world G1 seed 20 at 400 s, 72 porters stood on a mark of 19.95, the chamber's own level, 39-41 steps of tunnel from
+   * the royal chamber). 1: the cell is raised to the ant's own level, the cap fading with the seconds since its last chamber
+   * (`markDecay`), and never beyond it, so a mark records how recently a chamber lay behind and a busy tunnel keeps its slope.
+   * **Design.** Off by default (bit-exact); the sweep is in PRD §77.8.
+   */
+  markMax: number;
+  /** Seconds away from its chamber over which a floor mark falls to 1/e of what is laid at it (`layMark`). */
+  markDecay: number;
   /** nestmates round a waiting ant (its cell and the six round it, felt over CROWD_HALF) that make its home "crowded" */
   crowdAt: number;
   /** the rate per second an idle ant at home that smells a strong raid trail is recruited (less on a faint one): raids grow by degrees (docs/stance.md) */
@@ -566,6 +577,8 @@ export const DEFAULT_COLONY: ColonyParams = {
   broodCrowd: 3,
   cellCap: 0,
   deliveryFallback: 60,
+  markMax: 0,
+  markDecay: 30,
   crowdAt: 40,
   raidRecruit: 0.1,
   raidScout: 1 / 90,

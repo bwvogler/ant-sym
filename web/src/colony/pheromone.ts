@@ -153,6 +153,18 @@ export class Pheromones {
     this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
   }
 
+  /** Raise integer cell (cx, cy) to `level` (never past the channel's cap), leaving a higher value as it is: a mark that records a level, not a count. */
+  raiseCell(channel: Channel, cx: number, cy: number, level: number): void {
+    const { map } = this;
+    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
+    if (this.#absent !== null && this.#absent.has(channel)) return;
+    const f = this.fields[channel];
+    const capped = Math.min(this.params[channel].max ?? MAX_LEVEL, level);
+    if (capped <= f.get(cx, cy)) return;
+    f.set(cx, cy, capped);
+    this.#awake[channel].add(chunkKey(cx >> CHUNK_BITS, cy >> CHUNK_BITS));
+  }
+
   /** The level under world (x, y); −1 off the map, so a sensor reads the edge as worse than bare ground. */
   read(channel: Channel, x: number, y: number): number {
     cellOf(x, y);
