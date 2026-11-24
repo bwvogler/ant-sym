@@ -67,8 +67,11 @@ const cy = (c: Cell): number => centreY(c.y);
  * The unit direction the line runs out of an end hole, straight on from its end segment; with one hole, west at the
  * start and east at the end. (The lab's founding beyond an end aims along it: Game.foundBeyond.)
  */
-export function outward(holes: readonly Cell[], end: End): [number, number] {
+export function outward(holes: readonly Cell[], end: End, heading?: number): [number, number] {
   const k = holes.length - 1;
+  // With one hole the margins run along `heading` (radians; a line has no direction yet) when given, else west at the start and east at the end.
+  if (k === 0 && heading !== undefined)
+    return end === "start" ? [-Math.cos(heading), -Math.sin(heading)] : [Math.cos(heading), Math.sin(heading)];
   if (k === 0) return end === "start" ? [-1, 0] : [1, 0];
   const [a, b] = end === "start" ? [holes[1]!, holes[0]!] : [holes[k - 1]!, holes[k]!];
   const dx = cx(b) - cx(a);
@@ -83,9 +86,9 @@ export function segmentCells(a: Cell, b: Cell): Int32Array {
 }
 
 /** The `margin` cells past an end hole, nearest first: runs aimed straight on, far enough to have them all. */
-function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Array {
+function marginCells(holes: readonly Cell[], end: End, margin: number, heading?: number): Int32Array {
   const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
-  const [ux, uy] = outward(holes, end);
+  const [ux, uy] = outward(holes, end, heading);
   // A hex step is at most 1 long, so 2·margin of distance is always more than `margin` steps away.
   const fx = cx(v) + ux * 2 * margin;
   const fy = cy(v) + uy * 2 * margin;
@@ -94,8 +97,11 @@ function marginCells(holes: readonly Cell[], end: End, margin: number): Int32Arr
   return line.subarray(2, 2 + 2 * margin);
 }
 
-/** The line through `holes` (in order, at least one) with V₀ at column `s0`. */
-export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0?: number } = {}): Transect {
+/**
+ * The line through `holes` (in order, at least one) with V₀ at column `s0`. A line of one hole has no direction: its margins run west and east, or
+ * along `opts.heading` (radians) when given (a wild colony's or a far founding's line, endless-world §5); it is ignored with two holes or more.
+ */
+export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0?: number; heading?: number } = {}): Transect {
   if (holes.length === 0) throw new Error("makeTransect: no holes");
   for (let i = 1; i < holes.length; i++)
     if (holes[i]!.x === holes[i - 1]!.x && holes[i]!.y === holes[i - 1]!.y)
@@ -105,7 +111,7 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
   if (!Number.isInteger(margin) || margin < 0) throw new Error(`makeTransect: margin ${margin} is not a whole number of cells`);
   if (!Number.isInteger(s0)) throw new Error(`makeTransect: s0 ${s0} is not a whole column`);
   const parts: number[] = [];
-  const before = marginCells(holes, "start", margin);
+  const before = marginCells(holes, "start", margin, opts.heading);
   for (let i = before.length / 2 - 1; i >= 0; i--) parts.push(before[2 * i]!, before[2 * i + 1]!);
   const sHole: number[] = [];
   let s = s0;
@@ -119,7 +125,7 @@ export function makeTransect(holes: readonly Cell[], opts: { margin?: number; s0
     s += seg.length / 2 - 1;
     sHole.push(s);
   }
-  const after = marginCells(holes, "end", margin);
+  const after = marginCells(holes, "end", margin, opts.heading);
   for (let j = 0; j < after.length; j++) parts.push(after[j]!);
   return {
     holes: holes.map((h) => ({ x: h.x, y: h.y })),
@@ -195,7 +201,7 @@ export function grow(t: Transect, end: End, cell: Cell): Transect {
 }
 
 /** 4 × the squared distance between two cells' centres: a whole number (half-cells across, rows of height √3/2 down), so ties are exact. */
-function dist4(ax: number, ay: number, bx: number, by: number): number {
+export function dist4(ax: number, ay: number, bx: number, by: number): number {
   const dx = 2 * (ax - bx) + (ay & 1) - (by & 1);
   const dy = ay - by;
   return dx * dx + 3 * dy * dy;
@@ -352,7 +358,7 @@ const rounds = new Map<string, Int16Array>();
  * (parity 0) or odd row (`strict`: nearer than it), nearest first, ties in discOffsets' order: a round disc, not a
  * hexagon of steps. Cached.
  */
-function roundDisc(radius: number, parity: number, strict = false): Int16Array {
+export function roundDisc(radius: number, parity: number, strict = false): Int16Array {
   const key = `${radius}:${parity}:${strict}`;
   const have = rounds.get(key);
   if (have) return have;

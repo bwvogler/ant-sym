@@ -99,7 +99,7 @@ export function segmentGap(a: Segment, b: Segment): number {
   return Math.min(pointGap(x1, y1, b), pointGap(x2, y2, b), pointGap(x3, y3, a), pointGap(x4, y4, a));
 }
 
-function pointGap(px: number, py: number, s: Segment): number {
+export function pointGap(px: number, py: number, s: Segment): number {
   const [x1, y1, x2, y2] = s;
   const dx = x2 - x1;
   const dy = y2 - y1;
