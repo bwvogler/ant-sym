@@ -358,6 +358,14 @@ export class LoadGrid {
   readonly #blocks = new ChunkLayer((n) => new Float32Array(n), 0);
   #touched: number[] = [];
 
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.sum.dropEmpty();
+    this.#top.dropEmpty();
+    this.#strain.dropEmpty();
+    this.#blocks.dropEmpty();
+  }
+
   reset(): void {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) {
@@ -548,6 +556,14 @@ export class Fungus {
   frozenLayers: ReadonlySet<number> = new Set<number>();
   /** The hosts among the colonies asleep (Game.freeze): the steps read only the awake colonies' ants, so `hosts` adds these, and the fungus stays active (and steps the thawed ants again) while its only hosts sleep. */
   hostsAsleep = 0;
+
+  /** Free the chunks the step's load grids hold nothing in (an endless game's housekeeping: they keep every chunk a host has walked over). */
+  trimScratch(): void {
+    for (const L of this.#layers) {
+      L.all.trim();
+      for (const g of L.visible) g.trim();
+    }
+  }
 
   /** On one map, or (one world) on each of `map`'s, the first holding `spores` and `sporeStrain`. */
   constructor(map: WorldMap | readonly WorldMap[], params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
