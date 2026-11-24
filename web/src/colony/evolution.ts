@@ -425,8 +425,8 @@ export class Evolution {
   }
 
   /**
-   * A flower of hyphae becomes a patch (Fungus.settle, PRD §85): room to grow, but no start of its own: its seven cells'
-   * mass is the hyphae's already, so the body's mass is unchanged.
+   * A flower of hyphae becomes a patch (Fungus.settle, PRD §85): room to grow, but no start of its own: its middle
+   * cell's mass is the hyphae's already, so the body's mass is unchanged.
    */
   settle(): void {
     this.patches++;
