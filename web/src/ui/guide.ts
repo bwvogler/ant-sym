@@ -663,6 +663,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "A plan for the fungus: a landing patch that is a seven-cell flower (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
   },
   {
+    note: "lichen",
+    title: "The lichen partner",
+    covers:
+      "A plan for the fungus to take an alga on rock: lichens capture their alga by contact (free algae are scarce; some take another lichen's), spread over rock from the edge, fix carbon only while wet and lit, and turn rock into soil; usnic acid made insects die faster of Metarhizium; red wood ants carry lichen fragments. Not built.",
+  },
+  {
     note: "builder",
     title: "Builder mode",
     covers:
