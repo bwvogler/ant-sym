@@ -2406,11 +2406,11 @@ try {
     gp.evaluate(() => {
       const g = window.jevAnts.game;
       for (const c of g.colonies)
-        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 1 && (c.layer[i] ?? 0) === 0) return { x: c.x[i], y: c.y[i] };
+        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 0.05 && (c.layer[i] ?? 0) === 0) return { x: c.x[i], y: c.y[i] };
       return null;
     });
   let host = null;
-  for (let round = 0; round < 80 && !host; round++) {
+  for (let round = 0; round < 30 && !host; round++) {
     await gp.evaluate(() => window.jevAnts.step(100));
     host = await findHost();
   }
