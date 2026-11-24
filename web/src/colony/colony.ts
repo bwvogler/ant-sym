@@ -1046,6 +1046,21 @@ export class Colony {
     return this.queen !== null && !this.queen.alive;
   }
 
+  /**
+   * Whether the colony has died out for good (ja-ko75): no ant, no brood, no alate and no living queen. A colony with a queen is never extinct; an
+   * orphaned one is once its last ant, pupa and alate are gone (it never grows again: its brood was its last chance). A bare field's colony (no queen at
+   * all) is not while its larder can still become ants. The awake rule counts an extinct colony out of the cap and freezes it for good.
+   */
+  get extinct(): boolean {
+    return (
+      this.population === 0 &&
+      this.brood.size === 0 &&
+      this.alates.length === 0 &&
+      !this.queen?.alive &&
+      (this.queen !== null || this.larder <= 0)
+    );
+  }
+
   /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss (a fight), not old age. */
   kill(i: number, lost = true): void {
     const l = this.layer[i];

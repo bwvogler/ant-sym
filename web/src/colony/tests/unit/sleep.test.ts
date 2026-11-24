@@ -9,7 +9,7 @@ const P = { distance: 280, delay: 90, nestGround: 16, cap: 6, every: 1 };
 type Facts = (
   t: number,
   asleep: readonly boolean[],
-) => Partial<Pick<SleepInputs, "near" | "entered" | "holds">> & { contact?: (a: number, b: number) => boolean };
+) => Partial<Pick<SleepInputs, "near" | "entered" | "holds" | "dead">> & { contact?: (a: number, b: number) => boolean };
 
 /** Play a rule second by second over `n` colonies, applying each verdict; returns the log of who slept when. */
 function play(rule: SleepRule, n: number, seconds: number, facts: Facts, start: boolean[] = Array(n).fill(false)) {
@@ -24,6 +24,7 @@ function play(rule: SleepRule, n: number, seconds: number, facts: Facts, start: 
       entered: f.entered ?? Array(n).fill(false),
       holds: f.holds ?? Array(n).fill(false),
       contact: f.contact ?? (() => false),
+      ...(f.dead ? { dead: f.dead } : {}),
     };
     const v = rule.step(inp);
     for (const k of v.freeze) asleep[k] = true;
@@ -360,4 +361,95 @@ test("a contact that expired while the colonies were awake stays forgotten: they
   const woke = log.find((e) => e.t >= 500 && e.thaw.length > 0)!;
   assert.deepEqual(woke.thaw, [1]);
   assert.ok(log[500]!.asleep[0]);
+});
+
+// An extinct colony (ja-ko75, `Colony.extinct`): it counts as asleep, frees its place under the cap, is frozen the second it is found dead, and nothing wakes it.
+
+test("an extinct colony is frozen the second it is found dead, though the fungus is near, and nothing wakes it", () => {
+  const rule = new SleepRule(2, P);
+  const log = play(rule, 2, 200, (t) => ({ near: [true, true], entered: [true, true], dead: [false, t >= 10] }));
+  assert.equal(first(log, 1), 10, "frozen the second it is found dead, not T later");
+  assert.ok(
+    log.slice(10).every((e) => e.asleep[1]),
+    "and it stays asleep: the fungus at its hole and a host in its nest ground wake nothing extinct",
+  );
+  assert.ok(log.every((e) => !e.thaw.includes(1)));
+  assert.ok(
+    log.every((e) => !e.asleep[0]),
+    "the living colony beside it is untouched: the fungus keeps it awake",
+  );
+});
+
+test("an extinct colony frees its place under the cap: a living colony is not frozen for it, though it was the one the fungus touched last", () => {
+  const cap2 = { ...P, cap: 2 };
+  // three colonies near the fungus at the cap of two; the third was touched last (a host entered at 50), so over the cap it would be the living ones the cap freezes first
+  const facts = (dead: boolean) => (t: number) => ({
+    near: [true, true, true],
+    entered: [false, false, t === 50],
+    dead: [false, false, dead],
+  });
+  const live = play(new SleepRule(3, cap2), 3, 120, facts(false));
+  assert.ok(
+    live.some((e) => e.asleep[0] || e.asleep[1]),
+    "the control: with all three alive, the cap freezes a colony each second until two are awake",
+  );
+  const extinct = play(new SleepRule(3, cap2), 3, 120, facts(true));
+  assert.ok(
+    extinct.every((e) => !e.asleep[0] && !e.asleep[1]),
+    "with the third extinct, the two living colonies are never frozen by the cap",
+  );
+  assert.equal(first(extinct, 2), 0, "and the extinct one is frozen at once");
+});
+
+test("an extinct colony is nobody's group-mate: its old contacts do not hold a living colony awake with it", () => {
+  // colonies 0 and 1 are in contact until second 4; the fungus stays at colony 1 only; colony 1 dies at 6
+  const facts = (t: number) => ({
+    near: [false, true],
+    dead: [false, t >= 6],
+    contact: (a: number, b: number) => t < 5 && a === 0 && b === 1,
+  });
+  const withDead = play(new SleepRule(2, P), 2, 200, facts);
+  assert.equal(
+    first(withDead, 0),
+    P.delay,
+    "colony 0 freezes by itself T after the fungus last neared it, not when the old contact expires",
+  );
+  // the control: the same facts with colony 1 alive keep the group awake until the contact (second 4) has expired, T later
+  const alive = play(new SleepRule(2, P), 2, 200, (t) => ({ ...facts(t), dead: [false, false] }));
+  assert.equal(first(alive, 0), 4 + P.delay, "the control: a living group-mate holds colony 0 awake T past the last contact");
+});
+
+test("a sleeping extinct colony is never thawed, whatever the fungus does", () => {
+  const rule = new SleepRule(1, P);
+  const log = play(rule, 1, 100, () => ({ near: [true], entered: [true], holds: [true], dead: [true] }), [true]);
+  assert.ok(log.every((e) => e.asleep[0] && e.thaw.length === 0));
+});
+
+test("with no dead input every colony is alive: the rule is as it was", () => {
+  const rule = new SleepRule(1, P);
+  const log = play(rule, 1, 200, () => ({}));
+  assert.equal(first(log, 0), P.delay);
+});
+
+test("a colony the cap froze and that later died out is not woken when room comes back, though it still holds the fungus", () => {
+  const cap1 = { ...P, cap: 1 };
+  // both near the fungus at the cap of one: colony 0 is frozen by the cap at 0; colony 0 is found dead at 10; the fungus leaves at 20 and colony 1 freezes
+  // in its turn T later, so room comes back with colony 0 past its T, holding the fungus: a living colony would wake, an extinct one must not
+  const facts = (t: number) => ({ near: [t < 20, t < 20], holds: [true, false], dead: [t >= 10, false] });
+  const log = play(new SleepRule(2, cap1), 2, 400, facts);
+  assert.equal(first(log, 0), 0, "frozen by the cap at once");
+  assert.ok(
+    log.some((e) => e.asleep[1]),
+    "colony 1 freezes in its turn once the fungus has gone",
+  );
+  assert.ok(
+    log.every((e) => e.asleep[0]),
+    "and colony 0 never wakes: it is extinct",
+  );
+  // the control: the same facts with colony 0 alive wake it when room comes back
+  const alive = play(new SleepRule(2, cap1), 2, 400, (t) => ({ ...facts(t), dead: [false, false] }));
+  assert.ok(
+    alive.some((e) => e.thaw.includes(0)),
+    "the control: a living cap-frozen colony that holds the fungus wakes into the room",
+  );
 });
