@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { type Colony, PLANE, type OneWorld } from "../colony/index.ts";
+import { type Colony, type OneWorld } from "../colony/index.ts";
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
+import { hasChamberLabels } from "./fieldGoTo.ts";
 import { colonyName } from "./names.ts";
 
 // The "Go to" menu over the field (PRD §69; ja-fnd.6.3.12, docs/field-split.md): one compact menu, so the overlay never runs off a phone's width. The
@@ -81,7 +82,7 @@ export default function FieldGoToMenu({
               {colonyName(k)} nest
             </button>
           ))}
-          {(view === PLANE ? world.plane : world.curtain).chambers && (
+          {hasChamberLabels(world, view) && (
             <button
               type="button"
               className={labels ? `${item} text-accent` : item}

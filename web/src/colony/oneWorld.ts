@@ -20,6 +20,7 @@ import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import { lineSalt, lineSeed } from "./lines.ts";
+import { CURTAIN, PLANE } from "./vocab.ts";
 import { type Cell, type End, grow, makeTransect, type Transect } from "./transect.ts";
 import {
   AIR,
@@ -76,6 +77,25 @@ export interface OneWorld {
   /** the first line: the holes in order and the plane cell over each curtain column; a new line when the world grows (growWorld) */
   readonly line: Transect;
 }
+
+/** Whether layer id `l` is some line's curtain (layers: PLANE, then the curtain of line 0, of line 1, ...: a curtain's id is 1 + its line's index). */
+export const isCurtainLayer = (l: number): boolean => l >= CURTAIN;
+
+/** The line index of curtain layer `l` (a plane or unknown layer reads as line 0, the page's default below view). */
+export const lineIndexOfLayer = (world: OneWorld, l: number): number =>
+  l >= CURTAIN && l - CURTAIN < world.lines.length ? l - CURTAIN : 0;
+
+/** The line (holes, columns) under curtain layer `l`. */
+export const lineOfLayer = (world: OneWorld, l: number): Transect => world.lines[lineIndexOfLayer(world, l)]!.line;
+
+/** The curtain of curtain layer `l`. */
+export const curtainOfLayer = (world: OneWorld, l: number): WorldMap => world.lines[lineIndexOfLayer(world, l)]!.curtain;
+
+/** A layer's map: the plane for PLANE, else that line's curtain. */
+export const mapOfLayer = (world: OneWorld, l: number): WorldMap => (l === PLANE ? world.plane : curtainOfLayer(world, l));
+
+/** The layer id of line `li`'s curtain. */
+export const curtainLayerOf = (li: number): number => CURTAIN + li;
 
 /**
  * A one-world map from a seed: the plane is `generateWorld(seed, PLANE_WORLD)` (its defaults; `plane` overrides options, e.g. a

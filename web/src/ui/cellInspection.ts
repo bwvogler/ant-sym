@@ -6,6 +6,7 @@ import {
   CORPSE_ROT,
   HYPHA_ROOT,
   INFECTED,
+  mapOfLayer,
   PLANE,
   OPEN,
   rockAt,
@@ -100,7 +101,7 @@ export function inspectCell(
     cx = centreX(gx, gy),
     cy = centreY(gy);
   const place = probe(g, sensed, layer, cx, cy, trails);
-  const map = layer === PLANE ? g.world.plane : g.world.curtain;
+  const map = mapOfLayer(g.world, layer);
   const out: CellInspectionState = {
     cell: [gx, gy],
     place,
