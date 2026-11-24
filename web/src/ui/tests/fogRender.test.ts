@@ -30,3 +30,14 @@ test("the curtain's strip and the plane's ants over it are not drawn under the f
   assert.ok(count(off, "moveTo") > 100, "the strip's ants stroke without the fog");
   assert.equal(count(dark, "moveTo"), 0, "none under it");
 });
+
+test("the strip under the fog: where the plane under the line was never sensed every pixel of the curtain's chunks is fog; where all is sensed its ants are back", () => {
+  const dark = renderScene({ ...BASE, lv: CURTAIN, fog: true });
+  const solid = dark.pixels.filter((p) => p.length === 64 * 64 * 4);
+  assert.ok(solid.length > 0, "chunks were painted");
+  for (const p of solid)
+    for (let i = 0; i < p.length; i += 4) assert.equal(p[i + 3], 255, "nothing of the truth shows in unexplored ground");
+  const off = renderScene({ ...BASE, lv: CURTAIN }).log;
+  const lit = renderScene({ ...BASE, lv: CURTAIN, fog: true, stamp: LIT }).log;
+  assert.equal(count(lit, "moveTo"), count(off, "moveTo"), "the plane's ants over the strip once the plane is sensed");
+});

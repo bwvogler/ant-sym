@@ -277,7 +277,7 @@ export const actorsStage: Stage = (fs) => {
     if (alates) fs.alateOverlays.push(alates);
     drawAnts(fc, antFrame, col);
   }
-  if (strip && !fc.fog) drawStripAnts(fc, len, crumb, inView); // under the fog the strip waits for ja-1ypq.3.2
+  if (strip) drawStripAnts(fc, len, crumb, inView); // under the fog only the plane ants an observer senses now (overlays.ts)
   drawStalksRaised(fc, fs.cellWindow, fs.fungusFrame!);
 };
 

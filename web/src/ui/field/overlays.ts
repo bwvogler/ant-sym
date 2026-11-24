@@ -18,6 +18,7 @@ import {
 } from "../../colony/index.ts";
 import { toScreen, toWorld } from "../camera.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
+import { LIVE } from "../fog/knowledge.ts";
 import { odourColour } from "./colour.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 
@@ -181,6 +182,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
     let carriers = 0;
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== PLANE) continue;
+      if (k.fog && k.fog.stateAt(PLANE, col.x[i]!, col.y[i]!) !== LIVE) continue; // plane ants only where an observer senses them now
       cellOf(col.x[i]!, col.y[i]!);
       const over = columnsOver(line, CELL[0], CELL[1]);
       for (let j = 0; j < over.length; j++) {
@@ -200,6 +202,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
     ctx.fillStyle = theme.accent;
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
+      if (k.fog && k.fog.stateAt(PLANE, col.x[i]!, col.y[i]!) !== LIVE) continue;
       cellOf(col.x[i]!, col.y[i]!);
       const over = columnsOver(line, CELL[0], CELL[1]);
       for (let j = 0; j < over.length; j++) {

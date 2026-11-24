@@ -6,6 +6,9 @@ import { CELL, INFECTED, SOIL, AIR, SPORE_FULL, SPORE_SHOWN, cellOf, type Colony
 import { fitZoom, minimapRect, type Extent } from "../camera.ts";
 import { odourRgb } from "./colour.ts";
 import type { FieldCtx } from "./ctx.ts";
+import { SNAP } from "../fog/sources.ts";
+import { UNKNOWN, LIVE } from "../fog/knowledge.ts";
+import { dimPx, fogRgb } from "./fogCull.ts";
 import { stripAt } from "./ground.ts";
 import type { FieldEnv } from "./env.ts";
 
@@ -52,7 +55,7 @@ export class Minimap {
    * field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
    */
   paint(k: FieldCtx): void {
-    const { theme, m, colonies, lv, strip } = k;
+    const { theme, m, colonies, lv, strip, fog } = k;
     const [gx0, gw, gh] = [m.x0, m.size.w, m.size.h];
     const px = this.img.data;
     const food = theme.accentRgb;
@@ -66,11 +69,21 @@ export class Minimap {
         const x = CELL[0];
         const y = CELL[1];
         const off = x < gx0 || y < 0 || x >= gx0 + gw || y >= gh;
-        const t = off ? 1 : m.rock.get(x, y);
-        const fv = off ? 0 : m.food.get(x, y);
         const o = (my * this.canvas.width + mx) * 4;
+        // Under the fog a pixel is what was last sensed there: fog where nothing was, dimmed where nobody senses it now (docs/fog-of-war.md §5.1).
+        const fs = fog && !off ? fog.state(lv, x, y) : LIVE;
+        if (fs === UNKNOWN && !strip) {
+          const f = fogRgb(theme);
+          px[o] = f[0];
+          px[o + 1] = f[1];
+          px[o + 2] = f[2];
+          px[o + 3] = 255;
+          continue;
+        }
+        const t = off ? 1 : fog ? (fog.snapshot(lv, SNAP.rock, x, y) ?? 0) : m.rock.get(x, y);
+        const fv = off ? 0 : fog ? (fog.snapshot(lv, SNAP.food, x, y) ?? 0) : m.food.get(x, y);
         const cut = strip && !off ? stripAt(k, x, y) : null;
-        const heap = !off && t === 0 && m.spoil ? m.spoil.get(x, y) : 0;
+        const heap = !off && t === 0 && m.spoil ? (fog ? (fog.snapshot(lv, SNAP.spoil, x, y) ?? 0) : m.spoil.get(x, y)) : 0;
         const c =
           cut ??
           (fv > 0 ? food : t === SOIL ? theme.soil : t === AIR ? theme.sky : t ? theme.rock : heap > 0 ? theme.spoil : theme.paperRgb);
@@ -81,6 +94,7 @@ export class Minimap {
         px[o + 1] = Math.round(c[1] + (spore[1] - c[1]) * a);
         px[o + 2] = Math.round(c[2] + (spore[2] - c[2]) * a);
         px[o + 3] = 255;
+        if (fs !== LIVE && !cut) dimPx(px, o, fogRgb(theme));
       }
     // Every colony's ants, then the infected over them, so a healthy nestmate on the same pixel doesn't hide one.
     for (const sick of [false, true])
@@ -93,6 +107,7 @@ export class Minimap {
           const mx = Math.floor((col.x[i] - gx0) / 2);
           const my = Math.floor(col.y[i] / 2);
           if (mx < 0 || my < 0 || mx >= this.canvas.width || my >= this.canvas.height) continue;
+          if (fog && fog.stateAt(lv, col.x[i]!, col.y[i]!) !== LIVE) continue; // ants only where an observer senses them now
           const o = (my * this.canvas.width + mx) * 4;
           px[o] = tone[0];
           px[o + 1] = tone[1];
