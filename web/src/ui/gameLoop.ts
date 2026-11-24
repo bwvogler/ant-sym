@@ -81,6 +81,13 @@ export class GameLoop {
     return () => void this.#steps.delete(fn);
   };
 
+  /** One sim step of `dt`: the game ticks, the step subscribers run, the journal sees it. Every way the page steps the game goes through here, so nothing keeping up with the sim misses one. */
+  advance(dt: number): void {
+    this.game.tick(dt);
+    for (const fn of this.#steps) fn();
+    this.#journal?.observe(this.game);
+  }
+
   /** The latest stats (null until the first is taken). */
   stats = (): ColonyStats | null => this.#stats;
   /** Frames drawn in the last second. */
@@ -141,9 +148,7 @@ export class GameLoop {
       const total = dt * this.#speed;
       const steps = Math.max(1, Math.ceil(total / MAX_STEP));
       for (let k = 0; k < steps; k++) {
-        game.tick(total / steps);
-        for (const fn of this.#steps) fn();
-        this.#journal?.observe(game);
+        this.advance(total / steps);
         // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
         if (game.flights.length) {
           this.#onFlight();

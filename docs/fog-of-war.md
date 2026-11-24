@@ -5,7 +5,7 @@
 ## TL;DR
 
 - **Three states per cell**, as in strategy games since Warcraft II: *unknown* (never sensed), *remembered* (sensed before, nobody there now) and *live* (an observer senses it this step).
-- **The observers** are the fungus's hosts (every infected ant, of any colony, at its antennae's reach) and the fungus's living body (every hypha cell, mat, patch and flower, about 2 cells round it). Spores and corpses see nothing (owner, 2026-11-23). Later organisms join through the same interface, each with the reach from its own sense table.
+- **The observers** are the fungus's hosts (every infected ant, of any colony, at its antennae's reach) and the fungus's living body (every hypha cell, patch cell and flower, about 2 cells round it). Spores and corpses see nothing (owner, 2026-11-23). Later organisms join through the same interface, each with the reach from its own sense table.
 - **Remembered ground shows the last-seen state, never ants** (owner, 2026-11-23): rock, tunnels, food, spoil, mounds, chambers, hyphae and nests as they were when the last observer left, with "last seen N s ago". Ants, brood and queens show only where live.
 - **The readouts follow the fog** (owner, 2026-11-23): a colony enters the stats, badges and the go-to menu once the fungus has sensed its nest or holds a host in it. Its numbers are live while hosts are inside, otherwise as of when the last one left.
 - **The start reveals only the landing patch** and its sight (owner, 2026-11-23).
@@ -14,7 +14,7 @@
 
 ## 1. Where we are
 
-**What sees today.** `SensedMap` (`ui/fungusSight.ts`, PRD §65) is stamped once per render frame (`ColonyApp.tsx`, `onFrame`). Each living ant of any colony and any strain with `load >= INFECTED` marks the cells within `sensorDistance + REACH_MARGIN` (3 + 1 cells) with the sim time. Trails and alarm show in a cell as strongly as that mark is fresh, fading over `SENSED_FADE` = 20 s. A chunk faded right out is dropped and leaves a per-chunk `revealed` bit (E1.3, PRD §66), which nothing reads yet. The fungus's own body stamps nothing.
+**What sees today.** `SensedMap` (`ui/fungusSight.ts`, PRD §65) was stamped once per render frame (`ColonyApp.tsx`, `onFrame`) before F1, which stamps after every sim step. Each living ant of any colony and any strain with `load >= INFECTED` marks the cells within `sensorDistance + REACH_MARGIN` (3 + 1 cells) with the sim time. Trails and alarm show in a cell as strongly as that mark is fresh, fading over `SENSED_FADE` = 20 s. A chunk faded right out is dropped and leaves a per-chunk `revealed` bit (E1.3, PRD §66), which nothing reads yet. The fungus's own body stamps nothing.
 
 **What the page shows regardless.** The renderer and every card read the live `Game` objects directly. Only trails and alarm are gated. Everything else shows everywhere:
 
@@ -69,8 +69,8 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, but today's stamp skips them: F1 adds them (`ja-1ypq.1`).
-- **The body:** every hypha cell (`hyphaeOn(l).parent`), mat, patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
+- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, but the stamp still skips them: left for a later change (`ja-1ypq.1` notes).
+- **The body:** every hypha cell (`hyphaeOn(l).parent`, mats included), patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
 **In the game:** sight is a property of the player's organism and its hosts, read from what the simulation already holds. It adds no sense, no action and no situation field.
@@ -172,7 +172,7 @@ F1 and F2 change nothing on the page and can land before the endless world. F3�
 
 **Still open, each with a recommendation:**
 1. **The grace period.** Built as 1.5 s (it must exceed the body's 1 s stamp interval); F3 may tune it by eye.
-2. **How the body is stamped.** Incremental or on a coarser clock, chosen by F1's measurement.
+2. **A hitch when the body is stamped.** Built as one stamp every `BODY_EVERY` = 1 s: about 0.16 ms a step averaged at 10,000 hypha cells, but the one step that pays costs about 5 ms (14 ms at 30,000). Spread it over steps if a real game's mycelium gets that big (review of #371).
 3. **Memory that fades** (Dwarf Fortress). Recommend not now: revisit after the endless world's soak.
 
 ## Sources

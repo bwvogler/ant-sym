@@ -106,3 +106,22 @@ test("in a landed game the patch is seen before the first step, and sight is a f
     }
   assert.ok(lit > 0, "something is lit");
 });
+
+test("a game's hosts see at the sensors' reach plus REACH_MARGIN, and the body is stamped on every layer it grows on", () => {
+  const gx = 40;
+  const gy = 40;
+  const hyphae = new Map([[cellKey(60, 40), -1]]);
+  const game = {
+    time: 5,
+    colonies: [colony([{ x: centreX(gx, gy) + 0.4, y: centreY(gy), load: INFECTED, strain: 0 }])],
+    layers: [{}, {}],
+    fungus: { evolution: null, patchOn: () => [], hyphaeOn: (l: number) => (l === 1 ? { parent: hyphae } : null) },
+  } as unknown as Game;
+  const s = new SensedMap();
+  s.stampGame(game);
+  const r = 3 + REACH_MARGIN;
+  assert.equal(s.sight(PLANE, gx + r, gy), 1, "at the reach, which is past the sensors by REACH_MARGIN");
+  assert.equal(s.sight(PLANE, gx + r + 2, gy), 0, "past it");
+  assert.equal(s.sight(1, 60, 40), 1, "the body on layer 1 (the curtain)");
+  assert.equal(s.sight(PLANE, 60, 40), 0, "and not on the plane, where it has no hyphae");
+});

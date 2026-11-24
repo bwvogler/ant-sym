@@ -213,11 +213,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const step = useCallback(
     (n: number) => {
       for (let k = 0; k < n && !game.flights.length; k++) {
-        game.tick(MAX_STEP);
-        journal?.observe(game);
+        loop.advance(MAX_STEP);
       }
     },
-    [game, journal],
+    [game, loop],
   );
   /** What builds this game again (saves.ts). */
   const settings: GameSettings = {
