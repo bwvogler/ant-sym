@@ -9,10 +9,12 @@ import { type Role, type Colony, type Game, CELL, cellOf, centreX, centreY, R } 
  * What the nest card says of colony `k` when the game has frozen it (owner, 2026-11-24, ja-qpv.4.5: the page says it is asleep), else null.
  * The numbers on the card are as they were when it froze: a sleeping colony is not stepped.
  */
-export function asleepNote(game: Pick<Game, "isFrozen">, k: number): string | null {
-  return game.isFrozen(k)
-    ? "Asleep: the game has paused this colony while the fungus is elsewhere. Its numbers are as they were when it froze."
-    : null;
+export function asleepNote(game: Pick<Game, "isFrozen" | "colonies">, k: number): string | null {
+  if (!game.isFrozen(k)) return null;
+  // A colony that has died out is frozen for good (ja-ko75): it is not waiting for the fungus.
+  if (game.colonies[k]?.extinct)
+    return "Extinct: no ant, no brood and no queen are left, so the game no longer steps this colony. Its numbers are as they were at the end.";
+  return "Asleep: the game has paused this colony while the fungus is elsewhere. Its numbers are as they were when it froze.";
 }
 
 export interface ChamberView {
