@@ -470,3 +470,40 @@ test("sizes follow the device ratio and the text size: lines, dashes, dots and c
     "the circle's own line is the first",
   );
 });
+
+test("drawStripAnts: a colony the game has frozen draws its strip ants and crumbs at half strength, another colony's as before, and the strength ends at 1", () => {
+  const g = world(false);
+  const line = g.world.line;
+  const s = line.sHole[0]! + 4;
+  const [c0, c1] = g.colonies as [(typeof g.colonies)[number], (typeof g.colonies)[number]];
+  for (const col of g.colonies) col.alive.fill(0);
+  for (const col of [c0, c1]) {
+    cellAt(line, s);
+    col.x[0] = centreX(CELL[0], CELL[1]);
+    col.y[0] = centreY(CELL[1]);
+    col.alive[0] = 1;
+    col.layer[0] = PLANE;
+    col.carrying[0] = 1;
+  }
+  const cam: Camera = { x: centreX(s, STRIP), y: centreY(STRIP), zoom: 20 };
+  const drawn = (asleep: number[]) => {
+    const { k, log, state } = field(g, CURTAIN, cam);
+    k.asleep = new Set(asleep);
+    drawStripAnts(k, 8, 3, () => true);
+    let alpha = 1;
+    const at: string[] = [];
+    for (const l of log) {
+      const m = /^globalAlpha = (.+)$/.exec(l);
+      if (m) alpha = Number(m[1]);
+      else if (l === "stroke()" || l.startsWith("fillRect(")) at.push(`${l.slice(0, l.indexOf("("))}@${alpha}`);
+    }
+    return { at, end: state.globalAlpha };
+  };
+  assert.deepEqual(drawn([]), { at: ["stroke@0.85", "fillRect@1", "stroke@0.85", "fillRect@1"], end: 1 }, "nothing frozen: as before");
+  assert.deepEqual(
+    drawn([1]),
+    { at: ["stroke@0.85", "fillRect@1", "stroke@0.425", "fillRect@0.5"], end: 1 },
+    "colony 1 asleep: its ants and its crumb halved",
+  );
+  assert.deepEqual(drawn([0]), { at: ["stroke@0.425", "fillRect@0.5", "stroke@0.85", "fillRect@1"], end: 1 }, "colony 0 asleep, not 1");
+});

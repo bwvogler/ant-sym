@@ -60,6 +60,8 @@ export class SensedMap {
   onReset: (() => void) | null = null;
   /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
   #bodyAt = -Infinity;
+  /** The colonies the game has frozen, by index, as of the last `stampGame`: the page draws them still and dimmed (ja-qpv.4.5). Empty until a game is stamped. */
+  readonly asleep = new Set<number>();
 
   /** Whether a host has ever sensed any cell of chunk (cx, cy) on layer `l`. */
   revealed(l: number, cx: number, cy: number): boolean {
@@ -96,6 +98,8 @@ export class SensedMap {
   stampGame(game: Game): void {
     const now = game.time;
     this.#begin(now);
+    this.asleep.clear();
+    for (let k = 0; k < game.colonies.length; k++) if (game.isFrozen(k)) this.asleep.add(k);
     hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
     if (now - this.#bodyAt >= BODY_EVERY) {
       this.#bodyAt = now;

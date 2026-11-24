@@ -1,9 +1,19 @@
-import { type Role, type Colony, CELL, cellOf, centreX, centreY, R } from "../colony/index.ts";
+import { type Role, type Colony, type Game, CELL, cellOf, centreX, centreY, R } from "../colony/index.ts";
 
 // The nest as the player sees it, pure, for the Learn drawer's Nest tab and
 // the field's chamber labels. This is the whole map's view, read from the
 // chamber table: an ant senses none of it except the role of the chamber it
 // stands in (docs/vision.md, the sense table), and the drawer says so.
+
+/**
+ * What the nest card says of colony `k` when the game has frozen it (owner, 2026-11-24, ja-qpv.4.5: the page says it is asleep), else null.
+ * The numbers on the card are as they were when it froze: a sleeping colony is not stepped.
+ */
+export function asleepNote(game: Pick<Game, "isFrozen">, k: number): string | null {
+  return game.isFrozen(k)
+    ? "Asleep: the game has paused this colony while the fungus is elsewhere. Its numbers are as they were when it froze."
+    : null;
+}
 
 export interface ChamberView {
   id: number;

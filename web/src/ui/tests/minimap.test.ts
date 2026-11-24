@@ -470,3 +470,15 @@ test("under the fog the minimap's food and mound come from the snapshot too, not
   assert.deepEqual(paintedPixel(s, 1, 0), [...THEME.accentRgb, 255], "food as sensed, though the map's table has none");
   assert.deepEqual(paintedPixel(s, 2, 0), [...THEME.spoil, 255], "the mound as sensed");
 });
+
+test("on an endless extent the minimap neither allocates the nominal box's canvas nor draws, zoomed in or not (until E5.3's window)", () => {
+  const s = setup({ w: 9, h: 5 });
+  const [w, h] = [s.canvases[0]!.width, s.canvases[0]!.height];
+  const endless = { x0: -2097152, w: 4194304, h: 3565158, endless: true as const };
+  s.minimap.resize(endless);
+  assert.deepEqual([s.canvases[0]!.width, s.canvases[0]!.height], [w, h], "resize left the canvas as it was");
+  const k = { ...s.k, ext: endless, c: { x: 50, y: 50, zoom: 20 } } as FieldCtx;
+  const before = [s.rec.log.length, s.canvases[0]!.rec.log.length];
+  s.minimap.draw(k, SEEN_ALL);
+  assert.deepEqual([s.rec.log.length, s.canvases[0]!.rec.log.length], before, "draw put nothing on the canvas and painted nothing");
+});

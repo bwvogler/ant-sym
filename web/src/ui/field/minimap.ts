@@ -3,7 +3,7 @@
 // a second at most). A class, since it holds that; the canvas comes from FieldEnv.newCanvas and the clock from FieldEnv.now. Plain TypeScript.
 
 import { CELL, INFECTED, SOIL, AIR, SPORE_FULL, SPORE_SHOWN, cellOf, type Colony } from "../../colony/index.ts";
-import { fitZoom, minimapRect, type Extent } from "../camera.ts";
+import { isZoomedIn, minimapRect, type Extent } from "../camera.ts";
 import { odourRgb } from "./colour.ts";
 import type { FieldCtx } from "./ctx.ts";
 import { SNAP } from "../fog/sources.ts";
@@ -39,6 +39,7 @@ export class Minimap {
 
   /** The shown map is another, or has grown: a canvas of 2 world units a pixel, painted afresh next time. */
   resize(ext: Extent): void {
+    if (ext.endless) return;
     this.canvas.width = Math.ceil(ext.w / 2);
     this.canvas.height = Math.ceil(ext.h / 2);
     this.img = this.cctx.createImageData(this.canvas.width, this.canvas.height);
@@ -124,7 +125,8 @@ export class Minimap {
    */
   draw(k: FieldCtx, seen: Seen): void {
     const { ctx, theme, c, v, d, ext, m } = k;
-    if (c.zoom <= fitZoom(ext, v) * 1.05) return;
+    // The endless plane's minimap is a window of chunks (E5.3, ja-qpv.4.3); until it is built, none is drawn (a picture of the nominal box is 2M cells wide).
+    if (ext.endless || !isZoomedIn(ext, v, c.zoom)) return;
     const gx0 = m.x0;
     const now = this.env.now();
     if (now - this.at > MINIMAP_EVERY_MS) {

@@ -21,6 +21,7 @@ import { toScreen, toWorld } from "../camera.ts";
 import { holeOwner } from "../lens.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
 import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
+import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
 import { odourColour } from "./colour.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 
@@ -222,6 +223,8 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
   ctx.lineCap = "round";
   ctx.lineWidth = Math.max(1, len * 0.3);
   for (const col of colonies) {
+    // A colony the game has frozen draws dimmed here too, as on the map (field/asleep.ts); with nothing asleep every value is what it was.
+    const dim = colonyAsleep(k, col) ? ASLEEP_DIM : 1;
     ctx.beginPath();
     let carriers = 0;
     for (let i = 0; i < col.n; i++) {
@@ -239,11 +242,12 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
       }
     }
     ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.85 * dim;
     ctx.stroke();
     ctx.globalAlpha = 1;
     if (carriers === 0) continue;
     ctx.fillStyle = theme.accent;
+    if (dim < 1) ctx.globalAlpha = dim;
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
       if (k.fog && k.fog.stateAt(PLANE, col.x[i]!, col.y[i]!) !== LIVE) continue;
@@ -256,6 +260,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
         ctx.fillRect(x + half - crumb / 2, y - crumb / 2, crumb, crumb);
       }
     }
+    if (dim < 1) ctx.globalAlpha = 1;
   }
 }
 
