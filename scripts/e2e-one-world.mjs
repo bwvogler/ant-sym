@@ -2386,6 +2386,80 @@ try {
   await fp.reload();
   check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
   await fctx.close();
+  // ——— 18. The fog of war (docs/fog-of-war.md, F3.6, `?fog=1`) ———
+  section("18. the fog of war");
+  // Two pages of one seed stepped the same by the hook: the sim is deterministic, so what differs is the page.
+  const fogPage = async (query) => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(`${url}${query}`);
+    await p.getByLabel("world seed").fill(String(SEED));
+    await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(() => p.evaluate(() => !!window.jevAnts?.game.world), "a game for the fog checks", 20_000, 100);
+    await p.getByRole("button", { name: "Pause", exact: true }).click();
+    return { c, p };
+  };
+  const { c: gctx, p: gp } = await fogPage("?fog=1");
+  // The first infected ant of any colony: where it is, on which view.
+  const findHost = () =>
+    gp.evaluate(() => {
+      const g = window.jevAnts.game;
+      for (const c of g.colonies)
+        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 1 && (c.layer[i] ?? 0) === 0) return { x: c.x[i], y: c.y[i] };
+      return null;
+    });
+  let host = null;
+  for (let round = 0; round < 80 && !host; round++) {
+    await gp.evaluate(() => window.jevAnts.step(100));
+    host = await findHost();
+  }
+  check(host !== null, "a host is found on the plane");
+  const stateAt = (x, y) => gp.evaluate(([a, b]) => window.jevAnts.fogState("above", a, b), [x, y]);
+  check((await stateAt(host.x, host.y)) === 2, "the cell under a host is live");
+  check((await stateAt(0.5, 0.5)) === 0, "a cell nothing has sensed is unknown");
+  // It walks away (or dies): its old cell turns remembered, never unknown again.
+  let away = false;
+  for (let round = 0; round < 200 && !away; round++) {
+    await gp.evaluate(() => window.jevAnts.step(30));
+    away = (await stateAt(host.x, host.y)) === 1;
+  }
+  check(away, "once the host has walked away its cell is remembered, not live");
+  await gp.evaluate(() => window.jevAnts.step(300));
+  check((await stateAt(host.x, host.y)) !== 0, "and stays explored");
+  check((await stateAt(0.5, 0.5)) === 0, "while the ground no host has been near is still unknown");
+  await gp.waitForTimeout(500);
+  const nofog = await fogPage("");
+  check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "without ?fog=1 the page has no fog");
+  // The frame time: the same game, the same steps, zoomed in to hexagons, paused (so a frame is drawing alone). The fog may cost a little, not a phone's frame rate (PR #408).
+  const frames = async (p) => {
+    await p.mouse.move(640, 450);
+    for (let i = 0; i < 6; i++) await p.mouse.wheel(0, -300);
+    await p.waitForTimeout(500);
+    return p.evaluate(
+      () =>
+        new Promise((done) => {
+          const ds = [];
+          let last = performance.now();
+          const t = () => {
+            const n = performance.now();
+            ds.push(n - last);
+            last = n;
+            if (ds.length < 90) requestAnimationFrame(t);
+            else done(ds.sort((a, b) => a - b)[ds.length >> 1]);
+          };
+          requestAnimationFrame(t);
+        }),
+    );
+  };
+  const simTime = await gp.evaluate(() => window.jevAnts.game.time);
+  await nofog.p.evaluate((n) => window.jevAnts.step(n), Math.round(simTime * 30)); // REHEARSE_DT is 1/30
+  const fogMs = await frames(gp);
+  const baseMs = await frames(nofog.p);
+  console.log(`  frame time, paused and zoomed in: fog ${fogMs.toFixed(1)} ms, no fog ${baseMs.toFixed(1)} ms`);
+  check(fogMs <= Math.max(baseMs * 1.6, baseMs + 12), "the fog's frame time is within noise of the game without it");
+  await gctx.close();
+  await nofog.c.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
