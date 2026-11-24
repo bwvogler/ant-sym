@@ -117,11 +117,10 @@ export class SleepRule {
     }
     // A group asleep stays a group (it freezes and wakes together): entries between sleeping members stay fresh; the others expire after T.
     for (const [key, at] of this.#contacts) {
-      if (time - at >= p.delay) this.#contacts.delete(key);
-      else {
-        const [a, b] = key.split(",").map(Number) as [number, number];
-        if (inp.asleep[a] && inp.asleep[b]) this.#contacts.set(key, time);
-      }
+      const [a, b] = key.split(",").map(Number) as [number, number];
+      // refresh before expiring: a group that froze with its entry T-1 old must not split on the next decision
+      if (inp.asleep[a] && inp.asleep[b]) this.#contacts.set(key, time);
+      else if (time - at >= p.delay) this.#contacts.delete(key);
     }
     for (let a = 0; a < n; a++)
       for (let b = a + 1; b < n; b++) if (!inp.asleep[a] && !inp.asleep[b] && inp.contact(a, b)) this.#contacts.set(`${a},${b}`, time);

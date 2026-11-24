@@ -345,3 +345,19 @@ test("a group ranks by its most recently touched member", () => {
   );
   assert.deepEqual(log.find((e) => e.t === 60)!.freeze, [2], "the group's newest touch (50) outranks colony 2's (20)");
 });
+
+test("a group that froze with its contact one second short of expiring still wakes together", () => {
+  for (const x of [5, 30, 60]) {
+    const near = (t: number) => (t <= x ? all(2, true) : t >= 400 ? [false, true] : all(2, false));
+    const log = play(new SleepRule(2, P), 2, 500, (t) => ({ near: near(t), contact: () => t <= x + 1 }));
+    assert.equal(first(log, 0), first(log, 1), `x = ${x}: frozen together`);
+    assert.deepEqual(log.find((e) => e.t >= 400 && e.thaw.length > 0)!.thaw, [0, 1], `x = ${x}`);
+  }
+});
+
+test("a contact that expired while the colonies were awake stays forgotten: they froze separately and wake separately", () => {
+  const log = play(new SleepRule(2, P), 2, 600, (t) => ({ near: [t <= 100, t <= 300 || t >= 500], contact: () => t <= 5 }));
+  const woke = log.find((e) => e.t >= 500 && e.thaw.length > 0)!;
+  assert.deepEqual(woke.thaw, [1]);
+  assert.ok(log[500]!.asleep[0]);
+});
