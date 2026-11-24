@@ -45,10 +45,9 @@ function laid(markMax: number, since: number, ticks: number, markDecay?: number,
   return c.ph.fields.royal.get(x, y);
 }
 
-test("floor marks: added every tick (the default), a tunnel saturates at the cap whatever its distance, and shows no slope", () => {
-  assert.equal(DEFAULT_COLONY.markMax, 0);
-  const near = laid(0, 1, 30 * 40);
-  const far = laid(0, 20, 30 * 40);
+test("floor marks: added every tick (markMax 0, the old rule at its 30 s decay), a tunnel saturates at the cap whatever its distance, and shows no slope", () => {
+  const near = laid(0, 1, 30 * 40, 30);
+  const far = laid(0, 20, 30 * 40, 30);
   assert.equal(near, MAX_LEVEL);
   assert.equal(far, MAX_LEVEL, "the cell 20 s from its chamber holds as much as the one 1 s from it");
 });
@@ -63,7 +62,8 @@ test("floor marks: with markMax 1 a busy tunnel keeps its slope: the cell holds 
 
 test("floor marks: markMax 1 only raises: a higher mark is kept, and the decay is the param", () => {
   assert.equal(laid(1, 20, 5, undefined, 17), 17, "a cell above the ant's level stays");
-  const quick = laid(1, 20, 5, 6);
-  assert.ok(Math.abs(quick - MAX_LEVEL * Math.exp(-(20 + TICK) / 6)) < 1e-3, `markDecay 6: ${quick}`);
+  const slow = laid(1, 20, 5, 30);
+  assert.ok(Math.abs(slow - MAX_LEVEL * Math.exp(-(20 + TICK) / 30)) < 1e-3, `markDecay 30: ${slow}`);
+  assert.equal(DEFAULT_COLONY.markMax, 1, "the max rule is the default (PRD §77.8)");
   assert.equal(DEFAULT_COLONY.markDecay, MARK_DECAY, "the default decay is the tuning constant");
 });

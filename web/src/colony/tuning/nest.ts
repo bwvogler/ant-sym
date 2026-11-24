@@ -18,7 +18,7 @@ export const CHAMBER_SCAN = 5;
 
 // Floor marks (nest slice 3): see layMark, destMark, roleFor.
 /** Marks are laid at the colony's trail deposit per second just out of a chamber, falling to 1/e after MARK_DECAY seconds away from it. */
-export const MARK_DECAY = 30; // the default of ColonyParams.markDecay (a test keeps them equal)
+export const MARK_DECAY = 6; // the default of ColonyParams.markDecay (a test keeps them equal); 30 under the old add rule (PRD §77.8)
 
 /** How much more a homing ant in a tunnel goes by its destination's mark than by the home trail. */
 export const SIGN_WEIGHT = 4;
