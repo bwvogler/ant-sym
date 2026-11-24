@@ -106,6 +106,7 @@ export function linePheromones(game: Game, line: CrayonLine): Pheromones[] {
   const out: Pheromones[] = [];
   game.colonies.forEach((c, k) => {
     if (line.colony !== -1 && line.colony !== k) return;
+    if (game.isFrozen(k)) return; // a sleeper's scent stands as it was
     const ph = c.layers[line.layer]?.ph;
     if (ph && ph.has(line.channel ?? "food")) out.push(ph);
   });
@@ -546,6 +547,7 @@ export class Builder {
       const under = new Set<number>();
       for (let k = 0; k < cells.length; k += 2) under.add((cells[k + 1]! + 0x8000) * 0x10000 + (cells[k]! + 0x8000));
       game.colonies.forEach((c, ci) => {
+        if (game.isFrozen(ci)) return; // rain does not wash a sleeper's trails
         const ph = c.layers[layer]?.ph;
         if (!ph) return;
         for (const channel of RAIN_CHANNELS) {
