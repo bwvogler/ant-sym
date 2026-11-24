@@ -46,7 +46,7 @@
 //     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
 //  17. fewer notices (PRD §69.6): the same notice three times is one toast, counted (×3); Important only floats a warning and not a remark;
 //     Bell only floats none (they stay in the page for a screen reader); the choice is kept across a reload.
-//  18. the fog of war (PRD §89, ja-1ypq.3.6), on `?fog=1`: the cell under a host is live, ground no host has been near is unknown, a cell a
+//  18. the fog of war (PRD §89, ja-1ypq.3.6), on the default page: the cell under a host is live, ground no host has been near is unknown, a cell a
 //     host left is remembered and stays explored; a frame costs about what it does without the fog; and "no ants": a plain ant put on
 //     remembered ground is not drawn (the crop of the field is byte-identical with it and without it), where on live ground it is.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
@@ -186,7 +186,9 @@ const vite = spawn(
 let viteLog = "";
 vite.stdout.on("data", (d) => (viteLog += d));
 vite.stderr.on("data", (d) => (viteLog += d));
-const url = `http://127.0.0.1:${port}/`;
+// The page has the fog by default (PRD §89); the sections that are not about it open `url`, which turns it off (`?fog=0`), and the tutorial's and the fog's own open `base`.
+const base = `http://127.0.0.1:${port}/`;
+const url = `${base}?fog=0`;
 let browser = null;
 /** Errors the page threw (a frame that throws stops the page's loop): said with any failure. */
 const errors = [];
@@ -856,7 +858,7 @@ try {
   });
   const tpage = await touch.newPage();
   tpage.on("pageerror", (e) => errors.push(String(e)));
-  await tpage.goto(url);
+  await tpage.goto(base); // the first game as a new player has it: under the fog
   await tpage.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
@@ -916,7 +918,7 @@ try {
     requestAnimationFrame(tick);
   });
   tu.on("pageerror", (e) => errors.push(String(e)));
-  await tu.goto(url);
+  await tu.goto(base);
   await tu.getByLabel("world seed").fill(String(SEED));
   await tu.getByRole("button", { name: "Start the tutorial", exact: true }).click();
   const tcard = tu.getByRole("dialog", { name: "tutorial" });
@@ -2391,21 +2393,21 @@ try {
   await fp.reload();
   check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
   await fctx.close();
-  // ——— 18. The fog of war (docs/fog-of-war.md, F3.6, `?fog=1`) ———
+  // ——— 18. The fog of war (docs/fog-of-war.md, F3.6; the page's default since F6) ———
   section("18. the fog of war");
   // Two pages of one seed stepped the same by the hook: the sim is deterministic, so what differs is the page.
   const fogPage = async (query) => {
     const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
     const p = await c.newPage();
     p.on("pageerror", (e) => errors.push(String(e)));
-    await p.goto(`${url}${query}`);
+    await p.goto(`${base}${query}`);
     await p.getByLabel("world seed").fill(String(SEED));
     await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
     await until(() => p.evaluate(() => !!window.jevAnts?.game.world), "a game for the fog checks", 20_000, 100);
     await p.getByRole("button", { name: "Pause", exact: true }).click();
     return { c, p };
   };
-  const { c: gctx, p: gp } = await fogPage("?fog=1");
+  const { c: gctx, p: gp } = await fogPage("");
   // The landing (docs/fog-of-war.md §5.4): before the first step only the landing patch is explored; the builder turns the fog off.
   const patch = await gp.evaluate(() => window.jevAnts.game.fungus.patchOn(0));
   check(patch.length >= 2, "the fungus has landed on a patch");
@@ -2446,8 +2448,8 @@ try {
   await gp.evaluate(() => window.jevAnts.step(300));
   for (const c of seen) check((await stateAt(...c)) !== 0, "every cell a host stood on stays explored");
   check((await stateAt(0.5, 0.5)) === 0, "while the ground no host has been near is still unknown");
-  const nofog = await fogPage("");
-  check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "without ?fog=1 the page has no fog");
+  const nofog = await fogPage("?fog=0");
+  check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "with ?fog=0 the page has no fog");
   // The frame time: the same game time on both pages (the sim is deterministic only from the Pause), zoomed in to hexagons, paused (so a frame
   // draws alone), the CPU slowed 4× on both so a cost shows over vsync (a phone's frame rate was lost to it, PR #408). The mean, for the median sits on the vsync tick.
   const timeOf = (p) => p.evaluate(() => window.jevAnts.game.time);

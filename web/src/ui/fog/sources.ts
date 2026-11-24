@@ -24,9 +24,9 @@ export function groundSources(game: Game): Source[] {
   return out;
 }
 
-/** Whether the page runs with the fog of war: `?fog=1` for now (the default flips in F6, ja-1ypq.6). */
+/** Whether the page runs with the fog of war: on by default (owner's go, 2026-11-24); `?fog=0` turns it off (the Lab and the guards that want the whole map). */
 export function fogFromUrl(search = typeof location === "undefined" ? "" : location.search): boolean {
-  return new URLSearchParams(search).get("fog") === "1";
+  return new URLSearchParams(search).get("fog") !== "0";
 }
 
 /** The sensed map for `game`: with the fog's knowledge hung on it when `fog`. */

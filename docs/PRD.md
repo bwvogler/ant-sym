@@ -8055,7 +8055,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **Built (F6, `ja-1ypq.6`, 2026-11-24, same flag):** the fog is off while the builder is on (owner, 2026-11-23): `SensedMap.suspended`, set by the page from the builder's state, makes `knowledge`, `corpses` and `known` read null, so the field, the cards, the lens, picking and the readouts show everything; sight goes on being recorded, so closing the builder brings the fog back as it was. The start already revealed only the landing patch (the page stamps the fungus's body once at game creation, before the first step); e2e section 18 now asserts it, and that the builder turns the fog off and on (hook `fogCell`). The tutorial follows a host, so it needed no change. **Not done: the default.** The page still needs `?fog=1`; flipping it waits for the owner's go, to be recorded here. Jev cost none.
 
-**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`, P3), F6's last step (the default flips on the owner's go), F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
+**Owner's go, default on (2026-11-24):** "I do want [fog] on by default." `fogFromUrl` now reads on unless the address says `?fog=0`. The Lab's omniscient view is the dev hook and `?fog=0`. The e2e's sections that are not about the fog, `field-shots` (so the pixel guard still compares with a base that has none) and the Lab-style guards open `?fog=0`; the tutorial and section 18 run on the default page. Jev cost none.
+
+**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`, P3),  F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
 
 **Still open.**
 - A fading memory (not now).
