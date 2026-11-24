@@ -6,6 +6,7 @@ import type { Followed } from "./follow.ts";
 import { handleKey, type KeyHost } from "./field/keyboard.ts";
 import { PointerController, type PointerHost, type PointerInput } from "./field/pointer.ts";
 import type { FieldApi, FieldBuild, FieldProps } from "./field/api.ts";
+import { isKnown } from "./fog/knownView.ts";
 import { chamberUnder, linkTarget, pickAnt } from "./field/hit.ts";
 import type { OrbitHost } from "./field/orbit.ts";
 import type { FieldPen } from "./field/ctx.ts";
@@ -293,7 +294,11 @@ export default function ColonyField({
     tilt: () => orbit.current.tilt,
     following: () => !!follow.current,
     unfollow,
-    nextNest: () => goNest((nestTurn.current + 1) % colonies.length),
+    // The n key cycles the nests the fungus knows (all of them without the fog).
+    nextNest: () => {
+      const ks = colonies.map((_, k) => k).filter((k) => isKnown(sensed.known, k));
+      if (ks.length) goNest(ks.find((k) => k > nestTurn.current) ?? ks[0]!);
+    },
   });
   const onKey = (e: KeyboardEvent<HTMLCanvasElement>) => {
     if (handleKey(keyHost(), e)) e.preventDefault();
@@ -321,6 +326,7 @@ export default function ColonyField({
       <FieldOrbitHandle host={orbitHost} buttonRef={orbitAxes} />
       <FieldGoToMenu
         colonies={colonies}
+        known={sensed.known}
         world={world}
         view={view}
         toolsAt={toolsAt}
