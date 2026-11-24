@@ -106,6 +106,12 @@ export class MeanGrid {
     t.length = 0;
   }
 
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.sum.dropEmpty();
+    this.count.dropEmpty();
+  }
+
   add(x: number, y: number, v: number): void {
     if (y < 0) return; // a column may be negative (one world's curtain starts at the line's sMin); a row never is
     const c = this.count.get(x, y);

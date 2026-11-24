@@ -473,6 +473,14 @@ export class Colony {
   scentSum = new MeanGrid();
   /** the strongest queen's scent perceived on each cell this tick (scent × scentGain): what nurses rear gynes by; rebuilt every tick, not saved */
   perceived = new FeltGrid();
+  /** Free the chunks the colony's per-tick grids hold nothing in (an endless game's housekeeping: they would keep every chunk the ants have been over). */
+  trimScratch(): void {
+    for (const g of [this.felt, this.youngs, this.broods, this.perceived]) g.trim();
+    this.cropDonors.trim();
+    this.donors.trim();
+    this.scentSum.trim();
+  }
+
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
   /** this colony's ants per cell (the game's occupancy), for the odds an ant senses by touch on meeting strangers (MR 4) */

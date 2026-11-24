@@ -62,6 +62,12 @@ export class CountGrid {
     t.length = 0;
   }
 
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.layer.dropEmpty();
+    this.#blocks.dropEmpty();
+  }
+
   add(x: number, y: number, n = 1): void {
     const v = this.layer.get(x, y);
     if (v === 0) this.#touched.push(x, y);

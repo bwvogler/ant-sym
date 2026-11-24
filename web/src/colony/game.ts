@@ -19,8 +19,8 @@ import { seeHoles } from "./layers.ts";
 import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
-import { CHUNK, CHUNK_BITS, chunkKey, local } from "./chunks.ts";
-import { isEndless, loadEndless, saveEndless, type EndlessMap } from "./endlessMap.ts";
+import { CHUNK, CHUNK_BITS, chunkKey, chunkOf, local } from "./chunks.ts";
+import { dropClean, isEndless, loadEndless, saveEndless, type EndlessMap } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -210,6 +210,10 @@ export interface GameSave {
   };
 }
 
+/** Eviction (`Game.evict`): chunks kept round anything awake (ants, the fungus's body, stepped scent), round an awake hole, and chunks dropped a tick. */
+const EVICT_NEAR = 3;
+const EVICT_HOLE = 5;
+const EVICT_PER_TICK = 2;
 /** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
 const CONTACT_RANGE = 4;
 
@@ -736,11 +740,19 @@ export class Game {
    * what it holds (generation is pure in (seed, chunk); `EndlessMap.prefetch` touches no layer, total or hook), and sleeping colonies read nothing so ask
    * for nothing. It runs on its own once-a-second cadence, with the awake rule on or not.
    */
-  #prefetchStep(map: EndlessMap): void {
+  #chunkStep(map: EndlessMap): void {
+    if (!this.prefetch && !this.evict) return;
     if (this.time >= this.#prefetchNext) {
       this.#prefetchNext = this.time + 1;
-      this.#planPrefetch();
+      const occ = this.#occupied();
+      if (this.prefetch) this.#planPrefetch(occ);
+      if (this.evict) {
+        this.#planEvict(map, occ);
+        this.#trimScratch();
+      }
     }
+    if (this.evict) this.#evictStep(map);
+    if (!this.prefetch) return;
     while (this.#prefetchHead < this.#prefetchQueue.length) {
       const [cx, cy] = this.#prefetchQueue[this.#prefetchHead] as [number, number];
       if (map.prefetch(cx, cy)) return; // a step of this chunk's work; the next tick takes the next
@@ -748,9 +760,14 @@ export class Game {
     }
   }
 
-  #planPrefetch(): void {
+  /**
+   * The chunks something awake occupies, once a second: `list` the chunks of awake ants on the plane, awake holes, the fungus's body and scent; `scented` the
+   * scent's; `holes` the awake holes'. The prefetch rings and the eviction margins are laid round them.
+   */
+  #occupied(): { list: [number, number][]; scented: [number, number][]; holes: [number, number][] } {
     const centres = new Set<number>();
     const list: [number, number][] = [];
+    const holes: [number, number][] = [];
     const add = (cx: number, cy: number): void => {
       const k = chunkKey(cx, cy);
       if (centres.has(k)) return;
@@ -773,6 +790,7 @@ export class Game {
       const h = (c.layers[PLANE] as Layer).nest;
       cellOf(h.x, h.y);
       add(CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS);
+      holes.push([CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS]);
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || c.layer[i] !== PLANE) continue;
         cellOf(c.x[i] as number, c.y[i] as number);
@@ -788,6 +806,10 @@ export class Game {
         for (let cy = Math.floor(by / R); cy <= Math.floor((by + 1) / R); cy++) this.#bodyChunks.push([bx, cy]);
     }
     for (const [cx, cy] of this.#bodyChunks) add(cx, cy);
+    return { list, scented, holes };
+  }
+
+  #planPrefetch({ list, scented }: { list: [number, number][]; scented: [number, number][] }): void {
     const queue: [number, number][] = [];
     const queued = new Set<number>();
     const ring = (cx: number, cy: number, r: number): void => {
@@ -804,6 +826,76 @@ export class Game {
     for (const [cx, cy] of scented) ring(cx, cy, 2);
     this.#prefetchQueue = queue;
     this.#prefetchHead = 0;
+  }
+
+  /**
+   * Whether an endless plane's far ground is freed (`#evictStep`; PRD §66 E4.4b, `ja-hacj`): a chunk nothing awake is near and nothing changed is dropped
+   * (`dropClean`) and made again, identical, if read. Same game either way, which a test holds; off, every chunk read is kept. A bounded game has no such
+   * ground: nothing happens.
+   */
+  evict = true;
+  /** Chunks (as keys) to try dropping, planned once a second, and the next one to take */
+  #evictQueue: number[] = [];
+  #evictHead = 0;
+  /** Chunks `dropClean` refused: a change is a delta, so they stay and are not asked again (a cache: a load clears it) */
+  #evictKept = new Set<number>();
+
+  /**
+   * Chunks of the map still held that nothing awake is near: not within EVICT_NEAR chunks of an awake ant, the fungus's body, or scent that is stepped (the
+   * prefetch rings and a trail's reads are inside that), nor within EVICT_HOLE of an awake hole (a smell's window, W, reaches that far). A frozen colony holds none
+   * of them: the ground it sleeps on is made again when it wakes.
+   */
+  #planEvict(map: EndlessMap, { list, holes }: { list: [number, number][]; holes: [number, number][] }): void {
+    const near = new Set<number>();
+    const mark = (cx: number, cy: number, m: number): void => {
+      for (let j = -m; j <= m; j++) for (let i = -m; i <= m; i++) near.add(chunkKey(cx + i, cy + j));
+    };
+    for (const [cx, cy] of list) mark(cx, cy, EVICT_NEAR);
+    for (const [cx, cy] of holes) mark(cx, cy, EVICT_HOLE);
+    const held = new Set<number>();
+    const note = (cx: number, cy: number): void => void held.add(chunkKey(cx, cy));
+    for (const l of [map.rock, map.food, map.quality, map.digHeading, map.filledAt, map.dugAt]) l.forEach(note);
+    const queue: number[] = [];
+    for (const k of held) if (!near.has(k) && !this.#evictKept.has(k)) queue.push(k);
+    this.#evictQueue = queue;
+    this.#evictHead = 0;
+  }
+
+  /** Drop a few of the planned chunks (each costs the plane's chunk made again, to compare): the pile cells of those freed leave the regrowth's list. */
+  #evictStep(map: EndlessMap): void {
+    const freed = new Set<number>();
+    for (let n = 0; n < EVICT_PER_TICK && this.#evictHead < this.#evictQueue.length; n++) {
+      const k = this.#evictQueue[this.#evictHead++] as number;
+      const [cx, cy] = chunkOf(k);
+      if (dropClean(map, cx, cy)) freed.add(k);
+      else this.#evictKept.add(k);
+    }
+    if (freed.size) this.#dropPiles(freed);
+  }
+
+  /** The pile cells of chunks freed: they were at their first size (a clean chunk), so regrowth skipped them; a chunk made again notes them again (`EndlessMap.regenHooks`). */
+  #dropPiles(freed: ReadonlySet<number>): void {
+    const piles = this.#piles;
+    for (const k of freed) this.#pileChunks.delete(k);
+    if (!piles || !piles.cells.length) return;
+    const keep: number[] = [];
+    for (let i = 0; i < piles.cells.length; i++) {
+      const c = piles.cells[i] as number;
+      if (!freed.has(chunkKey(keyX(c) >> CHUNK_BITS, keyY(c) >> CHUNK_BITS))) keep.push(i);
+    }
+    if (keep.length === piles.cells.length) return;
+    this.#piles = {
+      cells: Float64Array.from(keep, (i) => piles.cells[i] as number),
+      full: Float32Array.from(keep, (i) => piles.full[i] as number),
+    };
+  }
+
+  /** The grids the game and its colonies rebuild every tick free the chunks they hold nothing in: they would keep every chunk anything has walked over. */
+  #trimScratch(): void {
+    for (const gs of this.#grids) for (const g of gs) g.trim();
+    for (const r of this.#recs) r.trim();
+    for (const c of this.colonies) c.trimScratch();
+    this.fungus.trimScratch();
   }
 
   /** Ask the awake rule and apply its verdict. */
@@ -1184,6 +1276,7 @@ export class Game {
       this.#piles = { cells: new Float64Array(0), full: new Float32Array(0) };
       this.#regrowRng = mulberry32(map.seed * 92821 + 17);
       map.foodHooks.push((cx, cy, f) => this.#notePileChunk(cx, cy, f));
+      map.regenHooks.push((cx, cy, f) => this.#notePileChunk(cx, cy, f)); // a chunk freed (#evictStep) and made again
       map.food.forEach((cx, cy, a) => this.#notePileChunk(cx, cy, a));
       return;
     }
@@ -1518,7 +1611,7 @@ export class Game {
       this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
     if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
-    if (this.prefetch && isEndless(this.map)) this.#prefetchStep(this.map);
+    if (isEndless(this.map)) this.#chunkStep(this.map);
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
       this.#aimAll();
