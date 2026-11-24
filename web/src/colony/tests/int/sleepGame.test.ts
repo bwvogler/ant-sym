@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { Game } from "../../game.ts";
 import { STRAINS } from "../../fungus.ts";
 import { cellKey } from "../../hex.ts";
-import { generateOneWorld, mainGround } from "../../oneWorld.ts";
-import { mulberry32 } from "../../world.ts";
+import { generateOneWorld, mainGround, oneWorldOnLines } from "../../oneWorld.ts";
+import { generateWorld, mulberry32 } from "../../world.ts";
 
 // The awake rule in a game (docs/endless-world.md §6, PRD §66 E4.2): who the fungus is near, freeze and thaw applied, the rule saved.
 
@@ -183,7 +183,11 @@ test("a body on an awake curtain keeps its colony awake and counts as near; a sl
   const n2 = g2.colonies[0]!.nest;
   g2.fungus.paint(g2.colonies, n2.x, n2.y, 4, 2, 0, 0, 1);
   g2.enableSleep(RULE);
-  run(g2, 40);
+  // the ants that pick the fungus up are put right each tick, so only the body in the curtain can keep it awake
+  for (let i = 0; i < 40 * 30; i++) {
+    g2.colonies[0]!.load.fill(0);
+    g2.tick(1 / 30);
+  }
   assert.equal(g2.isFrozen(0), false, "a body in its curtain: the colony stays awake");
 });
 
@@ -199,4 +203,40 @@ test("the rule is asked once every `every` seconds, not every tick", () => {
   };
   run(g, 10);
   assert.ok(asked >= 5 && asked <= 6, `asked ${asked} times in 10 s at every 2 s`);
+});
+
+test("a cap-frozen colony whose frozen curtain holds the fungus wakes when room comes back", () => {
+  const g = new Game(
+    oneWorldOnLines(SEED, generateWorld(SEED), [[0], [1]]),
+    { regrow: 0, autoFound: false, fungus: { hyphae: true } },
+    mulberry32(5),
+    [
+      { antCount: 20, line: 0 },
+      { antCount: 20, line: 1 },
+    ],
+  );
+  g.enableSleep({ ...RULE, cap: 1 });
+  for (const c of g.colonies) g.fungus.paint(g.colonies, c.nest.x, c.nest.y, 4, 2, 0, 0, c.home);
+  run(g, 1);
+  assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [true, false], "over the cap, colony 0 sleeps with the fungus in its curtain");
+  g.freeze(1); // the other goes to sleep too, so there is room
+  run(g, 15);
+  assert.equal(g.isFrozen(0), true, "its T has not passed");
+  run(g, 10);
+  assert.equal(g.isFrozen(0), false, "room, T passed, and it holds the fungus in its curtain");
+});
+
+test("contact reaches a few steps and no further: ants 3 steps apart meet, 10 steps apart do not", () => {
+  for (const [dx, pairs] of [
+    [3, 1],
+    [10, 0],
+  ] as const) {
+    const g = fresh();
+    plane(g, 0, 100, 200);
+    plane(g, 1, 100 + dx, 200);
+    g.tick(1 / 30);
+    g.enableSleep(RULE);
+    g.tick(1 / 30);
+    assert.equal(g.sleepRule!.saveState().contacts.length, pairs, `${dx} steps apart`);
+  }
 });
