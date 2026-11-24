@@ -190,6 +190,8 @@ export interface GameSave {
     regrowClock: number;
     rng: number | null;
     regrowRng: number | null;
+    /** the colonies asleep, by index (Game.freeze); absent when none is */
+    frozen?: number[];
   };
 }
 
@@ -530,6 +532,61 @@ export class Game {
     });
   }
 
+  /** The colonies asleep, by index (freeze, docs/endless-world.md §6): not stepped, not met, not read by the fungus. Empty in every game that freezes nothing. */
+  #frozen = new Set<number>();
+
+  /**
+   * Put colony k to sleep (E4.1): its ants, its scent on every layer and its curtain stop where they are. Its ants leave the occupancy grids and the
+   * fights, the recognition and the fungus's reading of ants; a curtain whose colonies are all asleep is not stepped by the fungus (its spores do not
+   * fade, its hyphae do not grow). Nothing here decides when: that is the awake rule (E4.2). The camera never freezes anything.
+   */
+  freeze(k: number): void {
+    if (!this.colonies[k]) throw new Error(`freeze: no colony ${k}`);
+    this.#frozen.add(k);
+    this.#syncFrozen();
+    this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
+  }
+
+  /** Wake colony k: it steps again from exactly where it stopped. */
+  thaw(k: number): void {
+    this.#frozen.delete(k);
+    this.#syncFrozen();
+    this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
+  }
+
+  /** Whether colony k is asleep. */
+  isFrozen(k: number): boolean {
+    return this.#frozen.has(k);
+  }
+
+  /** The colonies awake, in order: the whole list when none sleeps (the same array, so nothing is copied). */
+  #awake(): Colony[] {
+    return this.#frozen.size ? this.colonies.filter((_, k) => !this.#frozen.has(k)) : this.colonies;
+  }
+
+  /** A per-colony list (a layer's grids) without the sleeping colonies' entries, aligned with `#awake()`. */
+  #awakeOf(perColony: CountGrid[]): CountGrid[] {
+    return this.#frozen.size ? perColony.filter((_, k) => !this.#frozen.has(k)) : perColony;
+  }
+
+  /** The fungus leaves alone a curtain whose colonies are all asleep: the plane is shared, and never is. */
+  #syncFrozen(): void {
+    const layers = new Set<number>();
+    this.layers.forEach((_, l) => {
+      if (l === PLANE) return;
+      const on = this.colonies.flatMap((c, k) => (c.home === l ? [k] : []));
+      if (on.length > 0 && on.every((k) => this.#frozen.has(k))) layers.add(l);
+    });
+    this.fungus.frozenLayers = layers;
+    // The hosts among the sleepers stay counted (their ants do not change while they sleep), so the fungus keeps stepping and wakes them in step.
+    let hosts = 0;
+    for (const k of this.#frozen) {
+      const c = this.colonies[k];
+      if (c) for (let i = 0; i < c.n; i++) if (c.alive[i] && (c.load[i] as number) > 0) hosts++;
+    }
+    this.fungus.hostsAsleep = hosts;
+  }
+
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
 
@@ -779,6 +836,7 @@ export class Game {
     });
     this.#wire();
     this.#refresh();
+    this.#syncFrozen();
     const q = c.queen;
     if (f.fungus && f.fungus.load > 0 && q) {
       q.load = Math.min(1, f.fungus.load);
@@ -899,9 +957,11 @@ export class Game {
 
   /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
   #refresh(): void {
+    const awake = this.#awake();
     this.#grids.forEach((grids, l) => {
-      this.colonies.forEach((c, k) => occupancy(c, grids[k] as CountGrid, l));
-      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(this.colonies, l);
+      // A colony asleep has no ants anyone can meet: its occupancy is empty.
+      this.colonies.forEach((c, k) => (this.#frozen.has(k) ? (grids[k] as CountGrid).reset() : occupancy(c, grids[k] as CountGrid, l)));
+      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(awake, l);
     });
   }
 
@@ -967,7 +1027,7 @@ export class Game {
   #meet(dt: number): void {
     const live: number[] = [];
     this.colonies.forEach((c, k) => {
-      if (!Game.beaten(c)) live.push(k);
+      if (!Game.beaten(c) && !this.#frozen.has(k)) live.push(k);
     });
     const keep = Math.exp(-dt / QUIET);
     const tol = this.recognition.params.tolerance;
@@ -1029,8 +1089,10 @@ export class Game {
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
-    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(this.colonies) : undefined;
-    for (const c of this.colonies) c.tick(dt, attackCue);
+    // The colonies asleep (freeze) are not stepped: their ants, scent and curtains stand as they were; no one meets them. With none asleep this is the whole list.
+    const awake = this.#awake();
+    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(awake) : undefined;
+    for (const c of awake) c.tick(dt, attackCue);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;
@@ -1049,7 +1111,7 @@ export class Game {
       // Fights on each layer, among the ants there.
       let died = 0;
       this.#grids.forEach((grids, l) => {
-        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
+        died += resolveFights(awake, this.#awakeOf(grids), dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
           (x, y) => x + y,
           0,
         );
@@ -1060,7 +1122,7 @@ export class Game {
         this.#haveMet = false;
       }
       // Odours: the gestalt at each nest, and blending where the fungus runs it.
-      this.recognition.advance(this.colonies, dt);
+      this.recognition.advance(awake, dt);
       // Whether the colonies meet as allies (unity, ja-i0f): read after odours move, from this tick's occupancy.
       this.#meet(dt);
     }
@@ -1073,7 +1135,7 @@ export class Game {
     });
     if (this.fungus.active) {
       const recs = this.colonies.length > 1 ? this.#recs : null;
-      this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
+      this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
@@ -1250,6 +1312,8 @@ export class Game {
         regrowClock: this.#regrowClock,
         rng: (this.#rng as Partial<Rng>).state ?? null,
         regrowRng: this.#regrowRng?.state ?? null,
+        // Only when a colony sleeps: a game that freezes nothing saves as it always has.
+        ...(this.#frozen.size ? { frozen: [...this.#frozen].sort((a, b) => a - b) } : {}),
       },
     };
   }
@@ -1324,6 +1388,8 @@ export class Game {
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
+    this.#frozen = new Set(p.frozen ?? []);
+    this.#syncFrozen();
     // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
     if (
