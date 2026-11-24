@@ -6,7 +6,7 @@
 
 import {
   type AphidClump,
-  CURTAIN,
+  isCurtainLayer,
   centreX,
   centreY,
   type Colony,
@@ -268,7 +268,7 @@ export const actorsStage: Stage = (fs) => {
   const { fc, len, crumb, inView, half, hexes, resourceLod, darkSprites, nestImage, resourceImage } = fs;
   const { lv, strip, colonies } = fc;
   if (lv === PLANE) drawLine(fc);
-  if (lv === CURTAIN) drawBends(fc);
+  if (isCurtainLayer(lv)) drawBends(fc);
   // Under the fog what lives on the ground (ants, brood, the queen, alates, corpses) is drawn only where an observer senses it now.
   const seen = actorCull(fc, inView);
   const nestFrame: NestFrame = { len, inView: seen, hexes, resourceLod, darkSprites, nestImage, resourceImage };
@@ -344,7 +344,7 @@ export const voxelStage: Stage = (fs) => {
       ctx.globalAlpha = 1;
     }
     if (world && lv === PLANE) drawLine(fc, false);
-    if (world && lv === CURTAIN) drawBends(fc);
+    if (world && isCurtainLayer(lv)) drawBends(fc);
   }
 };
 

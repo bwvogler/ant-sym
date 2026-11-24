@@ -15,6 +15,7 @@ import {
   SOIL,
   STRIP,
   cellAt,
+  lineOfLayer,
   cellKey,
   rockAt,
   SPORE_FULL,
@@ -71,7 +72,7 @@ export const groundSpoil = (k: FieldCtx) => (k.smellAll ? k.theme.spoil : CLOSE_
  */
 export function stripAt(k: FieldCtx, s: number, y: number): readonly number[] | null {
   const { world, theme } = k;
-  if (y > STRIP || !cellAt(world.line, s)) return null;
+  if (y > STRIP || !cellAt(lineOfLayer(world, k.lv), s)) return null;
   const g = planeGround(k, CELL[0], CELL[1]);
   if (g.state === UNKNOWN) return y === STRIP ? fogRgb(theme) : null; // under the fog, a place nothing has sensed is fog on the strip; there is no cut above it
   const c =
@@ -363,7 +364,7 @@ export class Ground {
     // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
     // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
     if (strip && cy === STRIP >> 6) {
-      const line = world.line;
+      const line = lineOfLayer(world, k.lv);
       const plane = world.plane;
       const ly = STRIP - y0;
       for (let lx = 0; lx < CHUNK; lx++) {

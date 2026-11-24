@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type BuildEvent, Builder, CURTAIN, type Game, PLANE } from "../colony/index.ts";
+import { type BuildEvent, Builder, type Game, PLANE } from "../colony/index.ts";
 import type { FieldApi, FieldBuild } from "./ColonyField.tsx";
 import { markSeen, seenTools, trayItems, type TrayItem, type TrayTool } from "./build.ts";
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
@@ -46,11 +46,14 @@ const typing = (target: EventTarget | null): boolean => {
 export function useBuilder({
   game,
   view,
+  belowLayer,
   field,
   closeDrawer,
 }: {
   game: Game;
   view: ColonyControls["view"];
+  /** the layer the below view shows (its line's curtain) */
+  belowLayer: number;
   field: RefObject<FieldApi | null>;
   closeDrawer: () => void;
 }) {
@@ -104,7 +107,7 @@ export function useBuilder({
       if (!on) {
         // Zoomed out, a finger's stroke spans hundreds of cells: the builder opens close in (LINK_ZOOM's ≥ 8 px a cell),
         // on the colony the fungus landed by, unless the view is close already.
-        const v = view === "above" ? PLANE : CURTAIN;
+        const v = view === "above" ? PLANE : belowLayer;
         const cam = field.current?.camera(v);
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         if (!cam || cam.zoom < 6 * dpr) {
@@ -115,7 +118,7 @@ export function useBuilder({
       return !on;
     });
     closeDrawer();
-  }, [view, game, field, closeDrawer]);
+  }, [view, belowLayer, game, field, closeDrawer]);
   const undoBuild = useCallback(() => {
     if (builder.undo()) {
       play("undo");

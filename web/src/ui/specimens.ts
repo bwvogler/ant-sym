@@ -1,4 +1,4 @@
-import { type Colony, CURTAIN, INFECTED, MODES } from "../colony/index.ts";
+import { type Colony, INFECTED, isCurtainLayer, MODES } from "../colony/index.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
 
@@ -75,7 +75,7 @@ export function specimenRow(colonies: readonly Colony[], s: Specimen): SpecimenR
     carrying: c.carrying[s.i] === 1,
     load: Math.min(1, load),
     host: load >= INFECTED,
-    below: c.layer[s.i] === CURTAIN,
+    below: isCurtainLayer(c.layer[s.i]!),
     fatigue: c.fatigue[s.i]!,
     patience: c.params.patience,
   };

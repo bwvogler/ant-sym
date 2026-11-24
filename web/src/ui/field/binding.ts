@@ -2,7 +2,7 @@
 // colony's trails and alarm on it, the fungus's spores, the theme read from the page's CSS, and the sprite sets. The shell's render effect used to hold
 // these as a dozen `let`s; here they are one object, with no DOM and no clock (the CSS is read through a function the shell gives).
 
-import { type Colony, CURTAIN, type ChunkLayer, type Fungus, type OneWorld, PLANE, type WorldMap } from "../../colony/index.ts";
+import { type Colony, type ChunkLayer, type Fungus, isCurtainLayer, mapOfLayer, type OneWorld, type WorldMap } from "../../colony/index.ts";
 import type { SensedMap } from "../fungusSight.ts";
 import type { FieldCtx, FieldTheme } from "./ctx.ts";
 import type { FieldEnv, SpriteSets } from "./env.ts";
@@ -151,10 +151,10 @@ export class FieldBinding {
   /** Read the shown view: its layer, map, scent and spores (each frame). */
   bind(): void {
     const lv = (this.lv = this.#inputs.shown());
-    const m = (this.m = lv === PLANE ? this.#world.plane : this.#world.curtain);
+    const m = (this.m = mapOfLayer(this.#world, lv));
     if (m !== this.#geoMap || m.x0 !== this.gx0 || m.size.w !== this.gw || m.size.h !== this.gh) this.#rebuild(m);
     this.spores = this.#fungus.sporesOn(lv)?.spores ?? this.#fungus.spores;
-    this.strip = lv === CURTAIN;
+    this.strip = isCurtainLayer(lv);
     this.trails = [];
     this.alarms = [];
     this.sensedLayer = this.#sensed.layer(lv);

@@ -44,6 +44,12 @@ export const AIR = 3;
 export type Terrain = typeof OPEN | typeof ROCK | typeof SOIL | typeof AIR;
 
 export interface WorldMap {
+  /**
+   * The endless plane (endlessMap.ts): true on a map with no edge, whose rock, food and quality are generated chunk by chunk on a miss.
+   * `size` and `x0` are then only a nominal box (the chunk key's range), never a bound: inBounds, clampCol, rockAt and disc ask this flag
+   * outside the box and rows above it, so the plane runs every way. Absent (never false) on every bounded map.
+   */
+  endless?: true;
   size: WorldSize;
   /**
    * The map's first column: its columns run x0 … x0 + size.w − 1. 0 on every map but one world's curtain, whose column
@@ -284,21 +290,28 @@ export function worldExtent(map: { size: WorldSize }): { w: number; h: number } 
 export interface Bounds {
   x0: number;
   size: WorldSize;
+  /** an endless plane has no edge (see WorldMap.endless) */
+  endless?: true;
 }
 
 /** Whether integer cell (x, y) is on the map. */
 export function inBounds(map: Bounds, x: number, y: number): boolean {
-  return x >= map.x0 && y >= 0 && x < map.x0 + map.size.w && y < map.size.h;
+  return (x >= map.x0 && y >= 0 && x < map.x0 + map.size.w && y < map.size.h) || map.endless === true;
 }
 
 /** Column x held to the map's columns (x0 … x0 + w − 1). */
 export function clampCol(map: Bounds, x: number): number {
+  if (map.endless) return x;
   return Math.min(map.x0 + map.size.w - 1, Math.max(map.x0, x));
 }
 
 /** The terrain at integer cell (x, y): OPEN, ROCK or SOIL; off the map is rock. Non-zero = solid. */
 export function rockAt(map: WorldMap, x: number, y: number): number {
-  return x < map.x0 || y < 0 || x >= map.x0 + map.size.w || y >= map.size.h ? ROCK : map.rock.get(x, y);
+  return x < map.x0 || y < 0 || x >= map.x0 + map.size.w || y >= map.size.h
+    ? map.endless
+      ? map.rock.get(x, y)
+      : ROCK
+    : map.rock.get(x, y);
 }
 
 /** The terrain of the cell under world position (x, y) (off the map is rock). */
@@ -396,6 +409,11 @@ function headingLayer(): ChunkLayer<Uint8Array> {
 /** A layer of times (simulated seconds), −Infinity = never. */
 function timeLayer(): ChunkLayer<Float32Array> {
   return new ChunkLayer((n) => new Float32Array(n).fill(-Infinity), -Infinity);
+}
+
+/** The per-cell dig bookkeeping layers a map starts with (digHeading, filledAt, dugAt), for a map made outside this file (endlessMap.ts). */
+export function editLayers(): Pick<WorldMap, "digHeading" | "filledAt" | "dugAt"> {
+  return { digHeading: headingLayer(), filledAt: timeLayer(), dugAt: timeLayer() };
 }
 
 /** The heading integer cell (x, y) was dug at, in radians; NaN if it wasn't dug (a chamber, or never soil). */
@@ -676,8 +694,13 @@ export function escapes(map: WorldMap, x: number, y: number, radius: number, thr
 
 /** Visit every cell whose centre is within `r` of world (cx, cy), on the map. */
 export function disc(map: WorldMap, cx: number, cy: number, r: number, fn: (x: number, y: number) => void): void {
-  for (let y = Math.max(0, Math.floor(cy / R - r / R - 1)); y <= Math.min(map.size.h - 1, Math.ceil(cy / R + r / R)); y++)
-    for (let x = Math.max(map.x0, Math.floor(cx - r - 1)); x <= Math.min(map.x0 + map.size.w - 1, Math.ceil(cx + r)); x++)
+  const open = map.endless === true; // no edge: the whole disc
+  const y0 = Math.floor(cy / R - r / R - 1);
+  const y1 = Math.ceil(cy / R + r / R);
+  const x0 = Math.floor(cx - r - 1);
+  const x1 = Math.ceil(cx + r);
+  for (let y = open ? y0 : Math.max(0, y0); y <= (open ? y1 : Math.min(map.size.h - 1, y1)); y++)
+    for (let x = open ? x0 : Math.max(map.x0, x0); x <= (open ? x1 : Math.min(map.x0 + map.size.w - 1, x1)); x++)
       if (Math.hypot(centreX(x, y) - cx, centreY(y) - cy) <= r) fn(x, y);
 }
 

@@ -12,7 +12,8 @@ function setup(shown = PLANE) {
   const log: string[] = [];
   const plane = map(0, 100) as ReturnType<typeof map>;
   const curtain = map(-10, 120);
-  const world = { plane, curtain };
+  const curtain2 = map(-5, 90);
+  const world = { plane, curtain, lines: [{ curtain }, { curtain: curtain2 }] };
   const layer = (name: string) => ({ name });
   const col = (id: string, has: boolean) => ({
     map: plane,
@@ -51,7 +52,7 @@ function setup(shown = PLANE) {
     (n) => (n === "--heat" ? "10 20 30" : n.startsWith("--") ? "#102030" : ""),
     colonies[0] as never,
   );
-  return { b, st, log, plane, curtain, colonies, spore, fungus, getRedraw: () => redraw };
+  return { b, st, log, plane, curtain, curtain2, colonies, spore, fungus, getRedraw: () => redraw };
 }
 
 test("a new binding binds the shown layer and reads the theme once, in that order", () => {
@@ -85,6 +86,16 @@ test("bind: the shown map, the spores and the scent of the colonies that have th
   assert.equal(b.smellAll, true);
   assert.equal(b.spores, fungus.spores, "no spores of its own on the curtain: the fungus's default");
   assert.deepEqual(b.trails, [], "no colony has the curtain layer");
+});
+
+test("bind: a second line's curtain (layer 2) is its own map and a strip, as the first line's is", () => {
+  const { b, st, curtain, curtain2 } = setup();
+  st.shown = 2;
+  b.bind();
+  assert.equal(b.m, curtain2);
+  assert.notEqual(b.m, curtain);
+  assert.equal(b.strip, true, "every curtain's view has the surface strip");
+  assert.equal(b.lv, 2);
 });
 
 test("rebuild only when the map is another or has changed size", () => {

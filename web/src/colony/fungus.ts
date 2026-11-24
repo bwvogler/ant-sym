@@ -619,6 +619,72 @@ export class Fungus {
     return out;
   }
 
+  /**
+   * Whether the fungus's body on map `layer` (a cell holding spores, or a hypha) lies within `radius` of each of `points` (world units): one pass over
+   * the body for all of them, for the awake rule (E4.2). The body of a curtain the game has put to sleep is not read: only an awake fungus wakes.
+   */
+  bodyNear(layer: number, points: readonly { x: number; y: number }[], radius: number): boolean[] {
+    const out = points.map(() => false);
+    const L = this.#layers[layer];
+    if (!L || this.frozenLayers.has(layer) || points.length === 0) return out;
+    const r2 = radius * radius;
+    // The body is taken in blocks of BLOCK world units (a block is "body" if any of its cells is), and the points in a coarse grid of cell `radius`, so
+    // a block tests only the points in the nine buckets round it: the pass is the body's blocks times a few hundred tests, however many points there
+    // are (2,462 far piles, a 13.6k-cell fungus: 90 ms as cell against point). A point is near when it is within `radius` of a body block, so the
+    // reach is `radius` to about BLOCK beyond it.
+    const BLOCK = 8;
+    const cell = Math.max(BLOCK, radius);
+    const bucket = (bx: number, by: number): number => (by + 0x4000) * 0x8000 + (bx + 0x4000);
+    const buckets = new Map<number, number[]>();
+    points.forEach((p, i) => {
+      const k = bucket(Math.floor(p.x / cell), Math.floor(p.y / cell));
+      const list = buckets.get(k);
+      if (list) list.push(i);
+      else buckets.set(k, [i]);
+    });
+    const blocks = new Set<number>();
+    const note = (key: number): void => {
+      const kx = keyX(key);
+      const ky = keyY(key);
+      blocks.add(bucket(Math.floor(centreX(kx, ky) / BLOCK), Math.floor(centreY(ky) / BLOCK)));
+    };
+    for (const key of L.sporeCells) note(key);
+    const h = this.#hyphae[layer];
+    if (h) for (const key of h.parent.keys()) note(key);
+    let left = points.length;
+    for (const bk of blocks) {
+      const by = Math.floor(bk / 0x8000) - 0x4000;
+      const bx = (bk % 0x8000) - 0x4000;
+      const x0 = bx * BLOCK;
+      const y0 = by * BLOCK;
+      const gx = Math.floor(x0 / cell);
+      const gy = Math.floor(y0 / cell);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const list = buckets.get(bucket(gx + dx, gy + dy));
+          if (!list) continue;
+          for (const i of list) {
+            if (out[i]) continue;
+            const p = points[i]!;
+            const ex = p.x < x0 ? x0 - p.x : p.x > x0 + BLOCK ? p.x - x0 - BLOCK : 0;
+            const ey = p.y < y0 ? y0 - p.y : p.y > y0 + BLOCK ? p.y - y0 - BLOCK : 0;
+            if (ex * ex + ey * ey <= r2) {
+              out[i] = true;
+              left--;
+            }
+          }
+        }
+      if (left === 0) break;
+    }
+    return out;
+  }
+
+  /** Whether the fungus has any body on map `layer` (spores or hyphae), asleep or not. */
+  bodyOn(layer: number): boolean {
+    const L = this.#layers[layer];
+    return !!L && (L.sporeCells.size > 0 || (this.#hyphae[layer]?.parent.size ?? 0) > 0);
+  }
+
   /** Map `layer`'s hyphae (params.hyphae), for the renderer and the assays: read only; null where none has rooted. */
   hyphaeOn(layer: number): Hyphae | null {
     return this.#hyphae[layer] ?? null;

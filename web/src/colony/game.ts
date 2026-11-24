@@ -9,13 +9,14 @@ import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fu
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, hash01, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
+import { clampCol, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved, type WildSite } from "./lines.ts";
 import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
+import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 
@@ -121,6 +122,16 @@ export interface Founding {
    */
   fungus?: { load: number; strain: number };
   /**
+   * A wild colony woken from its site (Game.wakeSite): the site's lattice cell. A save founds it again from this, so the game knows the site has woken
+   * and no longer reserves it.
+   */
+  wild?: { rx: number; ry: number };
+  /**
+   * The stream the colony is built from, when it must not depend on the game's: a wild colony's, from its site's hash. Not saved. The colony takes the
+   * game's own stream once it is built.
+   */
+  rng?: () => number;
+  /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
    */
@@ -192,8 +203,13 @@ export interface GameSave {
     regrowRng: number | null;
     /** the colonies asleep, by index (Game.freeze); absent when none is */
     frozen?: number[];
+    /** the awake rule (Game.enableSleep): its parameters and memory; absent when the game has none */
+    sleep?: { params: SleepParams; state: SleepState; next: number };
   };
 }
+
+/** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
+const CONTACT_RANGE = 4;
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
 export const GAME_REGROW = 1800;
@@ -545,6 +561,7 @@ export class Game {
     this.#frozen.add(k);
     this.#syncFrozen();
     this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
+    this.#aimAll(); // and the awake raid no one who sleeps
   }
 
   /** Wake colony k: it steps again from exactly where it stopped. */
@@ -552,11 +569,154 @@ export class Game {
     this.#frozen.delete(k);
     this.#syncFrozen();
     this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
+    this.#aimAll();
   }
 
   /** Whether colony k is asleep. */
   isFrozen(k: number): boolean {
     return this.#frozen.has(k);
+  }
+
+  /** The wild sites that have woken, by "rx,ry": the colony each became (Game.wakeSite). */
+  #wild = new Map<string, number>();
+
+  /**
+   * Wake a wild site (docs/endless-world.md §4, E4.3): its colony is generated, once, from the site and the world's seed only (never the game's
+   * stream: the same site woken in two games is the same colony), on a line of its own along the site's heading. It starts at the size a start colony
+   * reaches by about six minutes (measured, scripts/mature-colony.mjs: its cap, 1.5 times the start, with no brood left and its nest dug out); `ants`
+   * overrides it (the owner's size, ja-dv98). Its odour is a hash of the site. Waking a site twice gives the colony already woken.
+   */
+  wakeSite(site: WildSite, opts: { ants?: number } = {}): number {
+    const key = `${site.rx},${site.ry}`;
+    const woken = this.#wild.get(key);
+    if (woken !== undefined) return woken;
+    const seed = this.world.seed;
+    cellOf(site.x, site.y); // sets CELL: the site's hole cell
+    const cell = { x: CELL[0] as number, y: CELL[1] as number };
+    const cap = this.params.species.params.maxAnts ?? Math.round(1.5 * this.#firstAnts);
+    return this.addColony({
+      x: site.x,
+      y: site.y,
+      antCount: opts.ants ?? cap,
+      maxAnts: Math.max(cap, opts.ants ?? 0),
+      odour: hash01(seed, 101, site.rx, site.ry),
+      wild: { rx: site.rx, ry: site.ry },
+      rng: mulberry32(hash4(seed, 102, site.rx, site.ry)),
+      spot: { end: "end", cell, line: this.world.lines.length, newLine: { heading: site.heading } },
+    });
+  }
+
+  /** The awake rule (E4.2), when the game has one: it decides each `every` seconds who sleeps. Off in every game that does not turn it on (the bounded game). */
+  #sleep: SleepRule | null = null;
+  /** The next time the rule is asked (saved with the rule, so a load asks when the saved game would have). */
+  #sleepNext = 0;
+
+  /**
+   * Turn the awake rule on (docs/endless-world.md §6): from now on, every `every` seconds the game reads who the fungus is near and who has met whom, asks
+   * `SleepRule`, and freezes and thaws what it says. Colonies already asleep stay so until the rule wakes them. The bounded game never calls this.
+   */
+  enableSleep(params: Partial<SleepParams> = {}): void {
+    this.#sleep = new SleepRule(this.colonies.length, params, this.time);
+    this.#sleepNext = this.time;
+  }
+
+  /** The awake rule, for the page's and the assays' readings (`over`, `params`); null when the game has none. */
+  get sleepRule(): SleepRule | null {
+    return this.#sleep;
+  }
+
+  /**
+   * The facts the rule reads, from the game as it stands: where the awake fungus is (its body on the plane, in an awake curtain, and in the ants
+   * that carry it), and which awake ants are in sensing range of each other (E4.2, docs/endless-world.md §6). Reads only; each is a world-space
+   * test, never the camera.
+   */
+  #sleepFacts(rule: SleepRule): {
+    near: boolean[];
+    entered: boolean[];
+    holds: boolean[];
+    contact: (a: number, b: number) => boolean;
+  } {
+    const { distance, nestGround } = rule.params;
+    const n = this.colonies.length;
+    const holes = this.colonies.map((c) => (c.layers[PLANE] as Layer).nest);
+    // The plane is never frozen: its body is awake wherever it lies. A curtain's body is awake only while its colonies are.
+    const near = this.fungus.bodyNear(PLANE, holes, distance);
+    const entered = Array<boolean>(n).fill(false);
+    const holds = Array<boolean>(n).fill(false);
+    this.colonies.forEach((c, j) => {
+      const asleep = this.#frozen.has(j);
+      if (c.home !== PLANE && !asleep && this.fungus.bodyOn(c.home)) near[j] = true;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (c.load[i] as number) <= 0) continue;
+        if (asleep) {
+          holds[j] = true;
+          continue;
+        }
+        if (c.layer[i] !== PLANE) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        for (let k = 0; k < n; k++) {
+          const d = Math.hypot(holes[k]!.x - x, holes[k]!.y - y);
+          if (d <= distance) near[k] = true;
+          if (k !== j && d <= nestGround) entered[k] = true;
+        }
+      }
+      if (asleep && c.home !== PLANE && this.fungus.frozenLayers.has(c.home) && this.fungus.bodyOn(c.home)) holds[j] = true;
+    });
+    // Contact: an ant of a within CONTACT_RANGE of an ant of b, on any layer, by b's occupancy of the last tick (awake pairs only are asked).
+    const contact = (a: number, b: number): boolean => {
+      const ca = this.colonies[a] as Colony;
+      for (let i = 0; i < ca.n; i++) {
+        if (!ca.alive[i]) continue;
+        const l = ca.layer[i] as number;
+        const grid = (this.#grids[l] as CountGrid[] | undefined)?.[b];
+        if (!grid) continue;
+        // the ant's hex cell the way occupancy finds it, and b's ants within CONTACT_RANGE steps of it
+        const map = this.layers[l] as WorldMap;
+        ca.antCell(i);
+        if (around(grid, map, clampCol(map, CELL[0]), Math.min(map.size.h - 1, Math.max(0, CELL[1])), CONTACT_RANGE) > 0) return true;
+      }
+      return false;
+    };
+    return { near, entered, holds, contact };
+  }
+
+  /** Ask the awake rule and apply its verdict. */
+  #decideSleep(): void {
+    const rule = this.#sleep as SleepRule;
+    this.#sleepNext = this.time + rule.params.every;
+    const facts = this.#sleepFacts(rule);
+    const v = rule.step({ time: this.time, asleep: this.colonies.map((_, k) => this.#frozen.has(k)), ...facts });
+    for (const k of v.freeze) this.freeze(k);
+    for (const k of v.thaw) this.thaw(k);
+    this.#wakeSites(rule);
+  }
+
+  /**
+   * The sites that wake now (docs/endless-world.md §6, E4.3b): one the awake fungus's body has come within W of, or an awake host has entered the nest
+   * ground of. A host merely foraging past within W wakes nothing, and nothing but the fungus wakes a site (no ant wakes another, so waking cannot
+   * chain). Only sites that carry their lattice cell (`rx`, `ry`) can wake. The woken colony joins the rule awake; the cap, next decision, freezes
+   * the lowest-ranked if it is over.
+   */
+  #wakeSites(rule: SleepRule): void {
+    const sites = this.sites.filter((s): s is WildSite => s.rx !== undefined && s.ry !== undefined);
+    if (!sites.length) return;
+    const { distance, nestGround } = rule.params;
+    const woke = this.fungus.bodyNear(PLANE, sites, distance);
+    this.colonies.forEach((c, j) => {
+      if (this.#frozen.has(j)) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (c.load[i] as number) <= 0 || c.layer[i] !== PLANE) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        sites.forEach((s, k) => {
+          if (!woke[k] && Math.hypot(s.x - x, s.y - y) <= nestGround) woke[k] = true;
+        });
+      }
+    });
+    sites.forEach((s, k) => {
+      if (woke[k]) this.wakeSite(s);
+    });
   }
 
   /** The colonies awake, in order: the whole list when none sleeps (the same array, so nothing is copied). */
@@ -807,10 +967,11 @@ export class Game {
         tolerance: this.recognition.params.tolerance,
         ...this.#choice,
       },
-      this.#rng,
+      f.rng ?? this.#rng,
       this.params.species.policy ?? localPolicy,
       { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, at) },
     );
+    if (f.rng) c.rng = this.#rng;
     c.responses = this.params.species.responses;
     this.#ownSituation(c);
     if (f.mother !== undefined && c.queen && !f.nest) {
@@ -824,8 +985,14 @@ export class Game {
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
+    this.#sleep?.addColony(this.time);
+    if (f.wild) {
+      this.#wild.set(`${f.wild.rx},${f.wild.ry}`, k);
+      this.sites = this.sites.filter((s) => !(s.x === f.x && s.y === f.y)); // it is a real line now, not a reserved one
+    }
+    const { rng: _rng, ...saved } = f; // the construction stream is not part of the founding
     this.founded.push({
-      ...f,
+      ...saved,
       spot: {
         end: spot.end,
         cell: { x: spot.cell.x, y: spot.cell.y },
@@ -899,6 +1066,44 @@ export class Game {
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
   }
 
+  /**
+   * With the awake rule on, the pile cells (by index) food regrows in (docs/endless-world.md §6, E4.4): those within W of an awake colony's hole or of
+   * the awake fungus's body; elsewhere it waits, with no catch-up owed. Null (every pile) when the game has no rule, so the bounded game regrows as ever.
+   * Only the piles short of their size and not built over are looked at: a full pile has nothing to grow.
+   */
+  #awakeGround(piles: { cells: Float64Array; full: Float32Array }): Set<number> | null {
+    if (!this.#sleep) return null;
+    const { distance } = this.#sleep.params;
+    const holes = this.colonies.flatMap((c, k) => (this.#frozen.has(k) ? [] : [(c.layers[PLANE] as Layer).nest]));
+    const short: number[] = [];
+    const where: { x: number; y: number }[] = [];
+    for (let k = 0; k < piles.cells.length; k++) {
+      const x = keyX(piles.cells[k] as number);
+      const y = keyY(piles.cells[k] as number);
+      if (piles.full[k]! - this.map.food.get(x, y) < 1 || rockAt(this.map, x, y)) continue; // full, or built over: #regrow skips it too
+      short.push(k);
+      where.push({ x: centreX(x, y), y: centreY(y) });
+    }
+    const out = new Set<number>();
+    const far: number[] = [];
+    short.forEach((k, i) => {
+      const p = where[i] as { x: number; y: number };
+      if (holes.some((h) => Math.hypot(h.x - p.x, h.y - p.y) <= distance)) out.add(k);
+      else far.push(i);
+    });
+    if (far.length) {
+      const near = this.fungus.bodyNear(
+        PLANE,
+        far.map((i) => where[i] as { x: number; y: number }),
+        distance,
+      );
+      far.forEach((i, j) => {
+        if (near[j]) out.add(short[i] as number);
+      });
+    }
+    return out;
+  }
+
   /** Once a second: each pile cell short of its first size grows a unit back with chance deficit ÷ regrow. */
   #regrow(dt: number): void {
     const piles = this.#piles;
@@ -908,6 +1113,7 @@ export class Game {
     const owed = this.#regrowClock;
     this.#regrowClock = 0;
     const rate = owed / this.params.regrow;
+    const awake = this.#awakeGround(piles);
     for (let k = 0; k < piles.cells.length; k++) {
       const c = piles.cells[k];
       const x = keyX(c);
@@ -915,6 +1121,7 @@ export class Game {
       const v = this.map.food.get(x, y);
       const short = piles.full[k] - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
+      if (awake && !awake.has(k)) continue; // far from everything awake: it waits (E4.4)
       if (this.#regrowRng!() < short * rate) {
         this.map.food.set(x, y, v + 1);
         this.map.foodLeft += 1;
@@ -931,7 +1138,7 @@ export class Game {
    */
   #aimRaids(k: number): void {
     const c = this.colonies[k] as Colony;
-    const target = nearestRival(c, this.colonies, this.recognition.params.tolerance);
+    const target = nearestRival(c, this.#awake(), this.recognition.params.tolerance); // a sleeper has no defenders to raid and no ants to meet
     if (target) this.#aimAt(c, target);
   }
 
@@ -1039,6 +1246,9 @@ export class Game {
       for (let b = a + 1; b < live.length; b++)
         gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
+      // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
+      // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
+      if (this.#frozen.has(k) || (this.#frozen.size > 0 && live.length < 2)) return;
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
         let living = 0;
@@ -1137,23 +1347,33 @@ export class Game {
       const recs = this.colonies.length > 1 ? this.#recs : null;
       this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
+    if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
-      this.colonies.forEach((c, k) => {
-        // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
-        // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
-        // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
-        // raiders swarmed the other nest with nobody there to fight).
-        const tol = this.recognition.params.tolerance;
-        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
-          c.raidable = false;
-          return;
-        }
-        c.raidable = true;
-        // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
-        this.#aimRaids(k);
-      });
+      this.#aimAll();
     }
+  }
+
+  /**
+   * Who each colony raids, and whether it has anyone to (the rival check, every `rivalEvery` s, and again when a colony sleeps or wakes): a colony
+   * asleep is no rival, so a raid never walks to its empty nest.
+   */
+  #aimAll(): void {
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
+      // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
+      // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
+      // raiders swarmed the other nest with nobody there to fight).
+      const tol = this.recognition.params.tolerance;
+      if (!this.colonies.some((o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
+        c.raidable = false;
+        return;
+      }
+      c.raidable = true;
+      // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
+      this.#aimRaids(k);
+    });
   }
 
   /** Where the fungus landed (Game.land), or null before it has: the fungus game's start (ja-lo8.5). */
@@ -1173,7 +1393,7 @@ export class Game {
     const { x, y, toward } = this.#byHole(this.colonies[k] ?? (this.colonies[0] as Colony));
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
     if (evolve) this.fungus.evolve(strain);
-    this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.paint(this.#awake(), x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius, 0, toward);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
@@ -1225,7 +1445,7 @@ export class Game {
    * the ants on it.
    */
   paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number, layer = 0): void {
-    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain, layer);
+    this.fungus.paint(this.#awake(), x, y, radius, spores, dose, strain, layer); // a sleeper's ants are not dosed: they stand as they were
   }
 
   /**
@@ -1314,6 +1534,7 @@ export class Game {
         regrowRng: this.#regrowRng?.state ?? null,
         // Only when a colony sleeps: a game that freezes nothing saves as it always has.
         ...(this.#frozen.size ? { frozen: [...this.#frozen].sort((a, b) => a - b) } : {}),
+        ...(this.#sleep ? { sleep: { params: this.#sleep.params, state: this.#sleep.saveState(), next: this.#sleepNext } } : {}),
       },
     };
   }
@@ -1390,6 +1611,12 @@ export class Game {
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
     this.#frozen = new Set(p.frozen ?? []);
     this.#syncFrozen();
+    this.#sleep = null;
+    if (p.sleep) {
+      this.#sleep = new SleepRule(0, p.sleep.params);
+      this.#sleep.loadState(p.sleep.state);
+    }
+    this.#sleepNext = p.sleep?.next ?? 0;
     // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
     if (

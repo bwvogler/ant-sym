@@ -1,4 +1,4 @@
-import { type Colony, CURTAIN, INFECTED, PLANE } from "../colony/index.ts";
+import { type Colony, INFECTED, isCurtainLayer, PLANE } from "../colony/index.ts";
 import { ALARM_FULL, ALARM_SHOWN } from "./lens.ts";
 import { type KeyStore, persisted } from "./storage.ts";
 
@@ -85,7 +85,7 @@ export function cues(colonies: readonly Colony[], g: CodexNumbers): Set<Cue> {
       out.add("host");
       const l = c.layer[i] ?? PLANE;
       if (c.carrying[i] === 1) out.add("hostCarrying");
-      if (l === CURTAIN) out.add("hostBelow");
+      if (isCurtainLayer(l)) out.add("hostBelow");
       else out.add("hostOut");
       // Strangers met, whatever the ant's mode (its own contact, battle.ts: a raid or defence mode is the policy's, and the
       // desert ant's rule never fights): review of #206, S1.

@@ -2,7 +2,8 @@ import {
   AIR,
   CELL,
   cellOf,
-  CURTAIN,
+  isCurtainLayer,
+  mapOfLayer,
   type Colony,
   type Fungus,
   INFECTED,
@@ -13,8 +14,8 @@ import {
   rockAt,
   SOIL,
   SPORE_SHOWN,
+  type OneWorld,
   type WorldMap,
-  type Transect,
 } from "../colony/index.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { colonyName } from "./names.ts";
@@ -86,7 +87,28 @@ export interface LensWorld {
   colonies: readonly Colony[];
   fungus: Fungus;
   /** one world's plane and curtain */
-  world: { plane: WorldMap; curtain: WorldMap; line?: Transect };
+  world: OneWorld;
+}
+
+/**
+ * The colony whose hole is at (a, b) on layer `lv` (the plane cell, or the curtain's column and row), or -1. A colony's own hole is `holeCells[params.nest]`
+ * (its line's holes, indexed as its line's nests are), and a curtain's columns are its line's: only a colony at home on `lv` has its hole there.
+ */
+export function holeOwner(colonies: readonly Colony[], lv: number, a: number, b: number): number {
+  for (let k = 0; k < colonies.length; k++) {
+    const col = colonies[k]!;
+    const h = col.holeCells[col.params.nest];
+    if (h && (lv === PLANE ? h.px === a && h.py === b : col.home === lv && h.col === a && h.row === b)) return k;
+  }
+  return -1;
+}
+
+/**
+ * The colony that owns chamber `owner` (`Chamber.colony`: a nest's index among its curtain's) of `map`, or -1: the colony of that nest whose
+ * curtain `map` is, since each line's curtain numbers its nests from 0.
+ */
+export function chamberOwner(colonies: readonly Colony[], map: WorldMap, owner: number): number {
+  return colonies.findIndex((col) => col.params.nest === owner && (col.layers?.[col.home]?.map ?? map) === map);
 }
 
 /**
@@ -94,7 +116,7 @@ export interface LensWorld {
  * which trails the field draws now (Settings).
  */
 export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y: number, trails = { food: true, home: true }): LensProbe {
-  const map = lv === CURTAIN ? g.world.curtain : g.world.plane;
+  const map = mapOfLayer(g.world, lv);
   cellOf(x, y);
   const gx = CELL[0];
   const gy = CELL[1];
@@ -112,21 +134,16 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
       if (trails.home) homeTrail = Math.max(homeTrail, sight * Math.min(1, ph.fields.home.get(gx, gy) / HOME_FULL));
     }
   const spores = g.fungus.sporesOn(lv)?.spores ?? g.fungus.spores;
-  const holeOwner = g.colonies[0]?.holeCells ?? [];
-  let hole = -1;
-  for (let k = 0; k < holeOwner.length && hole < 0; k++) {
-    const h = holeOwner[k]!;
-    if (lv === PLANE ? h.px === gx && h.py === gy : h.col === gx && h.row === gy) hole = k;
-  }
+  const hole = holeOwner(g.colonies, lv, gx, gy);
   let chamber: LensProbe["chamber"] = null;
   const id = map.chambers?.at(gx, gy) ?? -1;
   const ch = id >= 0 ? map.chambers!.list[id] : undefined;
   if (ch) {
-    const k = g.colonies.findIndex((c) => c.params.nest === ch.colony);
+    const k = chamberOwner(g.colonies, map, ch.colony);
     if (k >= 0) chamber = { k, role: ch.role, brood: ch.brood, food: ch.food };
   }
   return {
-    view: lv === CURTAIN ? "below" : "above",
+    view: isCurtainLayer(lv) ? "below" : "above",
     ground: r === OPEN ? "open" : r === SOIL ? "soil" : r === AIR ? "air" : "rock",
     food: map.food.get(gx, gy),
     mound: map.spoil?.get(gx, gy) ?? 0,
