@@ -198,8 +198,8 @@ export interface GameSave {
   };
 }
 
-/** How near two ants must be to be in contact for the awake rule, in cells (a few steps of sensing). */
-const CONTACT_RANGE = 6;
+/** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
+const CONTACT_RANGE = 4;
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
 export const GAME_REGROW = 1800;
@@ -630,9 +630,10 @@ export class Game {
         const l = ca.layer[i] as number;
         const grid = (this.#grids[l] as CountGrid[] | undefined)?.[b];
         if (!grid) continue;
-        const x = Math.floor(ca.x[i] as number);
-        const y = Math.floor(ca.y[i] as number);
-        if (grid.any(x - CONTACT_RANGE, y - CONTACT_RANGE, x + CONTACT_RANGE, y + CONTACT_RANGE)) return true;
+        // the ant's hex cell the way occupancy finds it, and b's ants within CONTACT_RANGE steps of it
+        const map = this.layers[l] as WorldMap;
+        ca.antCell(i);
+        if (around(grid, map, clampCol(map, CELL[0]), Math.min(map.size.h - 1, Math.max(0, CELL[1])), CONTACT_RANGE) > 0) return true;
       }
       return false;
     };

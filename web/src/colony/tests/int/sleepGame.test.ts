@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Game } from "../../game.ts";
+import { STRAINS } from "../../fungus.ts";
+import { cellKey } from "../../hex.ts";
 import { generateOneWorld, mainGround } from "../../oneWorld.ts";
 import { mulberry32 } from "../../world.ts";
 
@@ -82,4 +84,119 @@ test("the rule is saved with the game, only when there is one, and a load decide
   run(b, 30);
   assert.deepEqual(b.sleepRule!.saveState(), a.sleepRule!.saveState());
   assert.equal(b.isFrozen(1), true);
+});
+
+const plane = (g: Game, k: number, x: number, y: number) => {
+  const c = g.colonies[k]!;
+  for (let i = 0; i < c.n; i++) if (c.alive[i]) c.putAnt(i, 0, x, y);
+};
+
+test("two colonies whose ants stand on the same ground are in contact, at any height of the map; far apart they are not", () => {
+  for (const y of [30, 100, 200, 300]) {
+    const g = fresh();
+    plane(g, 0, 100, y);
+    plane(g, 1, 100, y);
+    g.tick(1 / 30);
+    g.enableSleep(RULE);
+    g.tick(1 / 30);
+    assert.equal(g.sleepRule!.saveState().contacts.length, 1, `contact at y = ${y}`);
+  }
+  const g = fresh();
+  plane(g, 0, 100, 300);
+  plane(g, 1, 400, 60);
+  g.tick(1 / 30);
+  g.enableSleep(RULE);
+  g.tick(1 / 30);
+  assert.equal(g.sleepRule!.saveState().contacts.length, 0);
+});
+
+test("an awake host in a sleeping colony's nest ground wakes it, and so does one within W outside it; a host beyond W does not; with no spores anywhere", () => {
+  const trial = (dx: number) => {
+    const g = fresh();
+    g.freeze(1);
+    g.enableSleep(RULE);
+    g.tick(1 / 30);
+    g.tick(1 / 30);
+    assert.equal(g.isFrozen(1), true, "nothing near, and it stays asleep");
+    const c = g.colonies[0]!;
+    c.load[0] = 1;
+    c.putAnt(0, 0, hole(g, 1).x + dx, hole(g, 1).y);
+    run(g, 2);
+    return g.isFrozen(1);
+  };
+  assert.equal(trial(5), false, "in the nest ground (16)");
+  assert.equal(trial(25), false, "within W (30), outside the nest ground");
+  assert.equal(trial(60), true, "beyond W");
+});
+
+test("a colony the cap froze wakes when room comes back, if it still holds the fungus in its ants", () => {
+  const g = fresh();
+  g.enableSleep({ ...RULE, cap: 1 });
+  for (const k of [0, 1]) {
+    g.colonies[k]!.load[0] = 1;
+    g.colonies[k]!.putAnt(0, 0, hole(g, k).x, hole(g, k).y);
+  }
+  run(g, 1);
+  assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [true, false], "over the cap, colony 0 (ranked lowest) sleeps, holding its host");
+  g.colonies[1]!.load[0] = 0; // colony 1 no longer carries it and freezes T later
+  run(g, 15);
+  assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [true, false], "no room yet");
+  run(g, 10);
+  assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [false, true], "colony 1 slept and the room went to colony 0");
+});
+
+const make = (n: number) =>
+  new Game(
+    generateOneWorld(SEED),
+    { regrow: 0, autoFound: false, fungus: { hyphae: true } },
+    mulberry32(5),
+    Array(n).fill({ antCount: 20 }),
+  );
+
+test("a hypha alone is the fungus's body: bodyNear finds it within the radius and not beyond", () => {
+  const g = make(2);
+  g.land(
+    0,
+    STRAINS.findIndex((x) => x.id === "garden"),
+    { evolve: true },
+  );
+  const near = hole(g, 1);
+  const far = { x: near.x, y: near.y + 200 };
+  const key = (p: { x: number; y: number }) => cellKey(Math.floor(p.x), Math.floor(p.y / 0.866));
+  const h = g.fungus.hyphaeOn(0)!;
+  h.parent.set(key(far), -1); // a hypha where no spore lies
+  assert.deepEqual(g.fungus.bodyNear(0, [far, { x: far.x + 100, y: far.y }], 30), [true, false]);
+  assert.equal(g.fungus.bodyOn(0), true);
+});
+
+test("a body on an awake curtain keeps its colony awake and counts as near; a sleeping curtain's body is not read", () => {
+  const g = make(2);
+  const n = g.colonies[0]!.nest;
+  assert.equal(g.fungus.bodyOn(1), false);
+  g.fungus.paint(g.colonies, n.x, n.y, 4, 2, 0, 0, 1);
+  assert.equal(g.fungus.bodyOn(1), true);
+  assert.deepEqual(g.fungus.bodyNear(1, [n], 30), [true]);
+  g.freeze(0);
+  g.freeze(1);
+  assert.deepEqual(g.fungus.bodyNear(1, [n], 30), [false], "the curtain sleeps: its body wakes no one");
+  const g2 = make(1);
+  const n2 = g2.colonies[0]!.nest;
+  g2.fungus.paint(g2.colonies, n2.x, n2.y, 4, 2, 0, 0, 1);
+  g2.enableSleep(RULE);
+  run(g2, 40);
+  assert.equal(g2.isFrozen(0), false, "a body in its curtain: the colony stays awake");
+});
+
+test("the rule is asked once every `every` seconds, not every tick", () => {
+  const g = fresh();
+  g.enableSleep({ ...RULE, every: 2 });
+  const rule = g.sleepRule!;
+  const step = rule.step.bind(rule);
+  let asked = 0;
+  rule.step = (inp) => {
+    asked++;
+    return step(inp);
+  };
+  run(g, 10);
+  assert.ok(asked >= 5 && asked <= 6, `asked ${asked} times in 10 s at every 2 s`);
 });
