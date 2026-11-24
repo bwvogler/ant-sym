@@ -101,4 +101,14 @@ test("a refused save leaves the game as it was: the lines and colonies are count
   assert.equal(one.colonies.length, 1);
   assert.equal(one.world.lines.length, 1);
   assert.equal(JSON.stringify(roundtrip(one.save())), oneBefore);
+  // a save whose grids are another game's (a layer or a colony short) is refused before anything is made or poured back, the whole game as it was
+  const grids = roundtrip(a.save());
+  grids.grids.counts = grids.grids.counts.map((gs) => gs.slice(1));
+  assert.throws(() => b.load(grids), /^Error: save: its grids are another game's/);
+  const layers = roundtrip(a.save());
+  layers.grids.bands = layers.grids.bands.slice(1);
+  assert.throws(() => b.load(layers), /^Error: save: its grids are another game's/);
+  assert.equal(b.colonies.length, 2);
+  assert.equal(b.world.lines.length, 2);
+  assert.equal(JSON.stringify(roundtrip(b.save())), before);
 });
