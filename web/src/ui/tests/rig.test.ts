@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CURTAIN, generateEndlessPlane, PLANE, worldExtent, type WorldMap } from "../../colony/index.ts";
-import { clamp, fit, fitZoom, fromMinimap, minimapRect, zoomBy, type Viewport } from "../camera.ts";
+import { CHUNK, CURTAIN, generateEndlessPlane, PLANE, worldExtent, type WorldMap } from "../../colony/index.ts";
+import { clamp, fit, fitZoom, fromMinimap, miniFrame, minimapRect, MINI_CHUNKS_W, zoomBy, type Viewport } from "../camera.ts";
 import { CameraRig, extentOf, LINK_ZOOM, NEST_ZOOM, type RigHost } from "../field/rig.ts";
 
 // The field's cameras (ja-fnd.6.3.11): one per view, and what moves them. The expectations are computed from `ui/camera.ts`'s maths and
@@ -289,14 +289,70 @@ test("an endless plane's extent carries its flag and a home on the start nests; 
   assert.equal(r.vc().zoomedIn, true, "zoomed in is a level: the start view is past it");
   r.zoomAround(v, 400, 300, 1e6);
   assert.equal(r.vc().zoomedIn, true);
-  assert.equal(
-    r.inMini(790, 590),
-    false,
-    "no minimap on an endless plane until E5.3, even zoomed in (a point inside the nominal box's corner rectangle)",
-  );
+  // E5.2 pinned "no minimap on an endless plane" here (inMini false at a corner point); E5.3 replaces that on purpose: the minimap is the window, tested below.
+  assert.equal(r.inMini(790, 590), true, "the window's corner rectangle takes a point (E5.3)");
   r.zoomAround(v, 400, 300, 1e-6);
   assert.equal(r.camera().zoom, 0.5, "the least zoom is fixed");
   r.showAll();
   assert.deepEqual(r.camera(), c, "key 0 returns to the start nests");
   assert.equal(r.vc().fitted, true);
+});
+
+test("on an endless plane the minimap is the window round the camera: inMini takes the window's rectangle, jumpMini reads window coordinates and recentres the window on the click (E5.3, ja-qpv.4.3)", () => {
+  const plane = generateEndlessPlane(1);
+  const v = { w: 800, h: 600, dpr: 1 };
+  const st = { following: true, unfollowed: 0 };
+  const host: RigHost = {
+    view: () => PLANE,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => st.following,
+    unfollow: () => {
+      st.following = false;
+      st.unfollowed++;
+    },
+  };
+  const rig = new CameraRig(host);
+  const e = extentOf(plane);
+  const at = { x: 40000, y: -30000, zoom: 8 };
+  rig.set(at);
+  const win = miniFrame(e, at);
+  assert.equal(win.w, MINI_CHUNKS_W * CHUNK, "the window is a fixed number of chunks, not the nominal box");
+  assert.ok(at.x >= win.x0 && at.x < win.x0 + win.w && at.y >= win.y0 && at.y < win.y0 + win.h, "and holds the camera");
+  const r = minimapRect(win, v, 1);
+  assert.equal(r.w, 180);
+  for (const [x, y, inside] of [
+    [r.x, r.y, true],
+    [r.x + r.w, r.y + r.h, true],
+    [r.x - 0.01, r.y + 1, false],
+    [r.x + 1, r.y - 0.01, false],
+    [r.x + r.w + 0.01, r.y + 1, false],
+    [r.x + 1, r.y + r.h + 0.01, false],
+  ] as const)
+    assert.equal(rig.inMini(x, y), inside, `${x},${y}`);
+  // the nominal box's rectangle (the shape the bounded minimap would take) is not what takes a point: the window's is a different shape
+  const nominal = minimapRect(e, v, 1);
+  assert.notEqual(nominal.h, r.h);
+  assert.equal(rig.inMini(r.x + 1, r.y + r.h + 1), false, "below the window's rectangle (the nominal box's is taller)");
+  // a click a quarter of the way in looks at the window's point there, at the same zoom, and ends the follow
+  rig.jumpMini(r.x + r.w / 4, r.y + r.h / 4);
+  const want = { x: win.x0 + win.w / 4, y: win.y0 + win.h / 4 };
+  assert.ok(Math.abs(rig.camera().x - want.x) < 1e-6 && Math.abs(rig.camera().y - want.y) < 1e-6, "window coordinates");
+  assert.equal(rig.camera().zoom, 8);
+  assert.equal(st.unfollowed, 1);
+  // and the window now follows the camera: the clicked place is within a chunk of its middle
+  const next = miniFrame(e, rig.camera());
+  assert.ok(
+    Math.abs(next.x0 + next.w / 2 - want.x) <= CHUNK && Math.abs(next.y0 + next.h / 2 - want.y) <= CHUNK * 0.87 + CHUNK / 2,
+    "recentred on the jump",
+  );
+  // the minimap's middle is now (within a chunk) the clicked place: a second click in the middle moves the camera less than a chunk
+  const before = rig.camera();
+  const r2 = minimapRect(next, v, 1);
+  rig.jumpMini(r2.x + r2.w / 2, r2.y + r2.h / 2);
+  assert.ok(Math.hypot(rig.camera().x - before.x, rig.camera().y - before.y) <= 1.5 * CHUNK);
+  // zoomed out below the level: no minimap
+  rig.set({ x: at.x, y: at.y, zoom: 0.5 });
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), false);
 });

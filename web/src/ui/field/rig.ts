@@ -11,6 +11,7 @@ import {
   fromMinimap,
   isFitted,
   isZoomedIn,
+  miniFrame,
   minimapRect,
   pan,
   type Camera,
@@ -164,15 +165,16 @@ export class CameraRig {
   /** Whether device point (x, y) is on the minimap: only while it is drawn (the view zoomed in). */
   inMini(x: number, y: number): boolean {
     const ext = this.extent();
-    if (!this.vc().zoomedIn || ext.endless) return false; // an endless plane's minimap is E5.3's (minimap.ts draws none yet)
-    const r = minimapRect(ext, this.viewport(), this.host.dpr());
+    if (!this.vc().zoomedIn) return false;
+    // An endless plane's minimap is the window of chunks round the camera (miniFrame), a bounded map's the whole map.
+    const r = minimapRect(miniFrame(ext, this.camera()), this.viewport(), this.host.dpr());
     return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
   }
 
   /** A click or drag on the minimap: look at the world point under it (a follow ends). */
   jumpMini(x: number, y: number): void {
     if (this.host.following()) this.host.unfollow();
-    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y);
+    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y, this.camera());
     this.set({ ...this.camera(), x: wx, y: wy });
   }
 }
