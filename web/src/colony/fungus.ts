@@ -546,6 +546,8 @@ export class Fungus {
    * spores do not fade, its hyphae do not grow. The plane is never in it. Set by the game; empty in every game that freezes nothing.
    */
   frozenLayers: ReadonlySet<number> = new Set<number>();
+  /** The hosts among the colonies asleep (Game.freeze): the steps read only the awake colonies' ants, so `hosts` adds these, and the fungus stays active (and steps the thawed ants again) while its only hosts sleep. */
+  hostsAsleep = 0;
 
   /** On one map, or (one world) on each of `map`'s, the first holding `spores` and `sporeStrain`. */
   constructor(map: WorldMap | readonly WorldMap[], params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
@@ -721,7 +723,7 @@ export class Fungus {
     this.#seen = [grids];
     const hosts = this.#stepLayer(this.#layers[0] as SporeLayer, -1, colonies, grids, dt, rec);
     this.#grow(dt);
-    this.hosts = hosts;
+    this.hosts = hosts + this.hostsAsleep;
   }
 
   /**
@@ -744,7 +746,7 @@ export class Fungus {
       hosts += this.#stepLayer(L, l, colonies, grids[l] as readonly CountGrid[], dt, recs?.[l] ?? null);
     });
     this.#grow(dt);
-    this.hosts = hosts;
+    this.hosts = hosts + this.hostsAsleep;
   }
 
   /**
@@ -1338,7 +1340,7 @@ export class Fungus {
     // A tip that has reached a corpse (the midden's) colonises it.
     if (stepped && this.corpseAt)
       this.#hyphae.forEach((h, l) => {
-        if (!h) return;
+        if (!h || this.frozenLayers.has(l)) return;
         for (const t of h.tips.slice())
           if (!(this.#corpses[l] as Map<number, number>).has(cellKey(t.x, t.y)) && this.corpseAt!(l, t.x, t.y) > 0)
             this.colonise(l, t.x, t.y);
@@ -1346,7 +1348,7 @@ export class Fungus {
     // Knots age, and fruit their store onto a dug cell they touch (their own, dug open, or one beside), paid by the store
     // (ja-2bw.9: microsclerotia sporulate from their own reserves, Paixão et al. 2021). A buried knot keeps its store.
     this.#hyphae.forEach((h, l) => {
-      if (!h || h.knots.size === 0) return;
+      if (!h || h.knots.size === 0 || this.frozenLayers.has(l)) return;
       const L = this.#layers[l] as SporeLayer;
       const g = this.#ground(l);
       for (const [k, knot] of h.knots) {
@@ -1369,6 +1371,7 @@ export class Fungus {
     // spores over the open cells round it.
     const stalks = e.level("stalks");
     this.#corpses.forEach((corpses, l) => {
+      if (this.frozenLayers.has(l)) return;
       const L = this.#layers[l] as SporeLayer;
       const ages = this.#corpseAge[l] as Map<number, number>;
       for (const [k, left] of corpses) {
@@ -1391,7 +1394,7 @@ export class Fungus {
     const spots: { L: SporeLayer; cells: number[] }[] = [];
     let cells = 0;
     this.#hyphae.forEach((h, l) => {
-      if (!h) return;
+      if (!h || this.frozenLayers.has(l)) return;
       if (stepped || !this.#sporeSpots[l]) {
         // The patch fruits where it landed (its base), as without hyphae; spread over every dug cell the hyphae reach,
         // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §63.1), so

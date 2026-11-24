@@ -544,12 +544,14 @@ export class Game {
     if (!this.colonies[k]) throw new Error(`freeze: no colony ${k}`);
     this.#frozen.add(k);
     this.#syncFrozen();
+    this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
   }
 
   /** Wake colony k: it steps again from exactly where it stopped. */
   thaw(k: number): void {
     this.#frozen.delete(k);
     this.#syncFrozen();
+    this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
   }
 
   /** Whether colony k is asleep. */
@@ -576,6 +578,13 @@ export class Game {
       if (on.length > 0 && on.every((k) => this.#frozen.has(k))) layers.add(l);
     });
     this.fungus.frozenLayers = layers;
+    // The hosts among the sleepers stay counted (their ants do not change while they sleep), so the fungus keeps stepping and wakes them in step.
+    let hosts = 0;
+    for (const k of this.#frozen) {
+      const c = this.colonies[k];
+      if (c) for (let i = 0; i < c.n; i++) if (c.alive[i] && (c.load[i] as number) > 0) hosts++;
+    }
+    this.fungus.hostsAsleep = hosts;
   }
 
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
