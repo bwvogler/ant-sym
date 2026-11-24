@@ -20,7 +20,11 @@ import { EndlessPlane, type EndlessOptions, type PlaneChunk } from "./endlessPla
 import { FoodLedger } from "./foodLedger.ts";
 import { editLayers, type WorldMap } from "./world.ts";
 
-/** Half the nominal box, in cells: the chunk key's range (chunks.ts chunkKey, ±32,768 chunks). */
+/**
+ * Half the nominal box, in cells: the chunk key's range (chunks.ts chunkKey, ±32,768 chunks). Past it chunk keys alias (chunk (32768, 0) and chunk
+ * (-32768, 1) share a key) and the food ledger throws: it is a limit of correctness, 2,097,152 cells from the origin, not an edge the map draws
+ * (ja-qpv.8 owns widening the key; an ant would have to walk that far).
+ */
 export const ENDLESS_HALF = 32768 * CHUNK;
 
 /** A map with no edge, and the plane and ledger behind it. */
@@ -38,20 +42,24 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
   const starts = plane.startNests();
   // One plane.chunk() makes a chunk's rock and food together; whichever layer asks first leaves the other's half here (bounded: a layer
   // that never asks for it must not hold the world).
-  const pending = new Map<number, PlaneChunk>();
-  const made = (cx: number, cy: number): PlaneChunk => {
+  // Each entry is kept until BOTH layers have taken their half (else a layer asking second would make the chunk again: 70 ms with food patches).
+  const pending = new Map<number, { chunk: PlaneChunk; rock: boolean; food: boolean }>();
+  const made = (cx: number, cy: number, half: "rock" | "food"): PlaneChunk => {
     const k = chunkKey(cx, cy);
-    const have = pending.get(k);
-    if (have) return have;
-    if (pending.size >= 256) pending.clear();
-    const c = plane.chunk(cx, cy);
-    pending.set(k, c);
-    return c;
+    let have = pending.get(k);
+    if (!have) {
+      if (pending.size >= 256) pending.clear();
+      have = { chunk: plane.chunk(cx, cy), rock: false, food: false };
+      pending.set(k, have);
+    }
+    have[half] = true;
+    if (have.rock && have.food) pending.delete(k);
+    return have.chunk;
   };
   const rock = new ChunkLayer<Uint8Array>(
     (n) => new Uint8Array(n),
     1,
-    (cx, cy, a) => a.set(made(cx, cy).rock),
+    (cx, cy, a) => a.set(made(cx, cy, "rock").rock),
   );
   const map: EndlessMap = {
     endless: true,
@@ -77,7 +85,7 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
     (n) => new Float32Array(n),
     0,
     (cx, cy, a) => {
-      const f = made(cx, cy).food;
+      const f = made(cx, cy, "food").food;
       a.set(f);
       let sum = 0;
       for (let i = 0; i < f.length; i++) sum += f[i]!;
@@ -86,7 +94,6 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
         map.foodTotal += sum;
         map.foodLeft += sum;
       }
-      pending.delete(chunkKey(cx, cy));
     },
   );
   return map;

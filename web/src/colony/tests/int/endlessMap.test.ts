@@ -7,6 +7,7 @@ import { cellOf, CELL, centreX, centreY } from "../../hex.ts";
 import {
   clampCol,
   disc,
+  digCell,
   dropFood,
   fillCell,
   foodIn,
@@ -264,4 +265,77 @@ test("a bounded map is unchanged: its edge is rock, its bounds and clamps are it
   assert.ok(n > 0);
   const edge = (cx: number, cy: number) => centreX(cx, cy) >= 0 && centreY(cy) >= 0;
   assert.ok(edge(0, 0));
+});
+
+test("dropClean keeps a chunk whose only change is a quality, a dug time, or a filled-then-dug cell; frees one a write restored to the plane's", () => {
+  // quality only: food put back and taken again leaves the food equal but quality 2
+  const q = generateEndlessPlane(2);
+  const [fx, fy] = foodCell(q);
+  foodIn(q, fx, fy);
+  dropFood(q, centreX(fx, fy), centreY(fy), 1, 2);
+  assert.ok(takeFoodCell(q, fx, fy));
+  assert.equal(dropClean(q, fx >> CHUNK_BITS, fy >> CHUNK_BITS), false, "a quality of 2 is a change");
+  assert.ok(qualityAt(q, fx, fy) > 1, "the quality is a mix now, above the plane's 1");
+  // fill then dig: the rock reads open again, but a time was noted
+  const d = generateEndlessPlane(2);
+  let ox = 100_000;
+  while (rockAt(d, ox, 40) !== OPEN) ox++;
+  assert.ok(fillCell(d, ox, 40, 3));
+  assert.ok(digCell(d, ox, 40, 5));
+  assert.equal(rockAt(d, ox, 40), OPEN);
+  assert.equal(dropClean(d, ox >> CHUNK_BITS, 40 >> CHUNK_BITS), false, "a time noted is a change");
+  // a quality of 1 (the plane's) written and restored: the chunk is clean and its quality chunk is freed
+  const c = generateEndlessPlane(2);
+  const [cx, cy] = foodCell(c);
+  foodIn(c, cx, cy);
+  dropFood(c, centreX(cx, cy), centreY(cy), 1, 1);
+  assert.ok(takeFoodCell(c, cx, cy));
+  assert.ok(c.quality.count > 0);
+  assert.equal(dropClean(c, cx >> CHUNK_BITS, cy >> CHUNK_BITS), true);
+  assert.equal(c.quality.count, 0, "the quality chunk went with it");
+});
+
+test("generating a chunk adds its food to foodTotal and foodLeft together", () => {
+  const map = generateEndlessPlane(2);
+  const [fx, fy] = foodCell(map);
+  foodIn(map, fx, fy);
+  assert.ok(map.foodTotal > 0);
+  assert.equal(map.foodLeft, map.foodTotal);
+});
+
+test("whole chunks of dense food equal the plane's, corner cells included", () => {
+  const map = generateEndlessPlane(3, { patchesPerChunk: 30 });
+  const plane = new EndlessPlane(3, { patchesPerChunk: 30 });
+  let corner = false;
+  for (let cx = -4; cx <= 4; cx++)
+    for (let cy = -4; cy <= 4; cy++) {
+      foodIn(map, cx * CHUNK, cy * CHUNK);
+      const own = plane.chunk(cx, cy).food;
+      assert.deepEqual([...(map.food.chunk(cx, cy) as Float32Array)], [...own], `chunk ${cx},${cy}`);
+      if (own[0]! > 0 || own[CHUNK - 1]! > 0 || own[own.length - CHUNK]! > 0 || own[own.length - 1]! > 0) corner = true;
+    }
+  assert.ok(corner, "some chunk has food on a corner cell, so the compare covers corners");
+});
+
+test("a chunk is made by the plane once, whichever of rock and food is read first", () => {
+  for (const first of ["rock", "food"] as const) {
+    const map = generateEndlessPlane(5, { patchesPerChunk: 0, density: 0 });
+    const own = map.plane.chunk.bind(map.plane);
+    let calls = 0;
+    map.plane.chunk = (cx: number, cy: number) => {
+      calls++;
+      return own(cx, cy);
+    };
+    const chunks: [number, number][] = Array.from({ length: 20 }, (_, i) => [3000 + i * 7, -2000 - i * 5]);
+    for (const [cx, cy] of chunks) {
+      if (first === "rock") {
+        rockAt(map, cx * CHUNK, cy * CHUNK);
+        foodIn(map, cx * CHUNK, cy * CHUNK);
+      } else {
+        foodIn(map, cx * CHUNK, cy * CHUNK);
+        rockAt(map, cx * CHUNK, cy * CHUNK);
+      }
+    }
+    assert.equal(calls, 20, `${first} first`);
+  }
 });
