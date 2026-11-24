@@ -44,6 +44,8 @@
 //     keeps only the guide and the nest; l closes it.
 //  16. Polish (PRD §69.9): Appearance (set, kept across a reload, the palette, System clears it), a drawer's motion and its
 //     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
+//  17. fewer notices (PRD §69.6): the same notice three times is one toast, counted (×3); Important only floats a warning and not a remark;
+//     Bell only floats none (they stay in the page for a screen reader); the choice is kept across a reload.
 //  18. the fog of war (PRD §89, ja-1ypq.3.6), on `?fog=1`: the cell under a host is live, ground no host has been near is unknown, a cell a
 //     host left is remembered and stays explored; a frame costs about what it does without the fog; and "no ants": a plain ant put on
 //     remembered ground is not drawn (the crop of the field is byte-identical with it and without it), where on live ground it is.
@@ -2487,7 +2489,11 @@ try {
       return x > m.x0 + 30 && x < m.x0 + m.size.w - 30 && y > 30 && y < m.size.h - 30;
     }, c);
   let there = null;
-  for (const c of seen) if ((await stateAt(...c)) === 1 && (await interior(c))) there = c;
+  for (const c of seen)
+    if ((await stateAt(...c)) === 1 && (await interior(c))) {
+      there = c;
+      break;
+    }
   check(there !== null, "a remembered cell well inside the map is found to look at");
   /** [colony, slot] of the first living ant on the plane that is a host, or of one that is not. */
   const antWhere = (host) =>
@@ -2504,21 +2510,53 @@ try {
   const far = [0.5, 0.5]; // unknown ground, out of the crop
   const twoFrames = () => gp.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  // The picture of the field at the middle of the screen, once it holds still: two crops in a row are the same (the game is paused, so what
+  // moves is only the frame catching up with the change just made; two animation frames let the draw run, and no fixed wait guesses how long).
   const crop = async (name) => {
-    await twoFrames();
-    await sleep(300);
-    await twoFrames();
-    return gp.screenshot({ clip: { x: 490, y: 300, width: 300, height: 300 }, ...(SHOTS ? { path: join(SHOTS, `fog-${name}.png`) } : {}) });
+    let last = null;
+    return until(
+      async () => {
+        await twoFrames();
+        const b = await gp.screenshot({
+          clip: { x: 490, y: 300, width: 300, height: 300 },
+          ...(SHOTS ? { path: join(SHOTS, `fog-${name}.png`) } : {}),
+        });
+        const same = last !== null && b.equals(last);
+        last = b;
+        return same ? b : null;
+      },
+      `the field's picture (${name}) to hold still`,
+      8000,
+      50,
+    );
+  };
+  /** The fog page's camera once it has held still for three polls (as steadyCam does for the first page). */
+  const settledCam = async () => {
+    let last = "";
+    let same = 0;
+    return until(
+      async () => {
+        const cam = await gp.evaluate(() => window.jevAnts.camera("above"));
+        const key = JSON.stringify(cam);
+        same = key === last ? same + 1 : 0;
+        last = key;
+        return same >= 2 && cam ? cam : null;
+      },
+      "the fog page's camera to hold still",
+      5000,
+      60,
+    );
   };
   await gp.evaluate(() => window.jevAnts.goNest(1)); // the camera is the player's from here on
-  await sleep(1500);
+  await settledCam();
   await gp.evaluate(([x, y]) => {
     const c = window.jevAnts.camera("above");
     c.x = x;
     c.y = y;
     c.zoom = 30;
   }, there);
-  await sleep(600);
+  const cam18 = await settledCam();
+  check(near(cam18.x, there[0], 1e-6) && near(cam18.y, there[1], 1e-6), "the camera is on the remembered cell");
   check((await stateAt(...there)) === 1, "the cell is still remembered, not live");
   await putAnt(lone, there);
   const withAnt = await crop("remembered-with-ant");
