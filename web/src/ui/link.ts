@@ -20,6 +20,19 @@ import {
 /** A click this near the line (world units, from a line cell's centre) is on it: about three cells. */
 export const LINK_REACH = 3;
 
+/** The farthest a click on the plane may be from a line and still pick it, however far the view is zoomed out (world units): about eight cells. */
+export const LINK_REACH_MAX = 12;
+
+/**
+ * The pick radius (world units) for a click on the plane at `zoom` (device px per world unit, with `dpr` the device pixels per CSS px): the finger's `px`
+ * CSS px of screen, held between LINK_REACH (zoomed in, where it is today's three units) and LINK_REACH_MAX (zoomed far out, where a pixel is many cells
+ * and a click must still reach a line, but not a neighbour's). Depends only on the zoom, not on where the camera is.
+ */
+export function pickReach(zoom: number, dpr = 1, px = 14): number {
+  const r = zoom > 0 ? (px * dpr) / zoom : LINK_REACH_MAX;
+  return Math.max(LINK_REACH, Math.min(LINK_REACH_MAX, r));
+}
+
 /**
  * The column of the line cell nearest plane point (wx, wy) within `reach` world units of its centre, or null when the
  * line passes nowhere that near. A cell over two columns (at a bend) gives the first.
@@ -56,8 +69,10 @@ export function nearestColumn(line: Transect, wx: number, wy: number, reach = LI
 }
 
 /**
- * The line a click on the plane at (wx, wy) is over: the one whose line cell is nearest within `reach`, and that cell's column (the
- * first line wins a tie), or null when no line passes that near (docs/endless-world.md §8).
+ * The pick rule (docs/endless-world.md §8; PRD §66, E5.6): the line a click on the plane at world point (wx, wy) is over. Each line offers its
+ * nearest line cell (a hole is one) whose centre is within `reach` world units (inclusive: a cell exactly `reach` away is hit); the line whose cell
+ * is nearest wins, and the earlier line wins a tie, as the earlier column does within a line. Null when no line passes that near. It reads only the
+ * lines' cells at the point's own cell (never the plane's chunks), so a click far out, or at negative coordinates, generates nothing.
  */
 export function lineNear(world: OneWorld, wx: number, wy: number, reach = LINK_REACH): { line: number; s: number } | null {
   let best: { line: number; s: number } | null = null;

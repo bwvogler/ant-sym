@@ -106,6 +106,8 @@ test("camera asks the field for the plane above and the curtain below, and null 
   assert.deepEqual(hook.camera("above"), { x: PLANE });
   assert.deepEqual(hook.camera("below"), { x: CURTAIN });
   assert.deepEqual(calls.cameras, [PLANE, CURTAIN]);
+  assert.deepEqual(hook.camera("below", 2), { x: CURTAIN + 2 }, "a later line's curtain is layer 1 + its index");
+  assert.deepEqual(hook.camera("above", 2), { x: PLANE }, "the plane has one camera");
   hook.goNest(1);
   assert.deepEqual(calls.nests, [1]);
   const none = make({ field: { current: null } }).hook;

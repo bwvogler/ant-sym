@@ -64,7 +64,8 @@ export function devHook(d: DevDeps) {
         d.sensed.stampGame(game); // the page's step subscribers do not run here
       }
     },
-    camera: (v: View) => d.field.current?.camera(layerOf(v)) ?? null,
+    /** view v's camera; below, of line `line`'s curtain (layer 1 + line, E5.6) */
+    camera: (v: View, line = 0) => d.field.current?.camera(layerOf(v) + (v === "below" ? line : 0)) ?? null,
     goNest: (k: number) => d.field.current?.goNest(k),
     fly: (mother = 0) => {
       const m = game.colonies[mother];
