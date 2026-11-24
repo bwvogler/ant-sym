@@ -1556,8 +1556,8 @@ export class Fungus {
   /**
    * The evolving fungus takes root on the open cells within `radius` of (x, y) (Game.land): its base, which keeps
    * sporulating at the evolution's `spores` level. With `single`, on the one cell under (x, y) (an infected queen's
-   * founding, owner 2026-11-24: one tile, where the opening landing has a few); `radius` then only sets how far a tip's
-   * first steps are looked for. Nothing without an evolution.
+   * founding, owner 2026-11-24: one tile, where the opening landing has a few); `radius` is then ignored (the tips'
+   * first steps are looked for from the one cell). Nothing without an evolution.
    */
   root(x: number, y: number, radius: number, layer = 0, toward: { x: number; y: number } | null = null, single = false): void {
     if (!this.#evolution) return;
