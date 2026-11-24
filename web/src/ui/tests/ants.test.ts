@@ -400,6 +400,21 @@ test("a colony the game has frozen draws every ant at half strength, and leaves 
   assert.deepEqual(other.rec.log, awake, "another colony asleep changes nothing here");
 });
 
+test("the colony asleep is found by its index among the game's colonies: another's freezing leaves this one as it was", () => {
+  const ants: Ant[] = [{ x: 50, y: 40, heading: 0, odour: 0 }];
+  const awake = run(ants).rec.log;
+  const at = (asleep: number[]) => {
+    const s = setup(ants);
+    s.fc.colonies = [{} as Colony, s.col];
+    s.fc.asleep = new Set(asleep);
+    drawAnts(s.fc, s.f, s.col);
+    return s.rec.log;
+  };
+  assert.deepEqual(at([0]), awake, "colony 0 asleep: this one, colony 1, is awake");
+  assert.deepEqual(at([]), awake, "none asleep");
+  assert.ok(at([1]).includes("globalAlpha = 0.425"), "colony 1 asleep: this one is dimmed");
+});
+
 test("a frozen colony's walkers are still: the gait is not posed, though the sprite is drawn", () => {
   const o = { hexes: true, workerImage: true, zoom: 40 };
   const awake = run([{ x: 50, y: 40, heading: 0, odour: 0.1 }], o);
@@ -407,5 +422,15 @@ test("a frozen colony's walkers are still: the gait is not posed, though the spr
   const asleep = run([{ x: 50, y: 40, heading: 0, odour: 0.1 }], { ...o, asleep: true });
   assert.deepEqual(asleep.gaitCalls, ["update"], "no walking pose for a sleeper");
   assert.equal(asleep.rec.log.filter((l) => l.startsWith("drawImage(worker")).length, 1, "but it is still drawn");
-  assert.ok(asleep.rec.log.includes("globalAlpha = 0.5"), "at half strength");
+  const alphaAtSprite = (log: string[]) => {
+    let alpha = 1;
+    for (const l of log) {
+      const m = /^globalAlpha = (.+)$/.exec(l);
+      if (m) alpha = Number(m[1]);
+      else if (l.startsWith("drawImage(worker")) return alpha;
+    }
+    return NaN;
+  };
+  assert.equal(alphaAtSprite(awake.rec.log), 1, "awake: the sprite fully in");
+  assert.equal(alphaAtSprite(asleep.rec.log), 0.5, "asleep: the sprite itself at half strength");
 });

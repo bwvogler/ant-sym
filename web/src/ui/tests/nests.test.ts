@@ -736,10 +736,14 @@ test("a frozen colony draws its mound, nest, brood, queen and alates at half str
     const asleep = setup({ col: rich(alive), asleep: true });
     const overlay = run(asleep);
     const hs = strengths(asleep.log);
-    assert.ok(hs.length === strengths(awake.log).length && hs.length > 0, "the same things are drawn");
-    assert.ok(
-      hs.every((a) => a <= 0.5),
-      `every call at half strength or less: ${hs.join(",")}`,
+    const as = strengths(awake.log);
+    assert.ok(hs.length === as.length && hs.length > 0, "the same things are drawn");
+    // Each drawing call at exactly half the strength its awake twin was made at: the mound's fill (0.12), its outline (0.8), the ring (0.7),
+    // the brood and queen (1), the dead queen's cross (0.6), the alate's wings (0.5).
+    assert.deepEqual(
+      hs.map((a) => Math.round(a * 1e6)),
+      as.map((a) => Math.round(a * 0.5 * 1e6)),
+      `each call at half its awake strength: ${as.join(",")} -> ${hs.join(",")}`,
     );
     assert.equal(asleep.state.globalAlpha, 1, "the strength is left at 1 for the next stage");
     // The alates are drawn again over the fungus's mark, with whatever strength the stages between left: a sleeper sets its own.
