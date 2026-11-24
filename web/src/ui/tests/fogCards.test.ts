@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { CELL, cellOf, centreX, centreY, INFECTED, PLANE, type Colony } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
 import { inspectCell } from "../cellInspection.ts";
+import { inspectPatch } from "../inspectionPatch.ts";
+import { canFollow } from "../follow.ts";
 import { drawPen } from "../field/overlays.ts";
 import { chamberUnder, pickAnt } from "../field/hit.ts";
 import { prepareFrame } from "../field/prelude.ts";
@@ -197,4 +199,71 @@ test("the queen's pen asks no preview of ground the fungus has not sensed", () =
   sensed.stamp([hostAt(40, 40)], 1);
   drawPen(k, inp);
   assert.equal(asked, 1, "sensed: the preview");
+});
+
+test("canFollow: any ant without the fog; only where an observer senses it under it", () => {
+  const sensed = new SensedMap();
+  const fog = new Knowledge(sensed, []);
+  const col = ants([[30, 30]]);
+  const f = { k: 0, i: 0, gen: 0 };
+  assert.equal(canFollow(null, [col], f), true, "no fog");
+  assert.equal(canFollow(fog, [col], f), false, "never sensed");
+  sensed.stamp([hostAt(30, 30)], 1);
+  assert.equal(canFollow(fog, [col], f), true, "sensed");
+  sensed.stamp([none()], 1 + GRACE + 1);
+  assert.equal(canFollow(fog, [col], f), false, "remembered");
+  (col as { alive: Uint8Array }).alive[0] = 0;
+  assert.equal(canFollow(null, [col], f), true, "no fog: the caller's own checks decide");
+  assert.equal(canFollow(fog, [col], f), false, "gone");
+});
+
+test("the lens at a place only remembered says the ground, mound and age as they were, and a chamber's use is not known", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  const plane = game.world.plane;
+  const q: [number, number] = [210, 210];
+  const [x, y] = [centreX(q[0], q[1]), centreY(q[1])];
+  const g = { colonies: game.colonies, fungus: game.fungus, world: game.world };
+  plane.food.set(q[0], q[1], 0.5);
+  plane.spoil!.set(q[0], q[1], 2);
+  const before = probe(g, sensed, PLANE, x, y);
+  assert.deepEqual(
+    [before.fog, before.food, before.mound],
+    [0, 0, 0],
+    "never sensed: nothing of the place, not its food or mound, though they are there",
+  );
+  sensed.stamp([hostAt(q[0], q[1])], 1);
+  sensed.stamp([none()], 1 + GRACE + 9);
+  plane.spoil!.set(q[0], q[1], 0); // taken away while nobody was there
+  plane.food.set(q[0], q[1], 0);
+  const p = probe(g, sensed, PLANE, x, y);
+  assert.equal(p.mound, 2, "the mound as it was");
+  assert.equal(p.food, Math.fround(0.5), "the food as it was");
+  assert.ok((p.age ?? 0) >= 9, `the age: ${p.age}`);
+  const chamber = { ...p, chamber: { k: 0, role: "none" as const, brood: 0, food: 0 } };
+  const line = lensLines(chamber, null).find((l) => l.what.startsWith("A chamber of"));
+  assert.ok(line, "a remembered chamber is named, not given a use");
+});
+
+test("inspecting a remembered cell reads no aphids; the patch around a cell reads what was sensed, and nothing of ground never sensed", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  const plane = game.world.plane;
+  const q: [number, number] = [220, 220];
+  const [x, y] = [centreX(q[0], q[1]), centreY(q[1])];
+  const g = { colonies: game.colonies, fungus: game.fungus, world: game.world };
+  const clump = { layer: PLANE, cells: [q[0], q[1]], start: 10, eaten: 0, age: 1, owed: 0 };
+  plane.food.set(q[0], q[1], 7);
+  const trails = { food: true, home: true };
+  const patch = () => inspectPatch(g, sensed, PLANE, x, y, trails, [clump]);
+  assert.equal(patch().surfaceFood!.size, 0, "never sensed: no food of the ground round it");
+  assert.equal(inspectCell(g, sensed, PLANE, x, y, trails, [clump]).aphidDensity, 0);
+  sensed.stamp([hostAt(q[0], q[1])], 1);
+  assert.ok(patch().surfaceFood!.size > 0, "sensed: the food round it");
+  assert.ok(inspectCell(g, sensed, PLANE, x, y, trails, [clump]).aphidDensity > 0, "live: the aphids");
+  sensed.stamp([none()], 1 + GRACE + 1);
+  plane.food.set(q[0], q[1], 1); // eaten down while nobody was there
+  assert.equal(inspectCell(g, sensed, PLANE, x, y, trails, [clump]).aphidDensity, 0, "remembered: aphids are not remembered");
+  const food = [...patch().surfaceFood!.values()];
+  assert.ok(food.includes(7) && !food.includes(1), "remembered: the food as it was");
 });

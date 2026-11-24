@@ -230,11 +230,19 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
   if (p.chamber) {
     const c = p.chamber;
     const lying = [...(c.brood > 0 ? [`${Math.round(c.brood)} brood`] : []), ...(c.food > 0 ? [`${Math.round(c.food)} food`] : [])];
-    out.push({
-      what: `${ROLE_NAME[c.role]} of ${colonyName(c.k)}`,
-      says: `${ROLE_TEXT[c.role]}${lying.length ? ` · ${lying.join(", ")}` : ""}`,
-      entry: ROLE_ENTRY[c.role],
-    });
+    if (p.fog === REMEMBERED)
+      // Its use and what lies in it are live: only that it is a chamber of that colony is still known.
+      out.push({
+        what: `A chamber of ${colonyName(c.k)}`,
+        says: "what it is used for, and what lies in it, is not known now: nobody senses it",
+        entry: "chambers",
+      });
+    else
+      out.push({
+        what: `${ROLE_NAME[c.role]} of ${colonyName(c.k)}`,
+        says: `${ROLE_TEXT[c.role]}${lying.length ? ` · ${lying.join(", ")}` : ""}`,
+        entry: ROLE_ENTRY[c.role],
+      });
   }
   if (p.food > 0)
     out.push({ what: "Food", says: `${Math.round(p.food)} here: a forager carries it home a crumb at a time`, entry: "food-quality" });

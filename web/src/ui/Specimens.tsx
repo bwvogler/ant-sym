@@ -66,6 +66,7 @@ export default function Specimens({
                 type="button"
                 className="min-w-0 flex-1 rounded-md px-1.5 py-1 text-left hover:bg-raised"
                 onClick={() => onFollow(f)}
+                disabled={!!r.lost}
                 aria-current={on ? "true" : undefined}
                 title={on ? "Followed now" : "Follow this specimen"}
               >

@@ -34,7 +34,7 @@ import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.ts
 import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
-import type { Followed } from "./ui/follow.ts";
+import { canFollow, type Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
@@ -218,8 +218,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     // for it (PRD §69.2; checked by hand at 1280 and 900 in the review of #189).
     else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus");
   }, [pointsAt]);
-  // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
+  // What the fungus's hosts have sensed (PRD §65) is stamped here.
   // Sight follows the sim's steps, not the frames (docs/fog-of-war.md §4.1); one stamp at once too, so a paused or just-loaded game shows what its hosts sense now.
   useEffect(() => {
     sensed.stampGame(game);
@@ -250,10 +249,12 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     (f: Followed) => {
       const c = game.colonies[f.k];
       if (!c) return;
+      // Under the fog an ant nobody senses cannot be jumped to (it would show where it is): it is lost sight of, whichever route asked.
+      if (!canFollow(sensed.knowledge, game.colonies, f)) return onLostSight(f);
       if (oneWorld) showAt(c.layer[f.i]!, c.x[f.i]!, c.y[f.i]!);
       setFollowed(f);
     },
-    [game, oneWorld, showAt, setFollowed],
+    [game, oneWorld, showAt, setFollowed, sensed, onLostSight],
   );
   /** Follow the next host of yours (the key f): each press the next infected ant, in whichever view it is. */
   const hostTurn = useRef(0);

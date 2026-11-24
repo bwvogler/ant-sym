@@ -209,7 +209,10 @@ export function useFieldFrame({
             specimens: pinnedRef.current,
             sensed,
           },
-          { started, f, fcol, fHere },
+          // An ant the follow just lost sight of (it ended in the prelude) gets no ring: the ring would show where it is.
+          f !== null && fcol !== null && follow.current === null
+            ? { started, f: null, fcol: null, fHere: false }
+            : { started, f, fcol, fHere },
         ),
       );
     };

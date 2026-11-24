@@ -22,6 +22,7 @@ import {
 } from "../colony/index.ts";
 import { probe, type LensProbe, type LensWorld } from "./lens.ts";
 import { LIVE, REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
+import { SNAP } from "./fog/sources.ts";
 import type { SensedMap } from "./fungusSight.ts";
 
 export interface InspectedAnt {
@@ -124,7 +125,12 @@ export function inspectCell(
   // are never remembered) and the dead as they lay when last seen; only a place an observer senses now is read live.
   const fog = sensed.knowledge;
   const fs = fog ? fog.state(layer, gx, gy) : LIVE;
-  if (fs === UNKNOWN) return out;
+  if (fs === UNKNOWN) {
+    out.quality = 1;
+    return out;
+  }
+  // What the cell holds (its food's quality) is what was last sensed there, unless it is sensed now.
+  if (fs === REMEMBERED) out.quality = fog!.snapshot(layer, SNAP.quality, gx, gy) ?? 1;
   if (fs === REMEMBERED)
     for (const dead of sensed.corpses?.on(layer) ?? [])
       if (dead.x === gx && dead.y === gy)
