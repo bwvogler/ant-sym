@@ -120,22 +120,27 @@ function unchanged(a: Cells | undefined, b: ArrayLike<number>): boolean {
 
 /**
  * Free chunk (cx, cy) of every layer if no layer holds a change to it (a cell dug, food eaten or added, a quality set, a heading or time
- * noted): it will be generated again the same. A chunk with a change is the delta and stays. Returns whether it was freed. Costs one
- * regeneration of the chunk, so call it when a region goes to sleep or leaves the screen, not every tick.
+ * noted): it will be generated again the same. A chunk with a change is the delta and stays. Returns whether it was freed, or was already
+ * absent from every layer (nothing to drop: nothing is generated and no food counted, ja-qpv.8.1). A layer that does not hold the chunk
+ * holds no change to it (a generated layer would make the plane's own, the others read `empty`), so it is read with `peek`, never
+ * generated. Costs one regeneration of the plane's chunk when some layer holds it, so call it when a region goes to sleep or leaves the
+ * screen, not every tick.
  */
 export function dropClean(map: EndlessMap, cx: number, cy: number): boolean {
+  const written = [map.digHeading, map.filledAt, map.dugAt, map.quality];
+  if (map.rock.peek(cx, cy) === undefined && map.food.peek(cx, cy) === undefined && written.every((l) => l.peek(cx, cy) === undefined))
+    return true;
   const own = map.plane.chunk(cx, cy);
-  const layers = [map.digHeading, map.filledAt, map.dugAt, map.quality];
   const fill = (l: ChunkLayer<Cells>) => new Float32Array(CHUNK * CHUNK).fill(l.empty);
   if (
-    !unchanged(map.rock.chunk(cx, cy), own.rock) ||
-    !unchanged(map.food.chunk(cx, cy), own.food) ||
-    !layers.every((l) => unchanged(l.chunk(cx, cy), fill(l)))
+    !unchanged(map.rock.peek(cx, cy), own.rock) ||
+    !unchanged(map.food.peek(cx, cy), own.food) ||
+    !written.every((l) => unchanged(l.peek(cx, cy), fill(l)))
   )
     return false;
   map.rock.drop(cx, cy);
   map.food.drop(cx, cy);
-  for (const l of layers) l.drop(cx, cy);
+  for (const l of written) l.drop(cx, cy);
   return true;
 }
 
