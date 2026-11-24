@@ -57,6 +57,8 @@ export function devHook(d: DevDeps) {
       cellOf(x, y);
       return d.sensed.sight(layerOf(v), CELL[0], CELL[1]);
     },
+    /** Under the fog (`?fog=1`) what the fungus knows of the ground at (x, y) of view v: 0 unknown, 1 remembered, 2 live; null when there is no fog. */
+    fog: (v: View, x: number, y: number) => d.sensed.knowledge?.stateAt(layerOf(v), x, y) ?? null,
     nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(d.settings), maxSeconds, minTicks),
     step: (n = 1) => {
       for (let t = 0; t < n; t++) {

@@ -160,6 +160,20 @@ test("sensed asks the sight map for the cell under (x, y), on the plane above an
   assert.deepEqual(asked.at(-1), [PLANE, ...near]);
 });
 
+test("fog reads what the fungus knows of the ground at (x, y) of a view, and is null without the fog (ja-1ypq.3.6)", () => {
+  const asked: [number, number, number][] = [];
+  const { hook } = make({
+    sensed: {
+      knowledge: { stateAt: (l: number, x: number, y: number) => (asked.push([l, x, y]), 1) },
+    } as unknown as SensedMap,
+  });
+  assert.equal(hook.fog("above", 2, 3), 1);
+  assert.deepEqual(asked.at(-1), [PLANE, 2, 3]);
+  assert.equal(hook.fog("below", 40, 50), 1);
+  assert.deepEqual(asked.at(-1), [CURTAIN, 40, 50]);
+  assert.equal(make().hook.fog("above", 2, 3), null, "a map with no knowledge: no fog");
+});
+
 test("fly's defaults: mother 0, and the fungus's strain rides in her (review of #250, N1)", () => {
   const { g, hook } = make();
   hook.fly();

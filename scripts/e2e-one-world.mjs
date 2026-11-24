@@ -44,6 +44,10 @@
 //     keeps only the guide and the nest; l closes it.
 //  16. Polish (PRD §69.9): Appearance (set, kept across a reload, the palette, System clears it), a drawer's motion and its
 //     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
+//  18. the fog of war (PRD §89, ja-1ypq.3.6), on `?fog=1`: a frame costs about what it does with the fog off (the page's animation
+//     frames, measured on fresh pages, fog off and on, twice each); and a host that walks away leaves remembered ground and no ants:
+//     the ground a host sensed is live while it stands there, remembered once it has gone, and a plain ant put on remembered ground
+//     is not drawn (the picture is the same with and without it) where on live ground it is.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -2386,6 +2390,140 @@ try {
   await fp.reload();
   check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
   await fctx.close();
+
+  // ——— 18. The fog of war: a frame costs about what it did, and a host that walks away leaves remembered ground and no ants ———
+  section("18. the fog of war");
+  /** A fresh page on the one-world game, started without the tutorial, at `query` ("" or "?fog=1"). */
+  const startPage = async (query) => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(`${url}${query}`);
+    await p.getByLabel("world seed").fill(String(SEED));
+    await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(
+      () => p.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+      `a game at ${query || "no fog"}`,
+      20_000,
+      100,
+    );
+    return { c, p };
+  };
+  /** The page's animation-frame intervals in ms over `n` frames: a frame that takes the field long to draw shows here. */
+  const frameIntervals = (p, n = 120) =>
+    p.evaluate(
+      (n) =>
+        new Promise((done) => {
+          const ts = [];
+          const tick = (t) => {
+            ts.push(t);
+            if (ts.length <= n) requestAnimationFrame(tick);
+            else done(ts.slice(1).map((v, i) => v - ts[i]));
+          };
+          requestAnimationFrame(tick);
+        }),
+      n,
+    );
+  const medianOf = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  // Fog off then on, twice, each on a fresh page with the game running at the start view; the lower median of the two is kept, so one
+  // busy moment on a shared runner does not fail it. "Within noise": at most half as long again, and 5 ms, past the page's own.
+  const medians = { off: [], on: [] };
+  let fogPage = null;
+  for (let round = 0; round < 2; round++)
+    for (const [kind, query] of [
+      ["off", ""],
+      ["on", "?fog=1"],
+    ]) {
+      const { c, p } = await startPage(query);
+      await sleep(1500);
+      medians[kind].push(medianOf(await frameIntervals(p)));
+      if (kind === "on" && round === 1) fogPage = { c, p };
+      else await c.close();
+    }
+  const [fogOff, fogOn] = [Math.min(...medians.off), Math.min(...medians.on)];
+  check(
+    fogOn <= fogOff * 1.5 + 5,
+    `a frame with the fog on costs about what it did with it off (median ${fogOn.toFixed(1)} ms against ${fogOff.toFixed(1)} ms)`,
+  );
+  const gp = fogPage.p;
+  await gp.getByRole("button", { name: "Pause", exact: true }).click();
+  await noNotices(gp, "the game's own notices to go before the pictures are taken");
+  // Two open cells far from the fungus's body and every nest (nothing else senses them) and well inside the map, so the camera is not clamped.
+  const spots = await gp.evaluate(async () => {
+    const { OPEN, rockAt, centreX, centreY } = await import("/src/colony/index.ts");
+    const g = window.jevAnts.game;
+    const m = g.world.plane;
+    const body = [];
+    const patch = g.fungus.patchOn(0);
+    for (let i = 0; i < patch.length; i += 2) body.push([centreX(patch[i], patch[i + 1]), centreY(patch[i + 1])]);
+    for (const c of g.colonies) body.push([c.layers[0].nest.x, c.layers[0].nest.y]);
+    const open = [];
+    for (let gy = 40; gy < m.size.h - 40; gy += 4)
+      for (let gx = m.x0 + 40; gx < m.x0 + m.size.w - 40; gx += 4) {
+        const x = centreX(gx, gy);
+        const y = centreY(gy);
+        if (rockAt(m, gx, gy) === OPEN && body.every(([bx, by]) => Math.hypot(bx - x, by - y) >= 30)) open.push([x, y]);
+      }
+    const at = open[Math.floor(open.length / 2)];
+    return { at, away: open.find(([x, y]) => Math.hypot(x - at[0], y - at[1]) >= 40) };
+  });
+  check(!!spots.at && !!spots.away, "the plane has two open cells away from the fungus, 40 cells apart");
+  const fogAt = (p) => gp.evaluate(([x, y]) => window.jevAnts.fog("above", x, y), p);
+  const putAnt = (i, p) => gp.evaluate(([i, x, y]) => window.jevAnts.game.colonies[1].putAnt(i, 0, x, y), [i, ...p]);
+  const stepGame = (n) => gp.evaluate((n) => window.jevAnts.step(n), n);
+  const twoFrames = () => gp.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  // The picture of the ground under the camera: a fixed box at the middle of the field, taken once the frame has settled.
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const crop = async (name) => {
+    await twoFrames();
+    await sleep(300);
+    await twoFrames();
+    return gp.screenshot({ clip: { x: 490, y: 300, width: 300, height: 300 }, ...(SHOTS ? { path: join(SHOTS, `fog-${name}.png`) } : {}) });
+  };
+  const [host, plain] = await gp.evaluate(() => {
+    const c = window.jevAnts.game.colonies[1];
+    const out = [];
+    for (let i = 0; i < c.n && out.length < 2; i++) if (c.alive[i]) out.push(i);
+    return out;
+  });
+  await gp.evaluate(() => window.jevAnts.goNest(1)); // the camera is the player's from here on
+  await sleep(1500);
+  await gp.evaluate(([x, y]) => {
+    const c = window.jevAnts.camera("above");
+    c.x = x;
+    c.y = y;
+    c.zoom = 30;
+  }, spots.at);
+  await sleep(600);
+  check((await fogAt(spots.at)) === 0, "ground no host has sensed is unknown");
+  // A host stands on the cell: live. A plain ant beside it is drawn.
+  await putAnt(host, spots.at);
+  await gp.evaluate((i) => (window.jevAnts.game.colonies[1].load[i] = 1), host);
+  await stepGame(1);
+  check((await fogAt(spots.at)) === 2, "a host standing there senses it: the ground is live");
+  await putAnt(plain, spots.at);
+  const live = await crop("live");
+  // The host walks away (3 s of game time, past the 1.5 s grace): the ground is remembered, and a plain ant put there is not drawn.
+  await putAnt(host, spots.away);
+  await stepGame(90);
+  check((await fogAt(spots.at)) === 1, "the host walks away: the ground it sensed is remembered, not live and not unknown");
+  await putAnt(plain, spots.at);
+  const withAnt = await crop("remembered-with-ant");
+  await putAnt(plain, spots.away);
+  const withoutAnt = await crop("remembered-without-ant");
+  check(!live.equals(withAnt), "remembered ground is drawn unlike live ground");
+  check(withAnt.equals(withoutAnt), "an ant on remembered ground is not drawn: the picture is the same with it and without it");
+  // The control: the same ant on live ground is drawn, so the check above could have failed.
+  await putAnt(host, spots.at);
+  await stepGame(1);
+  check((await fogAt(spots.at)) === 2, "a host back on the cell: the ground is live again");
+  await putAnt(plain, spots.at);
+  const liveWith = await crop("live-with-ant");
+  await putAnt(plain, spots.away);
+  const liveWithout = await crop("live-without-ant");
+  check(!liveWith.equals(liveWithout), "the same ant on live ground is drawn: the picture differs with it and without it");
+  await fogPage.c.close();
+
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
