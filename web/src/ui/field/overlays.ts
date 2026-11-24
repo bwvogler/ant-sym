@@ -93,7 +93,7 @@ export function drawLine(k: FieldCtx, holes = true): void {
 function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
   const { ctx, theme, c, v, d } = k;
   const last = line.holes.length - 1;
-  if (k.fog) return drawLineFogged(k, holes);
+  if (k.fog) return drawLineFogged(k, line, holes);
   ctx.strokeStyle = theme.ink;
   ctx.lineWidth = Math.max(1, d * 1.2);
   ctx.setLineDash([6 * d, 5 * d]);
@@ -124,9 +124,8 @@ function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
  * The line under the fog: only the stretches between two holes the fungus has sensed, the margin beyond an end hole only if that hole is sensed,
  * and a marker only at a sensed hole. Where the other holes are is not shown before anyone has been there (docs/fog-of-war.md §5.1).
  */
-function drawLineFogged(k: FieldCtx, holes: boolean): void {
+function drawLineFogged(k: FieldCtx, line: Transect, holes: boolean): void {
   const { ctx, theme, c, v, d, fog } = k;
-  const line = k.world.line;
   const last = line.holes.length - 1;
   const known = line.holes.map((h) => fog!.state(PLANE, h.x, h.y) !== UNKNOWN);
   ctx.strokeStyle = theme.ink;

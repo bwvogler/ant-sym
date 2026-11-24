@@ -152,7 +152,12 @@ test("the bends under the fog: a rule and label only at an interior hole the fun
     sHole: [0, 20, 40],
   };
   const bend = (over: Partial<FieldCtx> = {}) => {
-    const g = ctxFor(game, sensed, { lv: CURTAIN, ext: { x0: 0, w: 512, h: 368 } as never, world: { line } as never, ...over });
+    const g = ctxFor(game, sensed, {
+      lv: CURTAIN,
+      ext: { x0: 0, w: 512, h: 368 } as never,
+      world: { line, lines: [{ line }] } as never,
+      ...over,
+    });
     drawBends(g.k);
     return g.rec.log.filter((l) => l === "stroke()").length;
   };
