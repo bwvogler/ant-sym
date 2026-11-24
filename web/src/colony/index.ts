@@ -50,6 +50,7 @@ export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./weighted.ts";
 export * from "./steerBrain.ts";
+export * from "./endlessMap.ts";
 export * from "./world.ts";
 
 export { touch } from "./sense.ts";
