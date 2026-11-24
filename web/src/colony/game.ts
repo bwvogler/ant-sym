@@ -9,7 +9,7 @@ import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fu
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, hash01, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
 import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
@@ -17,6 +17,7 @@ import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
 import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
+import type { Site } from "./endlessPlane.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 
@@ -121,6 +122,16 @@ export interface Founding {
    * colony the world starts with has nothing a founded one can't get.
    */
   fungus?: { load: number; strain: number };
+  /**
+   * A wild colony woken from its site (Game.wakeSite): the site's lattice cell. A save founds it again from this, so the game knows the site has woken
+   * and no longer reserves it.
+   */
+  wild?: { rx: number; ry: number };
+  /**
+   * The stream the colony is built from, when it must not depend on the game's: a wild colony's, from its site's hash. Not saved. The colony takes the
+   * game's own stream once it is built.
+   */
+  rng?: () => number;
   /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
@@ -567,6 +578,35 @@ export class Game {
     return this.#frozen.has(k);
   }
 
+  /** The wild sites that have woken, by "rx,ry": the colony each became (Game.wakeSite). */
+  #wild = new Map<string, number>();
+
+  /**
+   * Wake a wild site (docs/endless-world.md §4, E4.3): its colony is generated, once, from the site and the world's seed only (never the game's
+   * stream: the same site woken in two games is the same colony), on a line of its own along the site's heading. It starts at the size a start colony
+   * reaches by about six minutes (measured, scripts/mature-colony.mjs: its cap, 1.5 times the start, with no brood left and its nest dug out); `ants`
+   * overrides it (the owner's size, ja-dv98). Its odour is a hash of the site. Waking a site twice gives the colony already woken.
+   */
+  wakeSite(site: Site, opts: { ants?: number } = {}): number {
+    const key = `${site.rx},${site.ry}`;
+    const woken = this.#wild.get(key);
+    if (woken !== undefined) return woken;
+    const seed = this.world.seed;
+    cellOf(site.x, site.y); // sets CELL: the site's hole cell
+    const cell = { x: CELL[0] as number, y: CELL[1] as number };
+    const cap = this.params.species.params.maxAnts ?? Math.round(1.5 * this.#firstAnts);
+    return this.addColony({
+      x: site.x,
+      y: site.y,
+      antCount: opts.ants ?? cap,
+      maxAnts: Math.max(cap, opts.ants ?? 0),
+      odour: hash01(seed, 101, site.rx, site.ry),
+      wild: { rx: site.rx, ry: site.ry },
+      rng: mulberry32(hash4(seed, 102, site.rx, site.ry)),
+      spot: { end: "end", cell, line: this.world.lines.length, newLine: { heading: site.heading } },
+    });
+  }
+
   /** The awake rule (E4.2), when the game has one: it decides each `every` seconds who sleeps. Off in every game that does not turn it on (the bounded game). */
   #sleep: SleepRule | null = null;
   /** The next time the rule is asked (saved with the rule, so a load asks when the saved game would have). */
@@ -900,10 +940,11 @@ export class Game {
         tolerance: this.recognition.params.tolerance,
         ...this.#choice,
       },
-      this.#rng,
+      f.rng ?? this.#rng,
       this.params.species.policy ?? localPolicy,
       { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, at) },
     );
+    if (f.rng) c.rng = this.#rng;
     c.responses = this.params.species.responses;
     this.#ownSituation(c);
     if (f.mother !== undefined && c.queen && !f.nest) {
@@ -918,8 +959,13 @@ export class Game {
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
     this.#sleep?.addColony(this.time);
+    if (f.wild) {
+      this.#wild.set(`${f.wild.rx},${f.wild.ry}`, k);
+      this.sites = this.sites.filter((s) => !(s.x === f.x && s.y === f.y)); // it is a real line now, not a reserved one
+    }
+    const { rng: _rng, ...saved } = f; // the construction stream is not part of the founding
     this.founded.push({
-      ...f,
+      ...saved,
       spot: {
         end: spot.end,
         cell: { x: spot.cell.x, y: spot.cell.y },
