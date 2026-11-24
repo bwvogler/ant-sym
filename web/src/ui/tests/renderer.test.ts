@@ -589,6 +589,7 @@ test("the voxel pass runs flat under the fog and is covered by it: unknown cells
   const lit = setup({ zoom: 130, world: null });
   (lit.parts.voxelMap as { draw: unknown }).draw = draw;
   const hostAll = {
+    alates: [],
     n: 1,
     params: { sensorDistance: 3 },
     alive: Uint8Array.of(1),
