@@ -5,10 +5,29 @@
 // whole map fits the view; zoomed in, the view never leaves the map. A map
 // runs from x0 (0 but for one world's curtain, whose columns are the line's s
 // and start below 0) to x0 + w, and from 0 to h.
+//
+// An endless plane (docs/endless-world.md §8, `Extent.endless`) has no whole map to fit: the least zoom is a fixed number (ENDLESS_MIN_ZOOM),
+// "zoomed in" is a zoom level (ENDLESS_ZOOMED_IN), and the view may go anywhere inside `reachOf(world)`, the ONE place a bound on the view
+// lives. Today that is the nominal box (the limit of correctness of the chunk and cell keys); the fog (ja-1ypq.7) will set `Extent.reach` to the
+// explored ground plus a margin and change nothing else here.
 
 /** The map's extent in world units: x from x0 (default 0) to x0 + w, y from 0 to h. */
 export interface Extent {
   x0?: number;
+  w: number;
+  h: number;
+  /** An endless plane: no edge to fit or clamp to (see the header); `w` and `h` are only its nominal box. */
+  endless?: true;
+  /** Endless only: where the view may go (reachOf). Absent: the nominal box. The fog sets it to explored ground plus a margin. */
+  reach?: Reach;
+  /** Endless only: what `fit` shows, the start nests and a margin. Absent: the reach (which `fit` shows at the least zoom). */
+  home?: Reach;
+}
+
+/** A rectangle of the plane in world units: from (x0, y0), w wide and h tall. */
+export interface Reach {
+  x0: number;
+  y0: number;
   w: number;
   h: number;
 }
@@ -32,24 +51,66 @@ export interface Viewport {
 /** Closest zoom in CSS pixels per world unit, reaching inspection-scale detail. */
 export const MAX_ZOOM = 360;
 
-/** The zoom at which the whole map fits the view. */
+/** An endless plane's least zoom, in CSS pixels per world unit (times the view's dpr): the same however far the plane reaches. */
+export const ENDLESS_MIN_ZOOM = 0.5;
+
+/** An endless plane counts as "zoomed in" (the minimap shows) past this zoom, in CSS pixels per world unit: about where a 512-wide map fits a 1000 px view. */
+export const ENDLESS_ZOOMED_IN = 2;
+
+/**
+ * Where the view's edges may go: the one bound on the camera. A bounded map: the map. An endless plane: `world.reach` when set (the fog's
+ * explored ground plus a margin), else its nominal box, centred on the origin in y (an endless plane has rows above and below 0).
+ */
+export function reachOf(world: Extent): Reach {
+  if (!world.endless) return { x0: world.x0 ?? 0, y0: 0, w: world.w, h: world.h };
+  return world.reach ?? { x0: world.x0 ?? -world.w / 2, y0: -world.h / 2, w: world.w, h: world.h };
+}
+
+/** The least zoom: a bounded map's whole map fitting the view, an endless plane's fixed ENDLESS_MIN_ZOOM. */
+export function minZoom(world: Extent, view: Viewport): number {
+  return world.endless ? ENDLESS_MIN_ZOOM * (view.dpr ?? 1) : Math.min(view.w / world.w, view.h / world.h);
+}
+
+/** The zoom `fit` starts at: the whole bounded map; on an endless plane the home rectangle (between the least zoom and MAX_ZOOM). */
 export function fitZoom(world: Extent, view: Viewport): number {
-  return Math.min(view.w / world.w, view.h / world.h);
+  if (!world.endless) return Math.min(view.w / world.w, view.h / world.h);
+  const h = homeOf(world);
+  const z = Math.min(view.w / h.w, view.h / h.h);
+  return Math.max(minZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), z));
 }
 
-/** The whole map, centred. */
+/** What an endless plane's `fit` shows: `home`, else the reach. */
+function homeOf(world: Extent): Reach {
+  return world.home ?? reachOf(world);
+}
+
+/** The whole map, centred; on an endless plane its home (the start nests), clamped to the reach. */
 export function fit(world: Extent, view: Viewport): Camera {
-  return { x: (world.x0 ?? 0) + world.w / 2, y: world.h / 2, zoom: fitZoom(world, view) };
+  if (!world.endless) return { x: (world.x0 ?? 0) + world.w / 2, y: world.h / 2, zoom: fitZoom(world, view) };
+  const h = homeOf(world);
+  return clamp({ x: h.x0 + h.w / 2, y: h.y0 + h.h / 2, zoom: fitZoom(world, view) }, world, view);
 }
 
-/** Zoom between "the whole map" and MAX_ZOOM; the centre kept so the view stays over the map (or centred on an axis the map doesn't fill). */
+/** Whether the camera is showing what `fit` gives (the page then refits it as the box changes). An endless plane's is the home view only while the camera is on it. */
+export function isFitted(world: Extent, view: Viewport, c: Camera): boolean {
+  if (!world.endless) return c.zoom <= fitZoom(world, view) * 1.0001;
+  const f = fit(world, view);
+  return Math.abs(c.zoom - f.zoom) <= f.zoom * 1e-4 && Math.abs(c.x - f.x) < 1e-6 && Math.abs(c.y - f.y) < 1e-6;
+}
+
+/** Whether the view counts as zoomed in (the minimap shows): past the whole map by a twentieth, or past ENDLESS_ZOOMED_IN on an endless plane. */
+export function isZoomedIn(world: Extent, view: Viewport, zoom: number): boolean {
+  return world.endless ? zoom > ENDLESS_ZOOMED_IN * (view.dpr ?? 1) : zoom > fitZoom(world, view) * 1.05;
+}
+
+/** Zoom between the least zoom and MAX_ZOOM; the centre kept so the view stays inside `reachOf` (or centred on an axis the reach doesn't fill). */
 export function clamp(c: Camera, world: Extent, view: Viewport): Camera {
-  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom));
+  const zoom = Math.max(minZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom));
   const halfW = view.w / zoom / 2;
   const halfH = view.h / zoom / 2;
-  const x0 = world.x0 ?? 0;
-  const x = halfW * 2 >= world.w ? x0 + world.w / 2 : Math.max(x0 + halfW, Math.min(x0 + world.w - halfW, c.x));
-  const y = halfH * 2 >= world.h ? world.h / 2 : Math.max(halfH, Math.min(world.h - halfH, c.y));
+  const r = reachOf(world);
+  const x = halfW * 2 >= r.w ? r.x0 + r.w / 2 : Math.max(r.x0 + halfW, Math.min(r.x0 + r.w - halfW, c.x));
+  const y = halfH * 2 >= r.h ? r.y0 + r.h / 2 : Math.max(r.y0 + halfH, Math.min(r.y0 + r.h - halfH, c.y));
   return { x, y, zoom };
 }
 
@@ -73,10 +134,10 @@ export function zoomAt(c: Camera, view: Viewport, sx: number, sy: number, factor
 /**
  * Zoom by `factor` about screen (sx, sy), stopping at the limits: the factor is cut to what the
  * zoom range allows *before* the centre is worked out, so zooming in at MAX_ZOOM (or out at the
- * whole map) leaves the view where it is instead of sliding it toward the pointer.
+ * least zoom) leaves the view where it is instead of sliding it toward the pointer.
  */
 export function zoomBy(c: Camera, world: Extent, view: Viewport, sx: number, sy: number, factor: number): Camera {
-  const zoom = Math.max(fitZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom * factor));
+  const zoom = Math.max(minZoom(world, view), Math.min(MAX_ZOOM * (view.dpr ?? 1), c.zoom * factor));
   if (zoom === c.zoom) return clamp(c, world, view);
   return clamp(zoomAt(c, view, sx, sy, zoom / c.zoom), world, view);
 }

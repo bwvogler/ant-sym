@@ -3,12 +3,18 @@ import assert from "node:assert/strict";
 import {
   aimed,
   clamp,
+  ENDLESS_MIN_ZOOM,
+  ENDLESS_ZOOMED_IN,
   fit,
   fitZoom,
   fromMinimap,
+  isFitted,
+  isZoomedIn,
   MAX_ZOOM,
   minimapRect,
+  minZoom,
   pan,
+  reachOf,
   toScreen,
   toWorld,
   visible,
@@ -121,4 +127,91 @@ test("an aim is clamped afresh in each view it is drawn in, not from the last cl
   // Without an aim the camera is only clamped; with a span, zoomed to fit it across the shorter side.
   assert.deepEqual(aimed(tall, null, map, { w: 900, h: 560 }), clamp(tall, map, { w: 900, h: 560 }));
   assert.equal(aimed({ ...c, zoom: 3 }, { x: 250, y: 160, span: 280 }, map, { w: 900, h: 560 }).zoom, 2);
+});
+
+// The endless plane (docs/endless-world.md §8, ja-qpv.4.2): no whole map, a fixed least zoom, a view that may go anywhere inside `reachOf`.
+const H = 32768 * 64; // the nominal box's half side (any big number: the box is the limit of correctness, not an edge)
+const endless = { endless: true as const, x0: -H, w: 2 * H, h: 1.7 * H, home: { x0: 20, y0: -30, w: 300, h: 160 } };
+
+test("endless: the view pans far and is not pulled back to a map", () => {
+  const far = clamp({ x: 123456, y: -98765, zoom: 4 }, endless, view);
+  assert.deepEqual(far, { x: 123456, y: -98765, zoom: 4 });
+  const p = pan(far, -500, 300);
+  assert.deepEqual(clamp(p, endless, view), p, "a drag far from the start is kept");
+  const west = clamp({ x: -1e9, y: 0, zoom: 4 }, endless, view);
+  assert.ok(near(visible(west, view).x0, -H), "only the nominal box stops it");
+});
+
+test("endless: the least zoom is fixed, whatever the size of the plane, and scales with dpr", () => {
+  assert.equal(minZoom(endless, view), ENDLESS_MIN_ZOOM);
+  assert.equal(minZoom({ ...endless, w: 5, h: 5 }, view), ENDLESS_MIN_ZOOM, "not the map's size");
+  assert.equal(minZoom(endless, { ...view, dpr: 2 }), 2 * ENDLESS_MIN_ZOOM);
+  assert.equal(clamp({ x: 0, y: 0, zoom: 1e-9 }, endless, view).zoom, ENDLESS_MIN_ZOOM);
+  assert.equal(clamp({ x: 0, y: 0, zoom: 1e9 }, endless, view).zoom, MAX_ZOOM);
+  let c = { x: 5000, y: 5000, zoom: 3 };
+  for (let k = 0; k < 60; k++) c = zoomBy(c, endless, view, 100, 100, 0.7);
+  assert.equal(c.zoom, ENDLESS_MIN_ZOOM, "zooming out stops at the least zoom");
+  const at = zoomBy(c, endless, view, 10, 400, 0.5);
+  assert.deepEqual(at, c, "and at the least zoom it leaves the view where it is");
+});
+
+test("endless: zooming about a point keeps that ground under the pointer, far from the origin", () => {
+  const c = { x: 70000, y: -40000, zoom: 3 };
+  const [wx, wy] = toWorld(c, view, 820, 90);
+  for (const f of [0.4, 1.7]) {
+    const z = zoomBy(c, endless, view, 820, 90, f);
+    const [ax, ay] = toWorld(z, view, 820, 90);
+    assert.ok(near(ax, wx, 1e-6) && near(ay, wy, 1e-6), `factor ${f}`);
+  }
+});
+
+test("endless: aimed() keeps its aim, at the camera's zoom or the aim's span", () => {
+  const c = { x: 0, y: 0, zoom: 6 };
+  assert.deepEqual(aimed(c, { x: -88000, y: 61000 }, endless, view), { x: -88000, y: 61000, zoom: 6 });
+  const spanned = aimed(c, { x: 123, y: -456, span: 250 }, endless, view);
+  assert.deepEqual(spanned, { x: 123, y: -456, zoom: 500 / 250 });
+  assert.deepEqual(aimed(c, null, endless, view), clamp(c, endless, view), "no aim: only clamped");
+});
+
+test("endless: fit starts on the home rectangle (the start nests), and showing it counts as fitted", () => {
+  const c = fit(endless, view);
+  assert.ok(near(c.x, 170) && near(c.y, 50), "centred on the home rectangle");
+  const v = visible(c, view);
+  assert.ok(v.x0 <= 20 && v.x1 >= 320 && v.y0 <= -30 && v.y1 >= 130, "all of it in view");
+  assert.equal(c.zoom, fitZoom(endless, view));
+  assert.ok(c.zoom > ENDLESS_MIN_ZOOM && c.zoom < MAX_ZOOM);
+  assert.ok(isFitted(endless, view, c));
+  assert.ok(!isFitted(endless, view, pan(c, 30, 0)), "panned away it is not");
+  assert.ok(!isFitted(endless, view, { ...c, zoom: c.zoom / 2 }), "nor zoomed out: the page must not refit it");
+  const noHome = fit({ ...endless, home: undefined }, view);
+  assert.equal(noHome.zoom, ENDLESS_MIN_ZOOM, "with no home it shows as much as the least zoom does");
+});
+
+test("endless: zoomed in is a zoom level, not 'more than the whole map'", () => {
+  assert.ok(!isZoomedIn(endless, view, ENDLESS_ZOOMED_IN));
+  assert.ok(isZoomedIn(endless, view, ENDLESS_ZOOMED_IN * 1.01));
+  assert.ok(!isZoomedIn(endless, { ...view, dpr: 2 }, 3) && isZoomedIn(endless, { ...view, dpr: 2 }, 4.1), "the level is in CSS pixels");
+  // A bounded map keeps its rule: past the whole map by a twentieth.
+  assert.ok(!isZoomedIn(world, view, fitZoom(world, view) * 1.05) && isZoomedIn(world, view, fitZoom(world, view) * 1.06));
+  assert.ok(isFitted(world, view, fit(world, view)) && !isFitted(world, view, { x: 0, y: 0, zoom: fitZoom(world, view) * 1.01 }));
+});
+
+test("endless: the bound is reachOf, one seam: a smaller reach (the fog's explored ground and margin) holds the view", () => {
+  assert.deepEqual(reachOf(endless), { x0: -H, y0: -0.85 * H, w: 2 * H, h: 1.7 * H });
+  const explored = { x0: -100, y0: -50, w: 600, h: 400 };
+  const fogged = { ...endless, reach: explored };
+  assert.deepEqual(reachOf(fogged), explored);
+  const east = clamp({ x: 99999, y: 100, zoom: 4 }, fogged, view);
+  assert.ok(near(visible(east, view).x1, 500), "the east edge stops at the reach");
+  const wide = clamp({ x: 99999, y: 100, zoom: ENDLESS_MIN_ZOOM }, fogged, view);
+  assert.equal(wide.x, 200, "a reach narrower than the view is centred on that axis, as a small map is");
+  assert.equal(wide.zoom, ENDLESS_MIN_ZOOM, "and the least zoom does not follow it");
+  // the start view is the home view held to the reach: this is the fog's path (a small explored patch holds the start view and key 0)
+  const unbounded = { ...endless, reach: undefined };
+  assert.deepEqual(fit(fogged, view), clamp(fit(unbounded, view), fogged, view), "fit holds the start view to the reach");
+  const patch = { ...endless, reach: { x0: 0, y0: 0, w: 150, h: 100 } };
+  assert.deepEqual(fit(patch, view), clamp(fit(unbounded, view), patch, view), "a small explored patch too");
+  assert.notDeepEqual(fit(patch, view), fit(unbounded, view), "and it moves the start view off the home centre");
+  assert.deepEqual(reachOf(world), { x0: 0, y0: 0, w: 512, h: 320 }, "a bounded map's reach is the map");
+  assert.deepEqual(reachOf({ x0: -64, w: 300, h: 320 }), { x0: -64, y0: 0, w: 300, h: 320 });
 });
