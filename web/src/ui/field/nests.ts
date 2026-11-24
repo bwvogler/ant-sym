@@ -12,7 +12,7 @@ import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite } from "../resourceSprites.ts";
 import { workerLod } from "../workerSprites.ts";
 import { odourColour, odourRgb } from "./colour.ts";
-import { UNKNOWN } from "../fog/knowledge.ts";
+import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
 
 /** What the shell works out once a frame that the nests (and the ants after them) read. */
@@ -198,4 +198,41 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   };
   drawAlates();
   return col.alates.length ? drawAlates : null;
+}
+
+/**
+ * The dead the fungus has seen and nobody senses now, as they lay when last seen (docs/fog-of-war.md §4.3: corpses are ground items). The
+ * live ones are drawn by their colony's nest stage; these are the remembered, a little fainter. Only under the fog.
+ */
+export function drawRememberedCorpses(k: FieldCtx, f: NestFrame): void {
+  const { ctx, theme, c, v, d, lv, fog, corpses } = k;
+  if (!fog || !corpses) return;
+  const { len, inView, resourceLod, nestImage } = f;
+  const bd = Math.max(1.5, len * 0.4);
+  ctx.strokeStyle = theme.mound;
+  ctx.lineWidth = Math.max(1, d * 0.8);
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  for (const corpse of corpses.on(lv)) {
+    const wx = centreX(corpse.x, corpse.y);
+    const wy = centreY(corpse.y);
+    if (!inView(wx, wy)) continue;
+    if (fog.state(lv, corpse.x, corpse.y) === LIVE) continue; // sensed now: the nest stage draws it as it is
+    const [x, y] = toScreen(c, v, wx, wy);
+    if (k.sprites.cadaver.draw(ctx, resourceLod, corpse.stage, x, y, c.zoom, corpse.heading)) continue;
+    if (nestImage) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(corpse.heading ?? 0);
+      drawNestSprite(ctx, nestImage, resourceLod, "corpse", 0, 0, c.zoom);
+      ctx.restore();
+      continue;
+    }
+    ctx.moveTo(x - bd, y - bd);
+    ctx.lineTo(x + bd, y + bd);
+    ctx.moveTo(x + bd, y - bd);
+    ctx.lineTo(x - bd, y + bd);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }

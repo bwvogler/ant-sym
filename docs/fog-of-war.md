@@ -105,6 +105,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 
 **F3.2 (`ja-1ypq.3.2`, same flag):** the curtain's strip and its cut are the plane under the line as last sensed (`planeGround` in `field/fogCull.ts`): fog where that plane cell was never sensed, dimmed where nobody senses it now; the plane's ants over the strip only where live. The minimap paints unexplored pixels as fog, the rest from snapshots (dimmed when remembered), and ants only where live. In hexagon mode the dirt pellets come from the snapshot. Spores and hyphae are the fungus's own body and always draw. Corpses show only where live for now: remembering them needs a corpse source (F3.3).
 
+**F3.3 (`ja-1ypq.3.3`, same flag):** aphids draw only where live; chamber labels only where live (a role is read live); hole names and the strip's bends only at holes the fungus has sensed; the line and its hole dots only between and at sensed holes (owner call pending: fog like the rest, recommended; the alternative is a map the player always knows); the fungus's colonised corpses and stalks only where the place has been sensed; a remembered chamber is tinted plainly, since its role may have changed; and the dead are remembered as ground items (`fog/corpses.ts`, `CorpseMemory`): kept as they lay when last seen, shown a little fainter where nobody senses now, forgotten when an observer senses the place again and finds them gone. Still to do for the field: the followed ring, specimens, traces and the hover inspection (F4).
+
 ### 5.2 Picking and cards (`ja-1ypq.4`)
 - Only ants in live cells can be picked.
 - Following a non-host ends with "lost sight" when it leaves; hosts stay followable.
