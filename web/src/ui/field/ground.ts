@@ -28,6 +28,8 @@ import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "../l
 import { MapChunkPaintCache } from "../mapChunkPaintCache.ts";
 import { HOME_RGB, ROLE_RGB } from "../palette.ts";
 import { odourRgb } from "./colour.ts";
+import { GRACE } from "../fog/knowledge.ts";
+import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
 import type { FieldEnv } from "./env.ts";
 import type { CellWindow } from "./fungus.ts";
@@ -74,6 +76,22 @@ export function stripAt(k: FieldCtx, s: number, y: number): readonly number[] | 
   const plane = world.plane;
   if (y === STRIP) return rockAt(plane, qx, qy) !== OPEN ? theme.rock : plane.food.get(qx, qy) > 0 ? theme.accentRgb : theme.paperRgb;
   return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
+}
+
+/** The fog's colour: the paper pulled a little towards the ink. */
+function fogRgb(theme: FieldCtx["theme"]): [number, number, number] {
+  return [0, 1, 2].map((k) => Math.round(theme.paperRgb[k]! + (theme.inkRgb[k]! - theme.paperRgb[k]!) * 0.16)) as [number, number, number];
+}
+function setPx(px: Uint8ClampedArray, o: number, rgb: readonly number[], a: number): void {
+  px[o] = rgb[0]!;
+  px[o + 1] = rgb[1]!;
+  px[o + 2] = rgb[2]!;
+  px[o + 3] = a;
+}
+/** A remembered cell: what was painted, mixed towards the fog (clear ground becomes a faint wash of it). */
+function dimPx(px: Uint8ClampedArray, o: number, fogPx: readonly number[]): void {
+  if (px[o + 3] === 0) return setPx(px, o, fogPx, 70);
+  for (let k = 0; k < 3; k++) px[o + k] = Math.round(px[o + k]! * 0.6 + fogPx[k]! * 0.4);
 }
 
 /** The chunks of the shown map and what keeps them. One per field; `clear()` when the shown map is another or has grown. */
@@ -160,14 +178,27 @@ export class Ground {
     const rock = groundRock(k),
       soil = groundSoil(k),
       spoil = groundSpoil(k);
-    const fc = m.food.chunk(cx, cy);
+    // Under the fog (docs/fog-of-war.md §5.1) a chunk paints from what was last sensed: unexplored cells as fog, remembered ones from their
+    // snapshots, dimmed, and the cells an observer senses now from the truth (the snapshot is written as they are sensed).
+    const fog = k.fog;
+    const fogV = fog?.view(k.lv, cx, cy);
+    if (fog && !fogV) {
+      if (this.tiles.needsPaint(c, "fog-unknown", [])) {
+        const fogPx = fogRgb(theme);
+        for (let i = 0; i < CHUNK * CHUNK; i++) setPx(c.img.data, i * 4, fogPx, 255);
+        c.ctx.putImageData(c.img, 0, 0);
+      }
+      return;
+    }
+    if (fogV) rc = (fogV.snap(SNAP.rock) as Uint8Array | undefined) ?? rc;
+    const fc = fogV ? (fogV.snap(SNAP.food) as Float32Array | undefined) : m.food.chunk(cx, cy);
     // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
     const sensedC = k.sensedLayer?.chunk(cx, cy);
     const now = k.sensedNow;
     // Every colony's food and home trails and alarm here, read only where something was sensed.
     const trailC: { food: Float32Array | undefined; home: Float32Array | undefined; tone: [number, number, number] }[] = [];
     const alarmC: Float32Array[] = [];
-    const qc = m.quality?.chunk(cx, cy);
+    const qc = fogV ? (fogV.snap(SNAP.quality) as Float32Array | undefined) : m.quality?.chunk(cx, cy);
     if (sensedC || smellAll) {
       for (const t of k.trails) {
         const food = t.food.chunk(cx, cy);
@@ -186,17 +217,18 @@ export class Ground {
     }
     const sporeC = k.spores.chunk(cx, cy);
     // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
-    const spoilC = m.spoil?.chunk(cx, cy);
+    const spoilC = fogV ? (fogV.snap(SNAP.spoil) as Uint16Array | undefined) : m.spoil?.chunk(cx, cy);
     const chambers = m.chambers;
-    const chamberC = chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
+    const chamberC = fogV ? (fogV.snap(SNAP.chamber) as Int16Array | Uint8Array | Uint16Array | undefined) : chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
     const [fr, fg, fb] = theme.accentRgb;
     const px = c.img.data;
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
     // The strip also depends on projected plane cells; keep its existing live repaint path.
-    if (!(strip && world && cy === STRIP >> 6)) {
+    if (!(strip && world && cy === STRIP >> 6 && !fog)) {
       const tag = JSON.stringify([
         foodAsSprites,
+        !!fog,
         show.food,
         show.home,
         smellAll,
@@ -212,6 +244,7 @@ export class Ground {
           rc,
           fc,
           qc,
+          fogV?.bits,
           sensedC,
           sporeC,
           spoilC,
@@ -315,9 +348,20 @@ export class Ground {
         } else px[o + 3] = 0;
       }
     }
+    // The fog's last pass: what was never sensed is fog, and what was sensed but is not now is dimmed towards it.
+    if (fog && fogV) {
+      const fogPx = fogRgb(theme);
+      for (let ly = 0; ly < CHUNK; ly++)
+        for (let lx = 0; lx < CHUNK; lx++) {
+          const i = ly * CHUNK + lx;
+          const o = i * 4;
+          if (!(fogV.bits[i >> 5]! & (1 << (i & 31)))) setPx(px, o, fogPx, 255);
+          else if (!(sensedC && now - sensedC[i]! <= GRACE)) dimPx(px, o, fogPx);
+        }
+    }
     // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
     // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
-    if (strip && cy === STRIP >> 6) {
+    if (strip && !fog && cy === STRIP >> 6) {
       const line = world.line;
       const plane = world.plane;
       const ly = STRIP - y0;

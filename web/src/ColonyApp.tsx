@@ -39,7 +39,7 @@ import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View 
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
-import { SensedMap } from "./ui/fungusSight.ts";
+import { fogFromUrl, sensedFor } from "./ui/fog/sources.ts";
 import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
@@ -213,7 +213,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   }, [pointsAt]);
   // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
-  const sensed = useMemo(() => new SensedMap(), [game]);
+  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Sight follows the sim's steps, not the frames (docs/fog-of-war.md §4.1); one stamp at once too, so a paused or just-loaded game shows what its hosts sense now.
   useEffect(() => {
     sensed.stampGame(game);

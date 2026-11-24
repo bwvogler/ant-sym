@@ -13,6 +13,7 @@ import {
   type Game,
 } from "../colony/index.ts";
 import { BODY_EVERY, bodySight, hostSight } from "./fog/observers.ts";
+import type { Knowledge } from "./fog/knowledge.ts";
 
 // What the field shows of the colonies' scent (PRD §65, ja-pc72.1): only what the fungus's hosts have sensed. Every frame,
 // each infected ant of any colony marks the cells within its antennae's reach with the time; a cell's trails and alarm
@@ -43,6 +44,8 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
+  /** the fog of war's knowledge when the page runs with it (fog/sources.ts sensedFor); null: no fog */
+  knowledge: Knowledge | null = null;
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */

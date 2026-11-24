@@ -141,6 +141,7 @@ export function useFieldFrame({
       spores: binding.spores,
       sensedLayer: binding.sensedLayer,
       sensedNow: sensed.now,
+      fog: sensed.knowledge,
     };
     const inputs: FieldInputs = { hover: null, pen: null, penSeen: { current: null }, show: layers.current };
     const mq = matchMedia("(prefers-color-scheme: dark)");

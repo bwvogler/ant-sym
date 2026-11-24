@@ -34,6 +34,9 @@ import { type Ground, groundPaper } from "./ground.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./marks.ts";
 import { drawNest, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
+import { UNKNOWN } from "../fog/knowledge.ts";
+import { actorCull } from "./fogCull.ts";
+import { SNAP } from "../fog/sources.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./overlays.ts";
 import { type FrameSinks, publishDrawMs, publishFrame } from "./result.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "./zoom.ts";
@@ -200,19 +203,23 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
 
 /** Surface plain-food cells join into tissue; carried food and other qualities stay separate morsels. */
 export const foodStage: Stage = ({ fc, cellWindow, resourceImage, resourceLod }) => {
-  const { ctx, c, v, lv, m, sprites } = fc;
+  const { ctx, c, v, lv, m, sprites, fog } = fc;
+  // Under the fog the food a cell shows is what was last sensed there (its snapshot), and none where nothing was.
+  const foodAt = (x: number, y: number): number =>
+    fog ? (fog.state(lv, x, y) === UNKNOWN ? 0 : (fog.snapshot(lv, SNAP.food, x, y) ?? 0)) : m.food.get(x, y);
+  const qualityAt = (x: number, y: number): number => (fog ? (fog.snapshot(lv, SNAP.quality, x, y) ?? 1) : (m.quality?.get(x, y) ?? 1));
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { surfaceLeaves, mapLeaves } = sprites;
   if (!resourceImage) return;
   for (let y = ry0; y <= ry1; y++)
     for (let x = rx0; x <= rx1; x++) {
-      const amount = m.food.get(x, y);
+      const amount = foodAt(x, y);
       if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
       const density = foodDensity(amount),
-        kind = foodKind(m.quality?.get(x, y) ?? 1);
+        kind = foodKind(qualityAt(x, y));
       if (lv === PLANE && kind === "plain") {
         const tiles = surfaceLeaves.get(x, y, (a, b) =>
-          rockAt(m, a, b) === OPEN && foodKind(m.quality?.get(a, b) ?? 1) === "plain" ? m.food.get(a, b) : 0,
+          rockAt(m, a, b) === OPEN && foodKind(qualityAt(a, b)) === "plain" ? foodAt(a, b) : 0,
         );
         mapLeaves.draw(ctx, tiles, c.zoom, v.w / 2 - c.x * c.zoom, v.h / 2 - c.y * c.zoom);
         continue;
@@ -261,14 +268,16 @@ export const actorsStage: Stage = (fs) => {
   const { lv, strip, colonies } = fc;
   if (lv === PLANE) drawLine(fc);
   if (lv === CURTAIN) drawBends(fc);
-  const nestFrame: NestFrame = { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage };
+  // Under the fog what lives on the ground (ants, brood, the queen, alates, corpses) is drawn only where an observer senses it now.
+  const seen = actorCull(fc, inView);
+  const nestFrame: NestFrame = { len, inView: seen, hexes, resourceLod, darkSprites, nestImage, resourceImage };
   const antFrame: AntFrame = { ...nestFrame, half, crumb };
   for (const col of [...colonies].reverse()) {
     const alates = drawNest(fc, nestFrame, col);
     if (alates) fs.alateOverlays.push(alates);
     drawAnts(fc, antFrame, col);
   }
-  if (strip) drawStripAnts(fc, len, crumb, inView);
+  if (strip && !fc.fog) drawStripAnts(fc, len, crumb, inView); // under the fog the strip waits for ja-1ypq.3.2
   drawStalksRaised(fc, fs.cellWindow, fs.fungusFrame!);
 };
 
@@ -291,11 +300,11 @@ export const voxelStage: Stage = (fs) => {
     fs.inputs.show,
     refs.aphids,
     theme,
-    !smellAll,
+    !smellAll && !fc.fog,
     mapCameraOrbit(lv, refs.orbit),
   );
   fs.voxel = voxel;
-  const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
+  const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll && !fc.fog);
   const frameAngled = "angled" in voxel && voxel.angled === true;
   // What the frame found out about itself goes to the shell's refs and the canvas's data attributes (field/result.ts).
   publishFrame(

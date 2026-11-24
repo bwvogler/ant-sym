@@ -101,6 +101,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Ants, the queen, brood and alates draw only in live cells.
 - The fog mask is drawn per cell at low resolution, upscaled and blurred, and snapped to the grid (§2).
 
+**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. While the fog is on, the 3-D voxel pass falls back to 2D, and the curtain's strip and its ants are not drawn (they wait for F3.2, which reads the plane under the line through the fog). Spores and hyphae are the fungus's own body and always draw. Corpses show only where live for now: remembering them needs a corpse source (F3.3).
+
 ### 5.2 Picking and cards (`ja-1ypq.4`)
 - Only ants in live cells can be picked.
 - Following a non-host ends with "lost sight" when it leaves; hosts stay followable.

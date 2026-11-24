@@ -7795,6 +7795,8 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F2 built (`ja-1ypq.2`, 2026-11-24):** `ui/fog/knowledge.ts` (explored bit per cell, snapshots per source copied while sensed, last-seen per 8 × 8 block) and `ui/fog/known.ts` (known colonies, live or as of); `SensedMap.onSeen` and `onReset` feed it. Measured in `fogKnowledge.test.ts`: 512 B of explored bits plus 256 B of block times a chunk, and 4 KB a byte layer or 16 KB a float layer of snapshot. Which sources the renderer copies (rock, food, quality, spoil, spores, chambers) is F3's choice, and with all of them a chunk is tens of KB, which is why F7 drops snapshots of chunks unchanged since seen. A picture only; goldens untouched.
 
+**F3.1 built (`ja-1ypq.3.1`, 2026-11-24, behind `?fog=1`, off by default):** ground chunks, food sprites, ants and nests through the fog; the voxel pass falls back to 2D and the curtain's strip is hidden under it until F3.2. `fogGround.test.ts` holds that a never-sensed chunk is fog, a remembered cell paints its snapshot dimmed and not the change made while away, and the actors are culled to live cells. The fog off paints exactly as before.
+
 **Still open.**
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
