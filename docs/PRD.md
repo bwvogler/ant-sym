@@ -7578,7 +7578,7 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 - **M1 (built, `ja-vlla.3`):** `LANDING.radius` 2 becomes 1 (landing, the first spores and a queen's founding: the assay measured the whole change). The parameter is `LANDING.radius`; `progression.mjs --landing 2` gives today's landing back. The fungus golden is re-recorded.
 - **M2a (built, `ja-vlla.4`):** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply (allowed only where the new `resource` field says a colonised corpse is on the tip's cell or beside it; elsewhere the answer plays the tip's own rule); the cells are a mat that `regress` leaves alone (`Hyphae.mat`, saved only when non-empty); the local rule never thickens, so the golden is bit-exact. `GROWTH_BRAIN_VERSION` 5, 48 situations become 96, and the shipped growth answers were re-asked ($0.0049 for the three aims, 404 input tokens a question): Jev thickens in 27 (*unite*), 29 (*peace*) and 32 (*spread*) of the 48 corpse situations and in none without a corpse. **M2b (built, `ja-vlla.5`):** after each round of tip steps (`Fungus.#settle`), a cell a tip has just thickened round whose six neighbours are all hyphae is a flower, and it becomes a patch when none of its seven cells is in a patch already (`base` or `sources`: the landing's cells and earlier flowers never count): the seven join the base and the sources, `Evolution.settle` adds one patch (room to grow) with no start of 4 (the mass is the hyphae's already: unchanged), no tips set out from it (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), layer 0 only; `Fungus.flowers` counts them (saved only when above 0, so the goldens hold). A flower is looked for only where a tip thickened, so only at a corpse: densely webbed hyphae that never thickened found nothing (owner asked, 2026-11-23: `ja-vlla.9`). **M2c** (`ja-vlla.6`): assays. Plan, as designed: a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, no tips of its own (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **Flowers anywhere (built, `ja-vlla.9`, owner 2026-11-23: "I personally like flowers everywhere"):** a flower may close wherever hyphae grow, not only where a tip thickened (every newly grown cell is checked, as the middle of a flower or as one of a flower's six neighbours); it may touch a patch (the seven's cells not yet in a patch join it: the patch spreads, and the patch count stays; a flower with none in a patch is a new patch, as before); its middle must be outside every patch; and it roots no tips (the tips that closed it run on).
-- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** design with the owner first (open questions in the note).
+- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** designed 2026-11-23/24: §90, epic `ja-vlla.11`.
 
 **M1 assay result (`ja-vlla.2`, 2026-11-22).** `progression.mjs --evolve --hyphae --growth --flow --seconds 600` (the bead's command; `--landing R` sets `LANDING.radius`; the without-hyphae rows drop `--hyphae --growth --flow`), time to a quarter of hosts, seconds, seeds 1–10 then 11–20, radius 1 against today's 2. Re-run on the head (`8ffc5711`) the radius-1 with-hyphae rows reproduce on all 20 seeds. Without `--growth --flow` the with-hyphae times differ (seed 1: 237 s at radius 1, 282 s at radius 2; the PR review's reading). P1 (§63.4): no seed more than 10 % slower with hyphae than without.
 - Radius 1, seeds 1–10, with hyphae: 260 179 155 205 141 222 212 212 201 159; without: 361 268 233 235 237 426 277 533 327 197. Every seed is as fast or faster with hyphae.
@@ -7806,3 +7806,71 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.
+
+## 90. A lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks it down (design, ja-vlla.11, 2026-11-24)
+
+**Research basis:** [lichen.md](lichen.md). FT is full text read; ABS is abstract only, with numbers **unverified**.
+- **Contact:** a lichen fungus captures a free alga by contact, and free algae are scarce. Some lichens take another lichen's alga (*Diploschistes* on *Cladonia*). Sources: Sanders & Masumoto 2021, FT; Friedl 1987, ABS; against, Beck et al. 1998, ABS.
+- **Spread and light:** a lichen grows from its edge, crustose ones well under 1 mm a year (Seminara et al. 2018, FT; Armstrong 2005, ABS). Its alga fixes carbon only while wet and lit, and switches on within 1–5 minutes of wetting (Palmqvist 2000, ABS; Bhatt et al. 2024, FT). The carbon share passed to the fungus is not quantified.
+- **Rock to soil:** lichens turn rock into a nascent soil by hyphae, wet-dry swelling and pH, with no rate in any source read (Jung et al. 2020, FT; Marques et al. 2016, ABS: "contradictory").
+- **Usnic acid** raised *Metarhizium* and *Beauveria* deaths in insect larvae (Duisembecov et al. 2017; Kryukov et al. 2018; both ABS).
+- **Ants:** red wood ants carry lichen fragments to their mounds (Heinken et al. 2007, ABS).
+- **Not found:** *Metarhizium* as a lichen fungus. The partnership is **design**.
+
+**The problem.** Nothing on the map is a plant, an alga, light or water. Rock is permanent and closed to hyphae (`enterable`). Every income comes through ants: hosts, corpses, or ground they walk.
+
+**Decisions.**
+- **Owner (2026-11-22, §85):**
+  - a special lichen partner that uses rock, breaks it down and spreads across it;
+  - contact with an alga as the trigger.
+- **Owner (2026-11-23, shown the literature above):**
+  - All four groups go into the epic: partner and crust on rock, light income, rock to soil, and the bitter crust and ant carriers last.
+  - Partners come from both scarce alga films on rock edges and wild lichens to overgrow.
+  - Weathering opens rock to the hyphae first. Rock the ants can dig is a later step, behind its own assay.
+- **Owner (2026-11-24, on the review of #377):** ants meet a lichen from the next cell (beside), as a hypha meets an alga; the crust stays on rock, so ants can't dig it away.
+- **Proposed:**
+  - Contact, spread, light and weathering are body, not choice (no Jev situation field).
+  - Light income goes to the free pool (§85 M3), capped by the crust's area.
+  - Every rate is design, set from the assay.
+
+**The mechanic.** Each milestone is a PR behind a setting whose off is main bit for bit:
+- **L1:** alga films and wild lichens in world generation. A free-pool `lichen` trait lets a hypha beside one turn the alga's rock cell into a lichen, which grows one rock cell from its rim every interval. An overgrown wild lichen is captured.
+- **L2:** lichen cells in light (the plane, and curtain cells beside the sky) feed the free pool.
+- **L3a:** rock under an old lichen becomes ground the hyphae enter.
+- **L3b:** that rock becomes soil the ants dig.
+- **L4:** a bitter crust; an ant beside a lichen cell loses resistance.
+- **L5:** an ant beside a lichen cell may scrape a fragment, carry it, and start a lichen where it drops it.
+
+A table of cue, response, rule and off is in the note. No rule reads state the fungus or an ant could not sense: there is a new fungus contact row in `vision.md`'s sense table, and no gap row.
+
+**Play.**
+- **New things on the map:** green films and grey-green wild lichens on rocks, a crust creeping over rock, rock opening.
+- **A free-pool line** (lichen, light, weathering, bitter crust) against the ants pool's lethal levers.
+- **A slow, host-free income** the colonies can't dig away.
+- **With L5,** the colonies carry the lichen themselves.
+- **Risks:** a host-free runaway, a cliff when lichen appears, and new routes between nests (L3b).
+
+**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): `progression.mjs` reports time to first lichen, lichen cells, growth from light and weathered cells. Then for each milestone:
+- **P1** by the worst seed on 1–20 (§63.4).
+- **Runaway check:** mutations per minute in minutes 8–10 against L1, for L2.
+- **Routes:** A3 (mills) and raid times against baseline, for L3b.
+- **Runaway infection:** time to half of hosts, for L4.
+
+**Cost (estimated).** None in Jev: no lane changes, and cached games spend nothing. The parked growth-lane value `resource: alga` (`ja-5ush`) would take the lane's 96 situations to 144 (tokens to measure) and is not planned.
+
+**Beads.** `ja-vlla.11` (this, child of `ja-vlla`; from `ja-vlla.8`, closed). Children:
+- `.1` research full texts;
+- `.2` assay;
+- `.3` L1 partner and crust;
+- `.4` L2 light;
+- `.5` L3a rock to hyphae;
+- `.6` L3b rock to ants;
+- `.7` L4 bitter crust;
+- `.8` L5 ant carriers;
+- `.9` Learn entries and drawings.
+
+Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the lichen as a refuge `ja-g8zo`, growth forms `ja-419b`, tips steered to an alga `ja-5ush`.
+
+**Still open.**
+- **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; whether the trait needs the borer or the web first.
+- **To read:** the sources marked unverified (`.1`).
