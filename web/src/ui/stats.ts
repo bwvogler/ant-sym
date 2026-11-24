@@ -131,7 +131,8 @@ function seenTogether(colonies: readonly Colony[]): number {
   return n;
 }
 
-function side(c: Colony, fungus: Fungus): SideStats {
+/** One colony's line in the panel, read off it now (the fog keeps one per known colony: fog/known.ts). */
+export function sideOf(c: Colony, fungus: Fungus): SideStats {
   const f = fungus.census(c);
   return {
     population: c.population,
@@ -189,7 +190,7 @@ export function statsOf(game: Game, rate: number, pace: number): ColonyStats {
     choicesPerSecond: rate,
     situationsSeen: seenTogether(game.colonies),
     situations: situationsOf(game.colonies),
-    sides: game.colonies.map((c) => side(c, game.fungus)),
+    sides: game.colonies.map((c) => sideOf(c, game.fungus)),
     fallen: game.fallen(),
     outcome: game.outcome(),
     sporeCells: game.fungus.shownSporeCells,

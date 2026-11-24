@@ -6,7 +6,10 @@ import { docUrl, guideFor, guideNote, NOTES, type GuideEntry } from "./guide.ts"
 import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import { asOf, isKnown } from "./fog/knownView.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
+import type { SideStats } from "./stats.ts";
 import { css, ROLE_RGB } from "./palette.ts";
 import Segmented from "./Segmented.tsx";
 import { forgetSeen, markViewed, setShowAll, useCodex } from "./useCodex.ts";
@@ -21,6 +24,8 @@ interface Props {
   colonies: readonly Colony[];
   /** the game: its species (which guide entries apply) and its colonies' nests */
   game: Game;
+  /** under the fog of war: the colonies the fungus knows (null: all); the nest tab shows only those, as last known where no host is in them */
+  known?: KnownColonies<SideStats> | null;
 }
 
 const TABS: [Exclude<LearnTab, "policy">, string][] = [
@@ -242,7 +247,9 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 
 function NestTab(props: Props & { focus?: string }) {
   useSimTick(500);
-  const views = props.colonies.map((c) => nestView(c));
+  const known = props.known ?? null;
+  // Under the fog a colony the fungus does not know has no card, and one it knows but has no host in shows its last known numbers, not the chamber table.
+  const views = props.colonies.map((c, k) => (isKnown(known, k) && (!known || known.get(k)?.live) ? nestView(c) : null));
   return (
     <div className="flex flex-col gap-3">
       <p className="rounded-md bg-accent-soft px-3 py-2 text-xs text-accent">
@@ -252,9 +259,11 @@ function NestTab(props: Props & { focus?: string }) {
           What an ant can sense
         </a>
       </p>
-      {views.every((v) => v === null) ? (
+      {views.every((v) => v === null) && !(known && known.list().length) ? (
         <section className={card}>
-          <p className="text-[13px]">No nest to look into: no colony has a nest underground.</p>
+          <p className="text-[13px]">
+            {known ? "No nest known yet: the fungus has sensed none." : "No nest to look into: no colony has a nest underground."}
+          </p>
         </section>
       ) : (
         <>
@@ -286,9 +295,33 @@ function NestTab(props: Props & { focus?: string }) {
             </p>
           </section>
           {views.map((v, k) => (v ? <NestCard key={k} k={k} v={v} focus={props.focus} /> : null))}
+          {known &&
+            props.colonies.map((_, k) => {
+              const e = known.get(k);
+              return e && !e.live ? <LastKnownNest key={`known-${k}`} k={k} at={e.asOf} now={props.game.time} side={e.readout} /> : null;
+            })}
         </>
       )}
     </div>
+  );
+}
+
+/** A colony the fungus knows but has no host in: only what it last knew (docs/fog-of-war.md §4.4), no chamber table. */
+function LastKnownNest({ k, at, now, side }: { k: number; at: number; now: number; side: SideStats | null }) {
+  return (
+    <section className={card}>
+      <h3 className="font-medium">
+        <span className={colonyTone(k)}>{colonyName(k)}</span> nest
+      </h3>
+      {side ? (
+        <p className="mt-1 font-mono text-xs text-fg-2">
+          {asOf(now, at)}: queen {side.queen === "alive" ? "alive" : side.queen === "lost" ? "dead (orphaned)" : "—"} · brood{" "}
+          {side.brood.join(" / ")} (eggs / larvae / pupae) · {side.population} ants
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-fg-3">The nest is known; no host of yours has been in it, so nothing of what is inside.</p>
+      )}
+    </section>
   );
 }
 

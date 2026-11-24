@@ -14,6 +14,8 @@ import {
 } from "../colony/index.ts";
 import { BODY_EVERY, bodySight, hostSight } from "./fog/observers.ts";
 import type { CorpseMemory } from "./fog/corpses.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import type { SideStats } from "./stats.ts";
 import type { Knowledge } from "./fog/knowledge.ts";
 import { decayStage } from "./cadaverVisual.ts";
 
@@ -50,6 +52,8 @@ export class SensedMap {
   knowledge: Knowledge | null = null;
   /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog */
   corpses: CorpseMemory | null = null;
+  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog */
+  known: KnownColonies<SideStats> | null = null;
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */
@@ -98,6 +102,7 @@ export class SensedMap {
       bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
     }
     if (this.knowledge) this.corpses?.update(game, this.knowledge, decayStage);
+    if (this.knowledge) this.known?.update(game, this.knowledge);
     this.#forget();
   }
 

@@ -1,5 +1,7 @@
 import type { Game } from "../../colony/index.ts";
+import { sideOf } from "../stats.ts";
 import { CorpseMemory } from "./corpses.ts";
+import { KnownColonies } from "./known.ts";
 import { Knowledge, type Source } from "./knowledge.ts";
 import { SensedMap } from "../fungusSight.ts";
 
@@ -33,6 +35,7 @@ export function sensedFor(game: Game, fog: boolean): SensedMap {
   if (fog) {
     s.knowledge = new Knowledge(s, groundSources(game));
     s.corpses = new CorpseMemory();
+    s.known = new KnownColonies((c, g) => sideOf(c, g.fungus));
   }
   return s;
 }

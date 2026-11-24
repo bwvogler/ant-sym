@@ -35,6 +35,9 @@ import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
 import { canFollow, type Followed } from "./ui/follow.ts";
+import type { KnownColonies } from "./ui/fog/known.ts";
+import { asOf, endingKnown, knownCodexStats, knowsAll, knownSides } from "./ui/fog/knownView.ts";
+import type { SideStats } from "./ui/stats.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
@@ -172,7 +175,9 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     [onFrame, game, history],
   );
   // The Codex (PRD §69.4): guide entries open as the game first shows what they are about; the rail's Codex says how many are new.
-  useCodexWatch(game, onFrame, loop.stats);
+  // The Codex counts the deaths and the odours of the colonies the fungus knows (docs/fog-of-war.md §5.3).
+  const codexStats = useCallback(() => knownCodexStats(loop.stats(), sensed.known), [loop, sensed]);
+  useCodexWatch(game, onFrame, codexStats);
   const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
@@ -344,7 +349,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   };
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
-  useNotices(loop, affordable, jevLock, jevPhase);
+  useNotices(loop, affordable, jevLock, jevPhase, sensed.known);
   const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : belowLayer) : -1;
   // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
@@ -474,7 +479,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             >
               <SimClock className="mr-2 font-mono text-fg-3 tabular-nums sm:hidden" />
               <SlowBadge playing={controls.playing} speed={controls.speed} />
-              <GoalLine />
+              <GoalLine known={sensed.known} />
             </div>
             <Notices />
           </div>
@@ -532,7 +537,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
 
         {drawer === "fungus" && (
           <Drawer label="the fungus" title="The fungus" onClose={closeDrawer}>
-            <FungusStatus />
+            <FungusStatus known={sensed.known} />
             <Aim />
             <AimLockNote />
           </Drawer>
@@ -625,7 +630,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
           />
         )}
 
-        <LearnDrawer colonies={game.colonies} game={game} />
+        <LearnDrawer colonies={game.colonies} game={game} known={sensed.known} />
         <LensLayer
           on={lensOn}
           colonies={game.colonies}
@@ -829,8 +834,8 @@ function SlowBadge({ playing, speed, wide = false }: { playing: boolean; speed: 
 }
 
 /** The top bar's line of where the game stands. */
-function GoalLine() {
-  return <span className="truncate">{useStats(goalLine)}</span>;
+function GoalLine({ known }: { known: KnownColonies<SideStats> | null }) {
+  return <span className="truncate">{useStats((s) => goalLine(s, known))}</span>;
 }
 
 /** The fungus's body and its mutations, or that it has not landed. */
@@ -846,35 +851,44 @@ function affordableIn(s: ColonyStats | null, menu: readonly string[]): boolean {
 }
 
 /** Where the fungus is, and how far the colonies have come together. */
-function FungusStatus() {
+function FungusStatus({ known }: { known: KnownColonies<SideStats> | null }) {
   const stats = useStats(wholeStats);
   if (!stats) return null;
+  const rows = knownSides(stats, known);
   return (
     <div className="flex flex-col gap-2" aria-label="infection">
       <SectionHead>
         In the colonies <Help to={{ tab: "guide", id: "fungus" }} label="the fungus" />
       </SectionHead>
-      {stats.sides.map((s, k) => (
-        <div key={k}>
-          <div className="flex items-baseline justify-between text-xs">
-            <span className={colonyTone(k)}>in the {colonyName(k)} colony</span>
-            <span className="font-mono text-spore tabular-nums">{Math.round(100 * s.infected)}%</span>
+      {known && rows.length === 0 && <p className="text-xs text-fg-3">No colony known yet: the fungus has sensed no nest.</p>}
+      {rows.map(({ k, side: s, live, asOf: at }) =>
+        s === null ? (
+          <p key={k} className="text-xs text-fg-3">
+            <span className={colonyTone(k)}>the {colonyName(k)} colony</span>: its nest is known; no host has been in it yet.
+          </p>
+        ) : (
+          <div key={k}>
+            <div className="flex items-baseline justify-between text-xs">
+              <span className={colonyTone(k)}>in the {colonyName(k)} colony</span>
+              <span className="font-mono text-spore tabular-nums">{Math.round(100 * s.infected)}%</span>
+            </div>
+            {!live && <p className="text-[11px] text-fg-3">{asOf(stats.time, at)}: no host of yours is in it now</p>}
+            <Bar value={s.infected} thin />
+            {s.queen !== null && (
+              <p className="mt-0.5 text-[11px] text-fg-3">
+                {s.queen === "lost" ? (
+                  "its queen is dead"
+                ) : s.queenLoad >= 0.05 ? (
+                  <span className="text-spore">in its queen: {Math.round(100 * s.queenLoad)}%</span>
+                ) : (
+                  "its queen is clean"
+                )}
+              </p>
+            )}
           </div>
-          <Bar value={s.infected} thin />
-          {s.queen !== null && (
-            <p className="mt-0.5 text-[11px] text-fg-3">
-              {s.queen === "lost" ? (
-                "its queen is dead"
-              ) : s.queenLoad >= 0.05 ? (
-                <span className="text-spore">in its queen: {Math.round(100 * s.queenLoad)}%</span>
-              ) : (
-                "its queen is clean"
-              )}
-            </p>
-          )}
-        </div>
-      ))}
-      {stats.sides.length > 1 && (
+        ),
+      )}
+      {stats.sides.length > 1 && knowsAll(known, stats.sides.length) && (
         <div aria-label="unity">
           <div className="flex items-baseline justify-between text-xs">
             <span className="flex items-center gap-1.5">
@@ -991,8 +1005,10 @@ function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: str
 }
 
 /** The top bar's one line: where the game stands. Goals proper come with the game's chapters (ja-lo8.5). */
-function goalLine(stats: ColonyStats | null): string {
+function goalLine(stats: ColonyStats | null, known: KnownColonies<SideStats> | null = null): string {
   if (!stats) return "";
+  // Under the fog an ending is news only about colonies the fungus knows.
+  if (!endingKnown(stats, known)) return goalLine({ ...stats, outcome: "playing" }, known);
   if (stats.outcome === "fallen") return `The ${colonyName(stats.fallen)} colony is gone: there is no one left to unite it with.`;
   if (stats.outcome === "unified")
     return "One colony: the nests smell alike, their ants have met, and nobody has died fighting for a minute.";
@@ -1001,7 +1017,7 @@ function goalLine(stats: ColonyStats | null): string {
 }
 
 /** Notices for what changed: the game's outcome, and Jev's state where it locks the policies. */
-function useNotices(loop: GameLoop, affordable: boolean, lock: string | null, phase: string): void {
+function useNotices(loop: GameLoop, affordable: boolean, lock: string | null, phase: string, known: KnownColonies<SideStats> | null): void {
   // The page draws again when the outcome or the chapter changes, not on every tick: the text is read from the stats then.
   const outcome = useLoopStats(loop, outcomeOf);
   const seenOutcome = useRef(outcome);
@@ -1009,8 +1025,11 @@ function useNotices(loop: GameLoop, affordable: boolean, lock: string | null, ph
     if (outcome === seenOutcome.current) return;
     seenOutcome.current = outcome;
     // The game's end shows even when the player has asked for important notices only.
-    if (outcome !== "playing") pushToast(goalLine(loop.stats()), outcome === "unified" ? "good" : "warn", { important: true });
-  }, [outcome, loop]);
+    // Under the fog the toast waits for the fungus to know the colonies it is about (goalLine says nothing of an ending it does not know).
+    const stats = loop.stats();
+    if (outcome !== "playing" && stats && endingKnown(stats, known))
+      pushToast(goalLine(stats, known), outcome === "unified" ? "good" : "warn", { important: true });
+  }, [outcome, loop, known]);
   // A new chapter is worth a notice.
   const chapter = useLoopStats(loop, chapterNameOf);
   const seenChapter = useRef(chapter);
