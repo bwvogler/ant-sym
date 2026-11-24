@@ -189,9 +189,11 @@ test("the game's save holds every private field it declares, or the field is bui
   const derived = ["piles"]; // the food piles as the world began: from the fresh world
   const fromPage = ["choice"]; // the Lab's setChoice (ja-nan3): not saved, the page sets it again on every game, a load included
   const fromSpecs = ["firstAnts"]; // colony 0's start count: from the specs the game was built with, as the page rebuilds it (docs/game-colonies.md)
+  const fromParams = ["recognition"]; // the recognition parameters every layer's Recognition is made from: the params the game was built with (a line made mid-game builds one more)
+  const onlyWhenSet = ["frozen"]; // the colonies asleep (Game.freeze): in `private` only when one sleeps, so a game that freezes nothing saves as it always has
   assert.deepEqual(
     [...declared].sort(),
-    [...inPrivate, ...inGrids, ...derived, ...fromPage, ...fromSpecs].sort(),
+    [...inPrivate, ...inGrids, ...derived, ...fromPage, ...fromSpecs, ...fromParams, ...onlyWhenSet].sort(),
     "every declared #field is accounted for",
   );
   const s = build(2).save();

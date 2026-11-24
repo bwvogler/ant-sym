@@ -3,15 +3,15 @@ import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
-import { growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
+import { generateCurtain, growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Line, nearestValidIn } from "./lines.ts";
-import { cellAt, type Cell, type End, outward } from "./transect.ts";
+import { clampCol, hash01, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
+import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -129,7 +129,14 @@ export interface Founding {
    * One world (U4b): where the founding went, nearestValid's hole on the plane and the end of the line it grew (Game.addColony
    * records it; x and y stay the landing point). A save's re-founding grows the line there again (oneWorld.ts growWorld).
    */
-  spot?: { end: End; cell: Cell; /** the line it grew (absent: the first, the only one until the endless world) */ line?: number };
+  spot?: {
+    end: End;
+    cell: Cell;
+    /** the line it grew (absent: the first, the only one until the endless world) */
+    line?: number;
+    /** it began a line of its own along this heading (radians): `line` is that line, made by the founding (Game.addLine) */
+    newLine?: { heading: number };
+  };
 }
 
 /** A saved game (Game.save): JSON. */
@@ -167,7 +174,13 @@ export interface GameSave {
    * One world (U4b): its seed, the line as saved (its holes, V₀'s column and the margin: a check, since load grows the
    * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
    */
-  world: { seed: number; line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown };
+  world: {
+    seed: number;
+    line: { holes: Cell[]; s0: number; margin: number };
+    curtain: unknown;
+    /** the lines after the first (docs/endless-world.md §8): absent in a game of one line */
+    more?: { line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown }[];
+  };
   private: {
     fightDeaths: number;
     lastFightDeath: number;
@@ -177,6 +190,8 @@ export interface GameSave {
     regrowClock: number;
     rng: number | null;
     regrowRng: number | null;
+    /** the colonies asleep, by index (Game.freeze); absent when none is */
+    frozen?: number[];
   };
 }
 
@@ -332,6 +347,8 @@ export class Game {
   readonly recognition: Recognition;
   /** each layer's recognition, built from the ants on it: `recognition` is layer 0's */
   #recs: Recognition[];
+  /** the recognition parameters every layer's Recognition is made from (a line that begins mid-game makes one more) */
+  #recognition: Partial<RecognitionParams>;
   params: GameParams;
   time = 0;
   /** each layer's occupancy, per colony: [layer][colony] */
@@ -396,6 +413,7 @@ export class Game {
     // names one. Every colony of a game is its species, so the game takes it from there.
     const tol = this.params.species.params.tolerance;
     const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
+    this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
     // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
@@ -514,8 +532,71 @@ export class Game {
     });
   }
 
+  /** The colonies asleep, by index (freeze, docs/endless-world.md §6): not stepped, not met, not read by the fungus. Empty in every game that freezes nothing. */
+  #frozen = new Set<number>();
+
+  /**
+   * Put colony k to sleep (E4.1): its ants, its scent on every layer and its curtain stop where they are. Its ants leave the occupancy grids and the
+   * fights, the recognition and the fungus's reading of ants; a curtain whose colonies are all asleep is not stepped by the fungus (its spores do not
+   * fade, its hyphae do not grow). Nothing here decides when: that is the awake rule (E4.2). The camera never freezes anything.
+   */
+  freeze(k: number): void {
+    if (!this.colonies[k]) throw new Error(`freeze: no colony ${k}`);
+    this.#frozen.add(k);
+    this.#syncFrozen();
+    this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
+  }
+
+  /** Wake colony k: it steps again from exactly where it stopped. */
+  thaw(k: number): void {
+    this.#frozen.delete(k);
+    this.#syncFrozen();
+    this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
+  }
+
+  /** Whether colony k is asleep. */
+  isFrozen(k: number): boolean {
+    return this.#frozen.has(k);
+  }
+
+  /** The colonies awake, in order: the whole list when none sleeps (the same array, so nothing is copied). */
+  #awake(): Colony[] {
+    return this.#frozen.size ? this.colonies.filter((_, k) => !this.#frozen.has(k)) : this.colonies;
+  }
+
+  /** A per-colony list (a layer's grids) without the sleeping colonies' entries, aligned with `#awake()`. */
+  #awakeOf(perColony: CountGrid[]): CountGrid[] {
+    return this.#frozen.size ? perColony.filter((_, k) => !this.#frozen.has(k)) : perColony;
+  }
+
+  /** The fungus leaves alone a curtain whose colonies are all asleep: the plane is shared, and never is. */
+  #syncFrozen(): void {
+    const layers = new Set<number>();
+    this.layers.forEach((_, l) => {
+      if (l === PLANE) return;
+      const on = this.colonies.flatMap((c, k) => (c.home === l ? [k] : []));
+      if (on.length > 0 && on.every((k) => this.#frozen.has(k))) layers.add(l);
+    });
+    this.fungus.frozenLayers = layers;
+    // The hosts among the sleepers stay counted (their ants do not change while they sleep), so the fungus keeps stepping and wakes them in step.
+    let hosts = 0;
+    for (const k of this.#frozen) {
+      const c = this.colonies[k];
+      if (c) for (let i = 0; i < c.n; i++) if (c.alive[i] && (c.load[i] as number) > 0) hosts++;
+    }
+    this.fungus.hostsAsleep = hosts;
+  }
+
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
+
+  /**
+   * Whether a founding far from every hole starts a line of its own (the founding rule's rule 1, lines.ts): off in the bounded game, where a
+   * line only grows at its ends; the endless world turns it on (E6).
+   */
+  newLines = false;
+  /** The wild sites' reserved lines, which no founding may come within a unit of or grow across (lines.ts): none in the bounded game. */
+  sites: Reserved[] = [];
 
   /** How every colony's ants draw their mode from Jev's probabilities (the Lab, ja-nan3): set by setChoice, given to colonies founded later too. */
   #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll" | "steerLane">> = {};
@@ -575,7 +656,7 @@ export class Game {
       odour: mother.nestOdour,
       mother: f.mother,
       reserve: f.food,
-      spot: { cell: s.cell, end: s.end, line: s.line },
+      spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}),
     });
   }
@@ -592,15 +673,45 @@ export class Game {
   settleAt(
     p: { x: number; y: number },
     ground?: (x: number, y: number) => boolean,
-  ): { ok: true; cell: Cell; end: End; line: number } | { ok: false; reason: string } {
+  ): { ok: true; cell: Cell; end: End; line: number; newLine?: { heading: number } } | { ok: false; reason: string } {
     cellOf(p.x, p.y);
-    // The founding rule over the world's lines (lines.ts), with new lines off: a game of one line grows its ends exactly as transect.ts nearestValid
-    // says (the endless world turns them on, E6).
+    // The founding rule over the world's lines (lines.ts). With new lines off (`newLines`, the bounded game), a game of one line grows its ends exactly as
+    // transect.ts nearestValid says. A landing that starts a line gets the index that line will have, `end: "end"` (it has one hole) and its heading,
+    // which is drawn from the seed and the landing cell, never from the game's stream.
     const lines: Line[] = this.world.lines.map((l) => ({ transect: l.line, salt: l.salt }));
-    const s = nearestValidIn(lines, [], { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(this.world), 0, { newLines: false });
-    return s && s.founding.kind === "grow"
+    const seed = this.world.seed;
+    const s = nearestValidIn(
+      lines,
+      this.sites,
+      { x: CELL[0], y: CELL[1] },
+      FOUND_RADIUS,
+      ground ?? mainGround(this.world),
+      (c) => hash01(seed, 100, c.x, c.y) * Math.PI,
+      { newLines: this.newLines },
+    );
+    if (!s) return { ok: false, reason: NO_ROOM };
+    return s.founding.kind === "grow"
       ? { ok: true, cell: s.cell, end: s.founding.end, line: s.founding.line }
-      : { ok: false, reason: NO_ROOM };
+      : { ok: true, cell: s.cell, end: "end", line: this.world.lines.length, newLine: { heading: s.founding.heading } };
+  }
+
+  /**
+   * A line that begins mid-game: one hole at plane `cell`, its margins along `heading`, its curtain dug from the line's own seed (the hole's nest is
+   * the curtain's first and only), its nest on the plane, and the game's layers in step: the layer, every colony's occupancy on it, its recognition and
+   * the fungus's spores and hyphae. Returns the line's index. The colony that lives there is made by addColony.
+   */
+  #addLine(cell: Cell, heading: number): number {
+    const world = this.world;
+    const salt = lineSalt(world.seed, cell, false);
+    const line = makeTransect([cell], { heading });
+    const curtain = generateCurtain(lineSeed(world.seed, salt), line);
+    world.lines.push({ line, curtain, salt });
+    world.plane.nests.push({ x: centreX(cell.x, cell.y), y: centreY(cell.y), r: 3 });
+    this.layers.push(curtain);
+    this.#grids.push(this.colonies.map(() => new CountGrid()));
+    this.#recs.push(new Recognition(this.#recognition));
+    this.fungus.addLayer(curtain);
+    return world.lines.length - 1;
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -666,13 +777,22 @@ export class Game {
       // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
       const s = this.settleAt(f);
       if (s.ok === false) throw new Error(`addColony: ${s.reason}`);
-      spot = { cell: s.cell, end: s.end, line: s.line };
+      spot = { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-    const li = spot.line ?? 0;
+    if (spot.newLine) {
+      // An explicit spot (one settleAt gave and was held across another founding, or made by hand) is checked again: it must still begin the next line,
+      // and no line may already have a hole at its cell.
+      if (spot.line !== undefined && spot.line !== world.lines.length)
+        throw new Error(`addColony: the spot begins line ${spot.line}, and the world's next line is ${world.lines.length}`);
+      if (world.lines.some((l) => l.line.holes.some((h) => h.x === spot!.cell.x && h.y === spot!.cell.y)))
+        throw new Error(`addColony: a line already has a hole at ${spot.cell.x},${spot.cell.y}`);
+    }
+    // A landing that begins a line makes the line (its curtain's first nest is the colony's); else the line it grows.
+    const li = spot.newLine ? this.#addLine(spot.cell, spot.newLine.heading) : (spot.line ?? 0);
     const wl = world.lines[li] as WorldLine;
     // `at` is the colony's index among its curtain's nests (its line's); its index among the plane's is `k`.
-    const at = growWorld(world, spot.end, spot.cell, li);
+    const at = spot.newLine ? 0 : growWorld(world, spot.end, spot.cell, li);
     // A save's nest is the one dug then (growWorld digs the same one: from the stream keyed by its hole).
     if (f.nest) wl.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
     const nest = wl.curtain.nests[at] as Nest;
@@ -706,11 +826,17 @@ export class Game {
     for (const g of this.#grids) g.push(new CountGrid());
     this.founded.push({
       ...f,
-      spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y }, ...(spot.line ? { line: spot.line } : {}) },
+      spot: {
+        end: spot.end,
+        cell: { x: spot.cell.x, y: spot.cell.y },
+        ...(li ? { line: li } : {}),
+        ...(spot.newLine ? { newLine: { heading: spot.newLine.heading } } : {}),
+      },
       nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) },
     });
     this.#wire();
     this.#refresh();
+    this.#syncFrozen();
     const q = c.queen;
     if (f.fungus && f.fungus.load > 0 && q) {
       q.load = Math.min(1, f.fungus.load);
@@ -743,7 +869,7 @@ export class Game {
         ...at,
         antCount,
         odour: (this.colonies[0] as Colony).nestOdour,
-        spot: { cell: s.cell, end: s.end, line: s.line },
+        spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       }),
     };
   }
@@ -831,9 +957,11 @@ export class Game {
 
   /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
   #refresh(): void {
+    const awake = this.#awake();
     this.#grids.forEach((grids, l) => {
-      this.colonies.forEach((c, k) => occupancy(c, grids[k] as CountGrid, l));
-      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(this.colonies, l);
+      // A colony asleep has no ants anyone can meet: its occupancy is empty.
+      this.colonies.forEach((c, k) => (this.#frozen.has(k) ? (grids[k] as CountGrid).reset() : occupancy(c, grids[k] as CountGrid, l)));
+      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(awake, l);
     });
   }
 
@@ -899,7 +1027,7 @@ export class Game {
   #meet(dt: number): void {
     const live: number[] = [];
     this.colonies.forEach((c, k) => {
-      if (!Game.beaten(c)) live.push(k);
+      if (!Game.beaten(c) && !this.#frozen.has(k)) live.push(k);
     });
     const keep = Math.exp(-dt / QUIET);
     const tol = this.recognition.params.tolerance;
@@ -961,8 +1089,10 @@ export class Game {
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
-    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(this.colonies) : undefined;
-    for (const c of this.colonies) c.tick(dt, attackCue);
+    // The colonies asleep (freeze) are not stepped: their ants, scent and curtains stand as they were; no one meets them. With none asleep this is the whole list.
+    const awake = this.#awake();
+    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(awake) : undefined;
+    for (const c of awake) c.tick(dt, attackCue);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;
@@ -981,7 +1111,7 @@ export class Game {
       // Fights on each layer, among the ants there.
       let died = 0;
       this.#grids.forEach((grids, l) => {
-        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
+        died += resolveFights(awake, this.#awakeOf(grids), dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
           (x, y) => x + y,
           0,
         );
@@ -992,7 +1122,7 @@ export class Game {
         this.#haveMet = false;
       }
       // Odours: the gestalt at each nest, and blending where the fungus runs it.
-      this.recognition.advance(this.colonies, dt);
+      this.recognition.advance(awake, dt);
       // Whether the colonies meet as allies (unity, ja-i0f): read after odours move, from this tick's occupancy.
       this.#meet(dt);
     }
@@ -1005,7 +1135,7 @@ export class Game {
     });
     if (this.fungus.active) {
       const recs = this.colonies.length > 1 ? this.#recs : null;
-      this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
+      this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
@@ -1136,9 +1266,6 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
-    // A save holds the first line and its curtain: another line would be lost without a word (saves hold the lines: E3.4).
-    if (this.world.lines.length > 1)
-      throw new Error(`save: this world has ${this.world.lines.length} lines, and a save holds one (docs/endless-world.md §8, E3.4)`);
     // A map without its nests: the world (or a re-founding) makes them.
     const bare = (m: WorldMap) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== "nests" && k !== "nest"));
     const map = bare(this.map);
@@ -1166,6 +1293,15 @@ export class Game {
         seed: world.seed,
         line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin },
         curtain: encode(bare(world.curtain)),
+        // The lines after the first, each as the first is (holes, V₀'s column, margin, and its curtain as dug): a game of one line saves exactly as it always has.
+        ...(world.lines.length > 1
+          ? {
+              more: world.lines.slice(1).map((l) => ({
+                line: { holes: l.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: l.line.sHole[0]!, margin: l.line.margin },
+                curtain: encode(bare(l.curtain)),
+              })),
+            }
+          : {}),
       },
       private: {
         fightDeaths: this.#fightDeaths,
@@ -1176,6 +1312,8 @@ export class Game {
         regrowClock: this.#regrowClock,
         rng: (this.#rng as Partial<Rng>).state ?? null,
         regrowRng: this.#regrowRng?.state ?? null,
+        // Only when a colony sleeps: a game that freezes nothing saves as it always has.
+        ...(this.#frozen.size ? { frozen: [...this.#frozen].sort((a, b) => a - b) } : {}),
       },
     };
   }
@@ -1201,9 +1339,19 @@ export class Game {
     for (const f of saved.founded ?? []) this.addColony(f);
     // The line grown again must be the one saved: else the curtain poured below would lie under another line.
     const line = world.line;
-    const same =
-      line.holes.length === sw.line.holes.length && line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
-    if (!same || line.sHole[0] !== sw.line.s0 || line.margin !== sw.line.margin) throw new Error("save: another world's line");
+    const sameLine = (t: Transect, sl: { holes: Cell[]; s0: number; margin: number }): boolean =>
+      t.holes.length === sl.holes.length &&
+      t.holes.every((c, k) => c.x === sl.holes[k]?.x && c.y === sl.holes[k]?.y) &&
+      t.sHole[0] === sl.s0 &&
+      t.margin === sl.margin;
+    if (!sameLine(line, sw.line)) throw new Error("save: another world's line");
+    // The lines a founding began are made again by the foundings above (a line that began is a spot with `newLine`); they must be the ones saved.
+    const more = sw.more ?? [];
+    if (world.lines.length !== 1 + more.length)
+      throw new Error(`save: ${1 + more.length} lines, this game's world has ${world.lines.length}`);
+    more.forEach((m, k) => {
+      if (!sameLine((world.lines[k + 1] as WorldLine).line, m.line)) throw new Error(`save: another world's line ${k + 1}`);
+    });
     if (saved.colonies.length !== this.colonies.length)
       throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
@@ -1218,6 +1366,11 @@ export class Game {
     fillLike(this.map, saved.map);
     qualityLike(world.curtain, sw.curtain);
     fillLike(world.curtain, sw.curtain);
+    more.forEach((m, k) => {
+      const curtain = (world.lines[k + 1] as WorldLine).curtain;
+      qualityLike(curtain, m.curtain);
+      fillLike(curtain, m.curtain);
+    });
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
     this.colonies.forEach((c, k) => {
       const t = this.colonies[saved.raids[k] ?? -1];
@@ -1235,6 +1388,8 @@ export class Game {
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
+    this.#frozen = new Set(p.frozen ?? []);
+    this.#syncFrozen();
     // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
     if (

@@ -127,7 +127,7 @@ Rule 2's clearance holds between lines as well as within one: no new segment or 
 
 **Flights lengthen on the endless plane** (owner, 2026-11-13). `FLIGHT_2D` = 140 was set by the bounded plane, whose edges failed half the flights at shorter ranges ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game), proposal 1). At 140 a daughter lands exactly `NEW_LINE_GAP` from her mother's hole, which lies on her mother's line, so she could never start a line of her own. **Proposed:** about 2 U (280 cells) to start, towards the 5 U or more real queens fly, set at E6 by `scripts/lab/flight-failure.mjs` on the endless plane. The founding radius is rechecked there too.
 
-**A line of one hole** takes its margins' heading from `outward` (`transect.ts:62`: west at the start, east at the end). Drawing the heading from the seed instead (a wild colony's from its site's hash, a founding's from the game's stream) is a choice, made in E3, so a field of lines doesn't all run east–west. The line grows from either end when a daughter lands beyond it.
+**A line of one hole** takes its margins' heading from `outward` (`transect.ts:62`: west at the start, east at the end). The heading is drawn instead, so a field of lines doesn't all run east–west: a wild colony's from its site's hash, a founding's from the world's seed and the landing cell (`hash01(seed, 100, cell) · π`, E3.3b), never from the game's stream, so the same world and landing make the same line. The line grows from either end when a daughter lands beyond it.
 
 **A wild colony starts its own line** (rule 1), placed when the colony wakes. Its site is chosen so that the rule holds against the start line and its neighbours' sites, with margins as wide as one-world's.
 
