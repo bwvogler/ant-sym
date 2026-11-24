@@ -4,7 +4,7 @@ import { type Colony, type Layer } from "./colony.ts";
 import { ENEMY } from "./vocab.ts";
 import { CELL, cellKey, centreX, centreY, discOffsets } from "./hex.ts";
 import { BINS, binCentre, binOf, STRANGER_EPS, SumGrid, type Recognition } from "./recognition.ts";
-import { blocked, clampCol, inBounds, type Bounds } from "./world.ts";
+import { blocked, clampCol, clampRow, inBounds, type Bounds } from "./world.ts";
 import { touch } from "./sense.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
@@ -118,11 +118,10 @@ export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid
   const on = layer < 0 ? null : colony.layers[layer];
   if (layer >= 0 && !on) return out; // a curtain of another line: this colony has no ants there
   const map = (on ?? colony).map;
-  const h = map.size.h;
   for (let i = 0; i < colony.n; i++) {
     if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
     colony.antCell(i);
-    out.add(clampCol(map, CELL[0]), Math.min(h - 1, Math.max(0, CELL[1])));
+    out.add(clampCol(map, CELL[0]), clampRow(map, CELL[1]));
   }
   return out;
 }
@@ -279,7 +278,7 @@ export function resolveFights(
       if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       c.antCell(i);
       const cx = clampCol(map, CELL[0]);
-      const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
+      const cy = clampRow(map, CELL[1]);
       let enemies = 0;
       if (buckets && distance !== undefined) {
         enemies = distancePressure(buckets, c, k, i, cx, cy, map, rec !== null, distance);

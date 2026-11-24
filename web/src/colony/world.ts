@@ -305,6 +305,17 @@ export function clampCol(map: Bounds, x: number): number {
   return Math.min(map.x0 + map.size.w - 1, Math.max(map.x0, x));
 }
 
+/** The first row ants may use: the curtain's `surfaceRows`, else 0; an endless plane has rows above 0 too (PRD §66 E6.0.2), so none is too high. */
+export function topRow(map: Bounds & { surfaceRows?: number }): number {
+  return map.surfaceRows ?? (map.endless ? -Infinity : 0);
+}
+
+/** Row y held to the map's rows (0 … h − 1); an endless plane has no edge, so any row. */
+export function clampRow(map: Bounds, y: number): number {
+  if (map.endless) return y;
+  return Math.min(map.size.h - 1, Math.max(0, y));
+}
+
 /** The terrain at integer cell (x, y): OPEN, ROCK or SOIL; off the map is rock. Non-zero = solid. */
 export function rockAt(map: WorldMap, x: number, y: number): number {
   return x < map.x0 || y < 0 || x >= map.x0 + map.size.w || y >= map.size.h
@@ -338,7 +349,7 @@ export function dig(map: WorldMap, x: number, y: number): boolean {
 
 /** Fill open integer cell (x, y) back with soil (a pellet dropped into a dead end) at time t; false if it isn't open ground on the map. */
 export function fillCell(map: WorldMap, x: number, y: number, t = 0): boolean {
-  if (!inBounds(map, x, y) || y < (map.surfaceRows ?? 0) || rockAt(map, x, y) !== OPEN) return false;
+  if (!inBounds(map, x, y) || y < topRow(map) || rockAt(map, x, y) !== OPEN) return false;
   map.rock.set(x, y, SOIL);
   map.digHeading.set(x, y, 0);
   map.filledAt.set(x, y, t);
@@ -391,7 +402,7 @@ function grounded(map: WorldMap, x: number, y: number): boolean {
 export function updateSurface(map: WorldMap, x: number, y: number): void {
   const sky = map.sky;
   if (!sky) return;
-  const top = map.surfaceRows ?? 0;
+  const top = topRow(map);
   for (let d = -1; d < 6; d++) {
     const ax = d < 0 ? x : nx(x, y, d);
     const ay = d < 0 ? y : ny(y, d);
@@ -608,7 +619,7 @@ export function flat<A extends Uint8Array | Float32Array>(map: WorldMap, layer: 
 export type Through = "open" | "diggable";
 
 function passable(map: WorldMap, x: number, y: number, through: Through): boolean {
-  if (y < (map.surfaceRows ?? 0)) return false; // the curtain's surface is the plane's: no way round underground through it
+  if (y < topRow(map)) return false; // the curtain's surface is the plane's: no way round underground through it
   const t = rockAt(map, x, y);
   return through === "open" ? t === OPEN : t === OPEN || t === SOIL;
 }

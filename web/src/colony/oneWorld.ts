@@ -18,7 +18,9 @@
 
 import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
-import { CELL, cellOf, centreX, centreY } from "./hex.ts";
+import { CELL, cellKey, cellOf, centreX, centreY } from "./hex.ts";
+import { isEndless } from "./endlessMap.ts";
+import { NEST_ESCAPE } from "./endlessPlane.ts";
 import { lineSalt, lineSeed } from "./lines.ts";
 import { CURTAIN, PLANE } from "./vocab.ts";
 import { type Cell, type End, grow, makeTransect, type Transect } from "./transect.ts";
@@ -333,6 +335,20 @@ export function growWorld(world: OneWorld, end: End, cell: Cell, at = 0): number
  */
 export function mainGround(world: OneWorld): (x: number, y: number) => boolean {
   const { plane, line } = world;
+  // No whole-plane pass on a plane with no edge (docs/endless-world.md §5, "Rule 4 becomes local"): the hole must join open ground that leaves a disc of
+  // NEST_ESCAPE steps, the check the world's own nests pass (endlessPlane.ts walksOut), remembered per cell.
+  if (isEndless(plane)) {
+    const seen = new Map<number, boolean>();
+    return (x, y) => {
+      const k = cellKey(x, y);
+      let ok = seen.get(k);
+      if (ok === undefined) {
+        ok = plane.plane.walksOut(centreX(x, y), centreY(y), NEST_ESCAPE);
+        seen.set(k, ok);
+      }
+      return ok;
+    };
+  }
   const reach = reachableFrom(
     plane,
     line.holes.map((v) => ({ x: centreX(v.x, v.y), y: centreY(v.y) })),

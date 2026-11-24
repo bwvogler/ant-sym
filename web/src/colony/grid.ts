@@ -19,7 +19,7 @@ import {
   SWELL,
 } from "./tuning.ts";
 import { FAINT, type CellCounts } from "./vocab.ts";
-import { AIR, OPEN, SOIL, rockAt, type WorldMap } from "./world.ts";
+import { AIR, OPEN, SOIL, rockAt, topRow, type WorldMap } from "./world.ts";
 
 /** No cell: a wall-follower with this as its target decides its next cell from where it stands. */
 export const NO_CELL = NO_KEY;
@@ -102,7 +102,7 @@ export function inReach(map: WorldMap, x0: number, y0: number, x1: number, y1: n
   const ay = CELL[1];
   if (ax === bx && ay === by) return true;
   if (hexDistance(ax, ay, bx, by) > steps) return false;
-  const top = map.surfaceRows ?? 0;
+  const top = topRow(map);
   if (straightReach(map, ax, ay, bx, by, top)) return true;
   const half = SENSE_STEPS + 1;
   const stamp = ++reachCall;
@@ -169,7 +169,7 @@ export function inReachShared(map: WorldMap, x0: number, y0: number, x1: number,
   const ay = CELL[1];
   if (ax === bx && ay === by) return true;
   if (hexDistance(ax, ay, bx, by) > SENSE_STEPS) return false;
-  const top = map.surfaceRows ?? 0;
+  const top = topRow(map);
   if (straightReach(map, ax, ay, bx, by, top)) return true;
   if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) searchWindow(map, ax, ay, top);
   // Within SENSE_STEPS of (ax, ay) (checked above), so inside the window.
@@ -181,12 +181,14 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
   const S = SENSE_STEPS;
   // Read straight from the rock layer's chunk arrays, a row at a time (as rockAt reads: off the map is rock, a missing chunk `empty`).
   const rock = map.rock;
-  const xLo = Math.max(ax - S, map.x0);
-  const xHi = Math.min(ax + S, map.x0 + map.size.w - 1);
+  // An endless plane has no edge (PRD §66 E6.0.2): the window is always whole, at any row, negative too.
+  const open = map.endless === true;
+  const xLo = open ? ax - S : Math.max(ax - S, map.x0);
+  const xHi = open ? ax + S : Math.min(ax + S, map.x0 + map.size.w - 1);
   for (let k = 0; k < SHARED_W; k++) {
     const y = ay + k - S;
     let bits = 0;
-    if (y >= top && y >= 0 && y < map.size.h) {
+    if (y >= top && (open || (y >= 0 && y < map.size.h))) {
       const cy = y >> CHUNK_BITS;
       const row = (y & CHUNK_MASK) << CHUNK_BITS;
       for (let x = xLo; x <= xHi;) {

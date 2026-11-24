@@ -186,7 +186,7 @@ test("the game's save holds every private field it declares, or the field is bui
   const inPrivate = ["fightDeaths", "lastFightDeath", "metBy", "haveMet", "nextRivalCheck", "regrowClock", "rng", "regrowRng"];
   // The occupancy grids and every layer's recognition bands are GameSave.grids (layer 0's recognition is `recognition` too).
   const inGrids = ["grids", "recs"];
-  const derived = ["piles"]; // the food piles as the world began: from the fresh world
+  const derived = ["piles", "pileChunks"]; // the food piles as the world began, and (an endless plane) which chunks they were noted from: from the fresh world, chunk by chunk as it is generated
   const fromPage = ["choice"]; // the Lab's setChoice (ja-nan3): not saved, the page sets it again on every game, a load included
   const fromSpecs = ["firstAnts"]; // colony 0's start count: from the specs the game was built with, as the page rebuilds it (docs/game-colonies.md)
   const fromFounded = ["wild"]; // the wild sites that have woken, by site: set again as each founding in `founded` is made again on load (Founding.wild)

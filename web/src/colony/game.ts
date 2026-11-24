@@ -9,16 +9,18 @@ import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fu
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, clampRow, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved, type WildSite } from "./lines.ts";
 import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
-import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
+import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
+import { CHUNK, CHUNK_BITS, chunkKey, local } from "./chunks.ts";
+import { isEndless, loadEndless, saveEndless } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -389,6 +391,8 @@ export class Game {
   #rng: () => number;
   /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
   #piles: { cells: Float64Array; full: Float32Array } | null = null;
+  /** the chunks of an endless plane whose piles are in `#piles` */
+  #pileChunks = new Set<number>();
   /** regrowth's own random numbers: the game's stream is never drawn from for it */
   #regrowRng: Rng | null = null;
   #regrowClock = 0;
@@ -487,6 +491,11 @@ export class Game {
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
+    // A plane with no edge: a founding far from every hole starts a line of its own, and the wild sites near what is awake are listed (PRD §66 E6.0.3).
+    if (isEndless(map)) {
+      this.newLines = true;
+      this.feedSites();
+    }
   }
 
   /** A colony asks its mode policy about the species' own situation, when its mode words have a schema of their own (ja-fnd.5.10). */
@@ -674,17 +683,45 @@ export class Game {
         // the ant's hex cell the way occupancy finds it, and b's ants within CONTACT_RANGE steps of it
         const map = this.layers[l] as WorldMap;
         ca.antCell(i);
-        if (around(grid, map, clampCol(map, CELL[0]), Math.min(map.size.h - 1, Math.max(0, CELL[1])), CONTACT_RANGE) > 0) return true;
+        if (around(grid, map, clampCol(map, CELL[0]), clampRow(map, CELL[1]), CONTACT_RANGE) > 0) return true;
       }
       return false;
     };
     return { near, entered, holds, contact };
   }
 
+  /**
+   * On an endless plane, keep `sites` equal to the wild sites near what is awake (docs/endless-world.md §4, §6; PRD §66 E6.0.3): those in a box of 2 W round
+   * every awake colony's hole (a flight lands within 2 U, and the fungus wakes within W) and in the squares of side W, a square each way round, that hold the
+   * fungus's body on the plane; sites that have woken are colonies now and are not listed, and a site far from every awake colony and from the body is dropped
+   * (it is reserved again when something awake comes near). Pure in what it reads, and the plane's own cache of sites (never the map's chunks: no chunk is
+   * generated for it), so it is cheap to run once a second. A bounded game has no sites to feed: nothing happens.
+   */
+  feedSites(): void {
+    const map = this.map;
+    if (!isEndless(map)) return;
+    const W = this.#sleep?.params.distance ?? DEFAULT_SLEEP.distance;
+    const boxes: [number, number, number, number][] = [];
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      const h = (c.layers[PLANE] as Layer).nest;
+      boxes.push([h.x - 2 * W, h.y - 2 * W, h.x + 2 * W, h.y + 2 * W]);
+    });
+    for (const [bx, by] of this.fungus.bodyBuckets(PLANE, W)) boxes.push([(bx - 1) * W, (by - 1) * W, (bx + 2) * W, (by + 2) * W]);
+    const want = new Map<string, WildSite>();
+    for (const b of boxes)
+      for (const s of map.plane.sitesIn(b[0], b[1], b[2], b[3])) {
+        const key = `${s.rx},${s.ry}`;
+        if (!this.#wild.has(key) && !want.has(key)) want.set(key, s);
+      }
+    this.sites = [...want.values()].sort((a, b) => a.ry - b.ry || a.rx - b.rx);
+  }
+
   /** Ask the awake rule and apply its verdict. */
   #decideSleep(): void {
     const rule = this.#sleep as SleepRule;
     this.#sleepNext = this.time + rule.params.every;
+    this.feedSites();
     const facts = this.#sleepFacts(rule);
     const v = rule.step({ time: this.time, asleep: this.colonies.map((_, k) => this.#frozen.has(k)), ...facts });
     for (const k of v.freeze) this.freeze(k);
@@ -1004,6 +1041,7 @@ export class Game {
     this.#wire();
     this.#refresh();
     this.#syncFrozen();
+    this.feedSites(); // a new hole reserves the sites round it, with the awake rule on or not (a bounded game: nothing)
     const q = c.queen;
     if (f.fungus && f.fungus.load > 0 && q) {
       q.load = Math.min(1, f.fungus.load);
@@ -1050,6 +1088,16 @@ export class Game {
 
   /** The plane's food piles now (as the world began): the cells with food. */
   #notePiles(): void {
+    if (isEndless(this.map)) {
+      // No whole-map scan on a plane with no edge: the piles are noted chunk by chunk as the food is generated (PRD §66 E6.0.2), kept in key
+      // order (the order the bounded scan finds them in), so which cells regrow does not depend on the order chunks were first made.
+      const map = this.map;
+      this.#piles = { cells: new Float64Array(0), full: new Float32Array(0) };
+      this.#regrowRng = mulberry32(map.seed * 92821 + 17);
+      map.foodHooks.push((cx, cy, f) => this.#notePileChunk(cx, cy, f));
+      map.food.forEach((cx, cy, a) => this.#notePileChunk(cx, cy, a));
+      return;
+    }
     const { w, h } = this.map.size;
     const { x0 } = this.map;
     const cells: number[] = [];
@@ -1064,6 +1112,39 @@ export class Game {
       }
     this.#piles = { cells: Float64Array.from(cells), full: Float32Array.from(full) };
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
+  }
+
+  /** An endless plane's chunk (cx, cy) made, holding food `f`: its pile cells join the regrowth's list, which stays in key order. */
+  #notePileChunk(cx: number, cy: number, f: ArrayLike<number>): void {
+    const piles = this.#piles;
+    if (!piles || this.#pileChunks.has(chunkKey(cx, cy))) return; // a chunk is noted once, however often it is generated again (a load counts them again)
+    this.#pileChunks.add(chunkKey(cx, cy));
+    const add: number[] = [];
+    const addFull: number[] = [];
+    for (let ly = 0; ly < CHUNK; ly++)
+      for (let lx = 0; lx < CHUNK; lx++) {
+        const v = f[local(lx, ly)]!;
+        if (v > 0) {
+          add.push(cellKey((cx << CHUNK_BITS) + lx, (cy << CHUNK_BITS) + ly));
+          addFull.push(v);
+        }
+      }
+    if (!add.length) return;
+    const n = piles.cells.length;
+    const cells = new Float64Array(n + add.length);
+    const full = new Float32Array(n + add.length);
+    let a = 0;
+    let b = 0;
+    for (let o = 0; o < cells.length; o++) {
+      if (b >= add.length || (a < n && piles.cells[a]! < add[b]!)) {
+        cells[o] = piles.cells[a]!;
+        full[o] = piles.full[a++]!;
+      } else {
+        cells[o] = add[b]!;
+        full[o] = addFull[b++]!;
+      }
+    }
+    this.#piles = { cells, full };
   }
 
   /**
@@ -1270,7 +1351,7 @@ export class Game {
               l = c.layer[i];
               map = this.layers[l] as WorldMap;
               cx = clampCol(map, CELL[0]);
-              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
+              cy = clampRow(map, CELL[1]);
             }
             if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, map, cx, cy, 1) > 0) {
               allied++;
@@ -1503,7 +1584,8 @@ export class Game {
       ...(this.aphids.length ? { aphids: this.aphids.map((a) => ({ ...a, cells: [...a.cells] })) } : {}),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
-      map: encode(map),
+      // An endless plane saves the seed and what changed, never the plane (endlessMap.ts saveEndless).
+      map: isEndless(this.map) ? saveEndless(this.map) : encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
       fungus: this.fungus.saveState(),
@@ -1551,8 +1633,15 @@ export class Game {
     const world = this.world;
     const sw = saved.world;
     if (!sw) throw new Error("save: a save of a game on one map, and this game is one world");
+    // An endless plane has no size to match: its save is the seed and what changed (a bounded save of another size is still refused, and so is one of the other kind).
+    const endless = isEndless(this.map);
+    const savedEndless = (saved.map as { endless?: unknown }).endless === true;
+    if (endless !== savedEndless)
+      throw new Error(
+        `save: a save of ${savedEndless ? "an endless" : "a bounded"} plane, and this game's is ${endless ? "endless" : "bounded"}`,
+      );
     const size = (saved.map as { size?: { w: number; h: number } }).size;
-    if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h)
+    if (sw.seed !== world.seed || (!endless && (size?.w !== this.map.size.w || size?.h !== this.map.size.h)))
       throw new Error(
         `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
       );
@@ -1583,8 +1672,11 @@ export class Game {
     this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
     this.aphids = (saved.aphids ?? []).map((a) => ({ ...a, cells: [...a.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
-    qualityLike(this.map, saved.map);
-    fillLike(this.map, saved.map);
+    if (isEndless(this.map)) loadEndless(this.map, saved.map as Record<string, unknown>);
+    else {
+      qualityLike(this.map, saved.map);
+      fillLike(this.map, saved.map);
+    }
     qualityLike(world.curtain, sw.curtain);
     fillLike(world.curtain, sw.curtain);
     more.forEach((m, k) => {
@@ -1627,5 +1719,6 @@ export class Game {
       throw new Error("save: its grids are another game's");
     this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
     this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
+    this.feedSites(); // the sites near what is awake now (not saved: the plane lists them)
   }
 }
