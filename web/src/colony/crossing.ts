@@ -6,7 +6,7 @@ import { NO_CELL, SOIL_FILL, SOIL_LOOSE, gauss, planeMoundReach } from "./grid.t
 import { CELL, R, centreX, centreY, hexDistance } from "./hex.ts";
 import { outDistAt, routeClear } from "./homing.ts";
 import { MIDDEN_MIN, PI_DRIFT_2D, WAIT_STEPS } from "./tuning.ts";
-import { CURTAIN, EXPLORE, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
+import { EXPLORE, FIGHT, FOLLOW, PLANE, RETURN } from "./vocab.ts";
 
 /**
  * One world's plane (U3c): ant i, with a pellet or corpse just carried up its hole (or a rival's), walks it out on a
@@ -155,7 +155,7 @@ export function crossDown(c: Colony, i: number, k: number): void {
     c.restT[i] = 0;
   }
   c.reporting[i] = 0; // a finder has told: its trail ends here, at the hole (ja-web)
-  c.layer[i] = CURTAIN;
+  c.layer[i] = c.home; // down its own line's hole: its curtain (the first line's is layer 1)
   c.x[i] = centreX(hc.col, hc.row);
   c.y[i] = centreY(hc.row);
   c.heading[i] = Math.PI / 2;

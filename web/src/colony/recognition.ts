@@ -187,7 +187,9 @@ export class Recognition {
     let occupied = 0;
     let everyone = 0;
     for (const c of colonies) {
-      const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+      const on = layer < 0 ? null : c.layers[layer];
+      if (layer >= 0 && !on) continue; // a curtain of another line
+      const map = (on ?? c).map;
       const h = map.size.h;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;

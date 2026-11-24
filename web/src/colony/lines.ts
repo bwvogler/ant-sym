@@ -64,6 +64,11 @@ export function lineSalt(seed: number, firstHole: Cell, first: boolean): number 
   return hash4(seed, 99, firstHole.x, firstHole.y) | 1;
 }
 
+/** A line's seed: the world's own for the first line (salt 0: today's ground and food), else mixed with the salt. Ground, food and nests of a line are made from it. */
+export function lineSeed(seed: number, salt: number): number {
+  return salt === 0 ? seed : hash4(seed, 98, salt, 0);
+}
+
 /** A line of one hole at `cell`, its margins along `heading`: a wild colony's, or a far founding's. */
 export function oneHoleLine(seed: number, cell: Cell, heading: number): Line {
   return { transect: makeTransect([cell], { heading }), salt: lineSalt(seed, cell, false) };

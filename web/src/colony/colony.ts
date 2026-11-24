@@ -266,6 +266,8 @@ export class Colony {
   readonly layers: Layer[];
   /** the layer the nest is on (the queen, brood and chambers; where ants are born): 0, but the curtain in one world */
   home = 0;
+  /** one world: the index of the line this colony's hole is on (its curtain is the game's layer `home`) */
+  lineIndex = 0;
   /** the layer bound now (bind): `home` between ticks */
   cur = 0;
   /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map. The game sets it again when the line grows (Game.addColony) */
@@ -567,7 +569,13 @@ export class Colony {
     params: Partial<ColonyParams> = {},
     rng: () => number = Math.random,
     policy: Policy = localPolicy,
-    world: { plane: WorldMap; line: Transect } | null = null,
+    world: {
+      plane: WorldMap;
+      line: Transect;
+      /** the game layer of this colony's curtain (its line's), 1 for the first line */ layer?: number;
+      /** the index of its line in the world */ lineIndex?: number;
+      /** the colony's index among the plane's nests, when it differs from `params.nest` (its index among its curtain's) */ planeNest?: number;
+    } | null = null,
   ) {
     this.map = map;
     this.params = { ...DEFAULT_COLONY, ...params };
@@ -591,8 +599,9 @@ export class Colony {
     const slots = {} as LayerSlots;
     if (world) {
       // One world: home is the curtain, bound now and between ticks.
-      this.home = CURTAIN;
-      this.cur = CURTAIN;
+      this.home = world.layer ?? CURTAIN;
+      this.cur = this.home;
+      this.lineIndex = world.lineIndex ?? 0;
     }
     storeLayer(this, slots);
     if (world) {
@@ -600,8 +609,9 @@ export class Colony {
       // colony's scent there has the plane's food cap, as on any open ground. Its Pheromones draws no random numbers.
       const top = channelParams(this.params.channels);
       if (this.params.channels.food?.max === undefined) top.food = { ...top.food, max: this.params.foodCapPlane };
-      const nest = world.plane.nests[this.params.nest];
-      if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
+      const planeNest = world.planeNest ?? this.params.nest;
+      const nest = world.plane.nests[planeNest];
+      if (!nest) throw new Error(`one world: the plane has no nest ${planeNest}`);
       const plane: LayerSlots = {
         map: world.plane,
         ph: new Pheromones(world.plane, top, this.params.channelSet),
@@ -623,7 +633,11 @@ export class Colony {
         raidNest: null,
         others: [],
       };
-      this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
+      // Indexed by the game's layer: the plane, and this colony's own curtain. On a later line's curtain the ones between are holes (a colony is on no
+      // other line's curtain): read them as `colony.layers[l]` with a guard, never by walking `layers` expecting an entry for each.
+      this.layers = [];
+      this.layers[PLANE] = layerView(this, PLANE, plane);
+      this.layers[this.home] = layerView(this, this.home, slots);
       this.line = world.line;
     } else this.layers = [layerView(this, 0, slots)];
     seeHoles(this);
@@ -1039,7 +1053,7 @@ export class Colony {
   get foodLeft(): number {
     if (this.layers.length === 1) return this.map.foodLeft;
     let s = 0;
-    for (const L of this.layers) s += L.map.foodLeft;
+    for (const L of this.layers) if (L) s += L.map.foodLeft; // a hole is a curtain of another line
     return s;
   }
 
@@ -1477,7 +1491,7 @@ export class Colony {
       this.outside = out;
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
-    for (const L of this.layers) L.ph.advance(dt);
+    for (const L of this.layers) if (L) L.ph.advance(dt);
     for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.housed) {

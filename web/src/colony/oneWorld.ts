@@ -19,6 +19,7 @@
 import { ChunkLayer } from "./chunks.ts";
 import { Chambers } from "./chambers.ts";
 import { CELL, cellOf, centreX, centreY } from "./hex.ts";
+import { lineSalt, lineSeed } from "./lines.ts";
 import { type Cell, type End, grow, makeTransect, type Transect } from "./transect.ts";
 import {
   AIR,
@@ -93,19 +94,34 @@ export function generateOneWorld(seed: number, opts: { plane?: Partial<WorldOpti
  * order, make the line, the plane gets an empty mound (`spoil`), and the curtain is dug under the line from `seed`.
  */
 export function oneWorldOn(seed: number, plane: WorldMap): OneWorld {
-  const holes = plane.nests.map((n) => {
-    cellOf(n.x, n.y);
-    return { x: CELL[0]!, y: CELL[1]! };
+  return oneWorldOnLines(seed, plane, [plane.nests.map((_, i) => i)]);
+}
+
+/**
+ * One world whose lines are given as groups of the plane's nests (by index): line i's holes are the group's nests', in order, and its curtain
+ * is dug from the line's own seed (lines.ts lineSeed: the world's for the first, whose salt is 0, so one group is exactly `oneWorldOn`'s). The
+ * colonies of a game on it are in plane-nest order, and each is on its group's line (ColonySpec.line).
+ */
+export function oneWorldOnLines(seed: number, plane: WorldMap, groups: readonly (readonly number[])[]): OneWorld {
+  if (groups.length === 0) throw new Error("oneWorldOnLines: a world has at least one line");
+  const lines: WorldLine[] = groups.map((group, li) => {
+    const holes = group.map((i) => {
+      const n = plane.nests[i];
+      if (!n) throw new Error(`oneWorldOnLines: the plane has no nest ${i}`);
+      cellOf(n.x, n.y);
+      return { x: CELL[0]!, y: CELL[1]! };
+    });
+    const line = makeTransect(holes);
+    const salt = lineSalt(seed, holes[0]!, li === 0);
+    return { line, salt, curtain: generateCurtain(lineSeed(seed, salt), line) };
   });
-  const line = makeTransect(holes);
   // The mound is the plane's (U3c): a height field of spoil, empty at the start.
   plane.spoil = new ChunkLayer((n) => new Uint16Array(n), 0);
   plane.moundCells = 0;
-  const first: WorldLine = { line, curtain: generateCurtain(seed, line), salt: 0 };
   return {
     seed,
     plane,
-    lines: [first],
+    lines,
     get curtain() {
       return this.lines[0]!.curtain;
     },
@@ -244,9 +260,11 @@ function curtainColumn(curtain: WorldMap, seed: number, s: number): void {
  * counted (foodTotal and foodLeft grow by it). Returns the new nest's index in both maps' nests.
  */
 export function growWorld(world: OneWorld, end: End, cell: Cell, at = 0): number {
-  const { seed, plane } = world;
+  const { plane } = world;
   const wl = world.lines[at];
   if (!wl) throw new Error(`growWorld: no line ${at}`);
+  // The line's own seed: the world's for the first line (salt 0), so a one-line world grows exactly as it did.
+  const seed = lineSeed(world.seed, wl.salt);
   const { curtain } = wl;
   const old = wl.line;
   const line = grow(old, end, cell);

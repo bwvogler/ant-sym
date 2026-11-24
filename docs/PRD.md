@@ -5723,8 +5723,15 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **`OneWorld.lines`.** `WorldLine { line, curtain, salt }`; `OneWorld.line` and `OneWorld.curtain` are read-only views of `lines[0]` (so every reader outside the world's own code is untouched), `growWorld(world, end, cell, at = 0)` grows line `at` in place (`wl.line` is replaced, the curtain widens), and an unknown line is an error. The first line's salt is 0, so its ground and food keep today's seeds.
 - **`Game.settleAt`** goes through `nearestValidIn` over the world's lines with `newLines: false` (a new option of `canFoundIn`, `nearestValidIn`: rule 1 skipped), no sites and no new lines until the endless world is the page's (E6). With one line and no sites the rule is `canFound` and its candidate order is `nearestValid`'s, so every landing is the same cell (a test compares 65 points, 5 of them moved, with `nearestValid`); the grown line is not laid out for a clearance check against nothing. `settleAt` and the founding's `spot` carry the line index (`spot.line`, written only when it is not 0, so saves are byte-identical).
 - **Guards** (`tests/int/oneWorldLines.test.ts`, 4 tests). The views and growth in place; an unknown line; `settleAt` equals `nearestValid` at 65 points, line 0; a far point is given a line of its own with new lines on and never with them off. Mutants: new lines left on in `Game` fails.
-- **Not here.** A second curtain needs the game's layers to be per line (E3.3): `Game.layers`, the occupancy grids, recognition and the fungus's layers are indexed by plane or curtain, and every colony's `layers` view with them. Cost: none.
-- **Cost.** None (no Jev situation, legend or question changed).
+- **Next.** The layers per line are E3.3a below; a founding that starts a line at runtime is E3.3b.
+
+**E3.3a built (`ja-qpv.2`, 2026-11-24).** A game over N lines, built at construction; behaviour is bit-exact for one line (the four golden masters, the unit tier and the int tier pass unchanged, bar one new public field `lineIndex` the colony-save audit now names).
+- **Layers by line.** `Game.layers` is the plane then each line's curtain (layer `1 + line`). A colony has a layer on the plane and on its own curtain only: `Colony.layers` is indexed by the game's layer, so on a later line's curtain the ones between are holes, read through `colony.layers[l]` with a guard (`for…of` over `layers` skips them). `Colony.home` is its curtain's layer and `Colony.lineIndex` its line; an ant going down a hole now arrives on `c.home`, not on layer 1 (`crossing.ts`: the one place that named the curtain). Per-layer grids, recognition and the fungus's layers were already per layer, and the cross-colony readers that asked every colony for layer `l` (`battle.ts` `occupancy`, `attackPressure`, `resolveFights`; `recognition.ts`; `fungus.ts` royal-scent check; `Game`'s wiring and raid aiming) skip a colony that is not on it.
+- **Indices.** A colony's `params.nest` is its index among its own curtain's nests (and its royal chamber's colony id); a new `planeNest` is its index among the plane's, found as the plane nest over the curtain nest's hole column (`planeNestOver`, the reading `seeHoles` makes), never assumed from the order of the colonies. For the first line the two are the same. `ColonySpec.line` puts a start colony on a line (its nest is the next of that line's), `oneWorldOnLines(seed, plane, groups)` makes a world whose lines are groups of the plane's nests (`oneWorldOn` is the one-group case), each curtain dug from `lineSeed(seed, salt)`; `growWorld` uses the line's own seed, and `addColony` founds onto `spot.line`.
+- **Builder.** The builder's stroke guard (`builder.ts` `guarded`) looked at layer `CURTAIN` for every colony's brood and queen; it now guards a colony's own curtain (`c.home`) and skips a colony not on the layer (review of #379, S1).
+- **Limits, on purpose.** A save holds one line: `Game.save` refuses a world of more (E3.4). Raids aim only where both colonies are (the plane). The fungus's mass flow down a hole runs only into the first line's curtain (a link into another's would take mass off the plane and set it down nowhere): its hyphae cross and grow there without the flow until the flow is made per line (E3.3c). The page, the stats and the lab still read the first line.
+- **Guards** (`tests/int/twoLines.test.ts`, 10 tests, ~14 s). A world over two groups: two lines, curtains, salts (the second's ground differs), one nest each; a game over it: the layers, homes, line indices, each colony's layers (holes), its plane nest and its curtain nest, the line it reads, the food total over every layer; two minutes of play: every ant on the plane or its own curtain, both colonies out on the plane, nothing throws; a founding onto line 1 (its own curtain index and plane index, line 1 grew and line 0 did not, `founded[0].spot.line`); the unknown line and too many colonies errors; the save refusal. Mutants (the plane nest, the line a colony reads, the food total, going down to layer 1, the hole the fungus crosses, its landing beside its own line's hole, the line's seed in `growWorld`, the royal-scent guard) each fail a test. Not covered: the flow guard (`layer === CURTAIN` on the links), which needs a mass-conservation test over two lines (E3.3c, `ja-qpv.2.2`).
+- **Cost.** None (no Jev situation, legend or question changed). The tick is not re-measured: the changes outside the guards are a per-colony index and a few `if (!layer)` tests outside the ant loops.
 
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
@@ -7571,7 +7578,7 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 - **M1 (built, `ja-vlla.3`):** `LANDING.radius` 2 becomes 1 (landing, the first spores and a queen's founding: the assay measured the whole change). The parameter is `LANDING.radius`; `progression.mjs --landing 2` gives today's landing back. The fungus golden is re-recorded.
 - **M2a (built, `ja-vlla.4`):** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply (allowed only where the new `resource` field says a colonised corpse is on the tip's cell or beside it; elsewhere the answer plays the tip's own rule); the cells are a mat that `regress` leaves alone (`Hyphae.mat`, saved only when non-empty); the local rule never thickens, so the golden is bit-exact. `GROWTH_BRAIN_VERSION` 5, 48 situations become 96, and the shipped growth answers were re-asked ($0.0049 for the three aims, 404 input tokens a question): Jev thickens in 27 (*unite*), 29 (*peace*) and 32 (*spread*) of the 48 corpse situations and in none without a corpse. **M2b (built, `ja-vlla.5`):** after each round of tip steps (`Fungus.#settle`), a cell a tip has just thickened round whose six neighbours are all hyphae is a flower, and it becomes a patch when none of its seven cells is in a patch already (`base` or `sources`: the landing's cells and earlier flowers never count): the seven join the base and the sources, `Evolution.settle` adds one patch (room to grow) with no start of 4 (the mass is the hyphae's already: unchanged), no tips set out from it (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), layer 0 only; `Fungus.flowers` counts them (saved only when above 0, so the goldens hold). A flower is looked for only where a tip thickened, so only at a corpse: densely webbed hyphae that never thickened found nothing (owner asked, 2026-11-23: `ja-vlla.9`). **M2c** (`ja-vlla.6`): assays. Plan, as designed: a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, no tips of its own (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **Flowers anywhere (built, `ja-vlla.9`, owner 2026-11-23: "I personally like flowers everywhere"):** a flower may close wherever hyphae grow, not only where a tip thickened (every newly grown cell is checked, as the middle of a flower or as one of a flower's six neighbours); it may touch a patch (the seven's cells not yet in a patch join it: the patch spreads, and the patch count stays; a flower with none in a patch is a new patch, as before); its middle must be outside every patch; and it roots no tips (the tips that closed it run on).
-- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** design with the owner first (open questions in the note).
+- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** designed 2026-11-23/24: §90, epic `ja-vlla.11`.
 
 **M1 assay result (`ja-vlla.2`, 2026-11-22).** `progression.mjs --evolve --hyphae --growth --flow --seconds 600` (the bead's command; `--landing R` sets `LANDING.radius`; the without-hyphae rows drop `--hyphae --growth --flow`), time to a quarter of hosts, seconds, seeds 1–10 then 11–20, radius 1 against today's 2. Re-run on the head (`8ffc5711`) the radius-1 with-hyphae rows reproduce on all 20 seeds. Without `--growth --flow` the with-hyphae times differ (seed 1: 237 s at radius 1, 282 s at radius 2; the PR review's reading). P1 (§63.4): no seed more than 10 % slower with hyphae than without.
 - Radius 1, seeds 1–10, with hyphae: 260 179 155 205 141 222 212 212 201 159; without: 361 268 233 235 237 426 277 533 327 197. Every seed is as fast or faster with hyphae.
@@ -7801,3 +7808,71 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
 - The game sources' full texts: their hosts were outside this session's network.
+
+## 90. A lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks it down (design, ja-vlla.11, 2026-11-24)
+
+**Research basis:** [lichen.md](lichen.md). FT is full text read; ABS is abstract only, with numbers **unverified**.
+- **Contact:** a lichen fungus captures a free alga by contact, and free algae are scarce. Some lichens take another lichen's alga (*Diploschistes* on *Cladonia*). Sources: Sanders & Masumoto 2021, FT; Friedl 1987, ABS; against, Beck et al. 1998, ABS.
+- **Spread and light:** a lichen grows from its edge, crustose ones well under 1 mm a year (Seminara et al. 2018, FT; Armstrong 2005, ABS). Its alga fixes carbon only while wet and lit, and switches on within 1–5 minutes of wetting (Palmqvist 2000, ABS; Bhatt et al. 2024, FT). The carbon share passed to the fungus is not quantified.
+- **Rock to soil:** lichens turn rock into a nascent soil by hyphae, wet-dry swelling and pH, with no rate in any source read (Jung et al. 2020, FT; Marques et al. 2016, ABS: "contradictory").
+- **Usnic acid** raised *Metarhizium* and *Beauveria* deaths in insect larvae (Duisembecov et al. 2017; Kryukov et al. 2018; both ABS).
+- **Ants:** red wood ants carry lichen fragments to their mounds (Heinken et al. 2007, ABS).
+- **Not found:** *Metarhizium* as a lichen fungus. The partnership is **design**.
+
+**The problem.** Nothing on the map is a plant, an alga, light or water. Rock is permanent and closed to hyphae (`enterable`). Every income comes through ants: hosts, corpses, or ground they walk.
+
+**Decisions.**
+- **Owner (2026-11-22, §85):**
+  - a special lichen partner that uses rock, breaks it down and spreads across it;
+  - contact with an alga as the trigger.
+- **Owner (2026-11-23, shown the literature above):**
+  - All four groups go into the epic: partner and crust on rock, light income, rock to soil, and the bitter crust and ant carriers last.
+  - Partners come from both scarce alga films on rock edges and wild lichens to overgrow.
+  - Weathering opens rock to the hyphae first. Rock the ants can dig is a later step, behind its own assay.
+- **Owner (2026-11-24, on the review of #377):** ants meet a lichen from the next cell (beside), as a hypha meets an alga; the crust stays on rock, so ants can't dig it away.
+- **Proposed:**
+  - Contact, spread, light and weathering are body, not choice (no Jev situation field).
+  - Light income goes to the free pool (§85 M3), capped by the crust's area.
+  - Every rate is design, set from the assay.
+
+**The mechanic.** Each milestone is a PR behind a setting whose off is main bit for bit:
+- **L1:** alga films and wild lichens in world generation. A free-pool `lichen` trait lets a hypha beside one turn the alga's rock cell into a lichen, which grows one rock cell from its rim every interval. An overgrown wild lichen is captured.
+- **L2:** lichen cells in light (the plane, and curtain cells beside the sky) feed the free pool.
+- **L3a:** rock under an old lichen becomes ground the hyphae enter.
+- **L3b:** that rock becomes soil the ants dig.
+- **L4:** a bitter crust; an ant beside a lichen cell loses resistance.
+- **L5:** an ant beside a lichen cell may scrape a fragment, carry it, and start a lichen where it drops it.
+
+A table of cue, response, rule and off is in the note. No rule reads state the fungus or an ant could not sense: there is a new fungus contact row in `vision.md`'s sense table, and no gap row.
+
+**Play.**
+- **New things on the map:** green films and grey-green wild lichens on rocks, a crust creeping over rock, rock opening.
+- **A free-pool line** (lichen, light, weathering, bitter crust) against the ants pool's lethal levers.
+- **A slow, host-free income** the colonies can't dig away.
+- **With L5,** the colonies carry the lichen themselves.
+- **Risks:** a host-free runaway, a cliff when lichen appears, and new routes between nests (L3b).
+
+**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): `progression.mjs` reports time to first lichen, lichen cells, growth from light and weathered cells. Then for each milestone:
+- **P1** by the worst seed on 1–20 (§63.4).
+- **Runaway check:** mutations per minute in minutes 8–10 against L1, for L2.
+- **Routes:** A3 (mills) and raid times against baseline, for L3b.
+- **Runaway infection:** time to half of hosts, for L4.
+
+**Cost (estimated).** None in Jev: no lane changes, and cached games spend nothing. The parked growth-lane value `resource: alga` (`ja-5ush`) would take the lane's 96 situations to 144 (tokens to measure) and is not planned.
+
+**Beads.** `ja-vlla.11` (this, child of `ja-vlla`; from `ja-vlla.8`, closed). Children:
+- `.1` research full texts;
+- `.2` assay;
+- `.3` L1 partner and crust;
+- `.4` L2 light;
+- `.5` L3a rock to hyphae;
+- `.6` L3b rock to ants;
+- `.7` L4 bitter crust;
+- `.8` L5 ant carriers;
+- `.9` Learn entries and drawings.
+
+Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the lichen as a refuge `ja-g8zo`, growth forms `ja-419b`, tips steered to an alga `ja-5ush`.
+
+**Still open.**
+- **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; whether the trait needs the borer or the web first.
+- **To read:** the sources marked unverified (`.1`).
