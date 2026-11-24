@@ -12,6 +12,7 @@ export * from "./chunks.ts";
 export * from "./colony.ts";
 export * from "./colonyBrain.ts";
 export * from "./evolution.ts";
+export { algaAt, Lichen, LICHEN, type Alga } from "./lichen.ts";
 export * from "./fungalPolicy.ts";
 export * from "./fungus.ts";
 export * from "./fungusBrain.ts";

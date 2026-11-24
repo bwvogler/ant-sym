@@ -47,6 +47,7 @@ import {
   stepRound,
   TIP_STEP,
 } from "./hyphae.ts";
+import { Lichen } from "./lichen.ts";
 
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
@@ -477,6 +478,8 @@ export class Fungus {
   #sporeSpots: (number[] | null)[] = [];
   /** each map's corpses the fungus grows out of (ja-2bw.7): cell (hyphae.ts cellKey) → free spores still to put out there; 0 once spent (it is not colonised again) */
   #corpses: Map<number, number>[];
+  /** the fungus's lichen on the plane (layer 0), made by contact with an alga on rock (lichen.ts, ja-vlla.11.3); null until the first */
+  #lichen: Lichen | null = null;
   /** seconds since each colonised corpse was colonised (stalks, ja-2bw.10), by map and cell */
   #corpseAge: Map<number, number>[];
   /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, the curtain cells it feeds, and the curtain (the game's layer; one per line) */
@@ -491,6 +494,8 @@ export class Fungus {
         y: number,
       ) => { x: number; y: number; /** the curtain it opens into (default: the first line's) */ layer?: number } | null)
     | null = null;
+  /** seconds the hyphae have grown (counts only once the lichen upgrade is kept, so a game without it saves as it did) */
+  #elapsed = 0;
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
   /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth); set through `bindPolicy` */
@@ -1387,6 +1392,17 @@ export class Fungus {
       this.#settle();
       stepped = true;
     }
+    // A hypha beside an alga on rock takes it, and lichen spreads over rock from its rim (lichen.ts, PRD §90).
+    if (e.level("lichen") > 0) {
+      const plane = this.#hyphae[0];
+      if (plane && !this.frozenLayers.has(0)) {
+        const lichen = (this.#lichen ??= new Lichen());
+        const base = (this.#layers[0] as SporeLayer).base[0];
+        if (stepped) lichen.touch(this.map, plane.parent.keys(), base === undefined ? null : keyCell(base), this.#elapsed);
+        lichen.step(this.map, dt);
+      }
+    }
+    this.#elapsed += dt;
     // At a web (the Mycelium upgrade's third level, ja-2bw.8): the hyphae feeding many tips thicken into cords, which take
     // CORD_DIGS digs to cut, and dead ends nothing uses fade, freeing their mass (a corpse's cell is kept).
     if (stepped && e.level("mycelium") >= 2)
@@ -1695,6 +1711,16 @@ export class Fungus {
   }
 
   /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
+  /** The lichen cells on the plane (cellKey), for the renderer and the assays; empty without any. */
+  lichenCells(): ReadonlySet<number> {
+    return this.#lichen?.cells ?? new Set();
+  }
+
+  /** Seconds into the game's growth that the first lichen formed, or null. */
+  get lichenFirst(): number | null {
+    return this.#lichen?.first ?? null;
+  }
+
   corpsesOn(layer: number): ReadonlyMap<number, number> {
     return this.#corpses[layer] ?? new Map();
   }
@@ -1995,6 +2021,7 @@ export class Fungus {
       // Only once a flower has become a patch: a game with none saves as it always has (the goldens hash the save).
       ...(this.flowers ? { flowers: this.flowers } : {}),
       ...(this.spread ? { spread: this.spread } : {}),
+      ...(this.#lichen ? { lichen: this.#lichen.save() } : {}),
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
@@ -2029,6 +2056,7 @@ export class Fungus {
     L.base = [...((r.base as number[] | undefined) ?? [])];
     this.flowers = (r.flowers as number | undefined) ?? 0;
     this.spread = (r.spread as number | undefined) ?? 0;
+    this.#lichen = r.lichen ? Lichen.load(r.lichen as ReturnType<Lichen["save"]>) : null;
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
       if (layers.length !== this.#layers.length - 1)

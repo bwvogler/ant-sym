@@ -57,6 +57,9 @@ on:
         description: "Also sample the ants' occupancy round the hypha tips (--traffic; reads only, docs/hyphal-traffic.md)"
         type: boolean
         default: false
+      order:
+        description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
+        default: ""
       lichen:
         description: "Also probe the rock the hyphae lie beside and the late earning rate (--lichen; reads only, docs/lichen.md, ja-vlla.11.2)"
         type: boolean
@@ -86,6 +89,7 @@ jobs:
           FLOW: ${{ inputs.flow }}
           TRAFFIC: ${{ inputs.traffic }}
           LICHEN: ${{ inputs.lichen }}
+          ORDER: ${{ inputs.order }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -98,6 +102,7 @@ jobs:
           [[ "$SECONDS_IN" =~ ^[0-9]{1,4}$ ]] || bad "seconds: a whole number up to 9999 (a runner stops after 60 minutes)"
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
           [[ "$BIAS" =~ ^(default|off|count|levels)$ ]] || bad "bias: default, off, count or levels"
+          [[ -z "$ORDER" || "$ORDER" =~ ^[a-z]+(,[a-z]+)*$ ]] || bad "order: upgrade ids, comma-separated"
           [[ -z "$RADIUS" || "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: empty or 1 to 6"
           [[ -z "$TROPISM" || "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: empty or 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
@@ -109,6 +114,7 @@ jobs:
           [ "$TRAFFIC" = "true" ] && args="$args --traffic"
           [ "$LICHEN" = "true" ] && args="$args --lichen"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
+          [ -n "$ORDER" ] && args="$args --order $ORDER"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
