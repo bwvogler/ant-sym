@@ -129,4 +129,13 @@ test("chunks held after a host walks 25 U and 50 U out and back are the awake ar
     far.live <= 1.25 * home.live + 3 * Math.max(0, far.changed - home.changed) + 30,
     `${far.live} chunks after 50 U against ${home.live} staying home`,
   );
+  // absolute bounds, since every relative one above passes when a regression raises every walk alike (review of #403: the game grids' trim missing held
+  // +29 % at 50 U, a missing #dropPiles doubled the food chunks): the food chunks stay at home's, the total within what the walk changed plus a margin
+  assert.ok(far.food <= home.food + 20, `food chunks ${far.food} after 50 U against ${home.food} staying home`);
+  assert.ok(
+    far.live <= home.live + 3 * Math.max(0, far.changed - home.changed) + 80,
+    `${far.live} chunks after 50 U against ${home.live} staying home, absolute`,
+  );
+  // not covered: the colonies' own scratch grids (`trimScratch`: felt, youngs, broods, perceived, donors, scentSum); the walker is one host, and foragers
+  // that walk far are a case of their own (bead ja-2fbq)
 });

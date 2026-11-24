@@ -210,11 +210,11 @@ export interface GameSave {
   };
 }
 
-/** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
 /** Eviction (`Game.evict`): chunks kept round anything awake (ants, the fungus's body, stepped scent), round an awake hole, and chunks dropped a tick. */
 const EVICT_NEAR = 3;
 const EVICT_HOLE = 5;
 const EVICT_PER_TICK = 2;
+/** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
 const CONTACT_RANGE = 4;
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
@@ -741,6 +741,7 @@ export class Game {
    * for nothing. It runs on its own once-a-second cadence, with the awake rule on or not.
    */
   #chunkStep(map: EndlessMap): void {
+    if (!this.prefetch && !this.evict) return;
     if (this.time >= this.#prefetchNext) {
       this.#prefetchNext = this.time + 1;
       const occ = this.#occupied();
