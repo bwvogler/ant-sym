@@ -131,12 +131,6 @@ test("the same world and the same landing make the same line: its salt, heading 
   assert.deepEqual(a.line.holes, b.line.holes);
 });
 
-test("a game over a line that began mid-game refuses to save, so no line is lost without a word", () => {
-  const g = fresh();
-  found(g, farPoint(g), 20, 0.4);
-  assert.throws(() => g.save(), /2 lines/);
-});
-
 test("with the fungus's hyphae on, a line that begins mid-game takes a landing and plays on: every per-layer structure of the fungus was made for it", () => {
   const g = new Game(generateOneWorld(SEED), { autoFound: false, fungus: { hyphae: true } }, mulberry32(5), specs);
   const p = farPoint(g);

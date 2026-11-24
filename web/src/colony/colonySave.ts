@@ -61,7 +61,7 @@ export const COLONY_SKIP: ReadonlySet<string> = new Set([
   "nest",
   "layers",
   "home",
-  "lineIndex", // the game's: which line this colony's hole is on, set at construction (a save holds one line until E3.4)
+  "lineIndex", // the game's: which line this colony's hole is on, set at construction (rebuilt by the game's own founding replay on load)
   "line",
   "holeCells",
   "policy",
