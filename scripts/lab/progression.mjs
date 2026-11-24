@@ -23,6 +23,9 @@
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
+// --lichen only reads (the game is the same bit for bit; ja-vlla.11.2, docs/lichen.md, PRD §90): every 5 s it counts the plane's rock cells
+// beside a hypha cell (the cells an alga film or a wild lichen would sit on, so the chance a hypha meets one), the first time
+// a hypha touched rock, and mutations earned a minute in the last three minutes (the light-income runaway gate, L2).
 // --sun sets how many times faster spores fade on one world's sunlit plane (FungusParams.sun, ja-6ip); unset, the default.
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -59,6 +62,7 @@ if (isMainThread) {
     split: flag("split"),
     trace: flag("trace"),
     traffic: flag("traffic"),
+    lichen: flag("lichen"),
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
     tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
@@ -97,6 +101,10 @@ if (isMainThread) {
       );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     if (r.trace?.length) console.log(`  trace: ${r.trace.join(" · ")}`);
+    if (r.lichen)
+      console.log(
+        `  lichen probe: rock cells touched ${r.lichen.touched} (of ${r.lichen.edge} rock cells beside open ground), first touch ${fmt(r.lichen.first)}, mutations a minute in the last 3 min ${r.lichen.lateRate.toFixed(1)}`,
+      );
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
   const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
@@ -231,10 +239,12 @@ if (isMainThread) {
     };
   };
   const probe = wantTraffic ? await trafficProbe(g) : null;
+  const lichen = workerData.lichen ? await lichenProbe(g, seconds) : null;
   const queue = [...order];
   for (let k = 0; g.time < seconds; k++) {
     g.tick(DT);
     if (probe && k % 150 === 0) probe.sample(r.quarter >= 0);
+    if (lichen && k % 150 === 0) lichen.sample();
     const e = g.fungus.evolution;
     if (e && buy) {
       // The first upgrade in the order it can keep now, as a player would: one it can't yet afford doesn't hold up a cheaper one.
@@ -272,6 +282,7 @@ if (isMainThread) {
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
   r.leans = `${g.fungus.hyphaeOn(0)?.trafficLeans ?? 0} of ${g.fungus.hyphaeOn(0)?.sideChoices ?? 0} side choices; tropisms ${g.fungus.hyphaeOn(0)?.tropisms ?? 0} of ${g.fungus.hyphaeOn(0)?.tropismChoices ?? 0} grow steps`;
   if (probe) r.traffic = probe.result();
+  if (lichen) r.lichen = lichen.result();
   parentPort.postMessage(r);
 }
 
@@ -407,6 +418,52 @@ async function trafficProbe(g) {
         };
       };
       return { before: one(phases.before), after: one(phases.after) };
+    },
+  };
+}
+
+/**
+ * The lichen probe (`--lichen`, ja-vlla.11.2): reads only. Which of the plane's rock cells a hypha cell has lain beside (an
+ * alga film or a wild lichen would sit on such a cell, docs/lichen.md §1), when the first was, and the mutations earned a
+ * minute over the game's last three minutes.
+ */
+async function lichenProbe(g, seconds) {
+  const { rockAt, inBounds, OPEN, ROCK } = await import("../../web/src/colony/world.ts");
+  const { keyCell, nx, ny } = await import("../../web/src/colony/hex.ts");
+  const map = g.colonies[0].layers[0].map;
+  const rock = (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === ROCK;
+  let edge = 0;
+  for (let y = 0; y < map.size.h; y++)
+    for (let x = map.x0; x < map.x0 + map.size.w; x++) {
+      if (!rock(x, y)) continue;
+      let open = false;
+      for (let d = 0; d < 6 && !open; d++) {
+        const [ax, ay] = [nx(x, y, d), ny(y, d)];
+        open = inBounds(map, ax, ay) && rockAt(map, ax, ay) === OPEN;
+      }
+      if (open) edge++;
+    }
+  const touched = new Set();
+  let first = -1;
+  let lateFrom = null;
+  return {
+    sample() {
+      const h = g.fungus.hyphaeOn(0);
+      if (h)
+        for (const k of h.parent.keys()) {
+          const [x, y] = keyCell(k);
+          for (let d = 0; d < 6; d++) {
+            const [ax, ay] = [nx(x, y, d), ny(y, d)];
+            if (!rock(ax, ay)) continue;
+            touched.add(ax * 1e6 + ay);
+            if (first < 0) first = Math.round(g.time);
+          }
+        }
+      if (lateFrom === null && g.time >= seconds - 180) lateFrom = [g.time, g.fungus.evolution?.earned ?? 0];
+    },
+    result() {
+      const late = lateFrom ? ((g.fungus.evolution?.earned ?? 0) - lateFrom[1]) / ((g.time - lateFrom[0]) / 60 || 1) : 0;
+      return { touched: touched.size, edge, first, lateRate: late };
     },
   };
 }
