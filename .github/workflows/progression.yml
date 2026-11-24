@@ -191,3 +191,9 @@ jobs:
           if grep -q '^  traffic ' out/seed-*.txt; then
             { echo; echo '```'; grep -H '^  traffic ' out/seed-*.txt | sed 's/^out\///'; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+      # --lichen's line (one per seed), in the log and on the summary page (ja-vlla.11.2).
+      - name: lichen
+        run: |
+          if grep -q '^  lichen probe' out/seed-*.txt; then
+            { echo; echo '```'; grep -H '^  lichen probe' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
