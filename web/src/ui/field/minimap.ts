@@ -191,10 +191,12 @@ export class Minimap {
         const [cx, cy] = [x >> CHUNK_BITS, y >> CHUNK_BITS];
         if (cx !== ckx || cy !== cky) {
           [ckx, cky] = [cx, cy];
-          rockC = m.rock.peek(cx, cy);
-          foodC = m.food.peek(cx, cy);
-          spoilC = m.spoil?.peek(cx, cy);
-          sporeC = k.spores.peek(cx, cy);
+          // past the nominal box (+-32,768 chunks) chunk keys alias (`ja-qpv.10`): the window there is unmade ground, as the camera's reach holds it
+          const inBox = cx >= -32768 && cx < 32768 && cy >= -32768 && cy < 32768;
+          rockC = inBox ? m.rock.peek(cx, cy) : undefined;
+          foodC = inBox ? m.food.peek(cx, cy) : undefined;
+          spoilC = inBox ? m.spoil?.peek(cx, cy) : undefined;
+          sporeC = inBox ? k.spores.peek(cx, cy) : undefined;
         }
         const at = ((y & mask) << CHUNK_BITS) | (x & mask);
         // Ground nobody has made (and under the fog, ground nobody has sensed) is fog; sensed ground that nobody senses now is dimmed.

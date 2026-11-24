@@ -27,9 +27,10 @@ import type { FieldEnv } from "../field/env.ts";
 import { stripAt } from "../field/ground.ts";
 import { MINIMAP_EVERY_MS, Minimap, WINDOW_UNITS_PX, arrowOn } from "../field/minimap.ts";
 import { extentOf } from "../field/rig.ts";
-import { Knowledge, GRACE } from "../fog/knowledge.ts";
+import { Knowledge, GRACE, LIVE, REMEMBERED } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
-import { fogRgb } from "../field/fogCull.ts";
+import { dimPx, fogRgb } from "../field/fogCull.ts";
+import { holeOwner } from "../lens.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { buildGame } from "../useColony.ts";
 import { centreX, centreY } from "../../colony/index.ts";
@@ -713,4 +714,83 @@ test("endless: under the fog the window paints unsensed ground as fog, though ma
   s.minimap.draw(s.k, SEEN_ALL);
   assert.deepEqual(paintedPixel(s, 40, 50), [...fogRgb(THEME), 255], "a made chunk nobody has sensed: fog");
   assert.equal(s.rec.log.filter((l) => l === "fill()").length, 0, "no hole has been sensed: no arrow shows where one lies");
+});
+
+// ---- Review of #411, S1: the window's ants, its remembered-ground path, its arrow colour and its frame at negative cameras. ----
+
+test("endless paint: a healthy ant is a dot in its colony's odour colour, an infected one in the host tone, a dead one and one on the other layer are not drawn", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  const win = miniFrame(s.ext, s.k.c);
+  const ant = (mx: number, my: number) => [win.x0 + mx * 4 + 1, win.y0 + my * 4 + 1] as const;
+  const [a0, a1, a2, a3] = [ant(10, 30), ant(20, 30), ant(30, 30), ant(40, 30)];
+  const colony = {
+    n: 4,
+    nestOdour: 0.3,
+    alive: [true, true, false, true],
+    layer: [PLANE, PLANE, PLANE, CURTAIN],
+    load: [0, INFECTED, 0, 0],
+    x: [a0[0], a1[0], a2[0], a3[0]],
+    y: [a0[1], a1[1], a2[1], a3[1]],
+  };
+  s.minimap.paint({ ...s.k, colonies: [colony] } as unknown as FieldCtx);
+  const px = (mx: number, my: number) => paintedPixel(s, mx, my).slice(0, 3);
+  assert.deepEqual(px(10, 30), [...odourRgb(THEME.inkRgb, THEME.warnRgb, 0.3)], "a healthy ant, at its pixel of the window");
+  assert.deepEqual(
+    px(20, 30),
+    [0, 1, 2].map((j) => Math.round((THEME.sporeRgb[j]! + THEME.inkRgb[j]!) / 2)),
+    "an infected one, in the host tone",
+  );
+  assert.deepEqual(px(30, 30), [...fogRgb(THEME)], "a dead ant is not drawn");
+  assert.deepEqual(px(40, 30), [...fogRgb(THEME)], "nor one on the other layer");
+});
+
+test("endless paint, under the fog: remembered ground is the snapshot, dimmed, and an ant on ground that is not live is not drawn", () => {
+  const stub = (st: number, at: number) => ({
+    state: () => st,
+    stateAt: () => at,
+    snapshot: (_l: number, n: string) => (n === SNAP.rock ? ROCK : 0),
+  });
+  const s = endless({ x: 5000, y: 3000 }, { over: { fog: stub(REMEMBERED, LIVE) } as unknown as Partial<FieldCtx> });
+  const win = miniFrame(s.ext, s.k.c);
+  const [x, y] = windowCell(win, 40, 50);
+  s.plane.rock.ensure(x >> 6, y >> 6).fill(0); // the world says open here now; the snapshot says rock
+  s.minimap.paint(s.k);
+  const want = new Uint8ClampedArray([...THEME.rock, 255]);
+  dimPx(want, 0, fogRgb(THEME));
+  assert.deepEqual(paintedPixel(s, 40, 50), [...want], "the snapshot's rock, dimmed, not what the world holds now");
+  const colony = { n: 1, nestOdour: 0.3, alive: [true], layer: [PLANE], load: [0], x: [win.x0 + 161], y: [win.y0 + 201] };
+  s.minimap.paint({ ...s.k, colonies: [colony], fog: stub(LIVE, REMEMBERED) } as unknown as FieldCtx);
+  assert.notDeepEqual(
+    paintedPixel(s, 40, 50).slice(0, 3),
+    [...odourRgb(THEME.inkRgb, THEME.warnRgb, 0.3)],
+    "an ant on ground that is only remembered is not drawn",
+  );
+});
+
+test("endless draw: each hole's arrow is in its owner's odour colour (the two start colonies differ)", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  s.minimap.draw(s.k, SEEN_ALL);
+  const odours = new Set<number>();
+  for (const h of s.g.world.lines.flatMap((wl) => wl.line.holes)) {
+    const col = s.g.colonies[holeOwner(s.g.colonies, PLANE, h.x, h.y)]!;
+    odours.add(col.nestOdour);
+    const [r, g, b] = odourRgb(THEME.inkRgb, THEME.warnRgb, col.nestOdour);
+    assert.ok(s.rec.log.includes(`fillStyle = rgb(${r}, ${g}, ${b})`), `an arrow for the hole at ${h.x},${h.y}`);
+  }
+  assert.equal(odours.size, 2, "so the test can tell the colours apart");
+});
+
+test("miniFrame puts the camera's chunk in the 9th column and 7th row for any camera, negative chunks included", () => {
+  const e = { x0: -2097152, w: 4194304, h: 3565158, endless: true as const };
+  for (const c of [
+    { x: 5000, y: 3000 },
+    { x: -5000, y: -3000 },
+    { x: -10, y: -10 },
+    { x: 10, y: -10 },
+    { x: -10, y: 10 },
+  ]) {
+    const f = miniFrame(e, c);
+    assert.equal(Math.floor((c.x - f.x0) / CHUNK), 8, `column for ${c.x},${c.y}`);
+    assert.equal(Math.floor((c.y - f.y0) / (CHUNK * R)), 6, `row for ${c.x},${c.y}`);
+  }
 });
