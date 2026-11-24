@@ -70,4 +70,13 @@ test("the nest card says a frozen colony is asleep, and says nothing of one that
   assert.equal(asleepNote(g, 1), null, "another colony is still awake");
   g.thaw(0);
   assert.equal(asleepNote(g, 0), null, "woken: nothing said");
+  // a frozen colony that has died out is not asleep: the card says so (ja-ko75)
+  const c = g.colonies[1]!;
+  c.alive.fill(0);
+  if (c.queen) c.queen.alive = false;
+  c.brood.items.length = 0;
+  c.alates.length = 0;
+  g.freeze(1);
+  assert.match(asleepNote(g, 1)!, /^Extinct: no ant, no brood and no queen are left/);
+  assert.match(asleepNote({ isFrozen: () => true, colonies: [] as never }, 5)!, /^Asleep:/, "no such colony: asleep, not extinct");
 });

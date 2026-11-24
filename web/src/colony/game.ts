@@ -647,6 +647,7 @@ export class Game {
     near: boolean[];
     entered: boolean[];
     holds: boolean[];
+    dead: boolean[];
     contact: (a: number, b: number) => boolean;
   } {
     const { distance, nestGround } = rule.params;
@@ -691,7 +692,9 @@ export class Game {
       }
       return false;
     };
-    return { near, entered, holds, contact };
+    // A colony that has died out frees its place under the cap and is frozen for good (ja-ko75).
+    const dead = this.colonies.map((c) => c.extinct);
+    return { near, entered, holds, dead, contact };
   }
 
   /**

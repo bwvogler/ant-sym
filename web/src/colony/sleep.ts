@@ -41,6 +41,11 @@ export interface SleepInputs {
   holds: readonly boolean[];
   /** whether colony a's ants and colony b's are in sensing range now (asked only of awake pairs) */
   contact: (a: number, b: number) => boolean;
+  /**
+   * This colony has died out for good (`Colony.extinct`, ja-ko75): it counts as asleep, so it never takes a place under the cap, it is frozen
+   * the second it is found dead, and nothing wakes it. Absent: no colony is dead.
+   */
+  dead?: readonly boolean[];
 }
 
 export interface SleepVerdict {
@@ -85,13 +90,14 @@ export class SleepRule {
   }
 
   /** The groups: colonies in contact within the last T, with those linked through others, as lists of indices. */
-  #groups(n: number, time: number): number[][] {
+  #groups(n: number, time: number, dead: (k: number) => boolean): number[][] {
     const root = Array.from({ length: n }, (_, k) => k);
     const find = (k: number): number => (root[k] === k ? k : (root[k] = find(root[k]!)));
     for (const [key, at] of this.#contacts) {
       if (time - at >= this.params.delay) continue;
       const [a, b] = key.split(",").map(Number) as [number, number];
-      if (a < n && b < n) root[find(a)] = find(b);
+      // an extinct colony is nobody's group-mate: its old contacts must not hold a living colony to it
+      if (a < n && b < n && !dead(a) && !dead(b)) root[find(a)] = find(b);
     }
     const out = new Map<number, number[]>();
     for (let k = 0; k < n; k++) out.set(find(k), [...(out.get(find(k)) ?? []), k]);
@@ -124,8 +130,10 @@ export class SleepRule {
     }
     for (let a = 0; a < n; a++)
       for (let b = a + 1; b < n; b++) if (!inp.asleep[a] && !inp.asleep[b] && inp.contact(a, b)) this.#contacts.set(`${a},${b}`, time);
-    const groups = this.#groups(n, time);
-    const asleep = [...inp.asleep];
+    const dead = (k: number): boolean => !!inp.dead?.[k];
+    const groups = this.#groups(n, time, dead);
+    // An extinct colony is asleep for everything below: it does not count toward the cap and is not woken (the verdict freezes it if it was awake).
+    const asleep = inp.asleep.map((s, k) => s || dead(k));
     const rank = (g: number[]) => Math.max(...g.map((k) => this.#touched[k]!));
     const awakeCount = () => asleep.filter((s) => !s).length;
 
@@ -144,6 +152,7 @@ export class SleepRule {
     // 1. Wake: a sleeping group the awake fungus is near, or whose nest ground an awake host entered, unless the cap holds it asleep.
     for (const g of groups) {
       if (!g.every((k) => asleep[k])) continue;
+      if (g.some(dead)) continue;
       if (g.some((k) => time < this.#capUntil[k]!)) continue;
       if (g.some((k) => inp.near[k] || inp.entered[k])) {
         // a wake is a touch: the group just woken outranks those awake the longer, so over the cap the awake set rotates
@@ -174,7 +183,7 @@ export class SleepRule {
     // 4. Room comes back: the highest-ranked cap-frozen group that still holds the fungus wakes once its T has passed and there is room for it.
     const capFrozen = groups
       .filter((g) => g.every((k) => asleep[k] && this.#capUntil[k]! > -Infinity && time >= this.#capUntil[k]!))
-      .filter((g) => g.some((k) => inp.holds[k]))
+      .filter((g) => g.some((k) => inp.holds[k]) && !g.some(dead))
       .sort((x, y) => rank(y) - rank(x) || x[0]! - y[0]!);
     for (const g of capFrozen) {
       if (awakeCount() + g.length > p.cap) continue;
