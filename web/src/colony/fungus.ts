@@ -1555,16 +1555,25 @@ export class Fungus {
 
   /**
    * The evolving fungus takes root on the open cells within `radius` of (x, y) (Game.land): its base, which keeps
-   * sporulating at the evolution's `spores` level. Nothing without an evolution.
+   * sporulating at the evolution's `spores` level. With `single`, on the one cell under (x, y) (an infected queen's
+   * founding, owner 2026-11-24: one tile, where the opening landing has a few); `radius` is then ignored (the tips'
+   * first steps are looked for from the one cell). Nothing without an evolution.
    */
-  root(x: number, y: number, radius: number, layer = 0, toward: { x: number; y: number } | null = null): void {
+  root(x: number, y: number, radius: number, layer = 0, toward: { x: number; y: number } | null = null, single = false): void {
     if (!this.#evolution) return;
     const L = this.#layers[layer] as SporeLayer;
     const { map } = L;
     const have = new Set(L.base);
-    disc(map, x, y, radius, (cx, cy) => {
-      if (!rockAt(map, cx, cy) && !have.has(cellKey(cx, cy))) L.base.push(cellKey(cx, cy));
-    });
+    if (single) {
+      cellOf(x, y);
+      const sx = CELL[0];
+      const sy = CELL[1];
+      if (!rockAt(map, sx, sy) && !have.has(cellKey(sx, sy))) L.base.push(cellKey(sx, sy));
+      radius = 0;
+    } else
+      disc(map, x, y, radius, (cx, cy) => {
+        if (!rockAt(map, cx, cy) && !have.has(cellKey(cx, cy))) L.base.push(cellKey(cx, cy));
+      });
     this.#evolution.root();
     if (!this.params.hyphae) return;
     // As hyphae: the patch is the hyphae's first cells, and a tip sets out from its rim in each of the six ways, going outward:
@@ -1617,11 +1626,12 @@ export class Fungus {
   /**
    * A flower is a cell outside every patch and its six neighbours, all hyphae (PRD §85, ja-vlla.5; owner 2026-11-23:
    * anywhere, and one may touch a patch). A cell the hyphae have just grown closes a flower round itself or round any of its six
-   * neighbours. The seven's cells not yet in a patch (base or sources) join it: when none of the seven were, they are a
-   * new patch (the count, room to grow, goes up by one, with no start of its own: the mass is the hyphae's); when some
-   * were, the patch spreads over them and the count stays. A flower roots no tips of its own (owner, 2026-11-23: its
-   * seven cells are hyphae already, and the tips that closed it run on). Layer 0 only, as every root today. Nothing
-   * without an evolution.
+   * neighbours. The patch is under the middle cell only (owner 2026-11-24: the first build put it under all seven, which
+   * misread the rule); a neighbour becomes patch later, when it is the middle of a flower of its own. A middle with no
+   * patch cell among its six neighbours is a new patch (the count, room to grow, goes up by one, with no start of its
+   * own: the mass is the hyphae's); a middle beside a patch extends it and the count stays. A flower roots no tips of its
+   * own (owner, 2026-11-23: its cells are hyphae already, and the tips that closed it run on). Layer 0 only, as every
+   * root today. Nothing without an evolution.
    */
   #settle(): void {
     const e = this.#evolution;
@@ -1643,15 +1653,14 @@ export class Fungus {
         if (!cells.every((c) => h.parent.has(c))) continue;
         // The middle is new ground (a patch grows from outside in): a hex centred on a patch's own edge cell is the tips' first steps, not a web.
         if (inPatch(cells[0]!)) continue;
-        // The middle is outside every patch, so there is always at least one fresh cell.
-        const fresh = cells.filter((c) => !inPatch(c));
-        for (const c of fresh) {
-          L.base.push(c);
-          base.add(c);
-          h.sources.add(c);
-        }
-        if (fresh.length < cells.length) {
-          this.spread += fresh.length;
+        // Only the middle becomes patch (owner 2026-11-24): its six neighbours are hyphae, and each becomes patch when it
+        // is itself the middle of a closed flower. A middle beside a patch's cell extends that patch; any other is a new one.
+        const touches = cells.some((c, i) => i > 0 && inPatch(c));
+        L.base.push(cells[0]!);
+        base.add(cells[0]!);
+        h.sources.add(cells[0]!);
+        if (touches) {
+          this.spread++;
           continue;
         }
         e.settle();

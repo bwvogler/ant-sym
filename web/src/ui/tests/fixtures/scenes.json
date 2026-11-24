@@ -35,7 +35,7 @@
     "strokes": 13
   },
   "below-labels": {
-    "hash": "476028ed817dc190",
+    "hash": "3ebb3b1288d85b45",
     "calls": 214,
     "pixels": "fd8d6ebfa9b907e4",
     "drawImages": 22,
@@ -58,7 +58,7 @@
   "above-smell": {
     "hash": "255d5cde301d6b06",
     "calls": 446,
-    "pixels": "2892f93e300c911c",
+    "pixels": "0c0752ec13f57295",
     "drawImages": 17,
     "strokes": 10
   },
@@ -77,9 +77,9 @@
     "strokes": 12
   },
   "far-ants": {
-    "hash": "06eb2ab4177d0029",
-    "calls": 670,
-    "pixels": "c2c577403437df80",
+    "hash": "0cf6a7834c9d65f7",
+    "calls": 689,
+    "pixels": "cf2cc9946fa76423",
     "drawImages": 150,
     "strokes": 15
   },
@@ -161,14 +161,14 @@
     "strokes": 10
   },
   "queen-below": {
-    "hash": "d011f879b68a56af",
+    "hash": "b61dc94541ce81e6",
     "calls": 169,
     "pixels": "fd8d6ebfa9b907e4",
     "drawImages": 17,
     "strokes": 12
   },
   "queen-below-dark": {
-    "hash": "f65c81a7c8b4c6ec",
+    "hash": "53c9645d74f75487",
     "calls": 201,
     "pixels": "965b19ee2982ab5e",
     "drawImages": 4,
@@ -182,7 +182,7 @@
     "strokes": 11
   },
   "below-fit": {
-    "hash": "726aecda6a8919bd",
+    "hash": "13ca52b9b1708e5a",
     "calls": 2020,
     "pixels": "e9799936d50cea78",
     "drawImages": 1706,
@@ -196,21 +196,21 @@
     "strokes": 12
   },
   "below-ants": {
-    "hash": "21ae7c6704d2b8c8",
+    "hash": "afbc33167075e002",
     "calls": 221,
     "pixels": "fd8d6ebfa9b907e4",
     "drawImages": 4,
     "strokes": 14
   },
   "below-followed": {
-    "hash": "b02c0f80fd76d972",
+    "hash": "a348c2caa5bc4c2f",
     "calls": 200,
     "pixels": "fd8d6ebfa9b907e4",
     "drawImages": 22,
     "strokes": 14
   },
   "below-dark": {
-    "hash": "82da34d4fae5a0ea",
+    "hash": "d7f8c94312629b5c",
     "calls": 179,
     "pixels": "965b19ee2982ab5e",
     "drawImages": 22,

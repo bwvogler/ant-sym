@@ -6,7 +6,7 @@ import { LIVE, UNKNOWN, type Knowledge } from "../fog/knowledge.ts";
 import { chamberOwner } from "../lens.ts";
 import { toWorld, type Camera, type Viewport } from "../camera.ts";
 import type { Followed } from "../follow.ts";
-import { lineNear, planePoint, stripColumn, stripPoint } from "../link.ts";
+import { lineNear, pickReach, planePoint, stripColumn, stripPoint } from "../link.ts";
 
 /** A click picks the nearest ant within this many CSS px. */
 export const PICK_PX = 14;
@@ -78,10 +78,11 @@ export function linkTarget(
   v: Viewport,
   x: number,
   y: number,
+  dpr = 1,
 ): { view: number; x: number; y: number } | null {
   const [wx, wy] = toWorld(c, v, x, y);
   if (lv === PLANE) {
-    const hit = lineNear(world, wx, wy);
+    const hit = lineNear(world, wx, wy, pickReach(c.zoom, dpr));
     if (hit === null) return null;
     const q = stripPoint(hit.s);
     return { view: curtainLayerOf(hit.line), x: q.x, y: q.y };

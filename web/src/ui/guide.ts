@@ -660,7 +660,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "fungus-unlocks",
     title: "The fungus's unlocks",
     covers:
-      "A plan for the fungus: a landing patch that is a seven-cell flower (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
+      "A plan for the fungus: a small landing patch (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
   },
   {
     note: "lichen",

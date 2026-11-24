@@ -40,6 +40,7 @@ function make(over: Partial<DevDeps> = {}) {
     notify: (text, tone) => calls.notices.push([text, tone]),
     traces: { traces: [{ colony: 1, i: 4, xs: [0, 1, 2], end: "home" }] } as unknown as AntTraces,
     view: "above",
+    line: 1,
     followed,
     setFollowed: (f) => calls.followed.push(f),
     sensed: new SensedMap(),
@@ -102,11 +103,18 @@ test("view and followed read what the page gave; notify passes the text and tone
   ]);
 });
 
+test("line reads the line whose curtain the side view shows (E5.6: the page's own record of a pick)", () => {
+  const { hook } = make();
+  assert.equal(hook.line(), 1);
+});
+
 test("camera asks the field for the plane above and the curtain below, and null before the field is there; goNest passes the colony on", () => {
   const { calls, hook } = make();
   assert.deepEqual(hook.camera("above"), { x: PLANE });
   assert.deepEqual(hook.camera("below"), { x: CURTAIN });
   assert.deepEqual(calls.cameras, [PLANE, CURTAIN]);
+  assert.deepEqual(hook.camera("below", 2), { x: CURTAIN + 2 }, "a later line's curtain is layer 1 + its index");
+  assert.deepEqual(hook.camera("above", 2), { x: PLANE }, "the plane has one camera");
   hook.goNest(1);
   assert.deepEqual(calls.nests, [1]);
   const none = make({ field: { current: null } }).hook;

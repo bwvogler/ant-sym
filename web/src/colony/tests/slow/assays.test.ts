@@ -46,8 +46,13 @@ test("A2b rich vs poor source: the colony picks the richer", () => {
 });
 
 // One world (PRD §76.1): A5 fails 0/20, more ants outside before food than after (ja-lp4.6.8), so it is guarded: outside
-// before ÷ after at most A5_GUARD (worst seed 2.645, seed 5, + 10 %). A5b passes 18/20 (fails 7, 20) and keeps its mark.
+// before ÷ after at most A5_GUARD (worst seed 2.645, seed 5, + 10 %). A5b passed 18/20 (fails 7, 20) on seeds 1 and 2, both held.
+// With the floor-mark max rule on (PRD §77.8) A5b is 15/20 on seeds 1-20 (17 on the old rule at the same head, 17 and 19 on seeds 21-40
+// for the old rule and the new) and a seed flips with the stream: seed 2 passes at decays 3 s and 10 s and fails at 4-8 s (gone/flow 0.72
+// at 6 s, the pass mark 0.5). So A5b's mark is a count over seeds 1-6 (old rule 5 of 6, the default 4 of 6; owner, 2026-11-24, PR #402).
 const A5_GUARD = 2.91;
+const A5B_SEEDS = [1, 2, 3, 4, 5, 6];
+const A5B_PASS = 4;
 for (const seed of [1, 2]) {
   test(`A5 regulation, guarded (ja-lp4.6.8): no more ants out before food than today's worst seed (seed ${seed})`, () => {
     const m = runAssay(oneAssay("regulate"), seed).metrics;
@@ -55,11 +60,15 @@ for (const seed of [1, 2]) {
     const ratio = m.outsideBefore / m.outsideAfter;
     assert.ok(ratio <= A5_GUARD, `outside before ${m.outsideBefore} ÷ after ${m.outsideAfter} = ${ratio}, guard ${A5_GUARD}`);
   });
-  test(`A5b foraging stops: departures fall once food is gone (seed ${seed})`, () => {
-    const m = runAssay(oneAssay("regulateStop"), seed).metrics;
-    assert.equal(m.pass, 1, `trips out per minute while food flowed ${m.departsFlow}, once gone ${m.departsGone}`);
-  });
 }
+test(`A5b foraging stops: departures fall once food is gone (at least ${A5B_PASS} of seeds ${A5B_SEEDS.join(", ")})`, () => {
+  const runs = A5B_SEEDS.map((seed) => ({ seed, m: runAssay(oneAssay("regulateStop"), seed).metrics }));
+  const passed = runs.filter((r) => r.m.pass === 1).length;
+  const seen = runs
+    .map((r) => `seed ${r.seed}: ${r.m.pass === 1 ? "pass" : "fail"} (flow ${r.m.departsFlow}, gone ${r.m.departsGone})`)
+    .join("; ");
+  assert.ok(passed >= A5B_PASS, `${passed} of ${A5B_SEEDS.length} pass, need ${A5B_PASS}: ${seen}`);
+});
 
 // One world (PRD §76.1): A9 10/20 at its mark of 4 lost per 100 food (ja-lp4.6.4), A10 2/20 at its draw of 2 (ja-je8), so
 // both are guarded: A9 at most A9_GUARD lost per 100 food (worst 8.04, seed 7, + 10 %, rounded up); A10's draw at least A10_GUARD

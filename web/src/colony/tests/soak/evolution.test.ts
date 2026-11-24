@@ -333,7 +333,8 @@ test("a colony the world starts with has nothing a founded one can't get", () =>
     g.colonies[g.addColony({ ...beyond(holes[holes.length - 1]!, 20), antCount: 200, odour: 0.5, fungus: { load: 0.4, strain: GARDEN } })]!;
   assert.equal(carried.queen!.load, 0.4);
   assert.equal(g.fungus.evolution!.patches, 2, "it roots by her hole");
-  assert.ok(g.fungus.base.length > patches);
+  assert.equal(g.fungus.base.length, patches + 1, "one tile, where the landing has a few (owner 2026-11-24)");
+  assert.ok(patches > 1, "the landing has more than one");
   // On the plane by her hole, as the landing is by the first colony's: every cell of her patch nearer her hole than any other.
   const dist = (key: number, c: typeof first) => {
     const h = c.holeCells[c.params.nest]!;

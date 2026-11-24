@@ -44,6 +44,11 @@
 //     keeps only the guide and the nest; l closes it.
 //  16. Polish (PRD §69.9): Appearance (set, kept across a reload, the palette, System clears it), a drawer's motion and its
 //     absence under reduced motion, and on a phone an open sheet not covered by a notice (it waits in the bell).
+//  17. fewer notices (PRD §69.6): the same notice three times is one toast, counted (×3); Important only floats a warning and not a remark;
+//     Bell only floats none (they stay in the page for a screen reader); the choice is kept across a reload.
+//  18. the fog of war (PRD §89, ja-1ypq.3.6), on `?fog=1`: the cell under a host is live, ground no host has been near is unknown, a cell a
+//     host left is remembered and stays explored; a frame costs about what it does without the fog; and "no ants": a plain ant put on
+//     remembered ground is not drawn (the crop of the field is byte-identical with it and without it), where on live ground it is.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -2485,8 +2490,192 @@ try {
     fogF.mean <= Math.max(baseF.mean * 1.5, baseF.mean + 15),
     `the fog's frame time (${fogF.mean.toFixed(1)} ms) is within noise of the game without it (${baseF.mean.toFixed(1)} ms)`,
   );
+  // "And no ants" (ja-1ypq.3.6): the checks above read the fog's state; this one reads the picture. A host that has left leaves remembered
+  // ground, and a plain ant standing on it is not drawn: a fixed crop at the middle of the field with the ant on the cell is byte-identical
+  // to the crop with it sent away. The control runs the same two crops on live ground, where the ant's being there changes the picture, so
+  // the check could have failed (and a cell the camera cannot centre on fails the control, not the check).
+  await (await gp.context().newCDPSession(gp)).send("Emulation.setCPUThrottlingRate", { rate: 1 }); // the frame check is done
+  const interior = (c) =>
+    gp.evaluate(([x, y]) => {
+      const m = window.jevAnts.game.world.plane;
+      return x > m.x0 + 30 && x < m.x0 + m.size.w - 30 && y > 30 && y < m.size.h - 30;
+    }, c);
+  let there = null;
+  for (const c of seen)
+    if ((await stateAt(...c)) === 1 && (await interior(c))) {
+      there = c;
+      break;
+    }
+  check(there !== null, "a remembered cell well inside the map is found to look at");
+  /** [colony, slot] of the first living ant on the plane that is a host, or of one that is not. */
+  const antWhere = (host) =>
+    gp.evaluate((host) => {
+      const cs = window.jevAnts.game.colonies;
+      for (let k = 0; k < cs.length; k++)
+        for (let i = 0; i < cs[k].n; i++) if (cs[k].alive[i] && cs[k].load[i] >= 0.05 === host) return [k, i];
+      return null;
+    }, host);
+  const putAnt = ([k, i], [x, y]) => gp.evaluate(([k, i, x, y]) => window.jevAnts.game.colonies[k].putAnt(i, 0, x, y), [k, i, x, y]);
+  const lone = await antWhere(false);
+  const hostAnt = await antWhere(true);
+  check(lone !== null && hostAnt !== null, "a plain ant and a host are found to move");
+  const far = [0.5, 0.5]; // unknown ground, out of the crop
+  const twoFrames = () => gp.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  // The picture of the field at the middle of the screen, once it holds still: two crops in a row are the same (the game is paused, so what
+  // moves is only the frame catching up with the change just made; two animation frames let the draw run, and no fixed wait guesses how long).
+  const crop = async (name) => {
+    let last = null;
+    return until(
+      async () => {
+        await twoFrames();
+        const b = await gp.screenshot({
+          clip: { x: 490, y: 300, width: 300, height: 300 },
+          ...(SHOTS ? { path: join(SHOTS, `fog-${name}.png`) } : {}),
+        });
+        const same = last !== null && b.equals(last);
+        last = b;
+        return same ? b : null;
+      },
+      `the field's picture (${name}) to hold still`,
+      8000,
+      50,
+    );
+  };
+  /** The fog page's camera once it has held still for three polls (as steadyCam does for the first page). */
+  const settledCam = async () => {
+    let last = "";
+    let same = 0;
+    return until(
+      async () => {
+        const cam = await gp.evaluate(() => window.jevAnts.camera("above"));
+        const key = JSON.stringify(cam);
+        same = key === last ? same + 1 : 0;
+        last = key;
+        return same >= 2 && cam ? cam : null;
+      },
+      "the fog page's camera to hold still",
+      5000,
+      60,
+    );
+  };
+  await gp.evaluate(() => window.jevAnts.goNest(1)); // the camera is the player's from here on
+  await settledCam();
+  await gp.evaluate(([x, y]) => {
+    const c = window.jevAnts.camera("above");
+    c.x = x;
+    c.y = y;
+    c.zoom = 30;
+  }, there);
+  const cam18 = await settledCam();
+  check(near(cam18.x, there[0], 1e-6) && near(cam18.y, there[1], 1e-6), "the camera is on the remembered cell");
+  check((await stateAt(...there)) === 1, "the cell is still remembered, not live");
+  await putAnt(lone, there);
+  const withAnt = await crop("remembered-with-ant");
+  await putAnt(lone, far);
+  const withoutAnt = await crop("remembered-without-ant");
+  check(withAnt.equals(withoutAnt), "an ant on remembered ground is not drawn: the picture is the same with it and without it");
+  await putAnt(hostAnt, there);
+  await gp.evaluate(() => window.jevAnts.step(1));
+  check((await stateAt(...there)) === 2, "a host put on the cell makes it live again");
+  await putAnt(lone, there);
+  const liveWith = await crop("live-with-ant");
+  await putAnt(lone, far);
+  const liveWithout = await crop("live-without-ant");
+  check(!liveWith.equals(liveWithout), "the same ant on live ground is drawn: the picture differs with it and without it");
+  check(!liveWith.equals(withAnt), "and live ground is drawn unlike remembered ground");
   await gctx.close();
   await nofog.c.close();
+  // ——— 19. Line picking: a click on a second line shows that line's curtain (E5.6, ja-qpv.4.6) ———
+  section("19. line picking");
+  const lnctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+  const lnp = await lnctx.newPage();
+  await lnp.addInitScript(`window.__onField = ${onField.toString()};`);
+  lnp.on("pageerror", (e) => errors.push(String(e)));
+  await lnp.goto(url);
+  await lnp.getByLabel("world seed").fill(String(SEED));
+  await lnp.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+  await until(() => lnp.evaluate(() => !!window.jevAnts?.game.world), "a game for line picking", 20_000, 100);
+  await lnp.getByRole("button", { name: "Pause", exact: true }).click();
+  // The bounded game grows one line; the endless world will start more. Here the page's own game is given a second line by the founding rule with new
+  // lines on (what the endless plane does): a colony founded far from the first line, in the first free place of a few fractions of the map.
+  const made = await lnp.evaluate(() => {
+    const g = window.jevAnts.game;
+    g.newLines = true;
+    const { w, h } = g.world.plane.size;
+    for (const [fx, fy] of [
+      [0.2, 0.5],
+      [0.5, 0.8],
+      [0.15, 0.15],
+      [0.85, 0.85],
+    ]) {
+      const at = { x: w * fx, y: h * fy };
+      const s = g.settleAt(at);
+      if (s.ok && s.newLine) {
+        g.addColony({
+          ...at,
+          antCount: 10,
+          odour: g.colonies[0].nestOdour,
+          spot: { cell: s.cell, end: s.end, line: s.line, newLine: s.newLine },
+        });
+        return g.world.lines.length;
+      }
+    }
+    return 0;
+  });
+  check(made === 2, `a colony founded far away starts a second line (${made} lines)`);
+  await lnp.locator("canvas").first().focus();
+  await lnp.keyboard.press("Digit0");
+  // The click spot: a cell of line 2 in the open map, clear of every plane ant (a click on an ant follows it) and of line 1's cells.
+  const spot2 = await lnp.evaluate(async () => {
+    const g = window.jevAnts.game;
+    const line = g.world.lines[1].line;
+    const other = g.world.lines[0].line;
+    const c = window.jevAnts.camera("above");
+    const cv = document.querySelector("canvas");
+    const r = cv.getBoundingClientRect();
+    const k = cv.width / r.width;
+    const reach = (14 * 1.2 * k) / c.zoom;
+    const R = Math.sqrt(3) / 2;
+    let best = null;
+    for (let s = line.sMin; s <= line.sMax; s++) {
+      const i = s - line.sMin;
+      const cx = line.cells[2 * i];
+      const cy = line.cells[2 * i + 1];
+      const wx = cx + 0.5 + 0.5 * (cy & 1);
+      const wy = (cy + 0.5) * R;
+      const sx = r.left + ((wx - c.x) * c.zoom + cv.width / 2) / k;
+      const sy = r.top + ((wy - c.y) * c.zoom + cv.height / 2) / k;
+      if (sx < r.left + 30 || sx > r.right - 30 || sy < r.top + 50 || sy > r.bottom - 30 || !window.__onField(sx, sy)) continue;
+      let room = Infinity;
+      for (const col of g.colonies)
+        for (let a = 0; a < col.n; a++)
+          if (col.alive[a] && col.layer[a] === 0) room = Math.min(room, Math.hypot(col.x[a] - wx, col.y[a] - wy));
+      let apart = Infinity;
+      for (let j = 0; j < other.cells.length / 2; j++)
+        apart = Math.min(apart, Math.hypot(other.cells[2 * j] + 0.5 - wx, (other.cells[2 * j + 1] + 0.5) * R - wy));
+      if (room > reach && apart > reach && (!best || room > best.room)) best = { s, sx, sy, room };
+    }
+    return best;
+  });
+  check(spot2 !== null, "a spot on line 2 in the open map, clear of ants and of line 1");
+  check((await lnp.evaluate(() => window.jevAnts.view())) === "above", "above before the click");
+  await lnp.mouse.click(spot2.sx, spot2.sy);
+  await until(async () => (await lnp.evaluate(() => window.jevAnts.view())) === "below", "below after a click on line 2");
+  // the page's own record of which line the side view shows (the click's controls, ColonyApp showAt): line 2 is index 1
+  check((await lnp.evaluate(() => window.jevAnts.line())) === 1, "the side view shows line 2 (controls.line is 1)");
+  const c2 = await until(() => lnp.evaluate(() => window.jevAnts.camera("below", 1)), "line 2's curtain has a camera", 5000, 60);
+  const cur2 = await lnp.evaluate(() => {
+    const m = window.jevAnts.game.world.lines[1].curtain;
+    return { x0: m.x0, w: m.size.w };
+  });
+  check(
+    c2.x >= cur2.x0 && c2.x <= cur2.x0 + cur2.w + 1,
+    `the side view looks at curtain 2's columns (x ${c2.x.toFixed(1)} in ${cur2.x0}..${cur2.x0 + cur2.w})`,
+  );
+  const c1 = await lnp.evaluate(() => window.jevAnts.camera("below", 0));
+  check(c1 === null || c1.x !== c2.x || c1.y !== c2.y, "line 1's curtain keeps a camera of its own, not moved to line 2's");
+  await lnctx.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
