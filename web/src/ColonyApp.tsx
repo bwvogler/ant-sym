@@ -34,7 +34,7 @@ import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.ts
 import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
-import type { Followed } from "./ui/follow.ts";
+import { canFollow, type Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
@@ -150,8 +150,10 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
+  // What the fungus's hosts (and, under the fog, its body) have sensed (ui/fungusSight.ts).
+  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
-  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken);
+  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken, sensed.knowledge);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -216,9 +218,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     // for it (PRD §69.2; checked by hand at 1280 and 900 in the review of #189).
     else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus");
   }, [pointsAt]);
-  // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
-  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
+  // What the fungus's hosts have sensed (PRD §65) is stamped here.
   // Sight follows the sim's steps, not the frames (docs/fog-of-war.md §4.1); one stamp at once too, so a paused or just-loaded game shows what its hosts sense now.
   useEffect(() => {
     sensed.stampGame(game);
@@ -242,15 +242,19 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     },
     [update, oneWorld],
   );
+  /** Under the fog a followed ant that walks out of every observer's sight is lost: the follow ends and the player is told. */
+  const onLostSight = useCallback((f: Followed) => pushToast(`Lost sight of ant #${f.i}: no host of yours is near it now.`, "info"), []);
   /** Follow ant f, the camera taken to whichever view it is in. */
   const goTo = useCallback(
     (f: Followed) => {
       const c = game.colonies[f.k];
       if (!c) return;
+      // Under the fog an ant nobody senses cannot be jumped to (it would show where it is): it is lost sight of, whichever route asked.
+      if (!canFollow(sensed.knowledge, game.colonies, f)) return onLostSight(f);
       if (oneWorld) showAt(c.layer[f.i]!, c.x[f.i]!, c.y[f.i]!);
       setFollowed(f);
     },
-    [game, oneWorld, showAt, setFollowed],
+    [game, oneWorld, showAt, setFollowed, sensed, onLostSight],
   );
   /** Follow the next host of yours (the key f): each press the next infected ant, in whichever view it is. */
   const hostTurn = useRef(0);
@@ -381,6 +385,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             view={controls.view === "above" ? PLANE : belowLayer}
             onLink={onLink}
             onCross={onCross}
+            onLostSight={onLostSight}
             apiRef={field}
             specimens={specimens}
             pen={pen}
@@ -587,6 +592,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                     followed={followed}
                     onFollow={goTo}
                     onUnpin={(f) => setSpecimens(unpin(specimens, f))}
+                    fog={sensed.knowledge}
                   />
                 )}
                 {followed && (

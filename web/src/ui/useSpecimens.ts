@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Game } from "../colony/index.ts";
+import type { Knowledge } from "./fog/knowledge.ts";
 import type { Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
 import { living, pin, sameAnt, type Specimen, specimenLabel, unpin } from "./specimens.ts";
@@ -11,6 +12,7 @@ import { pushToast } from "./toasts.ts";
 export function useSpecimens(
   game: Game,
   gameToken: object,
+  fog: Knowledge | null = null,
 ): { specimens: Specimen[]; setSpecimens: (list: Specimen[]) => void; togglePin: (f: Followed) => void } {
   const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
   const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
@@ -21,7 +23,7 @@ export function useSpecimens(
       if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
       // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
       // It is said here: the watch won't see it again.
-      const { kept, gone } = living(specimens, game.colonies);
+      const { kept, gone } = living(specimens, game.colonies, fog);
       for (const g of gone)
         pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info", {
           group: "specimen-died",
@@ -34,13 +36,13 @@ export function useSpecimens(
           "info",
         );
     },
-    [specimens, setSpecimens, game],
+    [specimens, setSpecimens, game, fog],
   );
   // A specimen that dies leaves the list, with a notice (checked once a second: the rows show nothing once it is gone).
   useEffect(() => {
     if (!specimens.length) return;
     const t = setInterval(() => {
-      const { kept, gone } = living(specimens, game.colonies);
+      const { kept, gone } = living(specimens, game.colonies, fog);
       if (!gone.length) return;
       setSpecimens(kept);
       for (const f of gone)
@@ -49,6 +51,6 @@ export function useSpecimens(
         });
     }, 1000);
     return () => clearInterval(t);
-  }, [specimens, game, setSpecimens]);
+  }, [specimens, game, setSpecimens, fog]);
   return { specimens, setSpecimens, togglePin };
 }

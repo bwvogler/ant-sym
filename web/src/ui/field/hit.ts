@@ -2,6 +2,7 @@
 // or the strip asks the page to look. Plain TypeScript over the camera and the game's arrays, so a Node test runs it; the shell passes what it reads.
 
 import { CELL, cellOf, type Colony, curtainLayerOf, lineOfLayer, PLANE, type OneWorld, type WorldMap } from "../../colony/index.ts";
+import { LIVE, UNKNOWN, type Knowledge } from "../fog/knowledge.ts";
 import { chamberOwner } from "../lens.ts";
 import { toWorld, type Camera, type Viewport } from "../camera.ts";
 import type { Followed } from "../follow.ts";
@@ -19,6 +20,7 @@ export function pickAnt(
   lv: number,
   x: number,
   y: number,
+  fog: Knowledge | null = null,
 ): Followed | null {
   const [wx, wy] = toWorld(c, v, x, y);
   const reach = (PICK_PX * dpr) / c.zoom;
@@ -27,6 +29,8 @@ export function pickAnt(
   for (const [k, col] of colonies.entries()) {
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== lv) continue;
+      // Under the fog an ant can be picked only where an observer senses it now.
+      if (fog && fog.stateAt(lv, col.x[i], col.y[i]) !== LIVE) continue;
       const dx = col.x[i] - wx;
       const dy = col.y[i] - wy;
       const dd = dx * dx + dy * dy;
@@ -47,11 +51,14 @@ export function chamberUnder(
   v: Viewport,
   x: number,
   y: number,
+  fog: { knowledge: Knowledge | null; lv: number } | null = null,
 ): { k: number; id: number } | null {
   const chambers = map.chambers;
   if (!chambers) return null;
   const [wx, wy] = toWorld(c, v, x, y);
   cellOf(wx, wy);
+  // Under the fog a chamber nothing has sensed is not there to inspect.
+  if (fog?.knowledge && fog.knowledge.state(fog.lv, CELL[0], CELL[1]) === UNKNOWN) return null;
   const id = chambers.at(CELL[0], CELL[1]);
   const ch = id >= 0 ? chambers.list[id] : undefined;
   if (!ch) return null;

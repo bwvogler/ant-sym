@@ -1,5 +1,5 @@
 import { snapshotAttackCue } from "./attackCue.ts";
-import { centreX, centreY } from "./hex.ts";
+import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
@@ -20,7 +20,7 @@ import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./s
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 import { CHUNK, CHUNK_BITS, chunkKey, local } from "./chunks.ts";
-import { isEndless, loadEndless, saveEndless } from "./endlessMap.ts";
+import { isEndless, loadEndless, saveEndless, type EndlessMap } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -715,6 +715,95 @@ export class Game {
         if (!this.#wild.has(key) && !want.has(key)) want.set(key, s);
       }
     this.sites = [...want.values()].sort((a, b) => a.ry - b.ry || a.rx - b.rx);
+  }
+
+  /** Whether an endless plane's chunks are made ahead of need (`#prefetchStep`); off, every chunk is made on its first read. Same game either way: tests and the bench turn it off to compare. */
+  prefetch = true;
+  /** The chunks to make ahead of need, as [cx, cy] pairs in the order to make them, and the next time to plan them again (a pure cache: never saved). */
+  #prefetchQueue: [number, number][] = [];
+  #prefetchHead = 0;
+  #prefetchNext = 0;
+  /** The chunks the fungus's body covers, replanned every few seconds (the body grows slowly and reading it costs a pass over its cells). */
+  #bodyChunks: [number, number][] = [];
+  #bodyNext = 0;
+
+  /**
+   * On an endless plane, make the chunks an awake ant, hole, trail or the fungus's body is about to read before they are read (PRD §66 E6.0.4, `ja-qpv.9.1`): a
+   * chunk with food patches costs ~70 ms to generate, a tick over 50 ms if a layer read makes it. Once a second the chunks one ring round every occupied chunk
+   * (awake ants on the plane, awake holes, the body, scent) are queued; each tick does one step of one of them (the patches of one neighbour, a ~10-80 ms
+   * flood, or the chunk itself), so no tick pays for two. An ant walks ~7 cells a second and a chunk is 64, so a ring of one is more than a second's reach; a
+   * chunk read before its turn (a flight landing far off, a load, a site woken) is still made on the read, as before: this changes WHEN a chunk is made, never
+   * what it holds (generation is pure in (seed, chunk); `EndlessMap.prefetch` touches no layer, total or hook), and sleeping colonies read nothing so ask
+   * for nothing. It runs on its own once-a-second cadence, with the awake rule on or not.
+   */
+  #prefetchStep(map: EndlessMap): void {
+    if (this.time >= this.#prefetchNext) {
+      this.#prefetchNext = this.time + 1;
+      this.#planPrefetch();
+    }
+    while (this.#prefetchHead < this.#prefetchQueue.length) {
+      const [cx, cy] = this.#prefetchQueue[this.#prefetchHead] as [number, number];
+      if (map.prefetch(cx, cy)) return; // a step of this chunk's work; the next tick takes the next
+      this.#prefetchHead++;
+    }
+  }
+
+  #planPrefetch(): void {
+    const centres = new Set<number>();
+    const list: [number, number][] = [];
+    const add = (cx: number, cy: number): void => {
+      const k = chunkKey(cx, cy);
+      if (centres.has(k)) return;
+      centres.add(k);
+      list.push([cx, cy]);
+    };
+    // Scent: a step of the trails reads the rock of every chunk with scent and its neighbours, and wakes a neighbour the scent spreads into (whose own
+    // neighbours it then reads): ring 1 round a scented chunk first, ring 2 after the rest (found: 80 of the ~125 misses of a 300 s game were the trails').
+    const scented: [number, number][] = [];
+    const seenScent = new Set<number>();
+    const scent = (cx: number, cy: number): void => {
+      const k = chunkKey(cx, cy);
+      if (seenScent.has(k)) return;
+      seenScent.add(k);
+      scented.push([cx, cy]);
+      add(cx, cy);
+    };
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      const h = (c.layers[PLANE] as Layer).nest;
+      cellOf(h.x, h.y);
+      add(CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS);
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.layer[i] !== PLANE) continue;
+        cellOf(c.x[i] as number, c.y[i] as number);
+        add(CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS);
+      }
+      for (const ph of [(c.layers[PLANE] as Layer).ph, c.foreign, c.raidMarks]) if (ph && ph.map === this.map) ph.eachAwakeChunk(scent);
+    });
+    if (this.time >= this.#bodyNext) {
+      this.#bodyNext = this.time + 5;
+      this.#bodyChunks = [];
+      // a bucket of CHUNK world units: its columns are chunk columns, its rows span chunk rows of CHUNK * R units
+      for (const [bx, by] of this.fungus.bodyBuckets(PLANE, CHUNK))
+        for (let cy = Math.floor(by / R); cy <= Math.floor((by + 1) / R); cy++) this.#bodyChunks.push([bx, cy]);
+    }
+    for (const [cx, cy] of this.#bodyChunks) add(cx, cy);
+    const queue: [number, number][] = [];
+    const queued = new Set<number>();
+    const ring = (cx: number, cy: number, r: number): void => {
+      for (let j = -r; j <= r; j++)
+        for (let i = -r; i <= r; i++) {
+          if (r > 1 && Math.max(Math.abs(i), Math.abs(j)) < r) continue; // ring 2 is the shell only: the inner rings were queued
+          const k = chunkKey(cx + i, cy + j);
+          if (queued.has(k)) continue;
+          queued.add(k);
+          queue.push([cx + i, cy + j]);
+        }
+    };
+    for (const [cx, cy] of list) ring(cx, cy, 1);
+    for (const [cx, cy] of scented) ring(cx, cy, 2);
+    this.#prefetchQueue = queue;
+    this.#prefetchHead = 0;
   }
 
   /** Ask the awake rule and apply its verdict. */
@@ -1429,6 +1518,7 @@ export class Game {
       this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
     if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
+    if (this.prefetch && isEndless(this.map)) this.#prefetchStep(this.map);
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
       this.#aimAll();
@@ -1645,8 +1735,27 @@ export class Game {
       throw new Error(
         `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
       );
+    // What the replay of the foundings would make, checked before it starts (ja-baxa): a save of more lines or colonies than this game can grow to is refused
+    // with this game as it was. (A refusal after the replay, below, a line whose holes were moved, still leaves the foundings made: a failed load of that kind
+    // voids the game, and the page drops it. The shape checks below the replay are now reachable only if the replay makes other lines or colonies than the
+    // save's foundings say, which the checks above rule out.)
+    const founded = saved.founded ?? [];
+    const willHave = world.lines.length + founded.filter((f) => f.spot?.newLine).length;
+    if (willHave !== 1 + (sw.more ?? []).length)
+      throw new Error(`save: ${1 + (sw.more ?? []).length} lines, this game's world has ${willHave}`);
+    if (saved.colonies.length !== this.colonies.length + founded.length)
+      throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length + founded.length}`);
+    // The grids and bands are a layer each (the plane, and one curtain a line) of one grid a colony: their shape is known before the replay, so a save whose
+    // grids are another game's is refused with this game as it was.
+    const sg = saved.grids;
+    if (
+      sg.counts.length !== 1 + willHave ||
+      sg.bands.length !== 1 + willHave ||
+      sg.counts.some((gs) => gs.length !== saved.colonies.length)
+    )
+      throw new Error("save: its grids are another game's");
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
-    for (const f of saved.founded ?? []) this.addColony(f);
+    for (const f of founded) this.addColony(f);
     // The line grown again must be the one saved: else the curtain poured below would lie under another line.
     const line = world.line;
     const sameLine = (t: Transect, sl: { holes: Cell[]; s0: number; margin: number }): boolean =>

@@ -64,6 +64,7 @@ export default function ColonyField({
   view = CURTAIN,
   onLink,
   onCross,
+  onLostSight,
   apiRef,
   pen = null,
   toolsAt = "top-2 left-2",
@@ -96,6 +97,7 @@ export default function ColonyField({
   const nestTurn = useRef(0);
   const followCb = useLatest(onFollow);
   const crossCb = useLatest(onCross);
+  const lostCb = useLatest(onLostSight);
   /** the followed ant's layer when last drawn: a change is a crossing (a new follow starts afresh) */
   const antLayer = useRef<{ f: Followed; layer: number } | null>(null);
   /**
@@ -152,6 +154,7 @@ export default function ColonyField({
       antLayer,
       carryTo,
       crossCb,
+      lostCb,
       rig,
     },
   });
@@ -211,9 +214,11 @@ export default function ColonyField({
     return [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
   };
   /** The nearest ant (any colony, on the view's layer) within PICK_PX of the point, or null. */
-  const pick = (x: number, y: number): Followed | null => pickAnt(colonies, camera(), viewport(), dpr(), shown.current, x, y);
+  const pick = (x: number, y: number): Followed | null =>
+    pickAnt(colonies, camera(), viewport(), dpr(), shown.current, x, y, sensed.knowledge);
   /** The chamber under the point, as (colony index, chamber id), or null. */
-  const chamberAt = (x: number, y: number) => chamberUnder(shownMap(), colonies, camera(), viewport(), x, y);
+  const chamberAt = (x: number, y: number) =>
+    chamberUnder(shownMap(), colonies, camera(), viewport(), x, y, { knowledge: sensed.knowledge, lv: shown.current });
 
   /** Send a piece of stroke, device points to world, to the builder (on the shown view's layer). */
   const paint = (pts: [number, number][], first: boolean) => {

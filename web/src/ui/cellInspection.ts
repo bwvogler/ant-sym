@@ -21,6 +21,8 @@ import {
   type AphidClump,
 } from "../colony/index.ts";
 import { probe, type LensProbe, type LensWorld } from "./lens.ts";
+import { LIVE, REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
+import { SNAP } from "./fog/sources.ts";
 import type { SensedMap } from "./fungusSight.ts";
 
 export interface InspectedAnt {
@@ -119,7 +121,21 @@ export function inspectCell(
     fallen: 0,
     buried: 0,
   };
-  for (let k = 0; k < g.colonies.length; k++) {
+  // Under the fog (docs/fog-of-war.md §5.2): a place never sensed has nothing to inspect; one only remembered shows no ant, queen, brood or aphid (they
+  // are never remembered) and the dead as they lay when last seen; only a place an observer senses now is read live.
+  const fog = sensed.knowledge;
+  const fs = fog ? fog.state(layer, gx, gy) : LIVE;
+  if (fs === UNKNOWN) {
+    out.quality = 1;
+    return out;
+  }
+  // What the cell holds (its food's quality) is what was last sensed there, unless it is sensed now.
+  if (fs === REMEMBERED) out.quality = fog!.snapshot(layer, SNAP.quality, gx, gy) ?? 1;
+  if (fs === REMEMBERED)
+    for (const dead of sensed.corpses?.on(layer) ?? [])
+      if (dead.x === gx && dead.y === gy)
+        out.cadavers!.push({ stage: dead.stage, fungal: false, ...(dead.heading === undefined ? {} : { heading: dead.heading }) });
+  for (let k = 0; fs === LIVE && k < g.colonies.length; k++) {
     const c = g.colonies[k];
     const local = workers?.[k].get(cellKey(gx, gy));
     for (let slot = 0; slot < (workers ? (local?.length ?? 0) : c.n); slot++) {
@@ -186,7 +202,7 @@ export function inspectCell(
     for (const dead of c.corpses) if (dead.held < 0 && (dead.layer ?? c.home) === layer && dead.x === gx && dead.y === gy) out.fallen++;
     if (layer === PLANE) out.buried += c.midden.get(cellKey(gx, gy)) ?? 0;
   }
-  for (const c of clumps) {
+  for (const c of fs === LIVE ? clumps : []) {
     if (c.layer !== layer || !c.cells.length) continue;
     for (let j = 0; j < c.cells.length; j += 2)
       if (c.cells[j] === gx && c.cells[j + 1] === gy) {

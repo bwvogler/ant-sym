@@ -343,6 +343,11 @@ export class EndlessPlane {
     return { mask, x0, y0, w };
   }
 
+  /** Whether `patchesOf(cx, cy)` is cached, so a caller that budgets its work (EndlessMap.prefetch) can pay for a window's flood one chunk at a time. */
+  patchesReady(cx: number, cy: number): boolean {
+    return this.#patches.has(chunkKey(cx, cy));
+  }
+
   /** The food patches chunk (cx, cy)'s stream draws that are kept: reachable (in its 3×3 window) and clear of the world's nests. */
   patchesOf(cx: number, cy: number): readonly Patch[] {
     const key = chunkKey(cx, cy);

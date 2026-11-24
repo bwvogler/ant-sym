@@ -28,6 +28,9 @@ import { editLayers, type WorldMap } from "./world.ts";
  */
 export const ENDLESS_HALF = 32768 * CHUNK;
 
+/** Chunks a map keeps made-but-not-yet-read at most (a chunk is ~20 KB, so ~10 MB): 3 colonies' rings are ~100. */
+const PENDING_MAX = 512;
+
 /** A map with no edge, and the plane and ledger behind it. */
 export interface EndlessMap extends WorldMap {
   endless: true;
@@ -39,6 +42,15 @@ export interface EndlessMap extends WorldMap {
    * that keeps a list of the food (the game's regrowth piles, game.ts) learns of each chunk as it is made. Run inside the generator: do not read the map's food.
    */
   foodHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
+  /**
+   * Make the plane's chunk (cx, cy) ahead of need (PRD §66 E6.0.4, `ja-qpv.9.1`): the layers take it from here when they first read the chunk, so that read
+   * costs a copy, not the ~70 ms of a chunk with food patches. One call does one step of that work (the patches of one of the chunk's 3x3 neighbours, or the
+   * chunk once they are all known) and returns true; false means there is nothing left to do (the chunk is made, or a layer holds it), so call until false,
+   * a step per tick. It touches no layer, no total and no hook, so the game cannot tell when, or whether, a chunk was prefetched: generation is pure in (seed, chunk).
+   */
+  prefetch(cx: number, cy: number): boolean;
+  /** Chunks a layer read had to make on a miss (nothing had prefetched them), and chunks `prefetch` made (steps that only warmed the patches are not counted): the bench and the soak test read these. */
+  gen: { misses: number; prefetched: number };
 }
 
 /** The map over the endless plane of `seed`; `opts` are the plane's (endlessPlane.ts). Chunks generate as they are read. */
@@ -49,14 +61,20 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
   // One plane.chunk() makes a chunk's rock and food together; whichever layer asks first leaves the other's half here (bounded: a layer
   // that never asks for it must not hold the world).
   // Each entry is kept until BOTH layers have taken their half (else a layer asking second would make the chunk again: 70 ms with food patches).
+  // A prefetched chunk waits here for both layers too. When full the oldest entry goes (Map order): a chunk read after that is made again on its miss.
   const pending = new Map<number, { chunk: PlaneChunk; rock: boolean; food: boolean }>();
+  const gen = { misses: 0, prefetched: 0 };
+  const keep = (k: number, have: { chunk: PlaneChunk; rock: boolean; food: boolean }): void => {
+    if (pending.size >= PENDING_MAX) pending.delete(pending.keys().next().value as number);
+    pending.set(k, have);
+  };
   const made = (cx: number, cy: number, half: "rock" | "food"): PlaneChunk => {
     const k = chunkKey(cx, cy);
     let have = pending.get(k);
     if (!have) {
-      if (pending.size >= 256) pending.clear();
+      gen.misses++;
       have = { chunk: plane.chunk(cx, cy), rock: false, food: false };
-      pending.set(k, have);
+      keep(k, have);
     }
     have[half] = true;
     if (have.rock && have.food) pending.delete(k);
@@ -86,6 +104,21 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
     plane,
     ledger,
     foodHooks: [],
+    gen,
+    prefetch: (cx, cy) => {
+      const k = chunkKey(cx, cy);
+      if (pending.has(k) || (map.rock.peek(cx, cy) !== undefined && map.food.peek(cx, cy) !== undefined)) return false;
+      // A chunk's food comes from the patches of its 3x3 neighbours, each a flood over its own window (~10-80 ms): one of those, or the chunk, per call.
+      for (let j = -1; j <= 1; j++)
+        for (let i = -1; i <= 1; i++)
+          if (!plane.patchesReady(cx + i, cy + j)) {
+            plane.patchesOf(cx + i, cy + j);
+            return true;
+          }
+      keep(k, { chunk: plane.chunk(cx, cy), rock: map.rock.peek(cx, cy) !== undefined, food: map.food.peek(cx, cy) !== undefined });
+      gen.prefetched++;
+      return true;
+    },
   };
   // The food layer's generator writes the map's totals, so it is made once the map exists.
   map.food = new ChunkLayer<Float32Array>(
@@ -120,22 +153,27 @@ function unchanged(a: Cells | undefined, b: ArrayLike<number>): boolean {
 
 /**
  * Free chunk (cx, cy) of every layer if no layer holds a change to it (a cell dug, food eaten or added, a quality set, a heading or time
- * noted): it will be generated again the same. A chunk with a change is the delta and stays. Returns whether it was freed. Costs one
- * regeneration of the chunk, so call it when a region goes to sleep or leaves the screen, not every tick.
+ * noted): it will be generated again the same. A chunk with a change is the delta and stays. Returns whether it was freed, or was already
+ * absent from every layer (nothing to drop: nothing is generated and no food counted, ja-qpv.8.1). A layer that does not hold the chunk
+ * holds no change to it (a generated layer would make the plane's own, the others read `empty`), so it is read with `peek`, never
+ * generated. Costs one regeneration of the plane's chunk when some layer holds it, so call it when a region goes to sleep or leaves the
+ * screen, not every tick.
  */
 export function dropClean(map: EndlessMap, cx: number, cy: number): boolean {
+  const written = [map.digHeading, map.filledAt, map.dugAt, map.quality];
+  if (map.rock.peek(cx, cy) === undefined && map.food.peek(cx, cy) === undefined && written.every((l) => l.peek(cx, cy) === undefined))
+    return true;
   const own = map.plane.chunk(cx, cy);
-  const layers = [map.digHeading, map.filledAt, map.dugAt, map.quality];
   const fill = (l: ChunkLayer<Cells>) => new Float32Array(CHUNK * CHUNK).fill(l.empty);
   if (
-    !unchanged(map.rock.chunk(cx, cy), own.rock) ||
-    !unchanged(map.food.chunk(cx, cy), own.food) ||
-    !layers.every((l) => unchanged(l.chunk(cx, cy), fill(l)))
+    !unchanged(map.rock.peek(cx, cy), own.rock) ||
+    !unchanged(map.food.peek(cx, cy), own.food) ||
+    !written.every((l) => unchanged(l.peek(cx, cy), fill(l)))
   )
     return false;
   map.rock.drop(cx, cy);
   map.food.drop(cx, cy);
-  for (const l of layers) l.drop(cx, cy);
+  for (const l of written) l.drop(cx, cy);
   return true;
 }
 
