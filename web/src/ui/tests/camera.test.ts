@@ -11,6 +11,7 @@ import {
   isFitted,
   isZoomedIn,
   MAX_ZOOM,
+  miniFrame,
   minimapRect,
   minZoom,
   pan,
@@ -214,4 +215,42 @@ test("endless: the bound is reachOf, one seam: a smaller reach (the fog's explor
   assert.notDeepEqual(fit(patch, view), fit(unbounded, view), "and it moves the start view off the home centre");
   assert.deepEqual(reachOf(world), { x0: 0, y0: 0, w: 512, h: 320 }, "a bounded map's reach is the map");
   assert.deepEqual(reachOf({ x0: -64, w: 300, h: 320 }), { x0: -64, y0: 0, w: 300, h: 320 });
+});
+
+test("miniFrame: a bounded map's is the whole map; an endless plane's is a fixed 16 x 12 chunks, chunk-aligned, following the camera a chunk at a time (E5.3)", () => {
+  assert.deepEqual(miniFrame(world), { x0: 0, y0: 0, w: 512, h: 320 });
+  assert.deepEqual(
+    miniFrame({ x0: -30, w: 200, h: 120 }, { x: 5, y: 5 }),
+    { x0: -30, y0: 0, w: 200, h: 120 },
+    "the camera is not asked on a bounded map",
+  );
+  assert.throws(() => miniFrame(endless), /follows the camera/);
+  const R = Math.sqrt(3) / 2;
+  const f = miniFrame(endless, { x: 5000, y: 3000 });
+  assert.equal(f.w, 16 * 64);
+  assert.ok(near(f.h, 12 * 64 * R));
+  assert.equal(f.x0 % 64, 0, "its corner is a chunk's");
+  assert.ok(near(f.y0 / (64 * R), Math.round(f.y0 / (64 * R))));
+  assert.ok(5000 >= f.x0 && 5000 < f.x0 + f.w && 3000 >= f.y0 && 3000 < f.y0 + f.h, "it holds the camera");
+  assert.deepEqual(miniFrame(endless, { x: 5003, y: 3001 }), f, "the same window while the camera stays in its chunk");
+  assert.equal(miniFrame(endless, { x: 5000 + 64, y: 3000 }).x0, f.x0 + 64, "a chunk east: the window moves a chunk");
+  assert.ok(miniFrame(endless, { x: -H + 10, y: 0 }).x0 % 64 === 0, "far negative too");
+  assert.ok(miniFrame(endless, { x: 9e5, y: -7e5 }).w === f.w, "the same size wherever it is");
+});
+
+test("fromMinimap on an endless plane reads window coordinates round the camera; a bounded map's is as before (E5.3)", () => {
+  const c = { x: 5000, y: 3000 };
+  const f = miniFrame(endless, c);
+  const r = minimapRect(f, view, 1);
+  assert.equal(r.w, 180);
+  assert.ok(near(r.h, (180 * f.h) / f.w), "sized to the window's shape, not the nominal box's");
+  const [x0, y0] = fromMinimap(endless, view, 1, r.x, r.y, c);
+  assert.ok(near(x0, f.x0) && near(y0, f.y0), "the corner of the minimap is the window's corner");
+  const [x1, y1] = fromMinimap(endless, view, 1, r.x + r.w, r.y + r.h, c);
+  assert.ok(near(x1, f.x0 + f.w) && near(y1, f.y0 + f.h));
+  const [xm, ym] = fromMinimap(endless, view, 1, r.x + r.w / 2, r.y + r.h / 2, c);
+  assert.ok(near(xm, f.x0 + f.w / 2) && near(ym, f.y0 + f.h / 2));
+  assert.throws(() => fromMinimap(endless, view, 1, r.x, r.y), /follows the camera/);
+  const b = minimapRect(world, view, 1);
+  assert.deepEqual(fromMinimap(world, view, 1, b.x + b.w / 2, b.y + b.h / 2), [256, 160]);
 });

@@ -3,7 +3,13 @@ import { test } from "node:test";
 import {
   AIR,
   CELL,
+  CHUNK,
+  ChunkLayer,
   CURTAIN,
+  Game,
+  gameRng,
+  generateEndlessWorld,
+  R,
   INFECTED,
   PLANE,
   ROCK,
@@ -14,15 +20,17 @@ import {
   cellOf,
   type WorldMap,
 } from "../../colony/index.ts";
-import { fitZoom, minimapRect } from "../camera.ts";
+import { fitZoom, miniFrame, minimapRect, MINI_CHUNKS_H, MINI_CHUNKS_W } from "../camera.ts";
 import { odourRgb } from "../field/colour.ts";
 import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
 import type { FieldEnv } from "../field/env.ts";
 import { stripAt } from "../field/ground.ts";
-import { MINIMAP_EVERY_MS, Minimap } from "../field/minimap.ts";
-import { Knowledge, GRACE } from "../fog/knowledge.ts";
+import { MINIMAP_EVERY_MS, Minimap, WINDOW_UNITS_PX, arrowOn } from "../field/minimap.ts";
+import { extentOf } from "../field/rig.ts";
+import { Knowledge, GRACE, LIVE, REMEMBERED } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
-import { fogRgb } from "../field/fogCull.ts";
+import { dimPx, fogRgb } from "../field/fogCull.ts";
+import { holeOwner } from "../lens.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { buildGame } from "../useColony.ts";
 import { centreX, centreY } from "../../colony/index.ts";
@@ -471,14 +479,318 @@ test("under the fog the minimap's food and mound come from the snapshot too, not
   assert.deepEqual(paintedPixel(s, 2, 0), [...THEME.spoil, 255], "the mound as sensed");
 });
 
-test("on an endless extent the minimap neither allocates the nominal box's canvas nor draws, zoomed in or not (until E5.3's window)", () => {
-  const s = setup({ w: 9, h: 5 });
-  const [w, h] = [s.canvases[0]!.width, s.canvases[0]!.height];
-  const endless = { x0: -2097152, w: 4194304, h: 3565158, endless: true as const };
-  s.minimap.resize(endless);
-  assert.deepEqual([s.canvases[0]!.width, s.canvases[0]!.height], [w, h], "resize left the canvas as it was");
-  const k = { ...s.k, ext: endless, c: { x: 50, y: 50, zoom: 20 } } as FieldCtx;
-  const before = [s.rec.log.length, s.canvases[0]!.rec.log.length];
-  s.minimap.draw(k, SEEN_ALL);
-  assert.deepEqual([s.rec.log.length, s.canvases[0]!.rec.log.length], before, "draw put nothing on the canvas and painted nothing");
+// ---- The endless plane's minimap: a window of chunks round the camera (E5.3, ja-qpv.4.3). It replaces E5.2's "draws nothing" guard on purpose. ----
+
+const WIN_PX = [(MINI_CHUNKS_W * CHUNK) / WINDOW_UNITS_PX, Math.ceil((MINI_CHUNKS_H * CHUNK * R) / WINDOW_UNITS_PX)];
+
+/** A real endless game's world, a camera far from the start (its chunks are not made), and the minimap over them. */
+function endless(cam = { x: 5000, y: 3000 }, o: Setup = {}) {
+  const world = generateEndlessWorld(4);
+  const g = new Game(world, {}, gameRng(4), [{ antCount: 20 }, { antCount: 20 }]);
+  const plane = world.plane;
+  const ext = extentOf(plane);
+  const spores = new ChunkLayer<Float32Array>((n) => new Float32Array(n), 0);
+  const s = setup({
+    over: { m: plane, ext, world: g.world, colonies: g.colonies, spores, c: { ...cam, zoom: 8 }, ...o.over },
+    now: o.now,
+  });
+  return { ...s, g, plane, spores, ext };
+}
+
+/** The cell of the window's pixel (mx, my), as paint reads it. */
+function windowCell(win: { x0: number; y0: number }, mx: number, my: number): [number, number] {
+  cellOf(win.x0 + mx * WINDOW_UNITS_PX + WINDOW_UNITS_PX / 2, win.y0 + my * WINDOW_UNITS_PX + WINDOW_UNITS_PX / 2);
+  return [CELL[0]!, CELL[1]!];
+}
+
+/** A hole's world position. */
+function centreXY(h: { x: number; y: number }): { x: number; y: number } {
+  return { x: h.x + 0.5 + 0.5 * (h.y & 1), y: (h.y + 0.5) * R };
+}
+
+test("endless: the canvas is the window's, 16 x 12 chunks at 4 units a pixel, whatever the plane's nominal box; the bounded map's is unchanged", () => {
+  const s = endless();
+  assert.equal(s.canvases.length, 1, "one canvas");
+  assert.deepEqual([s.canvases[0]!.width, s.canvases[0]!.height], WIN_PX, "256 x 167");
+  assert.deepEqual(WIN_PX, [256, 167]);
+  const img = (s.minimap as unknown as { img: ImageData }).img;
+  assert.deepEqual([img.width, img.height], WIN_PX, "and the colour buffer is that size too, not the nominal box's");
+  assert.ok(s.ext.w > 4e6, "the nominal box is millions of cells wide");
+  const b = setup({ w: 9, h: 5 });
+  assert.deepEqual([b.canvases[0]!.width, b.canvases[0]!.height], [5, 3], "a bounded map: 2 units a pixel as before");
+});
+
+test("endless: each pixel is the cell under its centre, read from the chunks the game has made; a chunk it has not made is fog, and painting makes none", () => {
+  const s = endless();
+  const win = miniFrame(s.ext, s.k.c);
+  const [x, y] = windowCell(win, 40, 50);
+  const [cx, cy] = [x >> 6, y >> 6];
+  const rock = s.plane.rock.ensure(cx, cy);
+  const food = s.plane.food.ensure(cx, cy);
+  rock.fill(0);
+  food.fill(0);
+  const sp = s.spores.ensure(cx, cy);
+  const put = (mx: number, my: number, f: (i: number) => void) => {
+    const [a, b] = windowCell(win, mx, my);
+    assert.deepEqual([a >> 6, b >> 6], [cx, cy], `pixel (${mx}, ${my}) is in the chunk made`);
+    f(((b & 63) << 6) | (a & 63));
+  };
+  put(40, 50, (i) => (food[i] = 1));
+  put(41, 50, (i) => (rock[i] = ROCK));
+  put(42, 50, (i) => (rock[i] = SOIL));
+  put(41, 51, (i) => (rock[i] = AIR));
+  put(43, 50, (i) => (sp[i] = SPORE_FULL));
+  const counts = () => [s.plane.rock.count, s.plane.food.count, s.spores.count];
+  const before = counts();
+  s.minimap.paint(s.k);
+  assert.deepEqual(counts(), before, "painting made no chunk of the rock, food or spore layers");
+  const px = (mx: number, my: number) => paintedPixel(s, mx, my);
+  assert.deepEqual(px(40, 50), [...THEME.accentRgb, 255], "food");
+  assert.deepEqual(px(41, 50), [...THEME.rock, 255], "rock");
+  assert.deepEqual(px(42, 50), [...THEME.soil, 255], "soil");
+  assert.deepEqual(px(41, 51), [...THEME.sky, 255], "sky");
+  assert.deepEqual(px(44, 50), [...THEME.paperRgb, 255], "open ground in the made chunk: the paper");
+  assert.deepEqual(
+    px(43, 50),
+    [...THEME.paperRgb.map((c, j) => Math.round(c + (THEME.sporeRgb[j]! - c) * 0.85)), 255],
+    "spores wash it as they do a bounded map",
+  );
+  const F = fogRgb(THEME);
+  assert.deepEqual(px(0, 0), [...F, 255], "a chunk nobody made: the fog's colour");
+  assert.deepEqual(px(255, 166), [...F, 255], "the last pixel too");
+  assert.deepEqual(counts(), before, "and still no chunk after reading them all");
+});
+
+test("endless, on a real game: painting and drawing generate no chunk, near the start nests or far, and do not touch the plane's miss count", () => {
+  const first = endless({ x: 0, y: 0 });
+  const [a] = first.plane.plane.startNests();
+  for (const cam of [
+    { x: a!.x, y: a!.y },
+    { x: a!.x + 800, y: a!.y - 600 },
+    { x: -3e5, y: 2e5 },
+  ]) {
+    const s = endless(cam);
+    // some ground made round the camera, as the page's own chunk painter makes it
+    s.plane.rock.chunk(Math.floor(cam.x / 64), Math.floor(cam.y / R / 64));
+    const key = () => [s.plane.rock.count, s.plane.food.count, s.plane.gen.misses, s.plane.gen.prefetched];
+    const before = key();
+    s.minimap.paint(s.k);
+    s.minimap.draw(s.k, SEEN_ALL);
+    assert.deepEqual(key(), before, `the camera at ${cam.x}, ${cam.y}`);
+  }
+});
+
+test("endless: the window follows the camera a chunk at a time; between two repaints the old picture is shifted under the new frame, and repainted at most twice a second", () => {
+  let now = 1000;
+  const s = endless({ x: 5000, y: 3000 }, { now: () => now });
+  const paints = () => s.canvases[0]!.rec.log.filter((l) => l.startsWith("putImageData(")).length;
+  const k1 = s.k;
+  const w1 = miniFrame(s.ext, k1.c);
+  s.minimap.draw(k1, SEEN_ALL);
+  assert.equal(paints(), 1);
+  assert.ok(!s.rec.log.includes("clip()"), "no shift while the window has not moved");
+  const r = minimapRect(w1, k1.v, k1.d);
+  assert.ok(s.rec.log.includes(`drawImage(${s.canvases[0]}, ${r3(r.x)}, ${r3(r.y)}, ${r3(r.w)}, ${r3(r.h)})`));
+  // the camera moves within its chunk: the same window, no repaint, no shift
+  s.rec.log.length = 0;
+  const k2 = { ...k1, c: { ...k1.c, x: k1.c.x + 3 } } as FieldCtx;
+  assert.deepEqual(miniFrame(s.ext, k2.c), w1);
+  s.minimap.draw(k2, SEEN_ALL);
+  assert.equal(paints(), 1);
+  assert.ok(!s.rec.log.includes("clip()"));
+  // two chunks east, one up: the window moves by those chunks; the picture painted for the old one is drawn shifted by the same, clipped to the minimap
+  s.rec.log.length = 0;
+  const k3 = { ...k1, c: { ...k1.c, x: k1.c.x + 2 * CHUNK, y: k1.c.y - CHUNK * R } } as FieldCtx;
+  const w3 = miniFrame(s.ext, k3.c);
+  assert.equal(w3.x0 - w1.x0, 2 * CHUNK);
+  assert.ok(Math.abs(w3.y0 - w1.y0 + CHUNK * R) < 1e-9);
+  s.minimap.draw(k3, SEEN_ALL);
+  assert.equal(paints(), 1, "within half a second: not painted again");
+  const r3w = minimapRect(w3, k3.v, k3.d);
+  const sc = r3w.w / w3.w;
+  assert.ok(s.rec.log.includes("clip()"), "clipped to the minimap");
+  assert.ok(
+    s.rec.log.includes(
+      `drawImage(${s.canvases[0]}, ${r3(r3w.x + (w1.x0 - w3.x0) * sc)}, ${r3(r3w.y + (w1.y0 - w3.y0) * sc)}, ${r3(r3w.w)}, ${r3(r3w.h)})`,
+    ),
+    "the old picture, moved by two chunks west and one down in the new frame (a chunk is 16 pixels)",
+  );
+  now += MINIMAP_EVERY_MS + 1;
+  s.rec.log.length = 0;
+  s.minimap.draw(k3, SEEN_ALL);
+  assert.equal(paints(), 2, "older than half a second: painted for the window the camera is in");
+  assert.ok(!s.rec.log.includes("clip()"), "and drawn unshifted");
+});
+
+test("endless: the camera's rectangle is in window coordinates and clipped to the window; nothing is drawn while the view is zoomed out", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  const win = miniFrame(s.ext, s.k.c);
+  const r = minimapRect(win, s.k.v, s.k.d);
+  const sc = r.w / win.w;
+  const seen = { x0: 4900, y0: 2900, x1: 5100, y1: 3050 };
+  s.minimap.draw(s.k, seen);
+  const strokes = s.rec.log.filter((l) => l.startsWith("strokeRect("));
+  assert.equal(strokes[0], `strokeRect(${r3(r.x)}, ${r3(r.y)}, ${r3(r.w)}, ${r3(r.h)})`, "the frame");
+  assert.equal(
+    strokes[1],
+    `strokeRect(${r3(r.x + (4900 - win.x0) * sc)}, ${r3(r.y + (2900 - win.y0) * sc)}, ${r3(200 * sc)}, ${r3(150 * sc)})`,
+    "the rectangle: from the window's own corner, not the nominal box's",
+  );
+  const t = endless({ x: 5000, y: 3000 });
+  t.minimap.draw(t.k, SEEN_ALL);
+  assert.equal(
+    t.rec.log.filter((l) => l.startsWith("strokeRect("))[1],
+    `strokeRect(${r3(r.x)}, ${r3(r.y)}, ${r3(r.w)}, ${r3(r.h)})`,
+    "a view wider than the window: the whole frame",
+  );
+  const z = endless({ x: 5000, y: 3000 });
+  z.minimap.draw({ ...z.k, c: { x: 5000, y: 3000, zoom: 0.5 } } as FieldCtx, SEEN_ALL);
+  assert.deepEqual(z.rec.log, [], "zoomed out past the level: not drawn");
+  assert.equal(z.canvases[0]!.rec.log.filter((l) => l.startsWith("putImageData(")).length, 0, "and not painted");
+});
+
+test("arrowOn: none for a point inside the window; else on the frame, on the side the point lies, pointing at it, clamped to the frame", () => {
+  const win = { x0: 1000, y0: 500, w: 1024, h: 600 };
+  assert.equal(arrowOn(win, 1000, 500), null, "the corner is inside");
+  assert.equal(arrowOn(win, 2023.9, 1099.9), null);
+  const east = arrowOn(win, 9000, 800)!;
+  assert.deepEqual([east.x, east.y, east.angle], [2024, 800, 0], "far east: the middle of the right side, pointing east");
+  const north = arrowOn(win, 1512, -9000)!;
+  assert.deepEqual([north.x, north.y], [1512, 500]);
+  assert.ok(Math.abs(north.angle + Math.PI / 2) < 1e-12, "north is up: y grows down");
+  const west = arrowOn(win, 0, 800)!;
+  assert.equal(west.x, 1000);
+  assert.ok(Math.abs(Math.abs(west.angle) - Math.PI) < 1e-12);
+  const south = arrowOn(win, 1512, 5000)!;
+  assert.deepEqual([south.x, south.y, south.angle], [1512, 1100, Math.PI / 2]);
+  const ne = arrowOn(win, 1512 + 5000, 800 - 5000)!;
+  assert.ok(Math.abs(ne.y - 500) < 1e-9 && ne.x > 1512 && ne.x < 2024, "steeper than the window's corner: on the top side");
+  assert.ok(Math.abs(ne.angle + Math.PI / 4) < 1e-12);
+  const flat = arrowOn(win, 1512 + 5000, 800 - 1000)!;
+  assert.ok(Math.abs(flat.x - 2024) < 1e-9 && flat.y < 800 && flat.y > 500, "shallower: on the right side");
+  for (const [x, y] of [
+    [3000, 3000],
+    [-4000, 200],
+    [1500, 90000],
+    [2100, 700],
+  ] as const) {
+    const a = arrowOn(win, x, y)!;
+    assert.ok(a.x >= 1000 - 1e-9 && a.x <= 2024 + 1e-9 && a.y >= 500 - 1e-9 && a.y <= 1100 + 1e-9, `(${x}, ${y}) is clamped to the frame`);
+    assert.ok(Math.abs(Math.atan2(y - 800, x - 1512) - a.angle) < 1e-12, "and points at the point from the middle");
+  }
+});
+
+test("endless: a nest beyond the window's edge is an arrow on the frame pointing at it; a hole inside the window has none", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  const win = miniFrame(s.ext, s.k.c);
+  const r = minimapRect(win, s.k.v, s.k.d);
+  const sc = r.w / win.w;
+  const holes = s.g.world.lines.flatMap((wl) => wl.line.holes);
+  assert.equal(holes.length, 2, "the start's two holes, both far from this camera");
+  s.minimap.draw(s.k, SEEN_ALL);
+  assert.equal(s.rec.log.filter((l) => l === "fill()").length, 2, "an arrow for each");
+  for (const h of holes) {
+    const a = arrowOn(win, centreXY(h).x, centreXY(h).y)!;
+    const [ax, ay] = [r.x + (a.x - win.x0) * sc, r.y + (a.y - win.y0) * sc];
+    const tip = `moveTo(${r3(ax + Math.cos(a.angle) * 4.5)}, ${r3(ay + Math.sin(a.angle) * 4.5)})`;
+    assert.ok(s.rec.log.includes(tip), `the tip of the arrow for hole ${h.x}, ${h.y}: ${tip}`);
+  }
+  // the camera over a hole: that one is on the picture (no arrow); only a hole beyond the window's edge has one
+  const h0 = centreXY(holes[0]!);
+  const near = endless({ x: h0.x, y: h0.y });
+  near.minimap.draw(near.k, SEEN_ALL);
+  const w2 = miniFrame(near.ext, near.k.c);
+  const far = holes.filter((h) => arrowOn(w2, centreXY(h).x, centreXY(h).y));
+  assert.ok(far.length < holes.length, "the hole under the camera is on the picture");
+  assert.equal(near.rec.log.filter((l) => l === "fill()").length, far.length, "an arrow only for a hole beyond the edge");
+});
+
+test("endless: under the fog the window paints unsensed ground as fog, though made, and an unsensed hole has no arrow", () => {
+  const fog = new Knowledge(new SensedMap(), []);
+  const s = endless({ x: 5000, y: 3000 }, { over: { fog } as Partial<FieldCtx> });
+  const win = miniFrame(s.ext, s.k.c);
+  const [x, y] = windowCell(win, 40, 50);
+  s.plane.rock.ensure(x >> 6, y >> 6).fill(0);
+  s.minimap.draw(s.k, SEEN_ALL);
+  assert.deepEqual(paintedPixel(s, 40, 50), [...fogRgb(THEME), 255], "a made chunk nobody has sensed: fog");
+  assert.equal(s.rec.log.filter((l) => l === "fill()").length, 0, "no hole has been sensed: no arrow shows where one lies");
+});
+
+// ---- Review of #411, S1: the window's ants, its remembered-ground path, its arrow colour and its frame at negative cameras. ----
+
+test("endless paint: a healthy ant is a dot in its colony's odour colour, an infected one in the host tone, a dead one and one on the other layer are not drawn", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  const win = miniFrame(s.ext, s.k.c);
+  const ant = (mx: number, my: number) => [win.x0 + mx * 4 + 1, win.y0 + my * 4 + 1] as const;
+  const [a0, a1, a2, a3] = [ant(10, 30), ant(20, 30), ant(30, 30), ant(40, 30)];
+  const colony = {
+    n: 4,
+    nestOdour: 0.3,
+    alive: [true, true, false, true],
+    layer: [PLANE, PLANE, PLANE, CURTAIN],
+    load: [0, INFECTED, 0, 0],
+    x: [a0[0], a1[0], a2[0], a3[0]],
+    y: [a0[1], a1[1], a2[1], a3[1]],
+  };
+  s.minimap.paint({ ...s.k, colonies: [colony] } as unknown as FieldCtx);
+  const px = (mx: number, my: number) => paintedPixel(s, mx, my).slice(0, 3);
+  assert.deepEqual(px(10, 30), [...odourRgb(THEME.inkRgb, THEME.warnRgb, 0.3)], "a healthy ant, at its pixel of the window");
+  assert.deepEqual(
+    px(20, 30),
+    [0, 1, 2].map((j) => Math.round((THEME.sporeRgb[j]! + THEME.inkRgb[j]!) / 2)),
+    "an infected one, in the host tone",
+  );
+  assert.deepEqual(px(30, 30), [...fogRgb(THEME)], "a dead ant is not drawn");
+  assert.deepEqual(px(40, 30), [...fogRgb(THEME)], "nor one on the other layer");
+});
+
+test("endless paint, under the fog: remembered ground is the snapshot, dimmed, and an ant on ground that is not live is not drawn", () => {
+  const stub = (st: number, at: number) => ({
+    state: () => st,
+    stateAt: () => at,
+    snapshot: (_l: number, n: string) => (n === SNAP.rock ? ROCK : 0),
+  });
+  const s = endless({ x: 5000, y: 3000 }, { over: { fog: stub(REMEMBERED, LIVE) } as unknown as Partial<FieldCtx> });
+  const win = miniFrame(s.ext, s.k.c);
+  const [x, y] = windowCell(win, 40, 50);
+  s.plane.rock.ensure(x >> 6, y >> 6).fill(0); // the world says open here now; the snapshot says rock
+  s.minimap.paint(s.k);
+  const want = new Uint8ClampedArray([...THEME.rock, 255]);
+  dimPx(want, 0, fogRgb(THEME));
+  assert.deepEqual(paintedPixel(s, 40, 50), [...want], "the snapshot's rock, dimmed, not what the world holds now");
+  const colony = { n: 1, nestOdour: 0.3, alive: [true], layer: [PLANE], load: [0], x: [win.x0 + 161], y: [win.y0 + 201] };
+  s.minimap.paint({ ...s.k, colonies: [colony], fog: stub(LIVE, REMEMBERED) } as unknown as FieldCtx);
+  assert.notDeepEqual(
+    paintedPixel(s, 40, 50).slice(0, 3),
+    [...odourRgb(THEME.inkRgb, THEME.warnRgb, 0.3)],
+    "an ant on ground that is only remembered is not drawn",
+  );
+});
+
+test("endless draw: each hole's arrow is in its owner's odour colour (the two start colonies differ)", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  s.minimap.draw(s.k, SEEN_ALL);
+  const odours = new Set<number>();
+  for (const h of s.g.world.lines.flatMap((wl) => wl.line.holes)) {
+    const col = s.g.colonies[holeOwner(s.g.colonies, PLANE, h.x, h.y)]!;
+    odours.add(col.nestOdour);
+    const [r, g, b] = odourRgb(THEME.inkRgb, THEME.warnRgb, col.nestOdour);
+    assert.ok(s.rec.log.includes(`fillStyle = rgb(${r}, ${g}, ${b})`), `an arrow for the hole at ${h.x},${h.y}`);
+  }
+  assert.equal(odours.size, 2, "so the test can tell the colours apart");
+});
+
+test("miniFrame puts the camera's chunk in the 9th column and 7th row for any camera, negative chunks included", () => {
+  const e = { x0: -2097152, w: 4194304, h: 3565158, endless: true as const };
+  for (const c of [
+    { x: 5000, y: 3000 },
+    { x: -5000, y: -3000 },
+    { x: -10, y: -10 },
+    { x: 10, y: -10 },
+    { x: -10, y: 10 },
+  ]) {
+    const f = miniFrame(e, c);
+    assert.equal(Math.floor((c.x - f.x0) / CHUNK), 8, `column for ${c.x},${c.y}`);
+    assert.equal(Math.floor((c.y - f.y0) / (CHUNK * R)), 6, `row for ${c.x},${c.y}`);
+  }
 });
