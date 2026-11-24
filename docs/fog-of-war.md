@@ -22,7 +22,7 @@
 |---|---|
 | Ground chunks (`field/ground.ts`), hexagon mode, food sprites | rock, soil, food, quality, spoil and mound, spores, chamber tints |
 | `drawNest`, `drawAnts`, `drawStripAnts` (`field/nests.ts`, `ants.ts`, `overlays.ts`) | every nest, brood pile, queen, alate, corpse and living ant of every colony |
-| The voxel pass (`mapVoxel.ts` through `inspectViewport`) | every cell in view, ants and brood included |
+| The voxel pass (`mapVoxel.ts` through `inspectViewport`) | every cell in view, ants and brood included; F3.4: runs flat under the fog and `drawFogOverlay` covers it |
 | The curtain strip (`stripAt`) | the plane under the line, repainted every frame |
 | The minimap (`field/minimap.ts`) | the whole map, every ant coloured by odour |
 | Picking, `AntCard`, following (`field/hit.ts`, `follow.ts`) | any ant anywhere, its mode, position and Jev answer |
@@ -101,7 +101,9 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Ants, the queen, brood and alates draw only in live cells.
 - The fog mask is drawn per cell at low resolution, upscaled and blurred, and snapped to the grid (§2).
 
-**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. While the fog is on, the 3-D voxel pass falls back to 2D.
+**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. (F3.4 below: the voxel pass no longer falls back to 2D.)
+
+**F3.4 (`ja-1ypq.3.4`, same flag):** under the fog the voxel pass runs flat (never tilted) and `drawFogOverlay` (`field/fogCull.ts`) covers it: unknown cells in the fog colour, remembered ones at alpha 0.35, live ones clear.
 
 **F3.2 (`ja-1ypq.3.2`, same flag):** the curtain's strip and its cut are the plane under the line as last sensed (`planeGround` in `field/fogCull.ts`): fog where that plane cell was never sensed, dimmed where nobody senses it now; the plane's ants over the strip only where live. The minimap paints unexplored pixels as fog, the rest from snapshots (dimmed when remembered), and ants only where live. In hexagon mode the dirt pellets come from the snapshot. Spores and hyphae are the fungus's own body and always draw. Corpses show only where live for now: remembering them needs a corpse source (F3.3).
 
