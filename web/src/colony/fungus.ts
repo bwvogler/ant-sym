@@ -541,6 +541,12 @@ export class Fungus {
   /** what #gather read around the ant being stepped */
   readonly #nb = { load: 0, topX: 0, topY: 0, visible: 0, ants: 0, own: 0 };
 
+  /**
+   * The layers left alone: a curtain whose colonies are all asleep (Game.freeze, docs/endless-world.md §6) is not stepped: its ants are not read, its
+   * spores do not fade, its hyphae do not grow. The plane is never in it. Set by the game; empty in every game that freezes nothing.
+   */
+  frozenLayers: ReadonlySet<number> = new Set<number>();
+
   /** On one map, or (one world) on each of `map`'s, the first holding `spores` and `sporeStrain`. */
   constructor(map: WorldMap | readonly WorldMap[], params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
     const maps: readonly WorldMap[] = Array.isArray(map) ? (map as readonly WorldMap[]) : [map as WorldMap];
@@ -734,6 +740,7 @@ export class Fungus {
     this.#seen = grids;
     let hosts = 0;
     this.#layers.forEach((L, l) => {
+      if (this.frozenLayers.has(l)) return;
       hosts += this.#stepLayer(L, l, colonies, grids[l] as readonly CountGrid[], dt, recs?.[l] ?? null);
     });
     this.#grow(dt);
@@ -928,11 +935,14 @@ export class Fungus {
       return;
     }
     let cells = 0;
-    for (const L of this.#layers) cells += L.base.length;
+    this.#layers.forEach((L, l) => {
+      if (!this.frozenLayers.has(l)) cells += L.base.length;
+    });
     if (cells) {
       const each = e.grow(dt) / cells;
       let unplaced = 0;
-      for (const L of this.#layers) {
+      for (const [l, L] of this.#layers.entries()) {
+        if (this.frozenLayers.has(l)) continue;
         for (const key of L.base) {
           const x = keyX(key);
           const y = keyY(key);
@@ -1265,8 +1275,10 @@ export class Fungus {
     // Every map's tips step together, in turns (hyphae.ts stepRound), on the first map's clock.
     const maps: { h: Hyphae; g: Ground; sinks?: Map<number, number>; resources?: ReadonlyMap<number, unknown> }[] = [];
     this.#hyphae.forEach((h, l) => {
-      if (h) maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined, resources: this.#corpses[l] });
+      if (h && !this.frozenLayers.has(l))
+        maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined, resources: this.#corpses[l] });
     });
+    if (maps.length === 0) return; // every mat there is lies in a frozen curtain
     const clock = maps[0]!.h;
     clock.clock += dt;
     let stepped = false;
