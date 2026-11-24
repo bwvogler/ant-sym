@@ -7989,7 +7989,7 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **Built (F3.6, `ja-1ypq.3.6`, 2026-11-24):** e2e section 18 (`scripts/e2e-one-world.mjs`) on a `?fog=1` page: a host is found and the cell under it is live; never-sensed ground is unknown; of the cells hosts have stood on one turns remembered once nothing senses it (any of them: the fungus's body can keep one live), and none is ever unknown again. A second page of the same seed without the flag has no fog; both are stepped to the same game time, zoomed to hexagons (asserted: zoom at least HEX_ZOOM), paused, with the CPU slowed 4× through CDP, and the mean frame is compared (bound 1.5× or +15 ms; measured 22 ms fog against 28 ms without; with the old `drawHexes` path put back the fog page ran 79 ms against 24, so the check bites). The dev hook gained `fogState(view, x, y)`. The `drawHexes` strips themselves were found while profiling PR #408 and are in main. The section adds about 40 s to the e2e. Jev cost none.
 
-**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
+**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`, P3), F6 the start, the builder and the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
 
 **Still open.**
 - A fading memory (not now).
