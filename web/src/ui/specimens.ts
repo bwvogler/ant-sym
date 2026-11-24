@@ -1,4 +1,5 @@
 import { type Colony, INFECTED, isCurtainLayer, MODES } from "../colony/index.ts";
+import { LIVE, type Knowledge } from "./fog/knowledge.ts";
 import { followedColony, type Followed } from "./follow.ts";
 import { colonyName } from "./names.ts";
 
@@ -36,11 +37,22 @@ export function pin(list: readonly Specimen[], f: Followed): { list: Specimen[];
 
 export const unpin = (list: readonly Specimen[], f: Followed): Specimen[] => list.filter((s) => !sameAnt(s, f));
 
-/** The specimens still alive, and those gone (dead, or their slot taken by a newborn). */
-export function living(list: readonly Specimen[], colonies: readonly Colony[]): { kept: Specimen[]; gone: Specimen[] } {
+/**
+ * The specimens still alive, and those gone (dead, or their slot taken by a newborn). Under the fog a death is news only where an observer senses
+ * the place the ant stood: an ant that dies out of sight is still kept, as one out of sight (docs/fog-of-war.md §5.2).
+ */
+export function living(
+  list: readonly Specimen[],
+  colonies: readonly Colony[],
+  fog: Knowledge | null = null,
+): { kept: Specimen[]; gone: Specimen[] } {
   const kept: Specimen[] = [];
   const gone: Specimen[] = [];
-  for (const s of list) (followedColony(colonies, s) ? kept : gone).push(s);
+  for (const s of list) {
+    const c = colonies[s.k];
+    const seenGone = !followedColony(colonies, s) && (!fog || !c || fog.stateAt(c.layer[s.i]!, c.x[s.i]!, c.y[s.i]!) === LIVE);
+    (seenGone ? gone : kept).push(s);
+  }
   return { kept, gone };
 }
 
@@ -59,13 +71,32 @@ export interface SpecimenRow {
   /** seconds of unsuccessful search, of its colony's patience */
   fatigue: number;
   patience: number;
+  /** under the fog: out of every observer's sight, so nothing of it is shown but who it is */
+  lost?: boolean;
 }
 
 export const specimenLabel = (no: number): string => `No. ${no}`;
 
 /** Specimen s's row, or null when the ant is gone. */
-export function specimenRow(colonies: readonly Colony[], s: Specimen): SpecimenRow | null {
+export function specimenRow(colonies: readonly Colony[], s: Specimen, fog: Knowledge | null = null): SpecimenRow | null {
   const c = followedColony(colonies, s);
+  const out = (): SpecimenRow => ({
+    label: specimenLabel(s.no),
+    who: `#${s.i} · ${colonyName(s.k)}`,
+    mode: "",
+    carrying: false,
+    load: 0,
+    host: false,
+    below: false,
+    fatigue: 0,
+    patience: 0,
+    lost: true,
+  });
+  if (fog) {
+    const col = colonies[s.k];
+    // Out of sight (alive and unsensed, or dead where nobody saw it): who it is and nothing live.
+    if (!c || (col && fog.stateAt(col.layer[s.i]!, col.x[s.i]!, col.y[s.i]!) !== LIVE)) return col ? out() : null;
+  }
   if (!c) return null;
   const load = c.load[s.i]!;
   return {

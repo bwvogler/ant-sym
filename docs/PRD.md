@@ -7948,6 +7948,8 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F3.3 built (`ja-1ypq.3.3`, 2026-11-24, same flag):** aphids, chamber labels, hole names, the line and its holes, the bends, the fungus's colonised corpses and stalks, the remembered chamber tint, and the dead kept as ground items (`fog/corpses.ts`) go through the fog; `fogMarks.test.ts` and `fogGround.test.ts` hold each (a mutation of every switch fails a test). The line and holes are fogged on the recommendation; the owner may still say they are always known. The hexagon terrain grain's snapshot read is untested.
 
+**F4 built (`ja-1ypq.4`, 2026-11-24, same flag):** live-only picking (`pickAnt`), chamber clicks only on sensed ground, "Lost sight" ends a follow, the lens and cell inspection through the fog ("Unexplored"; remembered ground as last seen with its age; no remembered ants), specimens out of sight, the pen preview on sensed ground only; `fogCards.test.ts` holds each (a mutation of every switch fails a test except the inspection's early return for an unknown cell, which the live/remembered gates cover).
+
 **F1's stamp, measured** (bead note, 2026-11-24): stamping the body costs 0.01–0.02 ms a step at 92 hypha cells, well inside the 0.5 ms budget; a big mycelium is re-measured with the queens-and-alates observers (`ja-1ypq.9`).
 
 **What is left** (bead audit, 2026-11-24): the voxel pass through the fog (F3.4, `ja-1ypq.3.4`; today it falls back to 2D), the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.

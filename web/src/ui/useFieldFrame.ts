@@ -44,6 +44,8 @@ export interface FieldFrameRefs {
   antLayer: RefObject<{ f: Followed; layer: number } | null>;
   carryTo: RefObject<number | null>;
   crossCb: RefObject<((layer: number, x: number, y: number) => void) | undefined>;
+  /** told when the followed ant is no longer sensed (the fog of war): the follow has ended */
+  lostCb: RefObject<((f: Followed) => void) | undefined>;
   rig: CameraRig;
 }
 
@@ -91,6 +93,7 @@ export function useFieldFrame({
     antLayer,
     carryTo,
     crossCb,
+    lostCb,
     rig,
   } = refs;
   const vc = () => rig.vc();
@@ -179,7 +182,15 @@ export function useFieldFrame({
       const fcol = f ? followedColony(colonies, f) : null;
       const fHere = f !== null && fcol !== null && fcol.layer[f.i] === binding.lv;
       // The follow, the crossing through a hole and the camera's ease (field/prelude.ts), then the frame draws with the camera it gives.
-      const c = prepareFrame(colonies, binding.lv, binding.ext, v, vc(), { follow, followCb, antLayer, carryTo, crossCb });
+      const c = prepareFrame(colonies, binding.lv, binding.ext, v, vc(), {
+        follow,
+        followCb,
+        antLayer,
+        carryTo,
+        crossCb,
+        lostCb,
+        fog: sensed.knowledge,
+      });
       binding.fill(fctx);
       Object.assign(fctx, { d, v, c });
       inputs.show = layers.current;
@@ -198,7 +209,10 @@ export function useFieldFrame({
             specimens: pinnedRef.current,
             sensed,
           },
-          { started, f, fcol, fHere },
+          // An ant the follow just lost sight of (it ended in the prelude) gets no ring: the ring would show where it is.
+          f !== null && fcol !== null && follow.current === null
+            ? { started, f: null, fcol: null, fHere: false }
+            : { started, f, fcol, fHere },
         ),
       );
     };

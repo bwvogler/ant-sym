@@ -2,7 +2,7 @@ import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { setMapInspection } from "./mapInspection.ts";
 import { useEffect, useState } from "react";
 import type { AphidClump, Colony, Fungus, OneWorld } from "../colony/index.ts";
-import type { Followed } from "./follow.ts";
+import { canFollow, type Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import LensCard from "./LensCard.tsx";
 import { lensAnt, lensLines, probe } from "./lens.ts";
@@ -65,7 +65,8 @@ export default function LensLayer({
   const shown = at !== null;
   useSimTick(250, shown);
   if (!at) return null;
-  const ant = at.ant && colonies[at.ant.k]?.gen[at.ant.i] === at.ant.gen ? at.ant : null;
+  // A pinned card keeps its ant only while it is the ant it was and, under the fog, while an observer still senses it.
+  const ant = at.ant && colonies[at.ant.k]?.gen[at.ant.i] === at.ant.gen && canFollow(sensed.knowledge, colonies, at.ant) ? at.ant : null;
   const lines = lensLines(
     probe({ colonies, fungus, world }, sensed, at.lv, at.x, at.y, trails),
     ant ? lensAnt(colonies, ant.k, ant.i) : null,
