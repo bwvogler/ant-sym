@@ -1066,6 +1066,44 @@ export class Game {
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
   }
 
+  /**
+   * With the awake rule on, the pile cells (by index) food regrows in (docs/endless-world.md §6, E4.4): those within W of an awake colony's hole or of
+   * the awake fungus's body; elsewhere it waits, with no catch-up owed. Null (every pile) when the game has no rule, so the bounded game regrows as ever.
+   * Only the piles short of their size are looked at: a full pile has nothing to grow.
+   */
+  #awakeGround(piles: { cells: Float64Array; full: Float32Array }): Set<number> | null {
+    if (!this.#sleep) return null;
+    const { distance } = this.#sleep.params;
+    const holes = this.colonies.flatMap((c, k) => (this.#frozen.has(k) ? [] : [(c.layers[PLANE] as Layer).nest]));
+    const short: number[] = [];
+    const where: { x: number; y: number }[] = [];
+    for (let k = 0; k < piles.cells.length; k++) {
+      const x = keyX(piles.cells[k] as number);
+      const y = keyY(piles.cells[k] as number);
+      if (piles.full[k]! - this.map.food.get(x, y) < 1) continue;
+      short.push(k);
+      where.push({ x: centreX(x, y), y: centreY(y) });
+    }
+    const out = new Set<number>();
+    const far: number[] = [];
+    short.forEach((k, i) => {
+      const p = where[i] as { x: number; y: number };
+      if (holes.some((h) => Math.hypot(h.x - p.x, h.y - p.y) <= distance)) out.add(k);
+      else far.push(i);
+    });
+    if (far.length) {
+      const near = this.fungus.bodyNear(
+        PLANE,
+        far.map((i) => where[i] as { x: number; y: number }),
+        distance,
+      );
+      far.forEach((i, j) => {
+        if (near[j]) out.add(short[i] as number);
+      });
+    }
+    return out;
+  }
+
   /** Once a second: each pile cell short of its first size grows a unit back with chance deficit ÷ regrow. */
   #regrow(dt: number): void {
     const piles = this.#piles;
@@ -1075,6 +1113,7 @@ export class Game {
     const owed = this.#regrowClock;
     this.#regrowClock = 0;
     const rate = owed / this.params.regrow;
+    const awake = this.#awakeGround(piles);
     for (let k = 0; k < piles.cells.length; k++) {
       const c = piles.cells[k];
       const x = keyX(c);
@@ -1082,6 +1121,7 @@ export class Game {
       const v = this.map.food.get(x, y);
       const short = piles.full[k] - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
+      if (awake && !awake.has(k)) continue; // far from everything awake: it waits (E4.4)
       if (this.#regrowRng!() < short * rate) {
         this.map.food.set(x, y, v + 1);
         this.map.foodLeft += 1;
