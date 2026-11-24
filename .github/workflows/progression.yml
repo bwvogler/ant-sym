@@ -57,6 +57,10 @@ on:
         description: "Also sample the ants' occupancy round the hypha tips (--traffic; reads only, docs/hyphal-traffic.md)"
         type: boolean
         default: false
+      lichen:
+        description: "Also probe the rock the hyphae lie beside and the late earning rate (--lichen; reads only, docs/lichen.md, ja-vlla.11.2)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -81,6 +85,7 @@ jobs:
           GROWTH: ${{ inputs.growth }}
           FLOW: ${{ inputs.flow }}
           TRAFFIC: ${{ inputs.traffic }}
+          LICHEN: ${{ inputs.lichen }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -102,6 +107,7 @@ jobs:
           [ "$GROWTH" = "true" ] && args="$args --growth"
           [ "$FLOW" = "true" ] && args="$args --flow"
           [ "$TRAFFIC" = "true" ] && args="$args --traffic"
+          [ "$LICHEN" = "true" ] && args="$args --lichen"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
