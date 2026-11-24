@@ -35,7 +35,7 @@ import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, ty
 import { drawNest, drawRememberedCorpses, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
 import { UNKNOWN } from "../fog/knowledge.ts";
-import { actorCull, exploredCull } from "./fogCull.ts";
+import { actorCull, drawFogOverlay, exploredCull } from "./fogCull.ts";
 import { SNAP } from "../fog/sources.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./overlays.ts";
 import { type FrameSinks, publishDrawMs, publishFrame } from "./result.ts";
@@ -302,8 +302,9 @@ export const voxelStage: Stage = (fs) => {
     fs.inputs.show,
     refs.aphids,
     theme,
-    !smellAll && !fc.fog,
-    mapCameraOrbit(lv, refs.orbit),
+    !smellAll,
+    // Under the fog the close map is the flat voxel mesh, covered by the fog cell by cell (below): never tilted, since the cover is flat.
+    fc.fog ? undefined : mapCameraOrbit(lv, refs.orbit),
   );
   fs.voxel = voxel;
   const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll && !fc.fog);
@@ -328,6 +329,7 @@ export const voxelStage: Stage = (fs) => {
     return false; // Map labels and hit targets use the overhead projection.
   }
   if (voxel.alpha > 0) {
+    if (fc.fog) drawFogOverlay(fc, fs.cellWindow);
     // Alates keep their existing body/wing atlas until the shared mesh contains their separate wings.
     for (const drawAlates of fs.alateOverlays) drawAlates();
     const hp = colonies[0]?.params;

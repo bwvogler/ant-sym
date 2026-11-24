@@ -51,6 +51,10 @@ export class Knowledge {
   readonly #sources: readonly Source[];
   readonly #liveAt: number;
   readonly #layers = new Map<number, Map<number, Chunk>>();
+  /** the chunk looked up last: a draw reads a run of neighbouring cells, so most reads skip the two map lookups (hot on a phone) */
+  #lastL = -1;
+  #lastK = -1;
+  #last: Chunk | undefined;
 
   constructor(sensed: SensedMap, sources: readonly Source[], grace = GRACE) {
     this.#sensed = sensed;
@@ -58,7 +62,10 @@ export class Knowledge {
     // sight() is 1 when just sensed and falls to 0 over SENSED_FADE: live is the first `grace` of that.
     this.#liveAt = 1 - grace / SENSED_FADE - 1e-6;
     sensed.onSeen = (l, cx, cy, start, end) => this.#see(l, cx, cy, start, end);
-    sensed.onReset = () => this.#layers.clear();
+    sensed.onReset = () => {
+      this.#layers.clear();
+      this.#last = undefined;
+    };
   }
 
   #see(l: number, cx: number, cy: number, start: number, end: number): void {
@@ -81,9 +88,22 @@ export class Knowledge {
     }
   }
 
+  /** Chunk (cx, cy) of layer `l`, if any cell of it has been sensed (the last one asked for is remembered). */
+  #chunk(l: number, cx: number, cy: number): Chunk | undefined {
+    const key = chunkKey(cx, cy);
+    if (this.#last && l === this.#lastL && key === this.#lastK) return this.#last;
+    const c = this.#layers.get(l)?.get(key);
+    if (c) {
+      this.#lastL = l;
+      this.#lastK = key;
+      this.#last = c;
+    }
+    return c;
+  }
+
   /** Whether cell (gx, gy) of layer `l` has ever been sensed. */
   explored(l: number, gx: number, gy: number): boolean {
-    const c = this.#layers.get(l)?.get(chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS));
+    const c = this.#chunk(l, gx >> CHUNK_BITS, gy >> CHUNK_BITS);
     if (!c) return false;
     const i = ((gy & (CHUNK - 1)) << CHUNK_BITS) | (gx & (CHUNK - 1));
     return (c.bits[i >> 5]! & (1 << (i & 31))) !== 0;
@@ -97,20 +117,20 @@ export class Knowledge {
 
   /** What source `name` held at cell (gx, gy) of layer `l` when it was last live there; undefined if never seen. Read it only where state() is not unknown. */
   snapshot(l: number, name: string, gx: number, gy: number): number | undefined {
-    const c = this.#layers.get(l)?.get(chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS));
+    const c = this.#chunk(l, gx >> CHUNK_BITS, gy >> CHUNK_BITS);
     return c?.snaps.get(name)?.[((gy & (CHUNK - 1)) << CHUNK_BITS) | (gx & (CHUNK - 1))];
   }
 
   /** The sim time the 8 × 8 block holding cell (gx, gy) was last seen (any of its cells); -1 if never. */
   lastSeen(l: number, gx: number, gy: number): number {
-    const c = this.#layers.get(l)?.get(chunkKey(gx >> CHUNK_BITS, gy >> CHUNK_BITS));
+    const c = this.#chunk(l, gx >> CHUNK_BITS, gy >> CHUNK_BITS);
     if (!c) return -1;
     return c.seen[(((gy & (CHUNK - 1)) >> 3) << (CHUNK_BITS - 3)) | ((gx & (CHUNK - 1)) >> 3)]!;
   }
 
   /** A chunk's explored bits and snapshots for painting it whole; undefined while none of it has been sensed. */
   view(l: number, cx: number, cy: number): { bits: Uint32Array; snap(name: string): Cells | undefined } | undefined {
-    const c = this.#layers.get(l)?.get(chunkKey(cx, cy));
+    const c = this.#chunk(l, cx, cy);
     return c && { bits: c.bits, snap: (name) => c.snaps.get(name) };
   }
 

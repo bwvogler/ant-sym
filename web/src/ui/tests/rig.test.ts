@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CURTAIN, PLANE, worldExtent, type WorldMap } from "../../colony/index.ts";
+import { CURTAIN, generateEndlessPlane, PLANE, worldExtent, type WorldMap } from "../../colony/index.ts";
 import { clamp, fit, fitZoom, fromMinimap, minimapRect, zoomBy, type Viewport } from "../camera.ts";
 import { CameraRig, extentOf, LINK_ZOOM, NEST_ZOOM, type RigHost } from "../field/rig.ts";
 
@@ -269,3 +269,34 @@ for (const dpr of [1, 2])
     rig.jumpMini(r.x + r.w / 2, r.y + r.h / 2);
     assert.equal(st.unfollowed, 1, "nothing followed now: nothing to end");
   });
+
+test("an endless plane's extent carries its flag and a home on the start nests; the rig starts there and pans far (ja-qpv.4.2)", () => {
+  const plane = generateEndlessPlane(1);
+  const e = extentOf(plane);
+  assert.equal(e.endless, true);
+  const [a, b] = plane.plane.startNests();
+  const home = e.home!;
+  for (const n of [a, b])
+    assert.ok(n.x > home.x0 && n.x < home.x0 + home.w && n.y > home.y0 && n.y < home.y0 + home.h, "both start nests are inside it");
+  const v = { w: 800, h: 600, dpr: 1 };
+  const host: RigHost = { view: () => PLANE, map: () => plane, size: () => v, dpr: () => 1, following: () => false, unfollow: () => {} };
+  const r = new CameraRig(host);
+  const c = r.camera();
+  assert.deepEqual(c, fit(e, v));
+  r.set({ x: c.x + 50000, y: c.y - 40000, zoom: c.zoom });
+  assert.equal(r.camera().x, c.x + 50000, "no clamp to a map");
+  assert.equal(r.vc().fitted, false);
+  assert.equal(r.vc().zoomedIn, true, "zoomed in is a level: the start view is past it");
+  r.zoomAround(v, 400, 300, 1e6);
+  assert.equal(r.vc().zoomedIn, true);
+  assert.equal(
+    r.inMini(790, 590),
+    false,
+    "no minimap on an endless plane until E5.3, even zoomed in (a point inside the nominal box's corner rectangle)",
+  );
+  r.zoomAround(v, 400, 300, 1e-6);
+  assert.equal(r.camera().zoom, 0.5, "the least zoom is fixed");
+  r.showAll();
+  assert.deepEqual(r.camera(), c, "key 0 returns to the start nests");
+  assert.equal(r.vc().fitted, true);
+});

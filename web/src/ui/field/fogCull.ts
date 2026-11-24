@@ -1,5 +1,5 @@
-import { OPEN, PLANE, rockAt } from "../../colony/index.ts";
-import { type FogState, LIVE, UNKNOWN } from "../fog/knowledge.ts";
+import { OPEN, PLANE, R, rockAt, SIDE } from "../../colony/index.ts";
+import { type FogState, LIVE, REMEMBERED, UNKNOWN } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
 
@@ -49,4 +49,50 @@ export function planeGround(k: FieldCtx, qx: number, qy: number): { state: FogSt
     food: fog.snapshot(PLANE, SNAP.food, qx, qy) ?? 0,
     spoil: fog.snapshot(PLANE, SNAP.spoil, qx, qy) ?? 0,
   };
+}
+
+/**
+ * Under the fog the flat close map the voxel pass draws is covered cell by cell: a cell never sensed in the fog's colour, one only remembered in a veil of it
+ * (the voxel patch itself already carries nothing of an unknown cell and no ant of a remembered one: inspectPatch). Hexagons as drawHexes draws them at the
+ * hexagon zoom. Only the cells in `win`.
+ */
+export function drawFogOverlay(k: FieldCtx, win: { rx0: number; rx1: number; ry0: number; ry1: number }): void {
+  const { ctx, c, v, lv, fog, theme } = k;
+  if (!fog) return;
+  const ox = v.w / 2 - c.x * c.zoom;
+  const oy = v.h / 2 - c.y * c.zoom;
+  const x = c.zoom * 0.5 * 1.04;
+  const shoulder = c.zoom * SIDE * 0.52;
+  const tip = c.zoom * SIDE * 1.04;
+  const hex = (sx: number, sy: number): void => {
+    ctx.moveTo(sx + x, sy + shoulder);
+    ctx.lineTo(sx, sy + tip);
+    ctx.lineTo(sx - x, sy + shoulder);
+    ctx.lineTo(sx - x, sy - shoulder);
+    ctx.lineTo(sx, sy - tip);
+    ctx.lineTo(sx + x, sy - shoulder);
+    ctx.closePath();
+  };
+  const [fr, fg, fb] = fogRgb(theme);
+  for (const [state, alpha] of [
+    [UNKNOWN, 1],
+    [REMEMBERED, 0.35],
+  ] as const) {
+    ctx.beginPath();
+    let any = false;
+    for (let y = win.ry0; y <= win.ry1; y++) {
+      const sy = (y + 0.5) * R * c.zoom + oy;
+      const shift = 0.5 + 0.5 * (y & 1);
+      for (let cx = win.rx0; cx <= win.rx1; cx++)
+        if (fog.state(lv, cx, y) === state) {
+          hex((cx + shift) * c.zoom + ox, sy);
+          any = true;
+        }
+    }
+    if (!any) continue;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `rgb(${fr},${fg},${fb})`;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 }
