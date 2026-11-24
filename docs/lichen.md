@@ -235,7 +235,7 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
   - the design rates once measured;
   - L3b's go;
   - L4 and L5 after `ja-vlla.11.1`;
-  - whether the lichen trait needs the borer or the web level first.
+  - ~~whether the lichen trait needs the borer or the web level first~~: decided (owner, 2026-11-24): after the borer, Mycelium level 2; L1 and the assay are measured at borer-level games.
 - **To measure:**
   - time to first lichen;
   - lichen cells per game;
