@@ -172,7 +172,8 @@ export function layMark(c: Colony, i: number, dt: number): void {
   const r = c.lastRole[i];
   if (r === 0) return;
   if (c.params.markMax > 0) {
-    // Raised to its own level, the field's cap fading with the time since its chamber: the cell keeps a slope, not a count.
+    // Raised to its own level, the field's cap fading with the time since its chamber: the cell keeps a slope, not a count. Below 1e-3 nothing is
+    // raised (at the default 6 s decay that is 59 s from a chamber; the old rule's cut was 1e-4 on a per-tick amount).
     const level = MAX_LEVEL * Math.exp(-c.sinceRole[i] / c.params.markDecay) * c.layGain[i];
     if (level > 1e-3) c.ph.raiseCell(MARKS[r - 1] as Mark, cx, cy, level);
     return;

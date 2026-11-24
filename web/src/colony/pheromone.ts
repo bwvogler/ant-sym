@@ -156,7 +156,7 @@ export class Pheromones {
   /** Raise integer cell (cx, cy) to `level` (never past the channel's cap), leaving a higher value as it is: a mark that records a level, not a count. */
   raiseCell(channel: Channel, cx: number, cy: number, level: number): void {
     const { map } = this;
-    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
+    if (!map.endless && (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h)) return;
     if (this.#absent !== null && this.#absent.has(channel)) return;
     const f = this.fields[channel];
     const capped = Math.min(this.params[channel].max ?? MAX_LEVEL, level);

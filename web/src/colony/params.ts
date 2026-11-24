@@ -419,7 +419,9 @@ export interface ColonyParams {
    * (PRD §77.8: on one-world G1 seed 20 at 400 s, 72 porters stood on a mark of 19.95, the chamber's own level, 39-41 steps of tunnel from
    * the royal chamber). 1: the cell is raised to the ant's own level, the cap fading with the seconds since its last chamber
    * (`markDecay`), and never beyond it, so a mark records how recently a chamber lay behind and a busy tunnel keeps its slope.
-   * **Design.** Off by default (bit-exact); the sweep is in PRD §77.8.
+   * **Design.** On by default (markMax 1, markDecay 6): the sweep and the other assays are in PRD §77.8; markMax 0 is the old rule. Under 1, `deposit`
+   * no longer affects floor marks (it still drives trails and noEntry) and the ant's lay gain (`layGain`, a fungus lever) scales the level it raises a cell to,
+   * capped at the field's maximum, so a gain above 1 only reaches further and one below 1 lowers the mark.
    */
   markMax: number;
   /** Seconds away from its chamber over which a floor mark falls to 1/e of what is laid at it (`layMark`). */
