@@ -2401,42 +2401,51 @@ try {
     return { c, p };
   };
   const { c: gctx, p: gp } = await fogPage("?fog=1");
-  // The first infected ant of any colony: where it is, on which view.
-  const findHost = () =>
+  // Every living host on the plane: its cell. The real frames before the Pause make which ant is first, and where, vary from run to run.
+  const hostCells = () =>
     gp.evaluate(() => {
-      const g = window.jevAnts.game;
-      for (const c of g.colonies)
-        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 0.05 && (c.layer[i] ?? 0) === 0) return { x: c.x[i], y: c.y[i] };
-      return null;
+      const out = [];
+      for (const c of window.jevAnts.game.colonies)
+        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 0.05 && (c.layer[i] ?? 0) === 0) out.push([c.x[i], c.y[i]]);
+      return out;
     });
-  let host = null;
-  for (let round = 0; round < 30 && !host; round++) {
-    await gp.evaluate(() => window.jevAnts.step(100));
-    host = await findHost();
-  }
-  check(host !== null, "a host is found on the plane");
   const stateAt = (x, y) => gp.evaluate(([a, b]) => window.jevAnts.fogState("above", a, b), [x, y]);
-  check((await stateAt(host.x, host.y)) === 2, "the cell under a host is live");
-  check((await stateAt(0.5, 0.5)) === 0, "a cell nothing has sensed is unknown");
-  // It walks away (or dies): its old cell turns remembered, never unknown again.
-  let away = false;
-  for (let round = 0; round < 200 && !away; round++) {
-    await gp.evaluate(() => window.jevAnts.step(30));
-    away = (await stateAt(host.x, host.y)) === 1;
+  let seen = [];
+  for (let round = 0; round < 30 && seen.length === 0; round++) {
+    await gp.evaluate(() => window.jevAnts.step(100));
+    seen = await hostCells();
   }
-  check(away, "once the host has walked away its cell is remembered, not live");
+  check(seen.length > 0, "a host is found on the plane");
+  check((await stateAt(...seen[0])) === 2, "the cell under a host is live");
+  check((await stateAt(0.5, 0.5)) === 0, "a cell nothing has sensed is unknown");
+  // Hosts walk away (or die): of the cells hosts have stood on, one turns remembered (live only while a host or the fungus's body is near), and none is unknown.
+  let left = null;
+  for (let round = 0; round < 200 && !left; round++) {
+    await gp.evaluate(() => window.jevAnts.step(30));
+    for (const c of await hostCells()) if (seen.length < 60) seen.push(c);
+    for (const c of seen) if ((await stateAt(...c)) === 1) left = c;
+  }
+  check(left !== null, `a cell a host stood on is remembered once nothing senses it (${seen.length} cells watched)`);
   await gp.evaluate(() => window.jevAnts.step(300));
-  check((await stateAt(host.x, host.y)) !== 0, "and stays explored");
+  for (const c of seen) check((await stateAt(...c)) !== 0, "every cell a host stood on stays explored");
   check((await stateAt(0.5, 0.5)) === 0, "while the ground no host has been near is still unknown");
-  await gp.waitForTimeout(500);
   const nofog = await fogPage("");
   check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "without ?fog=1 the page has no fog");
-  // The frame time: the same game, the same steps, zoomed in to hexagons, paused (so a frame is drawing alone). The fog may cost a little, not a phone's frame rate (PR #408).
+  // The frame time: the same game time on both pages (the sim is deterministic only from the Pause), zoomed in to hexagons, paused (so a frame
+  // draws alone), the CPU slowed 4× on both so a cost shows over vsync (a phone's frame rate was lost to it, PR #408). The mean, for the median sits on the vsync tick.
+  const timeOf = (p) => p.evaluate(() => window.jevAnts.game.time);
+  for (const [lag, p] of [
+    [(await timeOf(gp)) - (await timeOf(nofog.p)), nofog.p],
+    [(await timeOf(nofog.p)) - (await timeOf(gp)), gp],
+  ])
+    if (lag > 0) await p.evaluate((n) => window.jevAnts.step(n), Math.round(lag * 30)); // REHEARSE_DT is 1/30
   const frames = async (p) => {
+    await (await p.context().newCDPSession(p)).send("Emulation.setCPUThrottlingRate", { rate: 4 });
     await p.mouse.move(640, 450);
     for (let i = 0; i < 6; i++) await p.mouse.wheel(0, -300);
-    await p.waitForTimeout(500);
-    return p.evaluate(
+    await p.waitForTimeout(800);
+    const zoom = await p.evaluate(() => window.jevAnts.camera("above").zoom);
+    const mean = await p.evaluate(
       () =>
         new Promise((done) => {
           const ds = [];
@@ -2445,19 +2454,25 @@ try {
             const n = performance.now();
             ds.push(n - last);
             last = n;
-            if (ds.length < 90) requestAnimationFrame(t);
-            else done(ds.sort((a, b) => a - b)[ds.length >> 1]);
+            if (ds.length < 61) requestAnimationFrame(t);
+            else done(ds.slice(1).reduce((a, b) => a + b, 0) / (ds.length - 1));
           };
           requestAnimationFrame(t);
         }),
     );
+    return { zoom, mean };
   };
-  const simTime = await gp.evaluate(() => window.jevAnts.game.time);
-  await nofog.p.evaluate((n) => window.jevAnts.step(n), Math.round(simTime * 30)); // REHEARSE_DT is 1/30
-  const fogMs = await frames(gp);
-  const baseMs = await frames(nofog.p);
-  console.log(`  frame time, paused and zoomed in: fog ${fogMs.toFixed(1)} ms, no fog ${baseMs.toFixed(1)} ms`);
-  check(fogMs <= Math.max(baseMs * 1.6, baseMs + 12), "the fog's frame time is within noise of the game without it");
+  const fogF = await frames(gp);
+  const baseF = await frames(nofog.p);
+  console.log(`  mean frame, paused, zoomed in, CPU 4× slower: fog ${fogF.mean.toFixed(1)} ms, no fog ${baseF.mean.toFixed(1)} ms`);
+  check(
+    fogF.zoom >= 12 && baseF.zoom >= 12,
+    `both pages are zoomed in to hexagons (zoom ${fogF.zoom.toFixed(1)}, ${baseF.zoom.toFixed(1)}; HEX_ZOOM is 12)`,
+  );
+  check(
+    fogF.mean <= Math.max(baseF.mean * 1.5, baseF.mean + 15),
+    `the fog's frame time (${fogF.mean.toFixed(1)} ms) is within noise of the game without it (${baseF.mean.toFixed(1)} ms)`,
+  );
   await gctx.close();
   await nofog.c.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
