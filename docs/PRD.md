@@ -7906,6 +7906,8 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F3.2 built (`ja-1ypq.3.2`, 2026-11-24, same flag):** the strip and its ants, the minimap and the hexagon pellets read the fog; `minimap.test.ts` and `fogRender.test.ts` hold that unexplored pixels are fog, a remembered pixel is the snapshot dimmed, and ants show only where live. The hexagon pellets' snapshot read is held by a hexagon-zoom scene (`fogStrip.test.ts`); the hexagon terrain grain reads the snapshot too, untested. Review of #385 found the line, its hole dots and the bends' labels still draw everywhere (F3.3).
 
+**F3.3 built (`ja-1ypq.3.3`, 2026-11-24, same flag):** aphids, chamber labels, hole names, the line and its holes, the bends, the fungus's colonised corpses and stalks, the remembered chamber tint, and the dead kept as ground items (`fog/corpses.ts`) go through the fog; `fogMarks.test.ts` and `fogGround.test.ts` hold each (a mutation of every switch fails a test). The line and holes are fogged on the recommendation; the owner may still say they are always known. The hexagon terrain grain's snapshot read is untested.
+
 **Still open.**
 - How the body is stamped (F1 measures).
 - A fading memory (not now).

@@ -32,10 +32,10 @@ import type { FieldCtx, FieldInputs } from "./ctx.ts";
 import { drawFungusGround, drawStalksRaised } from "./fungus.ts";
 import { type Ground, groundPaper } from "./ground.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./marks.ts";
-import { drawNest, type NestFrame } from "./nests.ts";
+import { drawNest, drawRememberedCorpses, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
 import { UNKNOWN } from "../fog/knowledge.ts";
-import { actorCull } from "./fogCull.ts";
+import { actorCull, exploredCull } from "./fogCull.ts";
 import { SNAP } from "../fog/sources.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./overlays.ts";
 import { type FrameSinks, publishDrawMs, publishFrame } from "./result.ts";
@@ -279,6 +279,7 @@ export const actorsStage: Stage = (fs) => {
     drawAnts(fc, antFrame, col);
   }
   if (strip) drawStripAnts(fc, len, crumb, inView); // under the fog only the plane ants an observer senses now (overlays.ts)
+  drawRememberedCorpses(fc, { ...nestFrame, inView });
   drawStalksRaised(fc, fs.cellWindow, fs.fungusFrame!);
 };
 
@@ -348,8 +349,10 @@ export const voxelStage: Stage = (fs) => {
 };
 
 /** Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen. */
-export const labelsStage: Stage = ({ fc, refs, inView }) => {
+export const labelsStage: Stage = ({ fc, refs, inView: viewed }) => {
   const { ctx, c, v, d, m, theme } = fc;
+  // A chamber's role is read live, so under the fog a label shows only where an observer senses the place now.
+  const inView = actorCull(fc, viewed);
   if (!(refs.labelsOn && m.chambers)) return;
   const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
   ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -388,7 +391,7 @@ export const marksStage: Stage = (fs) => {
   drawSpecimens(fc, refs.specimens, f);
   drawFollowed(fc, f, fcol, fHere);
   // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-  if (lv === PLANE) drawHoleNames(fc, inView);
+  if (lv === PLANE) drawHoleNames(fc, exploredCull(fc, inView));
   if (lv === PLANE && inputs.pen) drawPen(fc, inputs);
   drawInspection(fc);
 };

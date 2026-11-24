@@ -1,4 +1,5 @@
 import type { Game } from "../../colony/index.ts";
+import { CorpseMemory } from "./corpses.ts";
 import { Knowledge, type Source } from "./knowledge.ts";
 import { SensedMap } from "../fungusSight.ts";
 
@@ -29,6 +30,9 @@ export function fogFromUrl(search = typeof location === "undefined" ? "" : locat
 /** The sensed map for `game`: with the fog's knowledge hung on it when `fog`. */
 export function sensedFor(game: Game, fog: boolean): SensedMap {
   const s = new SensedMap();
-  if (fog) s.knowledge = new Knowledge(s, groundSources(game));
+  if (fog) {
+    s.knowledge = new Knowledge(s, groundSources(game));
+    s.corpses = new CorpseMemory();
+  }
   return s;
 }

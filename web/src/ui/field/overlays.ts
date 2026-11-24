@@ -20,7 +20,7 @@ import {
 import { toScreen, toWorld } from "../camera.ts";
 import { holeOwner } from "../lens.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
-import { LIVE } from "../fog/knowledge.ts";
+import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { odourColour } from "./colour.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 
@@ -93,6 +93,7 @@ export function drawLine(k: FieldCtx, holes = true): void {
 function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
   const { ctx, theme, c, v, d } = k;
   const last = line.holes.length - 1;
+  if (k.fog) return drawLineFogged(k, line, holes);
   ctx.strokeStyle = theme.ink;
   ctx.lineWidth = Math.max(1, d * 1.2);
   ctx.setLineDash([6 * d, 5 * d]);
@@ -119,6 +120,40 @@ function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
   ctx.globalAlpha = 1;
 }
 
+/**
+ * The line under the fog: only the stretches between two holes the fungus has sensed, the margin beyond an end hole only if that hole is sensed,
+ * and a marker only at a sensed hole. Where the other holes are is not shown before anyone has been there (docs/fog-of-war.md §5.1).
+ */
+function drawLineFogged(k: FieldCtx, line: Transect, holes: boolean): void {
+  const { ctx, theme, c, v, d, fog } = k;
+  const last = line.holes.length - 1;
+  const known = line.holes.map((h) => fog!.state(PLANE, h.x, h.y) !== UNKNOWN);
+  ctx.strokeStyle = theme.ink;
+  ctx.lineWidth = Math.max(1, d * 1.2);
+  ctx.setLineDash([6 * d, 5 * d]);
+  const stretch = (lo: number, hi: number, alpha: number): void => {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    traceColumns(k, line, lo, hi);
+    ctx.stroke();
+  };
+  if (known[0]) stretch(line.sMin, line.sHole[0]!, 0.25);
+  if (known[last]) stretch(line.sHole[last]!, line.sMax, 0.25);
+  for (let j = 0; j < last; j++) if (known[j] && known[j + 1]) stretch(line.sHole[j]!, line.sHole[j + 1]!, 0.6);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = theme.ink;
+  if (holes)
+    line.holes.forEach((h, j) => {
+      if (!known[j]) return;
+      const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(2.5 * d, 0.36 * c.zoom), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  ctx.globalAlpha = 1;
+}
+
 /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
 export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boolean): void {
   const { theme, c, v, d, colonies, fungus } = k;
@@ -136,9 +171,12 @@ export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boo
       continue;
     }
     const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
+    // Under the fog a remembered hole shows its colony's name only: how far the fungus is into it and its queen are live numbers (docs/fog-of-war.md §4.4).
+    const parts = badgeParts(nestBadge(col, n, fungus));
+    const shown = k.fog && k.fog.state(PLANE, h.x, h.y) !== LIVE ? parts.slice(0, 1) : parts;
     pill(
       k,
-      badgeParts(nestBadge(col, n, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+      shown.map((p) => ({ text: p.text, fill: tone[p.tone] })),
       x,
       above - px * 0.2,
       px,
@@ -153,6 +191,8 @@ export function drawBends(k: FieldCtx): void {
   const px = Math.round(12 * d);
   for (let j = 1; j < line.holes.length - 1; j++) {
     const s = line.sHole[j]!;
+    // Under the fog a bend shows once its hole has been sensed.
+    if (k.fog && k.fog.state(PLANE, line.holes[j]!.x, line.holes[j]!.y) === UNKNOWN) continue;
     const [x, top] = toScreen(c, v, centreX(s, STRIP), 0);
     const [, bottom] = toScreen(c, v, 0, k.ext.h);
     if (x < -px * 4 || x > v.w + px * 4) continue;

@@ -3,6 +3,13 @@ import { type FogState, LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
 
+/** In view, and under the fog only where the place has been sensed at some time: what ground items and the fungus's own marks cull by. */
+export function exploredCull(fc: FieldCtx, inView: (wx: number, wy: number) => boolean): (wx: number, wy: number) => boolean {
+  const fog = fc.fog;
+  if (!fog) return inView;
+  return (wx, wy) => inView(wx, wy) && fog.stateAt(fc.lv, wx, wy) !== UNKNOWN;
+}
+
 /**
  * What the actors stage (ants, brood, the queen, alates, corpses) culls by: in view, and under the fog, only where an observer senses
  * the place now (docs/fog-of-war.md §5.1: ants are never remembered). Without the fog it is `inView` itself.
