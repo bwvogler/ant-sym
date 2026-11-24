@@ -28,9 +28,10 @@ import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "../l
 import { MapChunkPaintCache } from "../mapChunkPaintCache.ts";
 import { HOME_RGB, ROLE_RGB } from "../palette.ts";
 import { odourRgb } from "./colour.ts";
-import { GRACE } from "../fog/knowledge.ts";
+import { GRACE, LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
+import { dimPx, fogRgb, planeGround, setPx } from "./fogCull.ts";
 import type { FieldEnv } from "./env.ts";
 import type { CellWindow } from "./fungus.ts";
 import { HEX_ZOOM } from "./zoom.ts";
@@ -71,28 +72,25 @@ export const groundSpoil = (k: FieldCtx) => (k.smellAll ? k.theme.spoil : CLOSE_
 export function stripAt(k: FieldCtx, s: number, y: number): readonly number[] | null {
   const { world, theme } = k;
   if (y > STRIP || !cellAt(world.line, s)) return null;
-  const qx = CELL[0];
-  const qy = CELL[1];
-  const plane = world.plane;
-  if (y === STRIP) return rockAt(plane, qx, qy) !== OPEN ? theme.rock : plane.food.get(qx, qy) > 0 ? theme.accentRgb : theme.paperRgb;
-  return STRIP - y <= Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0) ? theme.spoil : null;
+  const g = planeGround(k, CELL[0], CELL[1]);
+  if (g.state === UNKNOWN) return y === STRIP ? fogRgb(theme) : null; // under the fog, a place nothing has sensed is fog on the strip; there is no cut above it
+  const c =
+    y === STRIP
+      ? g.rock !== OPEN
+        ? theme.rock
+        : g.food > 0
+          ? theme.accentRgb
+          : theme.paperRgb
+      : STRIP - y <= Math.min(CUT_MAX, g.spoil)
+        ? theme.spoil
+        : null;
+  return c && g.state !== LIVE ? mixToFog(c, fogRgb(theme)) : c;
 }
 
-/** The fog's colour: the paper pulled a little towards the ink. */
-function fogRgb(theme: FieldCtx["theme"]): [number, number, number] {
-  return [0, 1, 2].map((k) => Math.round(theme.paperRgb[k]! + (theme.inkRgb[k]! - theme.paperRgb[k]!) * 0.16)) as [number, number, number];
-}
-function setPx(px: Uint8ClampedArray, o: number, rgb: readonly number[], a: number): void {
-  px[o] = rgb[0]!;
-  px[o + 1] = rgb[1]!;
-  px[o + 2] = rgb[2]!;
-  px[o + 3] = a;
-}
-/** A remembered cell: what was painted, mixed towards the fog (clear ground becomes a faint wash of it). */
-function dimPx(px: Uint8ClampedArray, o: number, fogPx: readonly number[]): void {
-  if (px[o + 3] === 0) return setPx(px, o, fogPx, 70);
-  for (let k = 0; k < 3; k++) px[o + k] = Math.round(px[o + k]! * 0.6 + fogPx[k]! * 0.4);
-}
+/** A chunk nothing has been sensed in, for the strip's chunk of the curtain: no explored bit, no snapshot. */
+const EMPTY_VIEW = { bits: new Uint32Array((CHUNK * CHUNK) >> 5), snap: () => undefined };
+/** A colour mixed towards the fog, as a remembered cell is. */
+const mixToFog = (c: readonly number[], f: readonly number[]): number[] => [0, 1, 2].map((k) => Math.round(c[k]! * 0.6 + f[k]! * 0.4));
 
 /** The chunks of the shown map and what keeps them. One per field; `clear()` when the shown map is another or has grown. */
 export class Ground {
@@ -181,7 +179,9 @@ export class Ground {
     // Under the fog (docs/fog-of-war.md §5.1) a chunk paints from what was last sensed: unexplored cells as fog, remembered ones from their
     // snapshots, dimmed, and the cells an observer senses now from the truth (the snapshot is written as they are sensed).
     const fog = k.fog;
-    const fogV = fog?.view(k.lv, cx, cy);
+    // The strip chunk of the side view is painted from the plane under the line, so it paints even where the curtain's own chunk is unknown.
+    const stripChunk = k.strip && cy === STRIP >> 6;
+    const fogV = fog ? (fog.view(k.lv, cx, cy) ?? (stripChunk ? EMPTY_VIEW : undefined)) : undefined;
     if (fog && !fogV) {
       if (this.tiles.needsPaint(c, "fog-unknown", [])) {
         const fogPx = fogRgb(theme);
@@ -225,7 +225,7 @@ export class Ground {
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
     // The strip also depends on projected plane cells; keep its existing live repaint path.
-    if (!(strip && world && cy === STRIP >> 6 && !fog)) {
+    if (!(strip && world && cy === STRIP >> 6)) {
       const tag = JSON.stringify([
         foodAsSprites,
         !!fog,
@@ -361,7 +361,7 @@ export class Ground {
     }
     // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
     // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
-    if (strip && !fog && cy === STRIP >> 6) {
+    if (strip && cy === STRIP >> 6) {
       const line = world.line;
       const plane = world.plane;
       const ly = STRIP - y0;
@@ -370,8 +370,14 @@ export class Ground {
         const qx = CELL[0];
         const qy = CELL[1];
         let o = (ly * CHUNK + lx) * 4;
-        const food = plane.food.get(qx, qy);
-        if (rockAt(plane, qx, qy) !== OPEN) {
+        // Under the fog the strip is the plane as last sensed there: fog where nothing was, dimmed where nobody senses it now.
+        const pg = fog ? planeGround(k, qx, qy) : null;
+        const food = pg ? pg.food : plane.food.get(qx, qy);
+        if (pg?.state === UNKNOWN) {
+          setPx(px, o, fogRgb(theme), 255);
+          continue;
+        }
+        if ((pg ? pg.rock : rockAt(plane, qx, qy)) !== OPEN) {
           px[o] = theme.rock[0];
           px[o + 1] = theme.rock[1];
           px[o + 2] = theme.rock[2];
@@ -382,13 +388,16 @@ export class Ground {
           px[o + 2] = fb;
           px[o + 3] = 120 + Math.min(135, food * 12);
         } else px[o + 3] = 0; // open ground: the paper, as the side view's walkway
-        const cut = Math.min(CUT_MAX, plane.spoil?.get(qx, qy) ?? 0);
+        const dim = pg !== null && pg.state !== LIVE;
+        if (dim) dimPx(px, o, fogRgb(theme));
+        const cut = Math.min(CUT_MAX, pg ? pg.spoil : (plane.spoil?.get(qx, qy) ?? 0));
         for (let up = 1; up <= cut; up++) {
           o = ((ly - up) * CHUNK + lx) * 4;
           px[o] = theme.spoil[0];
           px[o + 1] = theme.spoil[1];
           px[o + 2] = theme.spoil[2];
           px[o + 3] = 255;
+          if (dim) dimPx(px, o, fogRgb(theme));
         }
       }
     }
@@ -436,8 +445,10 @@ export class Ground {
         if (x >> 6 !== chunkX) {
           chunkX = x >> 6;
           data = this.chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
-          terrain = pelletAlpha ? m.rock.chunk(chunkX, cy) : undefined;
-          heaps = pelletAlpha ? m.spoil?.chunk(chunkX, cy) : undefined;
+          // Under the fog the pellets of a mound are the ones last sensed, and none where nothing was.
+          const fv = k.fog?.view(lv, chunkX, cy);
+          terrain = !pelletAlpha ? undefined : k.fog ? (fv?.snap(SNAP.rock) as Uint8Array | undefined) : m.rock.chunk(chunkX, cy);
+          heaps = !pelletAlpha ? undefined : k.fog ? (fv?.snap(SNAP.spoil) as Uint16Array | undefined) : m.spoil?.chunk(chunkX, cy);
         }
         if (!data) continue;
         const index = (ly << 6) | (x & 63);

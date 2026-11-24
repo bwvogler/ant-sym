@@ -24,9 +24,20 @@ test("the fog hides the ants and the nests' discs; where every cell is sensed th
   assert.equal(count(lit, "arc("), count(off, "arc("), "every nest once all is explored");
 });
 
-test("the curtain's strip and the plane's ants over it are not drawn under the fog, and are where the fog is off", () => {
+test("the plane's ants over the curtain's strip are not drawn under the fog while nothing is sensed, and are where the fog is off", () => {
   const off = renderScene({ ...BASE, lv: CURTAIN }).log;
   const dark = renderScene({ ...BASE, lv: CURTAIN, fog: true }).log;
   assert.ok(count(off, "moveTo") > 100, "the strip's ants stroke without the fog");
   assert.equal(count(dark, "moveTo"), 0, "none under it");
+});
+
+test("the strip under the fog: where the plane under the line was never sensed every pixel of the curtain's chunks is fog; where all is sensed its ants are back", () => {
+  const dark = renderScene({ ...BASE, lv: CURTAIN, fog: true });
+  const solid = dark.pixels.filter((p) => p.length === 64 * 64 * 4);
+  assert.ok(solid.length > 0, "chunks were painted");
+  for (const p of solid)
+    for (let i = 0; i < p.length; i += 4) assert.equal(p[i + 3], 255, "nothing of the truth shows in unexplored ground");
+  const off = renderScene({ ...BASE, lv: CURTAIN }).log;
+  const lit = renderScene({ ...BASE, lv: CURTAIN, fog: true, stamp: LIT }).log;
+  assert.equal(count(lit, "moveTo"), count(off, "moveTo"), "the plane's ants over the strip once the plane is sensed");
 });

@@ -179,7 +179,7 @@ export const paperStage: Stage = ({ fc }) => {
 
 /** The chunks in view, as bricks or as hexagons, and the terrain's grain over the hexagons. */
 export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, resourceImage }) => {
-  const { ctx, c, v, m, theme } = fc;
+  const { ctx, c, v, m, theme, lv } = fc;
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { ground } = parts;
   ground.draw(fc, inputs.show, cellWindow, hexMix, !!resourceImage);
@@ -192,7 +192,8 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
       v.w / 2 - c.x * c.zoom,
       v.h / 2 - c.y * c.zoom,
       [rx0, rx1, ry0, ry1],
-      (x, y) => rockAt(m, x, y),
+      // Under the fog the grain shows the rock last sensed, and none where nothing was.
+      (x, y) => (fc.fog ? (fc.fog.state(lv, x, y) === UNKNOWN ? 0 : (fc.fog.snapshot(lv, SNAP.rock, x, y) ?? 0)) : rockAt(m, x, y)),
       (x, y) => ground.isBare(x, y),
       theme.ink,
       theme.paper,
@@ -277,7 +278,7 @@ export const actorsStage: Stage = (fs) => {
     if (alates) fs.alateOverlays.push(alates);
     drawAnts(fc, antFrame, col);
   }
-  if (strip && !fc.fog) drawStripAnts(fc, len, crumb, inView); // under the fog the strip waits for ja-1ypq.3.2
+  if (strip) drawStripAnts(fc, len, crumb, inView); // under the fog only the plane ants an observer senses now (overlays.ts)
   drawStalksRaised(fc, fs.cellWindow, fs.fungusFrame!);
 };
 

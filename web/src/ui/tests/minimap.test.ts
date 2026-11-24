@@ -20,7 +20,12 @@ import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
 import type { FieldEnv } from "../field/env.ts";
 import { stripAt } from "../field/ground.ts";
 import { MINIMAP_EVERY_MS, Minimap } from "../field/minimap.ts";
+import { Knowledge, GRACE } from "../fog/knowledge.ts";
+import { SNAP } from "../fog/sources.ts";
+import { fogRgb } from "../field/fogCull.ts";
+import { SensedMap } from "../fungusSight.ts";
 import { buildGame } from "../useColony.ts";
+import { centreX, centreY } from "../../colony/index.ts";
 import { RecordedCanvas, recordingContext } from "./recordingContext.ts";
 
 // The minimap on a recording fake context (ja-fnd.6.3.19): its picture pixel by pixel from the map, the spores and the ants (the buffer is real bytes), and
@@ -388,4 +393,78 @@ test("draw: the picture is painted again only when it is older than half a secon
   assert.equal(paints(), 4);
   s.minimap.draw(k, SEEN_ALL);
   assert.equal(paints(), 5, "shown again after a while: painted at once");
+});
+
+test("under the fog a pixel is fog where nothing was sensed, the snapshot while sensed, dimmed once nobody senses it; ants only where live", () => {
+  const rockSnap = new Uint8Array(64 * 64);
+  cellOf(1, 1);
+  const [px0, py0] = [CELL[0], CELL[1]]; // the cell pixel (0, 0) reads
+  rockSnap[py0 * 64 + px0] = ROCK;
+  const sensed = new SensedMap();
+  const fog = new Knowledge(sensed, [{ name: SNAP.rock, layer: PLANE, at: (cx, cy) => (cx === 0 && cy === 0 ? rockSnap : undefined) }]);
+  const ant = (gx: number, gy: number) => ({
+    n: 1,
+    nestOdour: 0,
+    alive: Uint8Array.of(1),
+    layer: Uint8Array.of(PLANE),
+    load: Float32Array.of(0),
+    params: { sensorDistance: 3 },
+    x: Float32Array.of(centreX(gx, gy)),
+    y: Float32Array.of(centreY(gy)),
+  });
+  const host = { ...ant(px0, py0), load: Float32Array.of(INFECTED) };
+  const walker = ant(7, 5); // a healthy ant in a cell nobody senses
+  const s = setup({ over: { fog }, colonies: [walker as never] });
+  const F = fogRgb(THEME);
+  s.minimap.paint(s.k);
+  assert.deepEqual(paintedPixel(s, 0, 0), [...F, 255], "nothing sensed: fog");
+  sensed.stamp([host as never], 1);
+  s.minimap.paint(s.k);
+  assert.deepEqual(paintedPixel(s, 0, 0), [...THEME.rock, 255], "live: the snapshot's rock, not the table's open ground");
+  assert.deepEqual(paintedPixel(s, 3, 2), [...F, 255], "far from the host: still fog");
+  sensed.stamp([{ ...host, n: 0 } as never], 1 + GRACE + 1);
+  s.minimap.paint(s.k);
+  const dim = paintedPixel(s, 0, 0);
+  assert.deepEqual(
+    dim.slice(0, 3),
+    THEME.rock.map((c, k) => Math.round(c * 0.6 + F[k]! * 0.4)),
+    "remembered: dimmed towards the fog",
+  );
+  const withAnt = setup({ over: { fog }, colonies: [host as never] });
+  withAnt.minimap.paint(withAnt.k);
+  assert.deepEqual(
+    paintedPixel(withAnt, 0, 0).slice(0, 3),
+    dim.slice(0, 3),
+    "an ant in a remembered cell is not drawn: its pixel is the dimmed ground",
+  );
+});
+
+test("under the fog the minimap's food and mound come from the snapshot too, not from what is there now", () => {
+  const food = new Float32Array(64 * 64);
+  const spoil = new Uint16Array(64 * 64);
+  const a = cellOfPixel(0, 1, 0).split(",").map(Number) as [number, number];
+  const b = cellOfPixel(0, 2, 0).split(",").map(Number) as [number, number];
+  food[a[1] * 64 + a[0]] = 0.5;
+  spoil[b[1] * 64 + b[0]] = 3;
+  const chunk = (arr: Float32Array | Uint16Array) => (cx: number, cy: number) => (cx === 0 && cy === 0 ? arr : undefined);
+  const sensed = new SensedMap();
+  const fog = new Knowledge(sensed, [
+    { name: SNAP.food, layer: PLANE, at: chunk(food) },
+    { name: SNAP.spoil, layer: PLANE, at: chunk(spoil) },
+  ]);
+  const hosts = {
+    n: 2,
+    nestOdour: 0,
+    alive: Uint8Array.of(1, 1),
+    layer: Uint8Array.of(PLANE, PLANE),
+    load: Float32Array.of(INFECTED, INFECTED),
+    params: { sensorDistance: 3 },
+    x: Float32Array.of(centreX(a[0], a[1]), centreX(b[0], b[1])),
+    y: Float32Array.of(centreY(a[1]), centreY(b[1])),
+  };
+  sensed.stamp([hosts as never], 1);
+  const s = setup({ over: { fog }, spoil: new Map(), colonies: [] });
+  s.minimap.paint(s.k);
+  assert.deepEqual(paintedPixel(s, 1, 0), [...THEME.accentRgb, 255], "food as sensed, though the map's table has none");
+  assert.deepEqual(paintedPixel(s, 2, 0), [...THEME.spoil, 255], "the mound as sensed");
 });

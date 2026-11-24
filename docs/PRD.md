@@ -7829,6 +7829,8 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F3.1 built (`ja-1ypq.3.1`, 2026-11-24, behind `?fog=1`, off by default):** ground chunks, food sprites, ants and nests through the fog; the voxel pass falls back to 2D and the curtain's strip is hidden under it until F3.2. `fogGround.test.ts` holds that a never-sensed chunk is fog, a remembered cell paints its snapshot dimmed and not the change made while away, and the actors are culled to live cells. The fog off paints exactly as before.
 
+**F3.2 built (`ja-1ypq.3.2`, 2026-11-24, same flag):** the strip and its ants, the minimap and the hexagon pellets read the fog; `minimap.test.ts` and `fogRender.test.ts` hold that unexplored pixels are fog, a remembered pixel is the snapshot dimmed, and ants show only where live. The hexagon pellets' snapshot read is held by a hexagon-zoom scene (`fogStrip.test.ts`); the hexagon terrain grain reads the snapshot too, untested. Review of #385 found the line, its hole dots and the bends' labels still draw everywhere (F3.3).
+
 **Still open.**
 - How the body is stamped (F1 measures).
 - A fading memory (not now).
