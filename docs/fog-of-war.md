@@ -161,7 +161,7 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 |---|---|---|
 | F1 observers (`ja-1ypq.1`) | one observer interface; every host and the living body; stamped on the sim clock | goldens bit-exact; the same stamps at 30 and 60 fps; stamp under 0.5 ms a step at a big mycelium |
 | F2 knowledge (`ja-1ypq.2`) | `ui/fog/`: explored bits, live with grace, snapshots on leaving, known colonies, a `FogView` | a change while away is not shown; a snapshot equals the truth when its chunk left sight; bytes per chunk measured |
-| F3 the field (`ja-1ypq.3`) | ground, voxel, strip and minimap through the view; ants only where live; the fog mask | off is pixel-identical (`field-shots`); an e2e section; frame time within noise |
+| F3 the field (`ja-1ypq.3`) | ground, voxel, strip and minimap through the view; ants only where live; the fog mask | off is pixel-identical (`field-shots`); an e2e section (built, step 18 of `e2e-one-world.mjs`, PRD §89); frame time within noise (built, to about 15 %) |
 | F4 picking and cards (`ja-1ypq.4`) | live picking, "lost sight", last-seen lens and inspection, specimens, chamber labels | a test per surface on a remembered and an unknown cell |
 | F5 readouts (`ja-1ypq.5`) | known colonies in stats, history, toasts, badges, go-to | an unknown colony is absent; numbers freeze and resume |
 | F6 start and builder (`ja-1ypq.6`) | the landing patch only; fog off while building; the default flips | the e2e landing section; the owner's go |

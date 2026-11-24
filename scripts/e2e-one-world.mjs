@@ -2424,10 +2424,12 @@ try {
         }),
       n,
     );
-  const medianOf = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
-  // Fog off then on, twice, each on a fresh page with the game running at the start view; the lower median of the two is kept, so one
-  // busy moment on a shared runner does not fail it. "Within noise": at most half as long again, and 5 ms, past the page's own.
-  const medians = { off: [], on: [] };
+  // The mean, not the median: headless Chromium draws this page at about 15 fps, so the median sits on one 16.7 ms step (66.7 ms) whatever
+  // the fog costs, while the mean moves by about 3 ms from run to run and shows a real cost.
+  const meanOf = (a) => a.reduce((sum, x) => sum + x, 0) / a.length;
+  // Fog off then on, twice, each on a fresh page with the game running at the start view; the lower mean of the two is kept, so one
+  // busy moment on a shared runner does not fail it. "Within noise": at most 15 % and 2 ms past the page's own, about three times the noise.
+  const means = { off: [], on: [] };
   let fogPage = null;
   for (let round = 0; round < 2; round++)
     for (const [kind, query] of [
@@ -2436,14 +2438,14 @@ try {
     ]) {
       const { c, p } = await startPage(query);
       await sleep(1500);
-      medians[kind].push(medianOf(await frameIntervals(p)));
+      means[kind].push(meanOf(await frameIntervals(p)));
       if (kind === "on" && round === 1) fogPage = { c, p };
       else await c.close();
     }
-  const [fogOff, fogOn] = [Math.min(...medians.off), Math.min(...medians.on)];
+  const [fogOff, fogOn] = [Math.min(...means.off), Math.min(...means.on)];
   check(
-    fogOn <= fogOff * 1.5 + 5,
-    `a frame with the fog on costs about what it did with it off (median ${fogOn.toFixed(1)} ms against ${fogOff.toFixed(1)} ms)`,
+    fogOn <= fogOff * 1.15 + 2,
+    `a frame with the fog on costs about what it did with it off (mean ${fogOn.toFixed(1)} ms against ${fogOff.toFixed(1)} ms)`,
   );
   const gp = fogPage.p;
   await gp.getByRole("button", { name: "Pause", exact: true }).click();
