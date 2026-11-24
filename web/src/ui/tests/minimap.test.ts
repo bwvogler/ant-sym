@@ -409,6 +409,7 @@ test("under the fog a pixel is fog where nothing was sensed, the snapshot while 
     layer: Uint8Array.of(PLANE),
     load: Float32Array.of(0),
     params: { sensorDistance: 3 },
+    alates: [],
     x: Float32Array.of(centreX(gx, gy)),
     y: Float32Array.of(centreY(gy)),
   });
@@ -459,6 +460,7 @@ test("under the fog the minimap's food and mound come from the snapshot too, not
     layer: Uint8Array.of(PLANE, PLANE),
     load: Float32Array.of(INFECTED, INFECTED),
     params: { sensorDistance: 3 },
+    alates: [],
     x: Float32Array.of(centreX(a[0], a[1]), centreX(b[0], b[1])),
     y: Float32Array.of(centreY(a[1]), centreY(b[1])),
   };

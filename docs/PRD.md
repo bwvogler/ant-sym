@@ -7954,7 +7954,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F5 built (`ja-1ypq.5`, 2026-11-24, same flag):** the readouts through the known colonies: the infection panel, the goal line and ending toast, the Codex's deaths and unity, the Go-to menu and the `n` key, and the Learn drawer's nest tab (last-known card). `fogKnownView.test.ts` holds the pure part (`knownView.ts`, the refresh interval, a real game's landing colony becoming known); the Lab stays omniscient.
 
-**F1's stamp, measured** (bead note, 2026-11-24): stamping the body costs 0.01–0.02 ms a step at 92 hypha cells, well inside the 0.5 ms budget; a big mycelium is re-measured with the queens-and-alates observers (`ja-1ypq.9`).
+**F1's stamp, measured** (bead note, 2026-11-24): stamping the body costs 0.01–0.02 ms a step at 92 hypha cells, well inside the 0.5 ms budget.
+
+**Queens and alates see (`ja-1ypq.9`, 2026-11-24, owner: yes).** `hostSight` adds the queen, when alive and at or past `INFECTED`, and each infected alate still in the nest, on the colony's `home` layer at a worker's reach (`fogObservers.test.ts`: both seen on the nest layer, a clean or dead queen not, her own cell live after a stamp; each new line fails a test when removed). Measured on a four-minute seed-7 game (2 colonies, 900 ants, 24 infected workers, 2 infected queens): the `hostSight` loop costs 0.0019 ms before and after, and 0.0025 ms with 100 infected alates added; the whole `SensedMap.stamp` (reviewer's rerun) costs 0.029 ms with none and 0.115 ms with 100, against the 0.5 ms budget. The body's stamp at a big mycelium is not re-measured here. An alate that has flown from the hole is the game's flight, not a colony's, and does not see. A picture only; goldens untouched.
 
 **What is left** (bead audit, 2026-11-24): the voxel pass through the fog (F3.4, `ja-1ypq.3.4`; today it falls back to 2D), the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
 

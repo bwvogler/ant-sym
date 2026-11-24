@@ -11,6 +11,9 @@ function colony(ants: { x: number; y: number; load: number; strain: number }[]):
   return {
     n: ants.length,
     params: { sensorDistance: 3 },
+    home: 0,
+    queen: null,
+    alates: [],
     alive: Uint8Array.from(ants.map(() => 1)),
     load: Float32Array.from(ants.map((a) => a.load)),
     strain: Uint8Array.from(ants.map((a) => a.strain)),
@@ -38,6 +41,41 @@ test("every host sees, whatever its strain; a clean ant does not", () => {
   assert.equal(sight(s, 30, 30), 1);
   assert.equal(sight(s, 80, 30), 1);
   assert.equal(sight(s, 120, 30), 0);
+});
+
+test("an infected queen and an infected alate in the nest see, on the nest layer; a clean or dead queen does not", () => {
+  const base = colony([]);
+  const withRoyals = (queen: { alive: boolean; load: number } | null, alates: number[]): Colony =>
+    Object.assign(base, {
+      home: 1,
+      queen: queen && { ...queen, x: 50, y: 20 },
+      alates: alates.map((load, i) => ({ x: 90 + i * 10, y: 25, load })),
+    }) as Colony;
+  const got = (c: Colony) => {
+    const seen: { l: number; x: number; y: number; r: number }[] = [];
+    hostSight([c], REACH_MARGIN, (l, x, y, r) => seen.push({ l, x, y, r }));
+    return seen;
+  };
+  const r = 3 + REACH_MARGIN;
+  assert.deepEqual(
+    got(withRoyals({ alive: true, load: INFECTED }, [INFECTED, 0])),
+    [
+      { l: 1, x: 50, y: 20, r },
+      { l: 1, x: 90, y: 25, r },
+    ],
+    "the infected queen and the infected alate, on the nest layer, at a worker's reach; the clean alate not",
+  );
+  assert.deepEqual(got(withRoyals({ alive: true, load: INFECTED * 0.5 }, [])), [], "a clean queen sees nothing");
+  assert.deepEqual(got(withRoyals({ alive: false, load: INFECTED }, [])), [], "a dead queen sees nothing");
+  assert.deepEqual(got(withRoyals(null, [])), [], "a colony with no queen (the plane) sees nothing");
+});
+
+test("an infected queen's cell is live once the game stamps its hosts", () => {
+  const c = Object.assign(colony([]), { home: PLANE, queen: { alive: true, load: INFECTED, x: 60, y: 60 }, alates: [] }) as Colony;
+  const s = new SensedMap();
+  s.stamp([c], 5);
+  assert.equal(sight(s, 60, 60), 1, "her own cell is live");
+  assert.equal(sight(s, 400, 400), 0, "far from her it is not");
 });
 
 test("the body sees BODY_SIGHT round each hypha cell and patch cell, and nothing else", () => {
