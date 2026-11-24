@@ -7964,10 +7964,10 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **Research basis:** [lichen.md](lichen.md). FT is full text read; ABS is abstract only, with numbers **unverified**.
 - **Contact:** a lichen fungus captures a free alga by contact, and free algae are scarce. Some lichens take another lichen's alga (*Diploschistes* on *Cladonia*). Sources: Sanders & Masumoto 2021, FT; Friedl 1987, ABS; against, Beck et al. 1998, ABS.
-- **Spread and light:** a lichen grows from its edge, crustose ones well under 1 mm a year (Seminara et al. 2018, FT; Armstrong 2005, ABS). Its alga fixes carbon only while wet and lit, and switches on within 1–5 minutes of wetting (Palmqvist 2000, ABS; Bhatt et al. 2024, FT). The carbon share passed to the fungus is not quantified.
+- **Spread and light:** a lichen grows from its edge, crustose ones well under 1 mm a year (Seminara et al. 2018, FT; Armstrong 2005, FT). Its alga fixes carbon only while wet and lit, and switches on within 1–5 minutes of wetting (Palmqvist 2000, ABS; Bhatt et al. 2024, FT). The carbon share passed to the fungus is not quantified.
 - **Rock to soil:** lichens turn rock into a nascent soil by hyphae, wet-dry swelling and pH, with no rate in any source read (Jung et al. 2020, FT; Marques et al. 2016, ABS: "contradictory").
 - **Usnic acid** raised *Metarhizium* and *Beauveria* deaths in insect larvae (Duisembecov et al. 2017; Kryukov et al. 2018; both ABS).
-- **Ants:** red wood ants carry lichen fragments to their mounds (Heinken et al. 2007, ABS).
+- **Ants:** red wood ants gather lichen fragments from the ground round their mounds, where the authors think they "may" regrow (inferred, not observed; Heinken et al. 2007, ABS). That ants carry lichen between trees is argued, not seen (Di Nuzzo et al. 2022, FT).
 - **Not found:** *Metarhizium* as a lichen fungus. The partnership is **design**.
 
 **The problem.** Nothing on the map is a plant, an alga, light or water. Rock is permanent and closed to hyphae (`enterable`). Every income comes through ants: hosts, corpses, or ground they walk.
@@ -8003,15 +8003,15 @@ A table of cue, response, rule and off is in the note. No rule reads state the f
 - **With L5,** the colonies carry the lichen themselves.
 - **Risks:** a host-free runaway, a cliff when lichen appears, and new routes between nests (L3b).
 
-**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): a read-only contact probe in `progression.mjs`, run with `--evolve --hyphae`: the plane's rock cells beside open ground, how many of them hyphae lie beside and when first, and mutations a minute over the last three minutes. It proposes L1's alga density. Time to first lichen, lichen cells, growth from light and weathered cells are added by L1–L3 with their code, since nothing exists to count before. Best built together with `ja-kura` (hyphae cell and spore columns), which is related, not a blocker. Then for each milestone:
+**Assays and targets.** The assay lands first (`ja-vlla.11.2`, no behaviour change, goldens exact): a read-only contact probe in `progression.mjs`, run with `--evolve --hyphae --growth --flow`: the plane's rock cells beside open ground, how many of them hyphae lie beside and when first, and mutations a minute over the last three minutes. It proposes L1's alga density. Time to first lichen, lichen cells, growth from light and weathered cells are added by L1–L3 with their code, since nothing exists to count before. Best built together with `ja-kura` (hyphae cell and spore columns), which is related, not a blocker. Then for each milestone:
 - **P1** by the worst seed on 1–20 (§63.4).
 - **Runaway check:** mutations per minute in minutes 8–10 against L1, for L2.
 - **Routes:** A3 (mills) and raid times against baseline, for L3b.
 - **Runaway infection:** time to half of hosts, for L4.
 
-**Baseline and the probe (`ja-vlla.11.2`, 2026-11-24, main `8a2ae138` with the probe).** `progression.mjs --lichen` only reads: the game is the same bit for bit (the table's quarter, half and queen times are identical to a run without it on all 20 seeds). Seeds 1–20, 600 s, `--evolve --hyphae --growth --flow` (run on GitHub's runners, `progression.yml` with its new `lichen` input, run 45431809352):
+**Baseline and the probe (`ja-vlla.11.2`, 2026-11-24, main `8a2ae138` with the probe).** `progression.mjs --lichen` only reads: the game is the same bit for bit (checked by reading the code, which calls only reads and uses no random numbers; by running seed 7 with and without it, byte-identical apart from its own line; and by a 20-seed run with it off against this one, see below). Seeds 1–20, 600 s, `--evolve --hyphae --growth --flow` (run on GitHub's runners, `progression.yml` with its new `lichen` input, run 45431809352):
 - **P1 baseline:** worst seed 6, quarter 357 s and queen 381 s; median quarter 163 s; 36 flowers in 8 of 20 games (as under §85).
-- **Rock the hyphae lie beside** (the plane's rock cells beside open ground, where an alga film or a wild lichen would sit): about 7,700–11,400 such cells a map. In ten minutes hyphae lay beside 4–109 of them (median 28; 15 of 20 seeds 15–50), about 0.3 %. The first contact is at 0 s in 6 of 20 seeds (rock beside the landing: seeds 7, 10, 12, 15, 16, 18), 5–160 s in 10, and late in seeds 3 (235 s), 11 (275 s) and 6 (425 s, the slowest seed).
+- **Rock the hyphae lie beside** (the plane's rock cells beside open ground, where an alga film or a wild lichen would sit): about 7,700–11,400 such cells a map. In ten minutes hyphae lay beside 4–109 of them (median 28.5, mean 35; 17 of 20 seeds 15–50), about 0.3 %. The first contact is at 0 s in 6 of 20 seeds (rock beside the landing: seeds 7, 10, 12, 15, 16, 18), 5–160 s in 11, and late in seeds 3 (235 s), 11 (275 s) and 6 (425 s, the slowest seed).
 - **Earning rate** (L2's runaway gate): mutations earned a minute over the last three minutes, 508–1,274 (median about 1,100). Seeds 7, 10 and 12 earn about 510–540 and the rest 860–1,270; L2 must not move any seed more than a stated share above its baseline.
 - **Proposal for L1's film density (design, to tune in `ja-vlla.11.3`):** hyphae touch about 0.3 % of the edge cells, so the expected contacts in a game are about 28 × the share of edge cells that carry a film. Films on 5–10 % of edge cells, in small clusters, would give about 1–3 contacts a game, most of them in minutes 2–8; wild lichens as a few discs a map. **No film within a few cells of the landing** (the six seeds that touch rock at 0 s would otherwise get a lichen with no travel), so the first lichen is a find, not a gift. The assay for L1 reports time to first lichen against this density.
 
@@ -8035,4 +8035,4 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Still open.**
 - **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; the trait's place in the upgrade order is decided: after the borer (2026-11-24), and L1 and the assay are measured at borer-level games.
-- **To read:** the sources marked unverified (`.1`).
+- **To read:** Heinken 2007 has no open copy; Chen 2000, Stretch & Viles 2002 and Joneson & Lutzoni 2009 could not be reached; the rest of the unverified list is abstract-only (`ja-vlla.11.1`, second read 2026-11-24). No lichen weathering rate and no carbon-share figure were found.

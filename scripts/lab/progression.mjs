@@ -425,7 +425,10 @@ async function trafficProbe(g) {
 /**
  * The lichen probe (`--lichen`, ja-vlla.11.2): reads only. Which of the plane's rock cells a hypha cell has lain beside (an
  * alga film or a wild lichen would sit on such a cell, docs/lichen.md §1), when the first was, and the mutations earned a
- * minute over the game's last three minutes.
+ * minute over the game's last three minutes. It samples every 5 s, so "first touch" has that resolution and a shorter contact is
+ * missed. The edge count is rock beside OPEN cells and the touched count rock beside any hypha cell: equal only while hyphae lie
+ * on open ground (the plane's topsoil is read as open). `inBounds` holds on this finite plane; on an endless one (ja-vlla.11.10)
+ * `touched` could exceed `edge`, so bound it first.
  */
 async function lichenProbe(g, seconds) {
   const { rockAt, inBounds, OPEN, ROCK } = await import("../../web/src/colony/world.ts");
