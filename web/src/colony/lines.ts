@@ -39,6 +39,11 @@ export interface Line {
 /** A wild site's reserved line, as the world holds it from the start: its hole and heading (endlessPlane.ts Site). */
 export type Reserved = Pick<Site, "x" | "y" | "heading">;
 
+/** Options of the rule: `newLines: false` skips rule 1, for a game whose world is one line (the bounded game, until the endless one is the page's). */
+export interface FoundOpts {
+  newLines?: boolean;
+}
+
 /** Why a founding is refused, beyond today's rules. */
 export type LineRefusal = Refusal | "site" | "line-clearance";
 
@@ -110,16 +115,18 @@ export function canFoundIn(
   p: Cell,
   open: (x: number, y: number) => boolean,
   heading: number,
+  opts: FoundOpts = {},
 ): Founding {
   const px = cx(p);
   const py = cy(p);
-  // The nearest hole of any line, and the nearest site's.
+  // The nearest hole of any line, and the nearest site's. Whether the point is far from every hole only matters to a new line.
+  const wantFar = opts.newLines !== false;
   let farLines = true;
   let nearLine = -1;
   let nearD4 = Infinity;
   lines.forEach((l, i) => {
     for (const h of l.transect.holes) {
-      if (Math.hypot(cx(h) - px, cy(h) - py) <= NEW_LINE_GAP) farLines = false;
+      if (wantFar && Math.hypot(cx(h) - px, cy(h) - py) <= NEW_LINE_GAP) farLines = false;
       // exact (transect.ts dist4, as canFound compares): a tie between two lines' holes goes to the lower line index, never to float noise
       const d4 = dist4(h.x, h.y, p.x, p.y);
       if (d4 < nearD4) {
@@ -133,7 +140,7 @@ export function canFoundIn(
   // A founding never lands within a unit of a wild site, woken or not (a site is a reserved line; its colony is there before anyone is).
   if (nearSite <= NEW_LINE_GAP) return { ok: false, reason: "site" };
   // 1. Far from every hole: a new line, if it keeps the clearance.
-  if (farLines && open(p.x, p.y)) {
+  if (opts.newLines !== false && farLines && open(p.x, p.y)) {
     const t = makeTransect([p], { heading });
     if (
       clearOf(
@@ -148,10 +155,11 @@ export function canFoundIn(
   if (nearLine < 0) return { ok: false, reason: "site" };
   const line = lines[nearLine]!;
   const r: FoundCheck = canFound(line.transect, p, open);
-  if (!r.ok) return { ok: false, reason: r.reason };
-  const grown = grow(line.transect, r.end, p);
+  if (r.ok === false) return { ok: false, reason: r.reason };
   const others = lines.filter((_, i) => i !== nearLine).map((l) => l.transect);
-  if (!clearOf(grown.cells, others, sites)) return { ok: false, reason: "line-clearance" };
+  // nothing to keep clear of (a world of one line and no sites): the grown line is not laid out just to be compared with nothing
+  if ((others.length > 0 || sites.length > 0) && !clearOf(grow(line.transect, r.end, p).cells, others, sites))
+    return { ok: false, reason: "line-clearance" };
   return { ok: true, kind: "grow", line: nearLine, end: r.end };
 }
 
@@ -169,13 +177,14 @@ export function nearestValidIn(
   radius: number,
   open: (x: number, y: number) => boolean,
   heading: number,
+  opts: FoundOpts = {},
 ): { cell: Cell; founding: Founding & { ok: true } } | null {
   // The cells within `radius` as transect.ts nearestValid takes them: by exact distance, ties in its fixed order (roundDisc), so a game replays and
   // the bounded game's landings do not move.
   const offs = roundDisc(radius, p.y & 1);
   for (let i = 0; i < offs.length; i += 2) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };
-    const f = canFoundIn(lines, sites, cell, open, heading);
+    const f = canFoundIn(lines, sites, cell, open, heading, opts);
     if (f.ok) return { cell, founding: f };
   }
   return null;
