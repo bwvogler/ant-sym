@@ -11,6 +11,7 @@ import { drawNestSprite, type NestSprite } from "../nestSprites.ts";
 import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite } from "../resourceSprites.ts";
 import { workerLod } from "../workerSprites.ts";
+import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
 import { odourColour, odourRgb } from "./colour.ts";
 import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
@@ -39,6 +40,8 @@ export interface NestFrame {
 export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) | null {
   const { ctx, theme, c, v, d, lv, m } = k;
   const { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage } = f;
+  // A colony the game has frozen draws dimmed, nest, brood, queen and alates alike (field/asleep.ts); with nothing asleep every value is what it was.
+  const dim = colonyAsleep(k, col) ? ASLEEP_DIM : 1;
   // The nest on the shown layer (one world: a disc round its hole on the plane; the shaft and chamber in the curtain).
   const nest = (col.layers[lv] ?? col.layers[0]!).nest;
   // The nest's life underground (brood, stores, the queen, alates) shows where the nest is: the curtain in one world.
@@ -57,21 +60,21 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
     ctx.arc(nx, ny, outer, 0, Math.PI * 2);
     ctx.arc(nx, ny, inner, 0, Math.PI * 2, true);
     ctx.fillStyle = theme.mound;
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.12 * dim;
     ctx.fill();
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = 0.8 * dim;
     ctx.beginPath();
     ctx.arc(nx, ny, outer, 0, Math.PI * 2);
     ctx.strokeStyle = theme.mound;
     ctx.lineWidth = Math.max(1, d * 1.2);
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = dim;
   }
   ctx.beginPath();
   if (structure) ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
   ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
   ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.7;
+  ctx.globalAlpha = 0.7 * dim;
   ctx.stroke();
   if (structure && nest.entrance) {
     // The side view: the entrance, a small ring on the ground line where the shaft comes up.
@@ -80,7 +83,7 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
     ctx.arc(ex, ey, Math.max(3, 1.5 * c.zoom), 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = dim;
   // Nest slice 4: the brood where it lies (eggs pale, larvae cream, pupae tan) and the queen, larger, in her colony's
   // colour (dead: hollow, and crossed out).
   const bd = Math.max(1.5, len * 0.4);
@@ -155,18 +158,20 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
         ctx.fill();
       } else {
         ctx.strokeStyle = qc;
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.6 * dim;
         ctx.stroke();
         ctx.beginPath();
         ctx.moveTo(x - qr * 1.4, y - qr);
         ctx.lineTo(x + qr * 1.4, y + qr);
         ctx.stroke();
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = dim;
       }
     }
   }
   // Alates (ja-lo8.9): new queens, smaller than the queen, with wings, as they wait and walk out to fly.
   const drawAlates = () => {
+    // Drawn again over the fungus's mark later, when the strength is whatever the stages between left it: a sleeper sets its own.
+    if (dim < 1) ctx.globalAlpha = dim;
     for (const al of col.alates) {
       if (!home || !inView(al.x, al.y)) continue;
       const [x, y] = toScreen(c, v, al.x, al.y);
@@ -183,10 +188,10 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
         ctx.beginPath();
         ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);
         ctx.ellipse(x + ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, 0.5, 0, Math.PI * 2);
-        ctx.globalAlpha = 0.5;
+        ctx.globalAlpha = 0.5 * dim;
         ctx.fillStyle = theme.paper;
         ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = dim;
       }
       if (al.load > 0) {
         ctx.beginPath();
@@ -195,6 +200,8 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
         ctx.fill();
       }
     }
+    // A sleeping colony drew at its dimmed strength: leave the strength as it was, for the next stage.
+    if (dim < 1) ctx.globalAlpha = 1;
   };
   drawAlates();
   return col.alates.length ? drawAlates : null;

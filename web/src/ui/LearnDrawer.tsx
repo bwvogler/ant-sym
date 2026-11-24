@@ -8,7 +8,7 @@ import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import type { KnownColonies } from "./fog/known.ts";
 import { isKnown, lastKnownText } from "./fog/knownView.ts";
-import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
+import { asleepNote, nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import type { SideStats } from "./stats.ts";
 import { css, ROLE_RGB } from "./palette.ts";
 import Segmented from "./Segmented.tsx";
@@ -294,7 +294,7 @@ function NestTab(props: Props & { focus?: string }) {
               ). Turn on <span className="font-medium">Labels</span> on the field, then click a chamber to find it here.
             </p>
           </section>
-          {views.map((v, k) => (v ? <NestCard key={k} k={k} v={v} focus={props.focus} /> : null))}
+          {views.map((v, k) => (v ? <NestCard key={k} k={k} v={v} focus={props.focus} note={asleepNote(props.game, k)} /> : null))}
           {known &&
             props.colonies.map((_, k) => {
               const e = known.get(k);
@@ -318,7 +318,7 @@ function LastKnownNest({ k, at, now, side }: { k: number; at: number; now: numbe
   );
 }
 
-function NestCard({ k, v, focus }: { k: number; v: NestView; focus?: string }) {
+function NestCard({ k, v, focus, note }: { k: number; v: NestView; focus?: string; note: string | null }) {
   return (
     <section className={card}>
       <h3 className="font-medium">
@@ -328,6 +328,7 @@ function NestCard({ k, v, focus }: { k: number; v: NestView; focus?: string }) {
         queen {v.queen === "alive" ? "alive" : v.queen === "dead" ? "dead (orphaned)" : "—"} · brood {v.brood.join(" / ")} (eggs / larvae /
         pupae) · {v.inside} inside, {v.outside} out · {v.midden} on the midden
       </p>
+      {note && <p className="mt-1 text-xs text-fg-3">{note}</p>}
       <div
         className="mt-2 overflow-x-auto focus-visible:outline-2 focus-visible:outline-accent"
         tabIndex={0}

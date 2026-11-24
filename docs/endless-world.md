@@ -232,7 +232,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
   - **An empty world:** too few wild sites, nothing to meet. E6 measures how often hosts meet strangers per hour.
   - **A world too full to found in:** too many wild sites. E6 measures flights landing near strangers.
   - **A runaway cost:** the cap and the memory soak watch it.
-  - **A frozen colony that looks dead:** the page draws it as still and says it is asleep.
+  - **A frozen colony that looks dead:** the page draws it as still and says it is asleep. Built in E5.5 (PRD §66): half strength, no gait, and "asleep" on the nest card and in the lens.
 
 ## 10. Decided, and still open
 

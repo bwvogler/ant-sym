@@ -60,6 +60,8 @@ interface Opts {
   cadaverDraws?: boolean;
   died?: number;
   reduced?: boolean;
+  /** the game has frozen this colony (ja-qpv.4.5) */
+  asleep?: boolean;
 }
 
 function setup(ants: Ant[], o: Opts = {}) {
@@ -97,6 +99,8 @@ function setup(ants: Ant[], o: Opts = {}) {
     c: { ...CAM, zoom: o.zoom ?? CAM.zoom },
     lv: o.lv ?? 1,
     env: { reducedMotion: () => !!o.reduced },
+    colonies: [col],
+    asleep: o.asleep ? new Set([0]) : new Set<number>(),
     sprites: {
       worker: { get: (_lod: string, tint: number[]) => (tints.push(tint), o.workerImage ? { toString: () => "worker" } : null) },
       gait: { update: () => gaitCalls.push("update"), pose: (_c: unknown, i: number) => (gaitCalls.push(`pose ${i}`), i + 1) },
@@ -370,4 +374,38 @@ test("each carried corpse has its own decay stage, and the nest sheet's brood sp
   assert.notEqual(egg, larva);
   assert.notEqual(larva, pupa);
   assert.notEqual(egg, pupa);
+});
+
+test("a colony the game has frozen draws every ant at half strength, and leaves the strength at 1 for the next stage", () => {
+  const ants: Ant[] = [
+    { x: 50, y: 40, heading: 0, odour: 0 },
+    { x: 52, y: 40, heading: 1, odour: 0.9, load: INFECTED },
+    { x: 54, y: 40, heading: 2, load: 1, carrying: 1 },
+    { x: 56, y: 40, heading: 3, pellet: 1 },
+  ];
+  const awake = run(ants).rec.log;
+  const asleep = run(ants, { asleep: true }).rec.log;
+  const halved = awake.map((l) => {
+    const m = /^globalAlpha = (.+)$/.exec(l);
+    return m ? `globalAlpha = ${fmt(Number(m[1]) * 0.5)}` : l;
+  });
+  assert.ok(
+    awake.some((l) => l === "globalAlpha = 0.85") && awake.some((l) => l === "globalAlpha = 0.55"),
+    "the awake log has the alphas to halve",
+  );
+  assert.deepEqual(asleep, [...halved, "globalAlpha = 1"], "the same strokes, each strength halved, and the strength left at 1");
+  const other = setup(ants);
+  other.fc.asleep = new Set([1]);
+  drawAnts(other.fc, other.f, other.col);
+  assert.deepEqual(other.rec.log, awake, "another colony asleep changes nothing here");
+});
+
+test("a frozen colony's walkers are still: the gait is not posed, though the sprite is drawn", () => {
+  const o = { hexes: true, workerImage: true, zoom: 40 };
+  const awake = run([{ x: 50, y: 40, heading: 0, odour: 0.1 }], o);
+  assert.deepEqual(awake.gaitCalls, ["update", "pose 0"]);
+  const asleep = run([{ x: 50, y: 40, heading: 0, odour: 0.1 }], { ...o, asleep: true });
+  assert.deepEqual(asleep.gaitCalls, ["update"], "no walking pose for a sleeper");
+  assert.equal(asleep.rec.log.filter((l) => l.startsWith("drawImage(worker")).length, 1, "but it is still drawn");
+  assert.ok(asleep.rec.log.includes("globalAlpha = 0.5"), "at half strength");
 });
