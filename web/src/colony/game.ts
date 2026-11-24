@@ -19,8 +19,8 @@ import { seeHoles } from "./layers.ts";
 import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
-import { CHUNK, CHUNK_BITS, local } from "./chunks.ts";
-import { isEndless } from "./endlessMap.ts";
+import { CHUNK, CHUNK_BITS, chunkKey, local } from "./chunks.ts";
+import { isEndless, loadEndless, saveEndless } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -391,6 +391,8 @@ export class Game {
   #rng: () => number;
   /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
   #piles: { cells: Float64Array; full: Float32Array } | null = null;
+  /** the chunks of an endless plane whose piles are in `#piles` */
+  #pileChunks = new Set<number>();
   /** regrowth's own random numbers: the game's stream is never drawn from for it */
   #regrowRng: Rng | null = null;
   #regrowClock = 0;
@@ -1114,7 +1116,8 @@ export class Game {
   /** An endless plane's chunk (cx, cy) made, holding food `f`: its pile cells join the regrowth's list, which stays in key order. */
   #notePileChunk(cx: number, cy: number, f: ArrayLike<number>): void {
     const piles = this.#piles;
-    if (!piles) return;
+    if (!piles || this.#pileChunks.has(chunkKey(cx, cy))) return; // a chunk is noted once, however often it is generated again (a load counts them again)
+    this.#pileChunks.add(chunkKey(cx, cy));
     const add: number[] = [];
     const addFull: number[] = [];
     for (let ly = 0; ly < CHUNK; ly++)
@@ -1580,7 +1583,8 @@ export class Game {
       ...(this.aphids.length ? { aphids: this.aphids.map((a) => ({ ...a, cells: [...a.cells] })) } : {}),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
-      map: encode(map),
+      // An endless plane saves the seed and what changed, never the plane (endlessMap.ts saveEndless).
+      map: isEndless(this.map) ? saveEndless(this.map) : encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
       fungus: this.fungus.saveState(),
@@ -1628,8 +1632,15 @@ export class Game {
     const world = this.world;
     const sw = saved.world;
     if (!sw) throw new Error("save: a save of a game on one map, and this game is one world");
+    // An endless plane has no size to match: its save is the seed and what changed (a bounded save of another size is still refused, and so is one of the other kind).
+    const endless = isEndless(this.map);
+    const savedEndless = (saved.map as { endless?: unknown }).endless === true;
+    if (endless !== savedEndless)
+      throw new Error(
+        `save: a save of ${savedEndless ? "an endless" : "a bounded"} plane, and this game's is ${endless ? "endless" : "bounded"}`,
+      );
     const size = (saved.map as { size?: { w: number; h: number } }).size;
-    if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h)
+    if (sw.seed !== world.seed || (!endless && (size?.w !== this.map.size.w || size?.h !== this.map.size.h)))
       throw new Error(
         `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
       );
@@ -1660,8 +1671,11 @@ export class Game {
     this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
     this.aphids = (saved.aphids ?? []).map((a) => ({ ...a, cells: [...a.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
-    qualityLike(this.map, saved.map);
-    fillLike(this.map, saved.map);
+    if (isEndless(this.map)) loadEndless(this.map, saved.map as Record<string, unknown>);
+    else {
+      qualityLike(this.map, saved.map);
+      fillLike(this.map, saved.map);
+    }
     qualityLike(world.curtain, sw.curtain);
     fillLike(world.curtain, sw.curtain);
     more.forEach((m, k) => {
@@ -1704,5 +1718,6 @@ export class Game {
       throw new Error("save: its grids are another game's");
     this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
     this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
+    this.feedSites(); // the sites near what is awake now (not saved: the plane lists them)
   }
 }
