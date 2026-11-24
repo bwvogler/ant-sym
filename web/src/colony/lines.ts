@@ -181,7 +181,7 @@ export function nearestValidIn(
   p: Cell,
   radius: number,
   open: (x: number, y: number) => boolean,
-  heading: number,
+  heading: number | ((cell: Cell) => number),
   opts: FoundOpts = {},
 ): { cell: Cell; founding: Founding & { ok: true } } | null {
   // The cells within `radius` as transect.ts nearestValid takes them: by exact distance, ties in its fixed order (roundDisc), so a game replays and
@@ -189,7 +189,7 @@ export function nearestValidIn(
   const offs = roundDisc(radius, p.y & 1);
   for (let i = 0; i < offs.length; i += 2) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };
-    const f = canFoundIn(lines, sites, cell, open, heading, opts);
+    const f = canFoundIn(lines, sites, cell, open, typeof heading === "function" ? heading(cell) : heading, opts);
     if (f.ok) return { cell, founding: f };
   }
   return null;

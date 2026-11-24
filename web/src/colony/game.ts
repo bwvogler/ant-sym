@@ -3,15 +3,15 @@ import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
-import { growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
+import { generateCurtain, growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Line, nearestValidIn } from "./lines.ts";
-import { cellAt, type Cell, type End, outward } from "./transect.ts";
+import { clampCol, hash01, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
+import { cellAt, type Cell, type End, makeTransect, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -129,7 +129,14 @@ export interface Founding {
    * One world (U4b): where the founding went, nearestValid's hole on the plane and the end of the line it grew (Game.addColony
    * records it; x and y stay the landing point). A save's re-founding grows the line there again (oneWorld.ts growWorld).
    */
-  spot?: { end: End; cell: Cell; /** the line it grew (absent: the first, the only one until the endless world) */ line?: number };
+  spot?: {
+    end: End;
+    cell: Cell;
+    /** the line it grew (absent: the first, the only one until the endless world) */
+    line?: number;
+    /** it began a line of its own along this heading (radians): `line` is that line, made by the founding (Game.addLine) */
+    newLine?: { heading: number };
+  };
 }
 
 /** A saved game (Game.save): JSON. */
@@ -332,6 +339,8 @@ export class Game {
   readonly recognition: Recognition;
   /** each layer's recognition, built from the ants on it: `recognition` is layer 0's */
   #recs: Recognition[];
+  /** the recognition parameters every layer's Recognition is made from (a line that begins mid-game makes one more) */
+  #recognition: Partial<RecognitionParams>;
   params: GameParams;
   time = 0;
   /** each layer's occupancy, per colony: [layer][colony] */
@@ -396,6 +405,7 @@ export class Game {
     // names one. Every colony of a game is its species, so the game takes it from there.
     const tol = this.params.species.params.tolerance;
     const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
+    this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
     // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
@@ -517,6 +527,14 @@ export class Game {
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
 
+  /**
+   * Whether a founding far from every hole starts a line of its own (the founding rule's rule 1, lines.ts): off in the bounded game, where a
+   * line only grows at its ends; the endless world turns it on (E6).
+   */
+  newLines = false;
+  /** The wild sites' reserved lines, which no founding may come within a unit of or grow across (lines.ts): none in the bounded game. */
+  sites: Reserved[] = [];
+
   /** How every colony's ants draw their mode from Jev's probabilities (the Lab, ja-nan3): set by setChoice, given to colonies founded later too. */
   #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll" | "steerLane">> = {};
 
@@ -575,7 +593,7 @@ export class Game {
       odour: mother.nestOdour,
       mother: f.mother,
       reserve: f.food,
-      spot: { cell: s.cell, end: s.end, line: s.line },
+      spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}),
     });
   }
@@ -592,15 +610,45 @@ export class Game {
   settleAt(
     p: { x: number; y: number },
     ground?: (x: number, y: number) => boolean,
-  ): { ok: true; cell: Cell; end: End; line: number } | { ok: false; reason: string } {
+  ): { ok: true; cell: Cell; end: End; line: number; newLine?: { heading: number } } | { ok: false; reason: string } {
     cellOf(p.x, p.y);
-    // The founding rule over the world's lines (lines.ts), with new lines off: a game of one line grows its ends exactly as transect.ts nearestValid
-    // says (the endless world turns them on, E6).
+    // The founding rule over the world's lines (lines.ts). With new lines off (`newLines`, the bounded game), a game of one line grows its ends exactly as
+    // transect.ts nearestValid says. A landing that starts a line gets the index that line will have, `end: "end"` (it has one hole) and its heading,
+    // which is drawn from the seed and the landing cell, never from the game's stream.
     const lines: Line[] = this.world.lines.map((l) => ({ transect: l.line, salt: l.salt }));
-    const s = nearestValidIn(lines, [], { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(this.world), 0, { newLines: false });
-    return s && s.founding.kind === "grow"
+    const seed = this.world.seed;
+    const s = nearestValidIn(
+      lines,
+      this.sites,
+      { x: CELL[0], y: CELL[1] },
+      FOUND_RADIUS,
+      ground ?? mainGround(this.world),
+      (c) => hash01(seed, 100, c.x, c.y) * Math.PI,
+      { newLines: this.newLines },
+    );
+    if (!s) return { ok: false, reason: NO_ROOM };
+    return s.founding.kind === "grow"
       ? { ok: true, cell: s.cell, end: s.founding.end, line: s.founding.line }
-      : { ok: false, reason: NO_ROOM };
+      : { ok: true, cell: s.cell, end: "end", line: this.world.lines.length, newLine: { heading: s.founding.heading } };
+  }
+
+  /**
+   * A line that begins mid-game: one hole at plane `cell`, its margins along `heading`, its curtain dug from the line's own seed (the hole's nest is
+   * the curtain's first and only), its nest on the plane, and the game's layers in step: the layer, every colony's occupancy on it, its recognition and
+   * the fungus's spores and hyphae. Returns the line's index. The colony that lives there is made by addColony.
+   */
+  #addLine(cell: Cell, heading: number): number {
+    const world = this.world;
+    const salt = lineSalt(world.seed, cell, false);
+    const line = makeTransect([cell], { heading });
+    const curtain = generateCurtain(lineSeed(world.seed, salt), line);
+    world.lines.push({ line, curtain, salt });
+    world.plane.nests.push({ x: centreX(cell.x, cell.y), y: centreY(cell.y), r: 3 });
+    this.layers.push(curtain);
+    this.#grids.push(this.colonies.map(() => new CountGrid()));
+    this.#recs.push(new Recognition(this.#recognition));
+    this.fungus.addLayer(curtain);
+    return world.lines.length - 1;
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -666,13 +714,14 @@ export class Game {
       // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
       const s = this.settleAt(f);
       if (s.ok === false) throw new Error(`addColony: ${s.reason}`);
-      spot = { cell: s.cell, end: s.end, line: s.line };
+      spot = { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-    const li = spot.line ?? 0;
+    // A landing that begins a line makes the line (its curtain's first nest is the colony's); else the line it grows.
+    const li = spot.newLine ? this.#addLine(spot.cell, spot.newLine.heading) : (spot.line ?? 0);
     const wl = world.lines[li] as WorldLine;
     // `at` is the colony's index among its curtain's nests (its line's); its index among the plane's is `k`.
-    const at = growWorld(world, spot.end, spot.cell, li);
+    const at = spot.newLine ? 0 : growWorld(world, spot.end, spot.cell, li);
     // A save's nest is the one dug then (growWorld digs the same one: from the stream keyed by its hole).
     if (f.nest) wl.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
     const nest = wl.curtain.nests[at] as Nest;
@@ -706,7 +755,12 @@ export class Game {
     for (const g of this.#grids) g.push(new CountGrid());
     this.founded.push({
       ...f,
-      spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y }, ...(spot.line ? { line: spot.line } : {}) },
+      spot: {
+        end: spot.end,
+        cell: { x: spot.cell.x, y: spot.cell.y },
+        ...(li ? { line: li } : {}),
+        ...(spot.newLine ? { newLine: { heading: spot.newLine.heading } } : {}),
+      },
       nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) },
     });
     this.#wire();
@@ -743,7 +797,7 @@ export class Game {
         ...at,
         antCount,
         odour: (this.colonies[0] as Colony).nestOdour,
-        spot: { cell: s.cell, end: s.end, line: s.line },
+        spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       }),
     };
   }
