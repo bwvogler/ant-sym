@@ -11,7 +11,11 @@ import {
   gameRng,
   generateOneWorld,
   GENERIC_ANT,
+  isCurtainLayer,
+  lineIndexOfLayer,
+  PLANE,
   speciesById,
+  type OneWorld,
 } from "../colony/index.ts";
 import { journalFromUrl } from "./journal.ts";
 import { pushToast } from "./toasts.ts";
@@ -78,6 +82,16 @@ export const freshGame = (c: ColonyControls): ColonyControls => ({ ...c, line: 0
 
 /** The line the below view shows: `line`, held within a world of `lines` lines (a new world may have fewer than the page was on). */
 export const clampLine = (line: number, lines: number): number => Math.max(0, Math.min(line, lines - 1));
+
+/**
+ * The controls that show layer `view`: the plane is the "above" view; a line's curtain is the "below" view of that line (a picked line, E5.6). A layer
+ * the world lacks reads as line 0 (`lineIndexOfLayer`), so a stale layer id cannot make an index past the lines.
+ */
+export const viewShowing = (
+  world: OneWorld | null | undefined,
+  view: number,
+): Pick<ColonyControls, "view"> & Partial<Pick<ColonyControls, "line">> =>
+  view === PLANE ? { view: "above" } : { view: "below", ...(world && isCurtainLayer(view) ? { line: lineIndexOfLayer(world, view) } : {}) };
 
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   species: GENERIC_ANT.id,
