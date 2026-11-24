@@ -680,6 +680,29 @@ export class Fungus {
     return out;
   }
 
+  /**
+   * The squares of side `size` (world units) of map `layer` that hold some of the fungus's body (a spore cell or a hypha), as [column, row] of the
+   * square: for the endless world's feed of wild sites (Game.feedSites), which lists the sites near the body. A curtain the game has put to sleep has none.
+   */
+  bodyBuckets(layer: number, size: number): [number, number][] {
+    const L = this.#layers[layer];
+    if (!L || this.frozenLayers.has(layer)) return [];
+    const seen = new Set<number>();
+    const out: [number, number][] = [];
+    const note = (key: number): void => {
+      const bx = Math.floor(centreX(keyX(key), keyY(key)) / size);
+      const by = Math.floor(centreY(keyY(key)) / size);
+      const k = by * 0x400000 + bx;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push([bx, by]);
+    };
+    for (const key of L.sporeCells) note(key);
+    const h = this.#hyphae[layer];
+    if (h) for (const key of h.parent.keys()) note(key);
+    return out;
+  }
+
   /** Whether the fungus has any body on map `layer` (spores or hyphae), asleep or not. */
   bodyOn(layer: number): boolean {
     const L = this.#layers[layer];

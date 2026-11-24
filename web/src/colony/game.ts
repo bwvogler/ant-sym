@@ -16,7 +16,7 @@ import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
-import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
+import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 import { CHUNK, CHUNK_BITS, local } from "./chunks.ts";
@@ -489,6 +489,11 @@ export class Game {
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
+    // A plane with no edge: a founding far from every hole starts a line of its own, and the wild sites near what is awake are listed (PRD §66 E6.0.3).
+    if (isEndless(map)) {
+      this.newLines = true;
+      this.feedSites();
+    }
   }
 
   /** A colony asks its mode policy about the species' own situation, when its mode words have a schema of their own (ja-fnd.5.10). */
@@ -683,10 +688,38 @@ export class Game {
     return { near, entered, holds, contact };
   }
 
+  /**
+   * On an endless plane, keep `sites` equal to the wild sites near what is awake (docs/endless-world.md §4, §6; PRD §66 E6.0.3): those in a box of 2 W round
+   * every awake colony's hole (a flight lands within 2 U, and the fungus wakes within W) and in the squares of side W, a square each way round, that hold the
+   * fungus's body on the plane; sites that have woken are colonies now and are not listed, and a site far from every awake colony and from the body is dropped
+   * (it is reserved again when something awake comes near). Pure in what it reads, and the plane's own cache of sites (never the map's chunks: no chunk is
+   * generated for it), so it is cheap to run once a second. A bounded game has no sites to feed: nothing happens.
+   */
+  feedSites(): void {
+    const map = this.map;
+    if (!isEndless(map)) return;
+    const W = this.#sleep?.params.distance ?? DEFAULT_SLEEP.distance;
+    const boxes: [number, number, number, number][] = [];
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      const h = (c.layers[PLANE] as Layer).nest;
+      boxes.push([h.x - 2 * W, h.y - 2 * W, h.x + 2 * W, h.y + 2 * W]);
+    });
+    for (const [bx, by] of this.fungus.bodyBuckets(PLANE, W)) boxes.push([(bx - 1) * W, (by - 1) * W, (bx + 2) * W, (by + 2) * W]);
+    const want = new Map<string, WildSite>();
+    for (const b of boxes)
+      for (const s of map.plane.sitesIn(b[0], b[1], b[2], b[3])) {
+        const key = `${s.rx},${s.ry}`;
+        if (!this.#wild.has(key) && !want.has(key)) want.set(key, s);
+      }
+    this.sites = [...want.values()].sort((a, b) => a.ry - b.ry || a.rx - b.rx);
+  }
+
   /** Ask the awake rule and apply its verdict. */
   #decideSleep(): void {
     const rule = this.#sleep as SleepRule;
     this.#sleepNext = this.time + rule.params.every;
+    this.feedSites();
     const facts = this.#sleepFacts(rule);
     const v = rule.step({ time: this.time, asleep: this.colonies.map((_, k) => this.#frozen.has(k)), ...facts });
     for (const k of v.freeze) this.freeze(k);
