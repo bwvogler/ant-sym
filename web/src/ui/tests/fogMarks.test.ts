@@ -212,6 +212,7 @@ test("the dead of another layer are not remembered on this one, and time going b
   const game = {
     time: 5,
     colonies: [colony],
+    isFrozen: () => false,
     layers: [{}, {}],
     fungus: { evolution: null, patchOn: () => [], hyphaeOn: () => null },
   } as unknown as Game;

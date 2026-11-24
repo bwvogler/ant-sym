@@ -78,6 +78,19 @@ test("an infected queen's cell is live once the game stamps its hosts", () => {
   assert.equal(sight(s, 400, 400), 0, "far from her it is not");
 });
 
+test("the sensed map copies the game's frozen colonies on every step, and forgets them when they wake", () => {
+  const g = buildGame({ species: "generic", seed: 1, antCount: 60, rival: true, generation: 0 });
+  const s = new SensedMap();
+  s.stampGame(g);
+  assert.equal(s.asleep.size, 0, "nothing frozen");
+  g.freeze(1);
+  s.stampGame(g);
+  assert.deepEqual([...s.asleep], [1], "colony 1 asleep");
+  g.thaw(1);
+  s.stampGame(g);
+  assert.equal(s.asleep.size, 0, "woken: forgotten");
+});
+
 test("the body sees BODY_SIGHT round each hypha cell and patch cell, and nothing else", () => {
   const hyphae = new Map([[cellKey(40, 40), -1]]);
   const fungus = {
@@ -97,6 +110,7 @@ test("a game's sight: the body is stamped every BODY_EVERY, hosts every step, an
   const game = {
     time: 10,
     colonies: [] as Colony[],
+    isFrozen: () => false,
     layers: [{}, {}],
     fungus: { evolution: null, patchOn: () => [], hyphaeOn: (l: number) => (l === PLANE ? { parent: hyphae } : null) },
   } as unknown as Game;
@@ -151,6 +165,7 @@ test("a game's hosts see at the sensors' reach plus REACH_MARGIN, and the body i
   const hyphae = new Map([[cellKey(60, 40), -1]]);
   const game = {
     time: 5,
+    isFrozen: () => false,
     colonies: [colony([{ x: centreX(gx, gy) + 0.4, y: centreY(gy), load: INFECTED, strain: 0 }])],
     layers: [{}, {}],
     fungus: { evolution: null, patchOn: () => [], hyphaeOn: (l: number) => (l === 1 ? { parent: hyphae } : null) },

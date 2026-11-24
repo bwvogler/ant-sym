@@ -12,6 +12,7 @@ import { drawNestSprite, type NestSprite } from "../nestSprites.ts";
 import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite, foodKind } from "../resourceSprites.ts";
 import { drawWorkerSprite, workerLod } from "../workerSprites.ts";
+import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
 import { odourColour } from "./colour.ts";
 import type { FieldCtx } from "./ctx.ts";
 import type { NestFrame } from "./nests.ts";
@@ -31,7 +32,10 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
   const zoom = c.zoom / d;
   ctx.lineCap = "round";
   ctx.lineWidth = Math.max(1, len * 0.3);
-  ctx.globalAlpha = 0.85;
+  // A colony the game has frozen draws still (no gait) and dimmed; with nothing asleep every value below is what it was.
+  const asleep = colonyAsleep(fc, col);
+  const dim = asleep ? ASLEEP_DIM : 1;
+  ctx.globalAlpha = 0.85 * dim;
   workerGait.update(col);
   // A front-facing curtain worker is the same silhouette as the aerial worker against its walking plane.
   // The surface strip is a separate diagrammatic projection, not another underground population.
@@ -49,8 +53,8 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
       if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
       const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
       if (sprite && spriteMix > 0) {
-        ctx.globalAlpha = spriteMix;
-        const pose = lod === "walk" && !env.reducedMotion() ? workerGait.pose(col, i) : 0;
+        ctx.globalAlpha = spriteMix * dim;
+        const pose = lod === "walk" && !env.reducedMotion() && !asleep ? workerGait.pose(col, i) : 0;
         drawWorkerSprite(ctx, sprite, lod, col.heading[i], pose, x, y, c.zoom);
       }
       if (spriteMix < 1) {
@@ -60,7 +64,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
         ctx.lineTo(x + hc, y + hs);
       }
     }
-    ctx.globalAlpha = 1 - spriteMix;
+    ctx.globalAlpha = (1 - spriteMix) * dim;
     ctx.strokeStyle = theme.ink;
     ctx.stroke();
     if (spriteMix < 1) {
@@ -80,7 +84,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
       ctx.stroke();
     }
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = dim;
   // Infected ants: a spore-coloured dot on the body, fainter for a light load.
   const dot = Math.max(1.5, len * 0.45);
   ctx.fillStyle = theme.spore;
@@ -88,7 +92,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
     [INFECTED, 0.5, 0.55],
     [0.5, 2, 1],
   ] as const) {
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = alpha * dim;
     for (let i = 0; i < col.n; i++) {
       const l = col.load[i];
       if (!col.alive[i] || l < lo || l >= hi || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
@@ -96,7 +100,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
       ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot);
     }
   }
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = dim;
   ctx.fillStyle = theme.accent;
   for (let i = 0; i < col.n; i++) {
     if (!col.alive[i] || !col.carrying[i] || col.layer[i] !== lv || !inView(col.x[i], col.y[i])) continue;
@@ -154,4 +158,6 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
       ctx.fillRect(px - crumb / 2, py - crumb / 2, crumb, crumb);
     }
   }
+  // A sleeping colony drew at its dimmed strength: leave the strength as it was, for the next stage.
+  if (asleep) ctx.globalAlpha = 1;
 }

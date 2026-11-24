@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CELL, cellOf, centreX, centreY, ChunkLayer, CURTAIN, type Fungus, INFECTED, PLANE } from "../../colony/index.ts";
+import { REMEMBERED } from "../fog/knowledge.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { lensAnt, lensLines, type LensProbe, probe } from "../lens.ts";
 import { buildGame } from "../useColony.ts";
@@ -183,4 +184,34 @@ test("below, the lens reads the curtain's own scent, sensing, spores and myceliu
   assert.deepEqual([f.spores, f.hypha], [true, true]);
   const up = probe(fake, sensed, PLANE, x, y);
   assert.deepEqual([up.spores, up.hypha], [false, false]);
+});
+
+test("a colony the game has frozen: its ant, its hole and its chambers say they are asleep; another colony's do not", () => {
+  const ant = { k: 1, i: 7, mode: "rest", carrying: false, infected: false };
+  const asleep = new Set([1]);
+  const lines = lensLines({ ...bare, hole: 1, view: "below", chamber: { k: 1, role: "brood", brood: 0, food: 0 }, asleep }, ant);
+  assert.equal(lines[0]!.says, "rest · not infected · asleep");
+  assert.match(lines[1]!.says, /the way up · asleep: the game has paused it while the fungus is elsewhere$/);
+  assert.match(lines[2]!.says, /where larvae are fed and pupae lie · asleep: the game has paused it/);
+  const remembered = lensLines(
+    { ...bare, view: "below", fog: REMEMBERED, chamber: { k: 1, role: "none", brood: 0, food: 0 }, asleep },
+    null,
+  );
+  assert.match(remembered[0]!.says, /nobody senses it · asleep/, "a remembered chamber still says whose colony sleeps");
+  const other = lensLines(
+    { ...bare, hole: 0, view: "below", chamber: { k: 0, role: "brood", brood: 0, food: 0 }, asleep },
+    { ...ant, k: 0 },
+  );
+  assert.ok(!other.some((l) => l.says.includes("asleep")), "colony 0 is awake");
+  assert.ok(!lensLines({ ...bare, hole: 1 }, ant).some((l) => l.says.includes("asleep")), "nothing frozen: nothing said");
+});
+
+test("probe carries the sensed map's frozen colonies, and only when some are", () => {
+  const g = aGame();
+  const lw = { colonies: g.colonies, fungus: g.fungus, world: g.world! };
+  const sensed = new SensedMap();
+  const h = g.colonies[0]!.holeCells[1]!;
+  assert.equal(probe(lw, sensed, PLANE, centreX(h.px, h.py), centreY(h.py)).asleep, undefined, "nothing frozen: no field at all");
+  sensed.asleep.add(1);
+  assert.deepEqual([...(probe(lw, sensed, PLANE, centreX(h.px, h.py), centreY(h.py)).asleep ?? [])], [1]);
 });
