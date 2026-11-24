@@ -78,3 +78,37 @@ test("a save is another game's when its lines are not this game's: a line missin
   other.world.more![0]!.line.holes[0]!.x += 5;
   assert.throws(() => build().load(other), /another world's line 1/);
 });
+
+test("a refused save leaves the game as it was: the lines and colonies are counted before the foundings are replayed (ja-baxa)", () => {
+  const a = played();
+  const b = build();
+  const before = JSON.stringify(roundtrip(b.save()));
+  // a save of three lines, without the foundings that make the third: a 'save:' message, not growWorld's
+  const noFoundings = roundtrip(a.save());
+  noFoundings.founded = [];
+  assert.throws(() => b.load(noFoundings), /^Error: save: 3 lines, this game's world has 2/);
+  // a save whose colony count is not the game's plus its foundings
+  const fewer = roundtrip(a.save());
+  fewer.colonies = fewer.colonies.slice(1);
+  assert.throws(() => b.load(fewer), /^Error: save: 3 colonies, this game has 4/);
+  assert.equal(b.colonies.length, 2);
+  assert.equal(b.world.lines.length, 2);
+  assert.equal(JSON.stringify(roundtrip(b.save())), before);
+  // a three-line save into a one-line game: a count, not 'growWorld: no line 1' from the replay
+  const one = new Game(generateOneWorld(SEED), { autoFound: false }, mulberry32(5), [{ antCount: 40 }]);
+  const oneBefore = JSON.stringify(roundtrip(one.save()));
+  assert.throws(() => one.load(roundtrip(a.save())), /^Error: save: 3 lines, this game's world has 2/);
+  assert.equal(one.colonies.length, 1);
+  assert.equal(one.world.lines.length, 1);
+  assert.equal(JSON.stringify(roundtrip(one.save())), oneBefore);
+  // a save whose grids are another game's (a layer or a colony short) is refused before anything is made or poured back, the whole game as it was
+  const grids = roundtrip(a.save());
+  grids.grids.counts = grids.grids.counts.map((gs) => gs.slice(1));
+  assert.throws(() => b.load(grids), /^Error: save: its grids are another game's/);
+  const layers = roundtrip(a.save());
+  layers.grids.bands = layers.grids.bands.slice(1);
+  assert.throws(() => b.load(layers), /^Error: save: its grids are another game's/);
+  assert.equal(b.colonies.length, 2);
+  assert.equal(b.world.lines.length, 2);
+  assert.equal(JSON.stringify(roundtrip(b.save())), before);
+});

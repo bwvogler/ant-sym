@@ -173,6 +173,18 @@ export class Pheromones {
     return this.#awake[channel].size > 0;
   }
 
+  /** Every chunk awake on any channel, once each (a step reads these chunks' rock and their neighbours', and scent may spread into the neighbours): for the endless plane's prefetch (game.ts). */
+  eachAwakeChunk(fn: (cx: number, cy: number) => void): void {
+    const seen = new Set<number>();
+    for (const ch of CHANNELS)
+      for (const key of this.#awake[ch]) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const [cx, cy] = chunkOf(key);
+        fn(cx, cy);
+      }
+  }
+
   /** Awake chunks, summed over channels: what a step costs. */
   awakeChunks(): number {
     let s = 0;

@@ -339,3 +339,38 @@ test("a chunk is made by the plane once, whichever of rock and food is read firs
     assert.equal(calls, 20, `${first} first`);
   }
 });
+
+test("dropClean on a chunk nobody read generates nothing and adds no food (ja-qpv.8.1)", () => {
+  const map = generateEndlessPlane(2);
+  assert.equal(dropClean(map, 900, 900), true);
+  assert.equal(map.rock.count, 0);
+  assert.equal(map.food.count, 0);
+  assert.equal(map.ledger.chunks, 0);
+  assert.equal(map.foodTotal, 0);
+  assert.equal(map.foodLeft, 0);
+  // a chunk only the rock layer holds drops without the food layer making its half
+  rockAt(map, 900 * CHUNK + 3, 900 * CHUNK + 3);
+  assert.equal(map.rock.count, 1);
+  assert.equal(dropClean(map, 900, 900), true);
+  assert.equal(map.rock.count, 0);
+  assert.equal(map.food.count, 0);
+  assert.equal(map.ledger.chunks, 0);
+});
+
+test("the ledger keeps no running left that can go stale: the map's foodLeft is the one count (ja-qpv.8.1)", () => {
+  const map = generateEndlessPlane(2);
+  const c = new EndlessPlane(2).chunk(0, 0);
+  let at = -1;
+  for (let i = 0; i < c.food.length; i++) if (c.food[i]! > 0) at = i;
+  assert.ok(at >= 0, "the start chunk has food");
+  const x = at & (CHUNK - 1);
+  const y = at >> CHUNK_BITS;
+  foodIn(map, x, y);
+  const total = map.foodTotal;
+  assert.equal(takeFoodCell(map, x, y), true);
+  assert.equal(map.foodLeft, total - 1);
+  assert.equal(map.foodTotal, total);
+  assert.equal(map.ledger.generatedTotal, total, "generated food is the ledger's one figure, and a take never moves it");
+  assert.equal("left" in map.ledger, false);
+  assert.equal("total" in map.ledger, false);
+});
