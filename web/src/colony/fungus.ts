@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import { CURTAIN, PLANE, type Colony, type Layer } from "./colony.ts";
+import { CURTAIN, PLANE, type Colony } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -485,7 +485,12 @@ export class Fungus {
    * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
    * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
    */
-  crossAt: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
+  crossAt:
+    | ((
+        x: number,
+        y: number,
+      ) => { x: number; y: number; /** the curtain it opens into (default: the first line's) */ layer?: number } | null)
+    | null = null;
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
   /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth); set through `bindPolicy` */
@@ -1070,8 +1075,8 @@ export class Fungus {
       if (map.sky.get(cx, cy) === 1) return "outside";
       if (ch.at(cx, cy) < 0) return "tunnel";
       for (const o of colonies) {
-        const ph = layer < 0 ? o.ph : (o.layers[layer] as Layer).ph;
-        if (ph.fields.royal && ph.fields.royal.get(cx, cy) >= ROYAL_FELT) return "queen";
+        const ph = layer < 0 ? o.ph : o.layers[layer]?.ph; // a colony of another line has no scent on this curtain
+        if (ph?.fields.royal && ph.fields.royal.get(cx, cy) >= ROYAL_FELT) return "queen";
       }
       return "chamber";
     }
@@ -1290,8 +1295,11 @@ export class Fungus {
         const down = this.crossAt(t.x, t.y);
         if (!down) continue;
         plane.tips = plane.tips.filter((u) => u !== t);
-        const to = this.rootShaft(CURTAIN, down.x, down.y);
-        if (p.flow && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to });
+        const layer = down.layer ?? CURTAIN;
+        const to = this.rootShaft(layer, down.x, down.y);
+        // Mass flows down a hole only into the first line's curtain (#placeMass and #sinks read that one mat): a link into another line's would take
+        // the mass off the plane and set it down nowhere. The other lines' hyphae grow on, without the flow, until the flow is made per line.
+        if (p.flow && layer === CURTAIN && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to });
       }
     }
     // A tip that has reached a corpse (the midden's) colonises it.

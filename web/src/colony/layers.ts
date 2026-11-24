@@ -200,7 +200,7 @@ export function seeHoles(c: Colony): void {
   }
   // On every layer with a hole into it (the side view's map; one world's curtain).
   for (const L of c.layers) {
-    if (!L.entrance) continue;
+    if (!L?.entrance) continue; // a hole in `layers` is a curtain of another line
     const holes: number[] = [];
     for (const n of L.map.nests ?? [L.nest])
       if (n.entrance) {

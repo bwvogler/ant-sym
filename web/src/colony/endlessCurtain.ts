@@ -10,6 +10,7 @@
 // The first line's salt is 0, so its ground and food keep the bounded curtain's seeds (E3).
 
 import { CHUNK, CHUNK_BITS, local } from "./chunks.ts";
+import { lineSeed } from "./lines.ts";
 import { centreX, centreY, nx, ny, R } from "./hex.ts";
 import { CRUST, CURTAIN_DEPTH, CURTAIN_WORLD, groundCell, groundSeed } from "./oneWorld.ts";
 import { AIR, hash4, mulberry32, nearNests, OPEN, ROCK, rockCut, soilCut, type Nest } from "./world.ts";
@@ -19,10 +20,7 @@ export const CURTAIN_ROWS = CRUST + CURTAIN_DEPTH;
 /** Row bands of 64 rows: chunk rows 0 … CURTAIN_BANDS − 1. */
 export const CURTAIN_BANDS = Math.ceil(CURTAIN_ROWS / CHUNK);
 
-/** A line's seed: the world seed itself for the first line (salt 0: today's ground and food), else mixed with the salt. */
-export function lineSeed(seed: number, salt: number): number {
-  return salt === 0 ? seed : hash4(seed, 98, salt, 0);
-}
+export { lineSeed };
 
 export interface CurtainChunk {
   rock: Uint8Array;
