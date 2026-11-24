@@ -634,7 +634,7 @@ export class Colony {
         others: [],
       };
       // Indexed by the game's layer: the plane, and this colony's own curtain. On a later line's curtain the ones between are holes (a colony is on no
-      // other line's curtain): read them through `layerOf`, never by walking `layers` expecting an entry for each.
+      // other line's curtain): read them as `colony.layers[l]` with a guard, never by walking `layers` expecting an entry for each.
       this.layers = [];
       this.layers[PLANE] = layerView(this, PLANE, plane);
       this.layers[this.home] = layerView(this, this.home, slots);

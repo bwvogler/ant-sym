@@ -11,7 +11,7 @@ import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, nearestValidIn } from "./lines.ts";
-import { type Cell, type End, outward } from "./transect.ts";
+import { cellAt, type Cell, type End, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -295,6 +295,26 @@ function holeOf(c: Colony): { x: number; y: number } {
   return n.entrance ?? n;
 }
 
+/**
+ * The index among the plane's nests of the one over curtain nest `nest` of line `wl`: the plane cell at the column of the nest's hole (the same
+ * reading as seeHoles'), matched to the plane's nests. Never assumed from the order of the colonies: a line holds the colonies that began on it.
+ */
+function planeNestOver(plane: WorldMap, wl: WorldLine, nest: number): number {
+  const n = wl.curtain.nests[nest];
+  if (!n) throw new Error(`the curtain has no nest ${nest}`);
+  const e = n.entrance ?? n;
+  cellOf(e.x, e.y);
+  if (!cellAt(wl.line, CELL[0]!)) throw new Error(`the line has no column ${CELL[0]}`);
+  const px = CELL[0]!;
+  const py = CELL[1]!;
+  const i = plane.nests.findIndex((m) => {
+    cellOf(m.x, m.y);
+    return CELL[0] === px && CELL[1] === py;
+  });
+  if (i < 0) throw new Error(`no plane nest over cell ${px},${py}, the hole of curtain nest ${nest}`);
+  return i;
+}
+
 export class Game {
   /** the plane, the surface (its food piles regrow there, and the fungus lands there) */
   readonly map: WorldMap;
@@ -397,11 +417,12 @@ export class Game {
     this.colonies = specs.map((spec, k) => {
       const li = spec.line ?? 0;
       const wl = world.lines[li] as WorldLine;
+      const nestIdx = spec.nest ?? slot[k]!;
       const c = new Colony(
         wl.curtain,
         {
           antCount: spec.antCount,
-          nest: spec.nest ?? slot[k]!,
+          nest: nestIdx,
           odour: spec.odour ?? (specs.length > 1 ? k / (specs.length - 1) : 0),
           tolerance,
           ...this.#speciesParams(),
@@ -409,7 +430,7 @@ export class Game {
         },
         rng,
         spec.policy ?? this.params.species.policy ?? localPolicy,
-        { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: k },
+        { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, nestIdx) },
       );
       c.responses = spec.responses ?? this.params.species.responses;
       this.#ownSituation(c);
@@ -668,7 +689,7 @@ export class Game {
       },
       this.#rng,
       this.params.species.policy ?? localPolicy,
-      { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: k },
+      { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, at) },
     );
     c.responses = this.params.species.responses;
     this.#ownSituation(c);

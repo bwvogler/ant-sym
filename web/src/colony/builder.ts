@@ -16,7 +16,7 @@ import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import type { Game } from "./game.ts";
 import { routeClear } from "./homing.ts";
 import type { Channel, Pheromones } from "./pheromone.ts";
-import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
+import { FAINT, PLANE } from "./vocab.ts";
 import { APHID, type AphidClump } from "./aphids.ts";
 import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
 
@@ -151,6 +151,7 @@ export function guarded(game: Game, layer: number): Set<number> {
   const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
   const add = (x: number, y: number) => out.add(key(x, y));
   for (const c of game.colonies) {
+    if (!c.layers[layer]) continue; // a curtain of another line: none of this colony's ants, hole, brood or queen are on it
     // Its own hole: the plane cell over it above, the crust's cell below.
     const h = c.holeCells[c.params.nest];
     if (h) {
@@ -162,8 +163,8 @@ export function guarded(game: Game, layer: number): Set<number> {
       c.antCell(i);
       add(CELL[0], CELL[1]);
     }
-    // Brood and the queen lie underground (the curtain).
-    if (layer === CURTAIN) {
+    // Brood and the queen lie underground: on the colony's own curtain.
+    if (layer === c.home) {
       for (const b of c.brood.items) add(b.x, b.y);
       if (c.queen?.alive) {
         cellOf(c.queen.x, c.queen.y);

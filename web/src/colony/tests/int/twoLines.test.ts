@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Game } from "../../game.ts";
-import { generateOneWorld, oneWorldOnLines } from "../../oneWorld.ts";
+import { STRAINS } from "../../fungus.ts";
+import { Game, LANDING } from "../../game.ts";
+import { lineSeed } from "../../lines.ts";
+import { makeTransect } from "../../transect.ts";
+import { generateCurtain, generateOneWorld, oneWorldOnLines } from "../../oneWorld.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 
 // A game over two lines (docs/endless-world.md §5, PRD §66 E3.3a): each colony on its own line's curtain, the plane shared.
@@ -112,6 +115,7 @@ test("a colony founded onto the second line is on that line's curtain, with its 
   assert.equal(w.lines[1]!.curtain.nests.length, 2);
   assert.equal(w.plane.nests.length, 3, "the plane's nests are by colony");
   assert.equal(c.nest, w.lines[1]!.curtain.nests[1], "its nest is the second of its curtain's");
+  assert.equal(c.layers[0]!.nest, w.plane.nests[2], "and its nest on the plane is the one just made, by colony");
   assert.equal(g.founded[0]!.spot!.line, 1, "the founding records its line");
   for (let t = 0; t < 30 * 30; t++) g.tick(1 / 30);
   assert.ok(c.population > 0);
@@ -132,4 +136,78 @@ test("a colony on a line the world does not have is an error, and so are more co
 test("a save holds one line: a game over two refuses to save, so no line is lost without a word", () => {
   assert.throws(() => game().save(), /2 lines/);
   assert.doesNotThrow(() => new Game(generateOneWorld(SEED), {}, mulberry32(1)).save());
+});
+
+test("a colony's food left is its plane's and its own curtain's, not another line's", () => {
+  const g = game();
+  g.colonies.forEach((c, k) => assert.equal(c.foodLeft, g.world.plane.foodLeft + g.world.lines[k]!.curtain.foodLeft, `colony ${k}`));
+});
+
+test("growing the second line digs its new columns from that line's own seed, as a fresh curtain over the grown line would", () => {
+  const w = two();
+  const g = game(w);
+  const old = w.lines[1]!.line;
+  const h = old.holes[0]!;
+  g.addColony({
+    x: h.x + 60.5,
+    y: (h.y + 0.5) * 0.866,
+    antCount: 20,
+    odour: 0.5,
+    spot: { cell: { x: h.x + 60, y: h.y }, end: "end", line: 1 },
+  });
+  const grown = w.lines[1]!;
+  assert.ok(grown.line.sMax > old.sMax, "the line grew at its end");
+  const fresh = generateCurtain(lineSeed(w.seed, grown.salt), grown.line);
+  // deep rows, in the stretch the growth added and between the two holes' shafts: the same ground
+  let same = 0;
+  for (let y = 120; y < 280; y += 7)
+    for (let s = old.sMax + 5; s < grown.line.sMax - 5; s += 3) {
+      assert.equal(grown.curtain.rock.get(s, y), fresh.rock.get(s, y), `line 1 column ${s} row ${y}`);
+      same++;
+    }
+  assert.ok(same > 100, `${same} cells compared`);
+});
+
+test("founding with the fungus: a landing by the second colony is beside its own hole, toward its line's other hole", () => {
+  const w = two();
+  const g = new Game(w, { autoFound: false, fungus: { hyphae: true } }, mulberry32(5), [
+    { antCount: 40, line: 0 },
+    { antCount: 40, line: 1 },
+  ]);
+  const h = w.lines[1]!.line.holes[0]!;
+  // the neighbour to the west, so a landing east of the hole (the no-neighbour fallback) would fail the direction below
+  g.addColony({
+    x: h.x - 59.5,
+    y: (h.y + 0.5) * 0.866,
+    antCount: 20,
+    odour: 0.5,
+    spot: { cell: { x: h.x - 60, y: h.y }, end: "start", line: 1 },
+  });
+  const garden = STRAINS.findIndex((x) => x.id === "garden");
+  const at = g.land(1, garden, { evolve: true });
+  const nest = g.colonies[1]!.layers[0]!.nest;
+  const other = g.colonies[2]!.layers[0]!.nest;
+  assert.ok(Math.hypot(at.x - nest.x, at.y - nest.y) < nest.r + LANDING.offset + 2, "beside its own hole");
+  assert.ok(
+    (at.x - nest.x) * (other.x - nest.x) + (at.y - nest.y) * (other.y - nest.y) > 0,
+    "on the side of the neighbouring hole of its own line",
+  );
+});
+
+test("the fungus on a second line's curtain: spores and hyphae are on layer 2, and play goes on without a throw", () => {
+  const w = two();
+  const g = new Game(w, { autoFound: false, fungus: { hyphae: true } }, mulberry32(5), [
+    { antCount: 40, line: 0 },
+    { antCount: 40, line: 1 },
+  ]);
+  const garden = STRAINS.findIndex((x) => x.id === "garden");
+  g.land(1, garden, { evolve: true });
+  const nest = g.colonies[1]!.layers[2]!.nest;
+  // spores on the second curtain, among its ants and its queen's chamber
+  g.paintSpores(nest.x, nest.y, 6, 5, 0.3, garden, 2);
+  assert.ok(g.fungus.sporesOn(2), "layer 2 has spores");
+  for (let t = 0; t < 150 * 30; t++) g.tick(1 / 30);
+  assert.equal(g.fungus.hyphaeOn(1), null, "nothing on the first line's curtain: no colony of the first line was reached");
+  assert.ok(g.fungus.hyphaeOn(2), "the hyphae went down the second line's hole into layer 2");
+  void makeTransect;
 });
