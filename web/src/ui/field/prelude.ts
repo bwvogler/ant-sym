@@ -3,7 +3,7 @@
 // bound, and the frame then draws with the camera it returns.
 
 import type { Colony } from "../../colony/index.ts";
-import { aimed, clamp, fit, fitZoom, type Aim, type Camera, type Extent, type Viewport } from "../camera.ts";
+import { aimed, clamp, fit, isZoomedIn, type Aim, type Camera, type Extent, type Viewport } from "../camera.ts";
 import { LIVE, type Knowledge } from "../fog/knowledge.ts";
 import { followedColony, type Followed } from "../follow.ts";
 
@@ -84,6 +84,6 @@ export function prepareFrame(colonies: readonly Colony[], lv: number, ext: Exten
   }
   const c = s.fitted || !s.cam ? clamp(fit(ext, v), ext, v) : aimed(s.cam, s.aim, ext, v);
   s.cam = c;
-  s.zoomedIn = c.zoom > fitZoom(ext, v) * 1.05;
+  s.zoomedIn = isZoomedIn(ext, v, c.zoom);
   return c;
 }
