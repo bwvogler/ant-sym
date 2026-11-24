@@ -1,6 +1,6 @@
 # The lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks the rock down
 
-*Research and design note for epic `ja-vlla.11` (M4 of `ja-vlla`, PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
+*Research and design note for epic `ja-vlla.11` (grew from M4 of `ja-vlla`; a top-level epic since 2026-11-24; PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
 - *Read status:* every source is marked full text (**FT**), abstract only (**ABS**, its numbers **unverified**) or not read (**NR**).
 - *Not reachable:* many society journals (Wiley, Springer, Elsevier) were behind a bot wall. Their numbers are abstract-only and gathered for reading in `ja-vlla.11.1`.
 
@@ -196,7 +196,7 @@ Each milestone is its own PR behind a setting whose off is main bit for bit. **B
 
 | Milestone | Cue (sensed) | Response | Local rule (design) | Off | Bead |
 |---|---|---|---|---|---|
-| Assay | none | metrics only: time to first lichen, lichen cells, growth from light, weathered cells | none | main | `ja-vlla.11.2` |
+| Assay | none | a read-only contact probe: rock beside open ground, hyphae beside it and when, mutations a minute late in the game; lichen counts come with L1–L3 | none | main | `ja-vlla.11.2` |
 | L1 partner and crust | a hypha cell beside an alga film or a wild-lichen cell (the fungus's contact) | the alga's rock cell becomes lichen; a wild lichen overgrown is captured | one rock cell from the rim every interval; free-pool `lichen` trait after the mycelium levels | no world content, no trait level | `ja-vlla.11.3` |
 | L2 light | a lichen cell in light (plane, or curtain beside the sky) | growth into the free pool | a rate per lit cell, capacity by lichen area | rate 0 | `ja-vlla.11.4` |
 | L3a rock to hyphae | lichen age on a rock cell | rock becomes ground the hyphae enter | age threshold | never | `ja-vlla.11.5` |
