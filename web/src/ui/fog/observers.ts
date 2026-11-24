@@ -12,7 +12,11 @@ export const BODY_EVERY = 1;
 /** Where an observer's sight goes: layer `l`, world point (x, y), reach `r` in cells. */
 export type Sight = (l: number, x: number, y: number, r: number) => void;
 
-/** The hosts the player sees through: every living ant, of any colony, with a load at or past INFECTED, at its sensors' reach plus `margin`. */
+/**
+ * The hosts the player sees through: every living ant, of any colony, with a load at or past INFECTED, at its sensors' reach plus
+ * `margin`. The queen and the alates still in the nest are hosts too (owner, 2026-11-24, ja-1ypq.9): they lie on the colony's nest
+ * layer `home`, and see as far as a worker of the colony does. An alate that has flown from the hole is the game's flight, not here.
+ */
 export function hostSight(colonies: readonly Colony[], margin: number, see: Sight): void {
   for (const c of colonies) {
     const r = c.params.sensorDistance + margin;
@@ -20,6 +24,9 @@ export function hostSight(colonies: readonly Colony[], margin: number, see: Sigh
       if (!c.alive[i] || c.load[i] < INFECTED) continue;
       see(c.layer[i] ?? 0, c.x[i], c.y[i], r);
     }
+    const q = c.queen;
+    if (q && q.alive && q.load >= INFECTED) see(c.home, q.x, q.y, r);
+    for (const a of c.alates) if (a.load >= INFECTED) see(c.home, a.x, a.y, r);
   }
 }
 
