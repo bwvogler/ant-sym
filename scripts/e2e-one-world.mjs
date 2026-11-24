@@ -2386,6 +2386,95 @@ try {
   await fp.reload();
   check((await fp.evaluate(() => localStorage.getItem("jevants.notices"))) === "bell", "the choice is kept across a reload");
   await fctx.close();
+  // ——— 18. The fog of war (docs/fog-of-war.md, F3.6, `?fog=1`) ———
+  section("18. the fog of war");
+  // Two pages of one seed stepped the same by the hook: the sim is deterministic, so what differs is the page.
+  const fogPage = async (query) => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(`${url}${query}`);
+    await p.getByLabel("world seed").fill(String(SEED));
+    await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
+    await until(() => p.evaluate(() => !!window.jevAnts?.game.world), "a game for the fog checks", 20_000, 100);
+    await p.getByRole("button", { name: "Pause", exact: true }).click();
+    return { c, p };
+  };
+  const { c: gctx, p: gp } = await fogPage("?fog=1");
+  // Every living host on the plane: its cell. The real frames before the Pause make which ant is first, and where, vary from run to run.
+  const hostCells = () =>
+    gp.evaluate(() => {
+      const out = [];
+      for (const c of window.jevAnts.game.colonies)
+        for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= 0.05 && (c.layer[i] ?? 0) === 0) out.push([c.x[i], c.y[i]]);
+      return out;
+    });
+  const stateAt = (x, y) => gp.evaluate(([a, b]) => window.jevAnts.fogState("above", a, b), [x, y]);
+  let seen = [];
+  for (let round = 0; round < 30 && seen.length === 0; round++) {
+    await gp.evaluate(() => window.jevAnts.step(100));
+    seen = await hostCells();
+  }
+  check(seen.length > 0, "a host is found on the plane");
+  check((await stateAt(...seen[0])) === 2, "the cell under a host is live");
+  check((await stateAt(0.5, 0.5)) === 0, "a cell nothing has sensed is unknown");
+  // Hosts walk away (or die): of the cells hosts have stood on, one turns remembered (live only while a host or the fungus's body is near), and none is unknown.
+  let left = null;
+  for (let round = 0; round < 200 && !left; round++) {
+    await gp.evaluate(() => window.jevAnts.step(30));
+    for (const c of await hostCells()) if (seen.length < 60) seen.push(c);
+    for (const c of seen) if ((await stateAt(...c)) === 1) left = c;
+  }
+  check(left !== null, `a cell a host stood on is remembered once nothing senses it (${seen.length} cells watched)`);
+  await gp.evaluate(() => window.jevAnts.step(300));
+  for (const c of seen) check((await stateAt(...c)) !== 0, "every cell a host stood on stays explored");
+  check((await stateAt(0.5, 0.5)) === 0, "while the ground no host has been near is still unknown");
+  const nofog = await fogPage("");
+  check((await nofog.p.evaluate(() => window.jevAnts.fogState("above", 5, 5))) === null, "without ?fog=1 the page has no fog");
+  // The frame time: the same game time on both pages (the sim is deterministic only from the Pause), zoomed in to hexagons, paused (so a frame
+  // draws alone), the CPU slowed 4× on both so a cost shows over vsync (a phone's frame rate was lost to it, PR #408). The mean, for the median sits on the vsync tick.
+  const timeOf = (p) => p.evaluate(() => window.jevAnts.game.time);
+  for (const [lag, p] of [
+    [(await timeOf(gp)) - (await timeOf(nofog.p)), nofog.p],
+    [(await timeOf(nofog.p)) - (await timeOf(gp)), gp],
+  ])
+    if (lag > 0) await p.evaluate((n) => window.jevAnts.step(n), Math.round(lag * 30)); // REHEARSE_DT is 1/30
+  const frames = async (p) => {
+    await (await p.context().newCDPSession(p)).send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    await p.mouse.move(640, 450);
+    for (let i = 0; i < 6; i++) await p.mouse.wheel(0, -300);
+    await p.waitForTimeout(800);
+    const zoom = await p.evaluate(() => window.jevAnts.camera("above").zoom);
+    const mean = await p.evaluate(
+      () =>
+        new Promise((done) => {
+          const ds = [];
+          let last = performance.now();
+          const t = () => {
+            const n = performance.now();
+            ds.push(n - last);
+            last = n;
+            if (ds.length < 61) requestAnimationFrame(t);
+            else done(ds.slice(1).reduce((a, b) => a + b, 0) / (ds.length - 1));
+          };
+          requestAnimationFrame(t);
+        }),
+    );
+    return { zoom, mean };
+  };
+  const fogF = await frames(gp);
+  const baseF = await frames(nofog.p);
+  console.log(`  mean frame, paused, zoomed in, CPU 4× slower: fog ${fogF.mean.toFixed(1)} ms, no fog ${baseF.mean.toFixed(1)} ms`);
+  check(
+    fogF.zoom >= 12 && baseF.zoom >= 12,
+    `both pages are zoomed in to hexagons (zoom ${fogF.zoom.toFixed(1)}, ${baseF.zoom.toFixed(1)}; HEX_ZOOM is 12)`,
+  );
+  check(
+    fogF.mean <= Math.max(baseF.mean * 1.5, baseF.mean + 15),
+    `the fog's frame time (${fogF.mean.toFixed(1)} ms) is within noise of the game without it (${baseF.mean.toFixed(1)} ms)`,
+  );
+  await gctx.close();
+  await nofog.c.close();
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();
