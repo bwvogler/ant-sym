@@ -4,7 +4,9 @@ import { centreX, centreY } from "../../hex.ts";
 import { Game } from "../../game.ts";
 import type { Site } from "../../endlessPlane.ts";
 import { generateOneWorld, mainGround } from "../../oneWorld.ts";
+import { makeTransect } from "../../transect.ts";
 import { hash01, mulberry32 } from "../../world.ts";
+import { cellOf, CELL } from "../../hex.ts";
 
 // A wild colony wakes from its site (docs/endless-world.md §4, PRD §66 E4.3): generated once, from the site and the seed only.
 
@@ -45,6 +47,10 @@ test("waking a site makes a colony on a line of its own, at the size a start col
   assert.equal(g.sites.length, 0, "no longer a reserved line");
   assert.equal(c.nestOdour, hash01(SEED, 101, 3, 4));
   assert.ok(c.queen?.alive);
+  // its line is the one-hole line of the site's own heading
+  cellOf(site.x, site.y);
+  const expect = makeTransect([{ x: CELL[0] as number, y: CELL[1] as number }], { heading: site.heading });
+  assert.deepEqual([...g.world.lines[1]!.line.cells], [...expect.cells]);
   assert.equal(g.wakeSite(site), 2, "waking it again gives the colony already woken");
   assert.equal(g.colonies.length, 3);
 });
@@ -88,4 +94,17 @@ test("a save holds the woken site: loaded, the colony is there, the site does no
   assert.equal(b.sites.length, 0);
   assert.equal(b.wakeSite(site), k);
   assert.equal(b.colonies[k]!.population, a.colonies[k]!.population);
+  // and on: the colony took the game's own stream once built (a stream the save never holds), so a load goes on as the saved game would
+  for (let t = 0; t < 10 * 30; t++) {
+    a.tick(1 / 30);
+    b.tick(1 / 30);
+  }
+  assert.equal(JSON.stringify(b.colonies[k]!.saveState()), JSON.stringify(a.colonies[k]!.saveState()));
+});
+
+test("`ants` sets the size and lifts the cap with it", () => {
+  const g = fresh();
+  const k = g.wakeSite(siteFor(g), { ants: 90 });
+  assert.equal(g.colonies[k]!.population, 90);
+  assert.equal(g.colonies[k]!.params.maxAnts, 90);
 });

@@ -592,7 +592,7 @@ export class Game {
     const woken = this.#wild.get(key);
     if (woken !== undefined) return woken;
     const seed = this.world.seed;
-    cellOf(site.x, site.y);
+    cellOf(site.x, site.y); // sets CELL: the site's hole cell
     const cell = { x: CELL[0] as number, y: CELL[1] as number };
     const cap = this.params.species.params.maxAnts ?? Math.round(1.5 * this.#firstAnts);
     return this.addColony({
