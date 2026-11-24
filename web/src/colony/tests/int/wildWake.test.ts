@@ -100,3 +100,38 @@ test("only an awake host wakes a site: an ant without the fungus, or a host asle
   assert.equal(trial(0, false), 2, "an ant that carries nothing does not");
   assert.equal(trial(1, true), 2, "a host asleep with its colony does not");
 });
+
+test("a dead carrier, and a host on a curtain whose numbers match the site's plane position, wake nothing", () => {
+  const dead = withSite();
+  run(dead.g, 2);
+  const c = dead.g.colonies[0]!;
+  for (let i = 0; i < c.n; i++) {
+    c.load[i] = 1;
+    c.putAnt(i, 0, dead.site.x + 5, dead.site.y);
+    c.alive[i] = 0;
+  }
+  run(dead.g, 2);
+  assert.equal(dead.g.colonies.length, 2, "dead ants wake nothing");
+  const under = withSite();
+  run(under.g, 2);
+  const u = under.g.colonies[0]!;
+  for (let i = 0; i < u.n; i++) {
+    u.load[i] = 1;
+    u.x[i] = under.site.x + 5;
+    u.y[i] = under.site.y;
+    u.layer[i] = 1; // underground: its x and y are the curtain's, not the plane's
+  }
+  run(under.g, 2);
+  assert.equal(under.g.colonies.length, 2, "an ant underground wakes no site on the plane");
+});
+
+test("with two sites listed, the one the fungus is near wakes and the other stays reserved", () => {
+  const { g, site } = withSite();
+  const far = { x: site.x + 200, y: site.y, heading: 0.4, rx: 7, ry: 8 };
+  g.sites = [far, ...g.sites]; // the near one is second: the indexing is by site, not by position
+  run(g, 2);
+  g.fungus.paint(g.colonies, site.x + 20, site.y, 3, 2, 0, 0, 0);
+  run(g, 3);
+  assert.equal(g.colonies.length, 3);
+  assert.deepEqual(g.sites, [far], "only the far one is still reserved");
+});
