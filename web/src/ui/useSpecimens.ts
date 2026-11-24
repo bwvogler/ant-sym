@@ -12,7 +12,8 @@ import { pushToast } from "./toasts.ts";
 export function useSpecimens(
   game: Game,
   gameToken: object,
-  fog: Knowledge | null = null,
+  /** the fog's knowledge as it is now (read when asked: the builder turns the fog off and on) */
+  fog: () => Knowledge | null = () => null,
 ): { specimens: Specimen[]; setSpecimens: (list: Specimen[]) => void; togglePin: (f: Followed) => void } {
   const [pinned, setPinned] = useState<{ token: object; list: Specimen[] }>({ token: gameToken, list: [] });
   const specimens = useMemo(() => (pinned.token === gameToken ? pinned.list : []), [pinned, gameToken]);
@@ -23,7 +24,7 @@ export function useSpecimens(
       if (specimens.some((s) => sameAnt(s, f))) return setSpecimens(unpin(specimens, f));
       // The living ones only: one that died within the second the watch waits doesn't count toward the three (review of #218).
       // It is said here: the watch won't see it again.
-      const { kept, gone } = living(specimens, game.colonies, fog);
+      const { kept, gone } = living(specimens, game.colonies, fog());
       for (const g of gone)
         pushToast(`${specimenLabel(g.no)}, ant #${g.i} of ${colonyName(g.k)}, has died: it leaves your specimens.`, "info", {
           group: "specimen-died",
@@ -42,7 +43,7 @@ export function useSpecimens(
   useEffect(() => {
     if (!specimens.length) return;
     const t = setInterval(() => {
-      const { kept, gone } = living(specimens, game.colonies, fog);
+      const { kept, gone } = living(specimens, game.colonies, fog());
       if (!gone.length) return;
       setSpecimens(kept);
       for (const f of gone)

@@ -2401,6 +2401,18 @@ try {
     return { c, p };
   };
   const { c: gctx, p: gp } = await fogPage("?fog=1");
+  // The landing (docs/fog-of-war.md §5.4): before the first step only the landing patch is explored; the builder turns the fog off.
+  const patch = await gp.evaluate(() => window.jevAnts.game.fungus.patchOn(0));
+  check(patch.length >= 2, "the fungus has landed on a patch");
+  const landed = await gp.evaluate(([gx, gy]) => window.jevAnts.fogCell("above", gx, gy), [patch[0], patch[1]]);
+  check(landed === 2 || landed === 1, `the landing patch is explored at the start (state ${landed})`);
+  check((await gp.evaluate(() => window.jevAnts.fogCell("above", 5, 5))) === 0, "and a cell far from it is not");
+  await gp.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Builder", exact: true }).click();
+  await until(() => gp.evaluate(() => window.jevAnts.fogCell("above", 5, 5) === null), "the fog to go off with the builder", 3000, 50);
+  check(true, "while the builder is on the fog is off (everything shows)");
+  await gp.getByRole("button", { name: "Done building" }).click();
+  await until(() => gp.evaluate(() => window.jevAnts.fogCell("above", 5, 5) === 0), "the fog to come back with Done", 3000, 50);
+  check(true, "and it is back, as it was, when the builder is closed");
   // Every living host on the plane: its cell. The real frames before the Pause make which ant is first, and where, vary from run to run.
   const hostCells = () =>
     gp.evaluate(() => {

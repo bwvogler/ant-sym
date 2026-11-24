@@ -48,12 +48,35 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
-  /** the fog of war's knowledge when the page runs with it (fog/sources.ts sensedFor); null: no fog */
-  knowledge: Knowledge | null = null;
-  /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog */
-  corpses: CorpseMemory | null = null;
-  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog */
-  known: KnownColonies<SideStats> | null = null;
+  #knowledge: Knowledge | null = null;
+  #corpses: CorpseMemory | null = null;
+  #known: KnownColonies<SideStats> | null = null;
+  /**
+   * The fog is off for now (the builder is on, docs/fog-of-war.md §5.4): knowledge, corpses and known read null, so everything shows as
+   * without the fog. The memory goes on being kept, so the fog comes back as it was.
+   */
+  suspended = false;
+  /** the fog of war's knowledge when the page runs with it (fog/sources.ts sensedFor); null: no fog (or suspended) */
+  get knowledge(): Knowledge | null {
+    return this.suspended ? null : this.#knowledge;
+  }
+  set knowledge(k: Knowledge | null) {
+    this.#knowledge = k;
+  }
+  /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog (or suspended) */
+  get corpses(): CorpseMemory | null {
+    return this.suspended ? null : this.#corpses;
+  }
+  set corpses(c: CorpseMemory | null) {
+    this.#corpses = c;
+  }
+  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog (or suspended) */
+  get known(): KnownColonies<SideStats> | null {
+    return this.suspended ? null : this.#known;
+  }
+  set known(k: KnownColonies<SideStats> | null) {
+    this.#known = k;
+  }
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */
@@ -105,8 +128,8 @@ export class SensedMap {
       this.#bodyAt = now;
       bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
     }
-    if (this.knowledge) this.corpses?.update(game, this.knowledge, decayStage);
-    if (this.knowledge) this.known?.update(game, this.knowledge);
+    if (this.#knowledge) this.#corpses?.update(game, this.#knowledge, decayStage);
+    if (this.#knowledge) this.#known?.update(game, this.#knowledge);
     this.#forget();
   }
 
@@ -116,8 +139,8 @@ export class SensedMap {
       this.#fresh.clear();
       this.#revealed.clear();
       this.#bodyAt = -Infinity;
-      this.corpses?.clear();
-      this.known?.clear();
+      this.#corpses?.clear();
+      this.#known?.clear();
       this.onReset?.();
     }
     this.now = now;
