@@ -566,6 +566,29 @@ export class Fungus {
   }
 
   /**
+   * A map the world gained after the fungus was made (a line that began mid-game, Game.addLine): its spore layer, hyphae and corpses, empty. Returns its
+   * layer index, the next one: the same as the game's, which keeps its layers in step.
+   */
+  addLayer(map: WorldMap): number {
+    const l = this.#layers.length;
+    this.#layers.push({
+      map,
+      spores: new ChunkLayer((n) => new Float32Array(n), 0),
+      sporeStrain: new ChunkLayer((n) => new Uint8Array(n), 0),
+      sporeCells: new Set<number>(),
+      base: [],
+      all: new LoadGrid(),
+      visible: [],
+      taken: [],
+      shown: 0,
+    });
+    this.#hyphae.push(null);
+    this.#corpses.push(new Map());
+    this.#corpseAge.push(new Map());
+    return l;
+  }
+
+  /**
    * Map `layer`'s spores and their strain (one world: 0 the plane, 1 the curtain), for the renderer: layer 0's are the
    * public `spores` and `sporeStrain`. Read only; null for a layer the fungus has no map for.
    */
