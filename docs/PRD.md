@@ -5552,7 +5552,7 @@ The owner saw one colony's trails all the time and disliked that Ink (colony 0) 
   - Every colony's food trail, home trail and alarm show in a cell as strongly as that mark is fresh, fading to nothing over `SENSED_FADE` = 20 sim-seconds.
   - Before any host there is no scent on the field. Paths light up as infected foragers walk them, and fade once they move on. Amber's trails appear the moment an Amber ant carries the fungus.
   - It is a picture only: the game never reads it, and the golden masters are bit-exact.
-  - The spores, the fungus's own body, show as before.
+  - The spores, the fungus's own body, show as before. (Superseded by §89, 2026-11-23: the fog hides them where nothing senses.)
 - **The seed chooses the landing colony** (`landingColony(seed, colonies)` in `ui/useColony.ts`, ja-pc72.2).
   - With two colonies it is `seed % 2`: odd seeds land by Amber, even by Ink. With one colony, that colony.
   - The start screen names it as the seed is typed, and the chapters, notices and tutorial follow `game.landed.colony`.
@@ -5633,7 +5633,7 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 **Still open** (endless-world §10, each with a recommendation):
 1. wild density: one site per 4 × 4 chunks to start;
 2. a wild colony's size on waking: a start colony's at 10 minutes;
-3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests;
+3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests (decided otherwise, §89: hosts and the living body, from the landing patch only);
 4. W, T and the awake cap: 2 U, 60 s and 6;
 5. the flight distance: 2 U to start;
 6. lines joining: not yet;
@@ -7733,3 +7733,69 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 **Baselines re-taken (2026-11-23, main `96832d41`).** Three colony changes landed after the arms above: #320 (the young keep to the brood), #327 (corpse tips) and #363 (flowers anywhere). Running the commit before each: #327 and #363 moved **no** quarter, half or queen time on any of the 20 seeds (they moved patch, flower and mat counts); #320 moved **every** seed. New baselines, quarter median / worst: default 163 s / 357 s (seed 6) on seeds 1-10 and 163.5 s / 313 s (seed 19) on 11-20; `bias off` 172.5 s / 357 s and 182.5 s / 361 s (seed 20). The older arms' worst seeds (219 s, 246 s) are not comparable with these (#320). The tropism on the same code: no seed slower, seed 20 361 to 171 s, seed 17 184 to 146 s, seed 7 176 to 156 s; T3 broken on seed 20 only. Per-seed tables and run ids in [hyphal-traffic.md](hyphal-traffic.md#baselines-re-taken-after-320-327-and-363-2026-11-23).
 
 **Still open.** The research full texts and an entomopathogen-specific mechanism search (`ja-ogph.1`); a measured range for an ant's plume in soil; a footfall memory (option C) as the closer stand-in for a deposited cue; the band edges and levels of a banded sense if the lean is ever moved off the plain count.
+
+## 89. The player sees only what its organisms sense (design, ja-1ypq, 2026-11-23)
+
+**Research basis:** [fog-of-war.md](fog-of-war.md).
+- Strategy games use three states per cell: unknown, remembered (explored, nobody there now) and live. Buildings and terrain are remembered as last seen; units are not (Warcraft II, Age of Empires II, OpenRA, Factorio's chart, which leaves trains off). All from search summaries (**unverified**).
+- *Ophiocordyceps* forms networks through its host's body but not inside the brain, and controls the body "peripherally" (Fredericksen et al. 2017, read in full). Entomopathogens meet a host by contact with its cuticle (Ortiz-Urquiza & Keyhani 2013, read in full). No paper shows a fungus reading its host's senses, and no measured sensing distance for mycelium was found. The fungus's sight is therefore **design**.
+- No shipped game was found where a parasite sees through its hosts.
+
+**The problem.** The owner asked (2026-11-23) for groundwork, ahead of the endless world (§66, `ja-qpv`), toward a fog of war. The player should see only what the fungus and its infected ants have sensed, and where they leave, the page should draw no updates. Today `SensedMap` (§65) gates only trails and alarm. The renderer and every card read the live `Game`: every ant, nest, chamber, badge, stat and toast shows everywhere ([fog-of-war §1](fog-of-war.md#1-where-we-are)).
+
+**Decisions** (owner, 2026-11-23):
+1. **The fungus's living body sees about 2 cells:** hyphae, mats, patches and flowers. Spores and corpses see nothing.
+2. **Remembered ground shows the last-seen state, never ants:** rock, tunnels, food, spoil, mounds, chambers, hyphae and nests, with "last seen N s ago". Ants, brood and queens show only where live.
+3. **Readouts cover known colonies.** A colony is known once its nest has been sensed or it holds a host. Its numbers are live while it holds hosts, otherwise as of when the last one left. The go-to menu lists only nests already seen.
+4. **The start reveals only the landing patch** and its sight. This replaces endless-world §8's start-nest discs.
+
+5. **Fog is off while the builder is on; the Lab's cards and the dev hook stay omniscient; corpses are remembered in snapshots as ground items** (owner, 2026-11-23).
+
+6. **Every host sees, of any ant kind: strain doesn't matter** (owner, 2026-11-23). D1: for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of"; nothing is drawn on the map (owner, 2026-11-23).
+
+**Built choice** (not the owner's call): a grace of 1.5 s against edge flicker, because it must exceed the body's 1 s stamp interval.
+
+**The mechanic.**
+- **Observers:**
+  - every host, at `sensorDistance + REACH_MARGIN`;
+  - the living body, at `BODY_SIGHT` = 2;
+  - stamped on the sim clock, not per frame.
+- **Knowledge** (`ui/fog/`, pure TS):
+  - an explored bit per cell (512 B a chunk);
+  - live = stamped this step, plus the grace;
+  - a snapshot of a chunk's paint inputs (`MapChunkPaintCache`'s format) copied when its last live cell goes out, with live cells writing through;
+  - known colonies with their last-known numbers.
+- **The picture** draws through a `FogView` behind a `fog` setting whose "off" is today's field pixel for pixel.
+- **What the simulation reads:** nothing. Goldens stay bit-exact. It retires no gap and adds none.
+
+**Play.** The map opens as the mycelium grows and as hosts walk, and stays behind them as greyed, last-seen ground. Infecting a far forager is scouting. Grooming that clears hosts also blinds the player. On the endless world the fog is the frontier ([fog-of-war, Play](fog-of-war.md#play)).
+
+**Guards** (no behaviour assays: it is a picture only):
+- goldens bit-exact at every stage;
+- the same stamps at 30 and 60 fps;
+- a snapshot equals the truth at the step its chunk left sight;
+- with fog off, `field-shots` hashes are unchanged;
+- an e2e section for a host walking away;
+- the memory soak (F7).
+
+**Cost.** Jev: none. No legend, question or situation changes, and a cached game spends nothing.
+- CPU: stamping per step (budget 0.5 ms at a big mycelium) and the fog mask per frame.
+- Memory: 512 B per explored chunk, plus snapshots of chunks changed out of sight.
+- Each is measured in its stage and written here.
+
+**Beads.** `ja-1ypq` (epic). Children:
+- `ja-1ypq.1` F1 observers;
+- `ja-1ypq.2` F2 knowledge;
+- `ja-1ypq.3` F3 the field;
+- `ja-1ypq.4` F4 picking and cards;
+- `ja-1ypq.5` F5 readouts;
+- `ja-1ypq.6` F6 start and builder;
+- `ja-1ypq.7` F7 endless (blocks `ja-qpv.4`);
+- `ja-1ypq.8` F8 other organisms.
+
+**F2 built (`ja-1ypq.2`, 2026-11-24):** `ui/fog/knowledge.ts` (explored bit per cell, snapshots per source copied while sensed, last-seen per 8 × 8 block) and `ui/fog/known.ts` (known colonies, live or as of); `SensedMap.onSeen` and `onReset` feed it. Measured in `fogKnowledge.test.ts`: 512 B of explored bits plus 256 B of block times a chunk, and 4 KB a byte layer or 16 KB a float layer of snapshot. Which sources the renderer copies (rock, food, quality, spoil, spores, chambers) is F3's choice, and with all of them a chunk is tens of KB, which is why F7 drops snapshots of chunks unchanged since seen. A picture only; goldens untouched.
+
+**Still open.**
+- How the body is stamped (F1 measures).
+- A fading memory (not now).
+- The game sources' full texts: their hosts were outside this session's network.

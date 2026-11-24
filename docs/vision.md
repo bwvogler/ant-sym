@@ -88,6 +88,7 @@ This is the budget the policy may draw on. Each row points to the research secti
 - **Lethal, off until the player turns them on:** the odour weapon, and `crown`, which passes a lethal infection to the queen and brood its host tends, as a chance per second (`regicide`).
 - **What its hyphal tips sense** (the mycelium as hyphae): what is ahead, its exposure, supply, the run since a branch and the resource there (the growth situation), and, since 2026-11-23, how many ants are near the cells a tip could grow into (design: the tip leans toward the busier side, [hyphal-traffic](hyphal-traffic.md)).
 - **Its own effectors:** spores on the ground, contact spread, and Bloom corpses on the midden that sporulate.
+- **What it shows the player** (design, not built, `ja-1ypq`): the page will show only what its hosts' antennae and its living body (about 2 cells) sense, and remembered ground as last seen ([fog-of-war](fog-of-war.md)). A picture only: no ant and no fungal lane reads it.
 - **Its body and its progress** (`evolution.ts`, `ja-lo8.12`): in the game it lands weak and takes root as a mycelium by the hole, which grows and pays for the spores it puts out; every bit of new fungus can mutate, so mutations come as fast as it grows, and the player keeps them as its spread traits or to how far each group of levers may reach ([fungus-body](fungus-body.md)). Reach holds a level where it takes effect; Jev is asked the full range.
 
 The gaps:
