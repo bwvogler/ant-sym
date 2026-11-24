@@ -35,7 +35,11 @@ export class KnownColonies<T> {
 
   /** Call once after each sim step, after the fog's sight is stamped. Time gone back (a restart, a load) forgets everything. */
   update(game: Game, knowledge: Knowledge): void {
-    if (this.#known.size && [...this.#known.values()].some((k) => k.asOf > game.time)) this.#known.clear();
+    for (const k of this.#known.values())
+      if (k.asOf > game.time) {
+        this.#known.clear(); // time went back (a restart, a load)
+        break;
+      }
     game.colonies.forEach((c, i) => {
       const k = this.#known.get(i);
       if (hostsOf(c) > 0) {
@@ -45,10 +49,16 @@ export class KnownColonies<T> {
       } else if (k) {
         if (k.live) k.live = false; // the last host left: the readout stays as it was
       } else {
-        const hole = c.holeCells[0];
-        if (hole && knowledge.explored(PLANE, hole.col, hole.row)) this.#known.set(i, { readout: null, asOf: game.time, live: false });
+        // The colony's own hole (holeCells lists every nest's on the map: its own is at params.nest), a plane cell.
+        const hole = c.holeCells[c.params.nest];
+        if (hole && knowledge.explored(PLANE, hole.px, hole.py)) this.#known.set(i, { readout: null, asOf: game.time, live: false });
       }
     });
+  }
+
+  /** Forget everything. */
+  clear(): void {
+    this.#known.clear();
   }
 
   /** What the fungus knows of colony `i`; null while it does not know it. */

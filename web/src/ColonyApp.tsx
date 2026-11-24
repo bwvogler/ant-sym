@@ -370,6 +370,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
       toggleLab,
       toggleLens,
       openSheet: () => setSheet(true),
+      known: sensed.known,
     });
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
@@ -1005,7 +1006,7 @@ function Evolve({ e, evolve, menu, wide }: { e: EvolutionStats; evolve: (id: str
 }
 
 /** The top bar's one line: where the game stands. Goals proper come with the game's chapters (ja-lo8.5). */
-function goalLine(stats: ColonyStats | null, known: KnownColonies<SideStats> | null = null): string {
+function goalLine(stats: ColonyStats | null, known: KnownColonies<SideStats> | null): string {
   if (!stats) return "";
   // Under the fog an ending is news only about colonies the fungus knows.
   if (!endingKnown(stats, known)) return goalLine({ ...stats, outcome: "playing" }, known);
@@ -1037,8 +1038,8 @@ function useNotices(loop: GameLoop, affordable: boolean, lock: string | null, ph
     if (chapter === seenChapter.current) return;
     const first = seenChapter.current === undefined;
     seenChapter.current = chapter;
-    if (!first && loop.stats() && chapter !== "land") pushToast(goalLine(loop.stats()), "good");
-  }, [chapter, loop]);
+    if (!first && loop.stats() && chapter !== "land") pushToast(goalLine(loop.stats(), known), "good");
+  }, [chapter, loop, known]);
   // A mutation it can keep is worth a notice, once each time there was none it could afford (ja-lo8.12).
   const couldAfford = useRef(affordable);
   useEffect(() => {

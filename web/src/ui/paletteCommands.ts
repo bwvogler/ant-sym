@@ -1,5 +1,8 @@
 import type { RefObject } from "react";
 import type { Game } from "../colony/index.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import { isKnown } from "./fog/knownView.ts";
+import type { SideStats } from "./stats.ts";
 import type { FieldApi } from "./field/api.ts";
 import { guideFor } from "./guide.ts";
 import { openLearn } from "./learn.ts";
@@ -36,6 +39,8 @@ export interface PaletteCtx {
   toggleLab: () => void;
   toggleLens: () => void;
   openSheet: () => void;
+  /** under the fog of war: the colonies the fungus knows (null: all); only their nests are listed */
+  known?: KnownColonies<SideStats> | null;
 }
 
 /** A command the page can run now (Palette.tsx's `Runnable`). */
@@ -61,6 +66,7 @@ export function paletteCommands(ctx: PaletteCtx): PaletteCommand[] {
     toggleLab,
     toggleLens,
     openSheet,
+    known = null,
   } = ctx;
   const SPEEDS = speeds;
   return [
@@ -94,13 +100,20 @@ export function paletteCommands(ctx: PaletteCtx): PaletteCommand[] {
       : []),
     { id: "host", label: "Follow a host of yours", group: "Game", key: "f", words: "infected ant", run: followHost },
     { id: "whole", label: "Whole map", group: "Map", key: "0", words: "zoom out fit", run: () => field.current?.showAll() },
-    ...game.colonies.map((_, k) => ({
-      id: `nest-${k}`,
-      label: `Go to ${colonyName(k)}'s nest`,
-      group: "Map",
-      words: "colony hole",
-      run: () => field.current?.goNest(k),
-    })),
+    // Under the fog only the nests the fungus knows (the Go-to menu's twin).
+    ...game.colonies.flatMap((_, k) =>
+      !isKnown(known, k)
+        ? []
+        : [
+            {
+              id: `nest-${k}`,
+              label: `Go to ${colonyName(k)}'s nest`,
+              group: "Map",
+              words: "colony hole",
+              run: () => field.current?.goNest(k),
+            },
+          ],
+    ),
     ...(
       [
         ["fungus", "The fungus", "infection aim"],

@@ -7,7 +7,7 @@ import Help from "./Help.tsx";
 import { closeLearn, openLearn, useLearn, type LearnTab } from "./learn.ts";
 import { colonyName, colonyTone } from "./names.ts";
 import type { KnownColonies } from "./fog/known.ts";
-import { asOf, isKnown } from "./fog/knownView.ts";
+import { isKnown, lastKnownText } from "./fog/knownView.ts";
 import { nestView, ROLE_TEXT, type NestView } from "./nest.ts";
 import type { SideStats } from "./stats.ts";
 import { css, ROLE_RGB } from "./palette.ts";
@@ -313,14 +313,7 @@ function LastKnownNest({ k, at, now, side }: { k: number; at: number; now: numbe
       <h3 className="font-medium">
         <span className={colonyTone(k)}>{colonyName(k)}</span> nest
       </h3>
-      {side ? (
-        <p className="mt-1 font-mono text-xs text-fg-2">
-          {asOf(now, at)}: queen {side.queen === "alive" ? "alive" : side.queen === "lost" ? "dead (orphaned)" : "—"} · brood{" "}
-          {side.brood.join(" / ")} (eggs / larvae / pupae) · {side.population} ants
-        </p>
-      ) : (
-        <p className="mt-1 text-xs text-fg-3">The nest is known; no host of yours has been in it, so nothing of what is inside.</p>
-      )}
+      <p className={side ? "mt-1 font-mono text-xs text-fg-2" : "mt-1 text-xs text-fg-3"}>{lastKnownText(side, now, at)}</p>
     </section>
   );
 }

@@ -113,6 +113,7 @@ export class SensedMap {
       this.#revealed.clear();
       this.#bodyAt = -Infinity;
       this.corpses?.clear();
+      this.known?.clear();
       this.onReset?.();
     }
     this.now = now;

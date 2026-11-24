@@ -51,5 +51,12 @@ export function endingKnown(stats: ColonyStats, known: KnownColonies<SideStats> 
   return true;
 }
 
+/** The nest tab's line for a colony the fungus knows but has no host in: what it last knew, and when (null: known by its hole alone). */
+export function lastKnownText(side: SideStats | null, now: number, at: number): string {
+  if (!side) return "The nest is known; no host of yours has been in it, so nothing of what is inside.";
+  const queen = side.queen === "alive" ? "alive" : side.queen === "lost" ? "dead (orphaned)" : "—";
+  return `${asOf(now, at)}: queen ${queen} · brood ${side.brood.join(" / ")} (eggs / larvae / pupae) · ${side.population} ants`;
+}
+
 /** "as of 12 s ago", for numbers no host is in. */
 export const asOf = (now: number, at: number): string => `as of ${Math.max(0, Math.round(now - at))} s ago`;
