@@ -193,3 +193,19 @@ test("suspended (the builder is on): knowledge, corpses and known read null, the
   assert.equal(kn.state(PLANE, 40, 40), REMEMBERED, "and what was left behind is remembered, not forgotten");
   assert.ok(s.known, "known is back");
 });
+
+test("suspended: the corpse and known memories are still updated while building, and read null (review of #417, S1)", () => {
+  const s = new SensedMap();
+  const kn = new Knowledge(s, []);
+  s.knowledge = kn;
+  const calls: string[] = [];
+  s.corpses = { update: () => calls.push("corpses"), clear: () => {} } as never;
+  s.known = { update: () => calls.push("known"), clear: () => {} } as never;
+  const game = { time: 1, colonies: [], layers: [0], fungus: { patchOn: () => [], hyphaeOn: () => undefined } } as unknown as Game;
+  s.suspended = true;
+  assert.equal(s.corpses, null);
+  s.stampGame(game);
+  assert.deepEqual(calls, ["corpses", "known"], "kept up while the fog is off");
+  s.suspended = false;
+  assert.ok(s.corpses, "and back after");
+});
