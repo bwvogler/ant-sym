@@ -197,7 +197,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     [update, oneWorld],
   );
   // The first game's tutorial (ja-7x4, PRD §61). A card that points at a drawer's panel opens that drawer.
-  const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
+  const tut = useTutorial({ game, onFrame, update, setFollowed, showAt, sensed });
   // The species' own guide entry, if it has one (the HUD's sun chip links to it).
   const ownEntry = GUIDE.find((e) => e.species === game.params.species.id)?.id;
   const pointsAt = tut.card?.highlight;

@@ -1051,6 +1051,26 @@ try {
       check(false, `the host was below for ${framesBelow} drawn frames and the view did not follow it (still ${view})`);
     else console.log(`  --  the host was below for ${framesBelow} drawn frames only: the view-follows-below check was not exercised`);
   } else console.log("  --  the host did not go below before the watch ended: the view-follows-below check was not exercised");
+  // Under the fog a host below INFECTED sees nothing, and the watch is exactly the moment it gets there: the tutorial keeps it as an observer
+  // (SensedMap.watch), so the follow is not lost with a "Lost sight" toast (PR #421, S1).
+  const groomedNow = () =>
+    tu.evaluate((i) => {
+      const c = window.jevAnts.game.colonies[window.jevAnts.game.landed.colony];
+      return c.alive[i] && c.load[i] < 0.05;
+    }, hostNo);
+  await until(
+    async () => (await groomedNow()) || /cleaned|clean|died|dead/i.test((await tcard.textContent()) ?? ""),
+    "the host groomed",
+    90_000,
+    100,
+  ).catch(() => {});
+  await sleep(400);
+  if (await groomedNow())
+    check(
+      (await tu.getByRole("region", { name: "followed ant" }).count()) === 1,
+      "a groomed host (below INFECTED, which senses nothing) is still followed: the tutorial's watch keeps it an observer",
+    );
+  else console.log("  --  the host did not reach the groomed state in time: the watch's observer check was not exercised");
   await tcard.getByRole("button", { name: "Skip tutorial", exact: true }).click();
   await until(async () => (await tcard.count()) === 0, "Skip ends the tutorial");
   check(!(await paused()) && (await bar("4×").getAttribute("aria-pressed")) === "true", "playing at 4× after Skip");

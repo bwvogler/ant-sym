@@ -209,3 +209,29 @@ test("suspended: the corpse and known memories are still updated while building,
   s.suspended = false;
   assert.ok(s.corpses, "and back after");
 });
+
+test("a watched ant stays an observer below INFECTED, until it is unwatched or gone (the tutorial's host, PR #421 S1)", () => {
+  const w = world();
+  const s = new SensedMap();
+  const kn = new Knowledge(s, [w.source]);
+  const groomed = {
+    ...hostAt(40, 40),
+    load: Float32Array.of(0.01),
+    gen: Uint8Array.of(3),
+    params: { sensorDistance: 3 },
+  } as unknown as Colony;
+  s.stamp([groomed], 1);
+  assert.equal(kn.state(PLANE, 40, 40), UNKNOWN, "an ant below INFECTED sees nothing");
+  s.watch = { k: 0, i: 0, gen: 3 };
+  s.stamp([groomed], 2);
+  assert.equal(kn.state(PLANE, 40, 40), LIVE, "watched: it still sees");
+  s.watch = { k: 0, i: 0, gen: 4 };
+  s.stamp([{ ...groomed, x: Float32Array.of(centreX(90, 90)), y: Float32Array.of(centreY(90)) } as unknown as Colony], 3);
+  assert.equal(kn.state(PLANE, 90, 90), UNKNOWN, "a slot reused by another ant is not the watched one");
+  s.watch = { k: 0, i: 0, gen: 3 };
+  s.stamp(
+    [{ ...groomed, alive: Uint8Array.of(0), x: Float32Array.of(centreX(90, 90)), y: Float32Array.of(centreY(90)) } as unknown as Colony],
+    4,
+  );
+  assert.equal(kn.state(PLANE, 90, 90), UNKNOWN, "and a dead one sees nothing");
+});
