@@ -10,7 +10,8 @@ import { type BandsSave, driftAim, Recognition, type RecognitionParams } from ".
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Cell, type End, nearestValid, outward } from "./transect.ts";
+import { type Line, nearestValidIn } from "./lines.ts";
+import { type Cell, type End, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -128,7 +129,7 @@ export interface Founding {
    * One world (U4b): where the founding went, nearestValid's hole on the plane and the end of the line it grew (Game.addColony
    * records it; x and y stay the landing point). A save's re-founding grows the line there again (oneWorld.ts growWorld).
    */
-  spot?: { end: End; cell: Cell };
+  spot?: { end: End; cell: Cell; /** the line it grew (absent: the first, the only one until the endless world) */ line?: number };
 }
 
 /** A saved game (Game.save): JSON. */
@@ -540,7 +541,7 @@ export class Game {
       odour: mother.nestOdour,
       mother: f.mother,
       reserve: f.food,
-      spot: { cell: s.cell, end: s.end },
+      spot: { cell: s.cell, end: s.end, line: s.line },
       ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}),
     });
   }
@@ -557,10 +558,15 @@ export class Game {
   settleAt(
     p: { x: number; y: number },
     ground?: (x: number, y: number) => boolean,
-  ): { ok: true; cell: Cell; end: End } | { ok: false; reason: string } {
+  ): { ok: true; cell: Cell; end: End; line: number } | { ok: false; reason: string } {
     cellOf(p.x, p.y);
-    const s = nearestValid(this.world.line, { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(this.world));
-    return s ? { ok: true, cell: s.cell, end: s.end } : { ok: false, reason: NO_ROOM };
+    // The founding rule over the world's lines (lines.ts), with new lines off: a game of one line grows its ends exactly as transect.ts nearestValid
+    // says (the endless world turns them on, E6).
+    const lines: Line[] = this.world.lines.map((l) => ({ transect: l.line, salt: l.salt }));
+    const s = nearestValidIn(lines, [], { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(this.world), 0, { newLines: false });
+    return s && s.founding.kind === "grow"
+      ? { ok: true, cell: s.cell, end: s.founding.end, line: s.founding.line }
+      : { ok: false, reason: NO_ROOM };
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -626,10 +632,10 @@ export class Game {
       // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
       const s = this.settleAt(f);
       if (s.ok === false) throw new Error(`addColony: ${s.reason}`);
-      spot = { cell: s.cell, end: s.end };
+      spot = { cell: s.cell, end: s.end, line: s.line };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-    const at = growWorld(world, spot.end, spot.cell);
+    const at = growWorld(world, spot.end, spot.cell, spot.line ?? 0);
     // A save's nest is the one dug then (growWorld digs the same one: from the stream keyed by its hole).
     if (f.nest) world.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
     const nest = world.curtain.nests[at] as Nest;
@@ -663,7 +669,7 @@ export class Game {
     for (const g of this.#grids) g.push(new CountGrid());
     this.founded.push({
       ...f,
-      spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y } },
+      spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y }, ...(spot.line ? { line: spot.line } : {}) },
       nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) },
     });
     this.#wire();
@@ -696,7 +702,12 @@ export class Game {
     if (s.ok === false) return s;
     return {
       ok: true,
-      k: this.addColony({ ...at, antCount, odour: (this.colonies[0] as Colony).nestOdour, spot: { cell: s.cell, end: s.end } }),
+      k: this.addColony({
+        ...at,
+        antCount,
+        odour: (this.colonies[0] as Colony).nestOdour,
+        spot: { cell: s.cell, end: s.end, line: s.line },
+      }),
     };
   }
 

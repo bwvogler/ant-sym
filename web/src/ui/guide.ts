@@ -773,6 +773,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. Planned (not built, PRD §66).",
   },
   {
+    note: "fog-of-war",
+    title: "Fog of war",
+    covers:
+      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Planned (not built, PRD §89).",
+  },
+  {
     note: "new-queens",
     title: "New queens",
     covers: "When a colony rears new queens, how they found, and the fungus's levers on it (not built).",

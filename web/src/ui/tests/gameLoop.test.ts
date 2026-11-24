@@ -348,3 +348,40 @@ test("a frame count that changes with no new stats is still told (the stats came
   assert.equal(told, 2, "told of the frame count alone");
   assert.equal(loop.fps(), 2);
 });
+
+test("onStep runs after every sim step, not every frame; paused it does not; unsubscribed it stops (the fog's sight keeps up with the sim)", () => {
+  const { game, clock, loop } = make({ speed: 8 });
+  let steps = 0;
+  const times: number[] = [];
+  const off = loop.onStep(() => (steps++, times.push(game.time)));
+  let ticks = 0;
+  const tick = game.tick.bind(game);
+  game.tick = (dt: number) => (ticks++, tick(dt));
+  loop.start();
+  clock.frame(50); // 0.4 s of sim in several steps
+  assert.ok(ticks > 1, `${ticks} ticks in one frame`);
+  assert.equal(steps, ticks, "one call per tick, after it");
+  assert.ok(
+    times.every((t, i) => i === 0 || t > times[i - 1]!),
+    "each after its own tick",
+  );
+  loop.set(false, 8);
+  const before = steps;
+  clock.frames(3);
+  assert.equal(steps, before, "paused: no steps");
+  loop.set(true, 8);
+  off();
+  clock.frame(50);
+  assert.equal(steps, before, "unsubscribed");
+});
+
+test("advance steps the game by hand and runs the step subscribers: the Lab's step control goes through it", () => {
+  const { game, loop } = make();
+  let steps = 0;
+  loop.onStep(() => steps++);
+  const t0 = game.time;
+  loop.advance(MAX_STEP);
+  loop.advance(MAX_STEP);
+  assert.equal(steps, 2);
+  assert.ok(Math.abs(game.time - (t0 + 2 * MAX_STEP)) < 1e-9);
+});

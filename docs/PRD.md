@@ -5552,7 +5552,7 @@ The owner saw one colony's trails all the time and disliked that Ink (colony 0) 
   - Every colony's food trail, home trail and alarm show in a cell as strongly as that mark is fresh, fading to nothing over `SENSED_FADE` = 20 sim-seconds.
   - Before any host there is no scent on the field. Paths light up as infected foragers walk them, and fade once they move on. Amber's trails appear the moment an Amber ant carries the fungus.
   - It is a picture only: the game never reads it, and the golden masters are bit-exact.
-  - The spores, the fungus's own body, show as before.
+  - The spores, the fungus's own body, show as before. (Superseded by §89, 2026-11-23: the fog hides them where nothing senses.)
 - **The seed chooses the landing colony** (`landingColony(seed, colonies)` in `ui/useColony.ts`, ja-pc72.2).
   - With two colonies it is `seed % 2`: odd seeds land by Amber, even by Ink. With one colony, that colony.
   - The start screen names it as the seed is typed, and the chapters, notices and tutorial follow `game.landed.colony`.
@@ -5633,7 +5633,7 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 **Still open** (endless-world §10, each with a recommendation):
 1. wild density: one site per 4 × 4 chunks to start;
 2. a wild colony's size on waking: a start colony's at 10 minutes;
-3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests;
+3. what reveals the fog: `SensedMap`'s sensed ground plus the start nests (decided otherwise, §89: hosts and the living body, from the landing patch only);
 4. W, T and the awake cap: 2 U, 60 s and 6;
 5. the flight distance: 2 U to start;
 6. lines joining: not yet;
@@ -5711,6 +5711,20 @@ The costs are CPU and memory, bounded by the awake cap. E1 and E4 measure them; 
 - **`FoodLedger`.** `foodTotal` and `foodLeft` become the food generated so far (a chunk or block counts once, by layer and key, however often it is generated: a dropped chunk that returns adds nothing) plus what the game adds (regrowth, honeydew, a stroke) less what it takes. The ledger does not feed `foodHome`; it is for the stats and the page once the generators fill a map (E4, E6).
 - **Carried from #197.** `homing.ts`'s `outField` comment and E1.4's text above said the window widens to "twice as wide"; it widens to three times its width (`fresh(f.x0 - f.w, f.x0 + 2 * f.w)`). `stepsAt`'s row bound never fires in play (defensive). `outField`'s `kept` check does fire: a differing map origin or width is how every other colony's field is rebuilt after `addColony` grows the curtain (`oneWorldFounding.test.ts` test 8 fails without it); only its window-length term is defensive (review of #374). Comments only, behaviour unchanged.
 - **Cost.** None. A 2 U disc sweeps about 120 chunks the first time (about 0.4 s cold, measured), once per colony.
+
+**E3.1 built (`ja-qpv.2`, 2026-11-24).** `colony/lines.ts`: the founding rule over many lines, pure (nothing imports it yet; the goldens are unchanged). `makeTransect` gains an optional `heading` (radians) for a line of one hole, whose margins ran only west and east; without it the line is exactly as before (`transect.test.ts` and the one-world golden pass unchanged).
+- **The rule** (`canFoundIn(lines, sites, p, open, heading)`), in order: within `NEW_LINE_GAP` (140) of a wild site, woken or not: refused ("site"); farther than 140 from every hole of every line, on open ground, and the one-hole line it would start (hole and margins, along `heading`) keeps the 12-cell clearance from every line's tiles and every site's reserved line: a new line; else the nearest hole is an end of its line: that line grows by today's rules (`canFound`), provided the grown line keeps the clearance from every other line and every site's reserved line ("line-clearance"); else refused with the rule's own reason. `applyFounding` makes the new lines, `nearestValidIn` finds the cell nearest a point within a radius where the rule holds, in `nearestValid`'s own order (exact distance, `roundDisc`'s tie order), so E3.2 moves no bounded landing. The nearest hole is chosen by exact `dist4`, ties to the lower line index. `lineSalt(seed, firstHole, first)`: 0 for the first line (today's ground and food seeds), else a non-zero hash of the first hole's plane cell, fixed for the line's life. `oneHoleLine` is a new line.
+- **Clearance from a site is a defence, not a working check, for a point more than 140 from it:** the new line's margin (64) and the site's reserved line (64) leave 140 − 128 = 12, the clearance, exactly. Between lines it does work (two tests build it: a point beside the middle of a long segment, and an end 130 from another line's vertical).
+- **Guards** (`tests/int/lines.test.ts`, 18 tests, ~5 s). Random foundings over 160 tries on two seeds, applied in turn: no plane cell is ever over two lines, no line comes within the clearance of a site's reserved line, a new line is farther than 140 from every hole, no founding is within 140 of a site, at least 3 new lines and 3 grown ends each; a one-hole line grows from either side and keeps its salt; the first salt is 0 and all others differ; a point crowding a hole is refused for the hole gap; `nearestValidIn` moves a crowded point, is the same every time and returns null where nothing is open. Mutants (the site refusal, the 140, the new-line clearance, the grown-line clearance and its sites argument, a far clearance failure refusing instead of falling to rule 2, the tie going to the last line, the candidate order, the open-ground test on a new line, the first salt) each fail a test. Sites on the new-line check are equivalent by construction (below).
+- **Open (owner, D1 on #376).** A far point whose new line fails only the clearance falls to rule 2 and may grow the nearest line by a long segment (up to a flight, 300 cells in a probe): as §5 is written. Options: keep it; refuse such a point so `nearestValid` moves it or the flight fails; or allow the fall-through only up to some length. Kept as written until decided; E6 counts how many foundings start a line and how many grow one.
+- **Left for E3.** Layer ids (E3.3) and saves (E3.4); E3.2 is below. `nearestValidIn` still scans every cell within the radius when nothing is valid (about 350,000 candidates for a 2 U flight; `settleAt` scans its 140: measured 14 ms when nothing is valid against 3.5 ms for `nearestValid`, before E3.2's trimming, which skips the far-from-every-hole test when new lines are off): E3.3 bounds it, and E6 re-measures it with many lines and the pen calling it under the pointer.
+
+**E3.2 built (`ja-qpv.2`, 2026-11-24).** The world holds a list of lines, and the game asks the founding rule through it; behaviour is bit-exact (the four golden masters, the one-world suites and the save tests pass unchanged).
+- **`OneWorld.lines`.** `WorldLine { line, curtain, salt }`; `OneWorld.line` and `OneWorld.curtain` are read-only views of `lines[0]` (so every reader outside the world's own code is untouched), `growWorld(world, end, cell, at = 0)` grows line `at` in place (`wl.line` is replaced, the curtain widens), and an unknown line is an error. The first line's salt is 0, so its ground and food keep today's seeds.
+- **`Game.settleAt`** goes through `nearestValidIn` over the world's lines with `newLines: false` (a new option of `canFoundIn`, `nearestValidIn`: rule 1 skipped), no sites and no new lines until the endless world is the page's (E6). With one line and no sites the rule is `canFound` and its candidate order is `nearestValid`'s, so every landing is the same cell (a test compares 65 points, 5 of them moved, with `nearestValid`); the grown line is not laid out for a clearance check against nothing. `settleAt` and the founding's `spot` carry the line index (`spot.line`, written only when it is not 0, so saves are byte-identical).
+- **Guards** (`tests/int/oneWorldLines.test.ts`, 4 tests). The views and growth in place; an unknown line; `settleAt` equals `nearestValid` at 65 points, line 0; a far point is given a line of its own with new lines on and never with them off. Mutants: new lines left on in `Game` fails.
+- **Not here.** A second curtain needs the game's layers to be per line (E3.3): `Game.layers`, the occupancy grids, recognition and the fungus's layers are indexed by plane or curtain, and every colony's `layers` view with them. Cost: none.
+- **Cost.** None (no Jev situation, legend or question changed).
 
 ## 67. Senses through open ground only, and hunger that reaches the stores (ja-uvhw, ja-4rfr, 2026-11-13)
 
@@ -7557,7 +7571,7 @@ Releasing after 20 s cuts repeated dropping but does not reliably improve delive
 - **M1 (built, `ja-vlla.3`):** `LANDING.radius` 2 becomes 1 (landing, the first spores and a queen's founding: the assay measured the whole change). The parameter is `LANDING.radius`; `progression.mjs --landing 2` gives today's landing back. The fungus golden is re-recorded.
 - **M2a (built, `ja-vlla.4`):** `thicken` fills the open, enterable neighbours of a tip's cell, HYPHA_MASS each from supply (allowed only where the new `resource` field says a colonised corpse is on the tip's cell or beside it; elsewhere the answer plays the tip's own rule); the cells are a mat that `regress` leaves alone (`Hyphae.mat`, saved only when non-empty); the local rule never thickens, so the golden is bit-exact. `GROWTH_BRAIN_VERSION` 5, 48 situations become 96, and the shipped growth answers were re-asked ($0.0049 for the three aims, 404 input tokens a question): Jev thickens in 27 (*unite*), 29 (*peace*) and 32 (*spread*) of the 48 corpse situations and in none without a corpse. **M2b (built, `ja-vlla.5`):** after each round of tip steps (`Fungus.#settle`), a cell a tip has just thickened round whose six neighbours are all hyphae is a flower, and it becomes a patch when none of its seven cells is in a patch already (`base` or `sources`: the landing's cells and earlier flowers never count): the seven join the base and the sources, `Evolution.settle` adds one patch (room to grow) with no start of 4 (the mass is the hyphae's already: unchanged), no tips set out from it (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), layer 0 only; `Fungus.flowers` counts them (saved only when above 0, so the goldens hold). A flower is looked for only where a tip thickened, so only at a corpse: densely webbed hyphae that never thickened found nothing (owner asked, 2026-11-23: `ja-vlla.9`). **M2c** (`ja-vlla.6`): assays. Plan, as designed: a hypha cell with all six neighbours hyphal becomes a patch only if none of its seven cells is already in a patch (`base` or `sources`: the landing's own cells never count), layer 0, `patches` + 1, no tips of its own (owner, 2026-11-23: its seven cells are hyphae already and the tips that closed it run on), the mass from the hyphae through an entry point that skips the 4 every patch adds today (`Evolution.root`); `GROWTH_BRAIN_VERSION` 5, precache imported free.
 - **Flowers anywhere (built, `ja-vlla.9`, owner 2026-11-23: "I personally like flowers everywhere"):** a flower may close wherever hyphae grow, not only where a tip thickened (every newly grown cell is checked, as the middle of a flower or as one of a flower's six neighbours); it may touch a patch (the seven's cells not yet in a patch join it: the patch spreads, and the patch count stays; a flower with none in a patch is a new patch, as before); its middle must be outside every patch; and it roots no tips (the tips that closed it run on).
-- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** designed 2026-11-23/24: §89, epic `ja-vlla.11`.
+- **M3 (decided, owner 2026-11-23, above):** two pools, two prices; build `ja-vlla.7`. **M4:** designed 2026-11-23/24: §90, epic `ja-vlla.11`.
 
 **M1 assay result (`ja-vlla.2`, 2026-11-22).** `progression.mjs --evolve --hyphae --growth --flow --seconds 600` (the bead's command; `--landing R` sets `LANDING.radius`; the without-hyphae rows drop `--hyphae --growth --flow`), time to a quarter of hosts, seconds, seeds 1–10 then 11–20, radius 1 against today's 2. Re-run on the head (`8ffc5711`) the radius-1 with-hyphae rows reproduce on all 20 seeds. Without `--growth --flow` the with-hyphae times differ (seed 1: 237 s at radius 1, 282 s at radius 2; the PR review's reading). P1 (§63.4): no seed more than 10 % slower with hyphae than without.
 - Radius 1, seeds 1–10, with hyphae: 260 179 155 205 141 222 212 212 201 159; without: 361 268 233 235 237 426 277 533 327 197. Every seed is as fast or faster with hyphae.
@@ -7720,7 +7734,73 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **Still open.** The research full texts and an entomopathogen-specific mechanism search (`ja-ogph.1`); a measured range for an ant's plume in soil; a footfall memory (option C) as the closer stand-in for a deposited cue; the band edges and levels of a banded sense if the lean is ever moved off the plain count.
 
-## 89. A lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks it down (design, ja-vlla.11, 2026-11-24)
+## 89. The player sees only what its organisms sense (design, ja-1ypq, 2026-11-23)
+
+**Research basis:** [fog-of-war.md](fog-of-war.md).
+- Strategy games use three states per cell: unknown, remembered (explored, nobody there now) and live. Buildings and terrain are remembered as last seen; units are not (Warcraft II, Age of Empires II, OpenRA, Factorio's chart, which leaves trains off). All from search summaries (**unverified**).
+- *Ophiocordyceps* forms networks through its host's body but not inside the brain, and controls the body "peripherally" (Fredericksen et al. 2017, read in full). Entomopathogens meet a host by contact with its cuticle (Ortiz-Urquiza & Keyhani 2013, read in full). No paper shows a fungus reading its host's senses, and no measured sensing distance for mycelium was found. The fungus's sight is therefore **design**.
+- No shipped game was found where a parasite sees through its hosts.
+
+**The problem.** The owner asked (2026-11-23) for groundwork, ahead of the endless world (§66, `ja-qpv`), toward a fog of war. The player should see only what the fungus and its infected ants have sensed, and where they leave, the page should draw no updates. Today `SensedMap` (§65) gates only trails and alarm. The renderer and every card read the live `Game`: every ant, nest, chamber, badge, stat and toast shows everywhere ([fog-of-war §1](fog-of-war.md#1-where-we-are)).
+
+**Decisions** (owner, 2026-11-23):
+1. **The fungus's living body sees about 2 cells:** hyphae, mats, patches and flowers. Spores and corpses see nothing.
+2. **Remembered ground shows the last-seen state, never ants:** rock, tunnels, food, spoil, mounds, chambers, hyphae and nests, with "last seen N s ago". Ants, brood and queens show only where live.
+3. **Readouts cover known colonies.** A colony is known once its nest has been sensed or it holds a host. Its numbers are live while it holds hosts, otherwise as of when the last one left. The go-to menu lists only nests already seen.
+4. **The start reveals only the landing patch** and its sight. This replaces endless-world §8's start-nest discs.
+
+5. **Fog is off while the builder is on; the Lab's cards and the dev hook stay omniscient; corpses are remembered in snapshots as ground items** (owner, 2026-11-23).
+
+6. **Every host sees, of any ant kind: strain doesn't matter** (owner, 2026-11-23). D1: for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of"; nothing is drawn on the map (owner, 2026-11-23).
+
+**Built choice** (not the owner's call): a grace of 1.5 s against edge flicker, because it must exceed the body's 1 s stamp interval.
+
+**The mechanic.**
+- **Observers:**
+  - every host, at `sensorDistance + REACH_MARGIN`;
+  - the living body, at `BODY_SIGHT` = 2;
+  - stamped on the sim clock, not per frame.
+- **Knowledge** (`ui/fog/`, pure TS):
+  - an explored bit per cell (512 B a chunk);
+  - live = stamped this step, plus the grace;
+  - a snapshot of a chunk's paint inputs (`MapChunkPaintCache`'s format) copied when its last live cell goes out, with live cells writing through;
+  - known colonies with their last-known numbers.
+- **The picture** draws through a `FogView` behind a `fog` setting whose "off" is today's field pixel for pixel.
+- **What the simulation reads:** nothing. Goldens stay bit-exact. It retires no gap and adds none.
+
+**Play.** The map opens as the mycelium grows and as hosts walk, and stays behind them as greyed, last-seen ground. Infecting a far forager is scouting. Grooming that clears hosts also blinds the player. On the endless world the fog is the frontier ([fog-of-war, Play](fog-of-war.md#play)).
+
+**Guards** (no behaviour assays: it is a picture only):
+- goldens bit-exact at every stage;
+- the same stamps at 30 and 60 fps;
+- a snapshot equals the truth at the step its chunk left sight;
+- with fog off, `field-shots` hashes are unchanged;
+- an e2e section for a host walking away;
+- the memory soak (F7).
+
+**Cost.** Jev: none. No legend, question or situation changes, and a cached game spends nothing.
+- CPU: stamping per step (budget 0.5 ms at a big mycelium) and the fog mask per frame.
+- Memory: 512 B per explored chunk, plus snapshots of chunks changed out of sight.
+- Each is measured in its stage and written here.
+
+**Beads.** `ja-1ypq` (epic). Children:
+- `ja-1ypq.1` F1 observers;
+- `ja-1ypq.2` F2 knowledge;
+- `ja-1ypq.3` F3 the field;
+- `ja-1ypq.4` F4 picking and cards;
+- `ja-1ypq.5` F5 readouts;
+- `ja-1ypq.6` F6 start and builder;
+- `ja-1ypq.7` F7 endless (blocks `ja-qpv.4`);
+- `ja-1ypq.8` F8 other organisms.
+
+**F2 built (`ja-1ypq.2`, 2026-11-24):** `ui/fog/knowledge.ts` (explored bit per cell, snapshots per source copied while sensed, last-seen per 8 × 8 block) and `ui/fog/known.ts` (known colonies, live or as of); `SensedMap.onSeen` and `onReset` feed it. Measured in `fogKnowledge.test.ts`: 512 B of explored bits plus 256 B of block times a chunk, and 4 KB a byte layer or 16 KB a float layer of snapshot. Which sources the renderer copies (rock, food, quality, spoil, spores, chambers) is F3's choice, and with all of them a chunk is tens of KB, which is why F7 drops snapshots of chunks unchanged since seen. A picture only; goldens untouched.
+
+**Still open.**
+- How the body is stamped (F1 measures).
+- A fading memory (not now).
+- The game sources' full texts: their hosts were outside this session's network.
+
+## 90. A lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks it down (design, ja-vlla.11, 2026-11-24)
 
 **Research basis:** [lichen.md](lichen.md). FT is full text read; ABS is abstract only, with numbers **unverified**.
 - **Contact:** a lichen fungus captures a free alga by contact, and free algae are scarce. Some lichens take another lichen's alga (*Diploschistes* on *Cladonia*). Sources: Sanders & Masumoto 2021, FT; Friedl 1987, ABS; against, Beck et al. 1998, ABS.

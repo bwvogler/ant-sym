@@ -8,15 +8,17 @@ import {
   CHUNK_BITS,
   chunkKey,
   chunkOf,
-  INFECTED,
   R,
   type Colony,
+  type Game,
 } from "../colony/index.ts";
+import { BODY_EVERY, bodySight, hostSight } from "./fog/observers.ts";
 
 // What the field shows of the colonies' scent (PRD §65, ja-pc72.1): only what the fungus's hosts have sensed. Every frame,
 // each infected ant of any colony marks the cells within its antennae's reach with the time; a cell's trails and alarm
 // show as strongly as that mark is fresh, fading over SENSED_FADE. You are the fungus: you know what your hosts smell,
-// where they walk, for a while. A picture only: no ant senses it, and the game never reads it.
+// where they walk, for a while. A picture only: no ant senses it, and the game never reads it. Who sees (every host and the
+// fungus's living body) is fog/observers.ts (docs/fog-of-war.md §4.1, ja-1ypq.1).
 
 /** Sim seconds over which a sensed cell fades from full to nothing. */
 export const SENSED_FADE = 20;
@@ -41,6 +43,12 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
+  /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
+  onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
+  /** told when time goes back and everything is forgotten */
+  onReset: (() => void) | null = null;
+  /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
+  #bodyAt = -Infinity;
 
   /** Whether a host has ever sensed any cell of chunk (cx, cy) on layer `l`. */
   revealed(l: number, cx: number, cy: number): boolean {
@@ -63,19 +71,37 @@ export class SensedMap {
     return c ? sightOf(c[((gy & (CHUNK - 1)) << CHUNK_BITS) | (gx & (CHUNK - 1))]!, this.now) : 0;
   }
 
-  /** Mark what every host of `colonies` senses at sim time `now`. Time gone back (a restart, a load) forgets everything. */
+  /** Mark what every host of `colonies` senses at sim time `now` (any strain). Time gone back (a restart, a load) forgets everything. */
   stamp(colonies: readonly Colony[], now: number): void {
+    this.#begin(now);
+    hostSight(colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    this.#forget();
+  }
+
+  /**
+   * Mark what the player's organisms sense after one sim step of `game` (call it once per step, not per frame, so what is seen does not
+   * depend on the frame rate): every host every step, its living body every BODY_EVERY.
+   */
+  stampGame(game: Game): void {
+    const now = game.time;
+    this.#begin(now);
+    hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    if (now - this.#bodyAt >= BODY_EVERY) {
+      this.#bodyAt = now;
+      bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
+    }
+    this.#forget();
+  }
+
+  #begin(now: number): void {
     if (now < this.now) {
       this.#layers.clear();
       this.#fresh.clear();
       this.#revealed.clear();
+      this.#bodyAt = -Infinity;
+      this.onReset?.();
     }
     this.now = now;
-    for (const c of colonies) {
-      const r = c.params.sensorDistance + REACH_MARGIN;
-      for (let i = 0; i < c.n; i++) if (c.alive[i] && c.load[i] >= INFECTED) this.mark(c.layer[i] ?? 0, c.x[i], c.y[i], r);
-    }
-    this.#forget();
   }
 
   /** Drop every chunk faded right out: it shows nothing now, and its revealed bit stays. */
@@ -125,6 +151,7 @@ export class SensedMap {
         const end = Math.min(right + 1, (cx + 1) * CHUNK);
         const start = row + (gx & (CHUNK - 1));
         grid.ensure(cx, cy).fill(this.now, start, start + end - gx);
+        this.onSeen?.(l, cx, cy, start, start + end - gx);
         const key = chunkKey(cx, cy);
         if (fresh.get(key) !== this.now) {
           fresh.set(key, this.now);

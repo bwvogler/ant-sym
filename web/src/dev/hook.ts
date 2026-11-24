@@ -59,7 +59,10 @@ export function devHook(d: DevDeps) {
     },
     nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(d.settings), maxSeconds, minTicks),
     step: (n = 1) => {
-      for (let t = 0; t < n; t++) game.tick(REHEARSE_DT);
+      for (let t = 0; t < n; t++) {
+        game.tick(REHEARSE_DT);
+        d.sensed.stampGame(game); // the page's step subscribers do not run here
+      }
     },
     camera: (v: View) => d.field.current?.camera(layerOf(v)) ?? null,
     goNest: (k: number) => d.field.current?.goNest(k),
