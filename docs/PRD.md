@@ -7908,6 +7908,8 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F3.3 built (`ja-1ypq.3.3`, 2026-11-24, same flag):** aphids, chamber labels, hole names, the line and its holes, the bends, the fungus's colonised corpses and stalks, the remembered chamber tint, and the dead kept as ground items (`fog/corpses.ts`) go through the fog; `fogMarks.test.ts` and `fogGround.test.ts` hold each (a mutation of every switch fails a test). The line and holes are fogged on the recommendation; the owner may still say they are always known. The hexagon terrain grain's snapshot read is untested.
 
+**F4 built (`ja-1ypq.4`, 2026-11-24, same flag):** live-only picking (`pickAnt`), chamber clicks only on sensed ground, "Lost sight" ends a follow, the lens and cell inspection through the fog ("Unexplored"; remembered ground as last seen with its age; no remembered ants), specimens out of sight, the pen preview on sensed ground only; `fogCards.test.ts` holds each (a mutation of every switch fails a test except the inspection's early return for an unknown cell, which the live/remembered gates cover).
+
 **Still open.**
 - How the body is stamped (F1 measures).
 - A fading memory (not now).

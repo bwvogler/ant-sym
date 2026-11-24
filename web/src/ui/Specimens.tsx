@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { Colony } from "../colony/index.ts";
+import type { Knowledge } from "./fog/knowledge.ts";
 import type { Followed } from "./follow.ts";
 import { Icon } from "./kit.tsx";
 import { colonyTone } from "./names.ts";
@@ -16,12 +17,15 @@ export default function Specimens({
   followed,
   onFollow,
   onUnpin,
+  fog = null,
 }: {
   list: readonly Specimen[];
   colonies: readonly Colony[];
   followed: Followed | null;
   onFollow: (f: Followed) => void;
   onUnpin: (f: Followed) => void;
+  /** under the fog of war: a specimen out of every observer's sight shows only who it is */
+  fog?: Knowledge | null;
 }) {
   const phone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches;
   const [folded, setFolded] = useState(() => !followed && phone());
@@ -53,7 +57,7 @@ export default function Specimens({
       </h2>
       <ul className="mt-1 flex flex-col gap-0.5" hidden={folded}>
         {list.map((f) => {
-          const r = specimenRow(colonies, f);
+          const r = specimenRow(colonies, f, fog);
           if (!r) return null;
           const on = followed !== null && sameAnt(followed, f);
           return (
@@ -72,13 +76,15 @@ export default function Specimens({
                     className={`ml-auto font-mono text-xs tabular-nums ${r.host ? "text-spore" : "text-fg-3"}`}
                     title="the fungus in it: a host from the line on"
                   >
-                    {r.host ? "host" : `fungus ${Math.round(100 * r.load)}%`}
+                    {r.lost ? "out of sight" : r.host ? "host" : `fungus ${Math.round(100 * r.load)}%`}
                   </span>
                 </span>
-                <span className="block font-mono text-[11px] text-fg-2">
-                  {r.mode}
-                  {r.carrying ? " · carrying food" : ""} · {r.below ? "below" : "above"} · fatigue {r.fatigue.toFixed(0)} / {r.patience} s
-                </span>
+                {!r.lost && (
+                  <span className="block font-mono text-[11px] text-fg-2">
+                    {r.mode}
+                    {r.carrying ? " · carrying food" : ""} · {r.below ? "below" : "above"} · fatigue {r.fatigue.toFixed(0)} / {r.patience} s
+                  </span>
+                )}
               </button>
               <button
                 type="button"

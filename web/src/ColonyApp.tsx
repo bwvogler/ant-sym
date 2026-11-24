@@ -150,8 +150,10 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
+  // What the fungus's hosts (and, under the fog, its body) have sensed (ui/fungusSight.ts).
+  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
-  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken);
+  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken, sensed.knowledge);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -218,7 +220,6 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   }, [pointsAt]);
   // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
-  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Sight follows the sim's steps, not the frames (docs/fog-of-war.md §4.1); one stamp at once too, so a paused or just-loaded game shows what its hosts sense now.
   useEffect(() => {
     sensed.stampGame(game);
@@ -242,6 +243,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     },
     [update, oneWorld],
   );
+  /** Under the fog a followed ant that walks out of every observer's sight is lost: the follow ends and the player is told. */
+  const onLostSight = useCallback((f: Followed) => pushToast(`Lost sight of ant #${f.i}: no host of yours is near it now.`, "info"), []);
   /** Follow ant f, the camera taken to whichever view it is in. */
   const goTo = useCallback(
     (f: Followed) => {
@@ -381,6 +384,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             view={controls.view === "above" ? PLANE : belowLayer}
             onLink={onLink}
             onCross={onCross}
+            onLostSight={onLostSight}
             apiRef={field}
             specimens={specimens}
             pen={pen}
@@ -587,6 +591,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                     followed={followed}
                     onFollow={goTo}
                     onUnpin={(f) => setSpecimens(unpin(specimens, f))}
+                    fog={sensed.knowledge}
                   />
                 )}
                 {followed && (

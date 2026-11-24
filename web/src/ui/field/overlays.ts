@@ -284,6 +284,8 @@ export function drawPen(k: FieldCtx, inp: FieldInputs): void {
   if (!hp) return;
   const [wx, wy] = toWorld(c, v, hp[0], hp[1]);
   cellOf(wx, wy);
+  // Under the fog the settle preview (and the reasons it gives from the truth) is only for ground the fungus has sensed.
+  if (k.fog && k.fog.state(PLANE, CELL[0], CELL[1]) === UNKNOWN) return;
   const key = `${CELL[0]},${CELL[1]},${Math.hypot(wx - pn.x, wy - pn.y) <= pn.r}`;
   const seen = inp.penSeen.current;
   if (!seen || seen.pen !== pn || seen.key !== key) inp.penSeen.current = { pen: pn, key, at: pn.preview({ x: wx, y: wy }) };

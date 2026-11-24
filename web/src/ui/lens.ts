@@ -17,6 +17,8 @@ import {
   type OneWorld,
   type WorldMap,
 } from "../colony/index.ts";
+import { type FogState, LIVE, REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
+import { SNAP } from "./fog/sources.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { colonyName } from "./names.ts";
 import { ROLE_TEXT } from "./nest.ts";
@@ -57,6 +59,10 @@ export interface LensProbe {
   hole: number;
   /** the chamber here: its colony (an index into the game's colonies), role, and what lies in it */
   chamber: { k: number; role: Role; brood: number; food: number } | null;
+  /** under the fog of war: unknown (never sensed), remembered or live; absent without it (docs/fog-of-war.md §5.2) */
+  fog?: FogState;
+  /** under the fog, how many sim seconds ago a remembered place was last sensed */
+  age?: number;
 }
 
 /** The ant under the pointer. */
@@ -120,7 +126,29 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
   cellOf(x, y);
   const gx = CELL[0];
   const gy = CELL[1];
-  const r = rockAt(map, gx, gy);
+  const fog = sensed.knowledge;
+  const fs: FogState = fog ? fog.state(lv, gx, gy) : LIVE;
+  const hole0 = holeOwner(g.colonies, lv, gx, gy);
+  if (fs === UNKNOWN)
+    // Nothing of a place never sensed: not its ground, food, scent or what lies in it (its hole is the nest's structure: shown once sensed).
+    return {
+      view: isCurtainLayer(lv) ? "below" : "above",
+      ground: "open",
+      food: 0,
+      mound: 0,
+      spores: false,
+      hypha: false,
+      sight: 0,
+      alarm: 0,
+      foodTrail: 0,
+      homeTrail: 0,
+      hole: -1,
+      chamber: null,
+      fog: UNKNOWN,
+    };
+  // A remembered place is what was last sensed there, not what is there now.
+  const remembered = fs === REMEMBERED && fog;
+  const r = remembered ? (fog.snapshot(lv, SNAP.rock, gx, gy) ?? 0) : rockAt(map, gx, gy);
   const sight = sensed.sight(lv, gx, gy);
   let alarm = 0;
   let foodTrail = 0;
@@ -134,19 +162,20 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
       if (trails.home) homeTrail = Math.max(homeTrail, sight * Math.min(1, ph.fields.home.get(gx, gy) / HOME_FULL));
     }
   const spores = g.fungus.sporesOn(lv)?.spores ?? g.fungus.spores;
-  const hole = holeOwner(g.colonies, lv, gx, gy);
+  const hole = hole0;
   let chamber: LensProbe["chamber"] = null;
   const id = map.chambers?.at(gx, gy) ?? -1;
   const ch = id >= 0 ? map.chambers!.list[id] : undefined;
   if (ch) {
     const k = chamberOwner(g.colonies, map, ch.colony);
-    if (k >= 0) chamber = { k, role: ch.role, brood: ch.brood, food: ch.food };
+    // A remembered chamber's role and what lies in it are live numbers: only that it is a chamber is still true.
+    if (k >= 0) chamber = remembered ? { k, role: "none", brood: 0, food: 0 } : { k, role: ch.role, brood: ch.brood, food: ch.food };
   }
   return {
     view: isCurtainLayer(lv) ? "below" : "above",
     ground: r === OPEN ? "open" : r === SOIL ? "soil" : r === AIR ? "air" : "rock",
-    food: map.food.get(gx, gy),
-    mound: map.spoil?.get(gx, gy) ?? 0,
+    food: remembered ? (fog.snapshot(lv, SNAP.food, gx, gy) ?? 0) : map.food.get(gx, gy),
+    mound: remembered ? (fog.snapshot(lv, SNAP.spoil, gx, gy) ?? 0) : (map.spoil?.get(gx, gy) ?? 0),
     spores: spores.get(gx, gy) >= SPORE_SHOWN,
     hypha: g.fungus.hyphaeOn(lv)?.has(gx, gy) ?? false,
     sight,
@@ -155,6 +184,7 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
     homeTrail,
     hole,
     chamber,
+    ...(fog ? { fog: fs, age: remembered ? Math.max(0, sensed.now - fog.lastSeen(lv, gx, gy)) : 0 } : {}),
   };
 }
 
@@ -180,6 +210,10 @@ const strength = (v: number) => (v >= 0.66 ? "strong" : v >= 0.33 ? "fair" : "fa
 /** What the lens says of a point and the ant there (if any): the ant first, then the place, top to bottom as drawn. */
 export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
   const out: LensLine[] = [];
+  if (p.fog === UNKNOWN)
+    return [
+      { what: "Unexplored", says: "your hosts and your body have not sensed this ground: nothing is known of it", entry: "fungus-senses" },
+    ];
   if (ant) {
     const bits = [ant.mode, ...(ant.carrying ? ["carrying food"] : []), ant.infected ? "a host of yours" : "not infected"];
     out.push({ what: `Ant #${ant.i} of ${colonyName(ant.k)}`, says: bits.join(" · "), entry: ant.infected ? "fungus" : "jobs" });
@@ -222,6 +256,12 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
     });
   if (p.mound > 0) out.push({ what: "Mound", says: "soil carried up out of the nest as the ants dig", entry: "midden" });
   out.push(groundLine(p));
+  if (p.fog === REMEMBERED)
+    out.push({
+      what: "Last seen",
+      says: `${Math.round(p.age ?? 0)} s ago: nobody senses it now, so this is how it was`,
+      entry: "fungus-senses",
+    });
   // Scent shows only where a host sensed it lately (PRD §65): say so where the map shows none.
   // Only open ground carries scent: the sky, rock and soil never show any, sensed or not (review of #196, N2).
   if (p.sight === 0 && p.ground === "open")

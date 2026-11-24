@@ -115,6 +115,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Chamber labels appear only for known nests. The nest tab (`LearnDrawer.tsx` `NestCard`: queen, brood and ant counts per colony) follows §5.3.
 - **Decided (D1, owner, 2026-11-23):** for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of N s ago", and nothing is drawn on the map.
 
+**Built (F4, `ja-1ypq.4`, same flag):** `pickAnt` finds only ants where live (so the lens's ant, the ant card and follow-by-click do too); a click on a chamber nothing has sensed finds none; a followed ant that is no longer sensed ends the follow and a toast says "Lost sight of ant #n" (a host is always sensed, so it stays); the lens (`probe`, `lensLines`) says "Unexplored" for a place never sensed and, for a remembered one, the ground, food and mound as last seen, a plain chamber and "Last seen N s ago"; cell inspection reads nothing of a place never sensed, no ant, queen, brood or aphid of a remembered one, and the dead as they lay when last seen; a pinned specimen out of sight shows only who it is, and a death out of sight is not reported until the place is sensed again; the queen's pen asks no preview of ground the fungus has not sensed. Not covered: the hover cell inspection's fungus part (hyphae, colonised corpses) reads live at an unsensed cell (the body is always sensed, so it is rarely unknown); traces of moved ants.
+
 ### 5.3 Readouts (`ja-1ypq.5`)
 - Stats, history, goal toasts, nest badges, the nest tab and the go-to menu list known colonies only, live or as of (§4.4).
 - The Lab's cards and the dev hook stay omniscient, since they are tools rather than play (owner, 2026-11-23).
