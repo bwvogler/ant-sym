@@ -9,7 +9,7 @@ import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fu
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { clampCol, clampRow, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved, type WildSite } from "./lines.ts";
 import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
@@ -19,6 +19,8 @@ import { seeHoles } from "./layers.ts";
 import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
+import { CHUNK, CHUNK_BITS, local } from "./chunks.ts";
+import { isEndless } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -674,7 +676,7 @@ export class Game {
         // the ant's hex cell the way occupancy finds it, and b's ants within CONTACT_RANGE steps of it
         const map = this.layers[l] as WorldMap;
         ca.antCell(i);
-        if (around(grid, map, clampCol(map, CELL[0]), Math.min(map.size.h - 1, Math.max(0, CELL[1])), CONTACT_RANGE) > 0) return true;
+        if (around(grid, map, clampCol(map, CELL[0]), clampRow(map, CELL[1]), CONTACT_RANGE) > 0) return true;
       }
       return false;
     };
@@ -1050,6 +1052,16 @@ export class Game {
 
   /** The plane's food piles now (as the world began): the cells with food. */
   #notePiles(): void {
+    if (isEndless(this.map)) {
+      // No whole-map scan on a plane with no edge: the piles are noted chunk by chunk as the food is generated (PRD §66 E6.0.2), kept in key
+      // order (the order the bounded scan finds them in), so which cells regrow does not depend on the order chunks were first made.
+      const map = this.map;
+      this.#piles = { cells: new Float64Array(0), full: new Float32Array(0) };
+      this.#regrowRng = mulberry32(map.seed * 92821 + 17);
+      map.foodHooks.push((cx, cy, f) => this.#notePileChunk(cx, cy, f));
+      map.food.forEach((cx, cy, a) => this.#notePileChunk(cx, cy, a));
+      return;
+    }
     const { w, h } = this.map.size;
     const { x0 } = this.map;
     const cells: number[] = [];
@@ -1064,6 +1076,38 @@ export class Game {
       }
     this.#piles = { cells: Float64Array.from(cells), full: Float32Array.from(full) };
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
+  }
+
+  /** An endless plane's chunk (cx, cy) made, holding food `f`: its pile cells join the regrowth's list, which stays in key order. */
+  #notePileChunk(cx: number, cy: number, f: ArrayLike<number>): void {
+    const piles = this.#piles;
+    if (!piles) return;
+    const add: number[] = [];
+    const addFull: number[] = [];
+    for (let ly = 0; ly < CHUNK; ly++)
+      for (let lx = 0; lx < CHUNK; lx++) {
+        const v = f[local(lx, ly)]!;
+        if (v > 0) {
+          add.push(cellKey((cx << CHUNK_BITS) + lx, (cy << CHUNK_BITS) + ly));
+          addFull.push(v);
+        }
+      }
+    if (!add.length) return;
+    const n = piles.cells.length;
+    const cells = new Float64Array(n + add.length);
+    const full = new Float32Array(n + add.length);
+    let a = 0;
+    let b = 0;
+    for (let o = 0; o < cells.length; o++) {
+      if (b >= add.length || (a < n && piles.cells[a]! < add[b]!)) {
+        cells[o] = piles.cells[a]!;
+        full[o] = piles.full[a++]!;
+      } else {
+        cells[o] = add[b]!;
+        full[o] = addFull[b++]!;
+      }
+    }
+    this.#piles = { cells, full };
   }
 
   /**
@@ -1270,7 +1314,7 @@ export class Game {
               l = c.layer[i];
               map = this.layers[l] as WorldMap;
               cx = clampCol(map, CELL[0]);
-              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
+              cy = clampRow(map, CELL[1]);
             }
             if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, map, cx, cy, 1) > 0) {
               allied++;

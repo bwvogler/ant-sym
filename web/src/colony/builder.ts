@@ -18,7 +18,21 @@ import { routeClear } from "./homing.ts";
 import type { Channel, Pheromones } from "./pheromone.ts";
 import { FAINT, PLANE } from "./vocab.ts";
 import { APHID, type AphidClump } from "./aphids.ts";
-import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
+import {
+  digCell,
+  disc,
+  dropFood,
+  fillCell,
+  inBounds,
+  OPEN,
+  openCell,
+  qualityAt,
+  ROCK,
+  rockAt,
+  SOIL,
+  topRow,
+  type WorldMap,
+} from "./world.ts";
 
 export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "aphids" | "crayon" | "noEntry" | "rain";
 export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "aphids", "crayon", "noEntry", "rain"];
@@ -234,7 +248,7 @@ function setTerrain(map: WorldMap, x: number, y: number, to: number): boolean {
 
 /** Whether cell (x, y) is ground the builder may change: on the map, under the curtain's sky rows. */
 function buildable(map: WorldMap, x: number, y: number): boolean {
-  return inBounds(map, x, y) && y >= (map.surfaceRows ?? 0) && !(map.sky && map.sky.get(x, y) === 1 && rockAt(map, x, y) !== OPEN);
+  return inBounds(map, x, y) && y >= topRow(map) && !(map.sky && map.sky.get(x, y) === 1 && rockAt(map, x, y) !== OPEN);
 }
 
 /** An ant the tweezers set down: colony, slot, its generation (a slot reborn is another ant), the game time and the

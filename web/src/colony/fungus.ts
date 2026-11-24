@@ -33,7 +33,7 @@ import {
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
-import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
+import { clampCol, clampRow, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
 import {
   cellKey,
   type Ground,
@@ -634,7 +634,8 @@ export class Fungus {
     // reach is `radius` to about BLOCK beyond it.
     const BLOCK = 8;
     const cell = Math.max(BLOCK, radius);
-    const bucket = (bx: number, by: number): number => (by + 0x4000) * 0x8000 + (bx + 0x4000);
+    // 2^21 buckets each way (PRD §66 E6.0.2): blocks of 8 over the cellKey range of ±2,097,152 cells are ±262,144, so no two far blocks share a key.
+    const bucket = (bx: number, by: number): number => (by + 0x100000) * 0x200000 + (bx + 0x100000);
     const buckets = new Map<number, number[]>();
     points.forEach((p, i) => {
       const k = bucket(Math.floor(p.x / cell), Math.floor(p.y / cell));
@@ -653,8 +654,8 @@ export class Fungus {
     if (h) for (const key of h.parent.keys()) note(key);
     let left = points.length;
     for (const bk of blocks) {
-      const by = Math.floor(bk / 0x8000) - 0x4000;
-      const bx = (bk % 0x8000) - 0x4000;
+      const by = Math.floor(bk / 0x200000) - 0x100000;
+      const bx = (bk % 0x200000) - 0x100000;
       const x0 = bx * BLOCK;
       const y0 = by * BLOCK;
       const gx = Math.floor(x0 / cell);
@@ -829,7 +830,6 @@ export class Fungus {
   ): number {
     const p = this.params;
     const map = L.map;
-    const { h } = map.size;
     while (L.visible.length < colonies.length) L.visible.push(new LoadGrid());
 
     // Everyone's load before the step: what every ant reads.
@@ -843,7 +843,7 @@ export class Fungus {
         if (!c.alive[i] || l === 0 || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = clampCol(map, CELL[0]);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const cy = clampRow(map, CELL[1]);
         const s = c.strain[i];
         all.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
@@ -853,7 +853,7 @@ export class Fungus {
       if (q && q.alive && q.load > 0 && (layer < 0 || layer === c.home)) {
         cellOf(q.x, q.y);
         const qx = clampCol(map, CELL[0]);
-        const qy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const qy = clampRow(map, CELL[1]);
         all.add(qx, qy, q.load, q.strain);
         vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
       }
@@ -871,7 +871,7 @@ export class Fungus {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = clampCol(map, CELL[0]);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const cy = clampRow(map, CELL[1]);
         const l = c.load[i];
         const ground = L.spores.get(cx, cy);
         const near = all.any(cx - 1, cy - 1, cx + 1, cy + 1);
@@ -1059,10 +1059,9 @@ export class Fungus {
     const nl = q.load;
     const st = this.strains[q.strain] as Strain;
     const nb = this.#nb;
-    const { h } = L.map.size;
     cellOf(q.x, q.y);
     const cx = clampCol(L.map, CELL[0]);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+    const cy = clampRow(L.map, CELL[1]);
     const sit: FungalSituation = {
       arousal: "calm",
       touch: this.#touch(L, c, cx, cy, nb.ants, rec, null),
@@ -1096,10 +1095,9 @@ export class Fungus {
     groomers: number,
   ): number {
     const p = this.params;
-    const { h } = L.map.size;
     cellOf(b.x, b.y);
     const cx = clampCol(L.map, CELL[0]);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+    const cy = clampRow(L.map, CELL[1]);
     const l = b.load;
     const ground = L.spores.get(cx, cy);
     const near = L.all.any(cx - 1, cy - 1, cx + 1, cy + 1);

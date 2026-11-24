@@ -33,6 +33,11 @@ export interface EndlessMap extends WorldMap {
   quality: ChunkLayer<Float32Array>;
   plane: EndlessPlane;
   ledger: FoodLedger;
+  /**
+   * Called with a chunk's food when it is first generated in this map's life (never again for a chunk dropped and generated again), so a reader
+   * that keeps a list of the food (the game's regrowth piles, game.ts) learns of each chunk as it is made. Run inside the generator: do not read the map's food.
+   */
+  foodHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
 }
 
 /** The map over the endless plane of `seed`; `opts` are the plane's (endlessPlane.ts). Chunks generate as they are read. */
@@ -79,6 +84,7 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
     ...editLayers(),
     plane,
     ledger,
+    foodHooks: [],
   };
   // The food layer's generator writes the map's totals, so it is made once the map exists.
   map.food = new ChunkLayer<Float32Array>(
@@ -93,6 +99,7 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
       if (ledger.generated("food", chunkKey(cx, cy), sum)) {
         map.foodTotal += sum;
         map.foodLeft += sum;
+        for (const hook of map.foodHooks) hook(cx, cy, f);
       }
     },
   );
