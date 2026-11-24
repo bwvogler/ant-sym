@@ -203,3 +203,11 @@ jobs:
           if grep -q '^  lichen probe' out/seed-*.txt; then
             { echo; echo '```'; grep -H '^  lichen probe' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+      # The lichen each seed's fungus made (L1, ja-vlla.11.3): the seed's own line carries it once it holds any.
+      - name: lichen made
+        run: |
+          if grep -q ' · lichen [0-9]* cells' out/seed-*.txt; then
+            { echo; echo 'Seeds whose fungus made lichen:'; echo '```'; grep -h ' · lichen [0-9]* cells' out/seed-*.txt | sed -E 's/^(seed [0-9]+):.* · (lichen .*)$/\1: \2/' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No seed made any lichen.' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
