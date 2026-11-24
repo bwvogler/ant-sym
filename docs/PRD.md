@@ -7856,6 +7856,12 @@ A table of cue, response, rule and off is in the note. No rule reads state the f
 - **Routes:** A3 (mills) and raid times against baseline, for L3b.
 - **Runaway infection:** time to half of hosts, for L4.
 
+**Baseline and the probe (`ja-vlla.11.2`, 2026-11-24, main `8a2ae138` with the probe).** `progression.mjs --lichen` only reads: the game is the same bit for bit (the table's quarter, half and queen times are identical to a run without it on all 20 seeds). Seeds 1–20, 600 s, `--evolve --hyphae --growth --flow` (run on GitHub's runners, `progression.yml` with its new `lichen` input, run 45431809352):
+- **P1 baseline:** worst seed 6, quarter 357 s and queen 381 s; median quarter 163 s; 36 flowers in 8 of 20 games (as under §85).
+- **Rock the hyphae lie beside** (the plane's rock cells beside open ground, where an alga film or a wild lichen would sit): about 7,700–11,400 such cells a map. In ten minutes hyphae lay beside 4–109 of them (median 28; 15 of 20 seeds 15–50), about 0.3 %. The first contact is at 0 s in 6 of 20 seeds (rock beside the landing: seeds 7, 10, 12, 15, 16, 18), 5–160 s in 10, and late in seeds 3 (235 s), 11 (275 s) and 6 (425 s, the slowest seed).
+- **Earning rate** (L2's runaway gate): mutations earned a minute over the last three minutes, 508–1,274 (median about 1,100). Seeds 7, 10 and 12 earn about 510–540 and the rest 860–1,270; L2 must not move any seed more than a stated share above its baseline.
+- **Proposal for L1's film density (design, to tune in `ja-vlla.11.3`):** hyphae touch about 0.3 % of the edge cells, so the expected contacts in a game are about 28 × the share of edge cells that carry a film. Films on 5–10 % of edge cells, in small clusters, would give about 1–3 contacts a game, most of them in minutes 2–8; wild lichens as a few discs a map. **No film within a few cells of the landing** (the six seeds that touch rock at 0 s would otherwise get a lichen with no travel), so the first lichen is a find, not a gift. The assay for L1 reports time to first lichen against this density.
+
 **Cost (estimated).** None in Jev: no lane changes, and cached games spend nothing. The parked growth-lane value `resource: alga` (`ja-5ush`) would take the lane's 96 situations to 144 (tokens to measure) and is not planned.
 
 **Beads.** `ja-vlla.11` (this, child of `ja-vlla`; from `ja-vlla.8`, closed). Children:
