@@ -619,6 +619,51 @@ export class Fungus {
     return out;
   }
 
+  /**
+   * Whether the fungus's body on map `layer` (a cell holding spores, or a hypha) lies within `radius` of each of `points` (world units): one pass over
+   * the body for all of them, for the awake rule (E4.2). The body of a curtain the game has put to sleep is not read: only an awake fungus wakes.
+   */
+  bodyNear(layer: number, points: readonly { x: number; y: number }[], radius: number): boolean[] {
+    const out = points.map(() => false);
+    const L = this.#layers[layer];
+    if (!L || this.frozenLayers.has(layer)) return out;
+    const r2 = radius * radius;
+    let left = points.length;
+    const test = (key: number): void => {
+      const kx = keyX(key);
+      const ky = keyY(key);
+      const x = centreX(kx, ky);
+      const y = centreY(ky);
+      for (let i = 0; i < points.length; i++) {
+        if (out[i]) continue;
+        const dx = points[i]!.x - x;
+        const dy = points[i]!.y - y;
+        if (dx * dx + dy * dy <= r2) {
+          out[i] = true;
+          left--;
+        }
+      }
+    };
+    for (const key of L.sporeCells) {
+      test(key);
+      if (left === 0) return out;
+    }
+    const h = this.#hyphae[layer];
+    if (h) {
+      for (const key of h.parent.keys()) {
+        test(key);
+        if (left === 0) return out;
+      }
+    }
+    return out;
+  }
+
+  /** Whether the fungus has any body on map `layer` (spores or hyphae), asleep or not. */
+  bodyOn(layer: number): boolean {
+    const L = this.#layers[layer];
+    return !!L && (L.sporeCells.size > 0 || (this.#hyphae[layer]?.parent.size ?? 0) > 0);
+  }
+
   /** Map `layer`'s hyphae (params.hyphae), for the renderer and the assays: read only; null where none has rooted. */
   hyphaeOn(layer: number): Hyphae | null {
     return this.#hyphae[layer] ?? null;
