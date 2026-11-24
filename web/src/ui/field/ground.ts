@@ -8,6 +8,8 @@ import {
   AIR,
   CELL,
   CHUNK,
+  type Cells,
+  type ChunkLayer,
   OPEN,
   PLANE,
   R,
@@ -22,7 +24,7 @@ import {
   SPORE_SHOWN,
 } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
-import { sightOf } from "../fungusSight.ts";
+import { SENSED_FADE, sightOf } from "../fungusSight.ts";
 import { moundBalls, type DirtBall } from "../inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "../inspectionGround.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "../lens.ts";
@@ -51,11 +53,33 @@ function fogCell(data: Uint8ClampedArray, o: number, fogPx: readonly number[]): 
 export const SUGAR_RGB: [number, number, number] = [214, 72, 140];
 export const CRUMB_RGB: [number, number, number] = [150, 100, 52];
 
+/**
+ * On an endless plane (docs/endless-world.md §8, PRD §66 E5.4) a chunk canvas is kept while its chunk is within this many chunks of the cells in view, and
+ * dropped beyond: memory follows the view, not the ground the camera has crossed. A bounded map keeps every canvas it has painted (its size is its bound).
+ */
+export const EVICT_MARGIN = 2;
+
 /** One chunk of the shown map: its canvas, the canvas's 2D context and the colour buffer painted into it. */
 export interface ChunkCanvas {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   img: ImageData;
+  /** the chunk's column and row */
+  cx: number;
+  cy: number;
+  /** how many times this chunk has been painted: it moves only when the chunk's inputs changed (the tile cache's exact compare), never with the frame count */
+  version: number;
+}
+
+/** A layer's chunk as the page may read it: on an endless plane `peek`, which never makes a chunk the game has not made; a bounded map's `chunk` (the same read). */
+function chunkOf<A extends Cells>(endless: boolean, layer: ChunkLayer<A> | undefined, cx: number, cy: number): A | undefined {
+  return endless ? layer?.peek(cx, cy) : layer?.chunk(cx, cy);
+}
+
+/** The cell (x, y) of a layer read with `peek` (what a cell of a chunk nobody made reads as: the layer's `empty`). Never makes a chunk. */
+export function peekCell(layer: ChunkLayer<Cells>, x: number, y: number): number {
+  const a = layer.peek(x >> 6, y >> 6);
+  return a ? a[((y & 63) << 6) | (x & 63)]! : layer.empty;
 }
 
 /** Which scent washes the Settings show (food trails, home trails). */
@@ -120,7 +144,7 @@ export class Ground {
     if (!c) {
       const cv = this.env.newCanvas(CHUNK, CHUNK);
       const cctx = cv.getContext("2d")!;
-      c = { canvas: cv, ctx: cctx, img: cctx.createImageData(CHUNK, CHUNK) };
+      c = { canvas: cv, ctx: cctx, img: cctx.createImageData(CHUNK, CHUNK), cx, cy, version: 0 };
       this.chunks.set(key, c);
     }
     return c;
@@ -155,16 +179,40 @@ export class Ground {
   draw(k: FieldCtx, show: GroundShow, win: CellWindow, hexMix: number, foodAsSprites: boolean): void {
     const { m } = k;
     const { rx0, rx1, ry0, ry1 } = win;
+    const endless = m.endless === true;
     for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
       for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
-        const rc = m.rock.chunk(cx, cy);
-        if (!rc) continue;
+        const rc = chunkOf(endless, m.rock, cx, cy);
+        if (!rc) {
+          // A chunk the game has not made (or has since freed) has no canvas: nothing here makes it, and a canvas of one it let go is dropped.
+          if (endless) this.chunks.delete(`${cx},${cy}`);
+          continue;
+        }
         const cc = this.chunkCanvas(cx, cy);
         this.paintChunk(k, show, cx, cy, cc, rc, foodAsSprites);
         if (hexMix > 0) continue;
         this.layBricks(k, win, cx, cy, cc);
       }
     if (hexMix > 0) this.drawHexes(k, win, hexMix);
+    if (endless) this.evict(win);
+  }
+
+  /**
+   * Drop the canvases of chunks more than `margin` chunks beyond the cells in view (an endless plane's; E5.4). A chunk painted again later starts from
+   * nothing, as a first paint does. Returns how many were dropped.
+   */
+  evict(win: CellWindow, margin = EVICT_MARGIN): number {
+    const x0 = (win.rx0 >> 6) - margin;
+    const x1 = (win.rx1 >> 6) + margin;
+    const y0 = (win.ry0 >> 6) - margin;
+    const y1 = (win.ry1 >> 6) + margin;
+    let dropped = 0;
+    for (const [key, cc] of this.chunks)
+      if (cc.cx < x0 || cc.cx > x1 || cc.cy < y0 || cc.cy > y1) {
+        this.chunks.delete(key);
+        dropped++;
+      }
+    return dropped;
   }
 
   /** Chunk (cx, cy)'s rows laid on the canvas as bricks: a strip a cell high for each row, odd rows shifted half a cell. */
@@ -186,6 +234,9 @@ export class Ground {
   paintChunk(k: FieldCtx, show: GroundShow, cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array, foodAsSprites: boolean): void {
     const { theme, m, world, smellAll, strip } = k;
     const [gx0, gw, gh] = [m.x0, m.size.w, m.size.h];
+    // An endless plane's rows run from -gh/2 (camera.ts reachOf), not from 0, and its layers are read with `peek` (no chunk is made to be painted).
+    const endless = m.endless === true;
+    const [yLo, yHi] = endless ? [-gh / 2, gh / 2] : [0, gh];
     const rock = groundRock(k),
       soil = groundSoil(k),
       spoil = groundSpoil(k);
@@ -200,18 +251,24 @@ export class Ground {
         const fogPx = fogRgb(theme);
         for (let i = 0; i < CHUNK * CHUNK; i++) setPx(c.img.data, i * 4, fogPx, 255);
         c.ctx.putImageData(c.img, 0, 0);
+        c.version++;
       }
       return;
     }
     if (fogV) rc = (fogV.snap(SNAP.rock) as Uint8Array | undefined) ?? rc;
-    const fc = fogV ? (fogV.snap(SNAP.food) as Float32Array | undefined) : m.food.chunk(cx, cy);
-    // What hosts sensed here and when: no host near lately, no scent shown (PRD §65).
-    const sensedC = k.sensedLayer?.chunk(cx, cy);
+    const fc = fogV ? (fogV.snap(SNAP.food) as Float32Array | undefined) : chunkOf(endless, m.food, cx, cy);
+    // What hosts sensed here and when: no host near lately, no scent shown (PRD §65). A chunk whose newest mark is SENSED_FADE old shows nothing, so its
+    // per-cell scent reads are skipped (ja-23io): the same pixels, since every cell's sight is 0 (and GRACE is under SENSED_FADE, so the fog's live test fails too).
     const now = k.sensedNow;
+    let sensedC = k.sensedLayer?.chunk(cx, cy);
+    if (sensedC) {
+      const newest = k.sensedNewest?.(cx, cy);
+      if (newest !== undefined && now - newest >= SENSED_FADE) sensedC = undefined;
+    }
     // Every colony's food and home trails and alarm here, read only where something was sensed.
     const trailC: { food: Float32Array | undefined; home: Float32Array | undefined; tone: [number, number, number] }[] = [];
     const alarmC: Float32Array[] = [];
-    const qc = fogV ? (fogV.snap(SNAP.quality) as Float32Array | undefined) : m.quality?.chunk(cx, cy);
+    const qc = fogV ? (fogV.snap(SNAP.quality) as Float32Array | undefined) : chunkOf(endless, m.quality, cx, cy);
     if (sensedC || smellAll) {
       for (const t of k.trails) {
         const food = t.food.chunk(cx, cy);
@@ -230,9 +287,11 @@ export class Ground {
     }
     const sporeC = k.spores.chunk(cx, cy);
     // One world's plane: the mound, a height field of spoil (oneWorld.ts), washed in by its height.
-    const spoilC = fogV ? (fogV.snap(SNAP.spoil) as Uint16Array | undefined) : m.spoil?.chunk(cx, cy);
+    const spoilC = fogV ? (fogV.snap(SNAP.spoil) as Uint16Array | undefined) : chunkOf(endless, m.spoil, cx, cy);
     const chambers = m.chambers;
-    const chamberC = fogV ? (fogV.snap(SNAP.chamber) as Int16Array | Uint8Array | Uint16Array | undefined) : chambers?.cell.chunk(cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
+    const chamberC = fogV
+      ? (fogV.snap(SNAP.chamber) as Int16Array | Uint8Array | Uint16Array | undefined)
+      : chunkOf(endless, chambers?.cell, cx, cy); // nest slice 2: dug chambers, a faint wash; slice 3: tinted by role
     const [fr, fg, fb] = theme.accentRgb;
     const px = c.img.data;
     const x0 = cx * CHUNK;
@@ -248,7 +307,8 @@ export class Ground {
         gx0,
         gw,
         gh,
-        sensedC && !smellAll ? now : 0,
+        // The clock matters only where it scales a scent (a trail or alarm here) or decides the fog's live ground: a chunk with neither does not repaint as time passes.
+        sensedC && !smellAll && (fog || trailC.length > 0 || alarmC.length > 0) ? now : 0,
         chambers?.list.map((ch) => ch.role),
         trailC.map((t) => t.tone),
       ]);
@@ -271,11 +331,12 @@ export class Ground {
       }
     }
     this.paints++;
+    c.version++;
     for (let ly = 0; ly < CHUNK; ly++) {
       for (let lx = 0; lx < CHUNK; lx++) {
         const i = ly * CHUNK + lx;
         const o = i * 4;
-        if (x0 + lx < gx0 || x0 + lx >= gx0 + gw || y0 + ly >= gh) {
+        if (x0 + lx < gx0 || x0 + lx >= gx0 + gw || y0 + ly >= yHi || y0 + ly < yLo) {
           px[o + 3] = 0; // past the edge of the map
           continue;
         }
@@ -434,9 +495,14 @@ export class Ground {
     const bg = paper;
     const bgKey = (bg[0] << 16) | (bg[1] << 8) | bg[2];
     ctx.fillStyle = `rgb(${bg[0]},${bg[1]},${bg[2]})`;
-    const [ax, ay] = toScreen(c, v, m.x0, 0);
-    const [bx, by] = toScreen(c, v, m.x0 + ext.w, ext.h);
-    ctx.fillRect(ax, ay, bx - ax, by - ay);
+    const endless = m.endless === true;
+    if (endless)
+      ctx.fillRect(0, 0, v.w, v.h); // an endless plane has no edge to stop the ground's paper at (its rows start at -h/2, not 0)
+    else {
+      const [ax, ay] = toScreen(c, v, m.x0, 0);
+      const [bx, by] = toScreen(c, v, m.x0 + ext.w, ext.h);
+      ctx.fillRect(ax, ay, bx - ax, by - ay);
+    }
     this.paths.clear();
     // Under the fog most cells in view are fog or remembered open ground: one strip a row lays them (a hexagon each, a path op a vertex, cost
     // the phone its frame rate); hexagons then draw only the cells with something on them.
@@ -470,8 +536,16 @@ export class Ground {
           data = this.chunks.get(`${chunkX},${cy}`)?.img.data ?? null;
           // Under the fog the pellets of a mound are the ones last sensed, and none where nothing was.
           const fv = k.fog?.view(lv, chunkX, cy);
-          terrain = !pelletAlpha ? undefined : k.fog ? (fv?.snap(SNAP.rock) as Uint8Array | undefined) : m.rock.chunk(chunkX, cy);
-          heaps = !pelletAlpha ? undefined : k.fog ? (fv?.snap(SNAP.spoil) as Uint16Array | undefined) : m.spoil?.chunk(chunkX, cy);
+          terrain = !pelletAlpha
+            ? undefined
+            : k.fog
+              ? (fv?.snap(SNAP.rock) as Uint8Array | undefined)
+              : chunkOf(endless, m.rock, chunkX, cy);
+          heaps = !pelletAlpha
+            ? undefined
+            : k.fog
+              ? (fv?.snap(SNAP.spoil) as Uint16Array | undefined)
+              : chunkOf(endless, m.spoil, chunkX, cy);
         }
         if (!data) continue;
         const index = (ly << 6) | (x & 63);

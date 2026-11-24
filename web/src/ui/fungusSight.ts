@@ -78,6 +78,11 @@ export class SensedMap {
     return this.#layers.get(l) ?? null;
   }
 
+  /** The sim time a host last sensed any cell of chunk (cx, cy) on layer `l`, or undefined if the chunk is not kept (never sensed, or faded right out). */
+  newest(l: number, cx: number, cy: number): number | undefined {
+    return this.#fresh.get(l)?.get(chunkKey(cx, cy));
+  }
+
   /** How strongly cell (gx, gy) of layer `l` shows now. */
   sight(l: number, gx: number, gy: number): number {
     const c = this.#layers.get(l)?.chunk(gx >> CHUNK_BITS, gy >> CHUNK_BITS);

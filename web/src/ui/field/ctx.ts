@@ -77,6 +77,8 @@ export interface FieldCtx {
   alarms: ChunkLayer<Float32Array>[];
   spores: ChunkLayer<Float32Array>;
   sensedLayer: ChunkLayer<Float32Array> | null;
+  /** the sim time a host last sensed any cell of chunk (cx, cy) on the shown layer (SensedMap.newest), or undefined; absent in a test that has no such map */
+  sensedNewest?: (cx: number, cy: number) => number | undefined;
   /** what the fungus knows of the ground (fog of war, docs/fog-of-war.md); null: no fog, the whole truth is drawn */
   fog?: Knowledge | null;
   /** the dead the fungus has seen (null without the fog) */

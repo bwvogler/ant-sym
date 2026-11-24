@@ -26,7 +26,12 @@ function setup(shown = PLANE) {
   const colonies = [col("a", true), col("bb", false), col("ccc", true)];
   const spore = { spores: layer("spores") };
   const fungus = { spores: layer("own"), sporesOn: (lv: number) => (lv === PLANE ? spore : undefined) };
-  const sensed = { layer: (lv: number) => layer(`sensed${lv}`), now: 7, asleep: new Set([2]) };
+  const sensed = {
+    layer: (lv: number) => layer(`sensed${lv}`),
+    now: 7,
+    asleep: new Set([2]),
+    newest: (lv: number, cx: number, cy: number) => lv * 1000 + cx * 10 + cy,
+  };
   const sprite = (n: string) => ({
     clearTints: () => log.push(`${n}.clearTints`),
     load: (cb: () => void) => (log.push(`${n}.load`), (redraw = cb)),
@@ -142,6 +147,7 @@ test("fill copies every bound field into the frame's context, after the view has
   assert.equal(fc.sensedLayer, b.sensedLayer);
   assert.notEqual(fc.sensedLayer, null);
   assert.equal(fc.sensedNow, 7);
+  assert.equal(fc.sensedNewest!(4, 2), CURTAIN * 1000 + 42, "the newest mark of a chunk is asked of the shown layer");
   assert.equal(fc.asleep, sensed.asleep, "the frozen colonies the sensed map holds are the ones the frame draws still");
 });
 
