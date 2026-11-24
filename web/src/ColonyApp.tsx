@@ -1,5 +1,8 @@
 import {
   CURTAIN,
+  curtainLayerOf,
+  isCurtainLayer,
+  lineIndexOfLayer,
   PLANE,
   UPGRADES,
   type Pool,
@@ -31,15 +34,15 @@ import { BareCards, Colonies, SavedGames, type LabProps } from "./ui/LabCards.ts
 import LabBench from "./ui/LabBench.tsx";
 import { History, sampleOf } from "./ui/history.ts";
 import { Button, Drawer, FLOAT, Icon, IconButton, SectionHead } from "./ui/kit.tsx";
-import type { Followed } from "./ui/follow.ts";
+import { canFollow, type Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
-import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { clampLine, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
-import { SensedMap } from "./ui/fungusSight.ts";
+import { fogFromUrl, sensedFor } from "./ui/fog/sources.ts";
 import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
@@ -147,8 +150,10 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const [follow, setFollow] = useState<{ token: object; f: Followed } | null>(null);
   const followed = follow && follow.token === gameToken ? follow.f : null;
   const setFollowed = useCallback((f: Followed | null) => setFollow(f ? { token: gameToken, f } : null), [gameToken]);
+  // What the fungus's hosts (and, under the fog, its body) have sensed (ui/fungusSight.ts).
+  const sensed = useMemo(() => sensedFor(game, fogFromUrl()), [game]);
   // Specimens (PRD §69.5): up to three pinned ants, compared in the inspector; like the follow, they belong to their game (ui/useSpecimens.ts).
-  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken);
+  const { specimens, setSpecimens, togglePin } = useSpecimens(game, gameToken, sensed.knowledge);
   // The dev hook reads the follow as it is now (the e2e's carried-follow check), not as it was when the hook was set.
   const followedNow = useRef<Followed | null>(followed);
   useEffect(() => {
@@ -171,6 +176,8 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const codex = useCodex();
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
+  // The layer shown: the plane, or the curtain of the line chosen (clamped: a new world may have fewer lines).
+  const belowLayer = oneWorld ? curtainLayerOf(clampLine(controls.line, oneWorld.lines.length)) : CURTAIN;
   const setView = useCallback((view: View) => update({ view }), [update]);
   // The views linked (one-world §5, U5.2): the field's cameras, a click across, and an ant followed through a hole.
   const field = useRef<FieldApi | null>(null);
@@ -178,9 +185,9 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const showAt = useCallback(
     (view: number, x: number, y: number, close = false) => {
       field.current?.centreOn(view, x, y, { close });
-      setView(view === PLANE ? "above" : "below");
+      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
     },
-    [setView],
+    [update, oneWorld],
   );
   // The first game's tutorial (ja-7x4, PRD §61). A card that points at a drawer's panel opens that drawer.
   const tut = useTutorial({ game, onFrame, update, setFollowed, showAt });
@@ -204,17 +211,19 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     toggleSmell,
     demo,
     build,
-  } = useBuilder({ game, view: controls.view, field, closeDrawer });
+  } = useBuilder({ game, view: controls.view, belowLayer, field, closeDrawer });
   useEffect(() => {
     if (pointsAt === "evolution") setDrawer("evolve");
     // From lg (1024 px) the aim is the bar under the map, outlined where it is; narrower it is in The fungus drawer, opened
     // for it (PRD §69.2; checked by hand at 1280 and 900 in the review of #189).
     else if (pointsAt === "aim" && !window.matchMedia("(min-width: 1024px)").matches) setDrawer("fungus");
   }, [pointsAt]);
-  // What the fungus's hosts have sensed (PRD §65): one map per game, marked every frame; the field shows scent only there.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh map for each game: `game` is the key, not an input
-  const sensed = useMemo(() => new SensedMap(), [game]);
-  useEffect(() => onFrame(() => sensed.stamp(game.colonies, game.time)), [onFrame, game, sensed]);
+  // What the fungus's hosts have sensed (PRD §65) is stamped here.
+  // Sight follows the sim's steps, not the frames (docs/fog-of-war.md §4.1); one stamp at once too, so a paused or just-loaded game shows what its hosts sense now.
+  useEffect(() => {
+    sensed.stampGame(game);
+    return loop.onStep(() => sensed.stampGame(game));
+  }, [loop, game, sensed]);
   const onStart = useCallback(
     (seed: number, withTutorial: boolean, species?: string) => {
       start(seed, withTutorial, species);
@@ -229,19 +238,23 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   const onCross = useCallback(
     (view: number, x: number, y: number) => {
       field.current?.centreOn(view, x, y, { keepFollow: true });
-      setView(view === PLANE ? "above" : "below");
+      update({ view: view === PLANE ? "above" : "below", ...(isCurtainLayer(view) ? { line: lineIndexOfLayer(oneWorld, view) } : {}) });
     },
-    [setView],
+    [update, oneWorld],
   );
+  /** Under the fog a followed ant that walks out of every observer's sight is lost: the follow ends and the player is told. */
+  const onLostSight = useCallback((f: Followed) => pushToast(`Lost sight of ant #${f.i}: no host of yours is near it now.`, "info"), []);
   /** Follow ant f, the camera taken to whichever view it is in. */
   const goTo = useCallback(
     (f: Followed) => {
       const c = game.colonies[f.k];
       if (!c) return;
-      if (oneWorld) showAt(c.layer[f.i] === CURTAIN ? CURTAIN : PLANE, c.x[f.i]!, c.y[f.i]!);
+      // Under the fog an ant nobody senses cannot be jumped to (it would show where it is): it is lost sight of, whichever route asked.
+      if (!canFollow(sensed.knowledge, game.colonies, f)) return onLostSight(f);
+      if (oneWorld) showAt(c.layer[f.i]!, c.x[f.i]!, c.y[f.i]!);
       setFollowed(f);
     },
-    [game, oneWorld, showAt, setFollowed],
+    [game, oneWorld, showAt, setFollowed, sensed, onLostSight],
   );
   /** Follow the next host of yours (the key f): each press the next infected ant, in whichever view it is. */
   const hostTurn = useRef(0);
@@ -332,7 +345,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // A mutation the fungus can keep: the rail's badge (the page draws again only when that changes) and a notice (useNotices).
   const affordable = useLoopStats(loop, (s) => affordableIn(s, controls.menu));
   useNotices(loop, affordable, jevLock, jevPhase);
-  const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : CURTAIN) : -1;
+  const shownLayer = oneWorld ? (controls.view === "above" ? PLANE : belowLayer) : -1;
   // The palette's commands (ui/paletteCommands.ts; commands.ts ranks them): built only while the palette is open (review of #196, N3).
   const paletteCommands = (): Runnable[] =>
     buildPaletteCommands({
@@ -369,9 +382,10 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
             onFollow={setFollowed}
             onChamber={(k, id) => openLearn({ tab: "nest", id: `chamber-${k}-${id}` })}
             world={oneWorld}
-            view={controls.view === "above" ? PLANE : CURTAIN}
+            view={controls.view === "above" ? PLANE : belowLayer}
             onLink={onLink}
             onCross={onCross}
+            onLostSight={onLostSight}
             apiRef={field}
             specimens={specimens}
             pen={pen}
@@ -578,6 +592,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
                     followed={followed}
                     onFollow={goTo}
                     onUnpin={(f) => setSpecimens(unpin(specimens, f))}
+                    fog={sensed.knowledge}
                   />
                 )}
                 {followed && (

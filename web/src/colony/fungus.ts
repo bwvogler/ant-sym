@@ -1,7 +1,7 @@
 import { decode, encode, fillLike } from "./save.ts";
 import type { CountGrid } from "./battle.ts";
 import { BLOCK_BITS, CHUNK, CHUNK_BITS, ChunkLayer } from "./chunks.ts";
-import { CURTAIN, PLANE, type Colony, type Layer } from "./colony.ts";
+import { CURTAIN, PLANE, type Colony } from "./colony.ts";
 import {
   DEFAULT_RULE,
   HIGH_LOAD,
@@ -33,7 +33,7 @@ import {
 } from "./levers.ts";
 import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
-import { clampCol, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
+import { clampCol, clampRow, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
 import {
   cellKey,
   type Ground,
@@ -479,13 +479,18 @@ export class Fungus {
   #corpses: Map<number, number>[];
   /** seconds since each colonised corpse was colonised (stalks, ja-2bw.10), by map and cell */
   #corpseAge: Map<number, number>[];
-  /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, and the curtain cells it feeds */
-  #links: { from: number; to: number[] }[] = [];
+  /** where hyphae crossed down a hole (ja-tgw9, flow on): the plane cell, the curtain cells it feeds, and the curtain (the game's layer; one per line) */
+  #links: { from: number; to: number[]; layer: number }[] = [];
   /**
    * One world (ja-2bw.14): the curtain entrance of the hole at or beside plane cell (x, y), or null: a plane tip that
    * comes to a hole crosses down it into the curtain (rootShaft there) and leaves the plane. Set by the game.
    */
-  crossAt: ((x: number, y: number) => { x: number; y: number } | null) | null = null;
+  crossAt:
+    | ((
+        x: number,
+        y: number,
+      ) => { x: number; y: number; /** the curtain it opens into (default: the first line's) */ layer?: number } | null)
+    | null = null;
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
   /** the growth policy (ja-2bw.5): a tip's answer in its situation, or null for the local rule (hyphae.ts localGrowth); set through `bindPolicy` */
@@ -536,6 +541,14 @@ export class Fungus {
   /** what #gather read around the ant being stepped */
   readonly #nb = { load: 0, topX: 0, topY: 0, visible: 0, ants: 0, own: 0 };
 
+  /**
+   * The layers left alone: a curtain whose colonies are all asleep (Game.freeze, docs/endless-world.md §6) is not stepped: its ants are not read, its
+   * spores do not fade, its hyphae do not grow. The plane is never in it. Set by the game; empty in every game that freezes nothing.
+   */
+  frozenLayers: ReadonlySet<number> = new Set<number>();
+  /** The hosts among the colonies asleep (Game.freeze): the steps read only the awake colonies' ants, so `hosts` adds these, and the fungus stays active (and steps the thawed ants again) while its only hosts sleep. */
+  hostsAsleep = 0;
+
   /** On one map, or (one world) on each of `map`'s, the first holding `spores` and `sporeStrain`. */
   constructor(map: WorldMap | readonly WorldMap[], params: Partial<FungusParams> = {}, strains: readonly Strain[] = STRAINS) {
     const maps: readonly WorldMap[] = Array.isArray(map) ? (map as readonly WorldMap[]) : [map as WorldMap];
@@ -561,6 +574,29 @@ export class Fungus {
   }
 
   /**
+   * A map the world gained after the fungus was made (a line that began mid-game, Game.addLine): its spore layer, hyphae and corpses, empty. Returns its
+   * layer index, the next one: the same as the game's, which keeps its layers in step.
+   */
+  addLayer(map: WorldMap): number {
+    const l = this.#layers.length;
+    this.#layers.push({
+      map,
+      spores: new ChunkLayer((n) => new Float32Array(n), 0),
+      sporeStrain: new ChunkLayer((n) => new Uint8Array(n), 0),
+      sporeCells: new Set<number>(),
+      base: [],
+      all: new LoadGrid(),
+      visible: [],
+      taken: [],
+      shown: 0,
+    });
+    this.#hyphae.push(null);
+    this.#corpses.push(new Map());
+    this.#corpseAge.push(new Map());
+    return l;
+  }
+
+  /**
    * Map `layer`'s spores and their strain (one world: 0 the plane, 1 the curtain), for the renderer: layer 0's are the
    * public `spores` and `sporeStrain`. Read only; null for a layer the fungus has no map for.
    */
@@ -581,6 +617,96 @@ export class Fungus {
       out.push(keyX(key), keyY(key));
     }
     return out;
+  }
+
+  /**
+   * Whether the fungus's body on map `layer` (a cell holding spores, or a hypha) lies within `radius` of each of `points` (world units): one pass over
+   * the body for all of them, for the awake rule (E4.2). The body of a curtain the game has put to sleep is not read: only an awake fungus wakes.
+   */
+  bodyNear(layer: number, points: readonly { x: number; y: number }[], radius: number): boolean[] {
+    const out = points.map(() => false);
+    const L = this.#layers[layer];
+    if (!L || this.frozenLayers.has(layer) || points.length === 0) return out;
+    const r2 = radius * radius;
+    // The body is taken in blocks of BLOCK world units (a block is "body" if any of its cells is), and the points in a coarse grid of cell `radius`, so
+    // a block tests only the points in the nine buckets round it: the pass is the body's blocks times a few hundred tests, however many points there
+    // are (2,462 far piles, a 13.6k-cell fungus: 90 ms as cell against point). A point is near when it is within `radius` of a body block, so the
+    // reach is `radius` to about BLOCK beyond it.
+    const BLOCK = 8;
+    const cell = Math.max(BLOCK, radius);
+    // 2^21 buckets each way (PRD §66 E6.0.2): blocks of 8 over the cellKey range of ±2,097,152 cells are ±262,144, so no two far blocks share a key.
+    const bucket = (bx: number, by: number): number => (by + 0x100000) * 0x200000 + (bx + 0x100000);
+    const buckets = new Map<number, number[]>();
+    points.forEach((p, i) => {
+      const k = bucket(Math.floor(p.x / cell), Math.floor(p.y / cell));
+      const list = buckets.get(k);
+      if (list) list.push(i);
+      else buckets.set(k, [i]);
+    });
+    const blocks = new Set<number>();
+    const note = (key: number): void => {
+      const kx = keyX(key);
+      const ky = keyY(key);
+      blocks.add(bucket(Math.floor(centreX(kx, ky) / BLOCK), Math.floor(centreY(ky) / BLOCK)));
+    };
+    for (const key of L.sporeCells) note(key);
+    const h = this.#hyphae[layer];
+    if (h) for (const key of h.parent.keys()) note(key);
+    let left = points.length;
+    for (const bk of blocks) {
+      const by = Math.floor(bk / 0x200000) - 0x100000;
+      const bx = (bk % 0x200000) - 0x100000;
+      const x0 = bx * BLOCK;
+      const y0 = by * BLOCK;
+      const gx = Math.floor(x0 / cell);
+      const gy = Math.floor(y0 / cell);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const list = buckets.get(bucket(gx + dx, gy + dy));
+          if (!list) continue;
+          for (const i of list) {
+            if (out[i]) continue;
+            const p = points[i]!;
+            const ex = p.x < x0 ? x0 - p.x : p.x > x0 + BLOCK ? p.x - x0 - BLOCK : 0;
+            const ey = p.y < y0 ? y0 - p.y : p.y > y0 + BLOCK ? p.y - y0 - BLOCK : 0;
+            if (ex * ex + ey * ey <= r2) {
+              out[i] = true;
+              left--;
+            }
+          }
+        }
+      if (left === 0) break;
+    }
+    return out;
+  }
+
+  /**
+   * The squares of side `size` (world units) of map `layer` that hold some of the fungus's body (a spore cell or a hypha), as [column, row] of the
+   * square: for the endless world's feed of wild sites (Game.feedSites), which lists the sites near the body. A curtain the game has put to sleep has none.
+   */
+  bodyBuckets(layer: number, size: number): [number, number][] {
+    const L = this.#layers[layer];
+    if (!L || this.frozenLayers.has(layer)) return [];
+    const seen = new Set<number>();
+    const out: [number, number][] = [];
+    const note = (key: number): void => {
+      const bx = Math.floor(centreX(keyX(key), keyY(key)) / size);
+      const by = Math.floor(centreY(keyY(key)) / size);
+      const k = by * 0x400000 + bx;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push([bx, by]);
+    };
+    for (const key of L.sporeCells) note(key);
+    const h = this.#hyphae[layer];
+    if (h) for (const key of h.parent.keys()) note(key);
+    return out;
+  }
+
+  /** Whether the fungus has any body on map `layer` (spores or hyphae), asleep or not. */
+  bodyOn(layer: number): boolean {
+    const L = this.#layers[layer];
+    return !!L && (L.sporeCells.size > 0 || (this.#hyphae[layer]?.parent.size ?? 0) > 0);
   }
 
   /** Map `layer`'s hyphae (params.hyphae), for the renderer and the assays: read only; null where none has rooted. */
@@ -687,7 +813,7 @@ export class Fungus {
     this.#seen = [grids];
     const hosts = this.#stepLayer(this.#layers[0] as SporeLayer, -1, colonies, grids, dt, rec);
     this.#grow(dt);
-    this.hosts = hosts;
+    this.hosts = hosts + this.hostsAsleep;
   }
 
   /**
@@ -706,10 +832,11 @@ export class Fungus {
     this.#seen = grids;
     let hosts = 0;
     this.#layers.forEach((L, l) => {
+      if (this.frozenLayers.has(l)) return;
       hosts += this.#stepLayer(L, l, colonies, grids[l] as readonly CountGrid[], dt, recs?.[l] ?? null);
     });
     this.#grow(dt);
-    this.hosts = hosts;
+    this.hosts = hosts + this.hostsAsleep;
   }
 
   /**
@@ -726,7 +853,6 @@ export class Fungus {
   ): number {
     const p = this.params;
     const map = L.map;
-    const { h } = map.size;
     while (L.visible.length < colonies.length) L.visible.push(new LoadGrid());
 
     // Everyone's load before the step: what every ant reads.
@@ -740,7 +866,7 @@ export class Fungus {
         if (!c.alive[i] || l === 0 || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = clampCol(map, CELL[0]);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const cy = clampRow(map, CELL[1]);
         const s = c.strain[i];
         all.add(cx, cy, l, s);
         vis.add(cx, cy, l * this.#shows(c, i, s), s);
@@ -750,7 +876,7 @@ export class Fungus {
       if (q && q.alive && q.load > 0 && (layer < 0 || layer === c.home)) {
         cellOf(q.x, q.y);
         const qx = clampCol(map, CELL[0]);
-        const qy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const qy = clampRow(map, CELL[1]);
         all.add(qx, qy, q.load, q.strain);
         vis.add(qx, qy, q.load * ((this.strains[q.strain] as Strain).visibility * q.show), q.strain);
       }
@@ -768,7 +894,7 @@ export class Fungus {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = clampCol(map, CELL[0]);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const cy = clampRow(map, CELL[1]);
         const l = c.load[i];
         const ground = L.spores.get(cx, cy);
         const near = all.any(cx - 1, cy - 1, cx + 1, cy + 1);
@@ -900,11 +1026,14 @@ export class Fungus {
       return;
     }
     let cells = 0;
-    for (const L of this.#layers) cells += L.base.length;
+    this.#layers.forEach((L, l) => {
+      if (!this.frozenLayers.has(l)) cells += L.base.length;
+    });
     if (cells) {
       const each = e.grow(dt) / cells;
       let unplaced = 0;
-      for (const L of this.#layers) {
+      for (const [l, L] of this.#layers.entries()) {
+        if (this.frozenLayers.has(l)) continue;
         for (const key of L.base) {
           const x = keyX(key);
           const y = keyY(key);
@@ -953,10 +1082,9 @@ export class Fungus {
     const nl = q.load;
     const st = this.strains[q.strain] as Strain;
     const nb = this.#nb;
-    const { h } = L.map.size;
     cellOf(q.x, q.y);
     const cx = clampCol(L.map, CELL[0]);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+    const cy = clampRow(L.map, CELL[1]);
     const sit: FungalSituation = {
       arousal: "calm",
       touch: this.#touch(L, c, cx, cy, nb.ants, rec, null),
@@ -990,10 +1118,9 @@ export class Fungus {
     groomers: number,
   ): number {
     const p = this.params;
-    const { h } = L.map.size;
     cellOf(b.x, b.y);
     const cx = clampCol(L.map, CELL[0]);
-    const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+    const cy = clampRow(L.map, CELL[1]);
     const l = b.load;
     const ground = L.spores.get(cx, cy);
     const near = L.all.any(cx - 1, cy - 1, cx + 1, cy + 1);
@@ -1070,8 +1197,8 @@ export class Fungus {
       if (map.sky.get(cx, cy) === 1) return "outside";
       if (ch.at(cx, cy) < 0) return "tunnel";
       for (const o of colonies) {
-        const ph = layer < 0 ? o.ph : (o.layers[layer] as Layer).ph;
-        if (ph.fields.royal && ph.fields.royal.get(cx, cy) >= ROYAL_FELT) return "queen";
+        const ph = layer < 0 ? o.ph : o.layers[layer]?.ph; // a colony of another line has no scent on this curtain
+        if (ph?.fields.royal && ph.fields.royal.get(cx, cy) >= ROYAL_FELT) return "queen";
       }
       return "chamber";
     }
@@ -1237,8 +1364,10 @@ export class Fungus {
     // Every map's tips step together, in turns (hyphae.ts stepRound), on the first map's clock.
     const maps: { h: Hyphae; g: Ground; sinks?: Map<number, number>; resources?: ReadonlyMap<number, unknown> }[] = [];
     this.#hyphae.forEach((h, l) => {
-      if (h) maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined, resources: this.#corpses[l] });
+      if (h && !this.frozenLayers.has(l))
+        maps.push({ h, g: this.#ground(l), sinks: l === 0 && p.flow ? this.#sinks() : undefined, resources: this.#corpses[l] });
     });
+    if (maps.length === 0) return; // every mat there is lies in a frozen curtain
     const clock = maps[0]!.h;
     clock.clock += dt;
     let stepped = false;
@@ -1290,14 +1419,15 @@ export class Fungus {
         const down = this.crossAt(t.x, t.y);
         if (!down) continue;
         plane.tips = plane.tips.filter((u) => u !== t);
-        const to = this.rootShaft(CURTAIN, down.x, down.y);
-        if (p.flow && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to });
+        const layer = down.layer ?? CURTAIN;
+        const to = this.rootShaft(layer, down.x, down.y);
+        if (p.flow && to.length > 0) this.#links.push({ from: cellKey(t.x, t.y), to, layer });
       }
     }
     // A tip that has reached a corpse (the midden's) colonises it.
     if (stepped && this.corpseAt)
       this.#hyphae.forEach((h, l) => {
-        if (!h) return;
+        if (!h || this.frozenLayers.has(l)) return;
         for (const t of h.tips.slice())
           if (!(this.#corpses[l] as Map<number, number>).has(cellKey(t.x, t.y)) && this.corpseAt!(l, t.x, t.y) > 0)
             this.colonise(l, t.x, t.y);
@@ -1305,7 +1435,7 @@ export class Fungus {
     // Knots age, and fruit their store onto a dug cell they touch (their own, dug open, or one beside), paid by the store
     // (ja-2bw.9: microsclerotia sporulate from their own reserves, Paixão et al. 2021). A buried knot keeps its store.
     this.#hyphae.forEach((h, l) => {
-      if (!h || h.knots.size === 0) return;
+      if (!h || h.knots.size === 0 || this.frozenLayers.has(l)) return;
       const L = this.#layers[l] as SporeLayer;
       const g = this.#ground(l);
       for (const [k, knot] of h.knots) {
@@ -1328,6 +1458,7 @@ export class Fungus {
     // spores over the open cells round it.
     const stalks = e.level("stalks");
     this.#corpses.forEach((corpses, l) => {
+      if (this.frozenLayers.has(l)) return;
       const L = this.#layers[l] as SporeLayer;
       const ages = this.#corpseAge[l] as Map<number, number>;
       for (const [k, left] of corpses) {
@@ -1350,7 +1481,7 @@ export class Fungus {
     const spots: { L: SporeLayer; cells: number[] }[] = [];
     let cells = 0;
     this.#hyphae.forEach((h, l) => {
-      if (!h) return;
+      if (!h || this.frozenLayers.has(l)) return;
       if (stepped || !this.#sporeSpots[l]) {
         // The patch fruits where it landed (its base), as without hyphae; spread over every dug cell the hyphae reach,
         // the same spores thinned the patch below an infecting dose (6 seeds of 10 took hold against 9, PRD §63.1), so
@@ -1576,14 +1707,18 @@ export class Fungus {
    */
   #placeMass(e: Evolution): void {
     const plane = this.#hyphae[0];
-    const down = this.#hyphae[CURTAIN];
-    if (plane && down && this.#links.length > 0) {
+    // Each line's curtain is its own mat: the mass that came down its holes goes to its walls, never to another line's.
+    const curtains = [...new Set(this.#links.map((k) => k.layer))].sort((a, b) => a - b);
+    for (const layer of curtains) {
+      const down = this.#hyphae[layer];
+      const links = this.#links.filter((k) => k.layer === layer);
+      if (!plane || !down || links.length === 0) continue;
       // The shaft's walls are one mat too: mass that came down the hole gathers on the wall roots a growing tip leads back to.
       const feeds = down.feedingCells();
-      const walls = [...new Set(this.#links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
+      const walls = [...new Set(links.flatMap(({ to }) => to))].filter((k) => down.parent.has(k));
       const outlets = walls.filter((k) => feeds.has(k));
       let came = 0;
-      for (const { from } of this.#links) {
+      for (const { from } of links) {
         came += plane.loads.get(from) ?? 0;
         plane.loads.delete(from);
       }
@@ -1596,7 +1731,7 @@ export class Fungus {
         }
         for (const k of outlets) down.addLoad(k, came / outlets.length);
       } else if (walls.length > 0) for (const k of walls) down.addLoad(k, came / walls.length);
-      else for (const { from } of this.#links) plane.addLoad(from, came / this.#links.length);
+      else for (const { from } of links) plane.addLoad(from, came / links.length);
     }
     let held = 0;
     for (const h of this.#hyphae) if (h) held += h.length * HYPHA_MASS + h.loaded;
@@ -1649,10 +1784,13 @@ export class Fungus {
   /** The plane cells where hyphae crossed down a hole, each weighted by its share of the curtain's tips (flow's sinks). */
   #sinks(): Map<number, number> {
     const out = new Map<number, number>();
-    const down = this.#hyphae[CURTAIN];
-    if (!down || this.#links.length === 0) return out;
-    const w = Math.max(1, down.tips.length / this.#links.length);
-    for (const { from } of this.#links) out.set(from, (out.get(from) ?? 0) + w);
+    for (const layer of new Set(this.#links.map((k) => k.layer))) {
+      const down = this.#hyphae[layer];
+      const links = this.#links.filter((k) => k.layer === layer);
+      if (!down || links.length === 0) continue;
+      const w = Math.max(1, down.tips.length / links.length);
+      for (const { from } of links) out.set(from, (out.get(from) ?? 0) + w);
+    }
     return out;
   }
 
@@ -1862,6 +2000,8 @@ export class Fungus {
       corpses: this.#corpses.map((m) => [...m]),
       corpseAges: this.#corpseAge.map((m) => [...m]),
       links: this.#links.map(({ from, to }) => [from, ...to]),
+      // The curtain of each link, only when one is not the first line's: a one-line game saves as it always has (the goldens hash the save).
+      ...(this.#links.some((k) => k.layer !== CURTAIN) ? { linkLayers: this.#links.map((k) => k.layer) } : {}),
     };
     // One world (U4b): every other map's spores, their cells and the base there (SPORE_LAYER_STATE), from layer 1 on.
     if (this.#layers.length > 1)
@@ -1917,7 +2057,12 @@ export class Fungus {
       m.clear();
       for (const [k, v] of ages[l] ?? []) m.set(k, v);
     });
-    this.#links = ((r.links as number[][] | undefined) ?? []).map(([from, ...to]) => ({ from: from!, to }));
+    const linkLayers = (r.linkLayers as number[] | undefined) ?? [];
+    this.#links = ((r.links as number[][] | undefined) ?? []).map(([from, ...to], i) => ({
+      from: from!,
+      to,
+      layer: linkLayers[i] ?? CURTAIN,
+    }));
     this.#evolved();
   }
 }

@@ -183,7 +183,7 @@ export function statsOf(game: Game, rate: number, pace: number): ColonyStats {
     time: game.time,
     stored: game.colonies.reduce((n, c) => n + c.stored, 0),
     // One world: both layers' food, as Game.foodLeft counts it (the plane's and the curtain's buried food).
-    foodTotal: game.world.plane.foodTotal + game.world.curtain.foodTotal,
+    foodTotal: game.world.lines.reduce((t, l) => t + l.curtain.foodTotal, game.world.plane.foodTotal),
     foodLeft: game.foodLeft,
     counts: sumCounts(game.colonies),
     choicesPerSecond: rate,

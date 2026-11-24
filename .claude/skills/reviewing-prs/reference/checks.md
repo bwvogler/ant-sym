@@ -26,7 +26,7 @@ env -u JEV_API_KEY npx tsc -b                     # typecheck, must be clean
 env -u JEV_API_KEY npm test 2>&1 | tail -12       # "# pass N", "# fail 0"
 npx oxlint 2>&1 | grep -c ': warning '          # warning count
 env -u JEV_API_KEY npx vite build 2>&1 | tail -3
-git -C "$W" diff --stat origin/main...HEAD -- web/src/colony/tests/golden/golden.json web/src/colony/tests/slow/golden.json web/public/precache
+git -C "$W" diff --stat origin/main...HEAD -- 'web/src/colony/tests/golden/*.json' web/src/colony/tests/slow/golden.json web/public/precache
 ```
 
 **Lint baseline**: compare with main's count *now*, not a remembered number. The script counts it on a temporary checkout of `origin/main` with the PR's oxlint and removes it; pass the count as the second argument to skip that. oxlint prints one `file:line:col: warning …` line per warning; there is no summary line to read. A PR that adds a warning gets a nit with the `file:line`.
@@ -104,7 +104,7 @@ What reviews of this codebase have caught. Check the ones the diff touches.
 - **Conservation.** Food and ants are neither created nor lost by bookkeeping. Follow every `+=` to `foodTotal`, stores and reserves to where it is written off. (#47: a 24-food founding reserve against ≤ 10 written off conjured 14.)
 - **Once per tick, once per event.** Two code paths that each roll the same chance in one tick double it (#39 `#leaves`). Handlers that can run twice need a guard (#47 `found()` was not idempotent).
 - **Saves.** New public fields are saved by `saveFields`; private fields need the guard test in `save.test.ts`. A save shape change bumps `SAVE_VERSION`, and older saves still load (`newestReadable`) or fail into a fresh game with a toast, never a blank page.
-- **Determinism and goldens.** `golden.json` and `slow/golden.json` stay bit-exact unless the PR says why they moved and re-records them. New randomness draws from the seeded RNG, not `Math.random`.
+- **Determinism and goldens.** Every golden master (`tests/golden/*.json`: `golden.json`, `oneWorldGolden.json`, `fungusGolden.json`, and `slow/golden.json`) stays bit-exact unless the PR says why they moved and re-records them. New randomness draws from the seeded RNG, not `Math.random`.
 - **Jev keys and versions.** Changing a legend, question or Touch bumps that lane's `*_VERSION` (`colonyBrain.ts`, `fungusBrain.ts`), or old cached answers are served to a new question. A lane's key holds only that lane's senses. The PR states the new per-lane cost (CLAUDE.md).
 - **Gates.** A new behaviour's "off" setting matches main bit for bit. A behaviour that needs a target checks the target exists (#53: no raid recruitment without a living rival).
 - **Tests that test it.** Every new branch has a test that fails without it; see the mutation check.

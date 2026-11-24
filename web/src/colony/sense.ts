@@ -10,7 +10,7 @@ import { MARKS, MAX_LEVEL, swapBroodStore, type Mark } from "./pheromone.ts";
 import { qualityOf, type Item, type Odds, type Touch, type DeliveryContextRole, type Where } from "./responses.ts";
 import { RETURNS_MANY } from "./tuning.ts";
 import { ENEMY, MODES, PLANE, trailLevel, type CellCounts, type Mode } from "./vocab.ts";
-import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt } from "./world.ts";
+import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt, topRow } from "./world.ts";
 
 /**
  * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
@@ -118,7 +118,7 @@ export function sense(c: Colony, i: number, dx: number, dy: number, slot: number
   const cx = CELL[0];
   const cy = CELL[1];
   // One world's curtain: its surface rows (the sky and the ground strip) are the plane's, solid to an ant underground.
-  if (rockAt(map, cx, cy) !== OPEN || cy < (map.surfaceRows ?? 0)) {
+  if (rockAt(map, cx, cy) !== OPEN || cy < topRow(map)) {
     s[slot] = s[slot + 3] = s[slot + 6] = -1;
     return;
   }

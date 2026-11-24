@@ -19,6 +19,7 @@ import { Ground } from "../field/ground.ts";
 import { Minimap } from "../field/minimap.ts";
 import { beginFrame, type FieldParts, FieldRenderer } from "../field/renderer.ts";
 import type { FrameSinks } from "../field/result.ts";
+import { sensedFor } from "../fog/sources.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { buildGame } from "../useColony.ts";
 import { RecordedCanvas, RecordedImage, RecordedPath, recordingContext } from "./recordingContext.ts";
@@ -78,6 +79,10 @@ export interface Scene {
   hover?: readonly [number, number] | null;
   labels?: boolean;
   smell?: boolean;
+  /** the fog of war on (fog/sources.ts sensedFor): nothing is sensed until `setup` or `stamp` says so */
+  fog?: boolean;
+  /** runs on the game and its sensed map just before the frame (stamp what the fungus senses) */
+  stamp?: (g: Game, sensed: SensedMap) => void;
   /** the walking traces of moved ants (what AntTraces holds): a run of the old vector, then a search loop */
   traces?: (g: Game) => unknown[];
   /** frames drawn on the one context (default 1): the log is the last one's, which starts from what the frames before it left set */
@@ -148,7 +153,8 @@ export function renderScene(s: Scene = {}): {
       sprites: readySprites,
     };
     const lv = s.lv ?? PLANE;
-    const sensed = new SensedMap();
+    const sensed = sensedFor(game, !!s.fog);
+    s.stamp?.(game, sensed);
     const ground = new Ground(env);
     const minimap = new Minimap(env);
     const parts: FieldParts = {

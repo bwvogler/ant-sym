@@ -4,7 +4,7 @@ import { type Colony, type Layer } from "./colony.ts";
 import { ENEMY } from "./vocab.ts";
 import { CELL, cellKey, centreX, centreY, discOffsets } from "./hex.ts";
 import { BINS, binCentre, binOf, STRANGER_EPS, SumGrid, type Recognition } from "./recognition.ts";
-import { blocked, clampCol, inBounds, type Bounds } from "./world.ts";
+import { blocked, clampCol, clampRow, inBounds, type Bounds } from "./world.ts";
 import { touch } from "./sense.ts";
 
 // Fights, pure. An ant with enemies in its own cell or the six around it is in a fight:
@@ -115,12 +115,13 @@ export class CountGrid {
 /** Ants per cell, one grid per colony: of the ants on layer `layer` (one world, ja-lp4.3), or every ant (−1: the colony's one map). */
 export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid {
   out.reset();
-  const map = layer < 0 ? colony.map : (colony.layers[layer] as Layer).map;
-  const h = map.size.h;
+  const on = layer < 0 ? null : colony.layers[layer];
+  if (layer >= 0 && !on) return out; // a curtain of another line: this colony has no ants there
+  const map = (on ?? colony).map;
   for (let i = 0; i < colony.n; i++) {
     if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
     colony.antCell(i);
-    out.add(clampCol(map, CELL[0]), Math.min(h - 1, Math.max(0, CELL[1])));
+    out.add(clampCol(map, CELL[0]), clampRow(map, CELL[1]));
   }
   return out;
 }
@@ -150,7 +151,9 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number,
   }
   for (const g of grids) g.reset();
   colonies.forEach((c, own) => {
-    const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+    const on = layer < 0 ? null : c.layers[layer];
+    if (layer >= 0 && !on) return; // a curtain of another line
+    const map = (on ?? c).map;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.attackLayer[i] < 0 || c.attackLayer[i] !== c.layer[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       const weight = recognition ? 1 - c.calm[i] : 1;
@@ -267,14 +270,15 @@ export function resolveFights(
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const observer = combatObservers.get(c);
-    const on = layer < 0 ? null : (c.layers[layer] as Layer);
+    const on = layer < 0 ? null : c.layers[layer];
+    if (layer >= 0 && !on) return; // a curtain of another line: none of this colony's ants are on it
     const map = (on ?? c).map;
     const ph = (on ?? c).ph;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       c.antCell(i);
       const cx = clampCol(map, CELL[0]);
-      const cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
+      const cy = clampRow(map, CELL[1]);
       let enemies = 0;
       if (buckets && distance !== undefined) {
         enemies = distancePressure(buckets, c, k, i, cx, cy, map, rec !== null, distance);

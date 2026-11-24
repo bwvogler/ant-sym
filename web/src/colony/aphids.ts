@@ -6,8 +6,8 @@
 // found"). Every number here is design, set so that a clump outlasts a sugar stroke (assay B10) without flooding a colony.
 // Deterministic: a clump draws no random numbers, so a game with none is the same game as before, tick for tick.
 
-import { centreX, centreY } from "./hex.ts";
-import { spread } from "./plume.ts";
+import { cellKey, centreX, centreY, keyX, keyY } from "./hex.ts";
+import { spread, type Frame } from "./plume.ts";
 import { dropFood, OPEN, rockAt, type WorldMap } from "./world.ts";
 
 /** The clumps' numbers (design marks; docs/aphids.md). Times in game seconds. */
@@ -103,12 +103,12 @@ export function stepAphids(w: AphidWorld, dt: number): void {
   });
 }
 
-/** The cell keys of every clump on `layer`, for a lookup by cell ((y + 0x8000) × 0x10000 + x + 0x8000). */
+/** The cell keys (hex.ts cellKey: any cell of an endless plane) of every clump on `layer`, for a lookup by cell. */
 export function aphidCells(clumps: readonly AphidClump[], layer: number): Set<number> {
   const out = new Set<number>();
   for (const c of clumps) {
     if (c.layer !== layer || aphidCount(c) <= 0) continue;
-    for (let k = 0; k < c.cells.length; k += 2) out.add((c.cells[k + 1]! + 0x8000) * 0x10000 + (c.cells[k]! + 0x8000));
+    for (let k = 0; k < c.cells.length; k += 2) out.add(cellKey(c.cells[k]!, c.cells[k + 1]!));
   }
   return out;
 }
@@ -124,13 +124,15 @@ export function aphidCells(clumps: readonly AphidClump[], layer: number): Set<nu
 export interface AphidOdour {
   /** per plane cell, steps from the nearest living aphid cell through open ground; −1 beyond; null with no clumps */
   dist: Int16Array | null;
+  /** the cells `dist` covers when the plane has no edge (an endless plane: a window round the clumps); null: the map's own */
+  frame: Frame | null;
   /** how far it was built out */
   range: number;
   /** the game's clumps (Game.aphids), for an ant that takes an aphid to find whose it is */
   clumps: AphidClump[];
 }
 
-export const aphidOdour = (): AphidOdour => ({ dist: null, range: 0, clumps: [] });
+export const aphidOdour = (): AphidOdour => ({ dist: null, frame: null, range: 0, clumps: [] });
 
 /** The living clump with cell (x, y), or null. */
 export function clumpAt(clumps: readonly AphidClump[], x: number, y: number): AphidClump | null {
@@ -143,24 +145,44 @@ export function clumpAt(clumps: readonly AphidClump[], x: number, y: number): Ap
 
 /** Build the game's aphid odour over `map` (the plane) out to `range` cells from the clumps as they are now; null with none living. */
 export function updateAphidOdour(o: AphidOdour, clumps: readonly AphidClump[], layer: number, map: WorldMap, range: number): void {
-  const { w, h } = map.size;
   const live = range > 0 ? aphidCells(clumps, layer) : new Set<number>();
   if (!live.size) {
     o.dist = null;
+    o.frame = null;
     return;
   }
+  // An endless plane: the window is the clumps' box and the range round it (PRD §66 E6.0.2); a bounded map's is the map.
+  let frame: Frame | null = null;
+  if (map.endless) {
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const k of live) {
+      x0 = Math.min(x0, keyX(k));
+      x1 = Math.max(x1, keyX(k));
+      y0 = Math.min(y0, keyY(k));
+      y1 = Math.max(y1, keyY(k));
+    }
+    frame = { x0: x0 - range - 1, y0: y0 - range - 1, w: x1 - x0 + 2 * range + 3, h: y1 - y0 + 2 * range + 3 };
+  }
+  const { w, h } = frame ?? map.size;
+  const fx0 = frame ? frame.x0 : map.x0;
+  const fy0 = frame ? frame.y0 : 0;
   const dist = o.dist && o.dist.length === w * h ? o.dist : new Int16Array(w * h);
   dist.fill(-1);
   const src: number[] = [];
   for (const k of live) {
-    const x = (k % 0x10000) - 0x8000;
-    const y = Math.floor(k / 0x10000) - 0x8000;
-    const col = x - map.x0;
-    if (col < 0 || y < 0 || col >= w || y >= h) continue;
-    dist[y * w + col] = 0;
-    src.push(y * w + col);
+    const x = keyX(k);
+    const y = keyY(k);
+    const col = x - fx0;
+    const row = y - fy0;
+    if (col < 0 || row < 0 || col >= w || row >= h) continue;
+    dist[row * w + col] = 0;
+    src.push(row * w + col);
   }
-  spread(dist, map, range, src);
+  spread(dist, map, range, src, frame ?? undefined);
   o.dist = dist;
+  o.frame = frame;
   o.range = range;
 }

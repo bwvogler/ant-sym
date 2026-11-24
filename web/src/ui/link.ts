@@ -1,4 +1,17 @@
-import { CELL, cellOf, centreX, centreY, discOffsets, R, SIDE, STRIP, cellAt, columnsOver, type Transect } from "../colony/index.ts";
+import {
+  CELL,
+  cellOf,
+  centreX,
+  centreY,
+  discOffsets,
+  R,
+  SIDE,
+  STRIP,
+  cellAt,
+  columnsOver,
+  type OneWorld,
+  type Transect,
+} from "../colony/index.ts";
 
 // One world's two views linked (docs/one-world.md §5, U5.2), pure: a click on the line in the top view opens the side
 // view at that column s, and a click on the side view's ground strip (or the sky over it) opens the top view at P(s),
@@ -12,6 +25,11 @@ export const LINK_REACH = 3;
  * line passes nowhere that near. A cell over two columns (at a bend) gives the first.
  */
 export function columnNear(line: Transect, wx: number, wy: number, reach = LINK_REACH): number | null {
+  return nearestColumn(line, wx, wy, reach)?.s ?? null;
+}
+
+/** columnNear's column with its squared distance (world units) from the click, or null. */
+export function nearestColumn(line: Transect, wx: number, wy: number, reach = LINK_REACH): { s: number; d: number } | null {
   cellOf(wx, wy);
   const x0 = CELL[0];
   const y0 = CELL[1];
@@ -34,6 +52,23 @@ export function columnNear(line: Transect, wx: number, wy: number, reach = LINK_
       best = cols[0]!;
     }
   }
+  return best === null ? null : { s: best, d: bestD };
+}
+
+/**
+ * The line a click on the plane at (wx, wy) is over: the one whose line cell is nearest within `reach`, and that cell's column (the
+ * first line wins a tie), or null when no line passes that near (docs/endless-world.md §8).
+ */
+export function lineNear(world: OneWorld, wx: number, wy: number, reach = LINK_REACH): { line: number; s: number } | null {
+  let best: { line: number; s: number } | null = null;
+  let bestD = Infinity;
+  world.lines.forEach((l, li) => {
+    const h = nearestColumn(l.line, wx, wy, reach);
+    if (h && h.d < bestD) {
+      bestD = h.d;
+      best = { line: li, s: h.s };
+    }
+  });
   return best;
 }
 

@@ -4,6 +4,7 @@
 
 import type { Colony } from "../../colony/index.ts";
 import { aimed, clamp, fit, fitZoom, type Aim, type Camera, type Extent, type Viewport } from "../camera.ts";
+import { LIVE, type Knowledge } from "../fog/knowledge.ts";
 import { followedColony, type Followed } from "../follow.ts";
 
 /** One view's camera: kept per view, so switching between above and below resets neither. */
@@ -38,6 +39,10 @@ export interface PreludeRefs {
   carryTo: { current: number | null };
   /** told when the followed ant goes through a hole: the page carries the camera across (U5.2) */
   crossCb: { current: ((layer: number, x: number, y: number) => void) | undefined };
+  /** told when the followed ant is no longer sensed, under the fog: the follow has ended */
+  lostCb?: { current: ((f: Followed) => void) | undefined };
+  /** what the fungus knows of the ground (the fog of war); null: no fog */
+  fog?: Knowledge | null;
 }
 
 /**
@@ -48,7 +53,12 @@ export interface PreludeRefs {
 export function prepareFrame(colonies: readonly Colony[], lv: number, ext: Extent, v: Viewport, s: ViewCam, refs: PreludeRefs): Camera {
   const { follow, followCb, antLayer, carryTo, crossCb } = refs;
   const f = follow.current;
-  const fcol = f ? followedColony(colonies, f) : null;
+  let fcol = f ? followedColony(colonies, f) : null;
+  // Under the fog the camera follows only an ant an observer senses now (a host always is): out of sight, the follow ends.
+  if (f && fcol && refs.fog && refs.fog.stateAt(fcol.layer[f.i]!, fcol.x[f.i]!, fcol.y[f.i]!) !== LIVE) {
+    refs.lostCb?.current?.(f);
+    fcol = null; // the follow ends below, as it does for an ant that is gone
+  }
   const fHere = f !== null && fcol !== null && fcol.layer[f.i] === lv;
   if (f && !fcol) {
     follow.current = null;

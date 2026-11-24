@@ -64,6 +64,8 @@ export interface FieldProps {
   onLink?: (view: number, x: number, y: number) => void;
   /** One world: the followed ant has gone through a hole, out of the shown view, onto layer `view` at (x, y). */
   onCross?: (view: number, x: number, y: number) => void;
+  /** under the fog: the followed ant walked out of every observer's sight and the follow ended */
+  onLostSight?: (f: Followed) => void;
   /** the field's cameras, for the page (centreOn: a linked click, an ant carried across) and the dev hook */
   apiRef?: { current: FieldApi | null };
   /** one world's queen's pen: her flight's circle on the plane, where she would settle, and a click to found there */

@@ -13,6 +13,7 @@ import { drawMapInspection, mapInspectionNow } from "../mapInspection.ts";
 import { APHID_SPOTS, aphidDensity, drawResourceSprite } from "../resourceSprites.ts";
 import { sameAnt, type Specimen, specimenLabel } from "../specimens.ts";
 import { type AntTraces, traceAlpha } from "../trace.ts";
+import { LIVE } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
 import type { NestFrame } from "./nests.ts";
 import { pill } from "./overlays.ts";
@@ -40,6 +41,8 @@ export function drawAphids(fc: FieldCtx, f: MarkFrame, clumps: readonly AphidClu
         const wx = centreX(cl.cells[k]!, cl.cells[k + 1]!);
         const wy = centreY(cl.cells[k + 1]!);
         if (!inView(wx, wy)) continue;
+        // Aphids are alive: under the fog only where an observer senses them now.
+        if (fc.fog && fc.fog.stateAt(lv, wx, wy) !== LIVE) continue;
         for (let j = 0; j < density.marks; j++) {
           const [ox, oy] = APHID_SPOTS[j]!;
           const [x, y] = toScreen(c, v, wx + ox, wy + oy);

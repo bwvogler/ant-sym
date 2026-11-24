@@ -16,9 +16,23 @@ import { CELL, cellOf, centreX, centreY } from "./hex.ts";
 import type { Game } from "./game.ts";
 import { routeClear } from "./homing.ts";
 import type { Channel, Pheromones } from "./pheromone.ts";
-import { CURTAIN, FAINT, PLANE } from "./vocab.ts";
+import { FAINT, PLANE } from "./vocab.ts";
 import { APHID, type AphidClump } from "./aphids.ts";
-import { digCell, disc, dropFood, fillCell, inBounds, OPEN, openCell, qualityAt, ROCK, rockAt, SOIL, type WorldMap } from "./world.ts";
+import {
+  digCell,
+  disc,
+  dropFood,
+  fillCell,
+  inBounds,
+  OPEN,
+  openCell,
+  qualityAt,
+  ROCK,
+  rockAt,
+  SOIL,
+  topRow,
+  type WorldMap,
+} from "./world.ts";
 
 export type BuildTool = "dig" | "dirt" | "rock" | "sugar" | "crumb" | "aphids" | "crayon" | "noEntry" | "rain";
 export const BUILD_TOOLS: readonly BuildTool[] = ["dig", "dirt", "rock", "sugar", "crumb", "aphids", "crayon", "noEntry", "rain"];
@@ -106,6 +120,7 @@ export function linePheromones(game: Game, line: CrayonLine): Pheromones[] {
   const out: Pheromones[] = [];
   game.colonies.forEach((c, k) => {
     if (line.colony !== -1 && line.colony !== k) return;
+    if (game.isFrozen(k)) return; // a sleeper's scent stands as it was
     const ph = c.layers[line.layer]?.ph;
     if (ph && ph.has(line.channel ?? "food")) out.push(ph);
   });
@@ -151,6 +166,7 @@ export function guarded(game: Game, layer: number): Set<number> {
   const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
   const add = (x: number, y: number) => out.add(key(x, y));
   for (const c of game.colonies) {
+    if (!c.layers[layer]) continue; // a curtain of another line: none of this colony's ants, hole, brood or queen are on it
     // Its own hole: the plane cell over it above, the crust's cell below.
     const h = c.holeCells[c.params.nest];
     if (h) {
@@ -162,8 +178,8 @@ export function guarded(game: Game, layer: number): Set<number> {
       c.antCell(i);
       add(CELL[0], CELL[1]);
     }
-    // Brood and the queen lie underground (the curtain).
-    if (layer === CURTAIN) {
+    // Brood and the queen lie underground: on the colony's own curtain.
+    if (layer === c.home) {
       for (const b of c.brood.items) add(b.x, b.y);
       if (c.queen?.alive) {
         cellOf(c.queen.x, c.queen.y);
@@ -232,7 +248,7 @@ function setTerrain(map: WorldMap, x: number, y: number, to: number): boolean {
 
 /** Whether cell (x, y) is ground the builder may change: on the map, under the curtain's sky rows. */
 function buildable(map: WorldMap, x: number, y: number): boolean {
-  return inBounds(map, x, y) && y >= (map.surfaceRows ?? 0) && !(map.sky && map.sky.get(x, y) === 1 && rockAt(map, x, y) !== OPEN);
+  return inBounds(map, x, y) && y >= topRow(map) && !(map.sky && map.sky.get(x, y) === 1 && rockAt(map, x, y) !== OPEN);
 }
 
 /** An ant the tweezers set down: colony, slot, its generation (a slot reborn is another ant), the game time and the
@@ -545,6 +561,7 @@ export class Builder {
       const under = new Set<number>();
       for (let k = 0; k < cells.length; k += 2) under.add((cells[k + 1]! + 0x8000) * 0x10000 + (cells[k]! + 0x8000));
       game.colonies.forEach((c, ci) => {
+        if (game.isFrozen(ci)) return; // rain does not wash a sleeper's trails
         const ph = c.layers[layer]?.ph;
         if (!ph) return;
         for (const channel of RAIN_CHANNELS) {
@@ -670,7 +687,8 @@ export class Builder {
         col.carriedY[c.i] -= c.dy;
       } else if (c.kind === "rain") {
         const ph = game.colonies[c.colony]?.layers[c.layer]?.ph;
-        if (ph && ph.fields[c.channel].get(c.x, c.y) < c.was)
+        // not into a colony asleep now: it stands as it was, an undo included
+        if (ph && !game.isFrozen(c.colony) && ph.fields[c.channel].get(c.x, c.y) < c.was)
           ph.depositCell(c.channel, c.x, c.y, c.was - ph.fields[c.channel].get(c.x, c.y));
       } else {
         c.line.cells.push(...c.cells);

@@ -3,7 +3,7 @@ import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import { TOLERANCE } from "./vocab.ts";
 import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
-import { clampCol, inBounds, type Bounds } from "./world.ts";
+import { clampCol, clampRow, inBounds, type Bounds } from "./world.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -187,13 +187,14 @@ export class Recognition {
     let occupied = 0;
     let everyone = 0;
     for (const c of colonies) {
-      const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
-      const h = map.size.h;
+      const on = layer < 0 ? null : c.layers[layer];
+      if (layer >= 0 && !on) continue; // a curtain of another line
+      const map = (on ?? c).map;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
         c.antCell(i);
         const cx = clampCol(map, CELL[0]);
-        const cy = Math.min(h - 1, Math.max(0, CELL[1]));
+        const cy = clampRow(map, CELL[1]);
         const b = binOf(c.odour[i]);
         if (calmed) {
           (this.#everyone[b] as SumGrid).add(cx, cy, 1);

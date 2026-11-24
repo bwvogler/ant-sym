@@ -99,7 +99,7 @@ export function segmentGap(a: Segment, b: Segment): number {
   return Math.min(pointGap(x1, y1, b), pointGap(x2, y2, b), pointGap(x3, y3, a), pointGap(x4, y4, a));
 }
 
-function pointGap(px: number, py: number, s: Segment): number {
+export function pointGap(px: number, py: number, s: Segment): number {
   const [x1, y1, x2, y2] = s;
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -343,6 +343,11 @@ export class EndlessPlane {
     return { mask, x0, y0, w };
   }
 
+  /** Whether `patchesOf(cx, cy)` is cached, so a caller that budgets its work (EndlessMap.prefetch) can pay for a window's flood one chunk at a time. */
+  patchesReady(cx: number, cy: number): boolean {
+    return this.#patches.has(chunkKey(cx, cy));
+  }
+
   /** The food patches chunk (cx, cy)'s stream draws that are kept: reachable (in its 3×3 window) and clear of the world's nests. */
   patchesOf(cx: number, cy: number): readonly Patch[] {
     const key = chunkKey(cx, cy);
@@ -409,5 +414,28 @@ export class EndlessPlane {
     for (let j = -1; j <= 1; j++)
       for (let i = -1; i <= 1; i++) for (const p of this.patchesOf(cx + i, cy + j)) paint(p.x, p.y, p.radius, true);
     return { rock, food };
+  }
+  /**
+   * The food first generated within `d` of world (x, y): the cells of the chunks the disc covers whose centres lie within it, over the food the
+   * generator places (never what has been eaten or grown since). A fixed disc, the same in any order of generation: `foodHome` divides a colony's
+   * stores by this over 2 U round its hole (docs/endless-world.md §3).
+   */
+  foodWithin(x: number, y: number, d: number): number {
+    let total = 0;
+    const cx0 = Math.floor((x - d - 1) / CHUNK);
+    const cx1 = Math.floor((x + d + 1) / CHUNK);
+    const cy0 = Math.floor((y - d - 1) / R / CHUNK);
+    const cy1 = Math.floor((y + d + 1) / R / CHUNK);
+    for (let cy = cy0; cy <= cy1; cy++)
+      for (let cx = cx0; cx <= cx1; cx++) {
+        const { food } = this.chunk(cx, cy);
+        for (let j = 0; j < CHUNK; j++)
+          for (let i = 0; i < CHUNK; i++) {
+            const v = food[local(i, j)]!;
+            if (v && Math.hypot(centreX((cx << CHUNK_BITS) + i, (cy << CHUNK_BITS) + j) - x, centreY((cy << CHUNK_BITS) + j) - y) <= d)
+              total += v;
+          }
+      }
+    return total;
   }
 }

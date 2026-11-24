@@ -1,6 +1,6 @@
 import { mapOrbit } from "./inspectionOrbit.ts";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
-import { type Colony, CURTAIN, PLANE, type WorldMap } from "../colony/index.ts";
+import { type Colony, CURTAIN, mapOfLayer, PLANE, type WorldMap } from "../colony/index.ts";
 import { toWorld } from "./camera.ts";
 import type { Followed } from "./follow.ts";
 import { handleKey, type KeyHost } from "./field/keyboard.ts";
@@ -64,6 +64,7 @@ export default function ColonyField({
   view = CURTAIN,
   onLink,
   onCross,
+  onLostSight,
   apiRef,
   pen = null,
   toolsAt = "top-2 left-2",
@@ -96,6 +97,7 @@ export default function ColonyField({
   const nestTurn = useRef(0);
   const followCb = useLatest(onFollow);
   const crossCb = useLatest(onCross);
+  const lostCb = useLatest(onLostSight);
   /** the followed ant's layer when last drawn: a change is a crossing (a new follow starts afresh) */
   const antLayer = useRef<{ f: Followed; layer: number } | null>(null);
   /**
@@ -112,7 +114,7 @@ export default function ColonyField({
   const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb });
 
   /** The shown view's map: the plane or the curtain. */
-  const shownMap = (): WorldMap => (shown.current === PLANE ? world.plane : world.curtain);
+  const shownMap = (): WorldMap => mapOfLayer(world, shown.current);
   // A new game starts zoomed out, in both views.
   useEffect(() => {
     rig.clear();
@@ -152,6 +154,7 @@ export default function ColonyField({
       antLayer,
       carryTo,
       crossCb,
+      lostCb,
       rig,
     },
   });
@@ -167,6 +170,15 @@ export default function ColonyField({
   const goNest = (k: number) => {
     const col = colonies[k] ?? anyColony;
     nestTurn.current = k;
+    // Below, a colony's shaft is on its own line's curtain: the page is asked to show that line (docs/endless-world.md §8), as a linked click does.
+    if (shown.current !== PLANE && col.home !== shown.current && onLink) {
+      const n = col.layers[col.home]?.nest;
+      if (n) {
+        const e = n.entrance;
+        onLink(col.home, e ? (e.x + n.x) / 2 : n.x, e ? (e.y + n.y) / 2 : n.y);
+        return;
+      }
+    }
     rig.goTo((col.layers[shown.current] ?? col.layers[0]!).nest);
   };
 
@@ -202,9 +214,11 @@ export default function ColonyField({
     return [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
   };
   /** The nearest ant (any colony, on the view's layer) within PICK_PX of the point, or null. */
-  const pick = (x: number, y: number): Followed | null => pickAnt(colonies, camera(), viewport(), dpr(), shown.current, x, y);
+  const pick = (x: number, y: number): Followed | null =>
+    pickAnt(colonies, camera(), viewport(), dpr(), shown.current, x, y, sensed.knowledge);
   /** The chamber under the point, as (colony index, chamber id), or null. */
-  const chamberAt = (x: number, y: number) => chamberUnder(shownMap(), colonies, camera(), viewport(), x, y);
+  const chamberAt = (x: number, y: number) =>
+    chamberUnder(shownMap(), colonies, camera(), viewport(), x, y, { knowledge: sensed.knowledge, lv: shown.current });
 
   /** Send a piece of stroke, device points to world, to the builder (on the shown view's layer). */
   const paint = (pts: [number, number][], first: boolean) => {

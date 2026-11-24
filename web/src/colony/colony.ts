@@ -8,7 +8,7 @@ import { Brood } from "./brood.ts";
 export { isFed, LARVA_FOOD } from "./brood.ts";
 import { type Chamber, CHAMBER_HEIGHT, type Chambers } from "./chambers.ts";
 import { heatStep } from "./heat.ts";
-import { plumeAt, updatePlume } from "./plume.ts";
+import { plumeAt, plumeFrame, updatePlume, type Frame } from "./plume.ts";
 import { clumpAt, type AphidOdour } from "./aphids.ts";
 import { CELL, cellOf, centreX, centreY, nx as stepX, ny as stepY, R } from "./hex.ts";
 import {
@@ -266,6 +266,8 @@ export class Colony {
   readonly layers: Layer[];
   /** the layer the nest is on (the queen, brood and chambers; where ants are born): 0, but the curtain in one world */
   home = 0;
+  /** one world: the index of the line this colony's hole is on (its curtain is the game's layer `home`) */
+  lineIndex = 0;
   /** the layer bound now (bind): `home` between ticks */
   cur = 0;
   /** one world's line (transect.ts): the plane cell over each curtain column; null on any other game's one map. The game sets it again when the line grows (Game.addColony) */
@@ -567,7 +569,13 @@ export class Colony {
     params: Partial<ColonyParams> = {},
     rng: () => number = Math.random,
     policy: Policy = localPolicy,
-    world: { plane: WorldMap; line: Transect } | null = null,
+    world: {
+      plane: WorldMap;
+      line: Transect;
+      /** the game layer of this colony's curtain (its line's), 1 for the first line */ layer?: number;
+      /** the index of its line in the world */ lineIndex?: number;
+      /** the colony's index among the plane's nests, when it differs from `params.nest` (its index among its curtain's) */ planeNest?: number;
+    } | null = null,
   ) {
     this.map = map;
     this.params = { ...DEFAULT_COLONY, ...params };
@@ -591,8 +599,9 @@ export class Colony {
     const slots = {} as LayerSlots;
     if (world) {
       // One world: home is the curtain, bound now and between ticks.
-      this.home = CURTAIN;
-      this.cur = CURTAIN;
+      this.home = world.layer ?? CURTAIN;
+      this.cur = this.home;
+      this.lineIndex = world.lineIndex ?? 0;
     }
     storeLayer(this, slots);
     if (world) {
@@ -600,8 +609,9 @@ export class Colony {
       // colony's scent there has the plane's food cap, as on any open ground. Its Pheromones draws no random numbers.
       const top = channelParams(this.params.channels);
       if (this.params.channels.food?.max === undefined) top.food = { ...top.food, max: this.params.foodCapPlane };
-      const nest = world.plane.nests[this.params.nest];
-      if (!nest) throw new Error(`one world: the plane has no nest ${this.params.nest}`);
+      const planeNest = world.planeNest ?? this.params.nest;
+      const nest = world.plane.nests[planeNest];
+      if (!nest) throw new Error(`one world: the plane has no nest ${planeNest}`);
       const plane: LayerSlots = {
         map: world.plane,
         ph: new Pheromones(world.plane, top, this.params.channelSet),
@@ -623,7 +633,11 @@ export class Colony {
         raidNest: null,
         others: [],
       };
-      this.layers = [layerView(this, PLANE, plane), layerView(this, CURTAIN, slots)];
+      // Indexed by the game's layer: the plane, and this colony's own curtain. On a later line's curtain the ones between are holes (a colony is on no
+      // other line's curtain): read them as `colony.layers[l]` with a guard, never by walking `layers` expecting an entry for each.
+      this.layers = [];
+      this.layers[PLANE] = layerView(this, PLANE, plane);
+      this.layers[this.home] = layerView(this, this.home, slots);
       this.line = world.line;
     } else this.layers = [layerView(this, 0, slots)];
     seeHoles(this);
@@ -896,13 +910,14 @@ export class Colony {
   smellsAphids(i: number, h: number, a: number, max: number): boolean {
     const dist = this.aphidOdour?.dist;
     if (!dist) return false;
+    const frame = this.aphidOdour?.frame ?? undefined;
     const keepX = CELL[0];
     const keepY = CELL[1];
     const range = this.params.aphidPlume;
     const d = this.params.sensorDistance;
     const read = (b: number) => {
       cellOf(this.x[i] + Math.cos(b) * d, this.y[i] + Math.sin(b) * d);
-      return plumeAt(dist, this.map, range, CELL[0], CELL[1]);
+      return plumeAt(dist, this.map, range, CELL[0], CELL[1], frame);
     };
     const l = read(h - a);
     const f = read(h);
@@ -924,9 +939,10 @@ export class Colony {
     const keepX = CELL[0];
     const keepY = CELL[1];
     cellOf(this.x[i], this.y[i]);
-    const { w, h } = this.map.size;
-    const col = CELL[0] - this.map.x0;
-    const row = CELL[1];
+    const frame = this.aphidOdour?.frame;
+    const { w, h } = frame ?? this.map.size;
+    const col = CELL[0] - (frame ? frame.x0 : this.map.x0);
+    const row = CELL[1] - (frame ? frame.y0 : 0);
     CELL[0] = keepX;
     CELL[1] = keepY;
     if (col < 0 || row < 0 || col >= w || row >= h) return false;
@@ -941,9 +957,11 @@ export class Colony {
   preyAphid(cx: number, cy: number): boolean {
     const o = this.aphidOdour;
     if (this.params.aphidPrey <= 0 || !o?.dist) return false;
-    const { w, h } = this.map.size;
-    const col = cx - this.map.x0;
-    if (col < 0 || cy < 0 || col >= w || cy >= h || o.dist[cy * w + col] !== 0) return false;
+    const frame = o.frame;
+    const { w, h } = frame ?? this.map.size;
+    const col = cx - (frame ? frame.x0 : this.map.x0);
+    const row = cy - (frame ? frame.y0 : 0);
+    if (col < 0 || row < 0 || col >= w || row >= h || o.dist[row * w + col] !== 0) return false;
     const clump = clumpAt(o.clumps, cx, cy);
     if (!clump || this.rng() >= this.params.aphidPrey) return false;
     clump.eaten += 1;
@@ -957,6 +975,8 @@ export class Colony {
   plume: Int16Array | null = null;
   plumeEpoch = -1;
   plumeFood = -1;
+  /** On an endless plane the cells the plume covers (a window round the hole, plume.ts plumeFrame), made at the first read from the nest; null on a bounded map. Not saved: derived from the nest. */
+  plumeBox: Frame | null = null;
   /**
    * Whether ant i, heading h, smells food in the air (ja-rf5.4, plume.ts) on any of its three sensors (h − a, h, h + a); if so, the
    * turn of at most `max` toward the strongest is left in plumeTurn. Leaves the shared CELL as it found it.
@@ -965,11 +985,19 @@ export class Colony {
     const keepX = CELL[0];
     const keepY = CELL[1];
     const range = this.params.foodPlume;
-    const plume = updatePlume(this, this.map, range, this.time);
+    let frame: Frame | undefined;
+    if (this.map.endless) {
+      if (this.plumeBox === null) {
+        cellOf(this.nest.x, this.nest.y);
+        this.plumeBox = plumeFrame(CELL[0], CELL[1]);
+      }
+      frame = this.plumeBox;
+    }
+    const plume = updatePlume(this, this.map, range, this.time, frame);
     const d = this.params.sensorDistance;
     const read = (b: number) => {
       cellOf(this.x[i] + Math.cos(b) * d, this.y[i] + Math.sin(b) * d);
-      return plumeAt(plume, this.map, range, CELL[0], CELL[1]);
+      return plumeAt(plume, this.map, range, CELL[0], CELL[1], frame);
     };
     const l = read(h - a);
     const f = read(h);
@@ -1039,7 +1067,7 @@ export class Colony {
   get foodLeft(): number {
     if (this.layers.length === 1) return this.map.foodLeft;
     let s = 0;
-    for (const L of this.layers) s += L.map.foodLeft;
+    for (const L of this.layers) if (L) s += L.map.foodLeft; // a hole is a curtain of another line
     return s;
   }
 
@@ -1063,8 +1091,18 @@ export class Colony {
   /** paint, with its layer bound. */
   paintOn(channel: Channel, x: number, y: number, radius: number, amount: number): void {
     const { size, x0 } = this.map;
-    for (let cy = Math.max(0, Math.floor((y - radius) / R - 1)); cy <= Math.min(size.h - 1, Math.ceil((y + radius) / R)); cy++)
-      for (let cx = Math.max(x0, Math.floor(x - radius - 1)); cx <= Math.min(x0 + size.w - 1, Math.ceil(x + radius)); cx++) {
+    // An endless plane has no edge (PRD §66 E6.0.2): the whole disc, any row.
+    const open = this.map.endless === true;
+    for (
+      let cy = open ? Math.floor((y - radius) / R - 1) : Math.max(0, Math.floor((y - radius) / R - 1));
+      cy <= (open ? Math.ceil((y + radius) / R) : Math.min(size.h - 1, Math.ceil((y + radius) / R)));
+      cy++
+    )
+      for (
+        let cx = open ? Math.floor(x - radius - 1) : Math.max(x0, Math.floor(x - radius - 1));
+        cx <= (open ? Math.ceil(x + radius) : Math.min(x0 + size.w - 1, Math.ceil(x + radius)));
+        cx++
+      ) {
         const px = centreX(cx, cy);
         const py = centreY(cy);
         if (rockAt(this.map, cx, cy) || Math.hypot(px - x, py - y) > radius) continue;
@@ -1477,7 +1515,7 @@ export class Colony {
       this.outside = out;
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
-    for (const L of this.layers) L.ph.advance(dt);
+    for (const L of this.layers) if (L) L.ph.advance(dt);
     for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.housed) {

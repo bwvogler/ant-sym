@@ -69,7 +69,7 @@ One world is a bounded plane, 512 × 368 cells (`PLANE_WORLD.size`, `colony/worl
 
 **The start nests** are placed by the same rule as wild sites (§4), near the origin: the first candidate that passes the local `escapes` check, then the second about `nestGap` (140) from it. No whole-map pass.
 
-**Curtain food** keeps `buryAlong`'s stream per 64-column block, salted by the line (§5). Its reach check (`keepReachableFood` over the whole curtain, `oneWorld.ts:154`) becomes a check within the block and its two neighbours, by digging from the crust. Pockets keep clear of the nests the world placed on that line (a wild colony's or a start nest's), not of foundings. Underground almost everything is reachable by digging, so the check mostly drops food inside stone.
+**Curtain food** keeps `buryAlong`'s stream per 64-column block, salted by the line (§5). Its reach check (`keepReachableFood` over the whole curtain, `oneWorld.ts:154`) becomes a check within the block and its two neighbours, by digging from the crust. Pockets keep clear of the nests the world placed on that line (a wild colony's or a start nest's), not of foundings. Underground almost everything is reachable by digging, so the check mostly drops food inside stone. The window holds the pockets of the block and its two neighbours only, so a path squeezing along its far edge, within 4 columns of it, could be cut by a pocket two blocks away: measured against the bounded curtain's whole-map flood, no block's food differed (E2.2).
 
 **Food totals.** `foodTotal` and `foodLeft` mean nothing once food appears as chunks are generated. They become the food generated so far plus regrowth, kept as chunks are made. The assays' `foodHome` instead divides a colony's stores by the food first generated within 2 U of its hole: a fixed disc, the same in any order of generation. The page shows food stored and carried, not food left in the world.
 
@@ -127,7 +127,7 @@ Rule 2's clearance holds between lines as well as within one: no new segment or 
 
 **Flights lengthen on the endless plane** (owner, 2026-11-13). `FLIGHT_2D` = 140 was set by the bounded plane, whose edges failed half the flights at shorter ranges ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game), proposal 1). At 140 a daughter lands exactly `NEW_LINE_GAP` from her mother's hole, which lies on her mother's line, so she could never start a line of her own. **Proposed:** about 2 U (280 cells) to start, towards the 5 U or more real queens fly, set at E6 by `scripts/lab/flight-failure.mjs` on the endless plane. The founding radius is rechecked there too.
 
-**A line of one hole** takes its margins' heading from `outward` (`transect.ts:62`: west at the start, east at the end). Drawing the heading from the seed instead (a wild colony's from its site's hash, a founding's from the game's stream) is a choice, made in E3, so a field of lines doesn't all run east–west. The line grows from either end when a daughter lands beyond it.
+**A line of one hole** takes its margins' heading from `outward` (`transect.ts:62`: west at the start, east at the end). The heading is drawn instead, so a field of lines doesn't all run east–west: a wild colony's from its site's hash, a founding's from the world's seed and the landing cell (`hash01(seed, 100, cell) · π`, E3.3b), never from the game's stream, so the same world and landing make the same line. The line grows from either end when a daughter lands beyond it.
 
 **A wild colony starts its own line** (rule 1), placed when the colony wakes. Its site is chosen so that the rule holds against the start line and its neighbours' sites, with margins as wide as one-world's.
 
@@ -185,7 +185,7 @@ The tick is then bounded by the cap, not by the world. The player sees part of t
 - `#outField` becomes a window round the colony's own hole on its own line, 193 columns wide and widened only when a tunnel reaches its edge, not the whole curtain (E1.4, `OutField` in `homing.ts`);
 - `cellKey` widens to the chunk key's range (E1.3: one key in `hex.ts`, where `grid.ts`, `hyphae.ts`, `transect.ts` and the forks each had their own).
 
-**`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit for the fog (§8).
+**`SensedMap`** today keeps the time a host last sensed each cell, at full resolution, forever. From E1 it keeps those times only in chunks sensed within `SENSED_FADE` (20 s), which the trails' picture needs. An older chunk is dropped and leaves one revealed bit (§8); the fog keeps its own explored bits per cell ([fog-of-war §4.2](fog-of-war.md#42-three-states-per-cell)).
 
 **The memory budget**, a soak test (E4):
 - a host walks 50 U out and back;
@@ -201,8 +201,8 @@ The numbers are set from E1's measurements. Nothing measures memory today.
 **The page:**
 - **Camera:** no hard clamp. The view can go anywhere revealed, plus a margin, with a fixed least zoom instead of "the whole map". "Zoomed in", which turns the minimap on, becomes a zoom level.
 - **Chunk canvases** (`ColonyField.tsx`): evicted when far off-screen, and repainted only when their chunk changed (a dirty flag per chunk), not every frame.
-- **The minimap:** a window of a fixed number of chunks round the camera, drawn from the same chunk canvases, with nests marked beyond its edge by arrows.
-- **Fog of war:** one revealed bit per chunk. **Proposed:** revealed where `SensedMap` says a host has sensed (PRD §65 already draws trails only there), plus a disc round the start nests. The fog then shows the fungus's own reach, and spreading it is the way to see. A frozen region shows its last-seen state. The owner decides (§10).
+- **The minimap:** a window of a fixed number of chunks round the camera, drawn from the same chunk canvases, with known nests marked beyond its edge by arrows (only nests the fungus has sensed: [fog-of-war §4.4](fog-of-war.md#44-known-colonies)).
+- **Fog of war:** designed in [fog-of-war](fog-of-war.md) (PRD §89, `ja-1ypq`; owner, 2026-11-23). An explored bit per cell rather than per chunk, revealed by the fungus's hosts and its living body (no disc round the start nests: the start reveals only the landing patch), with remembered ground drawn as last seen and no ants. A frozen region is remembered ground. The fog's share of this stage is `ja-1ypq.7`.
 - **The side view:** the line under the click, or the followed ant's line.
 
 ## 9. Building it: stages and guards
@@ -224,7 +224,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 
 ## Play
 
-- **See:** the world opens outward as the fungus spreads. Wild nests show as discs in the fog's edge. Following a host out past the start's ground reveals new ground. A side view of each nest group shows its own curtain.
+- **See:** the world opens outward as the fungus spreads. Wild nests the fungus has sensed show as discs at the fog's edge; unsensed ones stay hidden. Following a host out past the start's ground reveals new ground. A side view of each nest group shows its own curtain.
 - **Choose:** the player's levers don't change, but where to spread now matters: towards a wild colony (more hosts, a stronger stranger) or away (room for daughters to found). A daughter's landing click, 2 U out, usually starts a new line. A daughter that lands beyond the fungus's reach freezes after T, a lone queen, until the fungus follows her.
 - **Progression:** a slope, not a cliff. Wild colonies wake mature and are stronger than foundings, so reaching them takes the levers the fungus earns. The fog makes the frontier something to push, not a map handed over. The fungus's reach is the frontier: what it hasn't reached stays still.
 - **Cost:** none in Jev while answers are cached. Wild colonies use a preset doctrine whose answers ship, and no situation field changes. The cost is the tick and memory, bounded by the awake cap.
@@ -248,8 +248,8 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 **Still open, each with a recommendation:**
 1. **Wild density.** Recommend one site per 4 × 4 chunks to start, tuned at E6.
 2. **A wild colony's size on waking.** Recommend the size a start colony reaches in 10 minutes, measured in E4.
-3. **What reveals the fog.** Recommend where `SensedMap` says hosts sensed, plus the start nests.
+3. ~~**What reveals the fog.**~~ Decided (owner, 2026-11-23): the fungus's hosts and its living body, from the landing patch only; see [fog-of-war](fog-of-war.md).
 4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
 5. **The flight distance.** Recommend 2 U to start, set at E6.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.
-7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55).
+7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.

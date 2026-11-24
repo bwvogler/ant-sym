@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { APHID, aphidCells, aphidCount, aphidLife, stepAphids, type AphidClump } from "../../aphids.ts";
 import { APHIDS_EATEN_SAID, Builder } from "../../builder.ts";
 import { Game } from "../../game.ts";
-import { centreX, centreY } from "../../hex.ts";
+import { cellKey, centreX, centreY } from "../../hex.ts";
 import { PLANE } from "../../vocab.ts";
 import { mulberry32, OPEN, rockAt, type WorldMap } from "../../world.ts";
 import { smallOne } from "../builders.ts";
@@ -110,7 +110,8 @@ test("aphids go only on open ground", () => {
 test("aphidCells: the living clumps' cells on a layer", () => {
   const clump: AphidClump = { layer: PLANE, cells: [3, 4, 5, 6], start: 6, eaten: 0, age: 0, owed: 0 };
   const s = aphidCells([clump], PLANE);
-  assert.ok(s.has((4 + 0x8000) * 0x10000 + (3 + 0x8000)));
+  assert.ok(s.has(cellKey(3, 4)) && s.has(cellKey(5, 6)), "keys are hex.ts cellKeys: any cell of an endless plane");
+  assert.ok(aphidCells([{ ...clump, cells: [40000, -300] }], PLANE).has(cellKey(40000, -300)));
   assert.equal(s.size, 2);
   assert.equal(aphidCells([clump], PLANE + 1).size, 0);
   assert.equal(aphidCells([{ ...clump, eaten: 6 }], PLANE).size, 0, "a clump with no aphids left has none");

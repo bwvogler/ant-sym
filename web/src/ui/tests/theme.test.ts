@@ -104,6 +104,19 @@ const contrast = (a: string, b: string) => {
   return (hi! + 0.05) / (lo! + 0.05);
 };
 
+test("a lever name's three colours (spore, accent, error: ui/leverKinds.ts) clear 4.5:1 on the surfaces they sit on, in both themes", () => {
+  const themes = { light: declarations(":root {"), dark: declarations(':root[data-theme="dark"]') };
+  for (const [name, dark] of Object.entries(themes)) {
+    const v = { ...themes.light, ...dark };
+    // The upgrade tooltip and the ant card's chips are on raised; the Policy tab and the Levers tab on the panel and the ground.
+    for (const text of ["--spore", "--accent", "--err"])
+      for (const surface of ["--raised", "--panel", "--ground"]) {
+        const c = contrast(v[text]!, v[surface]!);
+        assert.ok(c >= 4.5, `${name}: ${text} on ${surface} is ${c.toFixed(2)}:1`);
+      }
+  }
+});
+
 test("body text clears 4.5:1 on every surface, in the light theme and the dark one", () => {
   const themes = { light: declarations(":root {"), dark: declarations(':root[data-theme="dark"]') };
   for (const [name, dark] of Object.entries(themes)) {

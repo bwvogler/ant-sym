@@ -663,6 +663,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "A plan for the fungus: a landing patch that is a seven-cell flower (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
   },
   {
+    note: "lichen",
+    title: "The lichen partner",
+    covers:
+      "A plan for the fungus to take an alga on rock: lichens capture their alga by contact (free algae are scarce; some take another lichen's), spread over rock from the edge, fix carbon only while wet and lit, and turn rock into soil; in two studies read only as abstracts, usnic acid made insect larvae die faster of Metarhizium and Beauveria; red wood ants carry lichen fragments. Not built.",
+  },
+  {
     note: "builder",
     title: "Builder mode",
     covers:
@@ -764,7 +770,13 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "endless-world",
     title: "Endless world",
     covers:
-      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. Planned (not built, PRD §66).",
+      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. In progress (PRD §66): many lines and waking wild colonies are in the simulation; the page still plays a bounded world.",
+  },
+  {
+    note: "fog-of-war",
+    title: "Fog of war",
+    covers:
+      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, behind ?fog=1; off by default.",
   },
   {
     note: "new-queens",
