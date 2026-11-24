@@ -7987,7 +7987,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **Built (F3.4, `ja-1ypq.3.4`, 2026-11-24):** the voxel pass runs flat under the fog (never tilted) and `drawFogOverlay` covers it: unknown cells in the fog's colour, remembered ones at 0.35, live ones clear. Picture only; goldens bit-exact; Jev cost none.
 
-**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
+**Built (F3.6, `ja-1ypq.3.6`, 2026-11-24):** e2e section 18 (`scripts/e2e-one-world.mjs`) on a `?fog=1` page: a host is found, the cell under it is live, never-sensed ground is unknown, and once the host has walked away its cell is remembered (not live, not unknown again). A second page of the same seed without the flag has no fog and, stepped to the same game time and zoomed to hexagons while paused, draws a frame within noise of the fog page (measured 17 ms against 18.5 ms; the bound is 1.6× or +12 ms). The dev hook gained `fogState(view, x, y)`. Found on the way (PR #408's phone profile): under the fog `drawHexes` built a hexagon per fog cell, 65 s against 11 s in a throttled profile; it now lays fog and remembered open ground as strips. The section adds about 40 s to the e2e. Jev cost none.
+
+**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
 
 **Still open.**
 - A fading memory (not now).
