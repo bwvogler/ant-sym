@@ -7956,7 +7956,9 @@ No single lane stands out. Each lane's shipped answers alone store a median 0.93
 
 **F1's stamp, measured** (bead note, 2026-11-24): stamping the body costs 0.01–0.02 ms a step at 92 hypha cells, well inside the 0.5 ms budget; a big mycelium is re-measured with the queens-and-alates observers (`ja-1ypq.9`).
 
-**What is left** (bead audit, 2026-11-24): the voxel pass through the fog (F3.4, `ja-1ypq.3.4`; today it falls back to 2D), the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
+**Built (F3.4, `ja-1ypq.3.4`, 2026-11-24):** the voxel pass runs flat under the fog (never tilted) and `drawFogOverlay` covers it: unknown cells in the fog's colour, remembered ones at 0.35, live ones clear. Picture only; goldens bit-exact; Jev cost none.
+
+**What is left** (bead audit, 2026-11-24): the blurred fog mask (F3.5, `.3.5`), the guards (F3.6, `.3.6`: the e2e host-walks-away section and frame time), F4 picking, F5 wiring the built `KnownColonies`, F6 the default, F7 on the endless world (its camera bound is E5.2, `ja-qpv.4.2`, built once for both), F8.
 
 **Still open.**
 - A fading memory (not now).

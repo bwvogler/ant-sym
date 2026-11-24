@@ -40,6 +40,7 @@ const THEME = {
   ink: "#ink",
   warn: "#warn",
   paperRgb: [240, 240, 240],
+  inkRgb: [20, 20, 20],
 } as unknown as FieldTheme;
 
 /** A cell in view of the camera at (50, 40): the rows are 1/R of a world unit apart. */
@@ -552,18 +553,48 @@ test("under the fog the food sprites show the snapshot: none where nothing was s
   );
 });
 
-test("the voxel pass is not allowed under the fog, and is without it", () => {
+test("the voxel pass runs flat under the fog and is covered by it: unknown cells in the fog's colour, remembered ones veiled, live ones clear", () => {
   const args: unknown[][] = [];
-  const draw = (...a: unknown[]) => (args.push(a), { alpha: 0, renderer: "sprites" });
-  const off = setup();
+  const draw = (...a: unknown[]) => (args.push(a), { alpha: 1, renderer: "voxel-webgl" });
+  const off = setup({ zoom: 130, world: null });
   (off.parts.voxelMap as { draw: unknown }).draw = draw;
   voxelStage(off.fs);
-  const on = setup();
+  const sensed = new SensedMap();
+  const on = setup({ zoom: 130, world: null });
   (on.parts.voxelMap as { draw: unknown }).draw = draw;
-  on.fc.fog = new Knowledge(new SensedMap(), []);
+  on.fc.fog = new Knowledge(sensed, []);
   voxelStage(on.fs);
   assert.equal(args[0]![10], true, "without the fog the 3-D pass may draw");
-  assert.equal(args[1]![10], false, "with it, 2-D only");
+  assert.equal(args[1]![10], true, "with it too: flat");
+  assert.equal(args[1]![11], undefined, "but never tilted");
+  const veils = (r: { rec: { log: string[] } }) => r.rec.log.filter((l) => l === "fill()").length;
+  assert.equal(veils(off), 0, "no cover without the fog");
+  assert.ok(veils(on) > 0, "the cells nothing has sensed are covered");
+  // Every cell in view live: nothing to cover.
+  const lit = setup({ zoom: 130, world: null });
+  (lit.parts.voxelMap as { draw: unknown }).draw = draw;
+  const hostAll = {
+    n: 1,
+    params: { sensorDistance: 3 },
+    alive: Uint8Array.of(1),
+    load: Float32Array.of(1),
+    layer: Uint8Array.of(PLANE),
+    x: Float32Array.of(50),
+    y: Float32Array.of(40),
+  };
+  const sensed2 = new SensedMap();
+  lit.fc.fog = new Knowledge(sensed2, []);
+  sensed2.stamp([hostAll as never], 1);
+  sensed2.mark(PLANE, 50, 40, 400);
+  voxelStage(lit.fs);
+  assert.equal(veils(lit), 0, "all live: no cover");
+  // All of it remembered: a veil, one fill.
+  sensed2.stamp([{ ...hostAll, n: 0 } as never], 1 + 1.5 + 1);
+  const remembered = setup({ zoom: 130, world: null });
+  (remembered.parts.voxelMap as { draw: unknown }).draw = draw;
+  remembered.fc.fog = lit.fc.fog;
+  voxelStage(remembered.fs);
+  assert.equal(veils(remembered), 1, "remembered: one veil");
 });
 
 test("the bends are drawn over every curtain's view (layer 1 or more), in the actors stage and over a voxel mesh, from that layer's own line", () => {
