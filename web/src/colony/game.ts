@@ -10,14 +10,13 @@ import { type BandsSave, driftAim, Recognition, type RecognitionParams } from ".
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved } from "./lines.ts";
+import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved, type WildSite } from "./lines.ts";
 import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
 import { SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
-import type { Site } from "./endlessPlane.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
 
@@ -587,7 +586,7 @@ export class Game {
    * reaches by about six minutes (measured, scripts/mature-colony.mjs: its cap, 1.5 times the start, with no brood left and its nest dug out); `ants`
    * overrides it (the owner's size, ja-dv98). Its odour is a hash of the site. Waking a site twice gives the colony already woken.
    */
-  wakeSite(site: Site, opts: { ants?: number } = {}): number {
+  wakeSite(site: WildSite, opts: { ants?: number } = {}): number {
     const key = `${site.rx},${site.ry}`;
     const woken = this.#wild.get(key);
     if (woken !== undefined) return woken;
@@ -690,6 +689,34 @@ export class Game {
     const v = rule.step({ time: this.time, asleep: this.colonies.map((_, k) => this.#frozen.has(k)), ...facts });
     for (const k of v.freeze) this.freeze(k);
     for (const k of v.thaw) this.thaw(k);
+    this.#wakeSites(rule);
+  }
+
+  /**
+   * The sites that wake now (docs/endless-world.md §6, E4.3b): one the awake fungus's body has come within W of, or an awake host has entered the nest
+   * ground of. A host merely foraging past within W wakes nothing, and nothing but the fungus wakes a site (no ant wakes another, so waking cannot
+   * chain). Only sites that carry their lattice cell (`rx`, `ry`) can wake. The woken colony joins the rule awake; the cap, next decision, freezes
+   * the lowest-ranked if it is over.
+   */
+  #wakeSites(rule: SleepRule): void {
+    const sites = this.sites.filter((s): s is WildSite => s.rx !== undefined && s.ry !== undefined);
+    if (!sites.length) return;
+    const { distance, nestGround } = rule.params;
+    const woke = this.fungus.bodyNear(PLANE, sites, distance);
+    this.colonies.forEach((c, j) => {
+      if (this.#frozen.has(j)) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (c.load[i] as number) <= 0 || c.layer[i] !== PLANE) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        sites.forEach((s, k) => {
+          if (!woke[k] && Math.hypot(s.x - x, s.y - y) <= nestGround) woke[k] = true;
+        });
+      }
+    });
+    sites.forEach((s, k) => {
+      if (woke[k]) this.wakeSite(s);
+    });
   }
 
   /** The colonies awake, in order: the whole list when none sleeps (the same array, so nothing is copied). */
