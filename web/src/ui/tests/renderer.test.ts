@@ -28,7 +28,7 @@ import { foodDensity } from "../resourceSprites.ts";
 import { Knowledge } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import { SensedMap } from "../fungusSight.ts";
-import { centreX, centreY, INFECTED } from "../../colony/index.ts";
+import { centreX, centreY, Game, generateWorld, INFECTED, mulberry32, oneWorldOnLines, STRIP } from "../../colony/index.ts";
 import { RecordedPath, recordingContext } from "./recordingContext.ts";
 
 // The renderer on a recording fake context (ja-fnd.6.3.8): what a frame derives once (beginFrame), the stage list and its early exit, and the stages the
@@ -55,7 +55,7 @@ interface Opts {
   quality?: Record<string, number>;
   chambers?: unknown[];
   colony?: Record<string, unknown> | null;
-  world?: null;
+  world?: null | object;
   x0?: number;
   at?: [number, number];
   labelsOn?: boolean;
@@ -87,7 +87,7 @@ function setup(o: Opts = {}) {
     lv: o.lv ?? PLANE,
     m,
     ext: { x0: o.x0 ?? 0, w: 200, h: 100 },
-    world: o.world === null ? null : {},
+    world: o.world === null ? null : (o.world ?? {}),
     colonies: o.colony === null ? [] : [{ params: { heatDay: 0 }, time: 0, ...(o.colony ?? {}) }],
     fungus: {},
     strip: false,
@@ -564,4 +564,28 @@ test("the voxel pass is not allowed under the fog, and is without it", () => {
   voxelStage(on.fs);
   assert.equal(args[0]![10], true, "without the fog the 3-D pass may draw");
   assert.equal(args[1]![10], false, "with it, 2-D only");
+});
+
+test("the bends are drawn over every curtain's view (layer 1 or more), in the actors stage and over a voxel mesh, from that layer's own line", () => {
+  // Two lines, one grown to three holes (a bend), listed second: the first has none
+  const g = new Game(oneWorldOnLines(3, generateWorld(3), [[0], [1]]), {}, mulberry32(5), [
+    { antCount: 5, line: 0 },
+    { antCount: 5, line: 1 },
+  ]);
+  g.foundBeyond("end");
+  g.foundBeyond("end");
+  const lines = [...g.world.lines].sort((a, b) => a.line.holes.length - b.line.holes.length);
+  const world = { ...g.world, lines, line: lines[0]!.line, curtain: lines[0]!.curtain };
+  const s = lines[1]!.line.sHole[1]!;
+  const bends = (lv: number, stage: typeof actorsStage | typeof voxelStage) => {
+    const t = setup({ lv, world, colony: null, zoom: 4, at: [centreX(s, STRIP), 20], voxel: { alpha: 1, renderer: "voxel-webgl" } });
+    t.fs.fungusFrame = { stalks: [], stalkLevel: 0 } as never; // the fungus stage has run: no stalks
+    stage(t.fs);
+    return t.rec.log.filter((l) => l === "globalAlpha = 0.18").length;
+  };
+  for (const stage of [actorsStage, voxelStage]) {
+    assert.equal(bends(2, stage), 1, "curtain 2's own bend");
+    assert.equal(bends(1, stage), 0, "curtain 1's line has none");
+    assert.equal(bends(PLANE, stage), 0, "and the plane draws none");
+  }
 });

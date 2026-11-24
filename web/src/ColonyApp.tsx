@@ -38,7 +38,7 @@ import type { Followed } from "./ui/follow.ts";
 import { Bar } from "./ui/widgets.tsx";
 import { PresetPicker, WordsBox } from "./ui/PolicyEditor.tsx";
 import Segmented from "./ui/Segmented.tsx";
-import { MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
+import { clampLine, MAX_SPEED, useColony, type ColonyStats, type EvolutionStats, type View } from "./ui/useColony.ts";
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
@@ -175,7 +175,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   // One world's two views (docs/one-world.md §5): a camera switch, the key `v` too (the page's key handler, below).
   const oneWorld = game.world;
   // The layer shown: the plane, or the curtain of the line chosen (clamped: a new world may have fewer lines).
-  const belowLayer = oneWorld ? curtainLayerOf(Math.min(controls.line, oneWorld.lines.length - 1)) : CURTAIN;
+  const belowLayer = oneWorld ? curtainLayerOf(clampLine(controls.line, oneWorld.lines.length)) : CURTAIN;
   const setView = useCallback((view: View) => update({ view }), [update]);
   // The views linked (one-world §5, U5.2): the field's cameras, a click across, and an ant followed through a hole.
   const field = useRef<FieldApi | null>(null);

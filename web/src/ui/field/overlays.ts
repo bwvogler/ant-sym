@@ -260,21 +260,24 @@ export function drawPen(k: FieldCtx, inp: FieldInputs): void {
   const tx = centreX(at.cell.x, at.cell.y);
   const ty = centreY(at.cell.y);
   const [sx, sy] = toScreen(c, v, tx, ty);
-  const holes = k.world.lines[at.line ?? 0]!.line.holes;
-  const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = Math.max(1.5, d * 1.5);
-  ctx.setLineDash([6 * d, 5 * d]);
-  // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
-  const seg = segmentCells(e, at.cell);
-  ctx.beginPath();
-  for (let i = 0; i < seg.length; i += 2) {
-    const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  // A settle that begins a new line (`newLine`: its index is the world's next, so no such line yet) has no end to grow: only the ring and her hole.
+  if (!at.newLine) {
+    const holes = k.world.lines[at.line ?? 0]!.line.holes;
+    const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
+    ctx.setLineDash([6 * d, 5 * d]);
+    // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
+    const seg = segmentCells(e, at.cell);
+    ctx.beginPath();
+    for (let i = 0; i < seg.length; i += 2) {
+      const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
   // From where she lands to where she settles, when she walks on.
   if (Math.hypot(sx - hp[0], sy - hp[1]) > 4 * d) {
     ctx.globalAlpha = 0.5;

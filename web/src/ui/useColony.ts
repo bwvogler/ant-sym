@@ -73,6 +73,12 @@ export const MAX_SPEED = 8;
 export const GAME_STRAIN = STRAINS.findIndex((s) => s.id === "garden");
 export { landingColony, landingOf } from "./landing.ts";
 
+/** A new game (Restart, New world, Start, a load) begins on its first line: `controls.line` belongs to the game that ended, and is not saved. */
+export const freshGame = (c: ColonyControls): ColonyControls => ({ ...c, line: 0 });
+
+/** The line the below view shows: `line`, held within a world of `lines` lines (a new world may have fewer than the page was on). */
+export const clampLine = (line: number, lines: number): number => Math.max(0, Math.min(line, lines - 1));
+
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   species: GENERIC_ANT.id,
   seed: 1,
@@ -199,7 +205,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     pending.current = r;
     setGeneration(r.settings.generation);
     setControls((c) => ({
-      ...c,
+      ...freshGame(c),
       species: r.settings.species,
       seed: r.settings.seed,
       antCount: r.settings.antCount,
@@ -234,7 +240,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const start = useCallback(
     (seed: number, tutorial = false, species: string = GENERIC_ANT.id) =>
       setControls((c) => ({
-        ...c,
+        ...freshGame(c),
         species,
         // The menu follows the species: rouse on where finders invite, off where they don't (owner, review of #202 D2).
         menu: menuFor(c.menu, (SPECIES[species]?.params.invitePace ?? 0) > 0),
@@ -251,8 +257,11 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     return () => void frameListeners.current.delete(fn);
   }, []);
   const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => ({ ...c, ...patch })), []);
-  const restart = useCallback(() => setGeneration((g) => g + 1), []);
-  const newWorld = useCallback(() => setControls((c) => ({ ...c, seed: 1 + Math.floor(Math.random() * 99_999) })), []);
+  const restart = useCallback(() => {
+    setGeneration((g) => g + 1);
+    setControls(freshGame);
+  }, []);
+  const newWorld = useCallback(() => setControls((c) => ({ ...freshGame(c), seed: 1 + Math.floor(Math.random() * 99_999) })), []);
   /** Give adaptations to the next level of upgrade `id` (evolution.UPGRADES); false when the fungus can't. */
   const evolve = useCallback((id: string) => game.fungus.upgrade(id), [game]);
 
