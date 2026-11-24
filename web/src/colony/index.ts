@@ -43,6 +43,7 @@ export * from "./royal.ts";
 export * from "./save.ts";
 export * from "./schema.ts";
 export * from "./species.ts";
+export * from "./sleep.ts";
 export * from "./desertAnt.ts";
 export * from "./neglectus.ts";
 export * from "./transect.ts";
