@@ -97,6 +97,30 @@ test("a seed line with spread (a flower that extended a patch, #363) gets a spre
   assert.doesNotMatch(mixed.out, /spread/);
 });
 
+test("a seed line that says how much mycelium and how many spore cells the game ended with (ja-kura) gets those two columns where every seed has them", () => {
+  const withSize = (seed: number, cells: number, spores: number) =>
+    seedText(seed, "100 s", "200 s").replace(
+      "mycelium 8.6",
+      `mycelium 8.6, patches 2 (flowers 1, spread 0, mat cells 7) · hyphae ${cells} cells, spores on ${spores} cells`,
+    );
+  const all = run({ "seed-1.txt": withSize(1, 120, 40), "seed-2.txt": withSize(2, 300, 10), "seed-3.txt": withSize(3, 210, 25) });
+  assert.equal(all.status, 0);
+  assert.match(
+    all.out,
+    /\| seed \| first host \| quarter \| half \| queen \| patches \| flowers \| spread \| mat cells \| hyphae cells \| spore cells \|\n\|---:(\|---:){10}\|/,
+  );
+  assert.match(all.out, /\| 2 \| 5 s \| 100 s \| never \| 200 s \| 2 \| 1 \| 0 \| 7 \| 300 \| 10 \|/);
+  assert.match(all.out, /- hyphae cells: median 210, 120 to 300; cells with spores: median 25, 10 to 40/);
+  // one seed with the line and one with the older one: the columns of the older line only, and no size line
+  const older = seedText(2, "100 s", "200 s").replace("mycelium 8.6", "mycelium 8.6, patches 2 (flowers 1, spread 0, mat cells 7)");
+  const mixed = run({ "seed-1.txt": withSize(1, 120, 40), "seed-2.txt": older });
+  assert.match(mixed.out, /\| spread \| mat cells \|\n/);
+  assert.doesNotMatch(mixed.out, /hyphae cells|spore cells/);
+  // a game with no hyphae says 0 cells and still gets the columns
+  const none = run({ "seed-1.txt": withSize(1, 0, 0) });
+  assert.match(none.out, /\| 1 \| 5 s \| 100 s \| never \| 200 s \| 2 \| 1 \| 0 \| 7 \| 0 \| 0 \|/);
+});
+
 test("two commits are both named, so a table that mixes arms shows it", () => {
   const { out } = run({
     "seed-1.txt": seedText(1, "100 s", "200 s", "aaaaaaa000000000000000000000000000000000"),
