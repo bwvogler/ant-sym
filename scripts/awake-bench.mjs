@@ -1,6 +1,6 @@
 // Offline, no key: how long one tick takes with the awake rule on and wild colonies woken (docs/endless-world.md §6, PRD §66 E4.5): two start
 // colonies and up to `wild` wild colonies woken from sites on lines of their own, every colony at `ants`, the awake cap `cap` (nothing is near the
-// fungus, so the cap alone decides who sleeps: the lowest-ranked freeze first). Reports the colonies in the game and awake, and the median, 90th
+// fungus, so the cap alone decides how many sleep; every colony ties on rank, so the lowest indexes freeze first). Reports the colonies in the game and awake, and the median, 90th
 // percentile and late mean milliseconds a tick takes after a warm-up, as colony-bench does.
 //
 // Usage: node scripts/awake-bench.mjs [wild=4] [cap=6] [ants per colony=400] [sim seconds=60] [seed=1]
@@ -26,6 +26,7 @@ for (let y = 20; y < 360 && woken < wild; y += 12)
     woken++;
   }
 game.newLines = false;
+if (woken < wild) console.error(`awake-bench: only ${woken} of ${wild} wild sites fit on this plane`);
 game.enableSleep({ cap, delay: 1e9 });
 const warm = Math.round(5 / DT);
 const ms = [];
