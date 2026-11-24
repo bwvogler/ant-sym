@@ -24,6 +24,14 @@ export class FoodLedger {
     return true;
   }
 
+  /** Forget every chunk counted and the totals (a load, which counts the chunks again as they are made: endlessMap.ts loadEndless). */
+  reset(): void {
+    this.#chunks.clear();
+    this.#generated = 0;
+    this.#added = 0;
+    this.#taken = 0;
+  }
+
   /** The game put food on the map (regrowth, honeydew, a stroke). */
   add(amount: number): void {
     this.#added += amount;

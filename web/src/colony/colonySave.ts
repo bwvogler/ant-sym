@@ -52,6 +52,7 @@ export const COLONY_STATE = [
 export const COLONY_SKIP: ReadonlySet<string> = new Set([
   ...COLONY_STATE,
   "plumeTurn", // smellsFood's answer, read in the same tick
+  "plumeBox", // an endless plane's plume window: derived from the nest at the first read (plume.ts plumeFrame)
   "aphidOdour", // the game's, wired in and rebuilt from its saved clumps (aphids.ts)
   "policyDrew", // set and read within one ask (policyDraw)
   "policyDraw", // code: the draw handed to the mode policy
