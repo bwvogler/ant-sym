@@ -3,6 +3,7 @@
 *Research and design note for epic `ja-vlla.11` (M4 of `ja-vlla`, PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
 - *Read status:* every source is marked full text (**FT**), abstract only (**ABS**, its numbers **unverified**) or not read (**NR**).
 - *Not reachable:* many society journals (Wiley, Springer, Elsevier) were behind a bot wall. Their numbers are abstract-only and gathered for reading in `ja-vlla.11.1`.
+- *Second read (`ja-vlla.11.1`, 2026-11-24):* no full text of the eleven sources could be reached. Wiley, Springer, Cambridge, BioOne and Elsevier answered with bot walls, and the session's network refused the open copies on iforest.sisef.org and flore.unifi.it (Di Nuzzo), publishup.uni-potsdam.de (Heinken) and publications.aston.ac.uk (Armstrong). The abstracts and citing papers were read instead, and the claims are restated to what they say. Allowing those four hosts would let three of them be read in full. Chen et al. 2000 and Stretch & Viles 2002 still give no rate (no abstract online).
 
 **Today**, nothing on the map is a plant, an alga, light or water, and rock is permanent:
 - Hyphae never enter rock (`enterable`, `hyphae.ts`).
@@ -20,7 +21,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 - **The partner fixes carbon only while wet and lit.** It switches on within minutes of wetting. How much carbon the fungus gets is not quantified (§3).
 - **Lichens turn rock into a nascent soil** by hyphae drilling in, wet-dry swelling and pH. No paper read gives a rate (§4).
 - **Usnic acid, a lichen compound, made insects die faster of *Metarhizium* and *Beauveria*.** This is abstracts only (§5).
-- **Red wood ants carry lichen fragments to their mounds,** where the fragments can regrow. This is abstract only (§6).
+- **Red wood ants carry lichen fragments from the ground round their mounds,** where the authors think fragments may regrow (inferred, not observed). This is abstract only (§6).
 - **Owner decisions (2026-11-23):**
   - All four groups go into the epic: partner and crust, light income, rock to soil, then bitter crust and ant carriers.
   - Partners come from alga films and from wild lichens to overgrow.
@@ -30,13 +31,13 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 ## 1. Finding a partner: contact, a scarce free alga, theft
 
 - **Contact capture.** The hyphae of a germinating lichen spore capture free-living algae they touch, and a single compatible algal cell may be enough to start a thallus. A fungus can also take algae from an existing lichen: "the host thallus is eventually destroyed as its photobionts are taken over by the invading hyphae of the aggressor" (Sanders & Masumoto 2021, *Lichenologist* 53:347, FT).
-- **Contact turns the symbiosis on.** In *Cladonia grayi* with *Asterochloris*, self/non-self recognition genes switch on when the partners first meet (Joneson, Armaleo & Lutzoni 2011, *Mycologia*, ABS). Fungal lectins binding the alga are a proposed recognition step (Sanders & Masumoto 2021). Joneson & Lutzoni 2009, on contact and growth towards touch (thigmotropism), was not read.
+- **Contact turns the symbiosis on.** In *Cladonia grayi* with *Asterochloris*, self/non-self recognition genes switch on when the partners first meet (Joneson, Armaleo & Lutzoni 2011, *Mycologia*, ABS). Fungal lectins binding the alga are a proposed recognition step (Sanders & Masumoto 2021). Joneson & Lutzoni (2009, not read) got the fungus to differentiate only beside a compatible alga, not beside glass beads, and 11–28 % of both partners' genes are already up before contact: a chemical signal, not touch itself (as described by Pichler, Muggia, Carniel, Grube & Kranner 2023, *New Phytol*, FT). For the game, meeting a compatible alga is the trigger.
 - **Free algae are scarce, not absent.**
   - *Trebouxia*, the commonest lichen alga, is "infrequently reported in the free-living state", though careful looking often finds it (Sanders & Masumoto 2021).
   - Meier, Scherrer & Honegger (2002, *Biol J Linn Soc* 76:259, ABS) call it rare outside thalli.
   - Pioneer lichens with no propagules on smooth bark carried the local alga, which suggests a free pool (Beck, Friedl & Rambold 1998, *New Phytol* 139:709, ABS).
 - **Theft.**
-  - *Diploschistes muscorum* starts as a parasite inside *Cladonia* scales and uses the *Cladonia* alga. It turns independent as its host breaks down, and can then switch alga (Friedl 1987, *Lichenologist* 19:183, ABS).
+  - *Diploschistes muscorum* starts as a parasite inside *Cladonia* scales and uses the *Cladonia* alga, *Trebouxia irregularis*, which multiplies as the *Diploschistes* hyphae grow. It turns independent as its host breaks down, and mature thalli can exchange that alga for *T. showmanii*; one thallus held both (Friedl 1987, *Lichenologist* 19:183, ABS).
   - Young *Xanthoria parietina* first pairs with "foreign algae" (Ott 1987, *Nord J Bot* 7:219, ABS).
 - **Contrary.**
   - Beck et al. (1998) found *Xanthoria*'s alga different from neighbouring *Physcia*'s, so they found no theft there.
@@ -57,7 +58,7 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
   - The model's ceiling is about 26 mm a year, against about 13 mm a year for the fastest reported *Parmelia*. The 13 mm figure is **unverified**: it comes second-hand from the paper's references.
   - 33 of the tracked thalli died during the survey.
 - **Crustose lichens are the slowest:**
-  - *Rhizocarpon* averaged 0.07 mm a year, ranging 0–0.19 (Armstrong 2005, ABS, **unverified**).
+  - *Rhizocarpon* averaged 0.07 mm a year over six years, ranging 0–0.19 (SD 0.06); 7 of 39 thalli did not grow measurably, and growth was below lichenometric estimates (Armstrong 2005, ABS: numbers stated in the abstract).
   - Crustose growth can decline in large thalli (Armstrong & Bradwell 2010, *Geogr Ann A* 92:3, ABS).
 - **A fruticose lichen,** *Usnea aurantiacoatra*, grew 4.3–5.5 mm a year in Antarctica (Li et al. 2014, *PLoS One* 9:e100735, FT).
 - **Not found:** a measured ring, where the centre of a lichen dies and leaves a ring. The nearest support is Seminara's poorer CO₂ supply to the centre.
@@ -106,8 +107,8 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 
 ## 5. Usnic acid and the host
 
-- **Usnic acid helps the pathogen.** Usnic acid, a common lichen compound, **raised** deaths from *Metarhizium robertsii* and *Beauveria bassiana* in Colorado potato beetle and wax moth larvae. A reindeer-lichen extract acted in synergy with infection (Duisembecov, Dubovskiy & Glupov 2017, *Contemp Probl Ecol* 10:286, ABS, **unverified**).
-  - A fluorinated usnic acid with *B. bassiana* cut the median time to death threefold in a field trial. It lowered larval haemocyte counts but raised phenoloxidase activity, and the authors attribute the synergy to toxicosis (Kryukov et al. 2018, *Pest Manag Sci* 74:598, ABS, **unverified**).
+- **Usnic acid helps the pathogen.** Usnic acid, a common lichen compound, **raised** deaths from *Metarhizium robertsii* and *Beauveria bassiana* in Colorado potato beetle and wax moth larvae. A reindeer-lichen extract (perlatolic and usnic acids) acted in synergy with fungal infection in wax moth, more than usnic acid alone; the abstract gives no doses and no route, eaten or by contact (Duisembecov, Dubovskiy & Glupov 2017, *Contemp Probl Ecol* 10:286, ABS, **unverified**).
+  - A fluorinated usnic acid with *B. bassiana* cut the median time to death threefold and raised 15-day mortality by 36 % in a field trial in Kazakhstan (with synergy in the lab too, in instars 2–4); the compound is synthetic, not natural usnic acid. It lowered larval haemocyte counts but raised phenoloxidase activity, and the authors attribute the synergy to toxicosis (Kryukov et al. 2018, *Pest Manag Sci* 74:598, ABS, **unverified**).
 - **It deters grazers.** Lichen compounds deter snails: removing them made *Parmeliaceae* palatable (Gauslaa 2005, *Oecologia* 143:94, ABS).
 - **Not found:** ants and lichen compounds, whether avoidance or harm. Nor any study of lichen compounds inhibiting entomopathogenic fungi; general antifungal screens were not reviewed.
 
@@ -119,9 +120,9 @@ The owner asked (PRD §85, 2026-11-22) for a partner, "a special lichen: use roc
 
 ## 6. Ants carry fragments
 
-- **Red wood ants.** Across 25 mounds of the *Formica rufa* group in German pine and spruce forests, there were 20 moss and 10 lichen species, on almost all mounds. Fragments may regrow where dropped on the way or on an abandoned mound (Heinken, Rohner & Hoppert 2007, ABS; the venue is not confirmed, held in the Potsdam repository).
-  - Where *F. paralugubris* was introduced, the epiphytic lichen community changed, and species that reproduce asexually were linked with ants (Di Nuzzo et al. 2022, *iForest* 15:71, ABS).
-  - That ants move propagules is suggested there, not shown.
+- **Red wood ants.** Across 25 mounds of the *Formica rufa* group in five pine and spruce forest types in Germany, there were fragments of 20 moss and 10 lichen species, on almost all mounds and often many. The species matched the **ground** vegetation round the nests, so the ants gather fragments from the ground nearby. Fragments "may" regrow where dropped on the way (over several metres) or on an abandoned mound: inferred, not observed (Heinken, Rohner & Hoppert 2007, *Nova Hedwigia Beihefte* 131:147, ABS).
+  - Where *F. paralugubris* was introduced over 50 years ago, lichens on silver fir differed in composition (not in richness) from trees without ants, and asexually reproducing species "seemed to be associated" with ants (Di Nuzzo et al. 2022, *iForest* 15:71, ABS).
+  - That ants move propagules is the authors' argument there, with herbivore exclusion as the alternative; it is not shown.
 - **Other animals disperse living propagules:**
   - 25 % of the mites *Humerobates arborea* carried soredia and left them 0.1–7.1 cm away (Stubbs 1995, *Mycologia* 87:454, ABS).
   - Lichens regrew from 29 % and 41 % of snail droppings (Boch et al. 2011, *PLoS One* 6:e18770, FT).
@@ -267,7 +268,7 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
 - Friedl T (1987). Thallus development and phycobionts of the parasitic lichen *Diploschistes muscorum*. *Lichenologist* 19:183. [doi:10.1017/s002428298700015x](https://doi.org/10.1017/s002428298700015x) (ABS)
 - Gasulla F, del Campo EM, Casano LM, Guéra A (2021). Advances in understanding of desiccation tolerance of lichens and lichen-forming algae. *Plants* 10:807. [doi:10.3390/plants10040807](https://doi.org/10.3390/plants10040807) (FT)
 - Gauslaa Y (2005). Lichen palatability depends on investments in herbivore defence. *Oecologia* 143:94. [doi:10.1007/s00442-004-1768-z](https://doi.org/10.1007/s00442-004-1768-z) (ABS)
-- Heinken T, Rohner M-S, Hoppert M (2007). Red wood ants (*Formica rufa* group) disperse bryophyte and lichen fragments on a local scale. [Potsdam repository](https://publishup.uni-potsdam.de/frontdoor/index/index/docId/30639) (ABS; venue not confirmed)
+- Heinken T, Rohner M-S, Hoppert M (2007). Red wood ants (*Formica rufa* group) disperse bryophyte and lichen fragments on a local scale. *Nova Hedwigia Beihefte* 131:147–163 (venue from citing papers' reference lists). [Potsdam repository](https://publishup.uni-potsdam.de/frontdoor/index/index/docId/30639) (ABS)
 - Joneson S, Armaleo D, Lutzoni F (2011). Fungal and algal gene expression in early developmental stages of lichen-symbiosis. *Mycologia* 103:291–306. [doi:10.3852/10-064](https://doi.org/10.3852/10-064) (ABS)
 - Joneson S, Lutzoni F (2009). Compatibility and thigmotropism in the lichen symbiosis: a reappraisal. *Symbiosis* 47:109. [doi:10.1007/bf03182294](https://doi.org/10.1007/bf03182294) (NR)
 - Jung P et al. (2020). Lichens bite the dust: a bioweathering scenario in the Atacama Desert. *iScience* 23:101647. [PMC7578742](https://pmc.ncbi.nlm.nih.gov/articles/PMC7578742/) (FT)
@@ -280,6 +281,7 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
 - Ott S (1987). Sexual reproduction and developmental adaptations in *Xanthoria parietina*. *Nord J Bot* 7:219. [doi:10.1111/j.1756-1051.1987.tb00933.x](https://doi.org/10.1111/j.1756-1051.1987.tb00933.x) (ABS)
 - Palmqvist K (2000). Carbon economy in lichens (Tansley Review No. 117). *New Phytol* 148:11–36. [doi:10.1046/j.1469-8137.2000.00732.x](https://doi.org/10.1046/j.1469-8137.2000.00732.x) (ABS)
 - Sanders WB, Masumoto H (2021). Lichen algae: the photosynthetic partners in lichen symbioses. *Lichenologist* 53:347. [doi:10.1017/s0024282921000335](https://doi.org/10.1017/s0024282921000335) (FT, key passages)
+- Pichler G, Muggia L, Carniel FC, Grube M, Kranner I (2023). How to build a lichen: from metabolite release to symbiotic interplay. *New Phytol* 238:1362–1378. [PMC10952756](https://pmc.ncbi.nlm.nih.gov/articles/PMC10952756/) (FT)
 - Seminara A, Fritz J, Brenner MP, Pringle A (2018). A universal growth limit for circular lichens. *J R Soc Interface* 15:20180063. [PMC6030627](https://pmc.ncbi.nlm.nih.gov/articles/PMC6030627/) (FT)
 - Spribille T et al. (2016). Basidiomycete yeasts in the cortex of ascomycete macrolichens. *Science* 353:488. [doi:10.1126/science.aaf8287](https://doi.org/10.1126/science.aaf8287) (ABS)
 - Stretch RC, Viles HA (2002). The nature and rate of weathering by lichens on lava flows on Lanzarote. *Geomorphology* 47:87. [doi:10.1016/S0169-555X(02)00143-5](https://doi.org/10.1016/S0169-555X(02)00143-5) (NR)
