@@ -146,7 +146,7 @@ export class Pheromones {
   /** Add to integer cell (cx, cy). */
   depositCell(channel: Channel, cx: number, cy: number, amount: number): void {
     const { map } = this;
-    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return;
+    if (!map.endless && (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h)) return;
     if (this.#absent !== null && this.#absent.has(channel)) return; // a channel the species lacks: nothing is laid, nothing wakes
     const f = this.fields[channel];
     f.set(cx, cy, Math.min(this.params[channel].max ?? MAX_LEVEL, f.get(cx, cy) + amount));
@@ -159,7 +159,7 @@ export class Pheromones {
     const cx = CELL[0];
     const cy = CELL[1];
     const { map } = this;
-    if (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h) return -1;
+    if (!map.endless && (cx < map.x0 || cy < 0 || cx >= map.x0 + map.size.w || cy >= map.size.h)) return -1;
     return this.fields[channel].get(cx, cy);
   }
 
@@ -171,6 +171,18 @@ export class Pheromones {
   /** Whether any of a channel's chunks is awake: false, and it holds nothing anywhere (a sensor need not read it). */
   live(channel: Channel): boolean {
     return this.#awake[channel].size > 0;
+  }
+
+  /** Every chunk awake on any channel, once each (a step reads these chunks' rock and their neighbours', and scent may spread into the neighbours): for the endless plane's prefetch (game.ts). */
+  eachAwakeChunk(fn: (cx: number, cy: number) => void): void {
+    const seen = new Set<number>();
+    for (const ch of CHANNELS)
+      for (const key of this.#awake[ch]) {
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const [cx, cy] = chunkOf(key);
+        fn(cx, cy);
+      }
   }
 
   /** Awake chunks, summed over channels: what a step costs. */
@@ -218,9 +230,12 @@ export class Pheromones {
     if (awake.size === 0) return;
     const layer = this.fields[ch];
     const map = this.map;
-    const minCx = map.x0 >> CHUNK_BITS;
-    const maxCx = (map.x0 + map.size.w - 1) >> CHUNK_BITS;
-    const maxCy = (map.size.h - 1) >> CHUNK_BITS;
+    // An endless plane has no edge (PRD §66 E6.0.2): no chunk is past the last, so scent spreads into any neighbour.
+    const open = map.endless === true;
+    const minCx = open ? -Infinity : map.x0 >> CHUNK_BITS;
+    const maxCx = open ? Infinity : (map.x0 + map.size.w - 1) >> CHUNK_BITS;
+    const minCy = open ? -Infinity : 0;
+    const maxCy = open ? Infinity : (map.size.h - 1) >> CHUNK_BITS;
     const keep = Math.max(0, 1 - this.params[ch].evaporation * dt);
     const k = Math.min(0.25, this.params[ch].diffusion * dt);
 
@@ -251,10 +266,10 @@ export class Pheromones {
         };
         if (w > SLEEP && cx > minCx) wake(cx - 1, cy);
         if (e > SLEEP && cx < maxCx) wake(cx + 1, cy);
-        if (n > SLEEP && cy > 0) wake(cx, cy - 1);
+        if (n > SLEEP && cy > minCy) wake(cx, cy - 1);
         if (s > SLEEP && cy < maxCy) wake(cx, cy + 1);
         // The two corners that touch a diagonal chunk (odd rows sit half a cell right).
-        if (a[0] > SLEEP && cx > minCx && cy > 0) wake(cx - 1, cy - 1);
+        if (a[0] > SLEEP && cx > minCx && cy > minCy) wake(cx - 1, cy - 1);
         if (a[(EDGE << CHUNK_BITS) | EDGE] > SLEEP && cx < maxCx && cy < maxCy) wake(cx + 1, cy + 1);
       }
     }

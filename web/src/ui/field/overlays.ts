@@ -14,10 +14,13 @@ import {
   STRIP,
   turnAt,
   PLANE,
+  lineOfLayer,
   type Transect,
 } from "../../colony/index.ts";
 import { toScreen, toWorld } from "../camera.ts";
+import { holeOwner } from "../lens.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
+import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { odourColour } from "./colour.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 
@@ -81,11 +84,16 @@ export function traceColumns(k: FieldCtx, line: Transect, lo: number, hi: number
   }
 }
 
-/** One world's top view: the line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
+/** One world's top view: every line, dashed over its tiles through the holes in order, fainter along its margins; a marker at each hole. */
 export function drawLine(k: FieldCtx, holes = true): void {
+  for (const wl of k.world.lines) drawOneLine(k, wl.line, holes);
+}
+
+/** One line of the top view (drawLine's): its dashes, margins and hole markers. */
+function drawOneLine(k: FieldCtx, line: Transect, holes: boolean): void {
   const { ctx, theme, c, v, d } = k;
-  const line = k.world.line;
   const last = line.holes.length - 1;
+  if (k.fog) return drawLineFogged(k, line, holes);
   ctx.strokeStyle = theme.ink;
   ctx.lineWidth = Math.max(1, d * 1.2);
   ctx.setLineDash([6 * d, 5 * d]);
@@ -112,17 +120,49 @@ export function drawLine(k: FieldCtx, holes = true): void {
   ctx.globalAlpha = 1;
 }
 
+/**
+ * The line under the fog: only the stretches between two holes the fungus has sensed, the margin beyond an end hole only if that hole is sensed,
+ * and a marker only at a sensed hole. Where the other holes are is not shown before anyone has been there (docs/fog-of-war.md §5.1).
+ */
+function drawLineFogged(k: FieldCtx, line: Transect, holes: boolean): void {
+  const { ctx, theme, c, v, d, fog } = k;
+  const last = line.holes.length - 1;
+  const known = line.holes.map((h) => fog!.state(PLANE, h.x, h.y) !== UNKNOWN);
+  ctx.strokeStyle = theme.ink;
+  ctx.lineWidth = Math.max(1, d * 1.2);
+  ctx.setLineDash([6 * d, 5 * d]);
+  const stretch = (lo: number, hi: number, alpha: number): void => {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    traceColumns(k, line, lo, hi);
+    ctx.stroke();
+  };
+  if (known[0]) stretch(line.sMin, line.sHole[0]!, 0.25);
+  if (known[last]) stretch(line.sHole[last]!, line.sMax, 0.25);
+  for (let j = 0; j < last; j++) if (known[j] && known[j + 1]) stretch(line.sHole[j]!, line.sHole[j + 1]!, 0.6);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = theme.ink;
+  if (holes)
+    line.holes.forEach((h, j) => {
+      if (!known[j]) return;
+      const [x, y] = toScreen(c, v, centreX(h.x, h.y), centreY(h.y));
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(2.5 * d, 0.36 * c.zoom), 0, Math.PI * 2);
+      ctx.fill();
+    });
+  ctx.globalAlpha = 1;
+}
+
 /** One world's top view: each hole named by the colony whose hole it is (holeCells), "empty hole" if none. */
 export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boolean): void {
   const { theme, c, v, d, colonies, fungus } = k;
-  const holes = colonies[0]!.holeCells;
   const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
-  for (const h of k.world.line.holes) {
+  for (const h of k.world.lines.flatMap((l) => l.line.holes)) {
     const wx = centreX(h.x, h.y);
     const wy = centreY(h.y);
     if (!inView(wx, wy)) continue;
-    let n = -1;
-    for (let j = 0; j < holes.length && n < 0; j++) if (holes[j]!.px === h.x && holes[j]!.py === h.y) n = j;
+    const n = holeOwner(colonies, PLANE, h.x, h.y);
     const [x, y] = toScreen(c, v, wx, wy);
     const above = y - Math.max(12 * d, 4.5 * c.zoom);
     const col = n >= 0 ? colonies[n] : undefined;
@@ -131,9 +171,12 @@ export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boo
       continue;
     }
     const tone = { ink: theme.ink, spore: theme.spore, warn: theme.warn, dim: theme.fg3 };
+    // Under the fog a remembered hole shows its colony's name only: how far the fungus is into it and its queen are live numbers (docs/fog-of-war.md §4.4).
+    const parts = badgeParts(nestBadge(col, n, fungus));
+    const shown = k.fog && k.fog.state(PLANE, h.x, h.y) !== LIVE ? parts.slice(0, 1) : parts;
     pill(
       k,
-      badgeParts(nestBadge(col, n, fungus)).map((p) => ({ text: p.text, fill: tone[p.tone] })),
+      shown.map((p) => ({ text: p.text, fill: tone[p.tone] })),
       x,
       above - px * 0.2,
       px,
@@ -144,10 +187,12 @@ export function drawHoleNames(k: FieldCtx, inView: (x: number, y: number) => boo
 /** One world's side view: a faint rule down the curtain at each bend (an interior hole's s), labelled with its turn. */
 export function drawBends(k: FieldCtx): void {
   const { ctx, theme, c, v, d } = k;
-  const line = k.world.line;
+  const line = lineOfLayer(k.world, k.lv);
   const px = Math.round(12 * d);
   for (let j = 1; j < line.holes.length - 1; j++) {
     const s = line.sHole[j]!;
+    // Under the fog a bend shows once its hole has been sensed.
+    if (k.fog && k.fog.state(PLANE, line.holes[j]!.x, line.holes[j]!.y) === UNKNOWN) continue;
     const [x, top] = toScreen(c, v, centreX(s, STRIP), 0);
     const [, bottom] = toScreen(c, v, 0, k.ext.h);
     if (x < -px * 4 || x > v.w + px * 4) continue;
@@ -171,7 +216,7 @@ export function drawBends(k: FieldCtx): void {
  */
 export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (x: number, y: number) => boolean): void {
   const { ctx, theme, c, v, colonies } = k;
-  const line = k.world.line;
+  const line = lineOfLayer(k.world, k.lv);
   const half = len / 2;
   const wy = centreY(STRIP);
   ctx.lineCap = "round";
@@ -181,6 +226,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
     let carriers = 0;
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== PLANE) continue;
+      if (k.fog && k.fog.stateAt(PLANE, col.x[i]!, col.y[i]!) !== LIVE) continue; // plane ants only where an observer senses them now
       cellOf(col.x[i]!, col.y[i]!);
       const over = columnsOver(line, CELL[0], CELL[1]);
       for (let j = 0; j < over.length; j++) {
@@ -200,6 +246,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
     ctx.fillStyle = theme.accent;
     for (let i = 0; i < col.n; i++) {
       if (!col.alive[i] || col.layer[i] !== PLANE || !col.carrying[i]) continue;
+      if (k.fog && k.fog.stateAt(PLANE, col.x[i]!, col.y[i]!) !== LIVE) continue;
       cellOf(col.x[i]!, col.y[i]!);
       const over = columnsOver(line, CELL[0], CELL[1]);
       for (let j = 0; j < over.length; j++) {
@@ -237,6 +284,8 @@ export function drawPen(k: FieldCtx, inp: FieldInputs): void {
   if (!hp) return;
   const [wx, wy] = toWorld(c, v, hp[0], hp[1]);
   cellOf(wx, wy);
+  // Under the fog the settle preview (and the reasons it gives from the truth) is only for ground the fungus has sensed.
+  if (k.fog && k.fog.state(PLANE, CELL[0], CELL[1]) === UNKNOWN) return;
   const key = `${CELL[0]},${CELL[1]},${Math.hypot(wx - pn.x, wy - pn.y) <= pn.r}`;
   const seen = inp.penSeen.current;
   if (!seen || seen.pen !== pn || seen.key !== key) inp.penSeen.current = { pen: pn, key, at: pn.preview({ x: wx, y: wy }) };
@@ -253,21 +302,24 @@ export function drawPen(k: FieldCtx, inp: FieldInputs): void {
   const tx = centreX(at.cell.x, at.cell.y);
   const ty = centreY(at.cell.y);
   const [sx, sy] = toScreen(c, v, tx, ty);
-  const holes = k.world.line.holes;
-  const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = Math.max(1.5, d * 1.5);
-  ctx.setLineDash([6 * d, 5 * d]);
-  // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
-  const seg = segmentCells(e, at.cell);
-  ctx.beginPath();
-  for (let i = 0; i < seg.length; i += 2) {
-    const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  // A settle that begins a new line (`newLine`: its index is the world's next, so no such line yet) has no end to grow: only the ring and her hole.
+  if (!at.newLine) {
+    const holes = k.world.lines[at.line ?? 0]!.line.holes;
+    const e = at.end === "start" ? holes[0]! : holes[holes.length - 1]!;
+    ctx.setLineDash([6 * d, 5 * d]);
+    // The new segment over the tiles it would lie on (segmentCells: what the founding lays).
+    const seg = segmentCells(e, at.cell);
+    ctx.beginPath();
+    for (let i = 0; i < seg.length; i += 2) {
+      const [x, y] = toScreen(c, v, centreX(seg[i]!, seg[i + 1]!), centreY(seg[i + 1]!));
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
-  ctx.stroke();
-  ctx.setLineDash([]);
   // From where she lands to where she settles, when she walks on.
   if (Math.hypot(sx - hp[0], sy - hp[1]) > 4 * d) {
     ctx.globalAlpha = 0.5;

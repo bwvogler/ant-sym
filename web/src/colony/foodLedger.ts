@@ -1,5 +1,7 @@
 // The endless world's food totals (docs/endless-world.md §3), pure bookkeeping: `foodTotal` and `foodLeft` mean nothing once food appears as
 // chunks are generated, so they become the food generated so far, plus what the game adds (regrowth, honeydew, a stroke) less what it takes.
+// The ledger counts only the generated part: the map's own `foodTotal` and `foodLeft` carry the adds and takes (world.ts takeFoodCell, dropFood).
+// It once had `add`, `take`, `total` and `left` too; nothing called them, so `left` went stale after the first take (ja-qpv.8.1) and they were removed.
 // A chunk counts once, by its key, however many times it is generated: a chunk dropped from memory and generated again comes back the same
 // and adds nothing the second time. The assays' `foodHome` does not use this: it divides by the food first generated within 2 U of the hole
 // (`EndlessPlane.foodWithin`), a fixed disc.
@@ -7,8 +9,6 @@
 export class FoodLedger {
   readonly #chunks = new Map<string, number>();
   #generated = 0;
-  #added = 0;
-  #taken = 0;
 
   /** A chunk (or curtain block) `key` of `layer` was generated holding `amount` food: counted the first time only (a second, different amount throws). Returns whether it was new. */
   generated(layer: string, key: number, amount: number): boolean {
@@ -24,29 +24,15 @@ export class FoodLedger {
     return true;
   }
 
-  /** The game put food on the map (regrowth, honeydew, a stroke). */
-  add(amount: number): void {
-    this.#added += amount;
-  }
-
-  /** The game took food off the map (eaten, carried to the stores). */
-  take(amount: number): void {
-    this.#taken += amount;
+  /** Forget every chunk counted and the totals (a load, which counts the chunks again as they are made: endlessMap.ts loadEndless). */
+  reset(): void {
+    this.#chunks.clear();
+    this.#generated = 0;
   }
 
   /** Food generated so far: what the generator placed in the chunks made, never what was added or taken since. */
   get generatedTotal(): number {
     return this.#generated;
-  }
-
-  /** `foodTotal`: generated so far plus added, as the bounded map's total counts what regrowth adds. */
-  get total(): number {
-    return this.#generated + this.#added;
-  }
-
-  /** `foodLeft`: the total less what was taken. */
-  get left(): number {
-    return this.total - this.#taken;
   }
 
   /** How many chunks have been counted. */

@@ -19,6 +19,7 @@ import { toScreen } from "../camera.ts";
 import { HYPHA_COLOURS } from "../hyphaVisual.ts";
 import { type Chain, chainsOf, hash, smoothThrough, twigsOf, wander } from "../hyphaeLook.ts";
 import { workerLod } from "../workerSprites.ts";
+import { UNKNOWN } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
 import { HEX_ZOOM } from "./zoom.ts";
 
@@ -244,6 +245,7 @@ export function drawFungusGround(k: FieldCtx, win: CellWindow): FungusFrame {
     stalkLevel = fungus.evolution?.level("stalks") ?? 0;
   for (const [cell, left] of fungus.corpsesOn(lv)) {
     const [sx, sy] = hyphaCell(cell);
+    if (k.fog && k.fog.state(lv, sx, sy) === UNKNOWN) continue; // a corpse nothing has sensed is not shown
     if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
     const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
     sprites.fungal.draw(
@@ -266,6 +268,7 @@ export function drawStalksRaised(k: FieldCtx, win: CellWindow, f: FungusFrame): 
   const { rx0, rx1, ry0, ry1 } = win;
   for (const cell of f.stalks) {
     const [sx, sy] = hyphaCell(cell);
+    if (k.fog && k.fog.state(k.lv, sx, sy) === UNKNOWN) continue;
     if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1) continue;
     const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
     k.sprites.fungal.draw(ctx, { stalkLevel: f.stalkLevel }, cell, x, y, c.zoom, "raised");

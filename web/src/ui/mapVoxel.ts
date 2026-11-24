@@ -4,7 +4,7 @@ import type { LensWorld } from "./lens.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import type { Camera, Viewport } from "./camera.ts";
 import { inspectViewport } from "./inspectionPatch.ts";
-import { centreX, centreY, CURTAIN, STRIP, SIDE, type AphidClump } from "../colony/index.ts";
+import { centreX, centreY, isCurtainLayer, STRIP, SIDE, type AphidClump } from "../colony/index.ts";
 
 export type MapVoxelScene = Pick<InspectionScene, "accelerated" | "setViewport" | "setPalette" | "draw" | "dispose">;
 type Factory = (canvas: HTMLCanvasElement, software: boolean) => Promise<MapVoxelScene>;
@@ -25,7 +25,7 @@ export function canTiltMap(layer: number, hasWorld: boolean, camera: Camera, vie
 }
 
 function supportsVoxelMap(layer: number, hasWorld: boolean, camera: Camera, view: Viewport): boolean {
-  return !hasWorld || layer !== CURTAIN || camera.y - view.h / camera.zoom / 2 > centreY(STRIP) + SIDE;
+  return !hasWorld || !isCurtainLayer(layer) || camera.y - view.h / camera.zoom / 2 > centreY(STRIP) + SIDE;
 }
 
 export function mapVoxelAlpha(cssZoom: number, accelerated = true): number {
@@ -115,7 +115,7 @@ export class MapVoxelPass {
       const worldHeight = view.h / camera.zoom;
       const tilt = orbit?.tilt ?? 0;
       const projectedTop = (worldHeight / 2 + BELOW_WALK_PLANE * Math.abs(Math.sin(tilt))) / Math.cos(tilt);
-      const stripInView = !!g.world && layer === CURTAIN && camera.y - projectedTop <= centreY(STRIP) + SIDE;
+      const stripInView = !!g.world && isCurtainLayer(layer) && camera.y - projectedTop <= centreY(STRIP) + SIDE;
       // The surface strip only has navigation hit targets in the flat projection.
       // So tilting Below near the strip switches between the tilted view and the flat map: intended (mapRendering.test.ts, "the underground camera tilts
       // at close zoom while the projected strip stays flat").
@@ -155,11 +155,11 @@ export class MapVoxelPass {
         ctx.globalAlpha = alpha;
         ctx.imageSmoothingEnabled = false;
         if (angled) {
-          ctx.fillStyle = layer === CURTAIN ? "#3e2b20" : "#b7b5aa";
+          ctx.fillStyle = isCurtainLayer(layer) ? "#3e2b20" : "#b7b5aa";
           ctx.fillRect(0, 0, view.w, view.h);
         }
         ctx.drawImage(this.surface, 0, 0, view.w, view.h);
-        if (angled && layer !== CURTAIN && Math.abs(orbit.tilt) > 0.5) {
+        if (angled && !isCurtainLayer(layer) && Math.abs(orbit.tilt) > 0.5) {
           // Only Above (never Below) fogs, and Above's camera tilt is never negative (mapCameraOrbit), so the horizon is always the top edge;
           // the bottom-edge branch is kept for an orbit with the other sign.
           const horizon = orbit.tilt < 0 ? view.h : 0;

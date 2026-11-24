@@ -319,10 +319,12 @@ export function believePlane(c: Colony, i: number, goal: Nest): Nest {
   }
   const b = c.belief;
   // Never past the plane's edges (as the side view's ground's ends): the search is centred on the point it can reach.
-  const lo = EDGE;
-  const lx = c.map.x0 + EDGE;
-  const hx = c.map.x0 + c.map.size.w - EDGE;
-  const hy = c.map.size.h * R - EDGE;
+  // An endless plane has no edge to keep off (PRD §66 E6.0.2): the belief is not held to a box.
+  const open = c.map.endless === true;
+  const lo = open ? -Infinity : EDGE;
+  const lx = open ? -Infinity : c.map.x0 + EDGE;
+  const hx = open ? Infinity : c.map.x0 + c.map.size.w - EDGE;
+  const hy = open ? Infinity : c.map.size.h * R - EDGE;
   b.x = Math.max(lx, Math.min(hx, Math.max(lx, Math.min(hx, cx)) + s * Math.cos(a)));
   b.y = Math.max(lo, Math.min(hy, Math.max(lo, Math.min(hy, cy)) + s * Math.sin(a)));
   b.r = goal.r;

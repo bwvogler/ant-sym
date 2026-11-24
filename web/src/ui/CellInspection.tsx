@@ -1,6 +1,7 @@
 import { dragOrbit, type InspectionOrbit } from "./inspectionOrbit.ts";
 import type { InspectionScene } from "./InspectionScene.ts";
 import { useEffect, useRef, useState } from "react";
+import { REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
 import type { InspectionPatch } from "./inspectionPatch.ts";
 import { INSPECTION_ATLAS_URL, LIFECYCLE_ATLAS_URL, LIFECYCLE_ATLAS_SIZE } from "./drawCellInspection.ts";
 import { InspectionPatchRenderer, BELOW_ATLAS_URL, BELOW_ATLAS_SIZE } from "./drawInspectionPatch.ts";
@@ -124,7 +125,8 @@ export default function CellInspection({
     };
   }, [onFrame, state.mode, software]);
   const selected = state.selected,
-    p = selected.place;
+    p = selected.place,
+    remembered = p.fog === REMEMBERED;
   return (
     <aside
       ref={panel}
@@ -270,59 +272,69 @@ export default function CellInspection({
           {state.cells[0]?.surfaceStrip && (
             <p className="mb-3 text-xs text-fg-3">Surface boundary: surface workers are shown in the above view.</p>
           )}
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
-            <dt className="text-fg-3">Ground</dt>
-            <dd>{p.ground}</dd>
-            <dt className="text-fg-3">Location</dt>
-            <dd>
-              {inspectionMarkers(p)
-                .map((m) => m.label)
-                .join(" · ") || "—"}
-            </dd>
-            <dt className="text-fg-3">Sensed home / food / alarm</dt>
-            <dd>{[p.homeTrail, p.foodTrail, p.alarm].map((v) => `${Math.round(v * 100)}%`).join(" / ")}</dd>
-            <dt className="text-fg-3">Workers</dt>
-            <dd>{selected.ants.length}</dd>
-            <dt className="text-fg-3">Queens</dt>
-            <dd>
-              {selected.queens.length}
-              {selected.queens.some((q) => !q.alive) ? " · dead queen present" : ""}
-            </dd>
-            <dt className="text-fg-3">Eggs / larvae / pupae</dt>
-            <dd>{selected.brood.join(" / ")}</dd>
-            <dt className="text-fg-3">Carried brood</dt>
-            <dd>{selected.ants.filter((a) => a.cargo === "brood").length}</dd>
-            <dt className="text-fg-3">Fallen workers</dt>
-            <dd>{selected.fallen}</dd>
-            <dt className="text-fg-3">Buried in midden</dt>
-            <dd>{selected.buried}</dd>
-            <dt className="text-fg-3">Loose food</dt>
-            <dd>{p.food.toFixed(2)}</dd>
-            {p.chamber && (
-              <>
-                <dt className="text-fg-3">Stored food (whole chamber)</dt>
-                <dd>{p.chamber.food.toFixed(2)}</dd>
-              </>
-            )}
-            <dt className="text-fg-3">Recent surface / midden remains</dt>
-            <dd>{selected.recentRemains ?? 0}</dd>
-            <dt className="text-fg-3">Aphid density</dt>
-            <dd>{selected.aphidDensity.toFixed(1)} / cell</dd>
-            <dt className="text-fg-3">Spoil height</dt>
-            <dd>{p.mound.toFixed(2)}</dd>
-            <dt className="text-fg-3">Mycelium</dt>
-            <dd>
-              {p.hypha ? "Present" : "None"}
-              {selected.knot ? " · knot" : ""}
-              {selected.knotSprouted ? " (sprouted)" : ""}
-              {selected.cord ? " · cord" : ""}
-              {selected.fruit ? " · spore tufts" : ""}
-              {selected.colonised ? " · colonised remains" : ""}
-              {selected.stalk ? " · stalk" : ""}
-            </dd>
-            <dt className="text-fg-3">Spores</dt>
-            <dd>{p.spores ? "Visible" : "None visible"}</dd>
-          </dl>
+          {p.fog === UNKNOWN ? (
+            <p className="text-fg-2">Unexplored: your hosts and your body have not sensed this ground, so nothing is known of it.</p>
+          ) : (
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+              {p.fog === REMEMBERED && (
+                <>
+                  <dt className="text-fg-3">Last seen</dt>
+                  <dd>{Math.round(p.age ?? 0)} s ago: how it was, not how it is</dd>
+                </>
+              )}
+              <dt className="text-fg-3">Ground</dt>
+              <dd>{p.ground}</dd>
+              <dt className="text-fg-3">Location</dt>
+              <dd>
+                {inspectionMarkers(p)
+                  .map((m) => m.label)
+                  .join(" · ") || "—"}
+              </dd>
+              <dt className="text-fg-3">Sensed home / food / alarm</dt>
+              <dd>{[p.homeTrail, p.foodTrail, p.alarm].map((v) => `${Math.round(v * 100)}%`).join(" / ")}</dd>
+              <dt className="text-fg-3">Workers</dt>
+              <dd>{remembered ? "—" : selected.ants.length}</dd>
+              <dt className="text-fg-3">Queens</dt>
+              <dd>
+                {remembered ? "—" : selected.queens.length}
+                {!remembered && selected.queens.some((q) => !q.alive) ? " · dead queen present" : ""}
+              </dd>
+              <dt className="text-fg-3">Eggs / larvae / pupae</dt>
+              <dd>{remembered ? "—" : selected.brood.join(" / ")}</dd>
+              <dt className="text-fg-3">Carried brood</dt>
+              <dd>{remembered ? "—" : selected.ants.filter((a) => a.cargo === "brood").length}</dd>
+              <dt className="text-fg-3">Fallen workers</dt>
+              <dd>{remembered ? "—" : selected.fallen}</dd>
+              <dt className="text-fg-3">Buried in midden</dt>
+              <dd>{remembered ? "—" : selected.buried}</dd>
+              <dt className="text-fg-3">Loose food</dt>
+              <dd>{p.food.toFixed(2)}</dd>
+              {p.chamber && (
+                <>
+                  <dt className="text-fg-3">Stored food (whole chamber)</dt>
+                  <dd>{p.chamber.food.toFixed(2)}</dd>
+                </>
+              )}
+              <dt className="text-fg-3">Recent surface / midden remains</dt>
+              <dd>{remembered ? "—" : (selected.recentRemains ?? 0)}</dd>
+              <dt className="text-fg-3">Aphid density</dt>
+              <dd>{remembered ? "—" : `${selected.aphidDensity.toFixed(1)} / cell`}</dd>
+              <dt className="text-fg-3">Spoil height</dt>
+              <dd>{p.mound.toFixed(2)}</dd>
+              <dt className="text-fg-3">Mycelium</dt>
+              <dd>
+                {p.hypha ? "Present" : "None"}
+                {selected.knot ? " · knot" : ""}
+                {selected.knotSprouted ? " (sprouted)" : ""}
+                {selected.cord ? " · cord" : ""}
+                {selected.fruit ? " · spore tufts" : ""}
+                {selected.colonised ? " · colonised remains" : ""}
+                {selected.stalk ? " · stalk" : ""}
+              </dd>
+              <dt className="text-fg-3">Spores</dt>
+              <dd>{p.spores ? "Visible" : "None visible"}</dd>
+            </dl>
+          )}
           <p className="mt-4 text-xs leading-relaxed text-fg-3">
             The six neighbours give context; these counts apply only to the outlined centre cell. Food and aphid marks show abundance.
             Cadavers decay in steps over 15 simulation minutes. Buried counts are historical, not exposed bodies. Store marks illustrate the

@@ -20,7 +20,7 @@ import {
   SWELL,
 } from "./tuning.ts";
 import { FAINT, PLANE } from "./vocab.ts";
-import { OPEN, dropFood, fillCell, groundTop, heapPlane, isSky, openCell, rockAt, takePlane, type Nest } from "./world.ts";
+import { OPEN, dropFood, fillCell, groundTop, heapPlane, isSky, openCell, rockAt, takePlane, topRow, type Nest } from "./world.ts";
 import { fromHomePlane, vectorHomePlane } from "./homing.ts";
 import { touch } from "./sense.ts";
 import { dropBrood } from "./body.ts";
@@ -285,7 +285,7 @@ export function unbury(self: Colony, i: number): void {
   const cy = CELL[1];
   if (rockAt(self.map, cx, cy) === OPEN) return;
   // Never up into one world's surface rows (the plane's: crossUp is the only way there).
-  const surface = self.map.surfaceRows ?? 0;
+  const surface = topRow(self.map);
   for (const d of [4, 5, 3, 0, 2, 1]) {
     const tx = stepX(cx, cy, d);
     const ty = stepY(cy, d);

@@ -69,7 +69,7 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, but the stamp still skips them: left for a later change (`ja-1ypq.1` notes).
+- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, and see (owner, 2026-11-24; `ja-1ypq.9`, not yet built: `hostSight` still loops over workers only).
 - **The body:** every hypha cell (`hyphaeOn(l).parent`, mats included), patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
@@ -101,6 +101,12 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Ants, the queen, brood and alates draw only in live cells.
 - The fog mask is drawn per cell at low resolution, upscaled and blurred, and snapped to the grid (§2).
 
+**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. While the fog is on, the 3-D voxel pass falls back to 2D.
+
+**F3.2 (`ja-1ypq.3.2`, same flag):** the curtain's strip and its cut are the plane under the line as last sensed (`planeGround` in `field/fogCull.ts`): fog where that plane cell was never sensed, dimmed where nobody senses it now; the plane's ants over the strip only where live. The minimap paints unexplored pixels as fog, the rest from snapshots (dimmed when remembered), and ants only where live. In hexagon mode the dirt pellets come from the snapshot. Spores and hyphae are the fungus's own body and always draw. Corpses show only where live for now: remembering them needs a corpse source (F3.3).
+
+**F3.3 (`ja-1ypq.3.3`, same flag):** aphids draw only where live; chamber labels only where live (a role is read live); hole names and the strip's bends only at holes the fungus has sensed; the line and its hole dots only between and at sensed holes (owner, 2026-11-24: fogged like the rest, as built; not a map the player always knows); the fungus's colonised corpses and stalks only where the place has been sensed; a remembered chamber is tinted plainly, since its role may have changed; and the dead are remembered as ground items (`fog/corpses.ts`, `CorpseMemory`): kept as they lay when last seen, shown a little fainter where nobody senses now, forgotten when an observer senses the place again and finds them gone. Still to do for the field: the followed ring, specimens, traces and the hover inspection (F4).
+
 ### 5.2 Picking and cards (`ja-1ypq.4`)
 - Only ants in live cells can be picked.
 - Following a non-host ends with "lost sight" when it leaves; hosts stay followable.
@@ -108,6 +114,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Specimens lose track out of sight.
 - Chamber labels appear only for known nests. The nest tab (`LearnDrawer.tsx` `NestCard`: queen, brood and ant counts per colony) follows §5.3.
 - **Decided (D1, owner, 2026-11-23):** for a known colony with no host in it, the nest tab and stats show queen and brood counts "as of N s ago", and nothing is drawn on the map.
+
+**Built (F4, `ja-1ypq.4`, same flag):** `pickAnt` finds only ants where live (so the lens's ant, the ant card and follow-by-click do too); a click on a chamber nothing has sensed finds none; a followed ant that is no longer sensed ends the follow and a toast says "Lost sight of ant #n" (a host is always sensed, so it stays); the lens (`probe`, `lensLines`) says "Unexplored" for a place never sensed and, for a remembered one, the ground, food and mound as last seen, a plain chamber and "Last seen N s ago"; cell inspection reads nothing of a place never sensed, no ant, queen, brood or aphid of a remembered one, and the dead as they lay when last seen; a pinned specimen out of sight shows only who it is, and a death out of sight is not reported until the place is sensed again; the queen's pen asks no preview of ground the fungus has not sensed. Review fixes: every route that would take the camera or a card to an ant goes through `canFollow` (`follow.ts`: the specimen row, `goTo`, a pinned lens card), a lost specimen's row is disabled, the 3-D patch's food, ground and spoil read the snapshot (nothing for ground never sensed), the cell card says "Unexplored" or "Last seen N s ago" (remembered ants, brood and counts are dashes), and the frame that loses sight draws no follow ring. Still open: the ant card shows the ant's Jev situation, which may include ground the fungus has not sensed (owner call: leave it, show it to hosts only, or blank the unknown fields), and the tutorial follows a non-host worker, so under `?fog=1` its follow step ends at once (F6). Not covered: the hover cell inspection's fungus part (hyphae, colonised corpses) reads live at an unsensed cell (the body is always sensed, so it is rarely unknown); traces of moved ants.
 
 ### 5.3 Readouts (`ja-1ypq.5`)
 - Stats, history, goal toasts, nest badges, the nest tab and the go-to menu list known colonies only, live or as of (§4.4).

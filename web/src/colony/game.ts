@@ -1,23 +1,26 @@
 import { snapshotAttackCue } from "./attackCue.ts";
-import { centreX, centreY } from "./hex.ts";
+import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
 import { cellKey as colonyCell, Colony, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
-import { growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
+import { generateCurtain, growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
-import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
-import { type Line, nearestValidIn } from "./lines.ts";
-import { cellAt, type Cell, type End, outward } from "./transect.ts";
+import { clampCol, clampRow, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
+import { type Line, lineSalt, lineSeed, nearestValidIn, type Reserved, type WildSite } from "./lines.ts";
+import { cellAt, type Cell, type End, makeTransect, outward, type Transect } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
 import { seeHoles } from "./layers.ts";
+import { DEFAULT_SLEEP, SleepRule, type SleepParams, type SleepState } from "./sleep.ts";
 import { stepCrayons, type CrayonLine } from "./builder.ts";
 import { aphidOdour, stepAphids, updateAphidOdour, type AphidClump } from "./aphids.ts";
+import { CHUNK, CHUNK_BITS, chunkKey, local } from "./chunks.ts";
+import { isEndless, loadEndless, saveEndless, type EndlessMap } from "./endlessMap.ts";
 
 export { CURTAIN, PLANE } from "./colony.ts";
 
@@ -121,6 +124,16 @@ export interface Founding {
    */
   fungus?: { load: number; strain: number };
   /**
+   * A wild colony woken from its site (Game.wakeSite): the site's lattice cell. A save founds it again from this, so the game knows the site has woken
+   * and no longer reserves it.
+   */
+  wild?: { rx: number; ry: number };
+  /**
+   * The stream the colony is built from, when it must not depend on the game's: a wild colony's, from its site's hash. Not saved. The colony takes the
+   * game's own stream once it is built.
+   */
+  rng?: () => number;
+  /**
    * The nest as dug (Game.addColony records it). A save founds from it rather than digging again: a second dig would
    * draw from the restored game's random stream and could put the shaft elsewhere (PR #42 review, B1).
    */
@@ -129,7 +142,14 @@ export interface Founding {
    * One world (U4b): where the founding went, nearestValid's hole on the plane and the end of the line it grew (Game.addColony
    * records it; x and y stay the landing point). A save's re-founding grows the line there again (oneWorld.ts growWorld).
    */
-  spot?: { end: End; cell: Cell; /** the line it grew (absent: the first, the only one until the endless world) */ line?: number };
+  spot?: {
+    end: End;
+    cell: Cell;
+    /** the line it grew (absent: the first, the only one until the endless world) */
+    line?: number;
+    /** it began a line of its own along this heading (radians): `line` is that line, made by the founding (Game.addLine) */
+    newLine?: { heading: number };
+  };
 }
 
 /** A saved game (Game.save): JSON. */
@@ -167,7 +187,13 @@ export interface GameSave {
    * One world (U4b): its seed, the line as saved (its holes, V₀'s column and the margin: a check, since load grows the
    * line again from `founded`), and the curtain as dug (its nests aside: the world digs them). `map` is the plane.
    */
-  world: { seed: number; line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown };
+  world: {
+    seed: number;
+    line: { holes: Cell[]; s0: number; margin: number };
+    curtain: unknown;
+    /** the lines after the first (docs/endless-world.md §8): absent in a game of one line */
+    more?: { line: { holes: Cell[]; s0: number; margin: number }; curtain: unknown }[];
+  };
   private: {
     fightDeaths: number;
     lastFightDeath: number;
@@ -177,8 +203,15 @@ export interface GameSave {
     regrowClock: number;
     rng: number | null;
     regrowRng: number | null;
+    /** the colonies asleep, by index (Game.freeze); absent when none is */
+    frozen?: number[];
+    /** the awake rule (Game.enableSleep): its parameters and memory; absent when the game has none */
+    sleep?: { params: SleepParams; state: SleepState; next: number };
   };
 }
+
+/** How near two ants must be to be in contact for the awake rule, in steps between hex cells (a few steps of sensing). */
+const CONTACT_RANGE = 4;
 
 /** The game's regrowth (GameParams.regrow): a pile eaten bare is half back in about 20 minutes. */
 export const GAME_REGROW = 1800;
@@ -332,6 +365,8 @@ export class Game {
   readonly recognition: Recognition;
   /** each layer's recognition, built from the ants on it: `recognition` is layer 0's */
   #recs: Recognition[];
+  /** the recognition parameters every layer's Recognition is made from (a line that begins mid-game makes one more) */
+  #recognition: Partial<RecognitionParams>;
   params: GameParams;
   time = 0;
   /** each layer's occupancy, per colony: [layer][colony] */
@@ -356,6 +391,8 @@ export class Game {
   #rng: () => number;
   /** the ground's food piles as the world began (cellKey, units), for regrowth; null when food does not regrow */
   #piles: { cells: Float64Array; full: Float32Array } | null = null;
+  /** the chunks of an endless plane whose piles are in `#piles` */
+  #pileChunks = new Set<number>();
   /** regrowth's own random numbers: the game's stream is never drawn from for it */
   #regrowRng: Rng | null = null;
   #regrowClock = 0;
@@ -396,6 +433,7 @@ export class Game {
     // names one. Every colony of a game is its species, so the game takes it from there.
     const tol = this.params.species.params.tolerance;
     const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
+    this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
     // Every layer's recognition (one world's curtain too) takes the same tolerance.
     this.#recs = this.layers.map((_, l) => (l === 0 ? this.recognition : new Recognition(recognition)));
@@ -453,6 +491,11 @@ export class Game {
     this.#wire();
     this.#refresh();
     if (this.params.regrow > 0) this.#notePiles();
+    // A plane with no edge: a founding far from every hole starts a line of its own, and the wild sites near what is awake are listed (PRD §66 E6.0.3).
+    if (isEndless(map)) {
+      this.newLines = true;
+      this.feedSites();
+    }
   }
 
   /** A colony asks its mode policy about the species' own situation, when its mode words have a schema of their own (ja-fnd.5.10). */
@@ -514,8 +557,332 @@ export class Game {
     });
   }
 
+  /** The colonies asleep, by index (freeze, docs/endless-world.md §6): not stepped, not met, not read by the fungus. Empty in every game that freezes nothing. */
+  #frozen = new Set<number>();
+
+  /**
+   * Put colony k to sleep (E4.1): its ants, its scent on every layer and its curtain stop where they are. Its ants leave the occupancy grids and the
+   * fights, the recognition and the fungus's reading of ants; a curtain whose colonies are all asleep is not stepped by the fungus (its spores do not
+   * fade, its hyphae do not grow). Nothing here decides when: that is the awake rule (E4.2). The camera never freezes anything.
+   */
+  freeze(k: number): void {
+    if (!this.colonies[k]) throw new Error(`freeze: no colony ${k}`);
+    this.#frozen.add(k);
+    this.#syncFrozen();
+    this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
+    this.#aimAll(); // and the awake raid no one who sleeps
+  }
+
+  /** Wake colony k: it steps again from exactly where it stopped. */
+  thaw(k: number): void {
+    this.#frozen.delete(k);
+    this.#syncFrozen();
+    this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
+    this.#aimAll();
+  }
+
+  /** Whether colony k is asleep. */
+  isFrozen(k: number): boolean {
+    return this.#frozen.has(k);
+  }
+
+  /** The wild sites that have woken, by "rx,ry": the colony each became (Game.wakeSite). */
+  #wild = new Map<string, number>();
+
+  /**
+   * Wake a wild site (docs/endless-world.md §4, E4.3): its colony is generated, once, from the site and the world's seed only (never the game's
+   * stream: the same site woken in two games is the same colony), on a line of its own along the site's heading. It starts at the size a start colony
+   * reaches by about six minutes (measured, scripts/mature-colony.mjs: its cap, 1.5 times the start, with no brood left and its nest dug out); `ants`
+   * overrides it (the owner's size, ja-dv98). Its odour is a hash of the site. Waking a site twice gives the colony already woken.
+   */
+  wakeSite(site: WildSite, opts: { ants?: number } = {}): number {
+    const key = `${site.rx},${site.ry}`;
+    const woken = this.#wild.get(key);
+    if (woken !== undefined) return woken;
+    const seed = this.world.seed;
+    cellOf(site.x, site.y); // sets CELL: the site's hole cell
+    const cell = { x: CELL[0] as number, y: CELL[1] as number };
+    const cap = this.params.species.params.maxAnts ?? Math.round(1.5 * this.#firstAnts);
+    return this.addColony({
+      x: site.x,
+      y: site.y,
+      antCount: opts.ants ?? cap,
+      maxAnts: Math.max(cap, opts.ants ?? 0),
+      odour: hash01(seed, 101, site.rx, site.ry),
+      wild: { rx: site.rx, ry: site.ry },
+      rng: mulberry32(hash4(seed, 102, site.rx, site.ry)),
+      spot: { end: "end", cell, line: this.world.lines.length, newLine: { heading: site.heading } },
+    });
+  }
+
+  /** The awake rule (E4.2), when the game has one: it decides each `every` seconds who sleeps. Off in every game that does not turn it on (the bounded game). */
+  #sleep: SleepRule | null = null;
+  /** The next time the rule is asked (saved with the rule, so a load asks when the saved game would have). */
+  #sleepNext = 0;
+
+  /**
+   * Turn the awake rule on (docs/endless-world.md §6): from now on, every `every` seconds the game reads who the fungus is near and who has met whom, asks
+   * `SleepRule`, and freezes and thaws what it says. Colonies already asleep stay so until the rule wakes them. The bounded game never calls this.
+   */
+  enableSleep(params: Partial<SleepParams> = {}): void {
+    this.#sleep = new SleepRule(this.colonies.length, params, this.time);
+    this.#sleepNext = this.time;
+  }
+
+  /** The awake rule, for the page's and the assays' readings (`over`, `params`); null when the game has none. */
+  get sleepRule(): SleepRule | null {
+    return this.#sleep;
+  }
+
+  /**
+   * The facts the rule reads, from the game as it stands: where the awake fungus is (its body on the plane, in an awake curtain, and in the ants
+   * that carry it), and which awake ants are in sensing range of each other (E4.2, docs/endless-world.md §6). Reads only; each is a world-space
+   * test, never the camera.
+   */
+  #sleepFacts(rule: SleepRule): {
+    near: boolean[];
+    entered: boolean[];
+    holds: boolean[];
+    contact: (a: number, b: number) => boolean;
+  } {
+    const { distance, nestGround } = rule.params;
+    const n = this.colonies.length;
+    const holes = this.colonies.map((c) => (c.layers[PLANE] as Layer).nest);
+    // The plane is never frozen: its body is awake wherever it lies. A curtain's body is awake only while its colonies are.
+    const near = this.fungus.bodyNear(PLANE, holes, distance);
+    const entered = Array<boolean>(n).fill(false);
+    const holds = Array<boolean>(n).fill(false);
+    this.colonies.forEach((c, j) => {
+      const asleep = this.#frozen.has(j);
+      if (c.home !== PLANE && !asleep && this.fungus.bodyOn(c.home)) near[j] = true;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (c.load[i] as number) <= 0) continue;
+        if (asleep) {
+          holds[j] = true;
+          continue;
+        }
+        if (c.layer[i] !== PLANE) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        for (let k = 0; k < n; k++) {
+          const d = Math.hypot(holes[k]!.x - x, holes[k]!.y - y);
+          if (d <= distance) near[k] = true;
+          if (k !== j && d <= nestGround) entered[k] = true;
+        }
+      }
+      if (asleep && c.home !== PLANE && this.fungus.frozenLayers.has(c.home) && this.fungus.bodyOn(c.home)) holds[j] = true;
+    });
+    // Contact: an ant of a within CONTACT_RANGE of an ant of b, on any layer, by b's occupancy of the last tick (awake pairs only are asked).
+    const contact = (a: number, b: number): boolean => {
+      const ca = this.colonies[a] as Colony;
+      for (let i = 0; i < ca.n; i++) {
+        if (!ca.alive[i]) continue;
+        const l = ca.layer[i] as number;
+        const grid = (this.#grids[l] as CountGrid[] | undefined)?.[b];
+        if (!grid) continue;
+        // the ant's hex cell the way occupancy finds it, and b's ants within CONTACT_RANGE steps of it
+        const map = this.layers[l] as WorldMap;
+        ca.antCell(i);
+        if (around(grid, map, clampCol(map, CELL[0]), clampRow(map, CELL[1]), CONTACT_RANGE) > 0) return true;
+      }
+      return false;
+    };
+    return { near, entered, holds, contact };
+  }
+
+  /**
+   * On an endless plane, keep `sites` equal to the wild sites near what is awake (docs/endless-world.md §4, §6; PRD §66 E6.0.3): those in a box of 2 W round
+   * every awake colony's hole (a flight lands within 2 U, and the fungus wakes within W) and in the squares of side W, a square each way round, that hold the
+   * fungus's body on the plane; sites that have woken are colonies now and are not listed, and a site far from every awake colony and from the body is dropped
+   * (it is reserved again when something awake comes near). Pure in what it reads, and the plane's own cache of sites (never the map's chunks: no chunk is
+   * generated for it), so it is cheap to run once a second. A bounded game has no sites to feed: nothing happens.
+   */
+  feedSites(): void {
+    const map = this.map;
+    if (!isEndless(map)) return;
+    const W = this.#sleep?.params.distance ?? DEFAULT_SLEEP.distance;
+    const boxes: [number, number, number, number][] = [];
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      const h = (c.layers[PLANE] as Layer).nest;
+      boxes.push([h.x - 2 * W, h.y - 2 * W, h.x + 2 * W, h.y + 2 * W]);
+    });
+    for (const [bx, by] of this.fungus.bodyBuckets(PLANE, W)) boxes.push([(bx - 1) * W, (by - 1) * W, (bx + 2) * W, (by + 2) * W]);
+    const want = new Map<string, WildSite>();
+    for (const b of boxes)
+      for (const s of map.plane.sitesIn(b[0], b[1], b[2], b[3])) {
+        const key = `${s.rx},${s.ry}`;
+        if (!this.#wild.has(key) && !want.has(key)) want.set(key, s);
+      }
+    this.sites = [...want.values()].sort((a, b) => a.ry - b.ry || a.rx - b.rx);
+  }
+
+  /** Whether an endless plane's chunks are made ahead of need (`#prefetchStep`); off, every chunk is made on its first read. Same game either way: tests and the bench turn it off to compare. */
+  prefetch = true;
+  /** The chunks to make ahead of need, as [cx, cy] pairs in the order to make them, and the next time to plan them again (a pure cache: never saved). */
+  #prefetchQueue: [number, number][] = [];
+  #prefetchHead = 0;
+  #prefetchNext = 0;
+  /** The chunks the fungus's body covers, replanned every few seconds (the body grows slowly and reading it costs a pass over its cells). */
+  #bodyChunks: [number, number][] = [];
+  #bodyNext = 0;
+
+  /**
+   * On an endless plane, make the chunks an awake ant, hole, trail or the fungus's body is about to read before they are read (PRD §66 E6.0.4, `ja-qpv.9.1`): a
+   * chunk with food patches costs ~70 ms to generate, a tick over 50 ms if a layer read makes it. Once a second the chunks one ring round every occupied chunk
+   * (awake ants on the plane, awake holes, the body, scent) are queued; each tick does one step of one of them (the patches of one neighbour, a ~10-80 ms
+   * flood, or the chunk itself), so no tick pays for two. An ant walks ~7 cells a second and a chunk is 64, so a ring of one is more than a second's reach; a
+   * chunk read before its turn (a flight landing far off, a load, a site woken) is still made on the read, as before: this changes WHEN a chunk is made, never
+   * what it holds (generation is pure in (seed, chunk); `EndlessMap.prefetch` touches no layer, total or hook), and sleeping colonies read nothing so ask
+   * for nothing. It runs on its own once-a-second cadence, with the awake rule on or not.
+   */
+  #prefetchStep(map: EndlessMap): void {
+    if (this.time >= this.#prefetchNext) {
+      this.#prefetchNext = this.time + 1;
+      this.#planPrefetch();
+    }
+    while (this.#prefetchHead < this.#prefetchQueue.length) {
+      const [cx, cy] = this.#prefetchQueue[this.#prefetchHead] as [number, number];
+      if (map.prefetch(cx, cy)) return; // a step of this chunk's work; the next tick takes the next
+      this.#prefetchHead++;
+    }
+  }
+
+  #planPrefetch(): void {
+    const centres = new Set<number>();
+    const list: [number, number][] = [];
+    const add = (cx: number, cy: number): void => {
+      const k = chunkKey(cx, cy);
+      if (centres.has(k)) return;
+      centres.add(k);
+      list.push([cx, cy]);
+    };
+    // Scent: a step of the trails reads the rock of every chunk with scent and its neighbours, and wakes a neighbour the scent spreads into (whose own
+    // neighbours it then reads): ring 1 round a scented chunk first, ring 2 after the rest (found: 80 of the ~125 misses of a 300 s game were the trails').
+    const scented: [number, number][] = [];
+    const seenScent = new Set<number>();
+    const scent = (cx: number, cy: number): void => {
+      const k = chunkKey(cx, cy);
+      if (seenScent.has(k)) return;
+      seenScent.add(k);
+      scented.push([cx, cy]);
+      add(cx, cy);
+    };
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      const h = (c.layers[PLANE] as Layer).nest;
+      cellOf(h.x, h.y);
+      add(CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS);
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || c.layer[i] !== PLANE) continue;
+        cellOf(c.x[i] as number, c.y[i] as number);
+        add(CELL[0]! >> CHUNK_BITS, CELL[1]! >> CHUNK_BITS);
+      }
+      for (const ph of [(c.layers[PLANE] as Layer).ph, c.foreign, c.raidMarks]) if (ph && ph.map === this.map) ph.eachAwakeChunk(scent);
+    });
+    if (this.time >= this.#bodyNext) {
+      this.#bodyNext = this.time + 5;
+      this.#bodyChunks = [];
+      // a bucket of CHUNK world units: its columns are chunk columns, its rows span chunk rows of CHUNK * R units
+      for (const [bx, by] of this.fungus.bodyBuckets(PLANE, CHUNK))
+        for (let cy = Math.floor(by / R); cy <= Math.floor((by + 1) / R); cy++) this.#bodyChunks.push([bx, cy]);
+    }
+    for (const [cx, cy] of this.#bodyChunks) add(cx, cy);
+    const queue: [number, number][] = [];
+    const queued = new Set<number>();
+    const ring = (cx: number, cy: number, r: number): void => {
+      for (let j = -r; j <= r; j++)
+        for (let i = -r; i <= r; i++) {
+          if (r > 1 && Math.max(Math.abs(i), Math.abs(j)) < r) continue; // ring 2 is the shell only: the inner rings were queued
+          const k = chunkKey(cx + i, cy + j);
+          if (queued.has(k)) continue;
+          queued.add(k);
+          queue.push([cx + i, cy + j]);
+        }
+    };
+    for (const [cx, cy] of list) ring(cx, cy, 1);
+    for (const [cx, cy] of scented) ring(cx, cy, 2);
+    this.#prefetchQueue = queue;
+    this.#prefetchHead = 0;
+  }
+
+  /** Ask the awake rule and apply its verdict. */
+  #decideSleep(): void {
+    const rule = this.#sleep as SleepRule;
+    this.#sleepNext = this.time + rule.params.every;
+    this.feedSites();
+    const facts = this.#sleepFacts(rule);
+    const v = rule.step({ time: this.time, asleep: this.colonies.map((_, k) => this.#frozen.has(k)), ...facts });
+    for (const k of v.freeze) this.freeze(k);
+    for (const k of v.thaw) this.thaw(k);
+    this.#wakeSites(rule);
+  }
+
+  /**
+   * The sites that wake now (docs/endless-world.md §6, E4.3b): one the awake fungus's body has come within W of, or an awake host has entered the nest
+   * ground of. A host merely foraging past within W wakes nothing, and nothing but the fungus wakes a site (no ant wakes another, so waking cannot
+   * chain). Only sites that carry their lattice cell (`rx`, `ry`) can wake. The woken colony joins the rule awake; the cap, next decision, freezes
+   * the lowest-ranked if it is over.
+   */
+  #wakeSites(rule: SleepRule): void {
+    const sites = this.sites.filter((s): s is WildSite => s.rx !== undefined && s.ry !== undefined);
+    if (!sites.length) return;
+    const { distance, nestGround } = rule.params;
+    const woke = this.fungus.bodyNear(PLANE, sites, distance);
+    this.colonies.forEach((c, j) => {
+      if (this.#frozen.has(j)) return;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (c.load[i] as number) <= 0 || c.layer[i] !== PLANE) continue;
+        const x = c.x[i] as number;
+        const y = c.y[i] as number;
+        sites.forEach((s, k) => {
+          if (!woke[k] && Math.hypot(s.x - x, s.y - y) <= nestGround) woke[k] = true;
+        });
+      }
+    });
+    sites.forEach((s, k) => {
+      if (woke[k]) this.wakeSite(s);
+    });
+  }
+
+  /** The colonies awake, in order: the whole list when none sleeps (the same array, so nothing is copied). */
+  #awake(): Colony[] {
+    return this.#frozen.size ? this.colonies.filter((_, k) => !this.#frozen.has(k)) : this.colonies;
+  }
+
+  /** A per-colony list (a layer's grids) without the sleeping colonies' entries, aligned with `#awake()`. */
+  #awakeOf(perColony: CountGrid[]): CountGrid[] {
+    return this.#frozen.size ? perColony.filter((_, k) => !this.#frozen.has(k)) : perColony;
+  }
+
+  /** The fungus leaves alone a curtain whose colonies are all asleep: the plane is shared, and never is. */
+  #syncFrozen(): void {
+    const layers = new Set<number>();
+    this.layers.forEach((_, l) => {
+      if (l === PLANE) return;
+      const on = this.colonies.flatMap((c, k) => (c.home === l ? [k] : []));
+      if (on.length > 0 && on.every((k) => this.#frozen.has(k))) layers.add(l);
+    });
+    this.fungus.frozenLayers = layers;
+    // The hosts among the sleepers stay counted (their ants do not change while they sleep), so the fungus keeps stepping and wakes them in step.
+    let hosts = 0;
+    for (const k of this.#frozen) {
+      const c = this.colonies[k];
+      if (c) for (let i = 0; i < c.n; i++) if (c.alive[i] && (c.load[i] as number) > 0) hosts++;
+    }
+    this.fungus.hostsAsleep = hosts;
+  }
+
   /** Colonies added mid-game (addColony), in order: a save re-founds them before it restores. */
   founded: Founding[] = [];
+
+  /**
+   * Whether a founding far from every hole starts a line of its own (the founding rule's rule 1, lines.ts): off in the bounded game, where a
+   * line only grows at its ends; the endless world turns it on (E6).
+   */
+  newLines = false;
+  /** The wild sites' reserved lines, which no founding may come within a unit of or grow across (lines.ts): none in the bounded game. */
+  sites: Reserved[] = [];
 
   /** How every colony's ants draw their mode from Jev's probabilities (the Lab, ja-nan3): set by setChoice, given to colonies founded later too. */
   #choice: Partial<Pick<ColonyParams, "sampleTemp" | "reroll" | "steerLane">> = {};
@@ -575,7 +942,7 @@ export class Game {
       odour: mother.nestOdour,
       mother: f.mother,
       reserve: f.food,
-      spot: { cell: s.cell, end: s.end, line: s.line },
+      spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       ...(f.load > 0 ? { fungus: { load: f.load, strain: f.strain } } : {}),
     });
   }
@@ -592,15 +959,45 @@ export class Game {
   settleAt(
     p: { x: number; y: number },
     ground?: (x: number, y: number) => boolean,
-  ): { ok: true; cell: Cell; end: End; line: number } | { ok: false; reason: string } {
+  ): { ok: true; cell: Cell; end: End; line: number; newLine?: { heading: number } } | { ok: false; reason: string } {
     cellOf(p.x, p.y);
-    // The founding rule over the world's lines (lines.ts), with new lines off: a game of one line grows its ends exactly as transect.ts nearestValid
-    // says (the endless world turns them on, E6).
+    // The founding rule over the world's lines (lines.ts). With new lines off (`newLines`, the bounded game), a game of one line grows its ends exactly as
+    // transect.ts nearestValid says. A landing that starts a line gets the index that line will have, `end: "end"` (it has one hole) and its heading,
+    // which is drawn from the seed and the landing cell, never from the game's stream.
     const lines: Line[] = this.world.lines.map((l) => ({ transect: l.line, salt: l.salt }));
-    const s = nearestValidIn(lines, [], { x: CELL[0], y: CELL[1] }, FOUND_RADIUS, ground ?? mainGround(this.world), 0, { newLines: false });
-    return s && s.founding.kind === "grow"
+    const seed = this.world.seed;
+    const s = nearestValidIn(
+      lines,
+      this.sites,
+      { x: CELL[0], y: CELL[1] },
+      FOUND_RADIUS,
+      ground ?? mainGround(this.world),
+      (c) => hash01(seed, 100, c.x, c.y) * Math.PI,
+      { newLines: this.newLines },
+    );
+    if (!s) return { ok: false, reason: NO_ROOM };
+    return s.founding.kind === "grow"
       ? { ok: true, cell: s.cell, end: s.founding.end, line: s.founding.line }
-      : { ok: false, reason: NO_ROOM };
+      : { ok: true, cell: s.cell, end: "end", line: this.world.lines.length, newLine: { heading: s.founding.heading } };
+  }
+
+  /**
+   * A line that begins mid-game: one hole at plane `cell`, its margins along `heading`, its curtain dug from the line's own seed (the hole's nest is
+   * the curtain's first and only), its nest on the plane, and the game's layers in step: the layer, every colony's occupancy on it, its recognition and
+   * the fungus's spores and hyphae. Returns the line's index. The colony that lives there is made by addColony.
+   */
+  #addLine(cell: Cell, heading: number): number {
+    const world = this.world;
+    const salt = lineSalt(world.seed, cell, false);
+    const line = makeTransect([cell], { heading });
+    const curtain = generateCurtain(lineSeed(world.seed, salt), line);
+    world.lines.push({ line, curtain, salt });
+    world.plane.nests.push({ x: centreX(cell.x, cell.y), y: centreY(cell.y), r: 3 });
+    this.layers.push(curtain);
+    this.#grids.push(this.colonies.map(() => new CountGrid()));
+    this.#recs.push(new Recognition(this.#recognition));
+    this.fungus.addLayer(curtain);
+    return world.lines.length - 1;
   }
 
   /** Colony k and every colony descended from it (its daughters, theirs, …), by index: k first. */
@@ -666,13 +1063,22 @@ export class Game {
       // Where she settles: the same reading the queen's pen previews (settleAt), so the two can't disagree.
       const s = this.settleAt(f);
       if (s.ok === false) throw new Error(`addColony: ${s.reason}`);
-      spot = { cell: s.cell, end: s.end, line: s.line };
+      spot = { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-    const li = spot.line ?? 0;
+    if (spot.newLine) {
+      // An explicit spot (one settleAt gave and was held across another founding, or made by hand) is checked again: it must still begin the next line,
+      // and no line may already have a hole at its cell.
+      if (spot.line !== undefined && spot.line !== world.lines.length)
+        throw new Error(`addColony: the spot begins line ${spot.line}, and the world's next line is ${world.lines.length}`);
+      if (world.lines.some((l) => l.line.holes.some((h) => h.x === spot!.cell.x && h.y === spot!.cell.y)))
+        throw new Error(`addColony: a line already has a hole at ${spot.cell.x},${spot.cell.y}`);
+    }
+    // A landing that begins a line makes the line (its curtain's first nest is the colony's); else the line it grows.
+    const li = spot.newLine ? this.#addLine(spot.cell, spot.newLine.heading) : (spot.line ?? 0);
     const wl = world.lines[li] as WorldLine;
     // `at` is the colony's index among its curtain's nests (its line's); its index among the plane's is `k`.
-    const at = growWorld(world, spot.end, spot.cell, li);
+    const at = spot.newLine ? 0 : growWorld(world, spot.end, spot.cell, li);
     // A save's nest is the one dug then (growWorld digs the same one: from the stream keyed by its hole).
     if (f.nest) wl.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
     const nest = wl.curtain.nests[at] as Nest;
@@ -687,10 +1093,11 @@ export class Game {
         tolerance: this.recognition.params.tolerance,
         ...this.#choice,
       },
-      this.#rng,
+      f.rng ?? this.#rng,
       this.params.species.policy ?? localPolicy,
       { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, at) },
     );
+    if (f.rng) c.rng = this.#rng;
     c.responses = this.params.species.responses;
     this.#ownSituation(c);
     if (f.mother !== undefined && c.queen && !f.nest) {
@@ -704,13 +1111,26 @@ export class Game {
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
+    this.#sleep?.addColony(this.time);
+    if (f.wild) {
+      this.#wild.set(`${f.wild.rx},${f.wild.ry}`, k);
+      this.sites = this.sites.filter((s) => !(s.x === f.x && s.y === f.y)); // it is a real line now, not a reserved one
+    }
+    const { rng: _rng, ...saved } = f; // the construction stream is not part of the founding
     this.founded.push({
-      ...f,
-      spot: { end: spot.end, cell: { x: spot.cell.x, y: spot.cell.y }, ...(spot.line ? { line: spot.line } : {}) },
+      ...saved,
+      spot: {
+        end: spot.end,
+        cell: { x: spot.cell.x, y: spot.cell.y },
+        ...(li ? { line: li } : {}),
+        ...(spot.newLine ? { newLine: { heading: spot.newLine.heading } } : {}),
+      },
       nest: { ...nest, ...(nest.entrance ? { entrance: { ...nest.entrance } } : {}) },
     });
     this.#wire();
     this.#refresh();
+    this.#syncFrozen();
+    this.feedSites(); // a new hole reserves the sites round it, with the awake rule on or not (a bounded game: nothing)
     const q = c.queen;
     if (f.fungus && f.fungus.load > 0 && q) {
       q.load = Math.min(1, f.fungus.load);
@@ -743,7 +1163,7 @@ export class Game {
         ...at,
         antCount,
         odour: (this.colonies[0] as Colony).nestOdour,
-        spot: { cell: s.cell, end: s.end, line: s.line },
+        spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       }),
     };
   }
@@ -757,6 +1177,16 @@ export class Game {
 
   /** The plane's food piles now (as the world began): the cells with food. */
   #notePiles(): void {
+    if (isEndless(this.map)) {
+      // No whole-map scan on a plane with no edge: the piles are noted chunk by chunk as the food is generated (PRD §66 E6.0.2), kept in key
+      // order (the order the bounded scan finds them in), so which cells regrow does not depend on the order chunks were first made.
+      const map = this.map;
+      this.#piles = { cells: new Float64Array(0), full: new Float32Array(0) };
+      this.#regrowRng = mulberry32(map.seed * 92821 + 17);
+      map.foodHooks.push((cx, cy, f) => this.#notePileChunk(cx, cy, f));
+      map.food.forEach((cx, cy, a) => this.#notePileChunk(cx, cy, a));
+      return;
+    }
     const { w, h } = this.map.size;
     const { x0 } = this.map;
     const cells: number[] = [];
@@ -773,6 +1203,77 @@ export class Game {
     this.#regrowRng = mulberry32(this.map.seed * 92821 + 17);
   }
 
+  /** An endless plane's chunk (cx, cy) made, holding food `f`: its pile cells join the regrowth's list, which stays in key order. */
+  #notePileChunk(cx: number, cy: number, f: ArrayLike<number>): void {
+    const piles = this.#piles;
+    if (!piles || this.#pileChunks.has(chunkKey(cx, cy))) return; // a chunk is noted once, however often it is generated again (a load counts them again)
+    this.#pileChunks.add(chunkKey(cx, cy));
+    const add: number[] = [];
+    const addFull: number[] = [];
+    for (let ly = 0; ly < CHUNK; ly++)
+      for (let lx = 0; lx < CHUNK; lx++) {
+        const v = f[local(lx, ly)]!;
+        if (v > 0) {
+          add.push(cellKey((cx << CHUNK_BITS) + lx, (cy << CHUNK_BITS) + ly));
+          addFull.push(v);
+        }
+      }
+    if (!add.length) return;
+    const n = piles.cells.length;
+    const cells = new Float64Array(n + add.length);
+    const full = new Float32Array(n + add.length);
+    let a = 0;
+    let b = 0;
+    for (let o = 0; o < cells.length; o++) {
+      if (b >= add.length || (a < n && piles.cells[a]! < add[b]!)) {
+        cells[o] = piles.cells[a]!;
+        full[o] = piles.full[a++]!;
+      } else {
+        cells[o] = add[b]!;
+        full[o] = addFull[b++]!;
+      }
+    }
+    this.#piles = { cells, full };
+  }
+
+  /**
+   * With the awake rule on, the pile cells (by index) food regrows in (docs/endless-world.md §6, E4.4): those within W of an awake colony's hole or of
+   * the awake fungus's body; elsewhere it waits, with no catch-up owed. Null (every pile) when the game has no rule, so the bounded game regrows as ever.
+   * Only the piles short of their size and not built over are looked at: a full pile has nothing to grow.
+   */
+  #awakeGround(piles: { cells: Float64Array; full: Float32Array }): Set<number> | null {
+    if (!this.#sleep) return null;
+    const { distance } = this.#sleep.params;
+    const holes = this.colonies.flatMap((c, k) => (this.#frozen.has(k) ? [] : [(c.layers[PLANE] as Layer).nest]));
+    const short: number[] = [];
+    const where: { x: number; y: number }[] = [];
+    for (let k = 0; k < piles.cells.length; k++) {
+      const x = keyX(piles.cells[k] as number);
+      const y = keyY(piles.cells[k] as number);
+      if (piles.full[k]! - this.map.food.get(x, y) < 1 || rockAt(this.map, x, y)) continue; // full, or built over: #regrow skips it too
+      short.push(k);
+      where.push({ x: centreX(x, y), y: centreY(y) });
+    }
+    const out = new Set<number>();
+    const far: number[] = [];
+    short.forEach((k, i) => {
+      const p = where[i] as { x: number; y: number };
+      if (holes.some((h) => Math.hypot(h.x - p.x, h.y - p.y) <= distance)) out.add(k);
+      else far.push(i);
+    });
+    if (far.length) {
+      const near = this.fungus.bodyNear(
+        PLANE,
+        far.map((i) => where[i] as { x: number; y: number }),
+        distance,
+      );
+      far.forEach((i, j) => {
+        if (near[j]) out.add(short[i] as number);
+      });
+    }
+    return out;
+  }
+
   /** Once a second: each pile cell short of its first size grows a unit back with chance deficit ÷ regrow. */
   #regrow(dt: number): void {
     const piles = this.#piles;
@@ -782,6 +1283,7 @@ export class Game {
     const owed = this.#regrowClock;
     this.#regrowClock = 0;
     const rate = owed / this.params.regrow;
+    const awake = this.#awakeGround(piles);
     for (let k = 0; k < piles.cells.length; k++) {
       const c = piles.cells[k];
       const x = keyX(c);
@@ -789,6 +1291,7 @@ export class Game {
       const v = this.map.food.get(x, y);
       const short = piles.full[k] - v;
       if (short < 1 || rockAt(this.map, x, y)) continue; // full, or built over (a mound)
+      if (awake && !awake.has(k)) continue; // far from everything awake: it waits (E4.4)
       if (this.#regrowRng!() < short * rate) {
         this.map.food.set(x, y, v + 1);
         this.map.foodLeft += 1;
@@ -805,7 +1308,7 @@ export class Game {
    */
   #aimRaids(k: number): void {
     const c = this.colonies[k] as Colony;
-    const target = nearestRival(c, this.colonies, this.recognition.params.tolerance);
+    const target = nearestRival(c, this.#awake(), this.recognition.params.tolerance); // a sleeper has no defenders to raid and no ants to meet
     if (target) this.#aimAt(c, target);
   }
 
@@ -831,9 +1334,11 @@ export class Game {
 
   /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
   #refresh(): void {
+    const awake = this.#awake();
     this.#grids.forEach((grids, l) => {
-      this.colonies.forEach((c, k) => occupancy(c, grids[k] as CountGrid, l));
-      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(this.colonies, l);
+      // A colony asleep has no ants anyone can meet: its occupancy is empty.
+      this.colonies.forEach((c, k) => (this.#frozen.has(k) ? (grids[k] as CountGrid).reset() : occupancy(c, grids[k] as CountGrid, l)));
+      if (this.colonies.length > 1) (this.#recs[l] as Recognition).build(awake, l);
     });
   }
 
@@ -899,7 +1404,7 @@ export class Game {
   #meet(dt: number): void {
     const live: number[] = [];
     this.colonies.forEach((c, k) => {
-      if (!Game.beaten(c)) live.push(k);
+      if (!Game.beaten(c) && !this.#frozen.has(k)) live.push(k);
     });
     const keep = Math.exp(-dt / QUIET);
     const tol = this.recognition.params.tolerance;
@@ -911,6 +1416,9 @@ export class Game {
       for (let b = a + 1; b < live.length; b++)
         gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
+      // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
+      // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
+      if (this.#frozen.has(k) || (this.#frozen.size > 0 && live.length < 2)) return;
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
         let living = 0;
@@ -932,7 +1440,7 @@ export class Game {
               l = c.layer[i];
               map = this.layers[l] as WorldMap;
               cx = clampCol(map, CELL[0]);
-              cy = Math.min(map.size.h - 1, Math.max(0, CELL[1]));
+              cy = clampRow(map, CELL[1]);
             }
             if (around((this.#grids[l] as CountGrid[])[d] as CountGrid, map, cx, cy, 1) > 0) {
               allied++;
@@ -961,8 +1469,10 @@ export class Game {
       this.aphidOdour.clumps = this.aphids;
       for (const c of this.colonies) c.aphidOdour = this.aphidOdour;
     }
-    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(this.colonies) : undefined;
-    for (const c of this.colonies) c.tick(dt, attackCue);
+    // The colonies asleep (freeze) are not stepped: their ants, scent and curtains stand as they were; no one meets them. With none asleep this is the whole list.
+    const awake = this.#awake();
+    const attackCue = this.params.fight.intent && this.params.fight.counterattack ? snapshotAttackCue(awake) : undefined;
+    for (const c of awake) c.tick(dt, attackCue);
     // Alates that flew this tick (ja-lo8.9): founded at once with autoFound, else held for the page's pen.
     this.colonies.forEach((c, k) => {
       if (!c.flown.length) return;
@@ -981,7 +1491,7 @@ export class Game {
       // Fights on each layer, among the ants there.
       let died = 0;
       this.#grids.forEach((grids, l) => {
-        died += resolveFights(this.colonies, grids, dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
+        died += resolveFights(awake, this.#awakeOf(grids), dt, this.#rng, this.params.fight, this.#recs[l] as Recognition, l).reduce(
           (x, y) => x + y,
           0,
         );
@@ -992,7 +1502,7 @@ export class Game {
         this.#haveMet = false;
       }
       // Odours: the gestalt at each nest, and blending where the fungus runs it.
-      this.recognition.advance(this.colonies, dt);
+      this.recognition.advance(awake, dt);
       // Whether the colonies meet as allies (unity, ja-i0f): read after odours move, from this tick's occupancy.
       this.#meet(dt);
     }
@@ -1005,25 +1515,36 @@ export class Game {
     });
     if (this.fungus.active) {
       const recs = this.colonies.length > 1 ? this.#recs : null;
-      this.fungus.advanceLayers(this.colonies, this.#grids, dt, recs);
+      this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
+    if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
+    if (this.prefetch && isEndless(this.map)) this.#prefetchStep(this.map);
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
-      this.colonies.forEach((c, k) => {
-        // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
-        // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
-        // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
-        // raiders swarmed the other nest with nobody there to fight).
-        const tol = this.recognition.params.tolerance;
-        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
-          c.raidable = false;
-          return;
-        }
-        c.raidable = true;
-        // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
-        this.#aimRaids(k);
-      });
+      this.#aimAll();
     }
+  }
+
+  /**
+   * Who each colony raids, and whether it has anyone to (the rival check, every `rivalEvery` s, and again when a colony sleeps or wakes): a colony
+   * asleep is no rival, so a raid never walks to its empty nest.
+   */
+  #aimAll(): void {
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
+      // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
+      // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
+      // raiders swarmed the other nest with nobody there to fight).
+      const tol = this.recognition.params.tolerance;
+      if (!this.colonies.some((o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
+        c.raidable = false;
+        return;
+      }
+      c.raidable = true;
+      // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
+      this.#aimRaids(k);
+    });
   }
 
   /** Where the fungus landed (Game.land), or null before it has: the fungus game's start (ja-lo8.5). */
@@ -1043,7 +1564,7 @@ export class Game {
     const { x, y, toward } = this.#byHole(this.colonies[k] ?? (this.colonies[0] as Colony));
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
     if (evolve) this.fungus.evolve(strain);
-    this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.paint(this.#awake(), x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius, 0, toward);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
@@ -1095,7 +1616,7 @@ export class Game {
    * the ants on it.
    */
   paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number, layer = 0): void {
-    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain, layer);
+    this.fungus.paint(this.#awake(), x, y, radius, spores, dose, strain, layer); // a sleeper's ants are not dosed: they stand as they were
   }
 
   /**
@@ -1136,9 +1657,6 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
-    // A save holds the first line and its curtain: another line would be lost without a word (saves hold the lines: E3.4).
-    if (this.world.lines.length > 1)
-      throw new Error(`save: this world has ${this.world.lines.length} lines, and a save holds one (docs/endless-world.md §8, E3.4)`);
     // A map without its nests: the world (or a re-founding) makes them.
     const bare = (m: WorldMap) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== "nests" && k !== "nest"));
     const map = bare(this.map);
@@ -1156,7 +1674,8 @@ export class Game {
       ...(this.aphids.length ? { aphids: this.aphids.map((a) => ({ ...a, cells: [...a.cells] })) } : {}),
       // The species is code (functions), not data: the save leaves it out (docs/species.md step 3 saves its id) and a load keeps the game's own.
       params: encode(withoutSpecies(this.params)),
-      map: encode(map),
+      // An endless plane saves the seed and what changed, never the plane (endlessMap.ts saveEndless).
+      map: isEndless(this.map) ? saveEndless(this.map) : encode(map),
       colonies: this.colonies.map((c) => c.saveState()),
       raids: this.colonies.map((c) => this.colonies.findIndex((o) => o.ph === c.raidMarks)),
       fungus: this.fungus.saveState(),
@@ -1166,6 +1685,15 @@ export class Game {
         seed: world.seed,
         line: { holes: world.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: world.line.sHole[0], margin: world.line.margin },
         curtain: encode(bare(world.curtain)),
+        // The lines after the first, each as the first is (holes, V₀'s column, margin, and its curtain as dug): a game of one line saves exactly as it always has.
+        ...(world.lines.length > 1
+          ? {
+              more: world.lines.slice(1).map((l) => ({
+                line: { holes: l.line.holes.map((c) => ({ x: c.x, y: c.y })), s0: l.line.sHole[0]!, margin: l.line.margin },
+                curtain: encode(bare(l.curtain)),
+              })),
+            }
+          : {}),
       },
       private: {
         fightDeaths: this.#fightDeaths,
@@ -1176,6 +1704,9 @@ export class Game {
         regrowClock: this.#regrowClock,
         rng: (this.#rng as Partial<Rng>).state ?? null,
         regrowRng: this.#regrowRng?.state ?? null,
+        // Only when a colony sleeps: a game that freezes nothing saves as it always has.
+        ...(this.#frozen.size ? { frozen: [...this.#frozen].sort((a, b) => a - b) } : {}),
+        ...(this.#sleep ? { sleep: { params: this.#sleep.params, state: this.#sleep.saveState(), next: this.#sleepNext } } : {}),
       },
     };
   }
@@ -1192,18 +1723,54 @@ export class Game {
     const world = this.world;
     const sw = saved.world;
     if (!sw) throw new Error("save: a save of a game on one map, and this game is one world");
+    // An endless plane has no size to match: its save is the seed and what changed (a bounded save of another size is still refused, and so is one of the other kind).
+    const endless = isEndless(this.map);
+    const savedEndless = (saved.map as { endless?: unknown }).endless === true;
+    if (endless !== savedEndless)
+      throw new Error(
+        `save: a save of ${savedEndless ? "an endless" : "a bounded"} plane, and this game's is ${endless ? "endless" : "bounded"}`,
+      );
     const size = (saved.map as { size?: { w: number; h: number } }).size;
-    if (sw.seed !== world.seed || size?.w !== this.map.size.w || size?.h !== this.map.size.h)
+    if (sw.seed !== world.seed || (!endless && (size?.w !== this.map.size.w || size?.h !== this.map.size.h)))
       throw new Error(
         `save: another world (seed ${sw.seed}, plane ${size?.w} × ${size?.h}; this game's: seed ${world.seed}, ${this.map.size.w} × ${this.map.size.h})`,
       );
+    // What the replay of the foundings would make, checked before it starts (ja-baxa): a save of more lines or colonies than this game can grow to is refused
+    // with this game as it was. (A refusal after the replay, below, a line whose holes were moved, still leaves the foundings made: a failed load of that kind
+    // voids the game, and the page drops it. The shape checks below the replay are now reachable only if the replay makes other lines or colonies than the
+    // save's foundings say, which the checks above rule out.)
+    const founded = saved.founded ?? [];
+    const willHave = world.lines.length + founded.filter((f) => f.spot?.newLine).length;
+    if (willHave !== 1 + (sw.more ?? []).length)
+      throw new Error(`save: ${1 + (sw.more ?? []).length} lines, this game's world has ${willHave}`);
+    if (saved.colonies.length !== this.colonies.length + founded.length)
+      throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length + founded.length}`);
+    // The grids and bands are a layer each (the plane, and one curtain a line) of one grid a colony: their shape is known before the replay, so a save whose
+    // grids are another game's is refused with this game as it was.
+    const sg = saved.grids;
+    if (
+      sg.counts.length !== 1 + willHave ||
+      sg.bands.length !== 1 + willHave ||
+      sg.counts.some((gs) => gs.length !== saved.colonies.length)
+    )
+      throw new Error("save: its grids are another game's");
     // Colonies founded mid-game first, as they were: then everything (the map as dug among it) is poured back over them.
-    for (const f of saved.founded ?? []) this.addColony(f);
+    for (const f of founded) this.addColony(f);
     // The line grown again must be the one saved: else the curtain poured below would lie under another line.
     const line = world.line;
-    const same =
-      line.holes.length === sw.line.holes.length && line.holes.every((c, k) => c.x === sw.line.holes[k]?.x && c.y === sw.line.holes[k]?.y);
-    if (!same || line.sHole[0] !== sw.line.s0 || line.margin !== sw.line.margin) throw new Error("save: another world's line");
+    const sameLine = (t: Transect, sl: { holes: Cell[]; s0: number; margin: number }): boolean =>
+      t.holes.length === sl.holes.length &&
+      t.holes.every((c, k) => c.x === sl.holes[k]?.x && c.y === sl.holes[k]?.y) &&
+      t.sHole[0] === sl.s0 &&
+      t.margin === sl.margin;
+    if (!sameLine(line, sw.line)) throw new Error("save: another world's line");
+    // The lines a founding began are made again by the foundings above (a line that began is a spot with `newLine`); they must be the ones saved.
+    const more = sw.more ?? [];
+    if (world.lines.length !== 1 + more.length)
+      throw new Error(`save: ${1 + more.length} lines, this game's world has ${world.lines.length}`);
+    more.forEach((m, k) => {
+      if (!sameLine((world.lines[k + 1] as WorldLine).line, m.line)) throw new Error(`save: another world's line ${k + 1}`);
+    });
     if (saved.colonies.length !== this.colonies.length)
       throw new Error(`save: ${saved.colonies.length} colonies, this game has ${this.colonies.length}`);
     this.time = saved.time;
@@ -1214,10 +1781,18 @@ export class Game {
     this.crayons = (saved.crayons ?? []).map((l) => ({ ...l, cells: [...l.cells] }));
     this.aphids = (saved.aphids ?? []).map((a) => ({ ...a, cells: [...a.cells] }));
     this.params = { ...(decode(saved.params) as GameParams), species: this.params.species };
-    qualityLike(this.map, saved.map);
-    fillLike(this.map, saved.map);
+    if (isEndless(this.map)) loadEndless(this.map, saved.map as Record<string, unknown>);
+    else {
+      qualityLike(this.map, saved.map);
+      fillLike(this.map, saved.map);
+    }
     qualityLike(world.curtain, sw.curtain);
     fillLike(world.curtain, sw.curtain);
+    more.forEach((m, k) => {
+      const curtain = (world.lines[k + 1] as WorldLine).curtain;
+      qualityLike(curtain, m.curtain);
+      fillLike(curtain, m.curtain);
+    });
     this.colonies.forEach((c, k) => c.loadState(saved.colonies[k] as Record<string, unknown>));
     this.colonies.forEach((c, k) => {
       const t = this.colonies[saved.raids[k] ?? -1];
@@ -1235,6 +1810,14 @@ export class Game {
     this.#regrowClock = p.regrowClock;
     if (p.rng !== null && "state" in this.#rng) (this.#rng as Rng).state = p.rng;
     if (p.regrowRng !== null && this.#regrowRng) this.#regrowRng.state = p.regrowRng;
+    this.#frozen = new Set(p.frozen ?? []);
+    this.#syncFrozen();
+    this.#sleep = null;
+    if (p.sleep) {
+      this.#sleep = new SleepRule(0, p.sleep.params);
+      this.#sleep.loadState(p.sleep.state);
+    }
+    this.#sleepNext = p.sleep?.next ?? 0;
     // The grids and bands as the save's last tick built them (GameSave.grids), never built again from the living.
     const grids = saved.grids;
     if (
@@ -1245,5 +1828,6 @@ export class Game {
       throw new Error("save: its grids are another game's");
     this.#grids.forEach((gs, l) => gs.forEach((g, k) => g.loadState((grids.counts[l] as number[][])[k] as number[])));
     this.#recs.forEach((r, l) => r.loadBands(grids.bands[l] as BandsSave));
+    this.feedSites(); // the sites near what is awake now (not saved: the plane lists them)
   }
 }

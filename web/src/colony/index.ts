@@ -43,12 +43,15 @@ export * from "./royal.ts";
 export * from "./save.ts";
 export * from "./schema.ts";
 export * from "./species.ts";
+export * from "./sleep.ts";
 export * from "./desertAnt.ts";
 export * from "./neglectus.ts";
 export * from "./transect.ts";
 export * from "./vocab.ts";
 export * from "./weighted.ts";
 export * from "./steerBrain.ts";
+export * from "./endlessMap.ts";
+export * from "./endlessWorld.ts";
 export * from "./world.ts";
 
 export { touch } from "./sense.ts";

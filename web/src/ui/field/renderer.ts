@@ -6,7 +6,7 @@
 
 import {
   type AphidClump,
-  CURTAIN,
+  isCurtainLayer,
   centreX,
   centreY,
   type Colony,
@@ -32,8 +32,11 @@ import type { FieldCtx, FieldInputs } from "./ctx.ts";
 import { drawFungusGround, drawStalksRaised } from "./fungus.ts";
 import { type Ground, groundPaper } from "./ground.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./marks.ts";
-import { drawNest, type NestFrame } from "./nests.ts";
+import { drawNest, drawRememberedCorpses, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
+import { UNKNOWN } from "../fog/knowledge.ts";
+import { actorCull, exploredCull } from "./fogCull.ts";
+import { SNAP } from "../fog/sources.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "./overlays.ts";
 import { type FrameSinks, publishDrawMs, publishFrame } from "./result.ts";
 import { BRICK_ZOOM, HEX_ZOOM } from "./zoom.ts";
@@ -176,7 +179,7 @@ export const paperStage: Stage = ({ fc }) => {
 
 /** The chunks in view, as bricks or as hexagons, and the terrain's grain over the hexagons. */
 export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, resourceImage }) => {
-  const { ctx, c, v, m, theme } = fc;
+  const { ctx, c, v, m, theme, lv } = fc;
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { ground } = parts;
   ground.draw(fc, inputs.show, cellWindow, hexMix, !!resourceImage);
@@ -189,7 +192,8 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
       v.w / 2 - c.x * c.zoom,
       v.h / 2 - c.y * c.zoom,
       [rx0, rx1, ry0, ry1],
-      (x, y) => rockAt(m, x, y),
+      // Under the fog the grain shows the rock last sensed, and none where nothing was.
+      (x, y) => (fc.fog ? (fc.fog.state(lv, x, y) === UNKNOWN ? 0 : (fc.fog.snapshot(lv, SNAP.rock, x, y) ?? 0)) : rockAt(m, x, y)),
       (x, y) => ground.isBare(x, y),
       theme.ink,
       theme.paper,
@@ -200,19 +204,23 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
 
 /** Surface plain-food cells join into tissue; carried food and other qualities stay separate morsels. */
 export const foodStage: Stage = ({ fc, cellWindow, resourceImage, resourceLod }) => {
-  const { ctx, c, v, lv, m, sprites } = fc;
+  const { ctx, c, v, lv, m, sprites, fog } = fc;
+  // Under the fog the food a cell shows is what was last sensed there (its snapshot), and none where nothing was.
+  const foodAt = (x: number, y: number): number =>
+    fog ? (fog.state(lv, x, y) === UNKNOWN ? 0 : (fog.snapshot(lv, SNAP.food, x, y) ?? 0)) : m.food.get(x, y);
+  const qualityAt = (x: number, y: number): number => (fog ? (fog.snapshot(lv, SNAP.quality, x, y) ?? 1) : (m.quality?.get(x, y) ?? 1));
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { surfaceLeaves, mapLeaves } = sprites;
   if (!resourceImage) return;
   for (let y = ry0; y <= ry1; y++)
     for (let x = rx0; x <= rx1; x++) {
-      const amount = m.food.get(x, y);
+      const amount = foodAt(x, y);
       if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
       const density = foodDensity(amount),
-        kind = foodKind(m.quality?.get(x, y) ?? 1);
+        kind = foodKind(qualityAt(x, y));
       if (lv === PLANE && kind === "plain") {
         const tiles = surfaceLeaves.get(x, y, (a, b) =>
-          rockAt(m, a, b) === OPEN && foodKind(m.quality?.get(a, b) ?? 1) === "plain" ? m.food.get(a, b) : 0,
+          rockAt(m, a, b) === OPEN && foodKind(qualityAt(a, b)) === "plain" ? foodAt(a, b) : 0,
         );
         mapLeaves.draw(ctx, tiles, c.zoom, v.w / 2 - c.x * c.zoom, v.h / 2 - c.y * c.zoom);
         continue;
@@ -260,15 +268,18 @@ export const actorsStage: Stage = (fs) => {
   const { fc, len, crumb, inView, half, hexes, resourceLod, darkSprites, nestImage, resourceImage } = fs;
   const { lv, strip, colonies } = fc;
   if (lv === PLANE) drawLine(fc);
-  if (lv === CURTAIN) drawBends(fc);
-  const nestFrame: NestFrame = { len, inView, hexes, resourceLod, darkSprites, nestImage, resourceImage };
+  if (isCurtainLayer(lv)) drawBends(fc);
+  // Under the fog what lives on the ground (ants, brood, the queen, alates, corpses) is drawn only where an observer senses it now.
+  const seen = actorCull(fc, inView);
+  const nestFrame: NestFrame = { len, inView: seen, hexes, resourceLod, darkSprites, nestImage, resourceImage };
   const antFrame: AntFrame = { ...nestFrame, half, crumb };
   for (const col of [...colonies].reverse()) {
     const alates = drawNest(fc, nestFrame, col);
     if (alates) fs.alateOverlays.push(alates);
     drawAnts(fc, antFrame, col);
   }
-  if (strip) drawStripAnts(fc, len, crumb, inView);
+  if (strip) drawStripAnts(fc, len, crumb, inView); // under the fog only the plane ants an observer senses now (overlays.ts)
+  drawRememberedCorpses(fc, { ...nestFrame, inView });
   drawStalksRaised(fc, fs.cellWindow, fs.fungusFrame!);
 };
 
@@ -291,11 +302,11 @@ export const voxelStage: Stage = (fs) => {
     fs.inputs.show,
     refs.aphids,
     theme,
-    !smellAll,
+    !smellAll && !fc.fog,
     mapCameraOrbit(lv, refs.orbit),
   );
   fs.voxel = voxel;
-  const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll);
+  const canRotate = canTiltMap(lv, !!world, c, v, d, !smellAll && !fc.fog);
   const frameAngled = "angled" in voxel && voxel.angled === true;
   // What the frame found out about itself goes to the shell's refs and the canvas's data attributes (field/result.ts).
   publishFrame(
@@ -333,13 +344,15 @@ export const voxelStage: Stage = (fs) => {
       ctx.globalAlpha = 1;
     }
     if (world && lv === PLANE) drawLine(fc, false);
-    if (world && lv === CURTAIN) drawBends(fc);
+    if (world && isCurtainLayer(lv)) drawBends(fc);
   }
 };
 
 /** Chamber labels (the Learn drawer): each chamber's role at its centre, where the chamber is wide enough on screen. */
-export const labelsStage: Stage = ({ fc, refs, inView }) => {
+export const labelsStage: Stage = ({ fc, refs, inView: viewed }) => {
   const { ctx, c, v, d, m, theme } = fc;
+  // A chamber's role is read live, so under the fog a label shows only where an observer senses the place now.
+  const inView = actorCull(fc, viewed);
   if (!(refs.labelsOn && m.chambers)) return;
   const px = Math.round(Math.max(10, Math.min(14, c.zoom * 0.9)) * d);
   ctx.font = `600 ${px}px ui-sans-serif, system-ui, sans-serif`;
@@ -378,7 +391,7 @@ export const marksStage: Stage = (fs) => {
   drawSpecimens(fc, refs.specimens, f);
   drawFollowed(fc, f, fcol, fHere);
   // The hole badges last of the map's marks, so a followed ant at its hole draws under its colony's badge (review of #189, N3).
-  if (lv === PLANE) drawHoleNames(fc, inView);
+  if (lv === PLANE) drawHoleNames(fc, exploredCull(fc, inView));
   if (lv === PLANE && inputs.pen) drawPen(fc, inputs);
   drawInspection(fc);
 };

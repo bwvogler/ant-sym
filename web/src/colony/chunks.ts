@@ -101,6 +101,11 @@ export class ChunkLayer<A extends Cells> {
     return r === undefined ? undefined : r[((cy & REGION_MASK) << REGION_BITS) | (cx & REGION_MASK)];
   }
 
+  /** The array of chunk (cx, cy) if it exists, never generating it (a reader that must not make ground: plume.ts on an endless plane). */
+  peek(cx: number, cy: number): A | undefined {
+    return this.#at(cx, cy);
+  }
+
   /** The array of chunk (cx, cy): undefined if it was never written, unless the layer generates it. */
   chunk(cx: number, cy: number): A | undefined {
     const a = this.#at(cx, cy);

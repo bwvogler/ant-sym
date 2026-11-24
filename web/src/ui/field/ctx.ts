@@ -4,6 +4,8 @@
 // Node test can run it on a recording fake context. Each layer that moves brings the inputs it reads; the rest join as their layers move.
 
 import type { ChunkLayer, Colony, Fungus, OneWorld, WorldMap } from "../../colony/index.ts";
+import type { CorpseMemory } from "../fog/corpses.ts";
+import type { Knowledge } from "../fog/knowledge.ts";
 import type { Camera, Extent, Viewport } from "../camera.ts";
 import type { PenCircle, Settle } from "../pen.ts";
 import type { Rgb } from "./colour.ts";
@@ -75,6 +77,10 @@ export interface FieldCtx {
   alarms: ChunkLayer<Float32Array>[];
   spores: ChunkLayer<Float32Array>;
   sensedLayer: ChunkLayer<Float32Array> | null;
+  /** what the fungus knows of the ground (fog of war, docs/fog-of-war.md); null: no fog, the whole truth is drawn */
+  fog?: Knowledge | null;
+  /** the dead the fungus has seen (null without the fog) */
+  corpses?: CorpseMemory | null;
   /** the sensed map's clock: a cell sensed this long ago shows its scent this faintly */
   sensedNow: number;
   /** what the frame takes from the outside world: the clock, a new path, a new canvas (field/env.ts) */

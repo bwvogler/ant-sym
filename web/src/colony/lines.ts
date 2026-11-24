@@ -37,7 +37,10 @@ export interface Line {
 }
 
 /** A wild site's reserved line, as the world holds it from the start: its hole and heading (endlessPlane.ts Site). */
-export type Reserved = Pick<Site, "x" | "y" | "heading">;
+export type Reserved = Pick<Site, "x" | "y" | "heading"> & Partial<Pick<Site, "rx" | "ry">>;
+
+/** A site that can wake: its lattice cell as well (endlessPlane.ts Site). */
+export type WildSite = Pick<Site, "x" | "y" | "rx" | "ry" | "heading">;
 
 /** Options of the rule: `newLines: false` skips rule 1, for a game whose world is one line (the bounded game, until the endless one is the page's). */
 export interface FoundOpts {
@@ -181,7 +184,7 @@ export function nearestValidIn(
   p: Cell,
   radius: number,
   open: (x: number, y: number) => boolean,
-  heading: number,
+  heading: number | ((cell: Cell) => number),
   opts: FoundOpts = {},
 ): { cell: Cell; founding: Founding & { ok: true } } | null {
   // The cells within `radius` as transect.ts nearestValid takes them: by exact distance, ties in its fixed order (roundDisc), so a game replays and
@@ -189,7 +192,7 @@ export function nearestValidIn(
   const offs = roundDisc(radius, p.y & 1);
   for (let i = 0; i < offs.length; i += 2) {
     const cell = { x: p.x + offs[i]!, y: p.y + offs[i + 1]! };
-    const f = canFoundIn(lines, sites, cell, open, heading, opts);
+    const f = canFoundIn(lines, sites, cell, open, typeof heading === "function" ? heading(cell) : heading, opts);
     if (f.ok) return { cell, founding: f };
   }
   return null;

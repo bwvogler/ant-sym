@@ -1,6 +1,6 @@
 # The lichen partner: the fungus takes an alga on rock, spreads over it, lives on light and breaks the rock down
 
-*Research and design note for epic `ja-vlla.11` (M4 of `ja-vlla`, PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
+*Research and design note for epic `ja-vlla.11` (grew from M4 of `ja-vlla`; a top-level epic since 2026-11-24; PRD §90). Written 2026-11-24 against code at `99532b60`, from two literature searches made on 2026-11-23 through Europe PMC, PubMed and Crossref.*
 - *Read status:* every source is marked full text (**FT**), abstract only (**ABS**, its numbers **unverified**) or not read (**NR**).
 - *Not reachable:* many society journals (Wiley, Springer, Elsevier) were behind a bot wall. Their numbers are abstract-only and gathered for reading in `ja-vlla.11.1`.
 - *Second read (`ja-vlla.11.1`, 2026-11-24):* no full text of the eleven sources could be reached. Wiley, Springer, Cambridge, BioOne and Elsevier answered with bot walls, and the session's network refused the open copies on iforest.sisef.org and flore.unifi.it (Di Nuzzo), publishup.uni-potsdam.de (Heinken) and publications.aston.ac.uk (Armstrong). The abstracts and citing papers were read instead, and the claims are restated to what they say. After the owner allowed those hosts, Armstrong 2005 and Di Nuzzo et al. 2022 were read in full; Heinken et al. 2007 has no open copy (the Potsdam record holds metadata only), so it stays abstract-only. Chen et al. 2000 and Stretch & Viles 2002 still give no rate (no abstract online).
@@ -197,7 +197,7 @@ Each milestone is its own PR behind a setting whose off is main bit for bit. **B
 
 | Milestone | Cue (sensed) | Response | Local rule (design) | Off | Bead |
 |---|---|---|---|---|---|
-| Assay | none | metrics only: time to first lichen, lichen cells, growth from light, weathered cells | none | main | `ja-vlla.11.2` |
+| Assay | none | a read-only contact probe: rock beside open ground, hyphae beside it and when, mutations a minute late in the game; lichen counts come with L1–L3 | none | main | `ja-vlla.11.2` |
 | L1 partner and crust | a hypha cell beside an alga film or a wild-lichen cell (the fungus's contact) | the alga's rock cell becomes lichen; a wild lichen overgrown is captured | one rock cell from the rim every interval; free-pool `lichen` trait after the mycelium levels | no world content, no trait level | `ja-vlla.11.3` |
 | L2 light | a lichen cell in light (plane, or curtain beside the sky) | growth into the free pool | a rate per lit cell, capacity by lichen area | rate 0 | `ja-vlla.11.4` |
 | L3a rock to hyphae | lichen age on a rock cell | rock becomes ground the hyphae enter | age threshold | never | `ja-vlla.11.5` |
@@ -236,7 +236,7 @@ Learn entries, upgrade text and drawings follow each built milestone (`ja-vlla.1
   - the design rates once measured;
   - L3b's go;
   - L4 and L5 after `ja-vlla.11.1`;
-  - whether the lichen trait needs the borer or the web level first.
+  - ~~whether the lichen trait needs the borer or the web level first~~: decided (owner, 2026-11-24): after the borer, Mycelium level 2; L1 and the assay are measured at borer-level games.
 - **To measure:**
   - time to first lichen;
   - lichen cells per game;

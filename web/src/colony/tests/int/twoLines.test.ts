@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { guarded } from "../../builder.ts";
 import { STRAINS } from "../../fungus.ts";
 import { Game, LANDING } from "../../game.ts";
 import { lineSeed } from "../../lines.ts";
 import { makeTransect } from "../../transect.ts";
+import { CELL, cellOf } from "../../hex.ts";
 import { generateCurtain, generateOneWorld, oneWorldOnLines } from "../../oneWorld.ts";
 import { generateWorld, mulberry32 } from "../../world.ts";
 
@@ -133,11 +135,6 @@ test("a colony on a line the world does not have is an error, and so are more co
   );
 });
 
-test("a save holds one line: a game over two refuses to save, so no line is lost without a word", () => {
-  assert.throws(() => game().save(), /2 lines/);
-  assert.doesNotThrow(() => new Game(generateOneWorld(SEED), {}, mulberry32(1)).save());
-});
-
 test("a colony's food left is its plane's and its own curtain's, not another line's", () => {
   const g = game();
   g.colonies.forEach((c, k) => assert.equal(c.foodLeft, g.world.plane.foodLeft + g.world.lines[k]!.curtain.foodLeft, `colony ${k}`));
@@ -210,4 +207,29 @@ test("the fungus on a second line's curtain: spores and hyphae are on layer 2, a
   assert.equal(g.fungus.hyphaeOn(1), null, "nothing on the first line's curtain: no colony of the first line was reached");
   assert.ok(g.fungus.hyphaeOn(2), "the hyphae went down the second line's hole into layer 2");
   void makeTransect;
+});
+
+test("the builder's guard is per curtain: a colony's queen and brood are guarded on its own curtain, which is not layer 1 for the second line", () => {
+  const g = game();
+  const key = (x: number, y: number) => (y + 0x8000) * 0x10000 + (x + 0x8000);
+  const at = (x: number, y: number) => {
+    cellOf(x, y);
+    return key(CELL[0]!, CELL[1]!);
+  };
+  for (const [k, layer] of [
+    [0, 1],
+    [1, 2],
+  ] as const) {
+    const c = g.colonies[k]!;
+    const guard = guarded(g, layer);
+    assert.ok(c.queen?.alive);
+    assert.ok(guard.has(at(c.queen.x, c.queen.y)), `colony ${k}'s queen is guarded on layer ${layer}`);
+    for (const b of c.brood.items) assert.ok(guard.has(at(b.x, b.y)), `colony ${k}'s brood is guarded on layer ${layer}`);
+  }
+  // a colony's hole on the plane is guarded on the plane for both
+  const plane = guarded(g, 0);
+  for (const c of g.colonies) {
+    const hc = c.holeCells[c.params.nest]!;
+    assert.ok(plane.has(key(hc.px, hc.py)), "its hole's plane cell is guarded");
+  }
 });

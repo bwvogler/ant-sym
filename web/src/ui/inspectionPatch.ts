@@ -1,7 +1,10 @@
 import {
   CELL,
-  CURTAIN,
+  isCurtainLayer,
+  lineOfLayer,
+  mapOfLayer,
   OPEN,
+  PLANE,
   SOIL,
   STRIP,
   R,
@@ -17,6 +20,8 @@ import {
 } from "../colony/index.ts";
 import { indexInspectedWorkers, inspectCell, type CellInspectionState } from "./cellInspection.ts";
 import type { LensWorld } from "./lens.ts";
+import { LIVE, UNKNOWN } from "./fog/knowledge.ts";
+import { SNAP } from "./fog/sources.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { voxelRegionBounds } from "./voxelViewport.ts";
 
@@ -73,11 +78,11 @@ export function inspectViewport(
   const workers = indexInspectedWorkers(g, layer),
     selected = inspectCell(g, sensed, layer, x, y, trails, clumps, workers),
     [gx, gy] = selected.cell,
-    map = layer === CURTAIN ? g.world.curtain : g.world.plane,
+    map = mapOfLayer(g.world, layer),
     coords: [number, number][] = [[gx, gy]],
     bounds = voxelRegionBounds(x, y, width, height);
   // Surface piles can spill across cell edges. Read enough source cells for their supported bases.
-  const margin = layer === CURTAIN ? 1 : 3;
+  const margin = isCurtainLayer(layer) ? 1 : 3;
   for (
     let yy = Math.max(0, Math.floor(bounds.top / R) - margin);
     yy <= Math.min(map.size.h - 1, Math.ceil(bounds.bottom / R) + margin);
@@ -112,7 +117,7 @@ function readPatch(
   workers?: ReturnType<typeof indexInspectedWorkers>,
 ): InspectionPatch {
   const [gx, gy] = selected.cell;
-  const map = layer === CURTAIN ? g.world.curtain : g.world.plane;
+  const map = mapOfLayer(g.world, layer);
   const mode = selected.place.view === "below" ? "below" : "surface";
   const cx = centreX(gx, gy),
     cy = centreY(gy);
@@ -124,18 +129,24 @@ function readPatch(
       x: centreX(xx, yy) - cx,
       y: centreY(yy) - cy,
       valid,
-      surfaceStrip: layer === CURTAIN && yy === STRIP,
+      surfaceStrip: isCurtainLayer(layer) && yy === STRIP,
     };
-    if (out.surfaceStrip && g.world.line && cellAt(g.world.line, xx)) {
+    if (out.surfaceStrip && cellAt(lineOfLayer(g.world, layer), xx)) {
       const px = CELL[0],
         py = CELL[1],
-        kind = rockAt(g.world.plane, px, py);
-      out.projectedGround = kind === OPEN ? "open" : kind === SOIL ? "soil" : "rock";
-      out.projectedSpoil = g.world.plane.spoil?.get(px, py) ?? 0;
+        // Under the fog the plane under the strip is what was last sensed there, and nothing where it never was.
+        fog = sensed.knowledge,
+        ps = fog ? fog.state(PLANE, px, py) : LIVE,
+        kind = ps === LIVE ? rockAt(g.world.plane, px, py) : (fog!.snapshot(PLANE, SNAP.rock, px, py) ?? OPEN);
+      if (ps !== UNKNOWN) {
+        out.projectedGround = kind === OPEN ? "open" : kind === SOIL ? "soil" : "rock";
+        out.projectedSpoil = ps === LIVE ? (g.world.plane.spoil?.get(px, py) ?? 0) : (fog!.snapshot(PLANE, SNAP.spoil, px, py) ?? 0);
+      }
       out.surfaceEntrance = g.colonies.some((c) => c.holeCells.some((h) => h.col === xx));
     }
     return out;
   });
+  const fog = sensed.knowledge;
   const surfaceFood = new Map<number, number>();
   if (mode === "surface")
     for (const c of cells) {
@@ -143,8 +154,14 @@ function readPatch(
       for (let d = -1; d < 6; d++) {
         const a = d < 0 ? x : nx(x, y, d),
           b = d < 0 ? y : ny(y, d);
-        if (inBounds(map, a, b) && rockAt(map, a, b) === OPEN && Math.abs((map.quality?.get(a, b) ?? 1) - 1) <= 0.01)
-          surfaceFood.set(cellKey(a, b), map.food.get(a, b));
+        if (!inBounds(map, a, b)) continue;
+        const fs = fog ? fog.state(layer, a, b) : LIVE;
+        if (fs === UNKNOWN) continue; // nothing of ground never sensed
+        const snap = fs === LIVE ? null : fog!; // a remembered cell reads its snapshot, not the truth
+        const rock = snap ? (snap.snapshot(layer, SNAP.rock, a, b) ?? OPEN) : rockAt(map, a, b);
+        const quality = snap ? (snap.snapshot(layer, SNAP.quality, a, b) ?? 1) : (map.quality?.get(a, b) ?? 1);
+        if (rock === OPEN && Math.abs(quality - 1) <= 0.01)
+          surfaceFood.set(cellKey(a, b), snap ? (snap.snapshot(layer, SNAP.food, a, b) ?? 0) : map.food.get(a, b));
       }
     }
   return { selected, mode, cells, surfaceFood };
