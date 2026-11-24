@@ -1,9 +1,9 @@
 import { snapshotAttackCue } from "./attackCue.ts";
 import { centreX, centreY } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
-import { cellKey as colonyCell, Colony, CURTAIN, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
+import { cellKey as colonyCell, Colony, localPolicy, PLANE, type ColonyParams, type Layer } from "./colony.ts";
 import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
-import { growWorld, mainGround, type OneWorld } from "./oneWorld.ts";
+import { growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
@@ -11,7 +11,7 @@ import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
 import { type Line, nearestValidIn } from "./lines.ts";
-import { type Cell, type End, outward } from "./transect.ts";
+import { cellAt, type Cell, type End, outward } from "./transect.ts";
 import { cellKey, cellOf, CELL, hexDistance, keyX, keyY } from "./hex.ts";
 import { decode, encode, fillLike } from "./save.ts";
 import { ALATE_RESERVE, type Flight } from "./royal.ts";
@@ -198,8 +198,10 @@ export type Outcome = "playing" | "unified" | "fallen";
 export interface ColonySpec {
   /** 0 is buildable */
   antCount: number;
-  /** which of the world's start nests (default: its position in the list) */
+  /** which of its line's curtain's start nests (default: the next one of that line's, in the order of the list) */
   nest?: number;
+  /** which line of the world its hole is on (default: the first: a world of one line, the only one until the endless world) */
+  line?: number;
   /** its nest odour (default: 0 for one colony, else k / (N - 1): 0 and 1 for two) */
   odour?: number;
   /** its colony params over the species', and over `nest` and `odour` */
@@ -293,6 +295,26 @@ function holeOf(c: Colony): { x: number; y: number } {
   return n.entrance ?? n;
 }
 
+/**
+ * The index among the plane's nests of the one over curtain nest `nest` of line `wl`: the plane cell at the column of the nest's hole (the same
+ * reading as seeHoles'), matched to the plane's nests. Never assumed from the order of the colonies: a line holds the colonies that began on it.
+ */
+function planeNestOver(plane: WorldMap, wl: WorldLine, nest: number): number {
+  const n = wl.curtain.nests[nest];
+  if (!n) throw new Error(`the curtain has no nest ${nest}`);
+  const e = n.entrance ?? n;
+  cellOf(e.x, e.y);
+  if (!cellAt(wl.line, CELL[0]!)) throw new Error(`the line has no column ${CELL[0]}`);
+  const px = CELL[0]!;
+  const py = CELL[1]!;
+  const i = plane.nests.findIndex((m) => {
+    cellOf(m.x, m.y);
+    return CELL[0] === px && CELL[1] === py;
+  });
+  if (i < 0) throw new Error(`no plane nest over cell ${px},${py}, the hole of curtain nest ${nest}`);
+  return i;
+}
+
 export class Game {
   /** the plane, the surface (its food piles regrow there, and the fungus lands there) */
   readonly map: WorldMap;
@@ -364,11 +386,10 @@ export class Game {
   ) {
     const map = world.plane;
     // The colonies' home map: the curtain, where their nests are.
-    const home = world.curtain;
-    const layered = { plane: world.plane, line: world.line };
     this.world = world;
     this.map = map;
-    this.layers = [world.plane, world.curtain];
+    // The game's layers: the plane, then each line's curtain (layer 1 + the line's index).
+    this.layers = [world.plane, ...world.lines.map((l) => l.curtain)];
     this.params = { ...DEFAULT_GAME, ...params };
     this.#rng = rng;
     // Fights are judged by the recognition's tolerance: a species' own (the invasive garden ant's one supercolony: ja-e668.3) unless the game
@@ -381,15 +402,27 @@ export class Game {
     const tolerance = this.recognition.params.tolerance;
     // Each colony starts at its own odour, as far apart as odours go (0 and 1 for two).
     if (specs.length === 0) throw new Error("a game starts with at least one colony");
-    if (specs.length > home.nests.length)
-      throw new Error(`${specs.length} colonies, and the world has ${home.nests.length} start nests (a founding makes any more)`);
+    // Each colony's line, and its start nest on that line's curtain: the next of the line's, in the order of the list.
+    const onLine: number[] = [];
+    const slot = specs.map((spec) => {
+      const li = spec.line ?? 0;
+      if (!world.lines[li]) throw new Error(`a colony is on line ${li}, and the world has ${world.lines.length}`);
+      return (onLine[li] = (onLine[li] ?? 0) + 1) - 1;
+    });
+    onLine.forEach((n, li) => {
+      const have = (world.lines[li] as WorldLine).curtain.nests.length;
+      if (n > have) throw new Error(`${n} colonies on line ${li}, and it has ${have} start nests (a founding makes any more)`);
+    });
     this.#firstAnts = specs[0]!.antCount;
     this.colonies = specs.map((spec, k) => {
+      const li = spec.line ?? 0;
+      const wl = world.lines[li] as WorldLine;
+      const nestIdx = spec.nest ?? slot[k]!;
       const c = new Colony(
-        home,
+        wl.curtain,
         {
           antCount: spec.antCount,
-          nest: spec.nest ?? k,
+          nest: nestIdx,
           odour: spec.odour ?? (specs.length > 1 ? k / (specs.length - 1) : 0),
           tolerance,
           ...this.#speciesParams(),
@@ -397,7 +430,7 @@ export class Game {
         },
         rng,
         spec.policy ?? this.params.species.policy ?? localPolicy,
-        layered,
+        { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, nestIdx) },
       );
       c.responses = spec.responses ?? this.params.species.responses;
       this.#ownSituation(c);
@@ -447,10 +480,10 @@ export class Game {
   #wire(): void {
     this.colonies.forEach((c, k) => {
       // The line as it stands (it grows with every founding), before the holes are read off it.
-      c.line = this.world.line;
+      c.line = (this.world.lines[c.lineIndex] as WorldLine).line;
       seeHoles(c);
       this.layers.forEach((m, l) => {
-        if (m.hasSoil) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
+        if (m.hasSoil && c.layers[l]) c.wire(l, { friends: (this.#grids[l] as CountGrid[])[k] as CountGrid });
       });
       // Undertakers put the dead on the midden: a host of a strain that sporulates (Bloom) puts spores on the ground there;
       // other strains die with their host (nest slices 7–8).
@@ -469,10 +502,11 @@ export class Game {
       };
       if (this.colonies.length > 1) {
         this.layers.forEach((_, l) => {
+          if (!c.layers[l]) return; // a curtain of another line: this colony is not on it
           c.wire(l, {
             enemies: this.#recs[l] as Recognition,
             nestmates: (this.#grids[l] as CountGrid[])[k] as CountGrid,
-            others: this.colonies.filter((o) => o !== c).map((o) => (o.layers[l] as Layer).nest),
+            others: this.colonies.filter((o) => o !== c && o.layers[l]).map((o) => (o.layers[l] as Layer).nest),
           });
         });
         this.#aimRaids(k);
@@ -635,12 +669,15 @@ export class Game {
       spot = { cell: s.cell, end: s.end, line: s.line };
     }
     if (!spot) throw new Error(`addColony: ${NO_ROOM}`);
-    const at = growWorld(world, spot.end, spot.cell, spot.line ?? 0);
+    const li = spot.line ?? 0;
+    const wl = world.lines[li] as WorldLine;
+    // `at` is the colony's index among its curtain's nests (its line's); its index among the plane's is `k`.
+    const at = growWorld(world, spot.end, spot.cell, li);
     // A save's nest is the one dug then (growWorld digs the same one: from the stream keyed by its hole).
-    if (f.nest) world.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
-    const nest = world.curtain.nests[at] as Nest;
+    if (f.nest) wl.curtain.nests[at] = { ...f.nest, ...(f.nest.entrance ? { entrance: { ...f.nest.entrance } } : {}) };
+    const nest = wl.curtain.nests[at] as Nest;
     const c = new Colony(
-      world.curtain,
+      wl.curtain,
       {
         ...this.#speciesParams(),
         antCount: f.antCount,
@@ -652,7 +689,7 @@ export class Game {
       },
       this.#rng,
       this.params.species.policy ?? localPolicy,
-      { plane: world.plane, line: world.line },
+      { plane: world.plane, line: wl.line, layer: 1 + li, lineIndex: li, planeNest: planeNestOver(world.plane, wl, at) },
     );
     c.responses = this.params.species.responses;
     this.#ownSituation(c);
@@ -775,6 +812,7 @@ export class Game {
   /** Colony c's raids, and the rival trail its bent ants read, at colony `target`: on each layer, its nest and scent there. */
   #aimAt(c: Colony, target: Colony): void {
     this.layers.forEach((_, l) => {
+      if (!c.layers[l] || !target.layers[l]) return; // only where both colonies are: the plane, and a curtain they share
       const { nest: other, ph } = target.layers[l] as Layer;
       c.wire(l, {
         raidTarget: other.entrance ? { x: other.entrance.x, y: other.entrance.y, r: 1.5 } : other, // side view: in at their hole
@@ -788,7 +826,7 @@ export class Game {
 
   /** Food left on the map, every layer's (the plane's and the curtain's buried food), as each colony counts it. */
   get foodLeft(): number {
-    return this.world.plane.foodLeft + this.world.curtain.foodLeft;
+    return this.world.lines.reduce((s, l) => s + l.curtain.foodLeft, this.world.plane.foodLeft);
   }
 
   /** Occupancy per colony, and every ant by odour band, on each layer: built from the ants, never by scanning the map. */
@@ -1020,7 +1058,7 @@ export class Game {
    */
   #byHole(c: Colony): { x: number; y: number; toward: { x: number; y: number } | null } {
     const nest = (c.layers[PLANE] as Layer).nest;
-    const holes = this.world.line.holes.map((h) => ({ x: centreX(h.x, h.y), y: centreY(h.y) }));
+    const holes = (this.world.lines[c.lineIndex] as WorldLine).line.holes.map((h) => ({ x: centreX(h.x, h.y), y: centreY(h.y) }));
     let i = 0;
     for (let j = 1; j < holes.length; j++)
       if (Math.hypot(holes[j]!.x - nest.x, holes[j]!.y - nest.y) < Math.hypot(holes[i]!.x - nest.x, holes[i]!.y - nest.y)) i = j;
@@ -1037,15 +1075,15 @@ export class Game {
   }
 
   /** One world: the curtain entrance of the hole whose mouth plane cell (x, y) is in (a colony's plane disc's centre), or null (Fungus.crossAt). */
-  #holeAt(x: number, y: number): { x: number; y: number } | null {
+  #holeAt(x: number, y: number): { x: number; y: number; layer: number } | null {
     for (const c of this.colonies) {
       const plane = c.layers[PLANE] as Layer | undefined;
-      const down = (c.layers[CURTAIN] as Layer | undefined)?.nest.entrance;
+      const down = (c.layers[c.home] as Layer | undefined)?.nest.entrance;
       if (!plane || !down) continue;
       cellOf(plane.nest.x, plane.nest.y);
       // The hole's mouth: its disc (the colony's ground round the hole on the plane), where the ground runs down into the
       // shaft. A tip set off toward the hole passes within a cell or two of it, not through it.
-      if (hexDistance(x, y, CELL[0], CELL[1]) <= Math.round(plane.nest.r)) return { x: down.x, y: down.y };
+      if (hexDistance(x, y, CELL[0], CELL[1]) <= Math.round(plane.nest.r)) return { x: down.x, y: down.y, layer: c.home };
     }
     return null;
   }
@@ -1098,6 +1136,9 @@ export class Game {
    * ui/saves.ts keeps the seed, view and settings beside it).
    */
   save(): GameSave {
+    // A save holds the first line and its curtain: another line would be lost without a word (saves hold the lines: E3.4).
+    if (this.world.lines.length > 1)
+      throw new Error(`save: this world has ${this.world.lines.length} lines, and a save holds one (docs/endless-world.md §8, E3.4)`);
     // A map without its nests: the world (or a re-founding) makes them.
     const bare = (m: WorldMap) => Object.fromEntries(Object.entries(m).filter(([k]) => k !== "nests" && k !== "nest"));
     const map = bare(this.map);

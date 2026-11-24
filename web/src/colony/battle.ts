@@ -115,7 +115,9 @@ export class CountGrid {
 /** Ants per cell, one grid per colony: of the ants on layer `layer` (one world, ja-lp4.3), or every ant (−1: the colony's one map). */
 export function occupancy(colony: Colony, out: CountGrid, layer = -1): CountGrid {
   out.reset();
-  const map = layer < 0 ? colony.map : (colony.layers[layer] as Layer).map;
+  const on = layer < 0 ? null : colony.layers[layer];
+  if (layer >= 0 && !on) return out; // a curtain of another line: this colony has no ants there
+  const map = (on ?? colony).map;
   const h = map.size.h;
   for (let i = 0; i < colony.n; i++) {
     if (!colony.alive[i] || (layer >= 0 && colony.layer[i] !== layer)) continue;
@@ -150,7 +152,9 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number,
   }
   for (const g of grids) g.reset();
   colonies.forEach((c, own) => {
-    const map = layer < 0 ? c.map : (c.layers[layer] as Layer).map;
+    const on = layer < 0 ? null : c.layers[layer];
+    if (layer >= 0 && !on) return; // a curtain of another line
+    const map = (on ?? c).map;
     for (let i = 0; i < c.n; i++) {
       if (!c.alive[i] || c.attackLayer[i] < 0 || c.attackLayer[i] !== c.layer[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
       const weight = recognition ? 1 - c.calm[i] : 1;
@@ -267,7 +271,8 @@ export function resolveFights(
   const deaths: number[][] = colonies.map(() => []);
   colonies.forEach((c, k) => {
     const observer = combatObservers.get(c);
-    const on = layer < 0 ? null : (c.layers[layer] as Layer);
+    const on = layer < 0 ? null : c.layers[layer];
+    if (layer >= 0 && !on) return; // a curtain of another line: none of this colony's ants are on it
     const map = (on ?? c).map;
     const ph = (on ?? c).ph;
     for (let i = 0; i < c.n; i++) {
