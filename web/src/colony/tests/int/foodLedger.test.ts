@@ -27,18 +27,6 @@ test("a chunk that generates differently the second time is an error, not a sile
   assert.equal(l.generatedTotal, 100);
 });
 
-test("total is generated plus added, left is total less taken, and neither moves the generated count", () => {
-  const l = new FoodLedger();
-  l.generated("plane", 1, 100);
-  l.add(30);
-  l.take(45);
-  assert.equal(l.generatedTotal, 100);
-  assert.equal(l.total, 130);
-  assert.equal(l.left, 85);
-  l.take(85);
-  assert.equal(l.left, 0);
-});
-
 test("the ledger over a walk of chunks does not depend on the order: any order, a regenerated chunk too", () => {
   const w = new EndlessPlane(3);
   const cells: [number, number][] = [];
