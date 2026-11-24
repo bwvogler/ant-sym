@@ -673,7 +673,8 @@ export class Builder {
         col.carriedY[c.i] -= c.dy;
       } else if (c.kind === "rain") {
         const ph = game.colonies[c.colony]?.layers[c.layer]?.ph;
-        if (ph && ph.fields[c.channel].get(c.x, c.y) < c.was)
+        // not into a colony asleep now: it stands as it was, an undo included
+        if (ph && !game.isFrozen(c.colony) && ph.fields[c.channel].get(c.x, c.y) < c.was)
           ph.depositCell(c.channel, c.x, c.y, c.was - ph.fields[c.channel].get(c.x, c.y));
       } else {
         c.line.cells.push(...c.cells);

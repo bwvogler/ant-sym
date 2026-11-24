@@ -54,10 +54,15 @@ test("a sleeper's contact memory is held, not decayed: met still reads what it w
   for (const c of g.colonies) for (let i = 0; i < c.n; i++) if (c.alive[i]) c.putAnt(i, PLANE, centreX(x, y), centreY(y));
   run(g, 20);
   const held = g.save().private.metBy![1]!;
+  const before0 = g.save().private.metBy![0]!;
   assert.ok(held > 0.01, `the two met (${held})`);
   g.freeze(1);
   run(g, 60);
   assert.equal(g.save().private.metBy![1], held, "held while it slept, not decayed toward 0");
+  assert.equal(g.save().private.metBy![0], before0, "and the awake colony's, with nobody awake left to meet");
+  assert.equal(g.unity().met, Math.min(held, before0), "so unity().met stands too");
+  g.thaw(1);
+  assert.equal(g.unity().met, Math.min(held, before0), "and is what it was the moment the colony wakes");
 });
 
 test("rain and crayon lines leave a sleeper's scent as it was", () => {
@@ -105,4 +110,18 @@ test("with three colonies, a colony raids the nearest rival that is awake, not t
   assert.equal(c.layers[PLANE]!.raidTarget, at(far), "the farther rival, since the nearer sleeps");
   g.thaw(near);
   assert.equal(c.layers[PLANE]!.raidTarget, at(near), "the nearer again once it wakes");
+});
+
+test("undo of a rain stroke does not write into a colony that sleeps now", () => {
+  const g = game();
+  const b = new Builder(g);
+  const [x, y] = openCell(g);
+  for (const c of g.colonies) for (const ch of RAIN_CHANNELS) c.layers[PLANE]!.ph.depositCell(ch, x, y, 2);
+  b.apply({ tool: "rain", layer: PLANE, points: [pt(x, y)] });
+  g.freeze(1);
+  assert.ok(b.undo());
+  for (const ch of RAIN_CHANNELS) {
+    assert.ok(g.colonies[0]!.layers[PLANE]!.ph.fields[ch]!.get(x, y) >= 2 - 1e-6, `${ch} back on the awake colony`);
+    assert.equal(g.colonies[1]!.layers[PLANE]!.ph.fields[ch]!.get(x, y), 0, `${ch} not written into the sleeper`);
+  }
 });

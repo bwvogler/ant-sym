@@ -1133,7 +1133,9 @@ export class Game {
       for (let b = a + 1; b < live.length; b++)
         gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
-      if (this.#frozen.has(k)) return; // a sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped
+      // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
+      // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
+      if (this.#frozen.has(k) || (this.#frozen.size > 0 && live.length < 2)) return;
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
         let living = 0;
