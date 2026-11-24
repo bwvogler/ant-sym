@@ -551,6 +551,7 @@ export class Game {
     this.#frozen.add(k);
     this.#syncFrozen();
     this.#refresh(); // the occupancy and the recognition bands are rebuilt without it now, not at the end of the next tick
+    this.#aimAll(); // and the awake raid no one who sleeps
   }
 
   /** Wake colony k: it steps again from exactly where it stopped. */
@@ -558,6 +559,7 @@ export class Game {
     this.#frozen.delete(k);
     this.#syncFrozen();
     this.#refresh(); // its first tick must read grids and bands that count it (else its crowd, one tick, is another colony's)
+    this.#aimAll();
   }
 
   /** Whether colony k is asleep. */
@@ -1023,7 +1025,7 @@ export class Game {
    */
   #aimRaids(k: number): void {
     const c = this.colonies[k] as Colony;
-    const target = nearestRival(c, this.colonies, this.recognition.params.tolerance);
+    const target = nearestRival(c, this.#awake(), this.recognition.params.tolerance); // a sleeper has no defenders to raid and no ants to meet
     if (target) this.#aimAt(c, target);
   }
 
@@ -1131,6 +1133,9 @@ export class Game {
       for (let b = a + 1; b < live.length; b++)
         gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
     this.colonies.forEach((c, k) => {
+      // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
+      // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
+      if (this.#frozen.has(k) || (this.#frozen.size > 0 && live.length < 2)) return;
       let share = 0;
       if (live.length >= 2 && live.includes(k)) {
         let living = 0;
@@ -1232,21 +1237,30 @@ export class Game {
     if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
     if (this.time >= this.#nextRivalCheck) {
       this.#nextRivalCheck = this.time + this.params.rivalEvery;
-      this.colonies.forEach((c, k) => {
-        // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
-        // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
-        // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
-        // raiders swarmed the other nest with nobody there to fight).
-        const tol = this.recognition.params.tolerance;
-        if (!this.colonies.some((o, j) => j !== k && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
-          c.raidable = false;
-          return;
-        }
-        c.raidable = true;
-        // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
-        this.#aimRaids(k);
-      });
+      this.#aimAll();
     }
+  }
+
+  /**
+   * Who each colony raids, and whether it has anyone to (the rival check, every `rivalEvery` s, and again when a colony sleeps or wakes): a colony
+   * asleep is no rival, so a raid never walks to its empty nest.
+   */
+  #aimAll(): void {
+    this.colonies.forEach((c, k) => {
+      if (this.#frozen.has(k)) return;
+      // With no living rival there is nothing to defend against or raid: forage, and ask nobody.
+      // (Solo, "raid" turned explorers into fighters with no target, and the colony stopped foraging.)
+      // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
+      // raiders swarmed the other nest with nobody there to fight).
+      const tol = this.recognition.params.tolerance;
+      if (!this.colonies.some((o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
+        c.raidable = false;
+        return;
+      }
+      c.raidable = true;
+      // Raids go to the nearest colony still a rival (one may have fallen, or come to smell like kin).
+      this.#aimRaids(k);
+    });
   }
 
   /** Where the fungus landed (Game.land), or null before it has: the fungus game's start (ja-lo8.5). */
@@ -1266,7 +1280,7 @@ export class Game {
     const { x, y, toward } = this.#byHole(this.colonies[k] ?? (this.colonies[0] as Colony));
     // The game's fungus starts weak and evolves (ja-lo8.12); a lab or test landing keeps the strain as listed.
     if (evolve) this.fungus.evolve(strain);
-    this.fungus.paint(this.colonies, x, y, LANDING.radius, spores, 0, strain);
+    this.fungus.paint(this.#awake(), x, y, LANDING.radius, spores, 0, strain);
     this.fungus.root(x, y, LANDING.radius, 0, toward);
     this.landed = { colony: k, x, y, at: this.time };
     return this.landed;
@@ -1318,7 +1332,7 @@ export class Game {
    * the ants on it.
    */
   paintSpores(x: number, y: number, radius: number, spores: number, dose: number, strain: number, layer = 0): void {
-    this.fungus.paint(this.colonies, x, y, radius, spores, dose, strain, layer);
+    this.fungus.paint(this.#awake(), x, y, radius, spores, dose, strain, layer); // a sleeper's ants are not dosed: they stand as they were
   }
 
   /**
