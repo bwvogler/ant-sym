@@ -413,9 +413,9 @@ for (const rng of [8, 9, 10, 11]) {
         sy += s.h * (centreY(s.y) - centreY(h.py));
         far.push(d);
       }
-      // Colony 1's floor is 20, as its soil floor above (owner, 2026-11-24, PR #402: with the floor-mark max rule colony 1 has 39 pellets on its mound on
-      // stream 9, soil out 33; across streams 8-15 colony 1 brings out 27-54 and colony 0 92-196).
-      assert.ok(n > (c === g.colonies[0] ? 40 : 20), `colony ${c.params.nest}: ${n} pellets on its mound`);
+      // Colony 1's floor is 30 (owner, 2026-11-24, PR #402): with the floor-mark max rule colony 1 has 62, 39, 48 and 51 pellets on its mound on streams
+      // 8-11 (colony 0: 199, 194, 184, 184), so 40 failed stream 9 by one and 30 holds with 9 to spare. Its soil floor above is 20.
+      assert.ok(n > (c === g.colonies[0] ? 40 : 30), `colony ${c.params.nest}: ${n} pellets on its mound`);
       assert.ok(
         Math.hypot(sx / n, sy / n) < 4,
         `colony ${c.params.nest}: the mound's centre is ${Math.hypot(sx / n, sy / n).toFixed(1)} from its hole`,
