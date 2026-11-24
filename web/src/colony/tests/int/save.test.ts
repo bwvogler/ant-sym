@@ -192,7 +192,7 @@ test("the game's save holds every private field it declares, or the field is bui
   const fromFounded = ["wild"]; // the wild sites that have woken, by site: set again as each founding in `founded` is made again on load (Founding.wild)
   const fromParams = ["recognition"]; // the recognition parameters every layer's Recognition is made from: the params the game was built with (a line made mid-game builds one more)
   const onlyWhenSet = ["frozen", "sleep", "sleepNext"]; // the colonies asleep (Game.freeze), and the awake rule with when it is next asked (Game.enableSleep): in `private` only when set, so a game that does neither saves as it always has
-  const prefetch = ["prefetchQueue", "prefetchHead", "prefetchNext", "bodyChunks", "bodyNext"]; // the endless plane's chunks made ahead (Game.#prefetchStep): a cache, replanned in a second after a load; it changes when a chunk is made, never what it holds (PRD §66 E6.0.4)
+  const prefetch = ["prefetchQueue", "prefetchHead", "prefetchNext", "bodyChunks", "bodyNext", "evictQueue", "evictHead", "evictKept"]; // the endless plane's chunks made ahead (Game.#prefetchStep) and freed (#evictStep): caches, replanned in a second after a load; they change when a chunk is made or held, never what it holds (PRD §66 E6.0.4, E4.4b)
   assert.deepEqual(
     [...declared].sort(),
     [...inPrivate, ...inGrids, ...derived, ...fromPage, ...fromSpecs, ...fromParams, ...fromFounded, ...onlyWhenSet, ...prefetch].sort(),

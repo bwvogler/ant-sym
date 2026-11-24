@@ -43,6 +43,11 @@ export interface EndlessMap extends WorldMap {
    */
   foodHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
   /**
+   * Called with a chunk's food when it is generated AGAIN (after `dropClean` freed it: the ledger counts nothing the second time, so `foodHooks` stay quiet),
+   * so a reader that dropped what it keeps per chunk (the game's regrowth piles) takes it up again. Run inside the generator: do not read the map's food.
+   */
+  regenHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
+  /**
    * Make the plane's chunk (cx, cy) ahead of need (PRD §66 E6.0.4, `ja-qpv.9.1`): the layers take it from here when they first read the chunk, so that read
    * costs a copy, not the ~70 ms of a chunk with food patches. One call does one step of that work (the patches of one of the chunk's 3x3 neighbours, or the
    * chunk once they are all known) and returns true; false means there is nothing left to do (the chunk is made, or a layer holds it), so call until false,
@@ -104,6 +109,7 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
     plane,
     ledger,
     foodHooks: [],
+    regenHooks: [],
     gen,
     prefetch: (cx, cy) => {
       const k = chunkKey(cx, cy);
@@ -134,7 +140,7 @@ export function generateEndlessPlane(seed: number, opts: Partial<EndlessOptions>
         map.foodTotal += sum;
         map.foodLeft += sum;
         for (const hook of map.foodHooks) hook(cx, cy, f);
-      }
+      } else for (const hook of map.regenHooks) hook(cx, cy, f);
     },
   );
   return map;

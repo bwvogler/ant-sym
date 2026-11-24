@@ -56,6 +56,8 @@ interface Over {
   f?: Partial<NestFrame>;
   /** the cadaver sprite set's answer: true when it drew the corpse itself */
   cadaver?: boolean;
+  /** the game has frozen this colony (ja-qpv.4.5) */
+  asleep?: boolean;
 }
 
 function setup(o: Over = {}) {
@@ -83,6 +85,8 @@ function setup(o: Over = {}) {
     v: V,
     c: o.c ?? C,
     lv: o.lv ?? PLANE,
+    colonies: [col],
+    asleep: o.asleep ? new Set([0]) : undefined,
     m: { x0: 0, size: { w: 200, h: 200 }, rock: { get: () => OPEN }, ...o.m } as unknown as WorldMap,
     sprites: {
       nest: {
@@ -699,4 +703,59 @@ test("small workers: the queen is at least 3 pixels, an alate's spore dot at lea
   run(fine);
   assert.ok(fine.log.includes("lineWidth = 1"), "the outline is at least 1");
   assert.ok(!fine.log.includes("lineWidth = 0.6"));
+});
+
+// A colony the game has frozen (ja-qpv.4.5, field/asleep.ts): its nest, mound, brood, queen and alates draw at half strength.
+const DRAWS = /^(stroke|fill|fillRect|drawImage)\(/;
+/** The strength each drawing call of `log` was made at, in order. */
+function strengths(log: string[]): number[] {
+  let alpha = 1;
+  const out: number[] = [];
+  for (const l of log) {
+    const m = /^globalAlpha = (.+)$/.exec(l);
+    if (m) alpha = Number(m[1]);
+    else if (DRAWS.test(l)) out.push(alpha);
+  }
+  return out;
+}
+
+test("a frozen colony draws its mound, nest, brood, queen and alates at half strength and leaves the strength at 1; an awake colony is as it was", () => {
+  const rich = (alive: boolean) => ({
+    soilOut: 400,
+    brood: { items: [{ x: 44, y: 30, stage: 1, held: -1 }] },
+    queen: { x: 42, y: 31, alive },
+    alates: [{ x: 43, y: 31, load: 2 }],
+  });
+  for (const alive of [true, false]) {
+    const awake = setup({ col: rich(alive) });
+    const again = run(awake);
+    assert.ok(
+      strengths(awake.log).some((a) => a === 0.8) && strengths(awake.log).some((a) => a === 1),
+      "awake: the mound at 0.8 and the rest at 1",
+    );
+    const asleep = setup({ col: rich(alive), asleep: true });
+    const overlay = run(asleep);
+    const hs = strengths(asleep.log);
+    const as = strengths(awake.log);
+    assert.ok(hs.length === as.length && hs.length > 0, "the same things are drawn");
+    // Each drawing call at exactly half the strength its awake twin was made at: the mound's fill (0.12), its outline (0.8), the ring (0.7),
+    // the brood and queen (1), the dead queen's cross (0.6), the alate's wings (0.5).
+    assert.deepEqual(
+      hs.map((a) => Math.round(a * 1e6)),
+      as.map((a) => Math.round(a * 0.5 * 1e6)),
+      `each call at half its awake strength: ${as.join(",")} -> ${hs.join(",")}`,
+    );
+    assert.equal(asleep.state.globalAlpha, 1, "the strength is left at 1 for the next stage");
+    // The alates are drawn again over the fungus's mark, with whatever strength the stages between left: a sleeper sets its own.
+    assert.equal(typeof again, "function");
+    assert.equal(typeof overlay, "function");
+    const mark = asleep.log.length;
+    asleep.state.globalAlpha = 0.9;
+    overlay!();
+    assert.ok(
+      strengths(asleep.log.slice(mark)).every((a) => a <= 0.5),
+      "the overlay draws at half strength, whatever it found",
+    );
+    assert.equal(asleep.state.globalAlpha, 1);
+  }
 });

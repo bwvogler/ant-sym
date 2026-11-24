@@ -26,6 +26,7 @@ const host = (x: number, y: number): Colony =>
   ({
     n: 1,
     params: { sensorDistance: 3 },
+    alates: [],
     alive: Uint8Array.of(1),
     load: Float32Array.of(INFECTED),
     layer: Uint8Array.of(PLANE),
@@ -142,7 +143,7 @@ test("known colonies: by a host or by the hole; live while it holds a host, as o
   const s = new SensedMap();
   const k = new Knowledge(s, [w.source]);
   const a = hostAt(40, 40);
-  const b = { ...none(), holeCells: [{ col: 120, row: 40, px: 0, py: 0 }] } as Colony;
+  const b = { ...none(), params: { nest: 0 }, holeCells: [{ col: 0, row: 0, px: 120, py: 40 }] } as unknown as Colony;
   const c = none();
   let pop = 5;
   const known = new KnownColonies<number>(() => pop);

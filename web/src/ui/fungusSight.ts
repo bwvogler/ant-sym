@@ -14,6 +14,8 @@ import {
 } from "../colony/index.ts";
 import { BODY_EVERY, bodySight, hostSight } from "./fog/observers.ts";
 import type { CorpseMemory } from "./fog/corpses.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import type { SideStats } from "./stats.ts";
 import type { Knowledge } from "./fog/knowledge.ts";
 import { decayStage } from "./cadaverVisual.ts";
 
@@ -50,12 +52,16 @@ export class SensedMap {
   knowledge: Knowledge | null = null;
   /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog */
   corpses: CorpseMemory | null = null;
+  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog */
+  known: KnownColonies<SideStats> | null = null;
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */
   onReset: (() => void) | null = null;
   /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
   #bodyAt = -Infinity;
+  /** The colonies the game has frozen, by index, as of the last `stampGame`: the page draws them still and dimmed (ja-qpv.4.5). Empty until a game is stamped. */
+  readonly asleep = new Set<number>();
 
   /** Whether a host has ever sensed any cell of chunk (cx, cy) on layer `l`. */
   revealed(l: number, cx: number, cy: number): boolean {
@@ -92,12 +98,15 @@ export class SensedMap {
   stampGame(game: Game): void {
     const now = game.time;
     this.#begin(now);
+    this.asleep.clear();
+    for (let k = 0; k < game.colonies.length; k++) if (game.isFrozen(k)) this.asleep.add(k);
     hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
     if (now - this.#bodyAt >= BODY_EVERY) {
       this.#bodyAt = now;
       bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
     }
     if (this.knowledge) this.corpses?.update(game, this.knowledge, decayStage);
+    if (this.knowledge) this.known?.update(game, this.knowledge);
     this.#forget();
   }
 
@@ -108,6 +117,7 @@ export class SensedMap {
       this.#revealed.clear();
       this.#bodyAt = -Infinity;
       this.corpses?.clear();
+      this.known?.clear();
       this.onReset?.();
     }
     this.now = now;

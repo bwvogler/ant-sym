@@ -79,6 +79,11 @@ export class FeltGrid {
     t.length = 0;
   }
 
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.layer.dropEmpty();
+  }
+
   /** `v` felt on cell (x, y): kept if it is the strongest there. */
   put(x: number, y: number, v: number): void {
     if (v <= 0) return; // a column may be negative (one world's curtain starts at the line's sMin), and so may a row (an endless plane, PRD §66 E6.0.2)
@@ -123,6 +128,11 @@ export class DonorGrid {
     const t = this.#touched;
     for (let k = 0; k < t.length; k += 2) this.layer.set(t[k], t[k + 1], 0);
     t.length = 0;
+  }
+
+  /** Free the chunks holding nothing (a game on an endless plane calls this a second: the grid zeroes cells and leaves their chunks, so it grows with the ground it has been over). */
+  trim(): void {
+    this.layer.dropEmpty();
   }
 
   /** Ant i (energy[i]) on cell (x, y): kept if it is the best-fed there. */

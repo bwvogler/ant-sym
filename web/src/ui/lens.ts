@@ -59,6 +59,8 @@ export interface LensProbe {
   hole: number;
   /** the chamber here: its colony (an index into the game's colonies), role, and what lies in it */
   chamber: { k: number; role: Role; brood: number; food: number } | null;
+  /** the colonies the game has frozen (only when some are): what the lens says of their ants, hole and chambers carries it (ja-qpv.4.5) */
+  asleep?: ReadonlySet<number>;
   /** under the fog of war: unknown (never sensed), remembered or live; absent without it (docs/fog-of-war.md §5.2) */
   fog?: FogState;
   /** under the fog, how many sim seconds ago a remembered place was last sensed */
@@ -184,6 +186,7 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
     homeTrail,
     hole,
     chamber,
+    ...(sensed.asleep.size ? { asleep: sensed.asleep } : {}),
     ...(fog ? { fog: fs, age: remembered ? Math.max(0, sensed.now - fog.lastSeen(lv, gx, gy)) : 0 } : {}),
   };
 }
@@ -205,6 +208,9 @@ export const ROLE_ENTRY: Record<Role, string> = {
   none: "chambers",
 };
 
+/** What the lens adds of a colony the game has frozen (owner, 2026-11-24: the page says it is asleep). */
+const ASLEEP_SAYS = "asleep: the game has paused it while the fungus is elsewhere";
+
 const strength = (v: number) => (v >= 0.66 ? "strong" : v >= 0.33 ? "fair" : "faint");
 
 /** What the lens says of a point and the ant there (if any): the ant first, then the place, top to bottom as drawn. */
@@ -215,16 +221,21 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
       { what: "Unexplored", says: "your hosts and your body have not sensed this ground: nothing is known of it", entry: "fungus-senses" },
     ];
   if (ant) {
-    const bits = [ant.mode, ...(ant.carrying ? ["carrying food"] : []), ant.infected ? "a host of yours" : "not infected"];
+    const bits = [
+      ant.mode,
+      ...(ant.carrying ? ["carrying food"] : []),
+      ant.infected ? "a host of yours" : "not infected",
+      ...(p.asleep?.has(ant.k) ? ["asleep"] : []),
+    ];
     out.push({ what: `Ant #${ant.i} of ${colonyName(ant.k)}`, says: bits.join(" · "), entry: ant.infected ? "fungus" : "jobs" });
   }
   if (p.hole >= 0)
     out.push({
       what: `${colonyName(p.hole)}'s hole`,
       says:
-        p.view === "below"
+        (p.view === "below"
           ? "where the nest's shaft meets the ground: the way up"
-          : "the way into the nest: the line through the holes shows below",
+          : "the way into the nest: the line through the holes shows below") + (p.asleep?.has(p.hole) ? ` · ${ASLEEP_SAYS}` : ""),
       entry: "one-world",
     });
   if (p.chamber) {
@@ -234,13 +245,13 @@ export function lensLines(p: LensProbe, ant: LensAnt | null): LensLine[] {
       // Its use and what lies in it are live: only that it is a chamber of that colony is still known.
       out.push({
         what: `A chamber of ${colonyName(c.k)}`,
-        says: "what it is used for, and what lies in it, is not known now: nobody senses it",
+        says: `what it is used for, and what lies in it, is not known now: nobody senses it${p.asleep?.has(c.k) ? ` · ${ASLEEP_SAYS}` : ""}`,
         entry: "chambers",
       });
     else
       out.push({
         what: `${ROLE_NAME[c.role]} of ${colonyName(c.k)}`,
-        says: `${ROLE_TEXT[c.role]}${lying.length ? ` · ${lying.join(", ")}` : ""}`,
+        says: `${ROLE_TEXT[c.role]}${lying.length ? ` · ${lying.join(", ")}` : ""}${p.asleep?.has(c.k) ? ` · ${ASLEEP_SAYS}` : ""}`,
         entry: ROLE_ENTRY[c.role],
       });
   }

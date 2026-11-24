@@ -26,7 +26,7 @@ function setup(shown = PLANE) {
   const colonies = [col("a", true), col("bb", false), col("ccc", true)];
   const spore = { spores: layer("spores") };
   const fungus = { spores: layer("own"), sporesOn: (lv: number) => (lv === PLANE ? spore : undefined) };
-  const sensed = { layer: (lv: number) => layer(`sensed${lv}`), now: 7 };
+  const sensed = { layer: (lv: number) => layer(`sensed${lv}`), now: 7, asleep: new Set([2]) };
   const sprite = (n: string) => ({
     clearTints: () => log.push(`${n}.clearTints`),
     load: (cb: () => void) => (log.push(`${n}.load`), (redraw = cb)),
@@ -52,7 +52,7 @@ function setup(shown = PLANE) {
     (n) => (n === "--heat" ? "10 20 30" : n.startsWith("--") ? "#102030" : ""),
     colonies[0] as never,
   );
-  return { b, st, log, plane, curtain, curtain2, colonies, spore, fungus, getRedraw: () => redraw };
+  return { b, st, log, plane, curtain, curtain2, colonies, spore, fungus, sensed, getRedraw: () => redraw };
 }
 
 test("a new binding binds the shown layer and reads the theme once, in that order", () => {
@@ -124,7 +124,7 @@ test("rebuild only when the map is another or has changed size", () => {
 });
 
 test("fill copies every bound field into the frame's context, after the view has changed", () => {
-  const { b, st } = setup();
+  const { b, st, sensed } = setup();
   st.shown = CURTAIN;
   st.smell = true;
   b.bind();
@@ -142,6 +142,7 @@ test("fill copies every bound field into the frame's context, after the view has
   assert.equal(fc.sensedLayer, b.sensedLayer);
   assert.notEqual(fc.sensedLayer, null);
   assert.equal(fc.sensedNow, 7);
+  assert.equal(fc.asleep, sensed.asleep, "the frozen colonies the sensed map holds are the ones the frame draws still");
 });
 
 test("retheme reads the CSS again and drops the tints, the tiles and the minimap's picture", () => {

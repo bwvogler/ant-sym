@@ -2,13 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { type Colony, type OneWorld } from "../colony/index.ts";
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { hasChamberLabels } from "./fieldGoTo.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import { isKnown } from "./fog/knownView.ts";
 import { colonyName } from "./names.ts";
+import type { SideStats } from "./stats.ts";
 
 // The "Go to" menu over the field (PRD §69; ja-fnd.6.3.12, docs/field-split.md): one compact menu, so the overlay never runs off a phone's width. The
 // whole map, each colony's nest, and the chamber-labels toggle. It lives here, not in field/, which is plain TypeScript with no React.
 
 export default function FieldGoToMenu({
   colonies,
+  known = null,
   world,
   view,
   toolsAt,
@@ -18,6 +22,8 @@ export default function FieldGoToMenu({
   goNest,
 }: {
   colonies: readonly Colony[];
+  /** under the fog of war: the colonies the fungus knows; only their nests are listed (null: all) */
+  known?: KnownColonies<SideStats> | null;
   world: OneWorld;
   /** the view shown: its map decides whether there are chambers to label */
   view: number;
@@ -71,17 +77,19 @@ export default function FieldGoToMenu({
           <button type="button" className={item} onClick={() => (showAll(), setGoOpen(false))} title="Show the whole map (0)">
             Whole map
           </button>
-          {colonies.map((_, k) => (
-            <button
-              key={k}
-              type="button"
-              className={item}
-              onClick={() => (goNest(k), setGoOpen(false))}
-              title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
-            >
-              {colonyName(k)} nest
-            </button>
-          ))}
+          {colonies.map((_, k) =>
+            !isKnown(known, k) ? null : (
+              <button
+                key={k}
+                type="button"
+                className={item}
+                onClick={() => (goNest(k), setGoOpen(false))}
+                title={`Go to the ${colonyName(k)} colony's nest (n cycles nests)`}
+              >
+                {colonyName(k)} nest
+              </button>
+            ),
+          )}
           {hasChamberLabels(world, view) && (
             <button
               type="button"

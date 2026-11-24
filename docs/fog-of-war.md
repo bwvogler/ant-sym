@@ -22,7 +22,7 @@
 |---|---|
 | Ground chunks (`field/ground.ts`), hexagon mode, food sprites | rock, soil, food, quality, spoil and mound, spores, chamber tints |
 | `drawNest`, `drawAnts`, `drawStripAnts` (`field/nests.ts`, `ants.ts`, `overlays.ts`) | every nest, brood pile, queen, alate, corpse and living ant of every colony |
-| The voxel pass (`mapVoxel.ts` through `inspectViewport`) | every cell in view, ants and brood included |
+| The voxel pass (`mapVoxel.ts` through `inspectViewport`) | every cell in view, ants and brood included; F3.4: runs flat under the fog and `drawFogOverlay` covers it |
 | The curtain strip (`stripAt`) | the plane under the line, repainted every frame |
 | The minimap (`field/minimap.ts`) | the whole map, every ant coloured by odour |
 | Picking, `AntCard`, following (`field/hit.ts`, `follow.ts`) | any ant anywhere, its mode, position and Jev answer |
@@ -69,7 +69,7 @@
 
 One source interface, so later organisms plug in without touching the fog (`ja-1ypq.1`, `ja-1ypq.8`):
 
-- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, and see (owner, 2026-11-24; `ja-1ypq.9`, not yet built: `hostSight` still loops over workers only).
+- **Hosts:** every living ant, of any colony, with `load >= INFECTED`, at `sensorDistance + REACH_MARGIN` on the ant's layer. Strain doesn't matter (owner, 2026-11-23). Queens and alates are hosts too, and see (owner, 2026-11-24; `ja-1ypq.9`, built: `hostSight` adds an infected queen and the infected alates still in the nest, on the colony's nest layer, at a worker's reach).
 - **The body:** every hypha cell (`hyphaeOn(l).parent`, mats included), patch cell (`patchOn(l)`) and flower, at `BODY_SIGHT` = 2. Spores on the ground and colonised corpses see nothing (owner). The body changes on the hyphae's clock (a tip step every 1–2 s), so it is stamped incrementally or on a coarser interval; the cost is measured at a big mycelium before it is chosen.
 - **On the sim clock.** Stamps follow `Game.time` steps, not render frames, so a slow machine sees what a fast one sees.
 
@@ -101,7 +101,9 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - Ants, the queen, brood and alates draw only in live cells.
 - The fog mask is drawn per cell at low resolution, upscaled and blurred, and snapped to the grid (§2).
 
-**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. While the fog is on, the 3-D voxel pass falls back to 2D.
+**Built so far (F3.1, `ja-1ypq.3.1`, behind `?fog=1`; off by default until F6):** `SensedMap.knowledge` carries the `Knowledge`; ground chunks (`field/ground.ts`) paint unexplored cells as fog, sensed cells from their snapshots, and dim the ones nobody senses now; the food sprites read the snapshot; `actorCull` (`field/fogCull.ts`) draws ants, brood, the queen, alates and corpses only where live; a nest's disc, mound and entrance show once its place has been sensed. (F3.4 below: the voxel pass no longer falls back to 2D.)
+
+**F3.4 (`ja-1ypq.3.4`, same flag):** under the fog the voxel pass runs flat (never tilted) and `drawFogOverlay` (`field/fogCull.ts`) covers it: unknown cells in the fog colour, remembered ones at alpha 0.35, live ones clear.
 
 **F3.2 (`ja-1ypq.3.2`, same flag):** the curtain's strip and its cut are the plane under the line as last sensed (`planeGround` in `field/fogCull.ts`): fog where that plane cell was never sensed, dimmed where nobody senses it now; the plane's ants over the strip only where live. The minimap paints unexplored pixels as fog, the rest from snapshots (dimmed when remembered), and ants only where live. In hexagon mode the dirt pellets come from the snapshot. Spores and hyphae are the fungus's own body and always draw. Corpses show only where live for now: remembering them needs a corpse source (F3.3).
 
@@ -120,6 +122,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 ### 5.3 Readouts (`ja-1ypq.5`)
 - Stats, history, goal toasts, nest badges, the nest tab and the go-to menu list known colonies only, live or as of (§4.4).
 - The Lab's cards and the dev hook stay omniscient, since they are tools rather than play (owner, 2026-11-23).
+
+**Built (F5, `ja-1ypq.5`, same flag):** `SensedMap.known` (a `KnownColonies` of each colony's `SideStats`, read at most every 0.5 s while a host is in it, kept as of the last host's leaving) is updated after each sim step. The "In the colonies" panel lists only known colonies, with "as of N s ago" where no host is in one and "its nest is known; no host has been in it yet" for one known by its hole alone, and shows the unity bar only when every colony is known; the top-bar goal line and the ending toast say a colony is gone, or that the colonies are one, only once the fungus knows them (`endingKnown`); the Codex counts the known colonies' deaths and the odours' gap only while two are known; the Go-to menu and the `n` key list and cycle the known nests; the Learn drawer's nest tab has no card for an unknown colony and a last-known card (queen, brood, ants, as of when) for one with no host in it. A colony is known by its own hole (`holeCells[params.nest]`, a plane cell) or by a host; the command palette's nests follow the same rule. The Lab's cards, history and Policy tab stay omniscient (owner); the unity bar and the Codex's deaths read the known colonies' live numbers, and an ending is told once the colony is known, ever: both await the owner (review of #404, D1). Not covered: an ending missed while unknown does not toast later (the goal line shows it once known); the ant card's situation (F4 note); the panels' rendering has no test (the pure `knownView.ts` does).
 
 ### 5.4 The start and the builder (`ja-1ypq.6`)
 - At landing only the patch and its `BODY_SIGHT` are explored. The landing colony's hole shows only if it lies within reach.
