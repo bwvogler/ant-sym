@@ -339,7 +339,8 @@ export class Ground {
           px[o + 2] = HOME_RGB[2];
           px[o + 3] = Math.round(h * 90);
         } else if (chamberC && chamberC[i]) {
-          const role = chambers!.list[chamberC[i] - 1]?.role ?? "none";
+          // A remembered chamber's role is not what it is now: its tint is the plain one until an observer senses it again.
+          const role = fogV && !(sensedC && now - sensedC[i]! <= GRACE) ? "none" : (chambers!.list[chamberC[i] - 1]?.role ?? "none");
           const tint = ROLE_RGB[role] ?? theme.chamber;
           px[o] = tint[0];
           px[o + 1] = tint[1];

@@ -170,3 +170,49 @@ test("the paint cache: an unknown chunk is painted once, a sensed one repaints, 
   paint(1 + GRACE + 1);
   assert.equal(ground.hits, again + 1, "remembered, at the same time: a hit, not a repaint every frame");
 });
+
+test("a remembered chamber is tinted plainly: its role is not what it may be now", () => {
+  const rock = new Uint8Array(CHUNK * CHUNK);
+  const chamber = new Uint16Array(CHUNK * CHUNK);
+  chamber[cell(10, 10)] = 1;
+  const sensed = new SensedMap();
+  const fog = new Knowledge(sensed, [{ name: SNAP.chamber, layer: PLANE, at: (cx, cy) => (cx === 0 && cy === 0 ? chamber : undefined) }]);
+  const m = {
+    x0: 0,
+    size: { w: 64, h: 64 },
+    rock: { chunk: () => rock },
+    food: { chunk: () => undefined },
+    chambers: { cell: { chunk: () => chamber }, list: [{ role: "brood" }] },
+  } as unknown as WorldMap;
+  const ground = new Ground(env);
+  const paint = (now: number) => {
+    const cc = ground.chunkCanvas(0, 0);
+    const k = {
+      ctx: recordingContext().ctx,
+      theme: THEME,
+      d: 1,
+      v: { w: 800, h: 600, dpr: 1 },
+      c: { x: 32, y: 20, zoom: 16 },
+      lv: PLANE,
+      m,
+      ext: { x0: 0, w: 64, h: 64 },
+      world: undefined,
+      colonies: [],
+      fungus: {},
+      smellAll: false,
+      strip: false,
+      trails: [],
+      alarms: [],
+      spores: { chunk: () => undefined },
+      sensedLayer: sensed.layer(PLANE),
+      sensedNow: now,
+      fog,
+    } as unknown as FieldCtx;
+    ground.paintChunk(k, { food: true, home: true }, 0, 0, cc, rock, false);
+    return cc.img;
+  };
+  sensed.stamp([host(10, 10)], 1);
+  assert.equal(px(paint(1), 10, 10)[3], 70, "live: the role's tint");
+  sensed.stamp([{ ...host(60, 60), n: 0 } as Colony], 1 + GRACE + 1);
+  assert.equal(px(paint(1 + GRACE + 1), 10, 10)[3], 55, "remembered: the plain tint (no role)");
+});

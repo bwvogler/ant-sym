@@ -190,6 +190,7 @@ export class FieldBinding {
     fc.sensedLayer = this.sensedLayer;
     fc.sensedNow = this.#sensed.now;
     fc.fog = this.#sensed.knowledge;
+    fc.corpses = this.#sensed.corpses;
   }
 
   /** Start loading the sprite images; each calls `redraw` when its images arrive. */
