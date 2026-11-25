@@ -64,6 +64,9 @@ on:
         description: "The fungus is hungry (--hungry, FungusParams.hungry, PRD §91): a cheap spore, a landing reserve and the free pool's higher share"
         type: boolean
         default: false
+      earnedshare:
+        description: "The free pool's share of earned mass when hungry (--earned-share, PRD §91): lab override; empty: EARNED.share"
+        default: ""
       sporecost:
         description: "The mass a spore costs (--spore-cost, ja-a2no): lab override; empty: the game's 1"
         default: ""
@@ -116,6 +119,7 @@ jobs:
           LEDGER: ${{ inputs.ledger }}
           SPORECOST: ${{ inputs.sporecost }}
           HUNGRY: ${{ inputs.hungry }}
+          EARNEDSHARE: ${{ inputs.earnedshare }}
           FREEBUDGET: ${{ inputs.freebudget }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
@@ -133,6 +137,7 @@ jobs:
           [[ -z "$LIGHT" || "$LIGHT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "light: empty or a number"
           [[ -z "$SPORECOST" || "$SPORECOST" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "sporecost: empty or a number"
           [[ -z "$FREEBUDGET" || "$FREEBUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "freebudget: empty or a number"
+          [[ -z "$EARNEDSHARE" || "$EARNEDSHARE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "earnedshare: empty or a number"
           [[ -z "$RADIUS" || "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: empty or 1 to 6"
           [[ -z "$TROPISM" || "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: empty or 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
@@ -149,6 +154,7 @@ jobs:
           [ "$SPLIT" = "true" ] && args="$args --split"
           [ "$LEDGER" = "true" ] && args="$args --ledger"
           [ "$HUNGRY" = "true" ] && args="$args --hungry"
+          [ -n "$EARNEDSHARE" ] && args="$args --earned-share $EARNEDSHARE"
           [ -n "$SPORECOST" ] && args="$args --spore-cost $SPORECOST"
           [ -n "$FREEBUDGET" ] && args="$args --free-budget $FREEBUDGET"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
