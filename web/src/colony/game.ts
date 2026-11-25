@@ -1637,6 +1637,11 @@ export class Game {
       const tol = this.recognition.params.tolerance;
       if (!this.colonies.some((o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
         c.raidable = false;
+        // Nobody awake to raid: the pointers at a sleeper go too, so a fungus-bent ant does not read a scent that no longer fades (ja-xfny).
+        // A thaw re-wires through the next #aimAll (#aimRaids). Only while something sleeps: a bounded game (awake rule off) keeps its pointers at a
+        // beaten or kin rival as before, so it stays bit-exact.
+        if (this.#frozen.size)
+          this.layers.forEach((_, l) => c.layers[l] && c.wire(l, { raidTarget: null, raidNest: null, raidMarks: null, foreign: null }));
         return;
       }
       c.raidable = true;

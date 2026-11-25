@@ -45,6 +45,40 @@ test("raids go to no sleeper: a colony whose only rival sleeps has none to raid,
   assert.equal(g.colonies[0]!.layers[PLANE]!.raidTarget, g.colonies[1]!.layers[PLANE]!.nest);
 });
 
+test("with every rival asleep a colony's raid pointers are cleared on every layer, and a thaw points them at the waker again (ja-xfny)", () => {
+  const g = game();
+  run(g, 1);
+  const pointers = (k: number) => g.colonies[k]!.layers.map((l) => l && [l.raidTarget, l.raidNest, l.raidMarks, l.foreign]);
+  const at = (k: number, target: number) =>
+    g.colonies[k]!.layers.every(
+      (l, i) => !l || (l.raidMarks === g.colonies[target]!.layers[i]!.ph && l.foreign === l.raidMarks && l.raidTarget !== null),
+    );
+  assert.ok(at(0, 1), "pointing at colony 1 while it is awake");
+  g.freeze(1);
+  assert.equal(g.colonies[0]!.raidable, false);
+  for (const l of pointers(0)) if (l) assert.deepEqual(l, [null, null, null, null], "all four cleared on this layer");
+  run(g, 5);
+  for (const l of pointers(0)) if (l) assert.deepEqual(l, [null, null, null, null], "and they stay cleared through the rival checks");
+  g.thaw(1);
+  assert.ok(at(0, 1), "the thaw wires them at the waker again");
+});
+
+test("a sleeper among three is not pointed at, but the awake rival still is", () => {
+  const g = game();
+  g.tick(1 / 30);
+  const at0 = g.colonies[0]!.layers[PLANE]!.nest;
+  let s = g.settleAt({ x: at0.x + 60, y: at0.y }, mainGround(g.world));
+  for (let d = 80; !s.ok && d < 400; d += 20) s = g.settleAt({ x: at0.x + d, y: at0.y + d / 2 }, mainGround(g.world));
+  assert.ok(s.ok, "a founding spot");
+  const k = g.addColony({ x: at0.x + 60, y: at0.y, antCount: 10, odour: 0.9, spot: { cell: s.cell, end: s.end, line: s.line } });
+  g.freeze(1);
+  run(g, 2);
+  const marks = (a: number) => g.colonies[a]!.layers[PLANE]!.raidMarks;
+  assert.notEqual(marks(0), null);
+  assert.notEqual(marks(0), g.colonies[1]!.layers[PLANE]!.ph, "not the sleeper");
+  assert.equal(marks(0), g.colonies[k]!.layers[PLANE]!.ph, "the awake rival");
+});
+
 test("a sleeper's contact memory is held, not decayed: met still reads what it was when the colony wakes", () => {
   const g = game([
     { antCount: 20, odour: 0.5 },
