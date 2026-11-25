@@ -26,6 +26,7 @@ Within one upgrade, levels still go in order. A level not listed below needs onl
 | Infectivity·virulent | Immune evasion·some | the top of infectivity waits on the body branch |
 | Knots·a few | Mycelium·a borer | knots form along a mycelium that spreads into the soil |
 | Knots·many | Mycelium·a web | |
+| Foci·new bases | Knots·a few | a new base is worth making once the fungus can sit out starvation (design, docs/foci.md, PRD §91; owner 2026-11-25) |
 | Stalks·a stalk | Fruiting·thick | a stalk spreads spores, worth little before there are many |
 | Stalks·a tall stalk | Fruiting·dense | |
 | Lichen·a partner | Mycelium·a borer | a hypha that takes an alga on rock is a borer's reach, and the partner is a free-pool level (docs/lichen.md, PRD §90) |

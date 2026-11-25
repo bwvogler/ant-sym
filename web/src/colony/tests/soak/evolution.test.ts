@@ -507,6 +507,7 @@ test("the tree's edges are the design note's table (docs/mutation-tree.md, ja-52
     "infectivity3<evasion1",
     "knots1<mycelium1",
     "knots2<mycelium2",
+    "foci1<knots1",
     "stalks1<fruiting1",
     "stalks2<fruiting2",
     "lichen1<mycelium1",
