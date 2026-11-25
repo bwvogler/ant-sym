@@ -16,6 +16,7 @@ import {
   pan,
   type Camera,
   type Extent,
+  type Reach,
   type Viewport,
   zoomBy,
 } from "../camera.ts";
@@ -65,6 +66,8 @@ export class CameraRig {
   /** each view's camera, by view: PLANE and CURTAIN */
   readonly cams = new Map<number, ViewCam>();
   private readonly host: RigHost;
+  /** An endless plane's minimap window, frozen while the pointer is down on it (E5.3 follow-up, ja-qpv.4.7): the view it was taken in, and the frame. */
+  private frozen: { view: number; win: Reach } | null = null;
 
   constructor(host: RigHost) {
     this.host = host;
@@ -73,6 +76,7 @@ export class CameraRig {
   /** A new game starts zoomed out, in both views. */
   clear(): void {
     this.cams.clear();
+    this.frozen = null;
   }
 
   /** A view's camera, made when first asked for. */
@@ -162,19 +166,50 @@ export class CameraRig {
     this.set({ x: hx, y: hy, zoom: Math.max(this.camera().zoom, NEST_ZOOM * this.host.dpr()) });
   }
 
+  /**
+   * The window the minimap shows now: the frozen one while the pointer is down on it, else (endless) the window round the camera or (bounded) the whole
+   * map. A freeze ends of itself when the view is another or the minimap is not drawn (zoomed out) any more, so none is ever left stuck.
+   */
+  miniWindow(): Reach {
+    const ext = this.extent();
+    const f = this.frozen;
+    if (f && (!ext.endless || f.view !== this.host.view() || !this.vc().zoomedIn)) this.frozen = null;
+    return this.frozen?.win ?? miniFrame(ext, this.camera());
+  }
+
+  /** The frozen window, or null while the minimap follows the camera (what the field draws the minimap with). */
+  frozenMini(): Reach | null {
+    this.miniWindow();
+    return this.frozen?.win ?? null;
+  }
+
+  /**
+   * The pointer went down on the minimap: on an endless plane keep its window as it is now (a fixed picture, like a bounded map's) until `releaseMini`,
+   * so a drag pans by the pointer's own displacement and a pointer held still holds the camera still. A bounded map's minimap is fixed already: no-op.
+   */
+  holdMini(): void {
+    if (!this.extent().endless) return;
+    this.frozen = null;
+    this.frozen = { view: this.host.view(), win: this.miniWindow() };
+  }
+
+  /** The press ended, was cancelled or lost: the window follows the camera again. */
+  releaseMini(): void {
+    this.frozen = null;
+  }
+
   /** Whether device point (x, y) is on the minimap: only while it is drawn (the view zoomed in). */
   inMini(x: number, y: number): boolean {
-    const ext = this.extent();
     if (!this.vc().zoomedIn) return false;
     // An endless plane's minimap is the window of chunks round the camera (miniFrame), a bounded map's the whole map.
-    const r = minimapRect(miniFrame(ext, this.camera()), this.viewport(), this.host.dpr());
+    const r = minimapRect(this.miniWindow(), this.viewport(), this.host.dpr());
     return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
   }
 
   /** A click or drag on the minimap: look at the world point under it (a follow ends). */
   jumpMini(x: number, y: number): void {
     if (this.host.following()) this.host.unfollow();
-    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y, this.camera());
+    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y, this.camera(), this.miniWindow());
     this.set({ ...this.camera(), x: wx, y: wy });
   }
 }

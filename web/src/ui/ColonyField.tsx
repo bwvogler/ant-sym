@@ -316,6 +316,8 @@ export default function ColonyField({
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
+        onLostPointerCapture={() => ptr.dropMini(ptrHost())}
+        onBlur={() => ptr.dropMini(ptrHost())}
         onPointerLeave={() => {
           hover.current = null;
           if (lensRef.current) probeCb.current?.(null);

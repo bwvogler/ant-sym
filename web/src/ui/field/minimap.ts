@@ -100,7 +100,7 @@ export class Minimap {
    * field would draw; ants as dots, infected ones in the fungus's colour (ja-hcq).
    */
   paint(k: FieldCtx): void {
-    if (k.ext.endless) return this.paintWindow(k, miniFrame(k.ext, k.c));
+    if (k.ext.endless) return this.paintWindow(k, k.miniWin ?? miniFrame(k.ext, k.c));
     const { theme, m, colonies, lv, strip, fog } = k;
     const [gx0, gw, gh] = [m.x0, m.size.w, m.size.h];
     const px = this.img.data;
@@ -248,7 +248,7 @@ export class Minimap {
    */
   private drawWindow(k: FieldCtx, seen: Seen): void {
     const { ctx, theme, c, v, d, fog, world } = k;
-    const win = miniFrame(k.ext, c);
+    const win = k.miniWin ?? miniFrame(k.ext, c);
     const now = this.env.now();
     if (now - this.at > MINIMAP_EVERY_MS) {
       this.paint(k);
