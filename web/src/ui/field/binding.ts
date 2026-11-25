@@ -91,6 +91,8 @@ export class FieldBinding {
   /** Smell vision (the builder's, PRD §73): every trail and alarm shown everywhere, each food trail in its colony's tone. */
   smellAll = false;
   sensedLayer: ChunkLayer<Float32Array> | null = null;
+  /** When a host last sensed any cell of a chunk of the shown layer (the ground skips the scent of a chunk faded right out). */
+  readonly sensedNewest = (cx: number, cy: number): number | undefined => this.#sensed.newest(this.lv, cx, cy);
   /** The map's size and first column: its columns run gx0 … gx0 + gw − 1 (gx0 < 0 on one world's curtain, whose column is the line's s), and the extent the camera fits. */
   gx0: number;
   gw: number;
@@ -188,6 +190,7 @@ export class FieldBinding {
     fc.alarms = this.alarms;
     fc.spores = this.spores;
     fc.sensedLayer = this.sensedLayer;
+    fc.sensedNewest = this.sensedNewest;
     fc.sensedNow = this.#sensed.now;
     fc.fog = this.#sensed.knowledge;
     fc.corpses = this.#sensed.corpses;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { landingOf } from "./landing.ts";
 import { PLANE, type Game } from "../colony/index.ts";
 import type { Followed } from "./follow.ts";
+import type { SensedMap } from "./fungusSight.ts";
 import {
   begin,
   cardFor,
@@ -35,6 +36,7 @@ export function useTutorial({
   update,
   setFollowed,
   showAt,
+  sensed,
 }: {
   game: Game;
   onFrame: (fn: () => void) => () => void;
@@ -42,6 +44,8 @@ export function useTutorial({
   setFollowed: (f: Followed | null) => void;
   /** centre view `view` (PLANE or CURTAIN) on (x, y), close, and show that view */
   showAt: (view: number, x: number, y: number, close?: boolean) => void;
+  /** the fungus's sight: the tutorial's host stays an observer through the watch (fog/fungusSight.ts `watch`) */
+  sensed: SensedMap;
 }) {
   const [t, setT] = useState<Tutorial | null>(null);
   const live = useRef<Tutorial | null>(null);
@@ -106,6 +110,15 @@ export function useTutorial({
       }),
     [onFrame, game, apply, showAt],
   );
+
+  // The tutorial's host is watched from its finding to the card that ends the watch, so the fog does not take it from the player as it is groomed clean (PR #421, S1).
+  const hostOf = t && (t.step === "host" || t.step === "watch" || t.step === "cleared" || t.step === "timeout") ? t.host : null;
+  useEffect(() => {
+    sensed.watch = hostOf ? { k: hostOf.k, i: hostOf.i, gen: hostOf.gen } : null;
+    return () => {
+      sensed.watch = null;
+    };
+  }, [sensed, hostOf]);
 
   // The highlight: one attribute on the root, styled in index.css.
   const card = t ? cardFor(t, landingOf(game)) : null;

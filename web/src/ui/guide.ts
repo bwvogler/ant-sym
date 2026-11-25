@@ -776,7 +776,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "fog-of-war",
     title: "Fog of war",
     covers:
-      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, behind ?fog=1; off by default.",
+      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, on by default; ?fog=0 turns it off.",
   },
   {
     note: "new-queens",

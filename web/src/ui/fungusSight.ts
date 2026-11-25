@@ -81,6 +81,11 @@ export class SensedMap {
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */
   onReset: (() => void) | null = null;
+  /**
+   * One ant that stays an observer whatever it carries: the tutorial's host, followed through the watch until it is groomed clean (a host
+   * below INFECTED sees nothing, and the watch is the page showing exactly that moment). Set by the tutorial (ui/useTutorial.ts).
+   */
+  watch: { k: number; i: number; gen: number } | null = null;
   /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
   #bodyAt = -Infinity;
   /** The colonies the game has frozen, by index, as of the last `stampGame`: the page draws them still and dimmed (ja-qpv.4.5). Empty until a game is stamped. */
@@ -101,6 +106,11 @@ export class SensedMap {
     return this.#layers.get(l) ?? null;
   }
 
+  /** The sim time a host last sensed any cell of chunk (cx, cy) on layer `l`, or undefined if the chunk is not kept (never sensed, or faded right out). */
+  newest(l: number, cx: number, cy: number): number | undefined {
+    return this.#fresh.get(l)?.get(chunkKey(cx, cy));
+  }
+
   /** How strongly cell (gx, gy) of layer `l` shows now. */
   sight(l: number, gx: number, gy: number): number {
     const c = this.#layers.get(l)?.chunk(gx >> CHUNK_BITS, gy >> CHUNK_BITS);
@@ -111,6 +121,7 @@ export class SensedMap {
   stamp(colonies: readonly Colony[], now: number): void {
     this.#begin(now);
     hostSight(colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    this.#watched(colonies);
     this.#forget();
   }
 
@@ -124,6 +135,7 @@ export class SensedMap {
     this.asleep.clear();
     for (let k = 0; k < game.colonies.length; k++) if (game.isFrozen(k)) this.asleep.add(k);
     hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    this.#watched(game.colonies);
     if (now - this.#bodyAt >= BODY_EVERY) {
       this.#bodyAt = now;
       bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
@@ -131,6 +143,14 @@ export class SensedMap {
     if (this.#knowledge) this.#corpses?.update(game, this.#knowledge, decayStage);
     if (this.#knowledge) this.#known?.update(game, this.#knowledge);
     this.#forget();
+  }
+
+  /** The watched ant (see `watch`) senses like a host while it lives. */
+  #watched(colonies: readonly Colony[]): void {
+    const w = this.watch;
+    const c = w && colonies[w.k];
+    if (!w || !c || !c.alive[w.i] || c.gen[w.i] !== w.gen) return;
+    this.mark(c.layer[w.i] ?? 0, c.x[w.i]!, c.y[w.i]!, c.params.sensorDistance + REACH_MARGIN);
   }
 
   #begin(now: number): void {

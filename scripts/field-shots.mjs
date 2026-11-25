@@ -504,7 +504,7 @@ if (mode === "check") {
 
 /** A fresh, paused game of seed 3 at time 0: Start, pause, Restart from the Lab (the game from the seed, not the few frames Start let run). */
 async function freshGame(page, url, species) {
-  await page.goto(url);
+  await page.goto(`${url}?fog=0`); // the whole map: the fog is the page's default (PRD §89), and the base the guard compares with has none
   if (species) {
     await page.getByRole("combobox", { name: "species" }).selectOption(species);
     await page.getByLabel("world seed").fill(String(SEED));
