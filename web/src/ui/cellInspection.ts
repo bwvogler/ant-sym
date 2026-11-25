@@ -9,7 +9,6 @@ import {
   mapOfLayer,
   PLANE,
   OPEN,
-  rockAt,
   aphidCount,
   cellKey,
   cellOf,
@@ -20,6 +19,7 @@ import {
   ny,
   type AphidClump,
 } from "../colony/index.ts";
+import { seenCell, seenRock } from "./groundPeek.ts";
 import { probe, type LensProbe, type LensWorld } from "./lens.ts";
 import { LIVE, REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
 import { SNAP } from "./fog/sources.ts";
@@ -107,7 +107,7 @@ export function inspectCell(
   const out: CellInspectionState = {
     cell: [gx, gy],
     place,
-    quality: map.quality?.get(gx, gy) ?? 1,
+    quality: map.quality ? seenCell(map, map.quality, gx, gy) : 1,
     aphidDensity: 0,
     ants: [],
     threads: [],
@@ -164,7 +164,7 @@ export function inspectCell(
     if (home && map.chambers)
       for (const ch of map.chambers.list) {
         if (ch.colony !== c.params.nest) continue;
-        for (const [xx, yy] of chamberFoodSpots(ch, (xx, yy) => map.chambers!.at(xx, yy) === ch.id && rockAt(map, xx, yy) === OPEN))
+        for (const [xx, yy] of chamberFoodSpots(ch, (xx, yy) => map.chambers!.at(xx, yy) === ch.id && seenRock(map, xx, yy) === OPEN))
           if (xx === gx && yy === gy) out.storedFoodMarks!++;
       }
     if (home && c.queen) {

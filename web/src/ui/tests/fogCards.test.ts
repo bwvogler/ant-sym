@@ -8,7 +8,7 @@ import { canFollow } from "../follow.ts";
 import { drawPen } from "../field/overlays.ts";
 import { chamberUnder, pickAnt } from "../field/hit.ts";
 import { prepareFrame } from "../field/prelude.ts";
-import { GRACE, Knowledge } from "../fog/knowledge.ts";
+import { GRACE, Knowledge, REMEMBERED } from "../fog/knowledge.ts";
 import { sensedFor } from "../fog/sources.ts";
 import { probe, lensLines } from "../lens.ts";
 import { living, specimenRow, type Specimen } from "../specimens.ts";
@@ -143,6 +143,24 @@ test("the lens: nothing of a place never sensed; how it was and when for one onl
   );
   const seen = away.find((l) => l.what === "Last seen")!;
   assert.ok(/^\d+ s ago/.test(seen.says), `the age: ${seen.says}`);
+});
+
+test("the lens reads no scent of ground that is only remembered: the pheromone there goes on changing unseen", () => {
+  const game = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(game, true);
+  const [gx, gy] = [200, 200];
+  const [x, y] = [centreX(gx, gy), centreY(gy)];
+  const ph = game.colonies[0]!.layers[PLANE]!.ph;
+  ph.fields.food.set(gx, gy, 8);
+  ph.fields.alarm.set(gx, gy, 8);
+  const g = { colonies: game.colonies, fungus: game.fungus, world: game.world };
+  sensed.stamp([hostAt(gx, gy)], 1);
+  const live = probe(g, sensed, PLANE, x, y);
+  assert.ok(live.foodTrail > 0 && live.alarm > 0, "live: the scent as it is");
+  sensed.stamp([none()], 1 + GRACE + 3); // its sight would still fade for 20 s
+  const away = probe(g, sensed, PLANE, x, y);
+  assert.equal(away.fog, REMEMBERED);
+  assert.deepEqual([away.foodTrail, away.alarm, away.homeTrail], [0, 0, 0], "remembered: none");
 });
 
 test("inspecting a cell: nothing if never sensed; no ant of a remembered one; the dead as they lay; the whole of a live one", () => {

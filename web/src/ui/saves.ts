@@ -1,4 +1,5 @@
 import { SAVE_VERSION, SPECIES, type GameSave } from "../colony/index.ts";
+import type { FogSave } from "./fog/sources.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
@@ -37,6 +38,8 @@ export interface SaveRecord {
   settings: GameSettings;
   player: PlayerState;
   game: GameSave;
+  /** what the fog had remembered (F7, ja-1ypq.7); absent from a save made without the fog, which loads with none */
+  fog?: FogSave;
 }
 
 /** The autosave's slot; the player's are 1..SLOTS − 1. */
@@ -94,8 +97,25 @@ export function browserSaves(): SaveStore {
 }
 
 /** A record for slot `slot`, now. */
-export function record(slot: number, settings: GameSettings, player: PlayerState, game: GameSave, chapter: string): SaveRecord {
-  return { slot, savedAt: Date.now(), simTime: game.time, chapter, settings: { ...settings }, player: structuredClone(player), game };
+export function record(
+  slot: number,
+  settings: GameSettings,
+  player: PlayerState,
+  game: GameSave,
+  chapter: string,
+  fog: FogSave | null = null,
+): SaveRecord {
+  const r: SaveRecord = {
+    slot,
+    savedAt: Date.now(),
+    simTime: game.time,
+    chapter,
+    settings: { ...settings },
+    player: structuredClone(player),
+    game,
+  };
+  if (fog) r.fog = fog;
+  return r;
 }
 
 /** "12 min of sim, 3 h ago" style, for a slot's line. */

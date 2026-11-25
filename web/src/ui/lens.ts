@@ -11,7 +11,6 @@ import {
   OPEN,
   PLANE,
   type Role,
-  rockAt,
   SOIL,
   SPORE_SHOWN,
   type OneWorld,
@@ -19,6 +18,7 @@ import {
 } from "../colony/index.ts";
 import { type FogState, LIVE, REMEMBERED, UNKNOWN } from "./fog/knowledge.ts";
 import { SNAP } from "./fog/sources.ts";
+import { seenCell, seenRock } from "./groundPeek.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { colonyName } from "./names.ts";
 import { ROLE_TEXT } from "./nest.ts";
@@ -150,12 +150,12 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
     };
   // A remembered place is what was last sensed there, not what is there now.
   const remembered = fs === REMEMBERED && fog;
-  const r = remembered ? (fog.snapshot(lv, SNAP.rock, gx, gy) ?? 0) : rockAt(map, gx, gy);
+  const r = remembered ? (fog.snapshot(lv, SNAP.rock, gx, gy) ?? 0) : seenRock(map, gx, gy);
   const sight = sensed.sight(lv, gx, gy);
   let alarm = 0;
   let foodTrail = 0;
   let homeTrail = 0;
-  if (sight > 0)
+  if (sight > 0 && !remembered)
     for (const c of g.colonies) {
       const ph = c.layers[lv]?.ph;
       if (!ph) continue;
@@ -176,8 +176,8 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
   return {
     view: isCurtainLayer(lv) ? "below" : "above",
     ground: r === OPEN ? "open" : r === SOIL ? "soil" : r === AIR ? "air" : "rock",
-    food: remembered ? (fog.snapshot(lv, SNAP.food, gx, gy) ?? 0) : map.food.get(gx, gy),
-    mound: remembered ? (fog.snapshot(lv, SNAP.spoil, gx, gy) ?? 0) : (map.spoil?.get(gx, gy) ?? 0),
+    food: remembered ? (fog.snapshot(lv, SNAP.food, gx, gy) ?? 0) : seenCell(map, map.food, gx, gy),
+    mound: remembered ? (fog.snapshot(lv, SNAP.spoil, gx, gy) ?? 0) : map.spoil ? seenCell(map, map.spoil, gx, gy) : 0,
     spores: spores.get(gx, gy) >= SPORE_SHOWN,
     hypha: g.fungus.hyphaeOn(lv)?.has(gx, gy) ?? false,
     sight,

@@ -1,4 +1,4 @@
-import { INFECTED, PLANE, type Colony, type Game } from "../../colony/index.ts";
+import { INFECTED, PLANE, decode, encode, type Colony, type Game } from "../../colony/index.ts";
 import type { Knowledge } from "./knowledge.ts";
 
 // The colonies the fungus knows of (docs/fog-of-war.md §4.4, PRD §89, ja-1ypq.2; owner, 2026-11-23). A colony is known once its
@@ -59,6 +59,18 @@ export class KnownColonies<T> {
   /** Forget everything. */
   clear(): void {
     this.#known.clear();
+  }
+
+  /** What is known, as JSON (the readouts are plain data): what a save of the page's fog holds. */
+  save(): unknown {
+    return encode({ known: [...this.#known].map(([i, k]) => [i, { readout: k.readout, asOf: k.asOf, live: k.live }]) });
+  }
+
+  /** Put a `save()` back in place of what is known now. */
+  load(saved: unknown): void {
+    this.#known.clear();
+    for (const [i, k] of (decode(saved) as { known: [number, KnownColony<T>][] }).known)
+      this.#known.set(i, { readout: k.readout ?? null, asOf: k.asOf, live: k.live });
   }
 
   /** What the fungus knows of colony `i`; null while it does not know it. */

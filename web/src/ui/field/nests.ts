@@ -3,10 +3,11 @@
 // TypeScript over FieldCtx (the sprite sets come from `k.sprites`, built by FieldEnv), so a Node test runs it on a recording context. The shell
 // calls it once per colony, last colony first, and the ants follow in the same loop; the canvas state it leaves (line width, alpha, styles) is what the ants start from.
 
-import { type Colony, centreX, centreY, moundRadius, OPEN, rockAt } from "../../colony/index.ts";
+import { type Colony, centreX, centreY, moundRadius, OPEN } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
 import { decayStage, visibleCadavers } from "../cadaverVisual.ts";
 import { chamberFoodSpots } from "../chamberFood.ts";
+import { seenRock } from "../groundPeek.ts";
 import { drawNestSprite, type NestSprite } from "../nestSprites.ts";
 import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite } from "../resourceSprites.ts";
@@ -104,7 +105,7 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
     ctx.fillStyle = theme.accent;
     for (const ch of m.chambers.list) {
       if (ch.colony !== col.params.nest || ch.food < 1 || ch.cells === 0) continue;
-      for (const [fx, fy] of chamberFoodSpots(ch, (x, y) => m.chambers!.at(x, y) === ch.id && rockAt(m, x, y) === OPEN)) {
+      for (const [fx, fy] of chamberFoodSpots(ch, (x, y) => m.chambers!.at(x, y) === ch.id && seenRock(m, x, y) === OPEN)) {
         const wx = centreX(fx, fy);
         const wy = centreY(fy);
         if (!inView(wx, wy)) continue;
