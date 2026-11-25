@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { centreX, centreY, CHUNK, INFECTED, PLANE, ROCK, type Colony, type WorldMap } from "../../colony/index.ts";
+import { centreX, centreY, CHUNK, INFECTED, PLANE, R, ROCK, SIDE, type Colony, type WorldMap } from "../../colony/index.ts";
 import type { FieldCtx, FieldTheme } from "../field/ctx.ts";
 import type { FieldEnv } from "../field/env.ts";
 import { Ground } from "../field/ground.ts";
@@ -240,6 +240,63 @@ test("up close, fog and remembered open ground are laid as strips, hexagons only
   assert.equal(unknown.hex, 0, "nothing sensed: no hexagon at all");
   assert.ok(unknown.strips > 0, "the fog is laid as strips");
   const some = hexes(true, true);
-  assert.ok(some.hex >= 20 && some.hex < 150, `the rock cell and the cells on the edge of the sensed ground draw as hexagons, not every cell (${some.hex})`);
+  assert.ok(
+    some.hex >= 20 && some.hex < 150,
+    `the rock cell and the cells on the edge of the sensed ground draw as hexagons, not every cell (${some.hex})`,
+  );
   assert.ok(hexes(false, false).strips === 0, "without the fog, no strips under the hexagons");
+});
+
+test("the hexagons are exactly the cells beside a cell of another colour, on odd and even rows alike (review of #422, S2)", () => {
+  made = [];
+  const { sensed, ground, k } = setup(true);
+  // Two hosts, one on an even row and one on an odd one: each leaves a disc of live ground in the fog, and the rock cell is a colour of its own.
+  sensed.stamp([host(10, 10), host(30, 21)], 1);
+  const win = { rx0: 0, rx1: 63, ry0: 0, ry1: 40 };
+  const ctx = k(1);
+  ground.draw(ctx, { food: true, home: true }, win, 1, false);
+  const at = (x: number, y: number) => `${x},${y}`;
+  const colour = (x: number, y: number) => (x === 10 && y === 10 ? "rock" : ctx.fog!.state(PLANE, x, y));
+  // Neighbours by the cells' centres (a hexagon touches the six whose centres are one cell away), not by the offsets the drawing uses.
+  const near = (x: number, y: number) => {
+    const out: [number, number][] = [];
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (
+          (dx || dy) &&
+          nx >= 0 &&
+          nx <= 63 &&
+          ny >= 0 &&
+          ny <= 40 &&
+          Math.hypot(centreX(nx, ny) - centreX(x, y), centreY(ny) - centreY(y)) < 1.05
+        )
+          out.push([nx, ny]);
+      }
+    return out;
+  };
+  const want = new Set<string>();
+  for (let y = 0; y <= 40; y++)
+    for (let x = 0; x <= 63; x++) {
+      if (x === 10 && y === 10) want.add(at(x, y));
+      else if (near(x, y).some(([nx, ny]) => colour(nx, ny) !== colour(x, y))) want.add(at(x, y));
+    }
+  // The first vertex of each hexagon drawn: (centre x + half the width, centre y + the shoulder), in pixels.
+  const zoom = 16;
+  const got = new Set<string>();
+  for (const p of made)
+    for (const c of p.cmds) {
+      const m = /^moveTo\(([-\d.]+), ([-\d.]+)\)$/.exec(c);
+      if (m) got.add(`${Math.round(Number(m[1]))},${Math.round(Number(m[2]))}`);
+    }
+  const first = new Set<string>();
+  for (const key of want) {
+    const [x, y] = key.split(",").map(Number) as [number, number];
+    const sx = (x + 0.5 + 0.5 * (y & 1)) * zoom + (800 / 2 - 32 * zoom) + zoom * 0.5 * 1.04;
+    const sy = (y + 0.5) * R * zoom + (600 / 2 - 20 * zoom) + zoom * SIDE * 0.52;
+    first.add(`${Math.round(sx)},${Math.round(sy)}`);
+  }
+  assert.ok(want.size > 40, `a scene with real edges (${want.size} cells)`);
+  assert.deepEqual([...got].sort(), [...first].sort(), "the hexagons drawn are those cells, no more and no fewer");
 });

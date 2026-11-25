@@ -134,6 +134,8 @@ export class Ground {
   hits = 0;
   private readonly tiles = new MapChunkPaintCache();
   private readonly paths = new Map<number, Path2D>();
+  /** under the fog, the hexagons of the strip-shown cells on an edge, by colour: drawn under the mound tint and the pellets (drawHexes) */
+  private readonly edges = new Map<number, Path2D>();
   /** per frame, under the fog: each cell in view's colour (-1: none) and whether a strip shows it (drawHexes) */
   private keys = new Int32Array(0);
   private plains = new Uint8Array(0);
@@ -509,6 +511,7 @@ export class Ground {
       ctx.fillRect(ax, ay, bx - ax, by - ay);
     }
     this.paths.clear();
+    this.edges.clear();
     // Under the fog most cells in view are fog or remembered open ground: one strip a row lays them (a hexagon each, a path op a vertex, cost
     // the phone its frame rate); hexagons then draw only the cells with something on them.
     const fogPx = k.fog ? fogRgb(k.theme) : null;
@@ -619,26 +622,19 @@ export class Ground {
           const key = keys[gi]!;
           if (key < 0 || !plains[gi]) continue;
           let edge = false;
-          for (const [nx, ny] of [
-            [x - 1, y],
-            [x + 1, y],
-            [x - 1 + up, y - 1],
-            [x + up, y - 1],
-            [x - 1 + up, y + 1],
-            [x + up, y + 1],
-          ]) {
+          for (let n = 0; n < 6 && !edge; n++) {
+            // the six neighbours: x - 1 and x + 1 in the row, and in the rows above and below x - 1 + up and x + up
+            const nx = x + (n < 2 ? (n ? 1 : -1) : n & 1 ? up : up - 1);
+            const ny = y + (n < 2 ? 0 : n < 4 ? -1 : 1);
             if (nx < rx0 || nx > rx1 || ny < ry0 || ny > ry1) continue;
             const nk = keys[(ny - ry0) * gw + (nx - rx0)]!;
-            if (nk >= 0 && nk !== key) {
-              edge = true;
-              break;
-            }
+            if (nk >= 0 && nk !== key) edge = true;
           }
           if (!edge) continue;
-          let path = this.paths.get(key);
+          let path = this.edges.get(key);
           if (!path) {
             path = this.env.newPath();
-            this.paths.set(key, path);
+            this.edges.set(key, path);
           }
           const sx = (x + shift) * c.zoom + ox;
           const sy = (y + 0.5) * R * c.zoom + oy;
@@ -651,6 +647,10 @@ export class Ground {
           path.closePath();
         }
       }
+    for (const [key, path] of this.edges) {
+      ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
+      ctx.fill(path);
+    }
     // Keep the returning brown tint behind the fading pellets so both are visible.
     for (const [key, path] of moundTints) {
       ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
