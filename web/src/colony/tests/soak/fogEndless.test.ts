@@ -1,19 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  cellOf,
-  CELL,
-  Game,
-  GAME_REGROW,
-  gameRng,
-  generateEndlessWorld,
-  saveEndless,
-  STRAINS,
-  type EndlessWorld,
-} from "../../../colony/index.ts";
-import { Knowledge } from "../../fog/knowledge.ts";
-import { layerSources, saveFog, loadFog, sensedFor } from "../../fog/sources.ts";
-import { SENSED_FADE, SensedMap } from "../../fungusSight.ts";
+import { cellOf, CELL, Game, GAME_REGROW, gameRng, generateEndlessWorld, saveEndless, STRAINS, type EndlessWorld } from "../../index.ts";
+import { Knowledge } from "../../../ui/fog/knowledge.ts";
+import { layerSources, saveFog, loadFog, sensedFor } from "../../../ui/fog/sources.ts";
+import { SENSED_FADE, SensedMap } from "../../../ui/fungusSight.ts";
 
 // The fog on the endless world (F7, ja-1ypq.7; docs/fog-of-war.md §6, endless-world §8): a host walks 50 U out and back; what the fog holds grows with the
 // ground explored in bits (512 B a chunk) and the ground changed in sight, not with the snapshots of ground the seed can make again; and a save and load
@@ -93,6 +83,8 @@ test("the fog saved and loaded is the same fog, bit for bit, and the chunks a ho
   const { g, k, sensed, step, world, row, col } = walk(12);
   const live = (): number => k.bytes(0);
   const heldBefore = walk(12, true).k.bytes(0); // the control: nothing droppable
+  // the page's own stamps compact as it plays (nothing here calls compact until below): the walk already holds less than the control
+  assert.ok(k.bytes(0) < heldBefore, `stampGame compacts: ${k.bytes(0)} B against the control's ${heldBefore} B`);
   for (let t = 0; t < SENSED_FADE * 30 + 30; t++) step(); // the marks fade right out
   while (k.compact(64) > 0);
   const extra = live() - k.chunks(0) * BYTES;

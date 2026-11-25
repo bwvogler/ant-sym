@@ -72,16 +72,17 @@ export const fogCarried = new WeakMap<Game, FogSave>();
 
 /** The fog of `s` as a save holds it, or null without the fog. */
 export function saveFog(s: SensedMap): FogSave | null {
-  const { knowledge, corpses, known } = s;
+  const { knowledge, corpses, known } = s.fogMemory(); // past `suspended`: the builder hides the fog, not its memory
   if (!knowledge || !corpses || !known) return null;
   return { knowledge: knowledge.save(), corpses: corpses.save(), known: known.save() };
 }
 
 /** Put a saved fog into `s` (where it has the fog): what was remembered at the save is remembered again. */
 export function loadFog(s: SensedMap, saved: FogSave): void {
-  s.knowledge?.load(saved.knowledge);
-  s.corpses?.load(saved.corpses);
-  s.known?.load(saved.known);
+  const { knowledge, corpses, known } = s.fogMemory();
+  knowledge?.load(saved.knowledge);
+  corpses?.load(saved.corpses);
+  known?.load(saved.known);
 }
 
 /** The sensed map for `game`: with the fog's knowledge hung on it when `fog`, and the fog a loaded save carried. */

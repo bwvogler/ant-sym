@@ -61,6 +61,9 @@ interface Chunk {
 /** How many chunks `compact` checks in one call by default: each costs one regeneration of the plane's chunk when it is not cached (20-40 ms cold). */
 export const COMPACT_BUDGET = 1;
 
+/** How many regenerated chunk arrays `Knowledge` keeps for reading dropped snapshots (each up to 16 KB): a screenful of chunks. */
+export const REGEN_KEPT = 64;
+
 /** The snapshot of a chunk saved: its parts as plain values (typed arrays), encoded for JSON by `Knowledge.save`. */
 interface SavedChunk {
   cx: number;
@@ -83,9 +86,11 @@ export class Knowledge {
   /** the chunks `compact` has still to check this pass, and where it is */
   #queue: Chunk[] = [];
   #at = 0;
-  /** the last fallback read: a painter reads a run of cells of one chunk */
-  #regenKey = "";
-  #regenCells: Cells | undefined;
+  /**
+   * What dropped snapshots read as, by layer, source and chunk: a painter reads rock, then food, then spoil for the same cell, and the
+   * regeneration behind a read is the plane's chunk (20-40 ms cold), so each is made once and kept (at most REGEN_KEPT chunks of it).
+   */
+  readonly #regen = new Map<string, Cells | undefined>();
 
   /**
    * `sources` is the ground the knowledge copies: a list, or a function of the layer for a game whose layers come and go (a line's curtain
@@ -112,6 +117,7 @@ export class Knowledge {
       this.#layers.clear();
       this.#last = undefined;
       this.#queue = [];
+      this.#regen.clear();
     };
   }
 
@@ -184,13 +190,13 @@ export class Knowledge {
     const held = c.snaps.get(name);
     if (held || !c.gone?.has(name)) return held;
     const key = `${c.l}|${name}|${c.cx}|${c.cy}`;
-    if (key !== this.#regenKey) {
-      this.#regenKey = key;
-      this.#regenCells = this.#sourcesOf(c.l)
-        .find((s) => s.name === name)
-        ?.regen?.(c.cx, c.cy);
-    }
-    return this.#regenCells;
+    if (this.#regen.has(key)) return this.#regen.get(key);
+    const cells = this.#sourcesOf(c.l)
+      .find((s) => s.name === name)
+      ?.regen?.(c.cx, c.cy);
+    if (this.#regen.size >= REGEN_KEPT) this.#regen.clear();
+    this.#regen.set(key, cells);
+    return cells;
   }
 
   /** The sim time the 8 × 8 block holding cell (gx, gy) was last seen (any of its cells); -1 if never. */
@@ -292,7 +298,7 @@ export class Knowledge {
     this.#last = undefined;
     this.#queue = [];
     this.#at = 0;
-    this.#regenKey = "";
+    this.#regen.clear();
     for (const [l, list] of layers) {
       const chunks = new Map<number, Chunk>();
       for (const s of list) {

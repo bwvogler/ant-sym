@@ -1,7 +1,10 @@
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { centreX, centreY, CHUNK, encode, INFECTED, PLANE, type Colony, type Game } from "../../colony/index.ts";
 import { Knowledge, type Source } from "../fog/knowledge.ts";
+import { fogCarried, loadFog, saveFog, sensedFor } from "../fog/sources.ts";
+import { record } from "../saves.ts";
 import { CorpseMemory } from "../fog/corpses.ts";
 import { KnownColonies } from "../fog/known.ts";
 import { SensedMap, SENSED_FADE } from "../fungusSight.ts";
@@ -205,4 +208,78 @@ test("the colonies known and the corpses remembered save and load as they were",
   const again = new CorpseMemory();
   again.load(json(corpses.save()));
   assert.deepEqual([...again.on(PLANE)], [...corpses.on(PLANE)]);
+});
+
+test("a snapshot of ground changed to a value above the seed's is kept as well as one below it", () => {
+  for (const v of [generated[at(40, 40)]! - 30, generated[at(40, 40)]! + 30]) {
+    const { k } = seenThenAway(Uint8Array.from(generated, (g, i) => (i === at(40, 40) ? v : g)));
+    k.compact();
+    assert.equal(k.bytes(), BYTES + N, `kept at ${v}`);
+    assert.equal(k.snapshot(PLANE, "food", 40, 40), v);
+  }
+});
+
+test("reading a dropped chunk regenerates it once for each source, not once for each read", () => {
+  const calls: Record<string, number> = { rock: 0, food: 0 };
+  const source = (name: "rock" | "food"): Source => {
+    const truth = Uint8Array.from(generated);
+    return {
+      name,
+      layer: PLANE,
+      at: (cx, cy) => (cx === 0 && cy === 0 ? truth : undefined),
+      regen: (cx, cy) => (cx === 0 && cy === 0 ? (calls[name]!++, generated) : undefined),
+    };
+  };
+  const s = new SensedMap();
+  const k = new Knowledge(s, [source("rock"), source("food")]);
+  s.stamp([hostAt(40, 40)], 10);
+  s.stamp([none()], 10 + SENSED_FADE + 5);
+  k.compact();
+  assert.equal(k.bytes(), BYTES, "both snapshots dropped");
+  const checked = { ...calls };
+  // a painter reads rock, then food, then rock again, for each cell of the chunk
+  for (let i = 0; i < 300; i++) for (const name of ["rock", "food", "rock"]) k.snapshot(PLANE, name, 40 + (i % 3), 40);
+  for (const name of ["rock", "food"]) k.view(PLANE, 0, 0)?.snap(name);
+  assert.equal(calls.rock! - checked.rock!, 1, "rock regenerated once for all those reads");
+  assert.equal(calls.food! - checked.food!, 1, "food regenerated once for all those reads");
+});
+
+/** What `record` and the page's save and load carry, with the pieces the page uses. */
+const fakeGame = { layers: [] } as unknown as Game;
+
+test("a save made while the builder has the fog suspended still carries it", () => {
+  const sensed = sensedFor(fakeGame, true);
+  sensed.knowledge!.load(seenThenAway().k.save());
+  sensed.suspended = true;
+  assert.equal(sensed.knowledge, null, "the page sees no fog while suspended");
+  const fog = saveFog(sensed);
+  assert.ok(fog, "the save has the memory the builder hides");
+  const back = sensedFor(fakeGame, true);
+  loadFog(back, fog);
+  assert.equal(back.knowledge!.chunks(PLANE), 1);
+});
+
+test("the page's save and load carry the fog: record keeps it, a loaded game's sensed map takes it up and holds it through a stamp", () => {
+  const sensed = sensedFor(fakeGame, true);
+  const { k } = seenThenAway();
+  sensed.knowledge!.load(k.save());
+  const fog = saveFog(sensed)!;
+  const rec = record(1, {} as never, {} as never, { time: 5 } as never, "", fog);
+  assert.deepEqual(rec.fog, fog, "record carries the fog");
+  assert.equal("fog" in record(1, {} as never, {} as never, { time: 5 } as never, ""), false, "a save without the fog has none");
+
+  const loaded = { layers: [] } as unknown as Game;
+  assert.equal(sensedFor(loaded, true).knowledge!.chunks(PLANE), 0, "a game with nothing carried starts blank");
+  fogCarried.set(loaded, rec.fog!);
+  const next = sensedFor(loaded, true);
+  assert.equal(next.knowledge!.chunks(PLANE), 1, "the loaded game's fog is what was saved");
+  next.stamp([none()], 5);
+  assert.equal(next.knowledge!.chunks(PLANE), 1, "and a stamp after the load keeps it");
+  assert.equal(sensedFor(loaded, false).knowledge, null, "with the fog off, nothing is taken up");
+});
+
+test("the page hands a record's fog to the game it loads and writes the fog into its saves (the two lines the pure tests cannot reach)", () => {
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  assert.match(read("../useColony.ts"), /g\.load\(r\.game\);\s*if \(r\.fog\) fogCarried\.set\(g, r\.fog\);/);
+  assert.match(read("../../ColonyApp.tsx"), /record\([^;]*saveFog\(n\.sensed\)\)/);
 });
