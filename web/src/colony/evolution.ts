@@ -60,8 +60,13 @@ export interface Upgrade {
   nest?: boolean;
 }
 
-/** The mycelium at its landing: the mass it starts with, how fast it grows (per second, logistic), and the mass one unit of spores costs. */
-export const BODY = { start: 4, growth: 0.03, sporeMass: 1 };
+/**
+ * The mycelium at its landing: the mass it starts with, how fast it grows (per second, logistic), the mass one unit of spores
+ * stands for (it sets how many spores a share of the mass makes), and the mass one unit of spores costs to make (`sporeCost`,
+ * ja-a2no: 1, as `sporeMass`, until the owner chooses a cheaper spore; a lab override sets it, docs/energy.md §7), and the most mass
+ * the free term pays out over a game (`freeBudget`, ja-a2no: no limit; a lab override stands in for a start reserve).
+ */
+export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBudget: Infinity };
 
 /** Mutations per unit of new fungus (its growth on the ground and in hosts). */
 export const MUTATION = 0.25;
@@ -459,21 +464,24 @@ export class Evolution {
   grow(dt: number): number {
     if (this.patches === 0) return 0;
     const t = this.traits();
-    const grown = Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt);
+    const grown = Math.min(
+      Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt),
+      Math.max(0, BODY.freeBudget - this.ledger.free),
+    );
     this.mass += grown;
     this.growth += grown;
     this.ground += grown;
     this.ledger.free += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
-    this.mass -= spores * BODY.sporeMass;
-    this.ledger.spores += spores * BODY.sporeMass;
+    this.mass -= spores * BODY.sporeCost;
+    this.ledger.spores += spores * BODY.sporeCost;
     return spores;
   }
 
   /** Spores its patch could not hold go back into the mycelium's mass. */
   refund(spores: number): void {
-    this.mass += spores * BODY.sporeMass;
-    this.ledger.spores -= spores * BODY.sporeMass;
+    this.mass += spores * BODY.sporeCost;
+    this.ledger.spores -= spores * BODY.sporeCost;
   }
 
   /** Hypha cut and lost (ja-2bw.4: ants digging through it): the mass it held is gone. */

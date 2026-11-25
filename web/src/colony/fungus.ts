@@ -1400,10 +1400,10 @@ export class Fungus {
         budget.tips += p.flow
           ? h.resprout(g, level) +
             h.sproutKnots(g, knots, { free: Infinity, tips: budget.tips }, level, (m, k) => {
-              e.refund(m / BODY.sporeMass);
+              e.refund(m / BODY.sporeCost);
               h.addLoad(k, m);
             })
-          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
+          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeCost));
       stepRound(maps, level, budget, this.growthPolicy);
       this.#settle();
       stepped = true;
@@ -1479,10 +1479,10 @@ export class Fungus {
         for (let d = 0; d < 6 && !at; d++) if (g.kind(nx(x, y, d), ny(y, d)) === "open") at = [nx(x, y, d), ny(y, d)];
         if (!at) continue;
         const v = L.spores.get(at[0], at[1]);
-        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeMass));
+        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeCost));
         if (put <= 0) continue;
         knot.store -= put;
-        L.spores.set(at[0], at[1], v + put / BODY.sporeMass);
+        L.spores.set(at[0], at[1], v + put / BODY.sporeCost);
         L.sporeStrain.set(at[0], at[1], e.strain);
         L.sporeCells.add(cellKey(at[0], at[1]));
       }
