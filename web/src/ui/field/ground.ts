@@ -72,6 +72,8 @@ export interface ChunkCanvas {
 }
 
 /** A layer's chunk as the page may read it: on an endless plane `peek`, which never makes a chunk the game has not made; a bounded map's `chunk` (the same read). */
+// Only rock and food have generators on an endless plane (quality, spoil and chambers are absent from it), so `peek` and `chunk` answer alike for those three today;
+// `peek` is used for all of them so that a layer that gets a generator later is not made by a frame.
 function chunkOf<A extends Cells>(endless: boolean, layer: ChunkLayer<A> | undefined, cx: number, cy: number): A | undefined {
   return endless ? layer?.peek(cx, cy) : layer?.chunk(cx, cy);
 }
