@@ -16,6 +16,7 @@ import {
   R,
   rockAt,
   sunDown,
+  type WorldMap,
 } from "../../colony/index.ts";
 import { toScreen, visible } from "../camera.ts";
 import type { Followed } from "../follow.ts";
@@ -30,7 +31,7 @@ import { workerLod } from "../workerSprites.ts";
 import { type AntFrame, drawAnts } from "./ants.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 import { drawFungusGround, drawStalksRaised } from "./fungus.ts";
-import { type Ground, groundPaper } from "./ground.ts";
+import { type Ground, groundPaper, peekCell } from "./ground.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./marks.ts";
 import { drawNest, drawRememberedCorpses, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
@@ -123,8 +124,10 @@ export function beginFrame(
   const { c, v, d, m, theme, sprites } = fc;
   const gx0 = m.x0;
   const vis = visible(c, v);
-  const ry0 = Math.max(0, Math.floor(vis.y0 / R) - 1);
-  const ry1 = Math.min(m.size.h - 1, Math.ceil(vis.y1 / R) + 1);
+  // An endless plane's rows run from -h/2 to h/2 (camera.ts reachOf), not from 0: clipping at row 0 would draw an edge where nothing is.
+  const [rowLo, rowHi] = m.endless === true ? [-m.size.h / 2, m.size.h / 2 - 1] : [0, m.size.h - 1];
+  const ry0 = Math.max(rowLo, Math.floor(vis.y0 / R) - 1);
+  const ry1 = Math.min(rowHi, Math.ceil(vis.y1 / R) + 1);
   const rx0 = Math.max(gx0, Math.floor(vis.x0) - 1);
   const rx1 = Math.min(gx0 + m.size.w - 1, Math.ceil(vis.x1) + 1);
   const zoom = c.zoom / d;
@@ -165,15 +168,22 @@ export function beginFrame(
   };
 }
 
+/** The terrain of cell (x, y): the map's (on an endless plane read with `peek`, so drawing makes no chunk: an unmade chunk reads as rock). */
+const terrainAt = (m: WorldMap, x: number, y: number): number => (m.endless === true ? peekCell(m.rock, x, y) : rockAt(m, x, y));
+
 /** The page's paper over the whole canvas, and the ground's own paper over the map. */
 export const paperStage: Stage = ({ fc }) => {
   const { ctx, c, v, m, ext, theme } = fc;
   ctx.fillStyle = theme.paper;
   ctx.fillRect(0, 0, v.w, v.h);
   ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = `rgb(${groundPaper(fc).join(",")})`;
+  if (m.endless === true) {
+    ctx.fillRect(0, 0, v.w, v.h); // no edge: the ground's paper is the whole view (the box in `ext` is nominal)
+    return;
+  }
   const [left, top] = toScreen(c, v, m.x0, 0);
   const [right, bottom] = toScreen(c, v, m.x0 + ext.w, ext.h);
-  ctx.fillStyle = `rgb(${groundPaper(fc).join(",")})`;
   ctx.fillRect(left, top, right - left, bottom - top);
 };
 
@@ -193,7 +203,7 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
       v.h / 2 - c.y * c.zoom,
       [rx0, rx1, ry0, ry1],
       // Under the fog the grain shows the rock last sensed, and none where nothing was.
-      (x, y) => (fc.fog ? (fc.fog.state(lv, x, y) === UNKNOWN ? 0 : (fc.fog.snapshot(lv, SNAP.rock, x, y) ?? 0)) : rockAt(m, x, y)),
+      (x, y) => (fc.fog ? (fc.fog.state(lv, x, y) === UNKNOWN ? 0 : (fc.fog.snapshot(lv, SNAP.rock, x, y) ?? 0)) : terrainAt(m, x, y)),
       (x, y) => ground.isBare(x, y),
       theme.ink,
       theme.paper,
@@ -206,21 +216,29 @@ export const groundStage: Stage = ({ fc, inputs, parts, hexMix, cellWindow, reso
 export const foodStage: Stage = ({ fc, cellWindow, resourceImage, resourceLod }) => {
   const { ctx, c, v, lv, m, sprites, fog } = fc;
   // Under the fog the food a cell shows is what was last sensed there (its snapshot), and none where nothing was.
+  const endless = m.endless === true;
   const foodAt = (x: number, y: number): number =>
-    fog ? (fog.state(lv, x, y) === UNKNOWN ? 0 : (fog.snapshot(lv, SNAP.food, x, y) ?? 0)) : m.food.get(x, y);
-  const qualityAt = (x: number, y: number): number => (fog ? (fog.snapshot(lv, SNAP.quality, x, y) ?? 1) : (m.quality?.get(x, y) ?? 1));
+    fog
+      ? fog.state(lv, x, y) === UNKNOWN
+        ? 0
+        : (fog.snapshot(lv, SNAP.food, x, y) ?? 0)
+      : endless
+        ? peekCell(m.food, x, y)
+        : m.food.get(x, y);
+  const qualityAt = (x: number, y: number): number =>
+    fog ? (fog.snapshot(lv, SNAP.quality, x, y) ?? 1) : endless ? (m.quality ? peekCell(m.quality, x, y) : 1) : (m.quality?.get(x, y) ?? 1);
   const { rx0, rx1, ry0, ry1 } = cellWindow;
   const { surfaceLeaves, mapLeaves } = sprites;
   if (!resourceImage) return;
   for (let y = ry0; y <= ry1; y++)
     for (let x = rx0; x <= rx1; x++) {
       const amount = foodAt(x, y);
-      if (!(amount > 0) || rockAt(m, x, y) !== OPEN) continue;
+      if (!(amount > 0) || terrainAt(m, x, y) !== OPEN) continue;
       const density = foodDensity(amount),
         kind = foodKind(qualityAt(x, y));
       if (lv === PLANE && kind === "plain") {
         const tiles = surfaceLeaves.get(x, y, (a, b) =>
-          rockAt(m, a, b) === OPEN && foodKind(qualityAt(a, b)) === "plain" ? foodAt(a, b) : 0,
+          terrainAt(m, a, b) === OPEN && foodKind(qualityAt(a, b)) === "plain" ? foodAt(a, b) : 0,
         );
         mapLeaves.draw(ctx, tiles, c.zoom, v.w / 2 - c.x * c.zoom, v.h / 2 - c.y * c.zoom);
         continue;

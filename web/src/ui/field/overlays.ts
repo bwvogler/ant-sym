@@ -195,6 +195,7 @@ export function drawBends(k: FieldCtx): void {
     // Under the fog a bend shows once its hole has been sensed.
     if (k.fog && k.fog.state(PLANE, line.holes[j]!.x, line.holes[j]!.y) === UNKNOWN) continue;
     const [x, top] = toScreen(c, v, centreX(s, STRIP), 0);
+    // The curtain's own bottom (a line's curtain is CURTAIN_ROWS deep, endless world or not): a real edge, not the plane's missing one (E5.4 checked).
     const [, bottom] = toScreen(c, v, 0, k.ext.h);
     if (x < -px * 4 || x > v.w + px * 4) continue;
     ctx.strokeStyle = theme.ink;
