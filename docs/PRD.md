@@ -8252,7 +8252,7 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Play.** The drawer gains a Foci node after Knots; once kept, purple flower patches appear where hyphae close a web. A real trade against Fruiting, Stalks, Lichen and a second Mycelium in the same pool. The risks are an invisible effect, a feature most games never buy, and the seed-5 runaway moving to after the buy (`foci.md` Play).
 
-**Assays and targets.** P1 (T1-T4, §63.4) on seeds 1-20 by the worst seed; a second arm whose buy order reaches Knots and Foci, since `scripts/lab/progression.mjs` DEFAULT_ORDER buys neither (under the gate the default arm forms no flower); flowers per game and the first flower's time; seed 5's patch count and hyphae cells. The assay lands first with no behaviour change (`ja-icc4.1`).
+**Assays and targets.** P1 (T1-T4, §63.4) on seeds 1-20 by the worst seed; the lab's `DEFAULT_ORDER` ends `knots,foci` since 2026-11-25 (arm C, the late order), so a bare run buys Foci and forms flowers after it; an `--order` without them is arm E (no flower forms); flowers per game and the first flower's time; seed 5's patch count and hyphae cells. The assay lands first with no behaviour change (`ja-icc4.1`).
 
 **Cost (estimated).** Jev: none. No situation field, legend or question changes. Price: about 2 mutations in the free pool (`round(1.5^kept)` after Mycelium 1 and Knots 1; to be measured).
 
@@ -8272,7 +8272,9 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 - **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so the early order was not taken; the owner chose the **late** order (arm C), whose cost is seed 6 (333 s to 448 s) and seed 9 (270 s to 358 s) to a quarter: **P1's no-cliff bound (no seed more than 10 % slower) is broken on those two seeds by this choice, and the baseline to compare against from here is arm C** (quarter median 167.5 s, worst 448 s; queen median 212 s, worst 467 s; flowers 57 in 6 games). Arm A (the old baseline) is the workflow's `nofoci` input (lab `--no-foci`) with an `order` that leaves Knots and Foci out; the ungated game with the new default order is `nofoci` alone. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
 - Not measured: the Foci price in play (about 2 mutations is an estimate); an infected queen's one-tile start (no progression seed founds one).
 
+**"Late" is not "last":** the lab buys the first affordable upgrade in the order, so under the late order Knots and Foci land mid-game (seed 9: Knots at 147 s, Foci at 199 s), not at the end.
+
 **Confirmed at the head (run 45617545152, `965a14c`):** the default order and gate reproduce arm C in every cell on all 20 seeds.
 
-**Still open.** Whether seeds 6 and 9's slower quarters are acceptable or the late buy should be tuned (a later or earlier slot for Knots and Foci);  the price of Foci in play; the seed-5 web under the gate.
+**Still open.** Whether seeds 6 and 9's slower quarters are acceptable or the late buy should be tuned (a later or earlier slot for Knots and Foci);the price of Foci in play; the seed-5 web under the gate.
 

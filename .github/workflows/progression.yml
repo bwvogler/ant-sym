@@ -61,7 +61,7 @@ on:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
       nofoci:
-        description: "Run the ungated game: flower patches form without the Foci upgrade (--no-foci, docs/foci.md, PRD §91). Default: gated, so none forms until it is kept; put `knots,foci` in order to buy it"
+        description: "Run the ungated game: flower patches form without the Foci upgrade (--no-foci, docs/foci.md, PRD §91). Default: gated, so none forms until Foci is kept; the default order ends `knots,foci` (arm C), an order without them forms no flower (arm E)"
         type: boolean
         default: false
       lichen:

@@ -45,12 +45,12 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 
 - `id: "foci"`, `kind: "spread"`, name "Foci", `steps: ["none", "new bases"]`, `needs: [[{ id: "knots", level: 1 }]]`, `trait: "foci"`, `values: [0, 1]`; added to `FREE_UPGRADES` (the free pool pays for it, from growth on the ground and corpses) and to the "Mycelium and spores" branch of the drawer.
 - **Cue and response:** the cue is the same (a closed flower of hyphae, the fungus's own body, nothing an ant senses); the response is the gate: `Fungus.#settle` reads `evolution.level("foci")`; at 0 it empties the grown-cell lists and does nothing; at 1 it is today's rule.
-- **Off setting:** a fungus param `fociGate`, on by default since 2026-11-25 (arm E, PRD §91: no flower forms with the assay's order and every time equals the ungated game's); off, flowers form as before.
+- **Off setting:** a fungus param `fociGate`, on by default since 2026-11-25 (arm E, PRD §91: no flower forms with an order that never buys Foci, and every time equals the ungated game's); off, flowers form as before.
 - **Unaffected:** the landing patch and an infected queen's one-tile patch (`Fungus.root`) are not flowers. Patches already formed stay: an old save with flower patches keeps them (they are in `base`) and forms no new ones until Foci is kept (owner, 2026-11-25).
 - **Price:** the free pool's rising price, `round(1.5^kept)` over its own kept levels (§80): Foci after Mycelium 1 and Knots 1 would cost about 2 mutations (estimate; the build measures it).
 - **Retires:** no gap-table row (a fungus mechanic, not an ant choice). Adds no sense and no scripted read.
 - **Cost (Jev):** none. No situation field, legend or question changes; the mutation menu is the player's, not a lane.
-- **The assay:** the progression assay's default buy order (`DEFAULT_ORDER` in `scripts/lab/progression.mjs`) buys neither Knots nor Lichen, so under the gate it forms no flower: P1's T1–T4 would be measured with no flowers (they were unmoved by flowers, PRD §85) and the patch columns would read 0. The assay needs a second arm with an order that buys Knots and Foci, to see what the gate costs and when flowers start.
+- **The assay:** the lab's `DEFAULT_ORDER` (`scripts/lab/progression.mjs`) ends `knots,foci` since 2026-11-25 (owner's choice, the late order, arm C of PRD §91): a bare run buys Foci mid-game and forms flowers after it, at the cost of seeds 6 and 9 to a quarter. An `--order` without them is arm E (no flower forms, every time equal to the ungated game's); `--no-foci` runs the ungated game.
 
 ## Play
 
