@@ -12,6 +12,7 @@ import {
   nx as neighbourX,
   ny as neighbourY,
   PLANE,
+  algaAt,
   type Hyphae,
 } from "../../colony/index.ts";
 import { visibleCadavers } from "../cadaverVisual.ts";
@@ -231,6 +232,41 @@ export function drawHyphae(k: FieldCtx, h: Hyphae, under: boolean, win: CellWind
 }
 
 /**
+ * Lichen on the plane's rock (ja-vlla.11.3, PRD §90): each lichen cell a pale green-grey blot; once the Lichen upgrade is kept, the alga films
+ * and wild lichens the world holds on the rock in view as small yellow flecks, so the player can find what a hypha could take. Only cells
+ * the fog has let the fungus know are drawn.
+ */
+function drawLichen(k: FieldCtx, win: CellWindow): void {
+  const { ctx, c, v, fungus } = k;
+  const { rx0, rx1, ry0, ry1 } = win;
+  if ((fungus.evolution?.level("lichen") ?? 0) === 0) return;
+  const known = (x: number, y: number) => !k.fog || k.fog.state(PLANE, x, y) !== UNKNOWN;
+  const taken = fungus.lichenCells();
+  ctx.save();
+  if (taken.size > 0) {
+    ctx.fillStyle = "rgba(168, 190, 150, 0.85)";
+    for (const cell of taken) {
+      const [sx, sy] = hyphaCell(cell);
+      if (sx < rx0 - 1 || sx > rx1 + 1 || sy < ry0 - 1 || sy > ry1 + 1 || !known(sx, sy)) continue;
+      const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1.5, c.zoom * 0.55), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.fillStyle = "rgba(226, 204, 92, 0.9)";
+  for (let sy = Math.floor(ry0) - 1; sy <= ry1 + 1; sy++)
+    for (let sx = Math.floor(rx0) - 1; sx <= rx1 + 1; sx++) {
+      if (taken.has(cellKey(sx, sy)) || !known(sx, sy) || !algaAt(fungus.map, sx, sy)) continue;
+      const [x, y] = toScreen(c, v, centreX(sx, sy), centreY(sy));
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(1, c.zoom * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  ctx.restore();
+}
+
+/**
  * The fungus on the ground, before the ants: the hyphae of this layer, then each corpse it has colonised (a bare mark, or a stalk where the
  * Stalks upgrade has raised one, with the cadaver under it when no colony's visible cadaver lies on that cell). Returns what the raised stalks
  * need later.
@@ -238,6 +274,7 @@ export function drawHyphae(k: FieldCtx, h: Hyphae, under: boolean, win: CellWind
 export function drawFungusGround(k: FieldCtx, win: CellWindow): FungusFrame {
   const { ctx, c, v, d, lv, colonies, fungus, sprites } = k;
   const { rx0, rx1, ry0, ry1 } = win;
+  if (lv === PLANE) drawLichen(k, win);
   const hy = fungus.hyphaeOn(lv);
   if (hy) drawHyphae(k, hy, lv === PLANE, win);
   const corpseCells = new Set(colonies.flatMap((col) => visibleCadavers(col, lv).map((cadaver) => cellKey(cadaver.x, cadaver.y))));

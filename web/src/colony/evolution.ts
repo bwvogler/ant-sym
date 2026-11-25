@@ -38,7 +38,7 @@ export interface Need {
 }
 
 /** A spread trait an upgrade sets. */
-export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks";
+export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks" | "lichen";
 
 export interface Upgrade {
   id: string;
@@ -94,7 +94,7 @@ export const POOLS = ["ants", "free"] as const;
 export type Pool = (typeof POOLS)[number];
 
 /** The fungus's own upgrades: what its mycelium makes outside a living host. Every other upgrade is the ants'. */
-const FREE_UPGRADES: ReadonlySet<string> = new Set(["mycelium", "knots", "stalks", "fruiting"]);
+const FREE_UPGRADES: ReadonlySet<string> = new Set(["mycelium", "knots", "stalks", "fruiting", "lichen"]);
 
 /** The pool that pays for upgrade `id`. */
 export function poolOf(id: string): Pool {
@@ -193,6 +193,17 @@ export const UPGRADES: readonly Upgrade[] = [
     needs: [[{ id: "fruiting", level: 1 }], [{ id: "fruiting", level: 2 }]],
     trait: "stalks",
     values: [0, 1, 2],
+  },
+  {
+    // A lichen partner (ja-vlla.11.3, PRD §90): its value is the level fungus.ts reads (0 none, 1 takes algae on rock).
+    id: "lichen",
+    kind: "spread",
+    name: "Lichen",
+    blurb: "whether a hypha beside an alga on rock takes it and spreads over the rock from its rim, a lichen",
+    steps: ["none", "a partner"],
+    needs: [[{ id: "mycelium", level: 1 }]],
+    trait: "lichen",
+    values: [0, 1],
   },
   {
     id: "fruiting",
@@ -329,6 +340,8 @@ export interface Traits {
   knots: number;
   /** the Stalks level (fungus.ts STALK): 0 none, 1 a stalk, 2 a tall stalk */
   stalks: number;
+  /** the Lichen level (fungus.ts): 0 none, 1 a partner */
+  lichen: number;
 }
 
 export interface EvolutionSave {
@@ -479,7 +492,7 @@ export class Evolution {
 
   /** The spread traits at the levels chosen. */
   traits(): Traits {
-    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0 };
+    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0, lichen: 0 };
     for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }

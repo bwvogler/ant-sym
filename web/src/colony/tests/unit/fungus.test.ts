@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { Fungus, INFECTED, SPORE_SHOWN, STRAINS, type Strain } from "../../fungus.ts";
-import { mulberry32, worldFromArrays, type WorldMap } from "../../world.ts";
+import { algaAt } from "../../lichen.ts";
+import { cellKey, nx, ny } from "../../hex.ts";
+import { generateWorld, mulberry32, OPEN, ROCK, rockAt, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at } from "../hexmaps.ts";
 import { arena, placedAt } from "../builders.ts";
 
@@ -394,4 +396,38 @@ test("a landing roots a tip in each of the six ways, whichever way it aims; grow
   assert.deepEqual(headings(null).sort(), all, "no aim: all six");
   // Aimed due west (heading 3, not the first in the list): the aimed tip comes first, then the rest round from it.
   assert.deepEqual(headings({ x: 10, y: at(20, 6).y }), [3, 4, 5, 0, 1, 2], "aimed west: all six, the aimed one first, then round");
+});
+
+test("a fungus that keeps the lichen upgrade takes an alga its hypha lies beside, and saves and loads it (ja-vlla.11.3)", () => {
+  const map = generateWorld(3);
+  let film: [number, number] | null = null;
+  for (let y = 0; y < map.size.h && !film; y++)
+    for (let x = map.x0; x < map.x0 + map.size.w && !film; x++) if (algaAt(map, x, y) === "film") film = [x, y];
+  let cell = -1;
+  for (let d = 0; d < 6 && cell < 0; d++)
+    if (rockAt(map, nx(film![0], film![1], d), ny(film![1], d)) !== ROCK) cell = cellKey(nx(film![0], film![1], d), ny(film![1], d));
+  const make = () => {
+    const f = new Fungus(map, { hyphae: true });
+    f.evolve(BLOOM);
+    return f;
+  };
+  const f = make();
+  // an open cell well past the keep-out from the film for the landing
+  let land: [number, number] | null = null;
+  for (let y = 10; y < 300 && !land; y++) for (let x = film![0] + 30; x < 500 && !land; x++) if (rockAt(map, x, y) === OPEN) land = [x, y];
+  f.root(land![0], land![1], 2, 0);
+  const e = f.evolution!;
+  e.growth += 100;
+  e.ground += 100;
+  assert.ok(f.upgrade("mycelium") && f.upgrade("lichen"), "the borer, then the partner");
+  f.paint([], land![0], land![1], 0.5, 4, 0, BLOOM, 0); // spores on the ground keep the fungus stepping
+  f.hyphaeOn(0)!.parent.set(cell, -1); // a hypha cell beside the film
+  assert.equal(f.lichenCells().size, 0);
+  for (let k = 0; k < 90; k++) f.stepLayers([], [[]], 1 / 30);
+  assert.ok(f.lichenCells().has(cellKey(film![0], film![1])), "the film's rock cell is lichen");
+  assert.ok(f.lichenFirst !== null);
+  const g = make();
+  g.loadState(JSON.parse(JSON.stringify(f.saveState())));
+  assert.deepEqual([...g.lichenCells()].sort(), [...f.lichenCells()].sort());
+  assert.equal(g.lichenFirst, f.lichenFirst);
 });
