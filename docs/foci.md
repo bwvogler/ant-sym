@@ -62,7 +62,7 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 
 ## Open questions
 
-- **Decided (owner, 2026-11-25), with the measurement in PRD §91:** an old save loses the ability to form flowers until it buys Foci (patches already formed stay); the default buy order reaches Knots and Foci (measured: it costs progression on 9 seeds early or up to +35 % on 2 seeds late, so `DEFAULT_ORDER` is unchanged and the call is back with the owner); the seed-5 runaway is accepted as "bounded by the price once Foci is bought" (`ja-27w1` stays open until it is measured with the gate).
+- **Decided (owner, 2026-11-25), with the measurement in PRD §91:** an old save loses the ability to form flowers until it buys Foci (patches already formed stay); the default buy order reaches Knots and Foci (measured: it costs progression on 9 seeds early or up to +35 % on 2 seeds late; the owner chose the late order, 2026-11-25, so the lab's `DEFAULT_ORDER` ends with `knots,foci`); the seed-5 runaway is accepted as "bounded by the price once Foci is bought" (`ja-27w1` stays open until it is measured with the gate).
 - To measure: P1 (T1–T4) on seeds 1–20 with the gate and a buy order that reaches Foci; flowers per game and when the first forms; whether the seed-5 web still runs away after the buy; the price of Foci in mutations.
 - Not now: Fukasawa's finding that outgrowth rises with the fraction of the resource used is a possible later lever (a flower that forms only after its cells are used up); it is not part of this change.
 

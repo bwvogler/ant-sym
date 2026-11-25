@@ -39,8 +39,9 @@ const opt = (name, fallback) => {
   return k < 0 ? fallback : args[k + 1];
 };
 const flag = (name) => args.includes(`--${name}`);
+// Knots and Foci last (owner 2026-11-25, PRD §91): the flower patches need Foci, so the default arm buys it once the rest has been bought.
 const DEFAULT_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth";
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth,knots,foci";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);

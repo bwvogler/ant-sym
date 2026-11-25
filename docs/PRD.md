@@ -8232,7 +8232,7 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 - It **needs Knots 1** (so Mycelium 1) (owner, 2026-11-25; the order is design, no paper orders them).
 - Until it is kept a closed flower does not become a patch; the landing patch and an infected queen's one-tile patch are unaffected (owner, 2026-11-25).
 - Patches already formed stay; an old save forms no new ones until Foci is kept (owner, 2026-11-25).
-- The default buy order reaches Knots and Foci; where in the order is measured (owner, 2026-11-25). **Measured below: it costs progression, so `DEFAULT_ORDER` is unchanged and the call goes back to the owner.**
+- The default buy order reaches Knots and Foci; where in the order is measured (owner, 2026-11-25). **Measured below: early costs 9 seeds more than 10 % slower, late costs 2; the owner chose the late order (2026-11-25), so the lab's `DEFAULT_ORDER` ends `...,stealth,knots,foci`** (the golden games' own order in `tests/goldens.ts` is unchanged).
 - `fociGate` is on by default since 2026-11-25 (arm E below met the pre-set rule: no seed more than 10 % slower to a quarter).
 - The seed-5 runaway moving to after the buy is accepted, bounded by the price; `ja-27w1` stays open until measured with the gate (owner, 2026-11-25).
 
@@ -8257,8 +8257,8 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 - **The gate works and costs nothing in P1.** E forms no flower and its quarter, half and queen times equal A's on every seed; with no Foci bought, seed 5 ends with 505 hyphae cells where A has 3,581 (the `ja-27w1` runaway needs Foci).
 - **B and D are identical cell for cell:** Foci is bought before any flower closes, so the gate never fires there. The cost in B, C and D is therefore not the gate: it is Knots and Foci displacing other purchases, and Knots changing the web (D, gate off, has 8 flowers to A's 40; C has 57, with seeds 3, 4 and 5 at 9, 18 and 26 patches after the late buy).
-- **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so `DEFAULT_ORDER` is **not** changed. The default CI progression now shows no flowers; a flower arm is an `order` that reaches `knots,foci` (the gate is the default now); the workflow's `nofoci` input (lab `--no-foci`) runs the ungated game, as arms A and D did. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
+- **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so the early order was not taken; the owner chose the **late** order (arm C), whose cost is seed 6 (333 s to 448 s) and seed 9 (270 s to 358 s) to a quarter: **P1's no-cliff bound (no seed more than 10 % slower) is broken on those two seeds by this choice, and the baseline to compare against from here is arm C** (quarter median 167.5 s, worst 448 s; queen median 212 s, worst 467 s; flowers 57 in 6 games). Arm A (the old baseline) is the workflow's `nofoci` input (lab `--no-foci`) with an `order` that leaves Knots and Foci out; the ungated game with the new default order is `nofoci` alone. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
 - Not measured: the Foci price in play (about 2 mutations is an estimate); an infected queen's one-tile start (no progression seed founds one).
 
-**Still open.** Whether the default buy order should reach Foci despite the cost above (owner); the price of Foci in play; the seed-5 web under the gate.
+**Still open.** Whether seeds 6 and 9's slower quarters are acceptable or the late buy should be tuned (a later or earlier slot for Knots and Foci);  the price of Foci in play; the seed-5 web under the gate.
 
