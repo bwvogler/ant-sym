@@ -11,9 +11,10 @@ import { NOTICE_LEVELS, noticeLevel, setNoticeLevel } from "../toasts.ts";
 
 // The command palette's commands (ja-fnd.6.2): the list the page gives the palette, and what each one does, from a fake page.
 
-function setup(o: Partial<PaletteCtx> = {}) {
+function setup(o: Partial<PaletteCtx> = {}, endless = false) {
   const calls: string[] = [];
   const game = {
+    map: { endless },
     colonies: [{ ph: { has: () => true } }, { ph: { has: () => true } }],
     params: { species: { id: "generic" } },
   } as unknown as Game;
@@ -86,6 +87,11 @@ test("the map's commands: the whole map, and a nest for each colony by its name"
   );
   nests[1]!.run();
   assert.deepEqual(calls.splice(0), ["goNest 1"]);
+  // An endless plane has no whole map: the key 0 goes back to the start (PRD §66 E6).
+  assert.equal(by("whole").label, "Whole map");
+  const home = setup({}, true).by("whole");
+  assert.equal(home.label, "Start");
+  assert.equal(home.key, "0");
 });
 
 test("the panels: five drawers, the Codex's guide, and the Lab by whether it is open", () => {
@@ -138,7 +144,11 @@ test("the Codex: an entry for each guide page the game has met, for the game's s
   // the species' own pages come with the species: a game of a species that has pages of its own lists them, and the generic game does not
   const own = GUIDE.find((e) => e.species !== undefined);
   assert.ok(own, "the guide has a species' own page");
-  const game = { colonies: [{ ph: { has: () => true } }], params: { species: { id: own!.species } } } as unknown as Game;
+  const game = {
+    map: { endless: false },
+    colonies: [{ ph: { has: () => true } }],
+    params: { species: { id: own!.species } },
+  } as unknown as Game;
   const ids = setup({ game }).cmds.map((c) => c.id);
   assert.ok(ids.includes(`learn-${own!.id}`), "its own page is in the palette");
   assert.ok(!cmds.some((c) => c.id === `learn-${own!.id}`), "and not in the generic game's");
@@ -170,7 +180,7 @@ const EXPECTED: [string, string, string | undefined, string, string][] = [
   ["view-above", "Game", "v", "surface top", "View above"],
   ["view-below", "Game", "v", "underground nest side", "View below"],
   ["host", "Game", "f", "infected ant", "Follow a host of yours"],
-  ["whole", "Map", "0", "zoom out fit", "Whole map"],
+  ["whole", "Map", "0", "zoom out fit home start", "Whole map"],
   ["nest-0", "Map", undefined, "colony hole", `Go to ${colonyName(0)}'s nest`],
   ["nest-1", "Map", undefined, "colony hole", `Go to ${colonyName(1)}'s nest`],
   ["drawer-fungus", "Panels", undefined, "infection aim", "The fungus"],

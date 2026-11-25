@@ -11,6 +11,8 @@ import {
   gameRng,
   generateOneWorld,
   GENERIC_ANT,
+  awakeCapFor,
+  generateEndlessWorld,
   isCurtainLayer,
   lineIndexOfLayer,
   PLANE,
@@ -22,6 +24,7 @@ import { journalFromUrl } from "./journal.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { landingOf } from "./landing.ts";
+import { worldFromUrl, worldOf, type WorldKind } from "./worldKind.ts";
 import { GameLoop, MAX_STEP } from "./gameLoop.ts";
 import type { ColonyStats, EvolutionStats, SideStats } from "./stats.ts";
 
@@ -54,6 +57,8 @@ export interface ColonyControls {
   cull: boolean;
   /** a rival colony at the map's second nest */
   rival: boolean;
+  /** the world the game is on (PRD §66 E6): the endless plane by default, the bounded one behind `?world=bounded` (worldKind.ts); a loaded save puts back the world it was made in */
+  world: WorldKind;
   /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
   view: View;
   /** which line's curtain the below view shows (docs/endless-world.md §8): the line clicked, chosen by Go to, or the followed ant's; an index into the world's lines */
@@ -107,6 +112,7 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   hide: false,
   cull: false,
   rival: true,
+  world: worldFromUrl(),
   view: "above",
   line: 0,
   sampleTemp: DEFAULT_COLONY.sampleTemp,
@@ -115,13 +121,19 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   steerLane: false,
 };
 
-/** A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load). */
+/**
+ * A game as the page builds it from its settings: a fresh world, nothing played (a save is poured in with Game.load).
+ *
+ * `settings.world` says which: the endless plane (PRD §66 E6, owner 2026-11-25: the page's default, `DEFAULT_COLONY_CONTROLS.world`) with the awake rule on and its cap
+ * by colony size (`awakeCapFor`), or the bounded one world. Absent reads bounded, so a save from before the switch, a script and an old test build what they always built.
+ */
 export function buildGame(s: GameSettings): Game {
   // The page plays one world only (owner, 2026-11-10; PRD §55): the side and open maps stay for the assays and scripts.
   // Its fungus grows as hyphae (ja-2bw, PRD §63): they fruit where they reach a tunnel, and its dead hosts are new starts.
-  const map = generateOneWorld(s.seed);
+  const endless = worldOf(s) === "endless";
+  const map = endless ? generateEndlessWorld(s.seed) : generateOneWorld(s.seed);
   const species = speciesById(s.species);
-  return new Game(
+  const game = new Game(
     map,
     {
       regrow: GAME_REGROW,
@@ -134,6 +146,9 @@ export function buildGame(s: GameSettings): Game {
     // The settings' ant count and rival box name the colonies the game starts with: one, or a pair of the same size.
     s.rival ? [{ antCount: s.antCount }, { antCount: s.antCount }] : [{ antCount: s.antCount }],
   );
+  // The endless plane freezes what the fungus is far from (W 280, T 90 s, nest ground 16: the rule's defaults), at most `awakeCapFor(antsPerColony)` colonies awake.
+  if (endless) game.enableSleep({ cap: awakeCapFor(s.antCount) });
+  return game;
 }
 
 export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
@@ -147,7 +162,14 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const [loads, setLoads] = useState(0);
   const game = useMemo(() => {
     const build = () =>
-      buildGame({ species: controls.species, seed: controls.seed, antCount: controls.antCount, rival: controls.rival, generation });
+      buildGame({
+        species: controls.species,
+        seed: controls.seed,
+        antCount: controls.antCount,
+        rival: controls.rival,
+        world: controls.world,
+        generation,
+      });
     const g = build();
     const r = pending.current;
     if (
@@ -156,6 +178,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       r.settings.seed === controls.seed &&
       r.settings.antCount === controls.antCount &&
       r.settings.rival === controls.rival &&
+      worldOf(r.settings) === controls.world &&
       r.settings.generation === generation
     ) {
       pending.current = null;
@@ -178,7 +201,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.species, controls.seed, controls.antCount, controls.rival, generation, loads]);
+  }, [controls.species, controls.seed, controls.antCount, controls.rival, controls.world, generation, loads]);
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
@@ -226,6 +249,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       seed: r.settings.seed,
       antCount: r.settings.antCount,
       rival: r.settings.rival,
+      world: worldOf(r.settings),
       started: true,
       playing: true,
     }));
@@ -249,6 +273,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     seed: controls.seed,
     antCount: controls.antCount,
     rival: controls.rival,
+    world: controls.world,
     generation,
   };
 

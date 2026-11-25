@@ -173,6 +173,7 @@ test("the nest tab's last-known line says when, and what was last known; and the
   const ids = (kn: KnownColonies<SideStats> | null) =>
     paletteCommands({
       game: {
+        map: { endless: false },
         colonies: [{ ...colonyWith(1, 0), ph: { has: () => true } }, colonyWith(1, 1), colonyWith(0, 2)],
         params: { species: { id: "generic" } },
       },
