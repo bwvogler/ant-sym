@@ -9,6 +9,7 @@ import {
   NO_ROOM,
   centreX,
   centreY,
+  generateEndlessWorld,
   generateOneWorld,
   mainGround,
 } from "../../colony/index.ts";
@@ -45,6 +46,17 @@ test("the pen's circle is her flight round her mother's hole on the plane; none 
   // The hole is the line's: the second colony's is V1.
   const v = g.world!.line.holes[1]!;
   assert.deepEqual([h.px, h.py], [v.x, v.y]);
+});
+
+test("on an endless plane the pen's circle is the longer flight: 280 round her mother's hole (PRD §66 E6)", () => {
+  const g = new Game(generateEndlessWorld(1), { regrow: 0 }, gameRng(1), [{ antCount: 4 }, { antCount: 4 }]);
+  const c = flightCircle(g, flight(1))!;
+  const h = g.colonies[1]!.holeCells[g.colonies[1]!.params.nest]!;
+  assert.deepEqual(c, { x: centreX(h.px, h.py), y: centreY(h.py), r: 280 });
+  assert.ok(
+    withinFlight(c, { x: c.x + 279, y: c.y }) && !withinFlight(c, { x: c.x + 281, y: c.y }),
+    "a click 279 away is inside, 281 is not",
+  );
 });
 
 test("a click outside the circle is refused, without asking where she would settle; inside, the settling is the game's", () => {

@@ -65,6 +65,14 @@ for (let k = 0; k < steps; k++) {
   }
 }
 const over = ms.filter((t) => t > 50).length;
+// The first 90 s (T, the awake rule's delay: until then nothing has frozen for the fungus's absence) against the rest.
+const split = (/** @type {number[]} */ a) => {
+  const b = [...a].sort((x, y) => x - y);
+  return b.length
+    ? `${b[b.length >> 1].toFixed(1)} (p90 ${b[Math.floor(0.9 * b.length)].toFixed(1)}, ${a.filter((t) => t > 50).length} over 50 ms)`
+    : "none";
+};
+const cut = Math.round(90 / DT) - warm;
 const sorted = [...ms].sort((a, b) => a - b);
 const q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))].toFixed(2);
 const awake = game.colonies.filter((_, i) => !game.isFrozen(i)).length;
@@ -76,6 +84,7 @@ console.log(
     `tick median ${q(0.5)} ms, p90 ${q(0.9)} ms, max ${sorted[sorted.length - 1].toFixed(1)} ms, ${over} of ${ms.length} ticks over 50 ms; ` +
     `${missed} chunks made on a miss in the ticks; chunks held ${chunks}; heap + buffers ${heap0.toFixed(0)} MB at the start, ${heap1.toFixed(0)} MB at the end${gced ? " (after gc)" : " (no gc: run with --expose-gc)"}`,
 );
+if (ms.length > cut && cut > 0) console.log(`  tick median ms: first 90 s ${split(ms.slice(0, cut))}; after ${split(ms.slice(cut))}`);
 if (!process.argv.includes("--no-save")) {
   const a = performance.now();
   const json = JSON.stringify(game.save());

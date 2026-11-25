@@ -2850,7 +2850,7 @@ try {
   );
   // A click far from the nests makes no chunk (the ground the click reads is peeked, not made), nor does the lens on far ground.
   await ep.getByRole("button", { name: "Pause", exact: true }).click();
-  const before = await planeCounts(ep);
+  const chunksBefore = await planeCounts(ep);
   const cv = ep.locator("canvas").first();
   for (const [x, y] of [
     [640, 450],
@@ -2869,7 +2869,7 @@ try {
     await ep.mouse.click(x, y);
   }
   await ep.keyboard.press("i");
-  check((await planeCounts(ep)) === before, "clicks and the lens on ground 20 U from the nests make no chunk");
+  check((await planeCounts(ep)) === chunksBefore, "clicks and the lens on ground 20 U from the nests make no chunk");
   // A save and a load round-trip: the save says its world, a reload offers it, and Continue plays it as an endless game.
   await ep.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).click();
   await ep.getByRole("button", { name: "Save here" }).first().click();
