@@ -30,6 +30,20 @@ export class FoodLedger {
     this.#generated = 0;
   }
 
+  /** Every chunk counted, as [layer:key, amount] pairs in the order counted: what a save keeps so a load counts the same chunks without making them again. */
+  entries(): [string, number][] {
+    return [...this.#chunks];
+  }
+
+  /** Put back what `entries()` gave, into an empty ledger (a load, after `reset`): each chunk counted once with its amount, the total their sum. */
+  restore(entries: readonly (readonly [string, number])[]): void {
+    if (this.#chunks.size > 0) throw new Error("FoodLedger.restore: the ledger already counts chunks");
+    for (const [k, amount] of entries) {
+      this.#chunks.set(k, amount);
+      this.#generated += amount;
+    }
+  }
+
   /** Food generated so far: what the generator placed in the chunks made, never what was added or taken since. */
   get generatedTotal(): number {
     return this.#generated;
