@@ -60,6 +60,10 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      split:
+        description: "Report where each seed's growth was made: the mycelium on the ground, corpses and hosts (--split, PRD §85 M3)"
+        type: boolean
+        default: false
       light:
         description: "The lichen's light income, growth a second a lichen cell (--light, ja-vlla.11.4); empty: the design number"
         default: ""
@@ -94,6 +98,7 @@ jobs:
           LICHEN: ${{ inputs.lichen }}
           ORDER: ${{ inputs.order }}
           LIGHT: ${{ inputs.light }}
+          SPLIT: ${{ inputs.split }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -121,6 +126,7 @@ jobs:
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$ORDER" ] && args="$args --order $ORDER"
           [ -n "$LIGHT" ] && args="$args --light $LIGHT"
+          [ "$SPLIT" = "true" ] && args="$args --split"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
@@ -216,4 +222,10 @@ jobs:
             { echo; echo 'Seeds whose fungus made lichen:'; echo '```'; grep -h ' · lichen [0-9]* cells' out/seed-*.txt | sed -E 's/^(seed [0-9]+):.* · (lichen .*)$/\1: \2/' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           else
             echo 'No seed made any lichen.' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --split's line (one per seed): where the growth that mutations come from was made.
+      - name: growth split
+        run: |
+          if grep -q '^  growth made' out/seed-*.txt; then
+            { echo; echo 'Growth made, by where (ground = the mycelium growing on its own, corpses = fed in, hosts = made in ants):'; echo '```'; grep -H '^  growth made' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi
