@@ -24,7 +24,7 @@ export class FoodLedger {
     return true;
   }
 
-  /** Forget every chunk counted and the totals (a load, which counts the chunks again as they are made: endlessMap.ts loadEndless). */
+  /** Forget every chunk counted and the totals (a load, before it `restore`s what the save counted, or, for an older save, counts the chunks again as they are made: endlessMap.ts loadEndless). */
   reset(): void {
     this.#chunks.clear();
     this.#generated = 0;

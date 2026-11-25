@@ -43,8 +43,9 @@ export interface EndlessMap extends WorldMap {
    */
   foodHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
   /**
-   * Called with a chunk's food when it is generated AGAIN (after `dropClean` freed it: the ledger counts nothing the second time, so `foodHooks` stay quiet),
-   * so a reader that dropped what it keeps per chunk (the game's regrowth piles) takes it up again. Run inside the generator: do not read the map's food.
+   * Called with a chunk's food when it is generated AGAIN: after `dropClean` freed it, or, in a loaded game, the first time a chunk the save counted
+   * (`madeFood`) is made after the load. The ledger counts nothing the second time, so `foodHooks` stay quiet; a reader that dropped or never held what it keeps
+   * per chunk (the game's regrowth piles) takes it up here. Run inside the generator: do not read the map's food.
    */
   regenHooks: ((cx: number, cy: number, food: Float32Array) => void)[];
   /**
@@ -208,8 +209,9 @@ function writtenChunks(layer: ChunkLayer<Cells>): SavedChunks {
 /**
  * The endless plane as a save holds it (PRD §66 E6.0.3, docs/endless-world.md §8): not the plane, which is the seed, but what the game changed: the
  * chunks of rock and food that differ from what the plane generates (`dropClean`'s notion of unchanged), the other layers' written chunks (dig
- * headings, dug and filled times, quality, the mound), and the food counters as offsets from the food generated (which a load counts again as chunks are
- * made). Size follows the ground changed, not the ground seen.
+ * headings, dug and filled times, quality, the mound), the food counters, and the chunks whose food was counted (`madeFood`: one 24-byte entry for every chunk
+ * ever read, evicted ones too: 3.4 KB at 140 chunks, under 1% of the map save). The rest follows the ground changed, not the ground seen. A load into a plane
+ * made with other options than the save's is not detected (the save records the seed only): `ja-qpv.5.9`.
  */
 export function saveEndless(map: EndlessMap): Record<string, unknown> {
   const spoil = map.spoil;
@@ -228,6 +230,9 @@ export function saveEndless(map: EndlessMap): Record<string, unknown> {
     filled: map.filled,
     // the chunks whose food was counted, with their amounts (a few KB): a load counts them again without making them, so foodLeft and foodTotal equal the original game's (ja-qpv.5.2)
     madeFood: map.ledger.entries(),
+    // the counters as they are (a load with `madeFood` sets them exactly) and as offsets from the food generated (what an older reader, or a save with no `madeFood`, counts from)
+    foodTotal: map.foodTotal,
+    foodLeft: map.foodLeft,
     foodAddedTotal: map.foodTotal - map.ledger.generatedTotal,
     foodAddedLeft: map.foodLeft - map.ledger.generatedTotal,
   };
@@ -246,8 +251,10 @@ export function loadEndless(map: EndlessMap, saved: Record<string, unknown>): vo
   // again later counts nothing the second time. An older save has none, and counts the chunks as they are made.
   const made = saved.madeFood as [string, number][] | undefined;
   if (made) map.ledger.restore(made);
-  map.foodTotal = (saved.foodAddedTotal as number) + map.ledger.generatedTotal;
-  map.foodLeft = (saved.foodAddedLeft as number) + map.ledger.generatedTotal;
+  // the absolute counters when the ledger is restored (exact: an offset plus the generated total can differ in the last bits); otherwise the offsets, counting from nothing
+  map.foodTotal =
+    made && typeof saved.foodTotal === "number" ? saved.foodTotal : (saved.foodAddedTotal as number) + map.ledger.generatedTotal;
+  map.foodLeft = made && typeof saved.foodLeft === "number" ? saved.foodLeft : (saved.foodAddedLeft as number) + map.ledger.generatedTotal;
   fillLayer(map.rock, saved.rock);
   fillLayer(map.food, saved.food);
   for (const [cx, cy] of (saved.food as SavedChunks).$chunks) {

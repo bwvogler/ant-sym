@@ -116,3 +116,33 @@ test("a saved amount that is not what the plane generates is refused, and the le
   );
   assert.throws(() => loadEndless(generateEndlessPlane(SEED), { ...saved, madeFood: tampered }), /FoodLedger/);
 });
+
+test("a save loads into a map that has already made chunks, and the counters are the save's, not a sum of the two", () => {
+  const a = played();
+  const saved = json(saveEndless(a));
+  const b = generateEndlessPlane(SEED);
+  makeChunks(b, 2); // a game that has played: its ledger counts chunks before the load (loadEndless resets it first)
+  assert.ok(b.ledger.chunks > 0);
+  loadEndless(b, saved);
+  assert.equal(b.foodTotal, a.foodTotal);
+  assert.equal(b.foodLeft, a.foodLeft);
+  assert.equal(b.ledger.chunks, a.ledger.chunks);
+  assert.equal(b.ledger.generatedTotal, a.ledger.generatedTotal);
+});
+
+test("the counters a save carries are exact, not an offset that can differ in the last bits", () => {
+  const a = played();
+  const g = a.ledger.generatedTotal;
+  // a food left well under half the generated total (much eaten) with a fraction, for which (left - generated) + generated is not left: the offset form loses it
+  let left = 0;
+  for (let k = 1; k < 5000 && left === 0; k++) {
+    const x = g * 0.3 + k * 0.0137;
+    if (x - g + g !== x) left = x;
+  }
+  assert.ok(left > 0, "found a food left the offset form cannot carry");
+  a.foodLeft = left;
+  const b = generateEndlessPlane(SEED);
+  loadEndless(b, json(saveEndless(a)));
+  assert.equal(b.foodTotal, a.foodTotal);
+  assert.equal(b.foodLeft, a.foodLeft);
+});
