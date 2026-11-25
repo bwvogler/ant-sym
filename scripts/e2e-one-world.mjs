@@ -2806,8 +2806,11 @@ try {
   await ep.keyboard.press("Escape");
   await until(() => ep.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the endless game", 60_000, 200);
   const fStart = await frameTimes(ep, 4000);
-  console.log(`  endless, at the start: ${fmt(fStart)}`);
+  console.log(`  endless, at the start, playing: ${fmt(fStart)}`);
   check(fStart.n > 3, "the endless page draws frames at the start");
+  await ep.getByRole("button", { name: "Pause", exact: true }).click();
+  const fStartDraw = await frameTimes(ep, 3000);
+  console.log(`  endless, at the start, paused (the draw alone): ${fmt(fStartDraw)}`);
   // The camera pans 20 U: no clamp to a box, and the minimap's window follows it.
   const n0 = await startNest(ep);
   const mini0 = await ep.evaluate(() => window.jevAnts.miniWindow());
@@ -2835,8 +2838,11 @@ try {
     camFar.x >= mini1.x0 && camFar.x <= mini1.x0 + mini1.w && Math.abs(mini1.w - mini0.w) < 1e-9 && Math.abs(mini1.h - mini0.h) < 1e-9,
     `the minimap's window (x ${mini1.x0.toFixed(0)}, ${mini1.w.toFixed(0)} wide, the same size as at the start) holds the camera`,
   );
+  const fFarDraw = await frameTimes(ep, 3000);
+  console.log(`  endless, after a 20 U pan, paused (the draw alone): ${fmt(fFarDraw)}`);
+  await ep.getByRole("button", { name: "Play", exact: true }).click();
   const fFar = await frameTimes(ep, 4000);
-  console.log(`  endless, after a 20 U pan: ${fmt(fFar)}`);
+  console.log(`  endless, after a 20 U pan, playing: ${fmt(fFar)}`);
   check(fFar.n > 3, "and draws frames after it");
   check(
     fFar.p50 <= fStart.p50 * 1.5 + 20,
@@ -2931,11 +2937,17 @@ try {
     const { c: bc, p: bp3 } = await openEndless("?fog=0&world=bounded");
     await until(() => bp3.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the bounded game", 60_000, 200);
     const b0 = await frameTimes(bp3, 4000);
+    await bp3.getByRole("button", { name: "Pause", exact: true }).click();
+    const b0d = await frameTimes(bp3, 3000);
     await bp3.evaluate(() => window.jevAnts.centreOn("above", 1e6, 100));
     await sleep(500);
+    const b1d = await frameTimes(bp3, 3000);
+    await bp3.getByRole("button", { name: "Play", exact: true }).click();
     const b1 = await frameTimes(bp3, 4000);
-    console.log(`  bounded, at the start: ${fmt(b0)}`);
-    console.log(`  bounded, panned to the box's east end: ${fmt(b1)}`);
+    console.log(`  bounded, at the start, playing: ${fmt(b0)}`);
+    console.log(`  bounded, at the start, paused (the draw alone): ${fmt(b0d)}`);
+    console.log(`  bounded, panned to the box's east end, paused: ${fmt(b1d)}`);
+    console.log(`  bounded, panned to the box's east end, playing: ${fmt(b1)}`);
     check(b0.n > 3 && b1.n > 3, "the bounded page draws frames, for comparison");
     await bc.close();
   }
@@ -2943,15 +2955,37 @@ try {
   {
     const { c: fc, p: fp2 } = await openEndless("");
     await fp2.getByRole("button", { name: "Pause", exact: true }).click();
-    const land = await fp2.evaluate(() => ({ x: window.jevAnts.game.landed.x, y: window.jevAnts.game.landed.y }));
-    check(land.y < 0, `the seed's landing is at negative y (${land.y.toFixed(1)}): the rows the fog once skipped`);
-    const here = await fp2.evaluate(([x, y]) => window.jevAnts.fogState("above", x, y), [land.x, land.y]);
+    // The landing patch is a few cells at the hole's rim: grid coordinates, as section 18 reads them. On the endless plane the start's rows are negative.
+    // The fog marks the fungus's body every BODY_EVERY (2 s of game time), so the check steps the paused game past the first mark.
+    await fp2.evaluate(() => window.jevAnts.step(90));
+    const patch = await fp2.evaluate(() => window.jevAnts.game.fungus.patchOn(0));
+    check(patch.length >= 2 && patch[1] < 0, `the landing patch lies at negative y (row ${patch[1]}): the rows the fog once skipped`);
+    const here = await fp2.evaluate(([gx, gy]) => window.jevAnts.fogCell("above", gx, gy), [patch[0], patch[1]]);
     check(here === 1 || here === 2, `the fog reveals ground at negative y under the host (state ${here})`);
     check(
-      (await fp2.evaluate(([x, y]) => window.jevAnts.fogState("above", x, y), [land.x + 8 * U, land.y - 4 * U])) === 0,
-      "and ground 8 U away is not revealed",
+      (await fp2.evaluate(([gx, gy]) => window.jevAnts.fogCell("above", gx, gy), [patch[0] + 8 * U, patch[1] - 4 * U])) === 0,
+      "and ground 8 U away, at negative y too, is not revealed",
     );
     await fc.close();
+  }
+  // The first game's tutorial plays the page's world (PRD §66 E6: on the endless plane the first host is found on all 20 seeds, 2-15 s in, and cleared 31-137 s after): its cards
+  // run on to the first host, which pauses the game and is followed, and on into the watch.
+  {
+    const { c: tc, p: tp } = await openEndless("?fog=0", { name: "Start the tutorial" });
+    const card = tp.getByRole("dialog", { name: "tutorial" });
+    await until(async () => /You are a fungus/.test((await card.textContent()) ?? ""), "the tutorial's first card on the endless world");
+    check(
+      (await tp.evaluate(() => window.jevAnts.game.map.endless === true)) &&
+        (await tp.getByRole("button", { name: "Play", exact: true }).count()) === 1,
+      "the tutorial's landing card waits, paused, on the endless world",
+    );
+    await card.getByRole("button", { name: "Let it play", exact: true }).click();
+    await until(async () => /carries you/.test((await card.textContent()) ?? ""), "the first host on the endless world", 90_000);
+    check((await tp.getByRole("button", { name: "Play", exact: true }).count()) === 1, "the first host pauses the endless game");
+    check((await tp.getByRole("region", { name: "followed ant" }).count()) === 1, "and is followed");
+    await card.getByRole("button", { name: "Follow it", exact: true }).click();
+    await until(async () => /groom it/.test((await card.textContent()) ?? ""), "the watch card on the endless world");
+    await tc.close();
   }
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

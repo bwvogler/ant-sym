@@ -12,7 +12,8 @@ import {
 } from "../../colony/index.ts";
 import { sensedFor } from "../fog/sources.ts";
 import { buildGame, DEFAULT_COLONY_CONTROLS, freshGame, GAME_STRAIN, landingOf } from "../useColony.ts";
-import { DEFAULT_WORLD, worldFromUrl, worldOf } from "../worldKind.ts";
+import { DEFAULT_WORLD, homeName, worldFromUrl, worldOf } from "../worldKind.ts";
+import { worldSummary } from "../worldText.ts";
 import type { GameSettings } from "../saves.ts";
 
 // The switch (PRD §66 E6, `ja-qpv.5.1`, owner 2026-11-25): the page plays the endless world by default, and `?world=bounded` keeps the bounded game.
@@ -29,6 +30,11 @@ test("the page's default world is the endless plane, and `?world=bounded` is the
   // The controls the page starts from carry it (a node test has no location: the default).
   assert.equal(DEFAULT_COLONY_CONTROLS.world, "endless");
   assert.equal(freshGame({ ...DEFAULT_COLONY_CONTROLS, world: "bounded" }).world, "bounded", "a new game stays in its world");
+});
+
+test("key 0 and the Go to menu say Start on a world with no whole map", () => {
+  assert.equal(homeName(true), "Start");
+  assert.equal(homeName(false), "Whole map");
 });
 
 test("a save from before the switch carries no world and is bounded", () => {
@@ -116,6 +122,16 @@ test("a queen flies 280 cells on the endless plane and 140 on a bounded one", ()
       assert.ok(Math.abs(d - want) < 1e-6, `landing ${d} from the hole, expected ${want}`);
     }
   }
+});
+
+test("the Lab's World card quotes no size for a world with no edge, and the bounded one's as it was", () => {
+  const e = worldSummary(buildGame(settings("endless")));
+  assert.match(e, /^One world with no edge: /);
+  assert.match(e, /\(1 line now\)/);
+  assert.doesNotMatch(e, /\d+×\d+ cells/, "no plane box");
+  const bounded = buildGame(settings("bounded"));
+  assert.match(worldSummary(bounded), /^One world: the surface, 512×368 cells seen from above/);
+  assert.match(worldSummary(bounded), /cells unrolled below it/);
 });
 
 test("the page's startup reads make no chunk: the fog's sight and the landing leave an endless game's ground as a game never looked at has it", () => {
