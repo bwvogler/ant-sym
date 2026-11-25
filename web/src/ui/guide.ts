@@ -640,6 +640,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
   },
   {
+    note: "foci",
+    title: "Foci: new bases",
+    covers:
+      "Whether a mycelium that has colonised a new resource makes a new base there: cord-forming fungi grow out from a colonised bait, past a size threshold, and outgrowth patterns differ between species; nothing read shows an insect-killing fungus doing it. In the game a one-level upgrade after knots.",
+  },
+  {
     note: "hyphal-traffic",
     title: "Hyphae and ant traffic",
     covers:
@@ -743,6 +749,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     title: "Leafcutter ants",
     covers:
       "Castes by size, the fungus garden as the store, quarantined waste workers, and plants learned harmful. Planned (not built, PRD §64).",
+  },
+  {
+    note: "odour-space",
+    title: "Colony odour as a blend",
+    covers:
+      "A colony's smell is several hydrocarbon axes, a few of which decide who is a stranger; fights teach the ant that was hit, they do not push colonies' smells apart. Planned (not built, PRD §91).",
   },
   {
     note: "pharaoh-ant",

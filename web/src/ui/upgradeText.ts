@@ -47,6 +47,7 @@ const WHY: Record<string, string> = {
     "The fungus on the ground by the hole is where spores and mutations come from. A thicker patch holds more mass, so it grows faster and can pay for more spores; every bit it grows is a chance to mutate, so a bigger one also earns mutations faster.",
   knots:
     "Ants digging their nest cut the hyphae in their way. A knot is the fungus's answer: where a hypha runs short of mass it hardens into a knot that digging can't cut. Underground it keeps a little of the hypha's mass as spores for the ants that dig into it; on the surface it holds that mass as a reserve. Later it sprouts a new thread (on the surface giving its reserve back).",
+  foci: "A free-pool upgrade, after knots. Where hyphae close a web round a cell, that cell becomes a new patch: a new base with room to grow and spores of its own, which a dense web can make again and again. Until you keep it, a web makes none, so it is a choice about where the fungus spreads from, not about how fast it infects.",
   stalks:
     "Ants carry their dead out of the nest, and a host that dies outside lies there. Once the fungus has colonised such a corpse, a stalk lifts its spores so they fall over a ring round it instead of one spot: more passing foragers each pick up a little. A corpse in the nest never gets one.",
   fruiting:
@@ -86,6 +87,10 @@ const SPREAD: Record<Trait, (v: number) => string> = {
     v === 0
       ? "starved hyphae stay as they are, and digging cuts them"
       : `a tip that rests short of mass for ${KNOT.rounds[v]} steps hardens into a knot that digging can't cut; it fruits its store onto a tunnel it touches and sprouts again after ${KNOT.sprout[v]} s`,
+  foci: (v) =>
+    v === 0
+      ? "hyphae that close a web round a cell make no patch there"
+      : "where hyphae close a web round a cell, that cell becomes a new patch: room to grow, and spores of its own",
   stalks: (v) =>
     v === 0
       ? "a colonised corpse puts its spores out on its own cell"

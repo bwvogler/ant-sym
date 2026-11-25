@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
-import { Fungus, INFECTED, SPORE_SHOWN, STRAINS, type Strain } from "../../fungus.ts";
+import { DEFAULT_FUNGUS, Fungus, INFECTED, SPORE_SHOWN, STRAINS, type Strain } from "../../fungus.ts";
 import { algaAt } from "../../lichen.ts";
 import { cellKey, nx, ny } from "../../hex.ts";
 import { generateWorld, mulberry32, OPEN, ROCK, rockAt, worldFromArrays, type WorldMap } from "../../world.ts";
@@ -430,4 +430,8 @@ test("a fungus that keeps the lichen upgrade takes an alga its hypha lies beside
   g.loadState(JSON.parse(JSON.stringify(f.saveState())));
   assert.deepEqual([...g.lichenCells()].sort(), [...f.lichenCells()].sort());
   assert.equal(g.lichenFirst, f.lichenFirst);
+});
+
+test("flower patches are behind the Foci upgrade by default (PRD §92, owner 2026-11-25)", () => {
+  assert.equal(DEFAULT_FUNGUS.fociGate, true);
 });

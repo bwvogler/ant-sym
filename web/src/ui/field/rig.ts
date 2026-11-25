@@ -229,9 +229,18 @@ export class CameraRig {
     return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
   }
 
-  /** A click or drag on the minimap: look at the world point under it (a follow ends). */
+  /**
+   * A click or drag on the minimap: look at the world point under it (a follow ends). While the window is frozen (a drag on an endless plane) the pointer
+   * is held to the window's rectangle: a drag that leaves it stops at the window's edge, as the bounded map's camera stops at the map's edge, so one drag
+   * covers at most the window and a longer trip takes another drag or a click (owner, 2026-11-25, `ja-4omg`).
+   */
   jumpMini(x: number, y: number): void {
     if (this.host.following()) this.host.unfollow();
+    if (this.frozen) {
+      const r = minimapRect(this.miniWindow(), this.viewport(), this.host.dpr());
+      x = Math.max(r.x, Math.min(r.x + r.w, x));
+      y = Math.max(r.y, Math.min(r.y + r.h, y));
+    }
     const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y, this.camera(), this.miniWindow());
     this.set({ ...this.camera(), x: wx, y: wy });
   }
