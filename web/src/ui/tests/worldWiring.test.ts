@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 const hook = readFileSync(new URL("../useColony.ts", import.meta.url), "utf8");
 
 test("loadSave puts back the world the save was made in", () => {
-  assert.match(hook, /rival:\s*r\.settings\.rival,\s*world:\s*worldOf\(r\.settings\),/, "loadSave sets world from the save's settings");
+  assert.match(hook, /world:\s*worldOf\(r\.settings\),\s*started:\s*true,/, "loadSave sets world from the save's settings");
 });
 
 test("a pending save loads only into a game of its own world", () => {
