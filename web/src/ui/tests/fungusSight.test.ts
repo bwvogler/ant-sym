@@ -109,6 +109,21 @@ test("the disc is exact both ways, at negative columns (the curtain) and across 
   }
 });
 
+test("newest: the time a host last sensed any cell of a chunk, until the chunk is dropped", () => {
+  const s = new SensedMap();
+  assert.equal(s.newest(PLANE, 0, 0), undefined, "nothing sensed");
+  s.stamp([colony([{ x: 20, y: 20, load: INFECTED }])], 100);
+  assert.equal(s.newest(PLANE, 0, 0), 100);
+  assert.equal(s.newest(CURTAIN, 0, 0), undefined, "per layer");
+  assert.equal(s.newest(PLANE, 3, 0), undefined, "and per chunk");
+  const away = colony([{ x: 20 + 4 * CHUNK, y: 20, load: INFECTED }]);
+  s.stamp([away], 130);
+  assert.equal(s.newest(PLANE, 0, 0), undefined, "dropped once faded right out");
+  assert.equal(s.newest(PLANE, 4, 0), 130);
+  s.stamp([away], 140);
+  assert.equal(s.newest(PLANE, 4, 0), 140, "a fresh pass moves it on");
+});
+
 test("a chunk faded right out is dropped and leaves a revealed bit; a fresh pass brings it back", () => {
   const s = new SensedMap();
   s.stamp([colony([{ x: 20, y: 20, load: INFECTED }])], 100);

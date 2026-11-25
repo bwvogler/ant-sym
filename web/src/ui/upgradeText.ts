@@ -65,6 +65,8 @@ const WHY: Record<string, string> = {
     "Widens how far it can change the queen's royal mark: what she lays, and what nurses perceive of it. Only where there is a nest. It is the route to new queens.",
   weapon:
     "Lethal, and off until you turn it on. Two keys: putting it on the menu is your permission, and this upgrade is the fungus's power to use it. Without both a host runs as is, so no power comes free.",
+  lichen:
+    "A free-pool upgrade, after the borer. Scarce alga films lie on rock beside open ground, and a few wild lichens. A hypha that reaches one takes the alga: its rock cell becomes lichen, which then spreads over the rock from its rim. Not built yet: what lichen gives (light, soil from rock) comes in later steps.",
   crown:
     "Lethal, and off until you turn it on. Two keys: putting it on the menu is your permission, and this upgrade is the fungus's power to use it. Without both a host runs as is. Only where there is a nest.",
 };
@@ -88,6 +90,10 @@ const SPREAD: Record<Trait, (v: number) => string> = {
     v === 0
       ? "a colonised corpse puts its spores out on its own cell"
       : `a colonised corpse outside grows a stalk after ${STALK.delay[v]} s and spreads its spores over the open cells within ${STALK.radius[v]} of it`,
+  lichen: (v) =>
+    v === 0
+      ? "an alga on rock beside a hypha stays as it is"
+      : "a hypha beside an alga film or a wild lichen on rock takes it: that rock becomes lichen, which spreads over rock from its rim",
   evasion: (v) =>
     v === 0 ? "grooming-built resistance counts in full against it" : `slips past ${pct(v)} of the resistance grooming builds`,
 };
