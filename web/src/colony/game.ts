@@ -671,7 +671,9 @@ export class Game {
         const y = c.y[i] as number;
         for (let k = 0; k < n; k++) {
           const d = Math.hypot(holes[k]!.x - x, holes[k]!.y - y);
-          if (d <= distance) near[k] = true;
+          // A host merely passing within W wakes nothing (§6, ja-u5s8): for a sleeper only the body within W or a host in its nest ground counts;
+          // an awake colony is kept awake by a host within W all the same.
+          if (d <= distance && !this.#frozen.has(k)) near[k] = true;
           if (k !== j && d <= nestGround) entered[k] = true;
         }
       }
