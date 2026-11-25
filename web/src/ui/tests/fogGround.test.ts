@@ -300,3 +300,36 @@ test("the hexagons are exactly the cells beside a cell of another colour, on odd
   assert.ok(want.size > 40, `a scene with real edges (${want.size} cells)`);
   assert.deepEqual([...got].sort(), [...first].sort(), "the hexagons drawn are those cells, no more and no fewer");
 });
+
+test("a scent trail or alarm shows only where a host senses now: not in ground that is only remembered, though its scent is still fresh and goes on changing", () => {
+  const { rock, sensed, ground, k } = setup(true);
+  const food = new Float32Array(CHUNK * CHUNK);
+  const alarm = new Float32Array(CHUNK * CHUNK);
+  food[cell(11, 10)] = 100; // a food trail an ant laid here
+  alarm[cell(9, 10)] = 100; // and an alarm
+  const trails = [{ food: { chunk: () => food }, home: { chunk: () => undefined }, odour: 0 }];
+  const alarms = [{ chunk: () => alarm }];
+  const paint = (now: number) => {
+    const cc = ground.chunkCanvas(0, 0);
+    ground.paintChunk(
+      { ...k(now), trails, alarms, sensedLayer: sensed.layer(PLANE), sensedNow: now } as unknown as FieldCtx,
+      { food: true, home: true },
+      0,
+      0,
+      cc,
+      rock,
+      false,
+    );
+    return cc.img;
+  };
+  sensed.stamp([host(10, 10)], 1);
+  const live = paint(1);
+  assert.ok(px(live, 11, 10)[3] > 0 && px(live, 11, 10)[0] === 51, "live: the food trail shows");
+  assert.ok(px(live, 9, 10)[3] > 0 && px(live, 9, 10)[0] === 61, "and the alarm");
+  const later = 1 + GRACE + 3; // the host has left; its sight would still fade for 20 s, and the pheromone is still there, changing
+  sensed.stamp([{ ...host(60, 60), n: 0 } as Colony], later);
+  const remembered = paint(later);
+  assert.ok(![51, 61].includes(px(remembered, 11, 10)[0]!) || px(remembered, 11, 10)[3] === 70, "remembered: no trail");
+  assert.equal(px(remembered, 11, 10)[3], 70, "the open ground as it was, dimmed, with no trail on it");
+  assert.equal(px(remembered, 9, 10)[3], 70, "and no alarm");
+});

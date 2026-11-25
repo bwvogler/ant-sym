@@ -367,7 +367,8 @@ export class Ground {
           continue;
         }
         // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike); everywhere in smell vision.
-        const w = smellAll ? 1 : sensedC ? sightOf(sensedC[i]!, now) : 0;
+        // Under the fog only where one senses it now: the pheromone goes on changing in ground nobody senses, and showing that (for the 20 s the sight fades over) is a trail that outlives its ants.
+        const w = smellAll ? 1 : sensedC && !(fogV && now - sensedC[i]! > GRACE) ? sightOf(sensedC[i]!, now) : 0;
         let al = 0;
         if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / ALARM_FULL));
         if (al > ALARM_SHOWN) {

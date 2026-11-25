@@ -91,7 +91,7 @@ One source interface, so later organisms plug in without touching the fog (`ja-1
 
 A colony is **known** once an observer has sensed a cell of its nest disc or it holds a host. From then on the readouts list it. Its numbers are live while it holds a host, and frozen at the step its last host left, with "as of". An observer that senses its nest again without a host learns that the nest is there (and, if it is gone, that it is gone), not its counts.
 
-**Scent stays as §65 has it:** trails and alarm show where sensed within 20 s. In remembered cells they have faded; in live cells they are the truth.
+**Scent shows only where sensed now (owner report 2026-11-25):** trails and alarm are drawn, and the lens reads them, only in live cells. §65's 20 s fade after sensing was the first design here, but the pheromone in a cell nobody senses goes on changing, so showing it there for up to 20 s drew a one-ant-wide trail that outlived its ants and leaked change from unseen ground. A remembered cell shows its ground as last seen and no scent.
 
 ## 5. The picture
 

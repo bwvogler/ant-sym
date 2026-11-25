@@ -155,7 +155,7 @@ export function probe(g: LensWorld, sensed: SensedMap, lv: number, x: number, y:
   let alarm = 0;
   let foodTrail = 0;
   let homeTrail = 0;
-  if (sight > 0)
+  if (sight > 0 && !remembered)
     for (const c of g.colonies) {
       const ph = c.layers[lv]?.ph;
       if (!ph) continue;
