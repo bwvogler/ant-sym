@@ -12,7 +12,7 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic] [--hungry]
 //          [--bias count|levels] [--radius 3] [--tropism N] [--no-foci]
 // The flower patches are behind the Foci upgrade (fungus.ts fociGate, on by default since 2026-11-25, PRD §92, docs/foci.md): until
 // it is kept no flower becomes a patch. The default --order ends knots,foci (arm C, the late order); an --order without them forms no flower (arm E). --no-foci runs the ungated game (flowers as before). --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
@@ -24,6 +24,7 @@
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
+// --hungry: the fungus is hungry (FungusParams.hungry, PRD §93): a cheap spore, a landing reserve, the free pool's higher share.
 // --lichen only reads (the game is the same bit for bit; ja-vlla.11.2, docs/lichen.md, PRD §90): every 5 s it counts the plane's rock cells
 // beside a hypha cell (the cells an alga film or a wild lichen would sit on, so the chance a hypha meets one), the first time
 // a hypha touched rock, and mutations earned a minute in the last three minutes (the light-income runaway gate, L2).
@@ -58,6 +59,7 @@ if (isMainThread) {
     grant: opt("grant", "").split(",").filter(Boolean),
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
+    hungry: flag("hungry"),
     price: opt("price", null),
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
@@ -65,6 +67,10 @@ if (isMainThread) {
     trace: flag("trace"),
     traffic: flag("traffic"),
     lichen: flag("lichen"),
+    ledger: flag("ledger"),
+    sporeCost: opt("spore-cost", null),
+    earnedShare: opt("earned-share", null),
+    freeBudget: opt("free-budget", null),
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
     tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
@@ -104,6 +110,7 @@ if (isMainThread) {
       );
     if (r.bought.length) console.log(`  bought: ${r.bought.join(" · ")}`);
     if (r.trace?.length) console.log(`  trace: ${r.trace.join(" · ")}`);
+    if (r.ledger) for (const line of r.ledger) console.log(line);
     if (r.lichen)
       console.log(
         `  lichen probe: rock cells touched ${r.lichen.touched} (of ${r.lichen.edge} rock cells beside open ground), first touch ${fmt(r.lichen.first)}, mutations a minute in the last 3 min ${r.lichen.lateRate.toFixed(1)}`,
@@ -131,6 +138,7 @@ if (isMainThread) {
     grant,
     sun,
     flow,
+    hungry,
     price,
     landing,
     rootRadius,
@@ -156,6 +164,7 @@ if (isMainThread) {
       fungus: {
         hyphae,
         flow,
+        ...(hungry ? { hungry } : {}),
         ...(sun === null ? {} : { sun }),
         ...(bias === null ? {} : { trafficBias: bias }),
         ...(radius === null ? {} : { trafficRadius: radius }),
@@ -199,6 +208,19 @@ if (isMainThread) {
     wrap("grow", "ground");
     wrap("feed", "corpses");
     wrap("replicate", "hosts");
+  }
+  // --spore-cost C and --free-budget K: lab overrides of BODY.sporeCost (the mass a spore costs) and BODY.freeBudget (the most
+  // mass the free term pays out in a game, a stand-in for a start reserve), to test a cheap spore on a small earned income
+  // (ja-a2no, docs/energy.md §7). Absent: the game as it is.
+  if (workerData.earnedShare !== null) {
+    // --earned-share S: the free pool's share of earned mass when hungry (EARNED.share), a lab override (PRD §93).
+    const { EARNED } = await import("../../web/src/colony/evolution.ts");
+    EARNED.share = Number(workerData.earnedShare);
+  }
+  if (workerData.sporeCost !== null || workerData.freeBudget !== null) {
+    const { BODY } = await import("../../web/src/colony/evolution.ts");
+    if (workerData.sporeCost !== null) BODY.sporeCost = Number(workerData.sporeCost);
+    if (workerData.freeBudget !== null) BODY.freeBudget = Number(workerData.freeBudget);
   }
   const { MUTATION, pathTo, poolOf } = await import("../../web/src/colony/evolution.ts");
   // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then, from its own pool (PRD §85 M3).
@@ -250,11 +272,15 @@ if (isMainThread) {
   };
   const probe = wantTraffic ? await trafficProbe(g) : null;
   const lichen = workerData.lichen ? await lichenProbe(g, seconds) : null;
+  // --ledger (ja-a2no.2): reads only. The mass made by source and spent by sink, and what the mycelium holds, at these times.
+  const marks = [120, 300, 600, seconds].filter((t, i, a) => t <= seconds && a.indexOf(t) === i);
+  r.ledger = [];
   const queue = [...order];
   for (let k = 0; g.time < seconds; k++) {
     g.tick(DT);
     if (probe && k % 150 === 0) probe.sample(r.quarter >= 0);
     if (lichen && k % 150 === 0) lichen.sample();
+    if (workerData.ledger && marks.length && g.time >= marks[0]) r.ledger.push(ledgerLine(g, marks.shift()));
     const e = g.fungus.evolution;
     if (e && buy) {
       // The first upgrade in the order it can keep now, as a player would: one it can't yet afford doesn't hold up a cheaper one.
@@ -284,6 +310,7 @@ if (isMainThread) {
     if (r.rivalFirst < 0 && b && b.n > 0) r.rivalFirst = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
+  if (workerData.ledger) while (marks.length) r.ledger.push(ledgerLine(g, marks.shift()));
   r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
   r.spent = g.fungus.evolution?.spent ?? 0;
   r.growth = Math.round(g.fungus.evolution?.growth ?? 0);
@@ -301,6 +328,21 @@ if (isMainThread) {
   if (probe) r.traffic = probe.result();
   if (lichen) r.lichen = lichen.result();
   parentPort.postMessage(r);
+}
+
+/** One ledger line (--ledger): where the mass came from and went, and what the mycelium holds now. Reads only. */
+function ledgerLine(g, at) {
+  const e = g.fungus.evolution;
+  const h = g.fungus.hyphaeOn(0);
+  const l = e?.ledger ?? {
+    free: 0,
+    corpse: 0,
+    spores: 0,
+    cut: 0,
+    knot: 0,
+  };
+  const n = (x) => Math.round(x);
+  return `  ledger @${at} s: made free ${n(l.free)} corpse ${n(l.corpse)} · spent spores ${n(l.spores)} cuts ${n(l.cut)} knots ${n(l.knot)} · mass ${n(e?.mass ?? 0)} · hyphae ${h?.length ?? 0} cells, ${h?.tips.length ?? 0} tips`;
 }
 
 function fmt(t) {
