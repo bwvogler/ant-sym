@@ -14,7 +14,7 @@
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
 //          [--bias count|levels] [--radius 3] [--tropism N] [--no-foci]
-// The flower patches are behind the Foci upgrade (fungus.ts fociGate, on by default since 2026-11-25, PRD §91, docs/foci.md): until
+// The flower patches are behind the Foci upgrade (fungus.ts fociGate, on by default since 2026-11-25, PRD §92, docs/foci.md): until
 // it is kept no flower becomes a patch. The default --order ends knots,foci (arm C, the late order); an --order without them forms no flower (arm E). --no-foci runs the ungated game (flowers as before). --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
 // --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
 // the plane, for docs/hyphal-traffic.md (ja-ogph.2, PRD §88): the share of cells occupied in three distance bands (1, 2-3, 4-6),
@@ -39,7 +39,7 @@ const opt = (name, fallback) => {
   return k < 0 ? fallback : args[k + 1];
 };
 const flag = (name) => args.includes(`--${name}`);
-// Knots and Foci last (owner 2026-11-25, PRD §91): the flower patches need Foci, so the default arm buys it once the rest has been bought.
+// Knots and Foci last (owner 2026-11-25, PRD §92): the flower patches need Foci, so the default arm buys it once the rest has been bought.
 const DEFAULT_ORDER =
   "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth,knots,foci";
 

@@ -846,7 +846,7 @@ test("an infected queen's founding roots one tile and still sets out six tips (j
   assert.equal(h.tips.length, tipsBefore + 6, "six tips set out from it");
 });
 
-test("with the Foci gate on, a closed flower is no patch until Foci is kept; a patch already formed stays (ja-icc4.2, PRD §91)", () => {
+test("with the Foci gate on, a closed flower is no patch until Foci is kept; a patch already formed stays (ja-icc4.2, PRD §92)", () => {
   const g = game(true, false, { fociGate: true });
   g.fungus.bindPolicy("growth", () => "rest");
   const e = g.fungus.evolution!;

@@ -112,7 +112,8 @@ export default function ColonyField({
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
   const hover = useRef<[number, number] | null>(null);
   const worldRef = useLatest(world);
-  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb });
+  const sensedRef = useLatest(sensed);
+  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb, sensed: sensedRef });
 
   /** The shown view's map: the plane or the curtain. */
   const shownMap = (): WorldMap => mapOfLayer(world, shown.current);

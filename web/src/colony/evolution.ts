@@ -184,7 +184,7 @@ export const UPGRADES: readonly Upgrade[] = [
     values: [0, 1, 2],
   },
   {
-    // Foci (ja-icc4, PRD §91, docs/foci.md; owner 2026-11-25: one level, after Knots): its value is the level fungus.ts #settle reads
+    // Foci (ja-icc4, PRD §92, docs/foci.md; owner 2026-11-25: one level, after Knots): its value is the level fungus.ts #settle reads
     // (0 none, 1 a closed flower of hyphae becomes a patch). Design: no paper shows an entomopathogen doing it.
     id: "foci",
     kind: "spread",
@@ -354,7 +354,7 @@ export interface Traits {
   stalks: number;
   /** the Lichen level (fungus.ts): 0 none, 1 a partner */
   lichen: number;
-  /** the Foci level (fungus.ts #settle, PRD §91): 0 none, 1 a closed flower of hyphae becomes a patch */
+  /** the Foci level (fungus.ts #settle, PRD §92): 0 none, 1 a closed flower of hyphae becomes a patch */
   foci: number;
 }
 

@@ -432,6 +432,6 @@ test("a fungus that keeps the lichen upgrade takes an alga its hypha lies beside
   assert.equal(g.lichenFirst, f.lichenFirst);
 });
 
-test("flower patches are behind the Foci upgrade by default (PRD §91, owner 2026-11-25)", () => {
+test("flower patches are behind the Foci upgrade by default (PRD §92, owner 2026-11-25)", () => {
   assert.equal(DEFAULT_FUNGUS.fociGate, true);
 });
