@@ -8225,7 +8225,7 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Research basis:** [foci.md](foci.md): (1) cord-forming fungi grow out from a colonised resource, and whether they move to a new bait depends on its size (a threshold between 4 and 16 cm³ in *P. velutina* inocula, Fukasawa et al. 2020; outgrowth rises with the fraction of the resource used, Fukasawa & Kaga 2020); (2) outgrowth patterns are a species trait that has evolved (Fricker et al. 2017; Aguilar-Trigueros et al. 2022); (3) no paper read shows *Metarhizium*, *Beauveria* or *Pandora* forming cords or a new focus on a cadaver or in soil, and no gene-level account of gaining or losing the trait was found, so the gate is **design**. Abstract-only sources are marked **unverified** in the note.
 
-**The problem (measured).** Every web turns a closed flower of hyphae into a patch from the first minute, at no cost (§85). It moves no quarter, half or queen time on seeds 1-20, but on a dense web it snowballs: seed 5 closes 42 flowers and grows 8,387 hyphae cells at 600 s against 1,376 before #416 (`ja-27w1`); over 1,800 s with the evolving fungus it reaches 33 patches and 6,652 cells, at 17 % more wall time than a normal web.
+**The problem (measured).** Every web turns a closed flower of hyphae into a patch from the first minute, at no cost (§85). It moves no quarter, half or queen time on seeds 1-20, but on a dense web it snowballs: seed 5 closed 42 flowers and grew 8,387 hyphae cells at 600 s against 1,376 before #416 (`ja-27w1`; on the later main of arm A below the same seed has 12 flowers and 3,581 cells, so the size of the runaway moves with the rest of the game); over 1,800 s with the evolving fungus it reaches 33 patches and 6,652 cells, at 17 % more wall time than a normal web.
 
 **Decisions.**
 - A new upgrade, **Foci**, in the fungus's own (free) pool; **one level** (owner, 2026-11-25).
@@ -8236,7 +8236,7 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 - `fociGate` is on by default since 2026-11-25 (arm E below met the pre-set rule: no seed more than 10 % slower to a quarter).
 - The seed-5 runaway moving to after the buy is accepted, bounded by the price; `ja-27w1` stays open until measured with the gate (owner, 2026-11-25).
 
-**The mechanic.** `Fungus.#settle` reads `evolution.level("foci")`: at 0 it empties the grown lists and does nothing, at 1 it is today's rule. Built behind a fungus param `fociGate` whose off setting is main bit for bit; the default flips after the assay, as the tropism's did (§88). Shape copied from the Lichen upgrade (`evolution.ts`, the drawer branch, `upgradeText.ts`).
+**The mechanic.** `Fungus.#settle` reads `evolution.level("foci")`: at 0 it empties the grown lists and does nothing, at 1 it is today's rule. Built behind a fungus param `fociGate` whose off setting is main bit for bit; the default flipped to on on 2026-11-25 after arm E, as the tropism's did (§88). **A flower that closes while gated is never looked at again** (`#settle` reads only cells grown since the last round and empties its lists while gated): after the buy its middle stays a plain hypha, and the web makes patches wherever it grows next (measured on a scratch test: a neighbouring cell with a closed hex became a patch). So an existing dense web does not burst into patches on the buy; patches already formed stay. Shape copied from the Lichen upgrade (`evolution.ts`, the drawer branch, `upgradeText.ts`).
 
 **Play.** The drawer gains a Foci node after Knots; once kept, purple flower patches appear where hyphae close a web. A real trade against Fruiting, Stalks, Lichen and a second Mycelium in the same pool. The risks are an invisible effect, a feature most games never buy, and the seed-5 runaway moving to after the buy (`foci.md` Play).
 
@@ -8251,13 +8251,13 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 | arm | quarter median / worst | queen median / worst | flowers (games) | seeds >10 % slower to a quarter than A |
 |---|---|---|---|---|
 | A | 171 s / 333 s (seed 6) | 210.5 s / 365 s | 40 (6) | none |
-| E | 171 s / 333 s | 210.5 s / 365 s | 0 (0) | none: all 20 seeds bit-identical to A |
+| E | 171 s / 333 s | 210.5 s / 365 s | 0 (0) | none: all 20 seeds' quarter, half and queen times are bit-identical to A (the flowers and mat cells differ) |
 | B = D | 179.5 s / 270 s (seed 9) | 213 s / 291 s | 8 (2) | 9: seed 10 +36 %, 8 +22 %, 15 +21 %, 14 +20 %, 4 +19 %, 12 +19 %, 3 +15 %, 16 +13 %, 11 +10.2 % (seeds 5, 6, 17, 18, 19 faster) |
 | C | 167.5 s / 448 s (seed 6) | 212 s / 467 s | 57 (6) | 2: seed 6 +35 %, seed 9 +33 % |
 
 - **The gate works and costs nothing in P1.** E forms no flower and its quarter, half and queen times equal A's on every seed; with no Foci bought, seed 5 ends with 505 hyphae cells where A has 3,581 (the `ja-27w1` runaway needs Foci).
 - **B and D are identical cell for cell:** Foci is bought before any flower closes, so the gate never fires there. The cost in B, C and D is therefore not the gate: it is Knots and Foci displacing other purchases, and Knots changing the web (D, gate off, has 8 flowers to A's 40; C has 57, with seeds 3, 4 and 5 at 9, 18 and 26 patches after the late buy).
-- **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so `DEFAULT_ORDER` is **not** changed. The default CI progression now shows no flowers; a flower arm is `foci` plus an `order` that reaches `knots,foci`. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
+- **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so `DEFAULT_ORDER` is **not** changed. The default CI progression now shows no flowers; a flower arm is an `order` that reaches `knots,foci` (the gate is the default now); the workflow's `nofoci` input (lab `--no-foci`) runs the ungated game, as arms A and D did. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
 - Not measured: the Foci price in play (about 2 mutations is an estimate); an infected queen's one-tile start (no progression seed founds one).
 
 **Still open.** Whether the default buy order should reach Foci despite the cost above (owner); the price of Foci in play; the seed-5 web under the gate.

@@ -660,11 +660,11 @@ for (const flow of [false, true])
 // flower (seven hyphae cells, a patch under the middle one only, 2026-11-24), which becomes a patch with no start of its own; at the landing's rim it makes none.
 
 /** A plane cell at least `far` cells from `from`, with its six neighbours open: a place for a corpse. */
-function openSpot(g: Game, from: { x: number; y: number }, far: number): [number, number] {
+function openSpot(g: Game, from: { x: number; y: number }, far: number, also: { x: number; y: number }[] = []): [number, number] {
   const plane = g.world!.plane;
   for (let y = 5; y < 95; y++)
     for (let x = 5; x < 155; x++) {
-      if (hexDistance(x, y, from.x, from.y) < far) continue;
+      if (hexDistance(x, y, from.x, from.y) < far || also.some((o) => hexDistance(x, y, o.x, o.y) < far)) continue;
       let ok = rockAt(plane, x, y) === OPEN;
       for (let d = 0; d < 6 && ok; d++) ok = rockAt(plane, nx(x, y, d), ny(y, d)) === OPEN;
       if (ok) return [x, y];
@@ -863,11 +863,15 @@ test("with the Foci gate on, a closed flower is no patch until Foci is kept; a p
   assert.equal(e.patches, patches, "and the count stays");
   assert.ok(!h.sources.has(hyphaKey(x, y)), "its middle is no source");
   // Foci needs Knots (which needs Mycelium): kept in that order, with the mutations to buy them at once.
-  assert.ok(!keep(g.fungus, "foci") || e.level("knots") === 1, "it comes only after Knots");
   e.ground = 1e7;
+  assert.ok(keep(g.fungus, "knots"), "Knots can be kept");
+  const [kx, ky] = openSpot(g, { x, y }, 25);
+  around(kx, ky);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 0, "Knots alone does not lift the gate");
   while (e.level("foci") < 1) assert.ok(keep(g.fungus, "foci"), "Foci can be kept once its path is paid for");
   // A flower closed after the buy is a patch, and a save keeps it and the level.
-  const [x2, y2] = openSpot(g, { x, y }, 25); // another place: the first was seen while gated, and its cells are not grown again
+  const [x2, y2] = openSpot(g, { x: kx, y: ky }, 25, [{ x, y }]); // another place: the first was seen while gated, and its cells are not grown again
   around(x2, y2);
   runFor(g, 10);
   assert.equal(g.fungus.flowers, 1, "a flower closed after the buy makes a patch");
