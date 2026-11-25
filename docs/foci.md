@@ -47,7 +47,7 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 - **Cue and response:** the cue is the same (a closed flower of hyphae, the fungus's own body, nothing an ant senses); the response is the gate: `Fungus.#settle` reads `evolution.level("foci")`; at 0 it empties the grown-cell lists and does nothing; at 1 it is today's rule.
 - **Off setting:** a fungus param `fociGate`, on by default since 2026-11-25 (arm E, PRD §92: no flower forms with an order that never buys Foci, and every time equals the ungated game's); off, flowers form as before.
 - **Unaffected:** the landing patch and an infected queen's one-tile patch (`Fungus.root`) are not flowers. Patches already formed stay: an old save with flower patches keeps them (they are in `base`) and forms no new ones until Foci is kept (owner, 2026-11-25).
-- **Price:** the free pool's rising price, `round(1.5^kept)` over its own kept levels (§80): Foci after Mycelium 1 and Knots 1 would cost about 2 mutations (estimate; the build measures it).
+- **Price:** the free pool's rising price, `round(1.5^kept)` over its own kept levels (§80): the price is dynamic: Foci costs `round(1.5^n)` for `n` free-pool levels kept when it is bought, so 2 mutations right after Mycelium 1 and Knots 1 (n = 2), 3 after one more free level, 5 after two, 8 after three; the later it is bought, the more it costs.
 - **Retires:** no gap-table row (a fungus mechanic, not an ant choice). Adds no sense and no scripted read.
 - **Cost (Jev):** none. No situation field, legend or question changes; the mutation menu is the player's, not a lane.
 - **The assay:** the lab's `DEFAULT_ORDER` (`scripts/lab/progression.mjs`) ends `knots,foci` since 2026-11-25 (owner's choice, the late order, arm C of PRD §92): a bare run buys Foci mid-game and forms flowers after it, at the cost of seeds 6 and 9 to a quarter. An `--order` without them is arm E (no flower forms, every time equal to the ungated game's); `--no-foci` runs the ungated game.
@@ -63,7 +63,7 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 ## Open questions
 
 - **Decided (owner, 2026-11-25), with the measurement in PRD §92:** an old save loses the ability to form flowers until it buys Foci (patches already formed stay); the default buy order reaches Knots and Foci (measured: it costs progression on 9 seeds early or up to +35 % on 2 seeds late; the owner chose the late order, 2026-11-25, so the lab's `DEFAULT_ORDER` ends with `knots,foci`); the seed-5 runaway is accepted as "bounded by the price once Foci is bought" (`ja-27w1` stays open until it is measured with the gate).
-- To measure: P1 (T1–T4) on seeds 1–20 with the gate and a buy order that reaches Foci; flowers per game and when the first forms; whether the seed-5 web still runs away after the buy; the price of Foci in mutations.
+- To measure: P1 (T1–T4) on seeds 1–20 with the gate and a buy order that reaches Foci; flowers per game and when the first forms; whether the seed-5 web still runs away after the buy; how many mutations Foci takes in the default order's games (the price is dynamic).
 - Not now: Fukasawa's finding that outgrowth rises with the fraction of the resource used is a possible later lever (a flower that forms only after its cells are used up); it is not part of this change.
 
 ## Sources
