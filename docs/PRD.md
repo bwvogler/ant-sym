@@ -8220,3 +8220,28 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 **Still open.**
 - **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; the trait's place in the upgrade order is decided: after the borer (2026-11-24), and L1 and the assay are measured at borer-level games.
 - **To read:** Heinken 2007 has no open copy; Chen 2000, Stretch & Viles 2002 and Joneson & Lutzoni 2009 could not be reached; the rest of the unverified list is abstract-only (`ja-vlla.11.1`, second read 2026-11-24). No lichen weathering rate and no carbon-share figure were found.
+
+## 91. Foci: a flower patch is an unlock, one level after Knots (design, ja-icc4, 2026-11-25)
+
+**Research basis:** [foci.md](foci.md): (1) cord-forming fungi grow out from a colonised resource, and whether they move to a new bait depends on its size (a threshold between 4 and 16 cm³ in *P. velutina* inocula, Fukasawa et al. 2020; outgrowth rises with the fraction of the resource used, Fukasawa & Kaga 2020); (2) outgrowth patterns are a species trait that has evolved (Fricker et al. 2017; Aguilar-Trigueros et al. 2022); (3) no paper read shows *Metarhizium*, *Beauveria* or *Pandora* forming cords or a new focus on a cadaver or in soil, and no gene-level account of gaining or losing the trait was found, so the gate is **design**. Abstract-only sources are marked **unverified** in the note.
+
+**The problem (measured).** Every web turns a closed flower of hyphae into a patch from the first minute, at no cost (§85). It moves no quarter, half or queen time on seeds 1-20, but on a dense web it snowballs: seed 5 closes 42 flowers and grows 8,387 hyphae cells at 600 s against 1,376 before #416 (`ja-27w1`); over 1,800 s with the evolving fungus it reaches 33 patches and 6,652 cells, at 17 % more wall time than a normal web.
+
+**Decisions.**
+- A new upgrade, **Foci**, in the fungus's own (free) pool; **one level** (owner, 2026-11-25).
+- It **needs Knots 1** (so Mycelium 1) (owner, 2026-11-25; the order is design, no paper orders them).
+- Until it is kept a closed flower does not become a patch; the landing patch and an infected queen's one-tile patch are unaffected (proposed from the owner's ask: needs confirming).
+- Patches already formed stay; an old save forms no new ones until Foci is kept (proposed: needs the owner).
+
+**The mechanic.** `Fungus.#settle` reads `evolution.level("foci")`: at 0 it empties the grown lists and does nothing, at 1 it is today's rule. Built behind a fungus param `fociGate` whose off setting is main bit for bit; the default flips after the assay, as the tropism's did (§88). Shape copied from the Lichen upgrade (`evolution.ts`, the drawer branch, `upgradeText.ts`).
+
+**Play.** The drawer gains a Foci node after Knots; once kept, purple flower patches appear where hyphae close a web. A real trade against Fruiting, Stalks, Lichen and a second Mycelium in the same pool. The risks are an invisible effect, a feature most games never buy, and the seed-5 runaway moving to after the buy (`foci.md` Play).
+
+**Assays and targets.** P1 (T1-T4, §63.4) on seeds 1-20 by the worst seed; a second arm whose buy order reaches Knots and Foci, since `scripts/lab/progression.mjs` DEFAULT_ORDER buys neither (under the gate the default arm forms no flower); flowers per game and the first flower's time; seed 5's patch count and hyphae cells. The assay lands first with no behaviour change (`ja-icc4.1`).
+
+**Cost (estimated).** Jev: none. No situation field, legend or question changes. Price: about 2 mutations in the free pool (`round(1.5^kept)` after Mycelium 1 and Knots 1; to be measured).
+
+**Beads.** `ja-icc4` (this); `.1` assay arm; `.2` the upgrade behind `fociGate`; `.3` measure on seeds 1-20 and flip the default.
+
+**Still open.** Whether an old save keeps forming flowers; whether the assay's and the page's default buy order should reach Foci; the price of Foci in play; the seed-5 web under the gate.
+
