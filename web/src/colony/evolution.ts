@@ -68,6 +68,14 @@ export interface Upgrade {
  */
 export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBudget: Infinity };
 
+/**
+ * A hungry fungus (FungusParams.hungry, PRD §91, docs/energy.md §7; owner 2026-11-25): a spore costs `sporeCost` of mass (not 1),
+ * the free term pays out only `reserve` mass over the game (the landing patch's reserve, until the litter is built), and the free
+ * pool counts each unit of earned mass (growth on the ground, corpses, light) as `share` mutations, not MUTATION. Design numbers,
+ * from the ledger's experiment: they keep P1 and the free pool near where they are.
+ */
+export const EARNED = { sporeCost: 0.1, reserve: 110, share: 1.2 };
+
 /** Mutations per unit of new fungus (its growth on the ground and in hosts). */
 export const MUTATION = 0.25;
 
@@ -360,6 +368,9 @@ export interface EvolutionSave {
   /** the part of `growth` made on the ground and from corpses, and of `spent` paid from that pool (PRD §85 M3); absent when 0 */
   ground?: number;
   spentFree?: number;
+  /** a hungry fungus (FungusParams.hungry) and the reserve it has spent; absent when not hungry */
+  hungry?: boolean;
+  reserveUsed?: number;
 }
 
 /** One fungus's body and evolution: the strain it evolves, its mycelium's mass, the fungus it has made, and what it has chosen. */
@@ -387,6 +398,10 @@ export class Evolution {
    * and in transit, `knot` mass stored in knots.
    */
   readonly ledger = { free: 0, corpse: 0, light: 0, spores: 0, cut: 0, knot: 0 };
+  /** the hungry fungus (FungusParams.hungry): set by the Fungus; off, none of EARNED applies and nothing here changes */
+  hungry = false;
+  /** mass the free term has paid out, counted only while `hungry` (the reserve it may spend): saved only then */
+  reserveUsed = 0;
   readonly #levels: Record<string, number>;
 
   constructor(strain: number) {
@@ -399,9 +414,15 @@ export class Evolution {
     return this.#levels[id] ?? 0;
   }
 
+  /** The mass one unit of spores costs: BODY's, or EARNED's when the fungus is hungry. */
+  get sporeCost(): number {
+    return this.hungry ? EARNED.sporeCost : BODY.sporeCost;
+  }
+
   /** Mutations its growth has given, kept or not (fractional: the panel shows whole ones). */
   get earned(): number {
-    return ANTS_START + MUTATION * this.growth;
+    if (!this.hungry) return ANTS_START + MUTATION * this.growth;
+    return ANTS_START + MUTATION * (this.growth - this.ground) + EARNED.share * this.ground;
   }
 
   /** Mutations to give, over both pools. */
@@ -413,7 +434,7 @@ export class Evolution {
   get pools(): Pools {
     return {
       ants: ANTS_START + MUTATION * (this.growth - this.ground) - (this.spent - this.spentFree),
-      free: MUTATION * this.ground - this.spentFree,
+      free: this.hungry ? EARNED.share * this.ground - this.spentFree : MUTATION * this.ground - this.spentFree,
     };
   }
 
@@ -464,24 +485,24 @@ export class Evolution {
   grow(dt: number): number {
     if (this.patches === 0) return 0;
     const t = this.traits();
-    const grown = Math.min(
-      Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt),
-      Math.max(0, BODY.freeBudget - this.ledger.free),
-    );
+    // The reserve it may spend: EARNED's when hungry (counted in `reserveUsed`, which is saved), else the lab's budget (none by default).
+    const room = this.hungry ? EARNED.reserve - this.reserveUsed : BODY.freeBudget - this.ledger.free;
+    const grown = Math.min(Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt), Math.max(0, room));
+    if (this.hungry) this.reserveUsed += grown;
     this.mass += grown;
     this.growth += grown;
     this.ground += grown;
     this.ledger.free += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
-    this.mass -= spores * BODY.sporeCost;
-    this.ledger.spores += spores * BODY.sporeCost;
+    this.mass -= spores * this.sporeCost;
+    this.ledger.spores += spores * this.sporeCost;
     return spores;
   }
 
   /** Spores its patch could not hold go back into the mycelium's mass. */
   refund(spores: number): void {
-    this.mass += spores * BODY.sporeCost;
-    this.ledger.spores -= spores * BODY.sporeCost;
+    this.mass += spores * this.sporeCost;
+    this.ledger.spores -= spores * this.sporeCost;
   }
 
   /** Hypha cut and lost (ja-2bw.4: ants digging through it): the mass it held is gone. */
@@ -544,6 +565,8 @@ export class Evolution {
       // The free pool's share, only once there is one: an evolution that never grew on the ground saves as it did with one pool.
       ...(this.ground > 0 ? { ground: this.ground } : {}),
       ...(this.spentFree > 0 ? { spentFree: this.spentFree } : {}),
+      // A hungry fungus only: the reserve it has spent. A game that is not hungry saves as it did.
+      ...(this.hungry ? { hungry: true, reserveUsed: this.reserveUsed } : {}),
     };
   }
 
@@ -556,6 +579,8 @@ export class Evolution {
     // A save from the one-pool days has neither: every mutation it earned counts as the ants' (its kept free levels stay kept).
     e.ground = r.ground ?? 0;
     e.spentFree = r.spentFree ?? 0;
+    e.hungry = r.hungry ?? false;
+    e.reserveUsed = r.reserveUsed ?? 0;
     e.rate = r.rate;
     for (const u of UPGRADES) e.#levels[u.id] = Math.max(0, Math.min(u.steps.length - 1, Math.floor(r.levels[u.id] ?? 0)));
     return e;

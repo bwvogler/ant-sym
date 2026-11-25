@@ -207,6 +207,11 @@ export interface FungusParams {
    */
   flow: boolean;
   /**
+   * a hungry fungus (PRD §91, docs/energy.md §7, ja-a2no.4; owner 2026-11-25): a spore costs EARNED.sporeCost of mass, the free
+   * term pays out only EARNED.reserve over a game, and the free pool counts earned mass at EARNED.share; off, as before
+   */
+  hungry: boolean;
+  /**
    * a tip that may turn either way leans toward ants (docs/hyphal-traffic.md, PRD §88, ja-ogph.3), read from the occupancy grids:
    * "count" takes the side with more ants within `trafficRadius` cells of it, "levels" the side whose neighbourhood has the
    * higher level of occupied cells (none, one cell, up to a tenth, more); "off" is the alternating choice as before
@@ -238,6 +243,7 @@ export const DEFAULT_FUNGUS: FungusParams = {
   hyphae: false,
   // On since 2026-11-14 (owner: turn it on and record the P1 miss, PRD §72.1).
   flow: true,
+  hungry: false,
   // On since 2026-11-23 (owner: turn it on with N = 4, PRD §88): a growing tip leans toward ants on every 4th cell. It shortens
   // the slowest progression seeds (seed 6: 350 s to 219 s) and leaves the median alone; the side-choice lean it rides on is inert.
   trafficBias: "count",
@@ -1039,6 +1045,7 @@ export class Fungus {
     const e = this.#evolution;
     if (!e) return;
     const p = this.params;
+    e.hungry = p.hungry;
     const before = e.growth;
     e.replicate(this.#made);
     if (p.hyphae && this.#hyphae.some((h) => h)) {
@@ -1400,10 +1407,10 @@ export class Fungus {
         budget.tips += p.flow
           ? h.resprout(g, level) +
             h.sproutKnots(g, knots, { free: Infinity, tips: budget.tips }, level, (m, k) => {
-              e.refund(m / BODY.sporeCost);
+              e.refund(m / e.sporeCost);
               h.addLoad(k, m);
             })
-          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeCost));
+          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / e.sporeCost));
       stepRound(maps, level, budget, this.growthPolicy);
       this.#settle();
       stepped = true;
@@ -1471,6 +1478,7 @@ export class Fungus {
       if (!h || h.knots.size === 0 || this.frozenLayers.has(l)) return;
       const L = this.#layers[l] as SporeLayer;
       const g = this.#ground(l);
+      const cost = this.#evolution?.sporeCost ?? BODY.sporeCost;
       for (const [k, knot] of h.knots) {
         knot.age += dt;
         if (knot.store <= 0 || g.topsoil) continue;
@@ -1479,10 +1487,10 @@ export class Fungus {
         for (let d = 0; d < 6 && !at; d++) if (g.kind(nx(x, y, d), ny(y, d)) === "open") at = [nx(x, y, d), ny(y, d)];
         if (!at) continue;
         const v = L.spores.get(at[0], at[1]);
-        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeCost));
+        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * cost));
         if (put <= 0) continue;
         knot.store -= put;
-        L.spores.set(at[0], at[1], v + put / BODY.sporeCost);
+        L.spores.set(at[0], at[1], v + put / cost);
         L.sporeStrain.set(at[0], at[1], e.strain);
         L.sporeCells.add(cellKey(at[0], at[1]));
       }
@@ -1566,6 +1574,7 @@ export class Fungus {
    */
   evolve(strain: number): Evolution {
     this.#evolution ??= new Evolution(Math.max(0, Math.min(this.strains.length - 1, Math.floor(strain))));
+    this.#evolution.hungry = this.params.hungry;
     this.#evolved();
     return this.#evolution;
   }

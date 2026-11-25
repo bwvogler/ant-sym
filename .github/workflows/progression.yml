@@ -60,6 +60,10 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      hungry:
+        description: "The fungus is hungry (--hungry, FungusParams.hungry, PRD §91): a cheap spore, a landing reserve and the free pool's higher share"
+        type: boolean
+        default: false
       sporecost:
         description: "The mass a spore costs (--spore-cost, ja-a2no): lab override; empty: the game's 1"
         default: ""
@@ -111,6 +115,7 @@ jobs:
           SPLIT: ${{ inputs.split }}
           LEDGER: ${{ inputs.ledger }}
           SPORECOST: ${{ inputs.sporecost }}
+          HUNGRY: ${{ inputs.hungry }}
           FREEBUDGET: ${{ inputs.freebudget }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
@@ -143,6 +148,7 @@ jobs:
           [ -n "$LIGHT" ] && args="$args --light $LIGHT"
           [ "$SPLIT" = "true" ] && args="$args --split"
           [ "$LEDGER" = "true" ] && args="$args --ledger"
+          [ "$HUNGRY" = "true" ] && args="$args --hungry"
           [ -n "$SPORECOST" ] && args="$args --spore-cost $SPORECOST"
           [ -n "$FREEBUDGET" ] && args="$args --free-budget $FREEBUDGET"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"

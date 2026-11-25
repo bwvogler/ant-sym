@@ -12,7 +12,7 @@
 //
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
-//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
+//          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic] [--hungry]
 //          [--bias count|levels] [--radius 3] [--tropism N]
 // --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
 // --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
@@ -23,6 +23,7 @@
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
+// --hungry: the fungus is hungry (FungusParams.hungry, PRD §91): a cheap spore, a landing reserve, the free pool's higher share.
 // --light N sets the lichen's light income a cell a second (ja-vlla.11.4).
 // --lichen only reads (the game is the same bit for bit; ja-vlla.11.2, docs/lichen.md, PRD §90): every 5 s it counts the plane's rock cells
 // beside a hypha cell (the cells an alga film or a wild lichen would sit on, so the chance a hypha meets one), the first time
@@ -57,6 +58,7 @@ if (isMainThread) {
     grant: opt("grant", "").split(",").filter(Boolean),
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
+    hungry: flag("hungry"),
     price: opt("price", null),
     landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
     rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
@@ -134,6 +136,7 @@ if (isMainThread) {
     grant,
     sun,
     flow,
+    hungry,
     price,
     landing,
     rootRadius,
@@ -158,6 +161,7 @@ if (isMainThread) {
       fungus: {
         hyphae,
         flow,
+        ...(hungry ? { hungry } : {}),
         ...(sun === null ? {} : { sun }),
         ...(bias === null ? {} : { trafficBias: bias }),
         ...(radius === null ? {} : { trafficRadius: radius }),
