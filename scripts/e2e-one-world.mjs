@@ -2966,6 +2966,38 @@ try {
       (await fp2.evaluate(([gx, gy]) => window.jevAnts.fogCell("above", gx, gy), [patch[0] + 8 * U, patch[1] - 4 * U])) === 0,
       "and ground 8 U away, at negative y too, is not revealed",
     );
+    // The fog is saved with an endless game (F7): ground the hosts explored and left (remembered, state 1) is still remembered after a reload and Continue. A game whose fog
+    // was not carried would show only what its hosts sense now.
+    const probe = [];
+    for (let dx = -160; dx <= 160; dx += 8) for (let dy = -160; dy <= 160; dy += 8) probe.push([patch[0] + dx, patch[1] + dy]);
+    const states = () => fp2.evaluate((cells) => cells.map(([gx, gy]) => window.jevAnts.fogCell("above", gx, gy) ?? 0), probe);
+    let s0 = await states();
+    for (let round = 0; round < 6 && !s0.includes(1); round++) {
+      await fp2.evaluate(() => window.jevAnts.step(600));
+      s0 = await states();
+    }
+    const remembered = s0.flatMap((v, i) => (v === 1 ? [i] : []));
+    check(
+      remembered.length > 0,
+      `the hosts have explored and left ground round the landing (${remembered.length} remembered of ${probe.length} probes)`,
+    );
+    await fp2.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).click();
+    await fp2.getByRole("button", { name: "Save here" }).first().click();
+    await until(async () => (await fp2.getByText(/^Slot 1 · empty/).count()) === 0, "the endless save under the fog", 5000, 100);
+    await fp2.goto(base);
+    await fp2.getByRole("button", { name: "Continue" }).first().click();
+    await until(
+      () => fp2.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+      "the endless game continued under the fog",
+      60_000,
+      100,
+    );
+    check(await fp2.evaluate(() => window.jevAnts.game.map.endless === true), "an endless save under the fog loads as the endless game");
+    const s1 = await states();
+    check(
+      remembered.every((i) => s1[i] > 0),
+      `and the ground it had left is still remembered (${remembered.filter((i) => s1[i] > 0).length} of ${remembered.length})`,
+    );
     await fc.close();
   }
   // The first game's tutorial plays the page's world (PRD §66 E6: on the endless plane the first host is found on all 20 seeds, 2-15 s in, and cleared 31-137 s after): its cards
