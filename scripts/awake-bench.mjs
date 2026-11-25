@@ -3,12 +3,14 @@
 // fungus, so the cap alone decides how many sleep; every colony ties on rank, so the lowest indexes freeze first). Reports the colonies in the game and awake, and the median, 90th
 // percentile and late mean milliseconds a tick takes after a warm-up, as colony-bench does.
 //
-// Usage: node scripts/awake-bench.mjs [wild=4] [cap=6] [ants per colony=400] [sim seconds=60] [seed=1] [--endless [--no-prefetch]]
+// Usage: node scripts/awake-bench.mjs [wild=4] [cap=6] [ants per colony=400] [sim seconds=60] [seed=1] [--endless [--no-prefetch] [--colonies N]]
 //
 // --endless plays the endless plane instead (generateEndlessWorld, PRD §66 E6.0.4): two start colonies, Garden landed by the first hole, the awake rule
 // on (cap as given, the default delay), `wild` is ignored (sites wake as the fungus reaches them). It also reports the ticks over 50 ms, the slowest
 // tick, and the chunks a layer read had to make on a miss inside the ticks after the 5 s warm-up (0 with the prefetch; --no-prefetch turns it off to
-// compare). Without --endless nothing changes: the bounded numbers of §66 stay reproducible.
+// compare). --colonies N (E6 measured, PRD §66): before the first tick wake the listed wild sites nearest the start, one after another, until the game holds N
+// colonies, so a cap of 8 has eight awake colonies to rank (a 300 s game wakes only the 1-4 sites the start's fungus is within W of: scripts/wild-meetings.mjs).
+// Without --endless nothing changes: the bounded numbers of §66 stay reproducible.
 import { Game, gameRng, generateOneWorld, generateEndlessWorld, mainGround, centreX, centreY, STRAINS } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
@@ -31,6 +33,17 @@ function endless() {
     STRAINS.findIndex((s) => s.id === "garden"),
     { evolve: true },
   );
+  const want = Number(process.argv[process.argv.indexOf("--colonies") + 1]);
+  if (process.argv.includes("--colonies")) {
+    const near = (s) => Math.min(...game.colonies.map((c) => Math.hypot(s.x - c.layers[0].nest.x, s.y - c.layers[0].nest.y)));
+    while (game.colonies.length < want) {
+      game.feedSites();
+      const next = game.sites.filter((s) => s.rx !== undefined).sort((a, b) => near(a) - near(b))[0];
+      if (!next || next.rx === undefined || next.ry === undefined)
+        throw new Error(`awake-bench: only ${game.colonies.length} colonies can be woken near the start`);
+      game.wakeSite({ ...next, rx: next.rx, ry: next.ry });
+    }
+  }
   const warm = Math.round(5 / DT);
   const ms = [];
   let missed = 0;

@@ -12,6 +12,7 @@
 
 import { chunkKey, CHUNK, CHUNK_BITS, local } from "./chunks.ts";
 import { cellOf, CELL, centreX, centreY, hexDistance, nx, ny, R } from "./hex.ts";
+import { DEFAULT_SLEEP } from "./sleep.ts";
 import { chunkRock, hash01, hash4, mulberry32, type Nest, ROCK, rockCut } from "./world.ts";
 
 /** A new line starts only farther than this from every hole of every line and site (docs/endless-world.md §5): one unit, 140 cells. */
@@ -34,6 +35,8 @@ export interface EndlessOptions {
   nestGap: number;
   /** no food patch closer than this to a nest the world placed, in cells */
   foodMinDist: number;
+  /** no wild site within this of either start nest, in cells: W (the sleep distance, 280) plus 32 for what the wake test reads past W (`Fungus.bodyNear` reaches up to W + 11 of a body cell, a hole is snapped to its cell, the fungus lands at the rim), so a game starts with the two start colonies awake and the fungus landed by either hole wakes no site (`ja-y0a8`); never under `NEW_LINE_GAP` */
+  startClear: number;
   /** a region is this many chunks on a side (at least 3, so a site's reserved line reaches only the 8 regions its check reads) */
   regionChunks: number;
   /** no two wild sites closer than this, in cells */
@@ -51,6 +54,7 @@ export const ENDLESS_PLANE: EndlessOptions = {
   foodPerCell: 12,
   nestGap: 140,
   foodMinDist: 24,
+  startClear: DEFAULT_SLEEP.distance + 32, // W and a margin: the wake test reads past W (bodyNear reaches W+11, holes snap to cells, the fungus lands at the rim; the measured threshold is about 285-288)
   regionChunks: 4,
   wildGap: 140,
   density: 1,
@@ -238,7 +242,7 @@ export class EndlessPlane {
     return startLine(a, b);
   }
 
-  /** Region (rx, ry)'s raw candidate: a point drawn from the seed that is open ground, walks out, and keeps off the start nests; or null. */
+  /** Region (rx, ry)'s raw candidate: a point drawn from the seed that is open ground, walks out, and keeps `startClear` (W and a margin) off the start nests; or null. */
   #candidate(rx: number, ry: number): Site | null {
     const key = `${rx},${ry}`;
     if (this.#candidates.has(key)) return this.#candidates.get(key)!;
@@ -248,7 +252,7 @@ export class EndlessPlane {
     const y = (ry * span + hash01(this.seed, 94, rx, ry) * span) * R;
     let site: Site | null = { x, y, r: 3, rx, ry, heading: hash01(this.seed, 95, rx, ry) * Math.PI };
     if (hash01(this.seed, 96, rx, ry) >= density || !this.walksOut(x, y, NEST_ESCAPE)) site = null;
-    else if (this.startNests().some((n) => Math.hypot(n.x - x, n.y - y) <= NEW_LINE_GAP)) site = null;
+    else if (this.startNests().some((n) => Math.hypot(n.x - x, n.y - y) <= Math.max(NEW_LINE_GAP, this.options.startClear))) site = null;
     else if (segmentGap(holeLine(x, y, site.heading), this.startSegment()) < LINE_CLEARANCE) site = null;
     if (this.#candidates.size >= this.options.cacheChunks) this.#candidates.clear();
     this.#candidates.set(key, site);

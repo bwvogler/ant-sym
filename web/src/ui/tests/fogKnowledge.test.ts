@@ -238,7 +238,7 @@ test("a watched ant stays an observer below INFECTED, until it is unwatched or g
 
 test("the explored box grows with each chunk first sensed, per layer, and is not moved by sensing a chunk again", () => {
   const s = new SensedMap();
-  s.firstRow = -Infinity; // the endless plane has rows above 0
+  s.endless = true; // the endless plane has rows above 0
   const k = new Knowledge(s, []);
   assert.equal(k.bounds(PLANE), undefined, "nothing explored");
   s.stamp([hostAt(40, 40)], 10);
@@ -264,18 +264,4 @@ test("the explored box is saved and loaded with the fog and forgotten when time 
   assert.deepEqual(k.bounds(PLANE), { cx0: 0, cy0: 0, cx1: 0, cy1: 0 });
   loaded.load(JSON.parse(JSON.stringify(new Knowledge(new SensedMap(), []).save())));
   assert.equal(loaded.bounds(PLANE), undefined, "a load replaces the box too");
-});
-
-test("rows above row 0 are sensed only where the map has them: a bounded map's host there senses nothing, an endless plane's does", () => {
-  const above = (): Colony => host(centreX(60, -10), centreY(-10));
-  const bounded = new SensedMap();
-  const kb = new Knowledge(bounded, []);
-  bounded.stamp([above()], 10);
-  assert.equal(kb.explored(PLANE, 60, -10), false, "no row above the top of a bounded map");
-  const endless = new SensedMap();
-  endless.firstRow = -Infinity;
-  const ke = new Knowledge(endless, []);
-  endless.stamp([above()], 10);
-  assert.equal(ke.explored(PLANE, 60, -10), true, "the endless plane has ground there");
-  assert.equal(ke.bounds(PLANE)!.cy0, -1);
 });

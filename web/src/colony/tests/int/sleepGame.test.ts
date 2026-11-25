@@ -110,7 +110,7 @@ test("two colonies whose ants stand on the same ground are in contact, at any he
   assert.equal(g.sleepRule!.saveState().contacts.length, 0);
 });
 
-test("an awake host in a sleeping colony's nest ground wakes it, and so does one within W outside it; a host beyond W does not; with no spores anywhere", () => {
+test("an awake host in a sleeping colony's nest ground wakes it; one merely within W outside it, or beyond W, does not; with no spores anywhere", () => {
   const trial = (dx: number) => {
     const g = fresh();
     g.freeze(1);
@@ -125,8 +125,29 @@ test("an awake host in a sleeping colony's nest ground wakes it, and so does one
     return g.isFrozen(1);
   };
   assert.equal(trial(5), false, "in the nest ground (16)");
-  assert.equal(trial(25), false, "within W (30), outside the nest ground");
+  assert.equal(trial(25), true, "within W (30), outside the nest ground: a host passing wakes nothing (ja-u5s8)");
   assert.equal(trial(60), true, "beyond W");
+});
+
+test("the fungus's body within W wakes a sleeper, and an awake colony stays awake while a host is within W (the freeze side keeps hosts)", () => {
+  // the body within W, no host: wakes
+  const g = fresh();
+  g.freeze(1);
+  g.enableSleep(RULE);
+  g.fungus.paint(g.colonies, hole(g, 1).x + 25, hole(g, 1).y, 3, 2, 0, 0, 0);
+  run(g, 2);
+  assert.equal(g.isFrozen(1), false, "the body is within W of the hole");
+  // an awake colony with only a host within W (no body there) is not frozen after T
+  const h = fresh();
+  h.enableSleep(RULE);
+  const c = h.colonies[0]!;
+  c.load[0] = 1;
+  const host = () => c.putAnt(0, 0, hole(h, 1).x + 25, hole(h, 1).y);
+  for (let t = 0; t < 40 * 30; t++) {
+    host();
+    h.tick(1 / 30);
+  }
+  assert.equal(h.isFrozen(1), false, "a host within W of colony 1's hole keeps it awake past T (20 s)");
 });
 
 test("a colony the cap froze wakes when room comes back, if it still holds the fungus in its ants", () => {

@@ -794,3 +794,41 @@ test("miniFrame puts the camera's chunk in the 9th column and 7th row for any ca
     assert.equal(Math.floor((c.y - f.y0) / (CHUNK * R)), 6, `row for ${c.x},${c.y}`);
   }
 });
+
+test("endless: with a frozen window (the pointer down on the minimap) the picture, the camera's rectangle and the pixels use it, however far the camera has moved; no shift, no clip", () => {
+  const s = endless({ x: 5000, y: 3000 });
+  const frozen = miniFrame(s.ext, s.k.c);
+  // the camera has run five chunks east and two up since the press
+  const moved = { ...s.k.c, x: s.k.c.x + 5 * CHUNK, y: s.k.c.y - 2 * CHUNK * R };
+  assert.notDeepEqual(miniFrame(s.ext, moved), frozen);
+  // an ant at the frozen window's pixel (3, 4): painted there only by the frozen window
+  const col = s.g.colonies[0]!;
+  col.x[0] = frozen.x0 + 3 * WINDOW_UNITS_PX + 1;
+  col.y[0] = frozen.y0 + 4 * WINDOW_UNITS_PX + 1;
+  col.alive[0] = 1;
+  col.layer[0] = PLANE;
+  col.load[0] = 0;
+  const tone = odourRgb(THEME.inkRgb, THEME.warnRgb, col.nestOdour);
+  const k = { ...s.k, c: moved, miniWin: frozen, colonies: [col] } as FieldCtx;
+  const seen = { x0: moved.x - 100, y0: moved.y - 60, x1: moved.x + 100, y1: moved.y + 60 };
+  s.minimap.draw(k, seen);
+  assert.deepEqual(paintedPixel(s, 3, 4).slice(0, 3), [...tone], "the pixel of the frozen window");
+  const r = minimapRect(frozen, k.v, k.d);
+  const sc = r.w / frozen.w;
+  assert.ok(!s.rec.log.includes("clip()"), "painted for the frozen window: drawn unshifted");
+  assert.ok(s.rec.log.includes(`drawImage(${s.canvases[0]}, ${r3(r.x)}, ${r3(r.y)}, ${r3(r.w)}, ${r3(r.h)})`));
+  const strokes = s.rec.log.filter((l) => l.startsWith("strokeRect("));
+  assert.equal(
+    strokes[1],
+    `strokeRect(${r3(r.x + (seen.x0 - frozen.x0) * sc)}, ${r3(r.y + (seen.y0 - frozen.y0) * sc)}, ${r3(200 * sc)}, ${r3(120 * sc)})`,
+    "the camera's rectangle in the frozen window's coordinates",
+  );
+  // the same frame without the freeze follows the camera: the ant is not at that pixel in that window
+  const t = endless({ x: 5000, y: 3000 });
+  t.minimap.draw({ ...t.k, c: moved, colonies: [col] } as FieldCtx, seen);
+  assert.notDeepEqual(paintedPixel(t, 3, 4).slice(0, 3), [...tone], "the window round the camera is another place");
+  // and a camera beyond the frozen window has a rectangle of nothing, not one run off the frame
+  s.rec.log.length = 0;
+  s.minimap.draw(k, { x0: frozen.x0 + frozen.w + 500, y0: frozen.y0, x1: frozen.x0 + frozen.w + 700, y1: frozen.y0 + 100 });
+  assert.match(s.rec.log.filter((l) => l.startsWith("strokeRect("))[1]!, /, 0, [\d.]+\)$/);
+});

@@ -42,7 +42,7 @@ One world is a bounded plane, 512 × 368 cells (`PLANE_WORLD.size`, `colony/worl
 
 **Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning/homing.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). ~~`cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.~~ E1.3: one `cellKey` (`hex.ts`) for every packed cell, ±2,097,152 on both axes.
 
-**Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
+**Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`) on a bounded map and no limit on an endless plane (`Game.colonyLimit`, owner 2026-11-25, `ja-y4eg`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
 
 **What it costs to run today:** a tick is 10.7–10.8 ms at 1,200 + 1,200 ants after `ja-web`, over the owner's 10 ms gate (`ja-lp4.6.7`), and the ants' step is ~73 % of it (PRD §51, U6a). Cost follows ants, not area: the pheromones already step only awake chunks.
 
@@ -156,7 +156,7 @@ Frozen hosts and the fungus's body inside a frozen curtain wake nothing. A wild 
 
 **A group freezes** when no member has had the awake fungus within W of its hole for T seconds. The start colonies are awake from the first tick and freeze by the same rule, together, once the fungus has left them. A daughter that lands beyond the fungus's reach freezes after T as a lone queen, until the fungus follows her.
 
-**The awake cap may freeze a colony the fungus lives in** (owner, 2026-11-13, by rank). The number of awake colonies is capped (proposed: 6, today's `MAX_COLONIES`, which PRD §50 took from the page's colony names, not from the tick; E4 measures the tick at the cap and may lower it).
+**The awake cap may freeze a colony the fungus lives in** (owner, 2026-11-13, by rank). The number of awake colonies is capped (owner 2026-11-25: set by colony size, 4 at 1,200 ants and 6 at 400, an awake-ant budget of about 5,000; `MAX_COLONIES` = 6 came from the page's colony names, not from the tick, and no longer limits an endless plane).
 - **The rank** of a colony is how long since the fungus last *touched* it: a host entering its nest ground, a new host made there, or the fungus's body growing within W of its hole. The most recent touch ranks highest. A colony woken just now was touched just now, so it ranks highest by the same rule.
 - **When a colony wakes** and the cap would be passed, the lowest-ranked awake groups freeze, with their hosts, until there is room. A group freezes whole, so it never splits. A group larger than the cap on its own may run over it; E4 counts how often.
 - **Hysteresis.** A colony frozen by the cap may not wake again for T.
@@ -220,6 +220,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 
 **Measured at E6:**
 - **The flight and the founding radius.** `ja-qpv`'s note asks for this. `FOUND_RADIUS` = 140 was set because edges failed half the flights at 70 ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game), proposal 2). Without edges, a shorter radius may fail mainly near strangers, which reads better. The flight is set in the same run.
+- **Measured offline, 2026-11-25** (PRD §66 "E6 measured (offline)"): flight 2 U (280) with `FOUND_RADIUS` 140 fails under 1 % of flights and starts a line on 61–65 % of foundings; the lattice as built is 0.22 sites a U², not §4's 0.35. A woken stranger loses its sleeping site's exclusion ring (`ja-lzwt`): accepted by the owner (2026-11-25), daughters beside strangers are the contact design. The under 1 % failure figure is for at most 8 own colonies (crowded own lines fail more, `ja-s994`).
 - **`ja-lp4.12`** (holes on the plane's rim) goes away with the rim.
 
 ## Play

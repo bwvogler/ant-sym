@@ -53,8 +53,21 @@ function changedBound(world: EndlessWorld): number {
   return saved.rock.$chunks.length * 4096 + saved.food.$chunks.length * 16384 + world.plane.quality.count * 16384;
 }
 
+/**
+ * The chunks still being sensed after the walk (the fungus's body round the landing keeps marking them, so they cannot compact), each holding at most a
+ * rock, food, quality and spoil snapshot: rock 4 KB, food 16 KB, quality 16 KB, spoil 8 KB. They are an area round the landing, the same whatever the
+ * walk's length. Since hosts at negative y mark too (ja-0iuy) that area is both halves of the disc, not the half below row 0 (review of #429).
+ */
+function liveBound(sensed: SensedMap, col: number, row: number): number {
+  let live = 0;
+  const [cx0, cy0] = [col >> 6, row >> 6];
+  for (let cy = cy0 - 12; cy <= cy0 + 12; cy++)
+    for (let cx = cx0 - 12; cx <= cx0 + 12; cx++) if (sensed.newest(0, cx, cy) !== undefined) live++;
+  return live * (4096 + 16384 + 16384 + 8192);
+}
+
 test("after a host walks 50 U out and back the fog holds explored bits and no snapshot of ground the seed can make again", () => {
-  const { k, step, world, row, col } = walk(50);
+  const { k, step, sensed, world, row, col } = walk(50);
   const chunks = k.chunks(0);
   assert.ok(chunks > 100, `${chunks} chunks explored`);
   // reads are the same before and after: sample explored cells along the walked row
@@ -71,8 +84,8 @@ test("after a host walks 50 U out and back the fog holds explored bits and no sn
   assert.deepEqual(read(), before, "every read is what it was");
   const extra = k.bytes(0) - explored * BYTES;
   assert.ok(
-    extra >= 0 && extra <= changedBound(world),
-    `explored bits and block times, 768 B a chunk, and snapshots only of ground changed: ${extra} B over`,
+    extra >= 0 && extra <= changedBound(world) + liveBound(sensed, col, row),
+    `explored bits and block times, 768 B a chunk, and snapshots only of ground changed and ground still sensed: ${extra} B over`,
   );
   // the control: a shorter walk with nothing droppable holds a rock and a food snapshot of every chunk walked
   const all = walk(12, true);
@@ -89,8 +102,8 @@ test("the fog saved and loaded is the same fog, bit for bit, and the chunks a ho
   while (k.compact(64) > 0);
   const extra = live() - k.chunks(0) * BYTES;
   assert.ok(
-    extra >= 0 && extra <= changedBound(world),
-    `compacted: bits and block times, and snapshots only of ground changed (${extra} B over)`,
+    extra >= 0 && extra <= changedBound(world) + liveBound(sensed, col, row),
+    `compacted: bits and block times, and snapshots only of ground changed and ground still sensed (${extra} B over)`,
   );
   assert.ok(extra < heldBefore / 2, "most of what was held is gone");
 

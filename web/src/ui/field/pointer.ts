@@ -55,6 +55,9 @@ export interface PointerRig {
   extent(): Extent & { x0: number };
   inMini(x: number, y: number): boolean;
   jumpMini(x: number, y: number): void;
+  /** the pointer went down on the minimap: an endless plane's window stays as it is until `releaseMini` */
+  holdMini(): void;
+  releaseMini(): void;
 }
 
 /** What the controller reads and does on the page: given afresh for each event, so nothing is stale. */
@@ -107,6 +110,7 @@ export class PointerController {
     const { x, y } = e;
     this.pointers.set(e.id, { x, y });
     if (this.pointers.size === 2) {
+      if (this.gesture.kind === "mini") host.rig.releaseMini(); // a second finger: a pinch, the window follows the camera again
       this.gesture = { ...NO_GESTURE, kind: "pinch", moved: Infinity };
       return true;
     }
@@ -115,6 +119,8 @@ export class PointerController {
     const build = host.build();
     if (e.button === 0 && host.rig.inMini(x, y)) {
       this.gesture = { ...NO_GESTURE, ...start, kind: "mini" };
+      // A click recentres at once, on the window as it was under the pointer; the window then holds still for the drag.
+      host.rig.holdMini();
       host.rig.jumpMini(x, y);
     } else if (host.angled()) {
       this.gesture = { ...NO_GESTURE, ...start, kind: "pan", button: e.button };
@@ -216,6 +222,7 @@ export class PointerController {
   up(host: PointerHost, e: PointerInput, cancelled = false): void {
     if (this.palms.delete(e.id)) return;
     const g = this.gesture;
+    if (g.kind === "mini") host.rig.releaseMini();
     const p = this.pointers.get(e.id);
     this.pointers.delete(e.id);
     // A tap with a tool in hand places it, where the finger landed (it built nothing while a second finger might have joined).
@@ -241,6 +248,17 @@ export class PointerController {
     if (this.pointers.size === 0) this.gesture = NO_GESTURE;
     // A pinch stays a pinch while two fingers are down (a third lifted); the last finger left pans, and never clicks.
     else if (g.kind === "pinch" && this.pointers.size === 1) this.gesture = { ...NO_GESTURE, kind: "pan", moved: Infinity };
+  }
+
+  /**
+   * The press on the minimap was lost without a pointer-up (the pointer capture went, the page lost focus): end the gesture and let the window follow
+   * the camera again. Any other gesture, and a press that already ended, are left alone.
+   */
+  dropMini(host: PointerHost): void {
+    if (this.gesture.kind !== "mini") return;
+    host.rig.releaseMini();
+    this.pointers.clear();
+    this.gesture = NO_GESTURE;
   }
 
   /** A pan on the ground: on a tilted map a vertical drag covers more ground than it shows. */

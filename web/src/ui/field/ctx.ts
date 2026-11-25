@@ -6,7 +6,7 @@
 import type { ChunkLayer, Colony, Fungus, OneWorld, WorldMap } from "../../colony/index.ts";
 import type { CorpseMemory } from "../fog/corpses.ts";
 import type { Knowledge } from "../fog/knowledge.ts";
-import type { Camera, Extent, Viewport } from "../camera.ts";
+import type { Camera, Extent, Reach, Viewport } from "../camera.ts";
 import type { PenCircle, Settle } from "../pen.ts";
 import type { Rgb } from "./colour.ts";
 import type { FieldEnv, SpriteSets } from "./env.ts";
@@ -66,6 +66,8 @@ export interface FieldCtx {
   /** the shown layer's map, and its extent */
   m: WorldMap;
   ext: Extent;
+  /** an endless plane's minimap window while the pointer is down on it (CameraRig.frozenMini): the minimap draws that, not the window round the camera */
+  miniWin?: Reach | null;
   world: OneWorld;
   colonies: readonly Colony[];
   fungus: Fungus;
