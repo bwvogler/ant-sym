@@ -81,9 +81,6 @@ on:
         description: "Report where each seed's growth was made: the mycelium on the ground, corpses and hosts (--split, PRD §85 M3)"
         type: boolean
         default: false
-      light:
-        description: "The lichen's light income, growth a second a lichen cell (--light, ja-vlla.11.4); empty: the design number"
-        default: ""
       lichen:
         description: "Also probe the rock the hyphae lie beside and the late earning rate (--lichen; reads only, docs/lichen.md, ja-vlla.11.2)"
         type: boolean
@@ -114,7 +111,6 @@ jobs:
           TRAFFIC: ${{ inputs.traffic }}
           LICHEN: ${{ inputs.lichen }}
           ORDER: ${{ inputs.order }}
-          LIGHT: ${{ inputs.light }}
           SPLIT: ${{ inputs.split }}
           LEDGER: ${{ inputs.ledger }}
           SPORECOST: ${{ inputs.sporecost }}
@@ -134,7 +130,6 @@ jobs:
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
           [[ "$BIAS" =~ ^(default|off|count|levels)$ ]] || bad "bias: default, off, count or levels"
           [[ -z "$ORDER" || "$ORDER" =~ ^[a-z]+(,[a-z]+)*$ ]] || bad "order: upgrade ids, comma-separated"
-          [[ -z "$LIGHT" || "$LIGHT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "light: empty or a number"
           [[ -z "$SPORECOST" || "$SPORECOST" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "sporecost: empty or a number"
           [[ -z "$FREEBUDGET" || "$FREEBUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "freebudget: empty or a number"
           [[ -z "$EARNEDSHARE" || "$EARNEDSHARE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "earnedshare: empty or a number"
@@ -150,7 +145,6 @@ jobs:
           [ "$LICHEN" = "true" ] && args="$args --lichen"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$ORDER" ] && args="$args --order $ORDER"
-          [ -n "$LIGHT" ] && args="$args --light $LIGHT"
           [ "$SPLIT" = "true" ] && args="$args --split"
           [ "$LEDGER" = "true" ] && args="$args --ledger"
           [ "$HUNGRY" = "true" ] && args="$args --hungry"

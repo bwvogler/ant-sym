@@ -13,12 +13,9 @@ import { hash01, ROCK, rockAt, type WorldMap } from "./world.ts";
  * - `blockOdds`: the share of blocks that hold algae at all; `filmOdds`: the share of a block's edge cells that are films;
  * - `wildOdds`: the share of `wildBlock`-cell blocks that hold a wild lichen, a disc of `wildRadius` cells at its centre;
  * - `keepOut`: cells round the landing with none (so a game's first contact is a find, not a gift);
- * - `light` (L2, ja-vlla.11.4): growth a second that each lichen cell in light adds to the free pool, as mutations only and not
- *   body mass; every lichen cell is on the plane (layer 0) and so in light; the crust's area, at most `cap` cells, bounds it;
  * - `every`: seconds between rim steps; `cap`: most lichen cells a map's fungus holds (a bound on work, not a rule).
  */
 export const LICHEN = {
-  light: 0.01,
   block: 4,
   blockOdds: 0.12,
   filmOdds: 0.6,

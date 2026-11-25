@@ -47,7 +47,7 @@ import {
   stepRound,
   TIP_STEP,
 } from "./hyphae.ts";
-import { Lichen, LICHEN } from "./lichen.ts";
+import { Lichen } from "./lichen.ts";
 
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
@@ -1423,7 +1423,6 @@ export class Fungus {
         const base = (this.#layers[0] as SporeLayer).base[0];
         if (stepped) lichen.touch(this.map, plane.parent.keys(), base === undefined ? null : keyCell(base), this.#elapsed);
         lichen.step(this.map, dt);
-        e.light(LICHEN.light * lichen.cells.size * dt);
       }
     }
     this.#elapsed += dt;

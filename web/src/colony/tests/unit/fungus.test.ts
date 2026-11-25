@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { CountGrid, occupancy } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { Fungus, INFECTED, SPORE_SHOWN, STRAINS, type Strain } from "../../fungus.ts";
-import { algaAt, LICHEN } from "../../lichen.ts";
+import { algaAt } from "../../lichen.ts";
 import { cellKey, nx, ny } from "../../hex.ts";
 import { generateWorld, mulberry32, OPEN, ROCK, rockAt, worldFromArrays, type WorldMap } from "../../world.ts";
 import { at } from "../hexmaps.ts";
@@ -430,41 +430,4 @@ test("a fungus that keeps the lichen upgrade takes an alga its hypha lies beside
   g.loadState(JSON.parse(JSON.stringify(f.saveState())));
   assert.deepEqual([...g.lichenCells()].sort(), [...f.lichenCells()].sort());
   assert.equal(g.lichenFirst, f.lichenFirst);
-});
-
-test("lichen cells in light add to the free pool, a lichen-free game's pool is untouched by the light rate (ja-vlla.11.4)", () => {
-  const map = generateWorld(3);
-  const run = (light: number, keep: boolean): number => {
-    const saved = LICHEN.light;
-    Object.assign(LICHEN, { light });
-    try {
-      const f = new Fungus(map, { hyphae: true });
-      f.evolve(BLOOM);
-      let film: [number, number] | null = null;
-      for (let y = 0; y < map.size.h && !film; y++)
-        for (let x = map.x0; x < map.x0 + map.size.w && !film; x++) if (algaAt(map, x, y) === "film") film = [x, y];
-      let land: [number, number] | null = null;
-      for (let y = 10; y < 300 && !land; y++)
-        for (let x = film![0] + 30; x < 500 && !land; x++) if (rockAt(map, x, y) === OPEN) land = [x, y];
-      f.root(land![0], land![1], 2, 0);
-      const e = f.evolution!;
-      e.growth += 100;
-      e.ground += 100;
-      f.upgrade("mycelium");
-      if (keep) f.upgrade("lichen");
-      f.paint([], land![0], land![1], 0.5, 4, 0, BLOOM, 0);
-      let cell = -1;
-      for (let d = 0; d < 6 && cell < 0; d++)
-        if (rockAt(map, nx(film![0], film![1], d), ny(film![1], d)) !== ROCK) cell = cellKey(nx(film![0], film![1], d), ny(film![1], d));
-      f.hyphaeOn(0)!.parent.set(cell, -1);
-      for (let k = 0; k < 600; k++) f.stepLayers([], [[]], 1 / 30);
-      return e.ground;
-    } finally {
-      Object.assign(LICHEN, { light: saved });
-    }
-  };
-  const dark = run(0, true);
-  const lit = run(1, true);
-  assert.ok(lit > dark + 5, `a lit crust adds to the free pool: ${lit} against ${dark}`);
-  assert.equal(run(1, false), run(0, false), "without the upgrade the light rate does nothing");
 });

@@ -71,7 +71,7 @@ export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBu
 /**
  * A hungry fungus (FungusParams.hungry, PRD §91, docs/energy.md §7; owner 2026-11-25): a spore costs `sporeCost` of mass (not 1),
  * the free term pays out only `reserve` mass over the game (the landing patch's reserve, until the litter is built), and the free
- * pool counts each unit of earned mass (growth on the ground, corpses, light) as `share` mutations, not MUTATION. Design numbers,
+ * pool counts each unit of earned mass (growth on the ground, corpses) as `share` mutations, not MUTATION. Design numbers,
  * from the ledger's experiment: they keep P1 and the free pool near where they are.
  */
 export const EARNED = { sporeCost: 0.1, reserve: 110, share: 0.6 };
@@ -397,7 +397,7 @@ export class Evolution {
    * added to the mutations (no mass); `spores` is the mass paid out as spores net of what came back, `cut` hypha lost to digging
    * and in transit, `knot` mass stored in knots.
    */
-  readonly ledger = { free: 0, corpse: 0, light: 0, spores: 0, cut: 0, knot: 0 };
+  readonly ledger = { free: 0, corpse: 0, spores: 0, cut: 0, knot: 0 };
   /** the hungry fungus (FungusParams.hungry): set by the Fungus; off, none of EARNED applies and nothing here changes */
   hungry = false;
   /** mass the free term has paid out, counted only while `hungry` (the reserve it may spend): saved only then */
@@ -518,13 +518,6 @@ export class Evolution {
     this.mass += mass;
     this.growth += mass;
     this.ground += mass;
-  }
-
-  /** Growth from light (a lichen's alga, PRD §90 L2): it counts toward the free pool's mutations, but adds no mass. */
-  light(growth: number): void {
-    this.ledger.light += growth;
-    this.growth += growth;
-    this.ground += growth;
   }
 
   /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */

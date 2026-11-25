@@ -24,7 +24,6 @@
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
 // --hungry: the fungus is hungry (FungusParams.hungry, PRD §91): a cheap spore, a landing reserve, the free pool's higher share.
-// --light N sets the lichen's light income a cell a second (ja-vlla.11.4).
 // --lichen only reads (the game is the same bit for bit; ja-vlla.11.2, docs/lichen.md, PRD §90): every 5 s it counts the plane's rock cells
 // beside a hypha cell (the cells an alga film or a wild lichen would sit on, so the chance a hypha meets one), the first time
 // a hypha touched rock, and mutations earned a minute in the last three minutes (the light-income runaway gate, L2).
@@ -70,7 +69,6 @@ if (isMainThread) {
     sporeCost: opt("spore-cost", null),
     earnedShare: opt("earned-share", null),
     freeBudget: opt("free-budget", null),
-    light: opt("light", null),
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
     tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
@@ -219,11 +217,6 @@ if (isMainThread) {
     if (workerData.sporeCost !== null) BODY.sporeCost = Number(workerData.sporeCost);
     if (workerData.freeBudget !== null) BODY.freeBudget = Number(workerData.freeBudget);
   }
-  // --light N: growth a second each lichen cell adds to the free pool (L2, ja-vlla.11.4); a lab override of the design number.
-  if (workerData.light !== null)
-    Object.assign((await import("../../web/src/colony/lichen.ts")).LICHEN, {
-      light: Number(workerData.light),
-    });
   const { MUTATION, pathTo, poolOf } = await import("../../web/src/colony/evolution.ts");
   // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then, from its own pool (PRD §85 M3).
   for (const id of grant) {
@@ -336,13 +329,12 @@ function ledgerLine(g, at) {
   const l = e?.ledger ?? {
     free: 0,
     corpse: 0,
-    light: 0,
     spores: 0,
     cut: 0,
     knot: 0,
   };
   const n = (x) => Math.round(x);
-  return `  ledger @${at} s: made free ${n(l.free)} corpse ${n(l.corpse)} · light (mutations only) ${n(l.light)} · spent spores ${n(l.spores)} cuts ${n(l.cut)} knots ${n(l.knot)} · mass ${n(e?.mass ?? 0)} · hyphae ${h?.length ?? 0} cells, ${h?.tips.length ?? 0} tips`;
+  return `  ledger @${at} s: made free ${n(l.free)} corpse ${n(l.corpse)} · spent spores ${n(l.spores)} cuts ${n(l.cut)} knots ${n(l.knot)} · mass ${n(e?.mass ?? 0)} · hyphae ${h?.length ?? 0} cells, ${h?.tips.length ?? 0} tips`;
 }
 
 function fmt(t) {
