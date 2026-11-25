@@ -99,7 +99,9 @@ Owner (2026-11-25): **make the free term earn its place.** The fungus is hungry,
 
 ## Open questions
 
-Owner decisions:
+Owner decisions, answered 2026-11-25: **1 → A** (patchy ground, litter as map content); **2 → mostly earned** (the free term retired, a start reserve kept so the first minutes work); **3 → decide after the ledger** (the energy-ledger assay, `ja-a2no.2`, shows how slow a hungry fungus is, and the owner then sets the bar); **5 → hold #425**, with these docs riding in it for now. **4** (plane or curtain, and roots) is not yet asked: the default is the plane only, with no roots.
+
+As asked:
 
 1. **The litter model:** A (map content), B (a trickle) or C (a capacity from sources held)? My recommendation is A.
 2. **How hungry:** how much of today's mass may come from the ground itself? Today it is about 95 % (§6). The more earned, the more the ground and the lichen must hold, and the more P1 moves. A hunger that moves the worst seed much past today's would need P1 rebased.

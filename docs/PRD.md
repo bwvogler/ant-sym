@@ -8186,7 +8186,8 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Decisions.**
 - **Owner, 2026-11-25:** make the free term earn its place: the fungus is hungry, and growth must come from somewhere the player can find (litter or substrate, cadavers, light, hosts).
-- **Proposed, needs the owner:** the litter model (energy.md §7: A map content, B a trickle, C a capacity from sources held; the recommendation is A); how hungry; how P1 is judged; plane, curtain or both; L2 (PR #425) hold or merge. Tracked in `ja-a2no.1`.
+- **Owner, 2026-11-25:** litter model **A**, patchy ground as map content (energy.md §7); **mostly earned**: the free term retired with a start reserve kept; **P1's baseline is decided after the ledger** (`ja-a2no.2`); **#425 is held**, the docs riding in it.
+- **Proposed, needs the owner:** plane only with no roots (the default), or the curtain and roots as well. Tracked in `ja-a2no.1`.
 
 **The mechanic.** Each milestone is a PR behind a setting whose off is main bit for bit. Cue → response: a hypha on a source takes up its carbon, at a yield below one, into the body's mass; the free term is off or replaced by a start reserve; corpses are drawn down, not given in a lump; the lichen's light becomes carbon (L2 reworked); starved hyphae fade and return mass.
 
