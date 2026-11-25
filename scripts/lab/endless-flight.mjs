@@ -12,8 +12,8 @@
 // seeds, and the WORST seed:
 //   fail      flights that found no valid cell within the radius (and the share of failures whose intended point was refused by: a site within 1 U,
 //             the line-clearance, the nest-ground rules of transect.ts, or no open ground)
-//   new       landings that start a line of their own (rule 1) against `grow` (rule 2) one of the own lines or `join` a wild line (a landing within
-//             a unit of a woken stranger's end hole), and `fall` = grows whose landing is farther than NEW_LINE_GAP from every hole (D1, ja-s994)
+//   new       landings that start a line of their own (rule 1) against `grow` (rule 2) one of the own lines or `join` a wild line (the founding
+//             rule's own output, lines.ts called directly, not a distance test and not Game.settleAt with a live game), and `fall` = grows whose landing is farther than NEW_LINE_GAP from every hole (D1, ja-s994)
 //   gap       landings by distance to the nearest stranger (a woken wild hole or a still-unwoken site) in units of U = 140 cells: < 0.6 U, 0.6-0.9 U
 //             (biology's survival line: nest-spacing §2), 0.9-1.5 U, > 1.5 U, and the share pulled by the founding radius (moved from the intended
 //             point) with the mean pull
@@ -28,6 +28,9 @@ import { CELL, cellOf, centreX, centreY, mainGround, mulberry32, generateEndless
 import { applyFounding, canFoundIn, nearestValidIn, oneHoleLine, NEW_LINE_GAP } from "../../web/src/colony/lines.ts";
 import { grow, makeTransect, nearestValid } from "../../web/src/colony/transect.ts";
 import { writeFileSync } from "node:fs";
+import { helpAndExit } from "../lib/usage.mjs";
+
+helpAndExit(import.meta.url);
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
