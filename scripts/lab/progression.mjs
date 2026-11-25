@@ -31,12 +31,7 @@
 import { readFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
-import {
-  Worker,
-  isMainThread,
-  parentPort,
-  workerData,
-} from "node:worker_threads";
+import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -63,12 +58,8 @@ if (isMainThread) {
     sun: opt("sun", null) === null ? null : Number(opt("sun", null)),
     flow: flag("flow"),
     price: opt("price", null),
-    landing:
-      opt("landing", null) === null ? null : Number(opt("landing", null)),
-    rootRadius:
-      opt("root-radius", null) === null
-        ? null
-        : Number(opt("root-radius", null)),
+    landing: opt("landing", null) === null ? null : Number(opt("landing", null)),
+    rootRadius: opt("root-radius", null) === null ? null : Number(opt("root-radius", null)),
     split: flag("split"),
     trace: flag("trace"),
     traffic: flag("traffic"),
@@ -76,8 +67,7 @@ if (isMainThread) {
     light: opt("light", null),
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
-    tropism:
-      opt("tropism", null) === null ? null : Number(opt("tropism", null)),
+    tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -106,9 +96,7 @@ if (isMainThread) {
     console.log(
       `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
     );
-    if (r.traffic)
-      for (const [name, t] of Object.entries(r.traffic))
-        if (t) console.log(trafficLine(name, t));
+    if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
       console.log(
         `  growth made: ground ${r.split.ground.toFixed(0)} · corpses ${r.split.corpses.toFixed(0)} · hosts ${r.split.hosts.toFixed(0)}`,
@@ -121,21 +109,13 @@ if (isMainThread) {
       );
     console.log(`  per minute (share%/resist): ${r.minutes.join("  ")}`);
   }
-  const worst = (k) =>
-    results.some((r) => r[k] < 0)
-      ? "never (some seed)"
-      : `${Math.max(...results.map((r) => r[k]))} s`;
-  console.log(
-    `worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`,
-  );
+  const worst = (k) => (results.some((r) => r[k] < 0) ? "never (some seed)" : `${Math.max(...results.map((r) => r[k]))} s`);
+  console.log(`worst seed: quarter ${worst("quarter")}, queen ${worst("queen")}`);
 } else {
-  const { Game, GAME_REGROW, gameRng } =
-    await import("../../web/src/colony/game.ts");
-  const { INFECTED, STRAINS, askedLevers } =
-    await import("../../web/src/colony/fungus.ts");
+  const { Game, GAME_REGROW, gameRng } = await import("../../web/src/colony/game.ts");
+  const { INFECTED, STRAINS, askedLevers } = await import("../../web/src/colony/fungus.ts");
   const { fungalKey } = await import("../../web/src/colony/fungusBrain.ts");
-  const { STRAIN_DEFAULT } =
-    await import("../../web/src/colony/fungalPolicy.ts");
+  const { STRAIN_DEFAULT } = await import("../../web/src/colony/fungalPolicy.ts");
   const { generateOneWorld } = await import("../../web/src/colony/oneWorld.ts");
   const {
     seed,
@@ -160,23 +140,12 @@ if (isMainThread) {
     radius,
     tropism,
   } = workerData;
-  if (landing !== null)
-    (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
+  if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
     const { PRICE } = await import("../../web/src/colony/evolution.ts");
     [PRICE.base, PRICE.ratio] = price.split(",").map(Number);
   }
-  const answers = new Map(
-    JSON.parse(
-      readFileSync(
-        new URL(
-          `../../web/public/precache/fungus-${aim}.json`,
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    ),
-  );
+  const answers = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/fungus-${aim}.json`, import.meta.url), "utf8")));
   const g = new Game(
     generateOneWorld(seed),
     {
@@ -195,25 +164,10 @@ if (isMainThread) {
     [{ antCount: 600 }, { antCount: 600 }],
   );
   const menu = g.fungus.menu;
-  g.fungus.bindPolicy(
-    "fungus",
-    (s) =>
-      answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ??
-      STRAIN_DEFAULT,
-  );
+  g.fungus.bindPolicy("fungus", (s) => answers.get(fungalKey(s, askedLevers(menu, s.task === "queen"))) ?? STRAIN_DEFAULT);
   if (growth) {
     const { growthKey } = await import("../../web/src/colony/growthBrain.ts");
-    const grows = new Map(
-      JSON.parse(
-        readFileSync(
-          new URL(
-            `../../web/public/precache/growth-${aim}.json`,
-            import.meta.url,
-          ),
-          "utf8",
-        ),
-      ),
-    );
+    const grows = new Map(JSON.parse(readFileSync(new URL(`../../web/public/precache/growth-${aim}.json`, import.meta.url), "utf8")));
     g.fungus.bindPolicy("growth", (s) => grows.get(growthKey(s)) ?? null);
   }
   if (rootRadius !== null) {
@@ -248,8 +202,7 @@ if (isMainThread) {
     Object.assign((await import("../../web/src/colony/lichen.ts")).LICHEN, {
       light: Number(workerData.light),
     });
-  const { MUTATION, pathTo, poolOf } =
-    await import("../../web/src/colony/evolution.ts");
+  const { MUTATION, pathTo, poolOf } = await import("../../web/src/colony/evolution.ts");
   // A granted level comes with what it needs (the tree, ja-52ui): each is paid for at the price then, from its own pool (PRD §85 M3).
   for (const id of grant) {
     const e = g.fungus.evolution;
@@ -314,10 +267,7 @@ if (isMainThread) {
         }
       }
     }
-    if (
-      trace &&
-      (g.fungus.spread !== seen[0] || g.fungus.flowers !== seen[1])
-    ) {
+    if (trace && (g.fungus.spread !== seen[0] || g.fungus.flowers !== seen[1])) {
       seen = [g.fungus.spread, g.fungus.flowers];
       r.trace.push(
         `${g.time.toFixed(1)}s spread ${seen[0]} flowers ${seen[1]} base ${g.fungus.patchOn(0).length / 2} hyphae ${g.fungus.hyphaeOn(0)?.parent.size}`,
@@ -331,8 +281,7 @@ if (isMainThread) {
     if (r.half < 0 && a.s >= 0.5) r.half = t;
     if (r.queen < 0 && g.revealed[0]) r.queen = t;
     if (r.rivalFirst < 0 && b && b.n > 0) r.rivalFirst = t;
-    if (k % (30 * 60) === 0 && k > 0)
-      r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
+    if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }
   r.earned = Math.round(g.fungus.evolution?.earned ?? 0);
   r.spent = g.fungus.evolution?.spent ?? 0;
@@ -343,13 +292,11 @@ if (isMainThread) {
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
   // How much mycelium and how many cells with spores the game ended with (ja-kura): every layer's hyphae, and Fungus.sporeCells (a total over layers).
-  for (let l = 0; l < g.layers.length; l++)
-    r.cells += g.fungus.hyphaeOn(l)?.parent.size ?? 0;
+  for (let l = 0; l < g.layers.length; l++) r.cells += g.fungus.hyphaeOn(l)?.parent.size ?? 0;
   r.spores = g.fungus.sporeCells;
   r.leans = `${g.fungus.hyphaeOn(0)?.trafficLeans ?? 0} of ${g.fungus.hyphaeOn(0)?.sideChoices ?? 0} side choices; tropisms ${g.fungus.hyphaeOn(0)?.tropisms ?? 0} of ${g.fungus.hyphaeOn(0)?.tropismChoices ?? 0} grow steps`;
   r.lichenCells = g.fungus.lichenCells().size;
-  r.lichenFirst =
-    g.fungus.lichenFirst === null ? -1 : Math.round(g.fungus.lichenFirst);
+  r.lichenFirst = g.fungus.lichenFirst === null ? -1 : Math.round(g.fungus.lichenFirst);
   if (probe) r.traffic = probe.result();
   if (lichen) r.lichen = lichen.result();
   parentPort.postMessage(r);
@@ -377,10 +324,8 @@ function trafficLine(name, t) {
  * of game time; `result()` has the means over the samples taken while the plane had tips.
  */
 async function trafficProbe(g) {
-  const { CountGrid, occupancy } =
-    await import("../../web/src/colony/battle.ts");
-  const { cellKey, keyCell, hexDistance, nx, ny, discOffsets } =
-    await import("../../web/src/colony/hex.ts");
+  const { CountGrid, occupancy } = await import("../../web/src/colony/battle.ts");
+  const { cellKey, keyCell, hexDistance, nx, ny, discOffsets } = await import("../../web/src/colony/hex.ts");
   const { inBounds } = await import("../../web/src/colony/world.ts");
   const grids = g.colonies.map(() => new CountGrid());
   const bounds = g.colonies[0].layers[0].map;
@@ -409,8 +354,7 @@ async function trafficProbe(g) {
   const within = (x, y, r) => {
     const o = discOffsets(r)[y & 1];
     let n = 0;
-    for (let k = 0; k < o.length; k += 2)
-      if (inside(x + o[k], y + o[k + 1])) n += count(x + o[k], y + o[k + 1]);
+    for (let k = 0; k < o.length; k += 2) if (inside(x + o[k], y + o[k + 1])) n += count(x + o[k], y + o[k + 1]);
     return n;
   };
   return {
@@ -422,8 +366,7 @@ async function trafficProbe(g) {
       g.colonies.forEach((c, k) => occupancy(c, grids[k], 0));
       for (const gr of grids) {
         const st = gr.saveState();
-        for (let k = 0; k < st.length; k += 3)
-          recent.set(cellKey(st[k], st[k + 1]), g.time);
+        for (let k = 0; k < st.length; k += 3) recent.set(cellKey(st[k], st[k + 1]), g.time);
       }
       acc.samples++;
       const o = discOffsets(6);
@@ -445,8 +388,7 @@ async function trafficProbe(g) {
           const f = cells[b] ? occ[b] / cells[b] : 0;
           acc.occ[b] += f;
           if (occ[b] === 0) acc.empty[b]++;
-          if (b === 1)
-            acc.levels[f === 0 ? 0 : f <= 0.04 ? 1 : f <= 0.1 ? 2 : 3]++;
+          if (b === 1) acc.levels[f === 0 ? 0 : f <= 0.04 ? 1 : f <= 0.1 ? 2 : 3]++;
         }
         const sides = [-1, 1].map((d) => {
           const hd = (((t.heading + d) % 6) + 6) % 6;
@@ -454,9 +396,7 @@ async function trafficProbe(g) {
         });
         if (sides.every(([x, y]) => inside(x, y))) {
           acc.sides++;
-          for (let r = 1; r <= 3; r++)
-            if (within(...sides[0], r) !== within(...sides[1], r))
-              acc.differ[r - 1]++;
+          for (let r = 1; r <= 3; r++) if (within(...sides[0], r) !== within(...sides[1], r)) acc.differ[r - 1]++;
         }
       }
       // The share of hyphae within r cells (1, 2, 3) of a cell an ant stood on in the last 60 s.
@@ -470,11 +410,7 @@ async function trafficProbe(g) {
         let least = 4;
         for (let k = 0; k < off.length; k += 2) {
           const seen = recent.get(cellKey(x + off[k], y + off[k + 1]));
-          if (seen !== undefined && g.time - seen <= 60)
-            least = Math.min(
-              least,
-              hexDistance(x, y, x + off[k], y + off[k + 1]),
-            );
+          if (seen !== undefined && g.time - seen <= 60) least = Math.min(least, hexDistance(x, y, x + off[k], y + off[k + 1]));
         }
         for (let r = 1; r <= 3; r++) if (least <= r) near[r - 1]++;
       }
@@ -511,8 +447,7 @@ async function trafficProbe(g) {
  * `touched` could exceed `edge`, so bound it first.
  */
 async function lichenProbe(g, seconds) {
-  const { rockAt, inBounds, OPEN, ROCK } =
-    await import("../../web/src/colony/world.ts");
+  const { rockAt, inBounds, OPEN, ROCK } = await import("../../web/src/colony/world.ts");
   const { keyCell, nx, ny } = await import("../../web/src/colony/hex.ts");
   const map = g.colonies[0].layers[0].map;
   const rock = (x, y) => inBounds(map, x, y) && rockAt(map, x, y) === ROCK;
@@ -543,14 +478,10 @@ async function lichenProbe(g, seconds) {
             if (first < 0) first = Math.round(g.time);
           }
         }
-      if (lateFrom === null && g.time >= seconds - 180)
-        lateFrom = [g.time, g.fungus.evolution?.earned ?? 0];
+      if (lateFrom === null && g.time >= seconds - 180) lateFrom = [g.time, g.fungus.evolution?.earned ?? 0];
     },
     result() {
-      const late = lateFrom
-        ? ((g.fungus.evolution?.earned ?? 0) - lateFrom[1]) /
-          ((g.time - lateFrom[0]) / 60 || 1)
-        : 0;
+      const late = lateFrom ? ((g.fungus.evolution?.earned ?? 0) - lateFrom[1]) / ((g.time - lateFrom[0]) / 60 || 1) : 0;
       return { touched: touched.size, edge, first, lateRate: late };
     },
   };
