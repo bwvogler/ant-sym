@@ -16,6 +16,7 @@ import {
 import { LIVE, REMEMBERED, UNKNOWN } from "../fog/knowledge.ts";
 import { loadFog, saveFog, sensedFor } from "../fog/sources.ts";
 import { SensedMap, SENSED_FADE } from "../fungusSight.ts";
+import { buildGame } from "../useColony.ts";
 
 // ja-0iuy (PRD §66): an endless plane is centred, so its rows run negative. A host at y < 0 senses what is round it; the rows under 0 are skipped only on
 // a bounded map and on a curtain (whose rows start at 0).
@@ -147,4 +148,33 @@ test("the fog's save and load round-trip cells at negative chunk rows", () => {
   // The loaded fog is remembered (nothing senses it on the new map), where it was.
   const [gx, gy] = cellAt(300, -400);
   assert.equal(now.state(PLANE, gx, gy), REMEMBERED);
+});
+
+test("a host far out at y = -2e5 of a real endless game is live there too", () => {
+  const g = game();
+  const sensed = sensedFor(g, true);
+  const k = sensed.knowledge!;
+  const c = g.colonies[0]!;
+  const i = hostSlot(c);
+  for (const col of g.colonies) col.load.fill(0);
+  c.load[i] = INFECTED;
+  c.putAnt(i, PLANE, -3000, -200000);
+  const [gx, gy] = cellAt(-3000, -200000);
+  sensed.stampGame(g);
+  assert.equal(k.state(PLANE, gx, gy), LIVE, "live far out at negative y");
+  assert.ok(k.snapshot(PLANE, "rock", gx, gy) !== undefined, "the ground is copied");
+});
+
+test("a bounded game stamped by stampGame keeps endless false: a host just above row 0 senses nothing under it (review of #429, S1)", () => {
+  const g = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
+  const sensed = sensedFor(g, true);
+  const c = g.colonies[0]!;
+  const i = hostSlot(c);
+  for (const col of g.colonies) col.load.fill(0);
+  c.load[i] = INFECTED;
+  c.putAnt(i, PLANE, c.x[i]!, 2);
+  sensed.stampGame(g);
+  assert.equal(sensed.endless, false, "a bounded plane is not endless");
+  assert.equal(lit(sensed, PLANE, -80, -1).size, 0, "nothing under row 0");
+  assert.ok(lit(sensed, PLANE, 0, 20).size > 0, "the rows from 0 are sensed");
 });
