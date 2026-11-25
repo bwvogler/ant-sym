@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Colony, CURTAIN, PLANE, Game, gameRng, CELL, cellOf, generateOneWorld, mulberry32 } from "../../colony/index.ts";
-import { nestView } from "../nest.ts";
+import { asleepNote, nestView } from "../nest.ts";
 
 test("the nest: its own chambers only, the royal one with the queen in it, below the ground line", () => {
   // On the curtain of a small one world (S2.3c).
@@ -61,3 +61,22 @@ function cellIn(col: Colony, i: number): number {
   cellOf(col.x[i]!, col.y[i]!);
   return col.map.chambers!.at(CELL[0]!, CELL[1]!);
 }
+
+test("the nest card says a frozen colony is asleep, and says nothing of one that is awake", () => {
+  const g = new Game(generateOneWorld(1), { regrow: 0 }, gameRng(1), [{ antCount: 8 }, { antCount: 8 }]);
+  assert.equal(asleepNote(g, 0), null, "awake: nothing said");
+  g.freeze(0);
+  assert.match(asleepNote(g, 0)!, /^Asleep: the game has paused this colony/);
+  assert.equal(asleepNote(g, 1), null, "another colony is still awake");
+  g.thaw(0);
+  assert.equal(asleepNote(g, 0), null, "woken: nothing said");
+  // a frozen colony that has died out is not asleep: the card says so (ja-ko75)
+  const c = g.colonies[1]!;
+  c.alive.fill(0);
+  if (c.queen) c.queen.alive = false;
+  c.brood.items.length = 0;
+  c.alates.length = 0;
+  g.freeze(1);
+  assert.match(asleepNote(g, 1)!, /^Extinct: no ant, no brood and no queen are left/);
+  assert.match(asleepNote({ isFrozen: () => true, colonies: [] as never }, 5)!, /^Asleep:/, "no such colony: asleep, not extinct");
+});

@@ -96,7 +96,7 @@ try {
       const within = (r) => r && r.left >= -1 && r.top >= -1 && r.right <= vp.width + 1 && r.bottom <= vp.height + 1;
 
       try {
-        await page.goto(server.url);
+        await page.goto(`${server.url}?fog=0`); // layout and touch on the whole map: the checks tap ground the fog has not shown yet (the fog is the default, PRD §89)
         await page.getByLabel("world seed").fill(String(SEED));
         await press(page.getByRole("button", { name: "Start without the tutorial", exact: true }));
         await until(() => page.evaluate(() => (window.jevAnts?.game.time ?? 0) > 2), "a game a couple of seconds in", 30_000);

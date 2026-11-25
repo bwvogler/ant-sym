@@ -660,7 +660,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "fungus-unlocks",
     title: "The fungus's unlocks",
     covers:
-      "A plan for the fungus: a landing patch that is a seven-cell flower (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
+      "A plan for the fungus: a small landing patch (built), hyphae that thicken at a resource and close a flower into a new patch, two budgets (ants and ground), and a lichen partner that breaks and spreads over rock. What the literature supports (a new focus at a resource, lichens weathering rock, contact with an alga) and what is design. The flower landing is built; the rest is not.",
   },
   {
     note: "lichen",
@@ -776,7 +776,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "fog-of-war",
     title: "Fog of war",
     covers:
-      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, behind ?fog=1; off by default.",
+      "Seeing only what the fungus's body and its hosts sense: ground remembered as last seen, without ants, and only the colonies the fungus knows. Partly built (PRD §89): the ground, ants, strip, minimap and overlays through the fog, on by default; ?fog=0 turns it off.",
   },
   {
     note: "new-queens",

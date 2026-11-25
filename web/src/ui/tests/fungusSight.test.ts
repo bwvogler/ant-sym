@@ -10,6 +10,7 @@ function colony(ants: { x: number; y: number; load: number; layer?: number; aliv
   return {
     n: ants.length,
     params: { sensorDistance },
+    alates: [],
     alive: Uint8Array.from(ants.map((a) => a.alive ?? 1)),
     load: Float32Array.from(ants.map((a) => a.load)),
     layer: Uint8Array.from(ants.map((a) => a.layer ?? PLANE)),

@@ -3,12 +3,35 @@
 // (the shell's host gives the canvas's size, the device ratio and the follow), so a unit test runs it. `ui/camera.ts` holds the maths;
 // this holds the state the maths is applied to.
 
-import { worldExtent, type WorldMap } from "../../colony/index.ts";
-import { clamp, fit, fitZoom, fromMinimap, minimapRect, pan, type Camera, type Extent, type Viewport, zoomBy } from "../camera.ts";
+import { isEndless, worldExtent, type WorldMap } from "../../colony/index.ts";
+import {
+  clamp,
+  fit,
+  fitZoom,
+  fromMinimap,
+  isFitted,
+  isZoomedIn,
+  miniFrame,
+  minimapRect,
+  pan,
+  type Camera,
+  type Extent,
+  type Viewport,
+  zoomBy,
+} from "../camera.ts";
 import type { ViewCam } from "./prelude.ts";
 
 /** A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. */
-export const extentOf = (m: WorldMap): Extent & { x0: number } => ({ x0: m.x0, ...worldExtent(m) });
+export function extentOf(m: WorldMap): Extent & { x0: number } {
+  const e = { x0: m.x0, ...worldExtent(m) };
+  if (!isEndless(m)) return e;
+  // An endless plane (camera.ts header): no whole map to fit, so `fit` shows the start nests and a margin.
+  const [a, b] = m.plane.startNests();
+  const pad = Math.max(30, 0.25 * Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
+  const x0 = Math.min(a.x, b.x) - pad;
+  const y0 = Math.min(a.y, b.y) - pad;
+  return { ...e, endless: true, home: { x0, y0, w: Math.max(a.x, b.x) + pad - x0, h: Math.max(a.y, b.y) + pad - y0 } };
+}
 
 /** A linked click opens the other view at least this close (CSS px a cell, as `n` goes to a nest). */
 export const LINK_ZOOM = 8;
@@ -90,9 +113,8 @@ export class CameraRig {
     const cam = clamp(c, we, vp);
     s.cam = cam;
     s.aim = null;
-    const fz = fitZoom(we, vp);
-    s.zoomedIn = cam.zoom > fz * 1.05;
-    s.fitted = cam.zoom <= fz * 1.0001;
+    s.zoomedIn = isZoomedIn(we, vp, cam.zoom);
+    s.fitted = isFitted(we, vp, cam);
   }
 
   /** Zoom the shown view by `factor` about device point (sx, sy) in a box `v` (the wheel's own box: its ratio is the canvas's, not the device's). */
@@ -102,8 +124,8 @@ export class CameraRig {
     const c = zoomBy(s.cam ?? fit(we, v), we, v, sx, sy, factor);
     s.cam = c;
     s.aim = null;
-    s.zoomedIn = c.zoom > fitZoom(we, v) * 1.05;
-    s.fitted = c.zoom <= fitZoom(we, v) * 1.0001;
+    s.zoomedIn = isZoomedIn(we, v, c.zoom);
+    s.fitted = isFitted(we, v, c);
   }
 
   /**
@@ -121,9 +143,8 @@ export class CameraRig {
     // Not clamped here: each frame clamps round the aim in the box it is drawn in (ViewCam.aim).
     s.cam = { x, y, zoom };
     s.aim = { x, y, ...(how.span ? { span: how.span } : {}) };
-    const fz = fitZoom(we, vp);
     s.fitted = false;
-    s.zoomedIn = zoom > fz * 1.05;
+    s.zoomedIn = isZoomedIn(we, vp, zoom);
   }
 
   /** The whole map, in the view shown (the key 0). */
@@ -143,15 +164,17 @@ export class CameraRig {
 
   /** Whether device point (x, y) is on the minimap: only while it is drawn (the view zoomed in). */
   inMini(x: number, y: number): boolean {
+    const ext = this.extent();
     if (!this.vc().zoomedIn) return false;
-    const r = minimapRect(this.extent(), this.viewport(), this.host.dpr());
+    // An endless plane's minimap is the window of chunks round the camera (miniFrame), a bounded map's the whole map.
+    const r = minimapRect(miniFrame(ext, this.camera()), this.viewport(), this.host.dpr());
     return x >= r.x && y >= r.y && x <= r.x + r.w && y <= r.y + r.h;
   }
 
   /** A click or drag on the minimap: look at the world point under it (a follow ends). */
   jumpMini(x: number, y: number): void {
     if (this.host.following()) this.host.unfollow();
-    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y);
+    const [wx, wy] = fromMinimap(this.extent(), this.viewport(), this.host.dpr(), x, y, this.camera());
     this.set({ ...this.camera(), x: wx, y: wy });
   }
 }

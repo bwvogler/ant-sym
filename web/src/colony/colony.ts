@@ -473,6 +473,14 @@ export class Colony {
   scentSum = new MeanGrid();
   /** the strongest queen's scent perceived on each cell this tick (scent × scentGain): what nurses rear gynes by; rebuilt every tick, not saved */
   perceived = new FeltGrid();
+  /** Free the chunks the colony's per-tick grids hold nothing in (an endless game's housekeeping: they would keep every chunk the ants have been over). */
+  trimScratch(): void {
+    for (const g of [this.felt, this.youngs, this.broods, this.perceived]) g.trim();
+    this.cropDonors.trim();
+    this.donors.trim();
+    this.scentSum.trim();
+  }
+
   /** this colony's own ants per cell, kept by the game each tick underground; null on its own */
   friends: CellCounts | null = null;
   /** this colony's ants per cell (the game's occupancy), for the odds an ant senses by touch on meeting strangers (MR 4) */
@@ -1036,6 +1044,21 @@ export class Colony {
   /** Whether the colony has lost its queen (a curtain colony; a bare field's has none to lose). */
   get orphaned(): boolean {
     return this.queen !== null && !this.queen.alive;
+  }
+
+  /**
+   * Whether the colony has died out for good (ja-ko75): no ant, no brood, no alate and no living queen. A colony with a queen is never extinct; an
+   * orphaned one is once its last ant, pupa and alate are gone (it never grows again: its brood was its last chance). A bare field's colony (no queen at
+   * all) is not while its larder can still become ants. The awake rule counts an extinct colony out of the cap and freezes it for good.
+   */
+  get extinct(): boolean {
+    return (
+      this.population === 0 &&
+      this.brood.size === 0 &&
+      this.alates.length === 0 &&
+      !this.queen?.alive &&
+      (this.queen !== null || this.larder <= 0)
+    );
   }
 
   /** Ant i dies where it stands; food it carried drops on that cell (a soil pellet is just lost; brood it carried lies there). `lost`: a loss (a fight), not old age. */

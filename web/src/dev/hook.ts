@@ -1,6 +1,6 @@
 // The dev hook (ja-fnd.6.2, docs/refactor.md S5.2): the game and the page's views on `window.jevAnts`, for the Playwright guard
 // (scripts/e2e-one-world.mjs). Dev builds only: ColonyApp installs it behind `import.meta.env.DEV`, so it is not in the Pages build.
-//   follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother) sends a new queen from that colony
+//   fogState(view, x, y) reads the fog's state of a cell (null with no fog); follow(k, i) follows an ant; view() and camera(view) read where each view looks; fly(mother) sends a new queen from that colony
 //   with the fungus in her and opens her pen, Jev or not. With the game paused, nextCrossing(maxSeconds, minTicks) rehearses on a
 //   copy which curtain ant comes up next, and on which fixed step (rehearse.ts), and step(n) takes the game itself n of those steps:
 //   the guard follows that ant through its hole for certain.
@@ -26,6 +26,8 @@ export interface DevDeps {
   traces: AntTraces;
   /** the view shown when the hook was installed (ColonyApp installs it again when the view changes) */
   view: View;
+  /** the line whose curtain the side view shows, when the hook was installed (ColonyApp installs it again when it changes) */
+  line: number;
   /** the followed ant, read when the guard asks */
   followed: { readonly current: Followed | null };
   setFollowed(f: Followed | null): void;
@@ -52,11 +54,16 @@ export function devHook(d: DevDeps) {
       return true;
     },
     view: () => d.view,
+    line: () => d.line,
     followed: () => d.followed.current,
     sensed: (v: View, x: number, y: number) => {
       cellOf(x, y);
       return d.sensed.sight(layerOf(v), CELL[0], CELL[1]);
     },
+    /** The fog's state of the cell at (x, y) of a view (0 unknown, 1 remembered, 2 live), or null while the page runs without the fog. */
+    fogState: (v: View, x: number, y: number): number | null => d.sensed.knowledge?.stateAt(layerOf(v), x, y) ?? null,
+    /** The fog's state of cell (gx, gy) of a view, or null with no fog (or while the builder has it off). */
+    fogCell: (v: View, gx: number, gy: number): number | null => d.sensed.knowledge?.state(layerOf(v), gx, gy) ?? null,
     nextCrossing: (maxSeconds = 20, minTicks = 1) => nextCrossing(game, buildGame(d.settings), maxSeconds, minTicks),
     step: (n = 1) => {
       for (let t = 0; t < n; t++) {
@@ -64,7 +71,8 @@ export function devHook(d: DevDeps) {
         d.sensed.stampGame(game); // the page's step subscribers do not run here
       }
     },
-    camera: (v: View) => d.field.current?.camera(layerOf(v)) ?? null,
+    /** view v's camera; below, of line `line`'s curtain (layer 1 + line, E5.6) */
+    camera: (v: View, line = 0) => d.field.current?.camera(layerOf(v) + (v === "below" ? line : 0)) ?? null,
     goNest: (k: number) => d.field.current?.goNest(k),
     fly: (mother = 0) => {
       const m = game.colonies[mother];

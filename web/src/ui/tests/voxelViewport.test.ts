@@ -187,8 +187,9 @@ test("the scene draws with the camera the orbit and the viewport give: its pose,
   const scenes: InspectionScene[] = [];
   try {
     // a game long enough that the nest has a mound and the surface cells near it have stalks and heaps for the patch's frame to fit
+    // (200 s: with the floor-mark max rule, PRD §77.8, seed 3 has no mound this wide at 80 s; at 120 s the frame is 1.42, the bound 1.5)
     const g = buildGame({ species: "generic", seed: 3, antCount: 40, rival: false, generation: 0 });
-    for (let t = 0; t < 2400; t++) g.tick(1 / 30);
+    for (let t = 0; t < 6000; t++) g.tick(1 / 30);
     const sensed = new SensedMap();
     for (const [mode, layer] of [
       ["surface", PLANE],

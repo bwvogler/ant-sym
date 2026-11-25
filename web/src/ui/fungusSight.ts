@@ -48,18 +48,48 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
-  /** the fog of war's knowledge when the page runs with it (fog/sources.ts sensedFor); null: no fog */
-  knowledge: Knowledge | null = null;
-  /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog */
-  corpses: CorpseMemory | null = null;
-  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog */
-  known: KnownColonies<SideStats> | null = null;
+  #knowledge: Knowledge | null = null;
+  #corpses: CorpseMemory | null = null;
+  #known: KnownColonies<SideStats> | null = null;
+  /**
+   * The fog is off for now (the builder is on, docs/fog-of-war.md §5.4): knowledge, corpses and known read null, so everything shows as
+   * without the fog. The memory goes on being kept, so the fog comes back as it was.
+   */
+  suspended = false;
+  /** the fog of war's knowledge when the page runs with it (fog/sources.ts sensedFor); null: no fog (or suspended) */
+  get knowledge(): Knowledge | null {
+    return this.suspended ? null : this.#knowledge;
+  }
+  set knowledge(k: Knowledge | null) {
+    this.#knowledge = k;
+  }
+  /** the dead the fungus has seen, kept as ground items (fog/corpses.ts); null: no fog (or suspended) */
+  get corpses(): CorpseMemory | null {
+    return this.suspended ? null : this.#corpses;
+  }
+  set corpses(c: CorpseMemory | null) {
+    this.#corpses = c;
+  }
+  /** the colonies the fungus knows of, with their numbers as last known (fog/known.ts); null: no fog (or suspended) */
+  get known(): KnownColonies<SideStats> | null {
+    return this.suspended ? null : this.#known;
+  }
+  set known(k: KnownColonies<SideStats> | null) {
+    this.#known = k;
+  }
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
   /** told when time goes back and everything is forgotten */
   onReset: (() => void) | null = null;
+  /**
+   * One ant that stays an observer whatever it carries: the tutorial's host, followed through the watch until it is groomed clean (a host
+   * below INFECTED sees nothing, and the watch is the page showing exactly that moment). Set by the tutorial (ui/useTutorial.ts).
+   */
+  watch: { k: number; i: number; gen: number } | null = null;
   /** the sim time the body was last stamped (it is stamped every BODY_EVERY, not every step) */
   #bodyAt = -Infinity;
+  /** The colonies the game has frozen, by index, as of the last `stampGame`: the page draws them still and dimmed (ja-qpv.4.5). Empty until a game is stamped. */
+  readonly asleep = new Set<number>();
 
   /** Whether a host has ever sensed any cell of chunk (cx, cy) on layer `l`. */
   revealed(l: number, cx: number, cy: number): boolean {
@@ -86,6 +116,7 @@ export class SensedMap {
   stamp(colonies: readonly Colony[], now: number): void {
     this.#begin(now);
     hostSight(colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    this.#watched(colonies);
     this.#forget();
   }
 
@@ -96,14 +127,25 @@ export class SensedMap {
   stampGame(game: Game): void {
     const now = game.time;
     this.#begin(now);
+    this.asleep.clear();
+    for (let k = 0; k < game.colonies.length; k++) if (game.isFrozen(k)) this.asleep.add(k);
     hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
+    this.#watched(game.colonies);
     if (now - this.#bodyAt >= BODY_EVERY) {
       this.#bodyAt = now;
       bodySight(game.fungus, game.layers.length, (l, x, y, r) => this.mark(l, x, y, r));
     }
-    if (this.knowledge) this.corpses?.update(game, this.knowledge, decayStage);
-    if (this.knowledge) this.known?.update(game, this.knowledge);
+    if (this.#knowledge) this.#corpses?.update(game, this.#knowledge, decayStage);
+    if (this.#knowledge) this.#known?.update(game, this.#knowledge);
     this.#forget();
+  }
+
+  /** The watched ant (see `watch`) senses like a host while it lives. */
+  #watched(colonies: readonly Colony[]): void {
+    const w = this.watch;
+    const c = w && colonies[w.k];
+    if (!w || !c || !c.alive[w.i] || c.gen[w.i] !== w.gen) return;
+    this.mark(c.layer[w.i] ?? 0, c.x[w.i]!, c.y[w.i]!, c.params.sensorDistance + REACH_MARGIN);
   }
 
   #begin(now: number): void {
@@ -112,8 +154,8 @@ export class SensedMap {
       this.#fresh.clear();
       this.#revealed.clear();
       this.#bodyAt = -Infinity;
-      this.corpses?.clear();
-      this.known?.clear();
+      this.#corpses?.clear();
+      this.#known?.clear();
       this.onReset?.();
     }
     this.now = now;

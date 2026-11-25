@@ -7,6 +7,7 @@ import { devHook, installDevHook, type DevDeps } from "../../dev/hook.ts";
 import { REHEARSE_DT } from "../rehearse.ts";
 import type { Followed } from "../follow.ts";
 import { SensedMap } from "../fungusSight.ts";
+import type { Knowledge } from "../fog/knowledge.ts";
 import { AntTraces } from "../trace.ts";
 
 // The dev hook on window.jevAnts (ja-fnd.6.2): what scripts/e2e-one-world.mjs calls, and what each call does. Until now only the e2e
@@ -39,6 +40,7 @@ function make(over: Partial<DevDeps> = {}) {
     notify: (text, tone) => calls.notices.push([text, tone]),
     traces: { traces: [{ colony: 1, i: 4, xs: [0, 1, 2], end: "home" }] } as unknown as AntTraces,
     view: "above",
+    line: 1,
     followed,
     setFollowed: (f) => calls.followed.push(f),
     sensed: new SensedMap(),
@@ -101,11 +103,18 @@ test("view and followed read what the page gave; notify passes the text and tone
   ]);
 });
 
+test("line reads the line whose curtain the side view shows (E5.6: the page's own record of a pick)", () => {
+  const { hook } = make();
+  assert.equal(hook.line(), 1);
+});
+
 test("camera asks the field for the plane above and the curtain below, and null before the field is there; goNest passes the colony on", () => {
   const { calls, hook } = make();
   assert.deepEqual(hook.camera("above"), { x: PLANE });
   assert.deepEqual(hook.camera("below"), { x: CURTAIN });
   assert.deepEqual(calls.cameras, [PLANE, CURTAIN]);
+  assert.deepEqual(hook.camera("below", 2), { x: CURTAIN + 2 }, "a later line's curtain is layer 1 + its index");
+  assert.deepEqual(hook.camera("above", 2), { x: PLANE }, "the plane has one camera");
   hook.goNest(1);
   assert.deepEqual(calls.nests, [1]);
   const none = make({ field: { current: null } }).hook;
@@ -185,4 +194,28 @@ test("installDevHook puts the hook on window.jevAnts, with the keys devHook buil
     if (had === undefined) delete w.window;
     else w.window = had;
   }
+});
+
+test("fogState reads the fog's state of the cell under (x, y) on the view's layer, and is null with no fog (F3.6)", () => {
+  assert.equal(make().hook.fogState("above", 2, 3), null);
+  const asked: [number, number, number][] = [];
+  const sensed = new SensedMap();
+  sensed.knowledge = { stateAt: (l: number, x: number, y: number) => (asked.push([l, x, y]), 2) } as unknown as Knowledge;
+  const { hook } = make({ sensed });
+  assert.equal(hook.fogState("below", 40, 50), 2);
+  assert.deepEqual(asked.at(-1), [CURTAIN, 40, 50]);
+  assert.equal(hook.fogState("above", 2, 3), 2);
+  assert.deepEqual(asked.at(-1), [PLANE, 2, 3]);
+});
+
+test("fogCell reads the fog's state of a cell by its coordinates, and is null with no fog or while the builder has it off (F6)", () => {
+  assert.equal(make().hook.fogCell("above", 2, 3), null);
+  const asked: [number, number, number][] = [];
+  const sensed = new SensedMap();
+  sensed.knowledge = { state: (l: number, x: number, y: number) => (asked.push([l, x, y]), 1) } as unknown as Knowledge;
+  const { hook } = make({ sensed });
+  assert.equal(hook.fogCell("below", 4, 5), 1);
+  assert.deepEqual(asked.at(-1), [CURTAIN, 4, 5]);
+  sensed.suspended = true;
+  assert.equal(hook.fogCell("above", 4, 5), null, "suspended: no fog");
 });

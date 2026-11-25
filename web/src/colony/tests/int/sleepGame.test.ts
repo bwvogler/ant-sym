@@ -240,3 +240,71 @@ test("contact reaches a few steps and no further: ants 3 steps apart meet, 10 st
     assert.equal(g.sleepRule!.saveState().contacts.length, pairs, `${dx} steps apart`);
   }
 });
+
+// A colony that has died out (ja-ko75): `Colony.extinct`, and the rule counting it out of the cap and freezing it for good.
+
+/** Kill everything of colony k: its queen, its ants, its brood and its alates (nothing is left to grow again). */
+const extinguish = (g: Game, k: number) => {
+  const c = g.colonies[k]!;
+  c.alive.fill(0);
+  if (c.queen) c.queen.alive = false;
+  c.brood.items.length = 0;
+  c.alates.length = 0;
+};
+
+test("Colony.extinct: no ant, no brood, no alate and no living queen; any one of them is enough to live", () => {
+  const g = fresh();
+  const c = g.colonies[1]!;
+  assert.equal(c.extinct, false, "a fresh colony");
+  extinguish(g, 1);
+  assert.equal(c.extinct, true, "everything gone");
+  c.queen!.alive = true;
+  assert.equal(c.extinct, false, "a living queen keeps it alive though she has no ants yet");
+  c.queen!.alive = false;
+  c.alive[0] = 1;
+  assert.equal(c.extinct, false, "one ant");
+  c.alive[0] = 0;
+  c.brood.add(c.layers[c.home]!.nest.x, c.layers[c.home]!.nest.y, 0);
+  assert.equal(c.extinct, false, "one egg");
+  c.brood.items.length = 0;
+  c.alates.push({ x: 0, y: 0, t: 0, step: 1, load: 0, strain: 0, resist: 0, food: 1 });
+  assert.equal(c.extinct, false, "one alate");
+  // A colony with no queen at all (the bare field): extinct only once its larder is empty too, for the larder still becomes ants.
+  c.alates.length = 0;
+  c.queen = null;
+  c.larder = 5;
+  assert.equal(c.extinct, false, "a queen-less colony with food in its larder");
+  c.larder = 0;
+  assert.equal(c.extinct, true, "a queen-less colony with an empty larder");
+});
+
+test("a colony that has died out is frozen at once and frees its place under the cap; the living colony is not frozen for it", () => {
+  // cap 1, the fungus at both holes: the rule ties on rank, so the control freezes the lower index, colony 0, by the cap
+  const control = fresh();
+  control.enableSleep({ ...RULE, cap: 1 });
+  spore(control, 0);
+  spore(control, 1);
+  run(control, 5);
+  assert.equal(control.isFrozen(0) && !control.isFrozen(1), true, "the control: the cap freezes colony 0 and keeps colony 1");
+  const g = fresh();
+  extinguish(g, 1);
+  g.enableSleep({ ...RULE, cap: 1 });
+  spore(g, 0);
+  spore(g, 1);
+  run(g, 5);
+  assert.equal(g.isFrozen(1), true, "the extinct colony is frozen at once");
+  assert.equal(g.isFrozen(0), false, "and colony 0 keeps the one place: the cap froze nothing living");
+});
+
+test("nothing wakes a frozen extinct colony: the fungus at its hole and a host in its nest ground leave it asleep", () => {
+  const g = fresh();
+  extinguish(g, 1);
+  g.enableSleep(RULE);
+  spore(g, 0);
+  spore(g, 1);
+  run(g, 5);
+  assert.equal(g.isFrozen(1), true);
+  spore(g, 1); // the fungus again at the dead colony's hole
+  run(g, 30);
+  assert.equal(g.isFrozen(1), true, "still frozen");
+});

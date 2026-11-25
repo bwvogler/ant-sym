@@ -47,12 +47,15 @@ test("the queen is asked only her own levers, and her signal lever scales the ro
   assert.ok(!askedLevers(menu, false).includes("queenSignal"), "a worker has no queen signal");
   const mark = (signalLevel: number) => {
     const { map, c } = court(4, 0.8);
+    // The court lays no marks of its own: under the max rule (PRD §77.8) any worker on the queen's cell sets it to the cap, as traffic does
+    // under the add rule, so the cell would read 20 whatever she lays. What is tested is her own deposit (nestWork, QUEEN_MARK × signal).
     const f = new Fungus(map, { grooming: 0 });
     c.queen!.load = 1;
     c.queen!.strain = GARDEN;
     f.hosts = 5;
     f.bindPolicy("fungus", (s) => (s.task === "queen" ? encodeLevels({ queenSignal: signalLevel }, askedLevers(f.menu, true)) : "default"));
     f.step([c], [occupancy(c, new CountGrid())], 0.1);
+    c.layGain.fill(0); // after the step, which sets each ant's levers
     const signal = c.queen!.signal;
     for (let k = 0; k < 30; k++) c.tick(1 / 30);
     cellOf(c.queen!.x, c.queen!.y);

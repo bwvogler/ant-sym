@@ -92,7 +92,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
     );
     if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
@@ -225,6 +225,8 @@ if (isMainThread) {
     spread: 0,
     patches: 0,
     mat: 0,
+    cells: 0,
+    spores: 0,
     leans: "",
     lichenCells: 0,
     lichenFirst: -1,
@@ -282,6 +284,9 @@ if (isMainThread) {
   r.spread = g.fungus.spread;
   r.patches = g.fungus.evolution?.patches ?? 0;
   r.mat = g.fungus.hyphaeOn(0)?.mat.size ?? 0;
+  // How much mycelium and how many cells with spores the game ended with (ja-kura): every layer's hyphae, and Fungus.sporeCells (a total over layers).
+  for (let l = 0; l < g.layers.length; l++) r.cells += g.fungus.hyphaeOn(l)?.parent.size ?? 0;
+  r.spores = g.fungus.sporeCells;
   r.leans = `${g.fungus.hyphaeOn(0)?.trafficLeans ?? 0} of ${g.fungus.hyphaeOn(0)?.sideChoices ?? 0} side choices; tropisms ${g.fungus.hyphaeOn(0)?.tropisms ?? 0} of ${g.fungus.hyphaeOn(0)?.tropismChoices ?? 0} grow steps`;
   r.lichenCells = g.fungus.lichenCells().size;
   r.lichenFirst = g.fungus.lichenFirst === null ? -1 : Math.round(g.fungus.lichenFirst);

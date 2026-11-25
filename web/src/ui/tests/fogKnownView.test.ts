@@ -133,6 +133,7 @@ test("a colony is known by its own hole, not by another's, and goes live when a 
       x: Float32Array.of(centreX(px, py)),
       y: Float32Array.of(centreY(py)),
       params: { sensorDistance: 3 },
+      alates: [],
     }) as unknown as Colony;
   sensed.stamp([host(HOLES[0]!.px, HOLES[0]!.py)], 1); // only colony 0's own hole is sensed
   k.update(game, fog);

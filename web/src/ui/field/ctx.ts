@@ -81,6 +81,8 @@ export interface FieldCtx {
   fog?: Knowledge | null;
   /** the dead the fungus has seen (null without the fog) */
   corpses?: CorpseMemory | null;
+  /** the colonies the game has frozen, by index (the sensed map copies them each step): drawn still and dimmed (field/asleep.ts) */
+  asleep?: ReadonlySet<number>;
   /** the sensed map's clock: a cell sensed this long ago shows its scent this faintly */
   sensedNow: number;
   /** what the frame takes from the outside world: the clock, a new path, a new canvas (field/env.ts) */

@@ -8,7 +8,7 @@ import { GRACE, Knowledge } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import { SensedMap } from "../fungusSight.ts";
 import { CLOSE_SPRITE_GROUND } from "../inspectionGround.ts";
-import { RecordedCanvas, recordingContext } from "./recordingContext.ts";
+import { RecordedCanvas, RecordedPath, recordingContext } from "./recordingContext.ts";
 
 // The ground under the fog (docs/fog-of-war.md §5.1, ja-1ypq.3.1): a chunk never sensed is fog; a sensed cell paints from its snapshot, dimmed
 // once nobody senses it, and a change made while it was out of sight does not show.
@@ -28,12 +28,17 @@ const THEME = {
 } as unknown as FieldTheme;
 const FOG = [0, 1, 2].map((k) => Math.round(THEME.paperRgb[k]! + (THEME.inkRgb[k]! - THEME.paperRgb[k]!) * 0.16));
 
+let made: RecordedPath[] = [];
 const env = {
   now: () => 0,
   dpr: () => 1,
   dev: false,
   reducedMotion: () => false,
-  newPath: () => ({}) as Path2D,
+  newPath: () => {
+    const p = new RecordedPath();
+    made.push(p);
+    return p as unknown as Path2D;
+  },
   newCanvas: (w: number, h: number) => new RecordedCanvas(w, h) as unknown as HTMLCanvasElement,
   sprites: () => {
     throw new Error("the ground uses no sprite");
@@ -46,6 +51,7 @@ const host = (gx: number, gy: number): Colony =>
   ({
     n: 1,
     params: { sensorDistance: 3 },
+    alates: [],
     alive: Uint8Array.of(1),
     load: Float32Array.of(INFECTED),
     layer: Uint8Array.of(PLANE),
@@ -68,9 +74,10 @@ function setup(fog: boolean) {
     ? new Knowledge(sensed, [{ name: SNAP.rock, layer: PLANE, at: (cx, cy) => (cx === 0 && cy === 0 ? rock : undefined) }])
     : null;
   const ground = new Ground(env);
+  const rec = recordingContext();
   const k = (now: number) =>
     ({
-      ctx: recordingContext().ctx,
+      ctx: rec.ctx,
       theme: THEME,
       d: 1,
       v: { w: 800, h: 600, dpr: 1 },
@@ -95,7 +102,7 @@ function setup(fog: boolean) {
     ground.paintChunk(k(now), { food: true, home: true }, 0, 0, cc, rock, false);
     return cc.img;
   };
-  return { rock, sensed, paint, ground };
+  return { rock, sensed, paint, ground, rec, k };
 }
 
 test("a chunk nothing has sensed is fog, every cell opaque", () => {
@@ -215,4 +222,24 @@ test("a remembered chamber is tinted plainly: its role is not what it may be now
   assert.equal(px(paint(1), 10, 10)[3], 70, "live: the role's tint");
   sensed.stamp([{ ...host(60, 60), n: 0 } as Colony], 1 + GRACE + 1);
   assert.equal(px(paint(1 + GRACE + 1), 10, 10)[3], 55, "remembered: the plain tint (no role)");
+});
+
+test("up close, fog and remembered open ground are laid as strips, hexagons only where something shows (a phone's frame rate)", () => {
+  const win = { rx0: 0, rx1: 63, ry0: 0, ry1: 40 };
+  const hexes = (fog: boolean, stamp: boolean) => {
+    made = [];
+    const { sensed, ground, rec, k } = setup(fog);
+    if (stamp) sensed.stamp([host(10, 10)], 1);
+    ground.draw(k(1), { food: true, home: true }, win, 1, false);
+    return {
+      hex: made.reduce((n, p) => n + p.cmds.filter((c) => c.startsWith("moveTo(")).length, 0),
+      strips: rec.log.filter((l) => l.startsWith("drawImage(")).length,
+    };
+  };
+  const unknown = hexes(true, false);
+  assert.equal(unknown.hex, 0, "nothing sensed: no hexagon at all");
+  assert.ok(unknown.strips > 0, "the fog is laid as strips");
+  const some = hexes(true, true);
+  assert.ok(some.hex > 0 && some.hex < 100, `a rock cell and the like draw as hexagons, not every cell (${some.hex})`);
+  assert.ok(hexes(false, false).strips === 0, "without the fog, no strips under the hexagons");
 });
