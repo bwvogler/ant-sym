@@ -74,7 +74,7 @@ export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBu
  * pool counts each unit of earned mass (growth on the ground, corpses, light) as `share` mutations, not MUTATION. Design numbers,
  * from the ledger's experiment: they keep P1 and the free pool near where they are.
  */
-export const EARNED = { sporeCost: 0.1, reserve: 110, share: 1.2 };
+export const EARNED = { sporeCost: 0.1, reserve: 110, share: 0.6 };
 
 /** Mutations per unit of new fungus (its growth on the ground and in hosts). */
 export const MUTATION = 0.25;
