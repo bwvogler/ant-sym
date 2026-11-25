@@ -3,7 +3,8 @@
 // (the shell's host gives the canvas's size, the device ratio and the follow), so a unit test runs it. `ui/camera.ts` holds the maths;
 // this holds the state the maths is applied to.
 
-import { isEndless, worldExtent, type WorldMap } from "../../colony/index.ts";
+import { CHUNK, isEndless, PLANE, R, worldExtent, type WorldMap } from "../../colony/index.ts";
+import type { Knowledge } from "../fog/knowledge.ts";
 import {
   clamp,
   fit,
@@ -22,8 +23,18 @@ import {
 } from "../camera.ts";
 import type { ViewCam } from "./prelude.ts";
 
-/** A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. */
-export function extentOf(m: WorldMap): Extent & { x0: number } {
+/**
+ * How far past the ground the fog has explored the camera may go, in cells: two chunks, about a screen at a usual zoom, so the edge of what the
+ * fungus knows can be looked past and aimed at. A constant, not the view's size: the camera's bound stays a pure function of the map and the fog.
+ */
+export const FOG_MARGIN = 2 * CHUNK;
+
+/**
+ * A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. On an endless
+ * plane under the fog (`knowledge`, null with the fog off or suspended) the view may go only where the fungus has explored plus FOG_MARGIN, and
+ * where `fit` starts (the home rectangle): `reach`, the one bound (camera.ts reachOf). A bounded map, or no fog, is as it always was (F7b, ja-1ypq.10).
+ */
+export function extentOf(m: WorldMap, knowledge: Knowledge | null = null): Extent & { x0: number } {
   const e = { x0: m.x0, ...worldExtent(m) };
   if (!isEndless(m)) return e;
   // An endless plane (camera.ts header): no whole map to fit, so `fit` shows the start nests and a margin.
@@ -31,7 +42,16 @@ export function extentOf(m: WorldMap): Extent & { x0: number } {
   const pad = Math.max(30, 0.25 * Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
   const x0 = Math.min(a.x, b.x) - pad;
   const y0 = Math.min(a.y, b.y) - pad;
-  return { ...e, endless: true, home: { x0, y0, w: Math.max(a.x, b.x) + pad - x0, h: Math.max(a.y, b.y) + pad - y0 } };
+  const home = { x0, y0, w: Math.max(a.x, b.x) + pad - x0, h: Math.max(a.y, b.y) + pad - y0 };
+  const out = { ...e, endless: true as const, home };
+  const box = knowledge?.bounds(PLANE);
+  if (!box) return out;
+  // The explored chunks (x in cells, y in rows of R) and the margin, joined with home so the reach is never narrower than the start view.
+  const rx0 = Math.min(box.cx0 * CHUNK - FOG_MARGIN, home.x0);
+  const ry0 = Math.min(box.cy0 * CHUNK * R - FOG_MARGIN * R, home.y0);
+  const rx1 = Math.max((box.cx1 + 1) * CHUNK + FOG_MARGIN, home.x0 + home.w);
+  const ry1 = Math.max((box.cy1 + 1) * CHUNK * R + FOG_MARGIN * R, home.y0 + home.h);
+  return { ...out, reach: { x0: rx0, y0: ry0, w: rx1 - rx0, h: ry1 - ry0 } };
 }
 
 /** A linked click opens the other view at least this close (CSS px a cell, as `n` goes to a nest). */
@@ -60,6 +80,8 @@ export interface RigHost {
   following: () => boolean;
   /** stop following now (the ref at once, the page's state after) */
   unfollow: () => void;
+  /** the fog's knowledge, when the page runs with it and it is not suspended (the camera goes only where it has explored); absent: no fog */
+  fog?: () => Knowledge | null;
 }
 
 export class CameraRig {
@@ -93,7 +115,7 @@ export class CameraRig {
 
   /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
   extent(): Extent & { x0: number } {
-    return extentOf(this.host.map(this.host.view()));
+    return extentOf(this.host.map(this.host.view()), this.host.fog?.() ?? null);
   }
 
   viewport(): Viewport {
@@ -140,7 +162,8 @@ export class CameraRig {
   centreOn(v: number, x: number, y: number, how: { close?: boolean; span?: number; keepFollow?: boolean } = {}): void {
     if (v === this.host.view() && this.host.following() && !how.keepFollow) this.host.unfollow();
     const s = this.of(v);
-    const we = extentOf(this.host.map(v));
+    // (the fog is passed for the same extent as everywhere else; this reads only its start view and zoom level, never the reach)
+    const we = extentOf(this.host.map(v), this.host.fog?.() ?? null);
     const vp = this.viewport();
     const now = this.cams.get(this.host.view())?.cam?.zoom ?? fitZoom(we, vp);
     const zoom = how.span ? Math.min(vp.w, vp.h) / how.span : how.close ? Math.max(now, LINK_ZOOM * this.host.dpr()) : now;

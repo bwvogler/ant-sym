@@ -235,3 +235,33 @@ test("a watched ant stays an observer below INFECTED, until it is unwatched or g
   );
   assert.equal(kn.state(PLANE, 90, 90), UNKNOWN, "and a dead one sees nothing");
 });
+
+test("the explored box grows with each chunk first sensed, per layer, and is not moved by sensing a chunk again", () => {
+  const s = new SensedMap();
+  s.endless = true; // the endless plane has rows above 0
+  const k = new Knowledge(s, []);
+  assert.equal(k.bounds(PLANE), undefined, "nothing explored");
+  s.stamp([hostAt(40, 40)], 10);
+  assert.deepEqual(k.bounds(PLANE), { cx0: 0, cy0: 0, cx1: 0, cy1: 0 });
+  s.stamp([hostAt(200, 70)], 11);
+  assert.deepEqual(k.bounds(PLANE), { cx0: 0, cy0: 0, cx1: 3, cy1: 1 });
+  s.stamp([hostAt(-70, -10)], 12);
+  assert.deepEqual(k.bounds(PLANE), { cx0: -2, cy0: -1, cx1: 3, cy1: 1 }, "it grows toward negative chunks too");
+  s.stamp([hostAt(41, 41)], 13);
+  assert.deepEqual(k.bounds(PLANE), { cx0: -2, cy0: -1, cx1: 3, cy1: 1 }, "a chunk sensed again moves nothing");
+  assert.equal(k.bounds(1), undefined, "another layer has its own");
+});
+
+test("the explored box is saved and loaded with the fog and forgotten when time goes back", () => {
+  const s = new SensedMap();
+  const k = new Knowledge(s, []);
+  s.stamp([hostAt(40, 40)], 10);
+  s.stamp([hostAt(200, 70)], 11);
+  const loaded = new Knowledge(new SensedMap(), []);
+  loaded.load(JSON.parse(JSON.stringify(k.save())));
+  assert.deepEqual(loaded.bounds(PLANE), k.bounds(PLANE));
+  s.stamp([hostAt(40, 40)], 5); // time went back: everything is forgotten, then this is sensed
+  assert.deepEqual(k.bounds(PLANE), { cx0: 0, cy0: 0, cx1: 0, cy1: 0 });
+  loaded.load(JSON.parse(JSON.stringify(new Knowledge(new SensedMap(), []).save())));
+  assert.equal(loaded.bounds(PLANE), undefined, "a load replaces the box too");
+});
