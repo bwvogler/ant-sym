@@ -60,6 +60,10 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      nofoci:
+        description: "Run the ungated game: flower patches form without the Foci upgrade (--no-foci, docs/foci.md, PRD §92). Default: gated, so none forms until Foci is kept; the default order ends `knots,foci` (arm C), an order without them forms no flower (arm E)"
+        type: boolean
+        default: false
       lichen:
         description: "Also probe the rock the hyphae lie beside and the late earning rate (--lichen; reads only, docs/lichen.md, ja-vlla.11.2)"
         type: boolean
@@ -89,6 +93,7 @@ jobs:
           FLOW: ${{ inputs.flow }}
           TRAFFIC: ${{ inputs.traffic }}
           LICHEN: ${{ inputs.lichen }}
+          NOFOCI: ${{ inputs.nofoci }}
           ORDER: ${{ inputs.order }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
@@ -113,6 +118,7 @@ jobs:
           [ "$FLOW" = "true" ] && args="$args --flow"
           [ "$TRAFFIC" = "true" ] && args="$args --traffic"
           [ "$LICHEN" = "true" ] && args="$args --lichen"
+          [ "$NOFOCI" = "true" ] && args="$args --no-foci"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$ORDER" ] && args="$args --order $ORDER"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
