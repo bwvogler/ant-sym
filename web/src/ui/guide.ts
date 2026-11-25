@@ -745,6 +745,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Castes by size, the fungus garden as the store, quarantined waste workers, and plants learned harmful. Planned (not built, PRD §64).",
   },
   {
+    note: "odour-space",
+    title: "Colony odour as a blend",
+    covers:
+      "A colony's smell is several hydrocarbon axes, a few of which decide who is a stranger; fights teach the ant that was hit, they do not push colonies' smells apart. Planned (not built, PRD §91).",
+  },
+  {
     note: "pharaoh-ant",
     title: "Pharaoh ants",
     covers: "Many queens across budding nests, a trail that lasts a day, colonies that move house. Planned (not built, PRD §64).",
