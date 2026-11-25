@@ -8,8 +8,6 @@ import {
   AIR,
   CELL,
   CHUNK,
-  type Cells,
-  type ChunkLayer,
   OPEN,
   PLANE,
   R,
@@ -19,11 +17,11 @@ import {
   cellAt,
   lineOfLayer,
   cellKey,
-  rockAt,
   SPORE_FULL,
   SPORE_SHOWN,
 } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
+import { chunkOf, peekCell, seenCell, seenRock } from "../groundPeek.ts";
 import { SENSED_FADE, sightOf } from "../fungusSight.ts";
 import { moundBalls, type DirtBall } from "../inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "../inspectionGround.ts";
@@ -71,18 +69,8 @@ export interface ChunkCanvas {
   version: number;
 }
 
-/** A layer's chunk as the page may read it: on an endless plane `peek`, which never makes a chunk the game has not made; a bounded map's `chunk` (the same read). */
-// Only rock and food have generators on an endless plane (quality, spoil and chambers are absent from it), so `peek` and `chunk` answer alike for those three today;
-// `peek` is used for all of them so that a layer that gets a generator later is not made by a frame.
-function chunkOf<A extends Cells>(endless: boolean, layer: ChunkLayer<A> | undefined, cx: number, cy: number): A | undefined {
-  return endless ? layer?.peek(cx, cy) : layer?.chunk(cx, cy);
-}
-
-/** The cell (x, y) of a layer read with `peek` (what a cell of a chunk nobody made reads as: the layer's `empty`). Never makes a chunk. */
-export function peekCell(layer: ChunkLayer<Cells>, x: number, y: number): number {
-  const a = layer.peek(x >> 6, y >> 6);
-  return a ? a[((y & 63) << 6) | (x & 63)]! : layer.empty;
-}
+// chunkOf and peekCell (the page's non-generating reads on an endless plane) live in ../groundPeek.ts, a leaf the click and lens paths import too.
+export { peekCell };
 
 /** Which scent washes the Settings show (food trails, home trails). */
 export interface GroundShow {
@@ -455,12 +443,12 @@ export class Ground {
         let o = (ly * CHUNK + lx) * 4;
         // Under the fog the strip is the plane as last sensed there: fog where nothing was, dimmed where nobody senses it now.
         const pg = fog ? planeGround(k, qx, qy) : null;
-        const food = pg ? pg.food : plane.food.get(qx, qy);
+        const food = pg ? pg.food : seenCell(plane, plane.food, qx, qy);
         if (pg?.state === UNKNOWN) {
           setPx(px, o, fogRgb(theme), 255);
           continue;
         }
-        if ((pg ? pg.rock : rockAt(plane, qx, qy)) !== OPEN) {
+        if ((pg ? pg.rock : seenRock(plane, qx, qy)) !== OPEN) {
           px[o] = theme.rock[0];
           px[o + 1] = theme.rock[1];
           px[o + 2] = theme.rock[2];
@@ -473,7 +461,7 @@ export class Ground {
         } else px[o + 3] = 0; // open ground: the paper, as the side view's walkway
         const dim = pg !== null && pg.state !== LIVE;
         if (dim) dimPx(px, o, fogRgb(theme));
-        const cut = Math.min(CUT_MAX, pg ? pg.spoil : (plane.spoil?.get(qx, qy) ?? 0));
+        const cut = Math.min(CUT_MAX, pg ? pg.spoil : plane.spoil ? seenCell(plane, plane.spoil, qx, qy) : 0);
         for (let up = 1; up <= cut; up++) {
           o = ((ly - up) * CHUNK + lx) * 4;
           px[o] = theme.spoil[0];
