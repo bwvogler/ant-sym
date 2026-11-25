@@ -2754,6 +2754,30 @@ try {
     );
   const fmt = (f) =>
     `${f.fps.toFixed(1)} fps, frame p50 ${f.p50.toFixed(1)} ms, p90 ${f.p90.toFixed(1)} ms, max ${f.max.toFixed(0)} ms (${f.n} frames)`;
+  /**
+   * A page's frame times as a player has them, in one run: at the start and after `pan`, at the default 4× (several ticks a frame: the loop keeps the game's speed), at 1×
+   * (one tick a frame) and paused (the draw alone). Leaves the page playing at 4×.
+   */
+  const frameReport = async (p, label, pan) => {
+    const speed = (name) => p.getByRole("group", { name: "speed" }).getByRole("button", { name, exact: true }).click();
+    const out = {};
+    const at = async (key, text, ms) => {
+      out[key] = await frameTimes(p, ms);
+      console.log(`  ${label}, ${text}: ${fmt(out[key])}`);
+    };
+    await at("start4", "at the start, 4× playing", 4000);
+    await speed("1×");
+    await at("start1", "at the start, 1× playing", 3000);
+    await p.getByRole("button", { name: "Pause", exact: true }).click();
+    await at("startDraw", "at the start, paused (the draw alone)", 3000);
+    await pan();
+    await at("panDraw", "after the pan, paused (the draw alone)", 3000);
+    await p.getByRole("button", { name: "Play", exact: true }).click();
+    await at("pan1", "after the pan, 1× playing", 3000);
+    await speed("4×");
+    await at("pan4", "after the pan, 4× playing", 4000);
+    return out;
+  };
   /** Every count a read could change on the plane: its layers' chunks and the generator's misses and prefetches. */
   const planeCounts = (p) =>
     p.evaluate(() => {
@@ -2805,48 +2829,42 @@ try {
   );
   await ep.keyboard.press("Escape");
   await until(() => ep.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the endless game", 60_000, 200);
-  const fStart = await frameTimes(ep, 4000);
-  console.log(`  endless, at the start, playing: ${fmt(fStart)}`);
-  check(fStart.n > 3, "the endless page draws frames at the start");
-  await ep.getByRole("button", { name: "Pause", exact: true }).click();
-  const fStartDraw = await frameTimes(ep, 3000);
-  console.log(`  endless, at the start, paused (the draw alone): ${fmt(fStartDraw)}`);
-  // The camera pans 20 U: no clamp to a box, and the minimap's window follows it.
+  // The camera pans 20 U: no clamp to a box, and the minimap's window follows it. The frame report takes the pan as a step, so the frames before and after it are read
+  // in one run: at the default 4× (several ticks a frame), at 1× (one tick a frame) and paused (the draw alone).
   const n0 = await startNest(ep);
   const mini0 = await ep.evaluate(() => window.jevAnts.miniWindow());
-  await ep.evaluate(([x, y]) => window.jevAnts.centreOn("above", x, y), [n0.x + 20 * U, n0.y]);
-  const camFar = await until(
-    async () => {
-      const c = await ep.evaluate(() => window.jevAnts.camera("above"));
-      return c && Math.abs(c.x - (n0.x + 20 * U)) < 1 ? c : null;
-    },
-    "the camera 20 U east of the start nest",
-    5000,
-    60,
-  );
+  let camFar = null;
+  let mini1 = null;
+  const fr = await frameReport(ep, "endless", async () => {
+    await ep.evaluate(([x, y]) => window.jevAnts.centreOn("above", x, y), [n0.x + 20 * U, n0.y]);
+    camFar = await until(
+      async () => {
+        const c = await ep.evaluate(() => window.jevAnts.camera("above"));
+        return c && Math.abs(c.x - (n0.x + 20 * U)) < 1 ? c : null;
+      },
+      "the camera 20 U east of the start nest",
+      5000,
+      60,
+    );
+    mini1 = await until(
+      async () => {
+        const w = await ep.evaluate(() => window.jevAnts.miniWindow());
+        return w && w.x0 > mini0.x0 + 19 * U ? w : null;
+      },
+      "the minimap's window to follow the camera",
+      5000,
+      60,
+    );
+  });
+  check(fr.start4.n > 3 && fr.pan4.n > 3, "the endless page draws frames at the start and after the pan");
   check(Math.abs(camFar.y - n0.y) < U, `the camera is 20 U east of the start (x ${camFar.x.toFixed(0)}, no clamp)`);
-  const mini1 = await until(
-    async () => {
-      const w = await ep.evaluate(() => window.jevAnts.miniWindow());
-      return w && w.x0 > mini0.x0 + 19 * U ? w : null;
-    },
-    "the minimap's window to follow the camera",
-    5000,
-    60,
-  );
   check(
     camFar.x >= mini1.x0 && camFar.x <= mini1.x0 + mini1.w && Math.abs(mini1.w - mini0.w) < 1e-9 && Math.abs(mini1.h - mini0.h) < 1e-9,
     `the minimap's window (x ${mini1.x0.toFixed(0)}, ${mini1.w.toFixed(0)} wide, the same size as at the start) holds the camera`,
   );
-  const fFarDraw = await frameTimes(ep, 3000);
-  console.log(`  endless, after a 20 U pan, paused (the draw alone): ${fmt(fFarDraw)}`);
-  await ep.getByRole("button", { name: "Play", exact: true }).click();
-  const fFar = await frameTimes(ep, 4000);
-  console.log(`  endless, after a 20 U pan, playing: ${fmt(fFar)}`);
-  check(fFar.n > 3, "and draws frames after it");
   check(
-    fFar.p50 <= fStart.p50 * 1.5 + 20,
-    `a pan over unmade ground costs no more a frame than the start (p50 ${fFar.p50.toFixed(1)} against ${fStart.p50.toFixed(1)} ms)`,
+    fr.panDraw.p50 <= fr.startDraw.p50 * 1.5 + 20 && fr.pan1.p50 <= fr.start1.p50 * 1.5 + 20,
+    `a pan over unmade ground costs no more a frame than the start (paused p50 ${fr.panDraw.p50.toFixed(1)} against ${fr.startDraw.p50.toFixed(1)} ms, 1× ${fr.pan1.p50.toFixed(1)} against ${fr.start1.p50.toFixed(1)})`,
   );
   // A click far from the nests makes no chunk (the ground the click reads is peeked, not made), nor does the lens on far ground.
   await ep.getByRole("button", { name: "Pause", exact: true }).click();
@@ -2936,19 +2954,8 @@ try {
   {
     const { c: bc, p: bp3 } = await openEndless("?fog=0&world=bounded");
     await until(() => bp3.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the bounded game", 60_000, 200);
-    const b0 = await frameTimes(bp3, 4000);
-    await bp3.getByRole("button", { name: "Pause", exact: true }).click();
-    const b0d = await frameTimes(bp3, 3000);
-    await bp3.evaluate(() => window.jevAnts.centreOn("above", 1e6, 100));
-    await sleep(500);
-    const b1d = await frameTimes(bp3, 3000);
-    await bp3.getByRole("button", { name: "Play", exact: true }).click();
-    const b1 = await frameTimes(bp3, 4000);
-    console.log(`  bounded, at the start, playing: ${fmt(b0)}`);
-    console.log(`  bounded, at the start, paused (the draw alone): ${fmt(b0d)}`);
-    console.log(`  bounded, panned to the box's east end, paused: ${fmt(b1d)}`);
-    console.log(`  bounded, panned to the box's east end, playing: ${fmt(b1)}`);
-    check(b0.n > 3 && b1.n > 3, "the bounded page draws frames, for comparison");
+    const br = await frameReport(bp3, "bounded", () => bp3.evaluate(() => window.jevAnts.centreOn("above", 1e6, 100)));
+    check(br.start4.n > 3 && br.pan4.n > 3, "the bounded page draws frames, for comparison (its pan is clamped to the box's east end)");
     await bc.close();
   }
   // The fog on an endless plane (the page's default): the landing patch lies at negative y, and it is explored there, a cell far off is not.
