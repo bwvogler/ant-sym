@@ -563,6 +563,45 @@ test("holdMini keeps the window taken at the press: inMini, jumpMini and frozenM
   assert.deepEqual(rig.miniWindow(), miniFrame(e, rig.camera()), "the window follows the camera again");
 });
 
+test("a held drag that leaves the minimap's rectangle is held to it: the camera stops at the frozen window's edge, whatever the distance (owner, ja-4omg)", () => {
+  const { rig, v, e } = endlessRig();
+  const win = miniFrame(e, rig.camera());
+  rig.holdMini();
+  const r = minimapRect(win, v, 1);
+  const at = (px: number, py: number) => {
+    rig.jumpMini(px, py);
+    return { x: rig.camera().x, y: rig.camera().y };
+  };
+  // the corners and edges of the rectangle, taken from inside it
+  const corner = at(r.x + r.w, r.y + r.h);
+  // far outside to the south east, and just outside: the same corner, not an extrapolation
+  assert.deepEqual(at(r.x + r.w + 5000, r.y + r.h + 3000), corner, "far past the corner: the corner");
+  assert.deepEqual(at(r.x + r.w + 1, r.y + r.h + 1), corner, "just past it: the corner");
+  // past one edge only: the pointer's other coordinate still counts
+  const top = at(r.x + r.w / 2, r.y);
+  const topFar = at(r.x + r.w / 2, r.y - 4000);
+  assert.deepEqual(topFar, top, "above the rectangle: the top edge at the same x");
+  const west = at(r.x, r.y + r.h / 2);
+  assert.deepEqual(at(r.x - 9000, r.y + r.h / 2), west, "left of the rectangle: the west edge at the same y");
+  // the corner is the window's own corner, in world units (the edge of what the picture shows)
+  assert.ok(
+    Math.abs(corner.x - (win.x0 + win.w)) < 1e-6 && Math.abs(corner.y - (win.y0 + win.h)) < 1e-6,
+    "the window's corner in world units",
+  );
+  rig.releaseMini();
+});
+
+test("a jump on a bounded map is never held to a window: the bounded map's own clamp to the map stands", () => {
+  const { rig, st } = setup();
+  const e = extentOf(PLANE_MAP);
+  rig.set({ x: 60, y: 45, zoom: fitZoom(e, vp(st)) * 3 });
+  rig.holdMini(); // a no-op on a bounded map
+  assert.equal(rig.frozenMini(), null);
+  rig.jumpMini(5000, 5000); // far outside: clamped to the map as ever
+  const c = rig.camera();
+  assert.ok(c.x <= 120 + 1e-6 && c.y <= 90 + 1e-6 && c.x >= 0 && c.y >= 0, `on the map (${c.x}, ${c.y})`);
+});
+
 test("a freeze ends of itself: zoomed out (no minimap), another view, a new game; a bounded map never takes one", () => {
   const out = endlessRig();
   out.rig.holdMini();
