@@ -118,8 +118,7 @@ function runSeed(seed, flight, radius) {
     for (const t of sites) nearStranger = Math.min(nearStranger, Math.hypot(t.x - lx, t.y - ly));
     for (const t of sitesNear(lx, ly, 400)) nearStranger = Math.min(nearStranger, Math.hypot(t.x - lx, t.y - ly));
     const moved = Math.hypot(lx - px, ly - py);
-    const kind =
-      s.founding.kind === "new" ? "new" : lines[s.founding.line].wild ? "join" : nearHole > NEW_LINE_GAP ? "fall" : "grow";
+    const kind = s.founding.kind === "new" ? "new" : lines[s.founding.line].wild ? "join" : nearHole > NEW_LINE_GAP ? "fall" : "grow";
     return { ok: true, kind, cell: s.cell, founding: s.founding, nearStranger, moved };
   }
 
@@ -135,7 +134,12 @@ function runSeed(seed, flight, radius) {
       continue;
     }
     phase1[r.kind]++;
-    const next = applyFounding(seed, lines.map((l) => ({ transect: l.transect, salt: l.salt })), r.cell, r.founding);
+    const next = applyFounding(
+      seed,
+      lines.map((l) => ({ transect: l.transect, salt: l.salt })),
+      r.cell,
+      r.founding,
+    );
     lines = next.map((l, k) => ({ ...l, wild: k < lines.length ? lines[k].wild : false }));
   }
   wake();
@@ -166,7 +170,9 @@ const pct = (a, b) => (b ? (100 * a) / b : 0);
 console.log(
   `endless plane, seeds ${SEEDS[0]}-${SEEDS.at(-1)} (${SEEDS.length}), region ${REGION}x${REGION} chunks, density ${DENSITY}, wild gap ${WILD_GAP}, wake ${WAKE}, ${PROBES} probes per own hole`,
 );
-console.log("flight radius |  fail% (worst seed) | new% grow% join% fall% | landings <0.6U 0.6-0.9U 0.9-1.5U >1.5U from a stranger | pulled% (mean cells) | own colonies, wild woken");
+console.log(
+  "flight radius |  fail% (worst seed) | new% grow% join% fall% | landings <0.6U 0.6-0.9U 0.9-1.5U >1.5U from a stranger | pulled% (mean cells) | own colonies, wild woken",
+);
 for (const flight of FLIGHTS)
   for (const radius of RADII) {
     const rows = SEEDS.map((s) => runSeed(s, flight, radius));
@@ -245,6 +251,8 @@ function bounded() {
         failed += sf;
         per.push((100 * sf) / sn);
       }
-      console.log(`flight ${flight}, radius ${radius}: ${((100 * failed) / tried).toFixed(1)}% of ${tried} fail (worst seed ${Math.max(...per).toFixed(0)}%)`);
+      console.log(
+        `flight ${flight}, radius ${radius}: ${((100 * failed) / tried).toFixed(1)}% of ${tried} fail (worst seed ${Math.max(...per).toFixed(0)}%)`,
+      );
     }
 }
