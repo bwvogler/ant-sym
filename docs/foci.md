@@ -46,7 +46,7 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 - `id: "foci"`, `kind: "spread"`, name "Foci", `steps: ["none", "new bases"]`, `needs: [[{ id: "knots", level: 1 }]]`, `trait: "foci"`, `values: [0, 1]`; added to `FREE_UPGRADES` (the free pool pays for it, from growth on the ground and corpses) and to the "Mycelium and spores" branch of the drawer.
 - **Cue and response:** the cue is the same (a closed flower of hyphae, the fungus's own body, nothing an ant senses); the response is the gate: `Fungus.#settle` reads `evolution.level("foci")`; at 0 it empties the grown-cell lists and does nothing; at 1 it is today's rule.
 - **Off setting:** a fungus param `fociGate` (default off, meaning no gate: main bit for bit, flowers form as today). The build flips the default after the assay, as the tropism's default was flipped (PRD §88).
-- **Unaffected:** the landing patch and an infected queen's one-tile patch (`Fungus.root`) are not flowers. Patches already formed stay: an old save with flower patches keeps them (they are in `base`) and forms no new ones until Foci is kept (proposed; the owner has not been asked).
+- **Unaffected:** the landing patch and an infected queen's one-tile patch (`Fungus.root`) are not flowers. Patches already formed stay: an old save with flower patches keeps them (they are in `base`) and forms no new ones until Foci is kept (owner, 2026-11-25).
 - **Price:** the free pool's rising price, `round(1.5^kept)` over its own kept levels (§80): Foci after Mycelium 1 and Knots 1 would cost about 2 mutations (estimate; the build measures it).
 - **Retires:** no gap-table row (a fungus mechanic, not an ant choice). Adds no sense and no scripted read.
 - **Cost (Jev):** none. No situation field, legend or question changes; the mutation menu is the player's, not a lane.
@@ -62,8 +62,7 @@ Knots are microsclerotia: a hypha short of mass hardens into a resting body that
 
 ## Open questions
 
-- Owner: should an old save keep forming flowers (a fungus grandfathered in), or lose the ability until it buys Foci? Proposed: lose it (patches already formed stay).
-- Owner: should the assay's and the page's default buy order include Knots and Foci, or only a flower arm do? Measure first.
+- **Decided (owner, 2026-11-25):** an old save loses the ability to form flowers until it buys Foci (patches already formed stay); the assay's and the page's default buy order reaches Knots and Foci (the measurement picks where in the order); the seed-5 runaway is accepted as "bounded by the price once Foci is bought" (`ja-27w1` stays open until it is measured with the gate).
 - To measure: P1 (T1–T4) on seeds 1–20 with the gate and a buy order that reaches Foci; flowers per game and when the first forms; whether the seed-5 web still runs away after the buy; the price of Foci in mutations.
 - Not now: Fukasawa's finding that outgrowth rises with the fraction of the resource used is a possible later lever (a flower that forms only after its cells are used up); it is not part of this change.
 

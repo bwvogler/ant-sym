@@ -92,7 +92,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}), first flower ${fmt(r.flowerFirst)} · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
     );
     if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
@@ -230,6 +230,7 @@ if (isMainThread) {
     leans: "",
     lichenCells: 0,
     lichenFirst: -1,
+    flowerFirst: -1,
     split,
     trace: [],
   };
@@ -273,6 +274,8 @@ if (isMainThread) {
     if (r.quarter < 0 && a.s >= 0.25) r.quarter = t;
     if (r.half < 0 && a.s >= 0.5) r.half = t;
     if (r.queen < 0 && g.revealed[0]) r.queen = t;
+    // The first closed flower, counting one that extended a patch (docs/foci.md): when the web first made a new base.
+    if (r.flowerFirst < 0 && g.fungus.flowers + g.fungus.spread > 0) r.flowerFirst = t;
     if (r.rivalFirst < 0 && b && b.n > 0) r.rivalFirst = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }

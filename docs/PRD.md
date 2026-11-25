@@ -8230,8 +8230,10 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 **Decisions.**
 - A new upgrade, **Foci**, in the fungus's own (free) pool; **one level** (owner, 2026-11-25).
 - It **needs Knots 1** (so Mycelium 1) (owner, 2026-11-25; the order is design, no paper orders them).
-- Until it is kept a closed flower does not become a patch; the landing patch and an infected queen's one-tile patch are unaffected (proposed from the owner's ask: needs confirming).
-- Patches already formed stay; an old save forms no new ones until Foci is kept (proposed: needs the owner).
+- Until it is kept a closed flower does not become a patch; the landing patch and an infected queen's one-tile patch are unaffected (owner, 2026-11-25).
+- Patches already formed stay; an old save forms no new ones until Foci is kept (owner, 2026-11-25).
+- The default buy order (the assay's and the page's) reaches Knots and Foci; where in the order is measured (owner, 2026-11-25).
+- The seed-5 runaway moving to after the buy is accepted, bounded by the price; `ja-27w1` stays open until measured with the gate (owner, 2026-11-25).
 
 **The mechanic.** `Fungus.#settle` reads `evolution.level("foci")`: at 0 it empties the grown lists and does nothing, at 1 it is today's rule. Built behind a fungus param `fociGate` whose off setting is main bit for bit; the default flips after the assay, as the tropism's did (§88). Shape copied from the Lichen upgrade (`evolution.ts`, the drawer branch, `upgradeText.ts`).
 
@@ -8243,5 +8245,5 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Beads.** `ja-icc4` (this); `.1` assay arm; `.2` the upgrade behind `fociGate`; `.3` measure on seeds 1-20 and flip the default.
 
-**Still open.** Whether an old save keeps forming flowers; whether the assay's and the page's default buy order should reach Foci; the price of Foci in play; the seed-5 web under the gate.
+**Still open.** Where in the buy order Foci goes; the price of Foci in play; the seed-5 web under the gate.
 
