@@ -8209,6 +8209,20 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 - **Owner, 2026-11-25: a spore costs 0.1** (`BODY.sporeCost`), and **the free pool counts earned income at a higher share** than today's 0.25, so its totals stay near today's (about 170 a game) and the fungus's own upgrades stay reachable. Proposed share: about 1.2 of earned growth, to be set from the ledger.
 - **A cost the numbers show:** the free pool earns 0.25 × ground growth (`ground` includes what `feed` takes in). With earned mass of 144 it makes about 36 mutations a game against about 170 today, so the fungus's own upgrades (mycelium, knots, stalks, fruiting, lichen) would be nearly out of reach unless the earned income, or the share of it that counts, is larger.
 
+**Slice 4a: a hungry fungus behind `FungusParams.hungry` (`ja-a2no.4`, commit a8f3d54c).** Off by default (the goldens are exact; the save adds `hungry` and `reserveUsed` only when on). On: a spore costs `EARNED.sporeCost` 0.1, the free term pays out only `EARNED.reserve` 110 mass over a game (the landing patch's reserve, until the litter is built, `ja-a2no.4b`), and the free pool counts earned mass at `EARNED.share`. Seeds 1–20, 900 s, ledger on; baseline run 45539333590 (quarter worst 333 s seed 6, median 171 s; queen median 210.5 s):
+
+| free-pool share (run) | quarter worst / median | queen median | seeds more than 10 % slower (quarter, baseline in brackets) |
+|---|---|---|---|
+| 0.25 (run 45618560672, the cheap-spore arm) | 168 s (seed 9) / 128 s | 154 s | none |
+| 0.6 (run 45650854912) | 353 s (seed 9) / 113 s | 144.5 s | seed 9: 353 s (270 s) |
+| 1.2 (run 45629410438) | 339 s (seed 20) / 125 s | 154 s | seeds 11: 319 (177), 20: 339 (197), 15: 174 (156) |
+
+- **At share 0.6 the worst-seed gate holds** (353 s is +6 % on 333 s, inside the 10 % bar), the median quarter falls from 171 s to 113 s, and 19 of 20 seeds are at least 15 % faster. Seed 9 is 31 % slower; the rest are not slower at all. The body late is thin but alive: mass held 25 to 118 at 900 s (none below 10), 465 hyphal cells (median) against 226, 12 of 20 games make flowers.
+- **A share of 1.2 slows seeds 11, 15 and 20** (319, 174, 339 s); at 0.25 they are 135, 131, 138 s and at 0.6 111, 113, 125 s (runs 45648861710, 45648871151); at 0.9 they are 105, 111, 121 s (run 45650842340), so the slowdown begins between 0.9 and 1.2.
+- **Why a seed is slow is the early infection, not the free pool.** On seed 9 (four runs compared) the free upgrades (mycelium, fruiting) are bought *earlier* in the slow run, not later; what is late is the first ants'-pool upgrade (infectivity at 253 s against 130 s), with hosts made 24,020 against 42,937 and infection at 1 to 2 % until minute 5. That is the early spread taking longer to catch, which moves from seed to seed when any spore timing changes (one seed single-run comparisons, different commits, so association, not proof).
+- **Why 0.6:** the free tree has nine levels (mycelium 2, knots 2, stalks 2, fruiting 2, lichen 1) costing 74 mutations in all (prices 1, 2, 2, 3, 5, 8, 11, 17, 25); 0.6 of about 145 earned mass is about 87, which covers them; 0.25 gives about 36 and would stop at seven. The default order buys only four free levels (cost 8), so P1 does not see this; play would.
+- **Owner, 2026-11-25:** the share is 0.6 for now. The front-loaded reserve (110 in the first minutes) is a stand-in; a litter patch would pay out as hyphae draw it down, which is slice 4b.
+
 **Assays and targets.** The assay lands first (`ja-a2no.2`, no behaviour change): mass in by source and out by sink over time, per seed, on GitHub's `progression.yml` (`split` input already reports the growth split). Target: P1 by the worst seed against the baseline the owner chooses, seeds 1–20, confirmed on a second set; the late earning rate within a stated bound; goldens bit-exact with the setting off and re-recorded and said so with it on.
 
 **Cost (estimated).** None in Jev for steering. A `resource` value in the growth lane's situation (`ja-a2no.8`) is +48 situations (96 to 144) and a token bill to measure before it is chosen.
