@@ -220,6 +220,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 
 **Measured at E6:**
 - **The flight and the founding radius.** `ja-qpv`'s note asks for this. `FOUND_RADIUS` = 140 was set because edges failed half the flights at 70 ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game), proposal 2). Without edges, a shorter radius may fail mainly near strangers, which reads better. The flight is set in the same run.
+- **Measured offline, 2026-11-25** (PRD §66 "E6 measured (offline)"): flight 2 U (280) with `FOUND_RADIUS` 140 fails under 1 % of flights and starts a line on 61–65 % of foundings; the lattice as built is 0.22 sites a U², not §4's 0.35. A woken stranger loses its sleeping site's exclusion ring (`ja-lzwt`): accepted by the owner (2026-11-25), daughters beside strangers are the contact design. The under 1 % failure figure is for at most 8 own colonies (crowded own lines fail more, `ja-s994`).
 - **`ja-lp4.12`** (holes on the plane's rim) goes away with the rim.
 
 ## Play
