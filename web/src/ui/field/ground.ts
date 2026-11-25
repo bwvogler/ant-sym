@@ -134,6 +134,11 @@ export class Ground {
   hits = 0;
   private readonly tiles = new MapChunkPaintCache();
   private readonly paths = new Map<number, Path2D>();
+  /** under the fog, the hexagons of the strip-shown cells on an edge, by colour: drawn under the mound tint and the pellets (drawHexes) */
+  private readonly edges = new Map<number, Path2D>();
+  /** per frame, under the fog: each cell in view's colour (-1: none) and whether a strip shows it (drawHexes) */
+  private keys = new Int32Array(0);
+  private plains = new Uint8Array(0);
   private readonly env: FieldEnv;
   constructor(env: FieldEnv) {
     this.env = env;
@@ -362,7 +367,8 @@ export class Ground {
           continue;
         }
         // How freshly a host sensed this cell: its scent shows that strongly (trails and alarm alike); everywhere in smell vision.
-        const w = smellAll ? 1 : sensedC ? sightOf(sensedC[i]!, now) : 0;
+        // Under the fog only where one senses it now: the pheromone goes on changing in ground nobody senses, and showing that (for the 20 s the sight fades over) is a trail that outlives its ants.
+        const w = smellAll ? 1 : sensedC && !(fogV && now - sensedC[i]! > GRACE) ? sightOf(sensedC[i]!, now) : 0;
         let al = 0;
         if (w > 0) for (const ac of alarmC) al = Math.max(al, w * Math.min(1, ac[i]! / ALARM_FULL));
         if (al > ALARM_SHOWN) {
@@ -506,6 +512,7 @@ export class Ground {
       ctx.fillRect(ax, ay, bx - ax, by - ay);
     }
     this.paths.clear();
+    this.edges.clear();
     // Under the fog most cells in view are fog or remembered open ground: one strip a row lays them (a hexagon each, a path op a vertex, cost
     // the phone its frame rate); hexagons then draw only the cells with something on them.
     const fogPx = k.fog ? fogRgb(k.theme) : null;
@@ -521,6 +528,19 @@ export class Ground {
     const tip = c.zoom * (R / 2 + (SIDE * 1.04 - R / 2) * hexMix);
     const [c0, c1, c2, c3, c4, c5] = [x, 0, -x, -x, 0, x];
     const [s0, s1, s2, s3, s4, s5] = [shoulder, tip, shoulder, -shoulder, -tip, -shoulder];
+    // Under the fog: the colour of every cell in view and whether the strips above already show it, for the cells on an edge (below).
+    const gw = rx1 - rx0 + 1;
+    let keys: Int32Array | null = null;
+    let plains: Uint8Array | null = null;
+    if (fogPx) {
+      const n = gw * (ry1 - ry0 + 1);
+      if (this.keys.length < n) {
+        this.keys = new Int32Array(n);
+        this.plains = new Uint8Array(n);
+      }
+      keys = this.keys.fill(-1, 0, n);
+      plains = this.plains.fill(0, 0, n);
+    }
     const ox = v.w / 2 - c.x * c.zoom;
     const oy = v.h / 2 - c.y * c.zoom;
     for (let y = ry0; y <= ry1; y++) {
@@ -562,15 +582,20 @@ export class Ground {
         }
         // The spoil wash fades out as the overhead pellets appear.
         const spoilWash = heap > 0 && data[o] === spoil[0] && data[o + 1] === spoil[1] && data[o + 2] === spoil[2];
-        // Under the fog a cell that is fog (opaque) or remembered open ground (the fog at 70) is the brick already laid.
-        if (fogPx && fogCell(data, o, fogPx)) continue;
         const opacity = Math.round((data[o + 3] / 255) * 15) / 15;
         const a = spoilWash ? opacity * (1 - pelletAlpha * pelletAlpha) : opacity;
         const r = Math.round(data[o] * a + paper[0] * (1 - a));
         const g = Math.round(data[o + 1] * a + paper[1] * (1 - a));
         const b = Math.round(data[o + 2] * a + paper[2] * (1 - a));
         const key = (r << 16) | (g << 8) | b;
-        if (key === bgKey) continue;
+        // Under the fog a cell that is fog (opaque) or remembered open ground (the fog at 70) is the strip already laid, as open ground is the paper.
+        const plain = key === bgKey || (fogPx !== null && fogCell(data, o, fogPx));
+        if (keys) {
+          const gi = (y - ry0) * gw + (x - rx0);
+          keys[gi] = key;
+          plains![gi] = plain ? 1 : 0;
+        }
+        if (plain) continue;
         const paint = spoilWash ? moundTints : this.paths;
         let path = paint.get(key);
         if (!path) {
@@ -586,6 +611,46 @@ export class Ground {
         path.lineTo(sx + c5, sy + s5);
         path.closePath();
       }
+    }
+    // The strips laid under the fog are brick-shaped: a cell they show beside a cell of another colour (the edge of the explored ground, of what is live
+    // now) is a hexagon too, so the edge is hexagonal as everywhere else. Only those cells, so the count follows the edges and not the area.
+    if (keys && plains)
+      for (let y = ry0; y <= ry1; y++) {
+        const shift = 0.5 + 0.5 * (y & 1);
+        const up = y & 1 ? 1 : 0; // the neighbours in the rows above and below: x - 1 + up and x + up
+        for (let x = rx0; x <= rx1; x++) {
+          const gi = (y - ry0) * gw + (x - rx0);
+          const key = keys[gi]!;
+          if (key < 0 || !plains[gi]) continue;
+          let edge = false;
+          for (let n = 0; n < 6 && !edge; n++) {
+            // the six neighbours: x - 1 and x + 1 in the row, and in the rows above and below x - 1 + up and x + up
+            const nx = x + (n < 2 ? (n ? 1 : -1) : n & 1 ? up : up - 1);
+            const ny = y + (n < 2 ? 0 : n < 4 ? -1 : 1);
+            if (nx < rx0 || nx > rx1 || ny < ry0 || ny > ry1) continue;
+            const nk = keys[(ny - ry0) * gw + (nx - rx0)]!;
+            if (nk >= 0 && nk !== key) edge = true;
+          }
+          if (!edge) continue;
+          let path = this.edges.get(key);
+          if (!path) {
+            path = this.env.newPath();
+            this.edges.set(key, path);
+          }
+          const sx = (x + shift) * c.zoom + ox;
+          const sy = (y + 0.5) * R * c.zoom + oy;
+          path.moveTo(sx + c0, sy + s0);
+          path.lineTo(sx + c1, sy + s1);
+          path.lineTo(sx + c2, sy + s2);
+          path.lineTo(sx + c3, sy + s3);
+          path.lineTo(sx + c4, sy + s4);
+          path.lineTo(sx + c5, sy + s5);
+          path.closePath();
+        }
+      }
+    for (const [key, path] of this.edges) {
+      ctx.fillStyle = `rgb(${key >> 16},${(key >> 8) & 255},${key & 255})`;
+      ctx.fill(path);
     }
     // Keep the returning brown tint behind the fading pellets so both are visible.
     for (const [key, path] of moundTints) {
