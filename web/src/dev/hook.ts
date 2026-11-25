@@ -33,7 +33,14 @@ export interface DevDeps {
   setFollowed(f: Followed | null): void;
   sensed: SensedMap;
   /** the map's camera and nest centring (ColonyField's FieldApi), once it is drawn */
-  field: { readonly current: { camera(view: number): unknown; goNest(k: number): void } | null };
+  field: {
+    readonly current: {
+      camera(view: number): unknown;
+      goNest(k: number): void;
+      centreOn(view: number, x: number, y: number, how?: { close?: boolean; span?: number }): void;
+      miniWindow(): unknown;
+    } | null;
+  };
   /** open the queen's pen without Jev (ColonyApp's devPen) */
   openPen(): void;
 }
@@ -74,6 +81,10 @@ export function devHook(d: DevDeps) {
     /** view v's camera; below, of line `line`'s curtain (layer 1 + line, E5.6) */
     camera: (v: View, line = 0) => d.field.current?.camera(layerOf(v) + (v === "below" ? line : 0)) ?? null,
     goNest: (k: number) => d.field.current?.goNest(k),
+    /** Centre view v's camera on world (x, y) (the e2e's far pan on an endless plane: a drag would take as many gestures as the ground is wide). */
+    centreOn: (v: View, x: number, y: number, how?: { close?: boolean; span?: number }) => d.field.current?.centreOn(layerOf(v), x, y, how),
+    /** The rectangle of the plane the minimap shows now: the whole map (bounded), or the window of chunks round the camera (endless). */
+    miniWindow: () => d.field.current?.miniWindow() ?? null,
     fly: (mother = 0) => {
       const m = game.colonies[mother];
       if (!m) return false;

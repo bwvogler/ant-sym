@@ -782,7 +782,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "endless-world",
     title: "Endless world",
     covers:
-      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. In progress (PRD §66): many lines and waking wild colonies are in the simulation; the page still plays a bounded world.",
+      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. The page plays it by default (PRD §66 E6): many lines, wild colonies that wake, ground frozen where the fungus is far; ?world=bounded keeps the bounded game.",
   },
   {
     note: "fog-of-war",

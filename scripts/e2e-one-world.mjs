@@ -49,6 +49,11 @@
 //  18. the fog of war (PRD §89, ja-1ypq.3.6), on the default page: the cell under a host is live, ground no host has been near is unknown, a cell a
 //     host left is remembered and stays explored; a frame costs about what it does without the fog; and "no ants": a plain ant put on
 //     remembered ground is not drawn (the crop of the field is byte-identical with it and without it), where on live ground it is.
+//  19. the endless world, the page's default (PRD §66 E6, ja-qpv.5.1), a page with no `world` in its address: it plays the endless plane (awake rule on,
+//     cap 6 at 600 ants, flight 280, "Start" where a bounded map says "Whole map"); the camera pans 20 U with no clamp and the minimap's window follows;
+//     a click and the lens 20 U from the nests make no chunk; a save says its world and loads as it (an endless one on a page asked for the bounded world,
+//     a bounded one on the default page); the fog reveals ground at negative y; frame times, printed beside the bounded game's under the same conditions.
+// Sections 1–18 are the bounded game's: they open the page with `?world=bounded`.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
 // Screenshots (deviceScaleFactor 1) go to E2E_SHOTS (a directory) when set: the linked switch and the pen's preview.
@@ -188,7 +193,9 @@ vite.stdout.on("data", (d) => (viteLog += d));
 vite.stderr.on("data", (d) => (viteLog += d));
 // The page has the fog by default (PRD §89); the sections that are not about it open `url`, which turns it off (`?fog=0`), and the tutorial's and the fog's own open `base`.
 const base = `http://127.0.0.1:${port}/`;
-const url = `${base}?fog=0`;
+const url = `${base}?fog=0&world=bounded`;
+// The page plays the endless world by default (PRD §66 E6, ja-qpv.5.1); sections 1-18 are the bounded game's guard and open it with `?world=bounded`: `bounded` is `base` for the pages that take the page's other defaults, the endless sections (19 on) open `base`.
+const bounded = `${base}?world=bounded`;
 let browser = null;
 /** Errors the page threw (a frame that throws stops the page's loop): said with any failure. */
 const errors = [];
@@ -858,7 +865,7 @@ try {
   });
   const tpage = await touch.newPage();
   tpage.on("pageerror", (e) => errors.push(String(e)));
-  await tpage.goto(base); // the first game as a new player has it: under the fog
+  await tpage.goto(bounded); // the first game as a new player has it: under the fog
   await tpage.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
   await until(
     () => tpage.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
@@ -918,7 +925,7 @@ try {
     requestAnimationFrame(tick);
   });
   tu.on("pageerror", (e) => errors.push(String(e)));
-  await tu.goto(base);
+  await tu.goto(bounded);
   await tu.getByLabel("world seed").fill(String(SEED));
   await tu.getByRole("button", { name: "Start the tutorial", exact: true }).click();
   const tcard = tu.getByRole("dialog", { name: "tutorial" });
@@ -2420,7 +2427,8 @@ try {
     const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
     const p = await c.newPage();
     p.on("pageerror", (e) => errors.push(String(e)));
-    await p.goto(`${base}${query}`);
+    // `query` is the fog's own (the page's default, or ?fog=0); the world is the bounded one (the endless sections open their own pages)
+    await p.goto(`${base}${query}${query ? "&" : "?"}world=bounded`);
     await p.getByLabel("world seed").fill(String(SEED));
     await p.getByRole("button", { name: "Start without the tutorial", exact: true }).click();
     await until(() => p.evaluate(() => !!window.jevAnts?.game.world), "a game for the fog checks", 20_000, 100);
@@ -2698,6 +2706,253 @@ try {
   const c1 = await lnp.evaluate(() => window.jevAnts.camera("below", 0));
   check(c1 === null || c1.x !== c2.x || c1.y !== c2.y, "line 1's curtain keeps a camera of its own, not moved to line 2's");
   await lnctx.close();
+  // ——— 19. The endless world, the page's default (PRD §66 E6, ja-qpv.5.1) ———
+  section("19. the endless world, the page's default");
+  // A page with no `world` in its address plays the endless world. Frame times are the page's own: a requestAnimationFrame loop run beside
+  // the game (its ticks run inside those frames), in headless Chromium without a GPU, so the numbers say how the two worlds compare here, not what a
+  // machine with a GPU does. They are printed for the PRD; the checks hold only that a pan over unmade ground costs no more than the start.
+  const openEndless = async (query, { name = "Start without the tutorial", seed = SEED } = {}) => {
+    const c = await browser.newContext({ viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1 });
+    const p = await c.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    await p.goto(`${base}${query}`);
+    await p.getByLabel("world seed").fill(String(seed));
+    await p.getByRole("button", { name, exact: true }).click();
+    await until(
+      () => p.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+      "a game on the endless page",
+      60_000,
+      100,
+    );
+    return { c, p };
+  };
+  const frameTimes = (p, ms) =>
+    p.evaluate(
+      (ms) =>
+        new Promise((resolve) => {
+          const d = [];
+          let last = performance.now();
+          const end = last + ms;
+          const f = (t) => {
+            d.push(t - last);
+            last = t;
+            if (t < end) requestAnimationFrame(f);
+            else {
+              const s = [...d].sort((a, b) => a - b);
+              resolve({
+                n: d.length,
+                p50: s[s.length >> 1],
+                p90: s[Math.floor(s.length * 0.9)],
+                max: s[s.length - 1],
+                fps: (1000 * d.length) / d.reduce((a, b) => a + b, 0),
+              });
+            }
+          };
+          requestAnimationFrame(f);
+        }),
+      ms,
+    );
+  const fmt = (f) =>
+    `${f.fps.toFixed(1)} fps, frame p50 ${f.p50.toFixed(1)} ms, p90 ${f.p90.toFixed(1)} ms, max ${f.max.toFixed(0)} ms (${f.n} frames)`;
+  /** Every count a read could change on the plane: its layers' chunks and the generator's misses and prefetches. */
+  const planeCounts = (p) =>
+    p.evaluate(() => {
+      const m = window.jevAnts.game.world.plane;
+      return JSON.stringify([
+        m.rock.count,
+        m.food.count,
+        m.quality?.count,
+        m.spoil?.count,
+        m.chambers?.cell.count,
+        m.gen.misses,
+        m.gen.prefetched,
+      ]);
+    });
+  const startNest = (p) =>
+    p.evaluate(() => {
+      const n = window.jevAnts.game.colonies[0].layers[0].nest;
+      return { x: n.x, y: n.y };
+    });
+  const U = 140; // a unit (about a mature colony's spacing)
+
+  const { c: ec, p: ep } = await openEndless("?fog=0");
+  const world = await ep.evaluate(() => {
+    const g = window.jevAnts.game;
+    return {
+      endless: g.map.endless === true,
+      colonies: g.colonies.length,
+      cap: g.sleepRule?.params.cap,
+      flight: g.flightLength,
+      newLines: g.newLines,
+      sites: g.sites.length,
+      ants: g.params.antCount,
+    };
+  });
+  check(world.endless, "a page with no world in its address plays the endless plane");
+  check(
+    world.colonies === 2 && world.newLines && world.sites > 0,
+    `two start colonies, new lines on, the wild sites listed (${world.sites})`,
+  );
+  check(
+    world.cap === 6 && world.flight === 280,
+    `the awake rule is on with cap ${world.cap} (600 ants a colony) and a queen flies ${world.flight} cells`,
+  );
+  await ep.getByRole("button", { name: "Go to ▾" }).click();
+  check(
+    (await ep.getByRole("button", { name: "Start", exact: true }).count()) === 1 &&
+      (await ep.getByRole("button", { name: "Whole map", exact: true }).count()) === 0,
+    "the Go to menu says Start where a bounded map says Whole map: there is no whole map",
+  );
+  await ep.keyboard.press("Escape");
+  await until(() => ep.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the endless game", 60_000, 200);
+  const fStart = await frameTimes(ep, 4000);
+  console.log(`  endless, at the start: ${fmt(fStart)}`);
+  check(fStart.n > 3, "the endless page draws frames at the start");
+  // The camera pans 20 U: no clamp to a box, and the minimap's window follows it.
+  const n0 = await startNest(ep);
+  const mini0 = await ep.evaluate(() => window.jevAnts.miniWindow());
+  await ep.evaluate(([x, y]) => window.jevAnts.centreOn("above", x, y), [n0.x + 20 * U, n0.y]);
+  const camFar = await until(
+    async () => {
+      const c = await ep.evaluate(() => window.jevAnts.camera("above"));
+      return c && Math.abs(c.x - (n0.x + 20 * U)) < 1 ? c : null;
+    },
+    "the camera 20 U east of the start nest",
+    5000,
+    60,
+  );
+  check(Math.abs(camFar.y - n0.y) < U, `the camera is 20 U east of the start (x ${camFar.x.toFixed(0)}, no clamp)`);
+  const mini1 = await until(
+    async () => {
+      const w = await ep.evaluate(() => window.jevAnts.miniWindow());
+      return w && w.x0 > mini0.x0 + 19 * U ? w : null;
+    },
+    "the minimap's window to follow the camera",
+    5000,
+    60,
+  );
+  check(
+    camFar.x >= mini1.x0 && camFar.x <= mini1.x0 + mini1.w && Math.abs(mini1.w - mini0.w) < 1e-9 && Math.abs(mini1.h - mini0.h) < 1e-9,
+    `the minimap's window (x ${mini1.x0.toFixed(0)}, ${mini1.w.toFixed(0)} wide, the same size as at the start) holds the camera`,
+  );
+  const fFar = await frameTimes(ep, 4000);
+  console.log(`  endless, after a 20 U pan: ${fmt(fFar)}`);
+  check(fFar.n > 3, "and draws frames after it");
+  check(
+    fFar.p50 <= fStart.p50 * 1.5 + 20,
+    `a pan over unmade ground costs no more a frame than the start (p50 ${fFar.p50.toFixed(1)} against ${fStart.p50.toFixed(1)} ms)`,
+  );
+  // A click far from the nests makes no chunk (the ground the click reads is peeked, not made), nor does the lens on far ground.
+  await ep.getByRole("button", { name: "Pause", exact: true }).click();
+  const before = await planeCounts(ep);
+  const cv = ep.locator("canvas").first();
+  for (const [x, y] of [
+    [640, 450],
+    [400, 300],
+    [900, 520],
+    [200, 700],
+  ])
+    await cv.click({ position: { x, y } });
+  await cv.focus();
+  await ep.keyboard.press("i");
+  for (const [x, y] of [
+    [640, 450],
+    [700, 380],
+  ]) {
+    await ep.mouse.move(x, y);
+    await ep.mouse.click(x, y);
+  }
+  await ep.keyboard.press("i");
+  check((await planeCounts(ep)) === before, "clicks and the lens on ground 20 U from the nests make no chunk");
+  // A save and a load round-trip: the save says its world, a reload offers it, and Continue plays it as an endless game.
+  await ep.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).click();
+  await ep.getByRole("button", { name: "Save here" }).first().click();
+  await until(async () => (await ep.getByText(/^Slot 1 · empty/).count()) === 0, "the endless save", 5000, 100);
+  const saved = await ep.evaluate(() => ({
+    time: window.jevAnts.game.time,
+    colonies: window.jevAnts.game.colonies.length,
+    rock: window.jevAnts.game.world.plane.rock.count,
+  }));
+  // the reload asks for the bounded world: the save carries its own
+  await ep.goto(`${base}?fog=0&world=bounded`);
+  await ep.getByRole("button", { name: "Continue" }).first().click();
+  await until(
+    () => ep.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+    "the endless game continued",
+    60_000,
+    100,
+  );
+  const back = await ep.evaluate(() => {
+    const g = window.jevAnts.game;
+    return {
+      endless: g.map.endless === true,
+      time: g.time,
+      colonies: g.colonies.length,
+      cap: g.sleepRule?.params.cap,
+      flight: g.flightLength,
+    };
+  });
+  check(
+    back.endless && back.cap === 6 && back.flight === 280,
+    "an endless save loads as the endless game, whatever the page's address says",
+  );
+  check(
+    back.colonies === saved.colonies && back.time >= saved.time && back.time < saved.time + 30,
+    `with its colonies and its time (${saved.time.toFixed(1)} s saved, ${back.time.toFixed(1)} s now)`,
+  );
+  await ec.close();
+  // The other way: a bounded save loads as the bounded game on a page that plays the endless world by default.
+  {
+    const { c: bc, p: bp2 } = await openEndless("?fog=0&world=bounded");
+    check(
+      await bp2.evaluate(() => window.jevAnts.game.map.endless !== true && window.jevAnts.game.flightLength === 140),
+      "?world=bounded plays the bounded game, flight 140",
+    );
+    await bp2.getByRole("button", { name: "Pause", exact: true }).click();
+    await bp2.getByRole("navigation", { name: "panels" }).getByRole("button", { name: "Saved games", exact: true }).click();
+    await bp2.getByRole("button", { name: "Save here" }).first().click();
+    await until(async () => (await bp2.getByText(/^Slot 1 · empty/).count()) === 0, "the bounded save", 5000, 100);
+    await bp2.goto(`${base}?fog=0`);
+    await bp2.getByRole("button", { name: "Continue" }).first().click();
+    await until(
+      () => bp2.evaluate(() => !!window.jevAnts?.game.world && window.jevAnts.game.landed !== null),
+      "the bounded game continued",
+      60_000,
+      100,
+    );
+    check(
+      await bp2.evaluate(() => window.jevAnts.game.map.endless !== true && window.jevAnts.game.sleepRule === null),
+      "a bounded save loads as the bounded game on the endless-default page",
+    );
+    await bc.close();
+  }
+  // The bounded game's frames under the same conditions, to compare: its start and the same pan, clamped to its box (the plane's east end).
+  {
+    const { c: bc, p: bp3 } = await openEndless("?fog=0&world=bounded");
+    await until(() => bp3.evaluate(() => window.jevAnts.game.time > 4), "four seconds of the bounded game", 60_000, 200);
+    const b0 = await frameTimes(bp3, 4000);
+    await bp3.evaluate(() => window.jevAnts.centreOn("above", 1e6, 100));
+    await sleep(500);
+    const b1 = await frameTimes(bp3, 4000);
+    console.log(`  bounded, at the start: ${fmt(b0)}`);
+    console.log(`  bounded, panned to the box's east end: ${fmt(b1)}`);
+    check(b0.n > 3 && b1.n > 3, "the bounded page draws frames, for comparison");
+    await bc.close();
+  }
+  // The fog on an endless plane (the page's default): the landing patch lies at negative y, and it is explored there, a cell far off is not.
+  {
+    const { c: fc, p: fp2 } = await openEndless("");
+    await fp2.getByRole("button", { name: "Pause", exact: true }).click();
+    const land = await fp2.evaluate(() => ({ x: window.jevAnts.game.landed.x, y: window.jevAnts.game.landed.y }));
+    check(land.y < 0, `the seed's landing is at negative y (${land.y.toFixed(1)}): the rows the fog once skipped`);
+    const here = await fp2.evaluate(([x, y]) => window.jevAnts.fogState("above", x, y), [land.x, land.y]);
+    check(here === 1 || here === 2, `the fog reveals ground at negative y under the host (state ${here})`);
+    check(
+      (await fp2.evaluate(([x, y]) => window.jevAnts.fogState("above", x, y), [land.x + 8 * U, land.y - 4 * U])) === 0,
+      "and ground 8 U away is not revealed",
+    );
+    await fc.close();
+  }
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await stop();

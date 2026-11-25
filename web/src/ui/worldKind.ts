@@ -13,3 +13,6 @@ export function worldFromUrl(search: string = typeof location === "undefined" ? 
 
 /** The world a save was made in: a save from before the switch carries none, and is bounded. */
 export const worldOf = (settings: { world?: WorldKind }): WorldKind => settings.world ?? "bounded";
+
+/** What "show everything" is called: a bounded map has a whole map to fit; an endless plane has none, and the key 0 goes back to the start (its nests and a margin). */
+export const homeName = (endless: boolean): string => (endless ? "Start" : "Whole map");

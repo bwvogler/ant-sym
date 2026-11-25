@@ -1,7 +1,7 @@
 // What the page may ask of the field and give it (ja-fnd.6.3.12, docs/field-split.md): the types ColonyField's props are made of. Re-exported by ColonyField.
 
 import type { AphidClump, BuildTool, Colony, Fungus, OneWorld } from "../../colony/index.ts";
-import type { Camera } from "../camera.ts";
+import type { Camera, Reach } from "../camera.ts";
 import type { Followed } from "../follow.ts";
 import type { SensedMap } from "../fungusSight.ts";
 import type { FieldProbe } from "../lensStore.ts";
@@ -35,6 +35,8 @@ export interface FieldApi {
   showAll: () => void;
   /** colony k's nest, in the view shown (the key n cycles them) */
   goNest: (k: number) => void;
+  /** the rectangle of the plane the minimap shows now, in world units: the whole map on a bounded one, the window of chunks round the camera on an endless one (the dev hook reads it) */
+  miniWindow: () => Reach;
 }
 
 /** What the page gives the field (ColonyField's props). */
