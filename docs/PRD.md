@@ -8193,6 +8193,20 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Play.** The player sees where the ground is rich and where the fungus has run out; chooses where to grow; and a hungry fungus that stops shows why. Risks: starving before it finds anything, a worst seed far worse than today's, litter the player cannot see (energy.md, Play).
 
+**A cheaper spore (owner, 2026-11-25: "perhaps spore should cost less"; experiment, `ja-a2no`).** `BODY.sporeCost` (the mass a spore costs, default 1, so the game is unchanged and the goldens exact) and `BODY.freeBudget` (the most the free term pays out, a stand-in for a start reserve) are lab overrides in `progression.mjs` (`--spore-cost`, `--free-budget`; `progression.yml` inputs `sporecost`, `freebudget`). Seeds 1–20, 900 s, ledger on, commit 72cb2755, against the baseline run 45539333590 (quarter worst 333 s seed 6, median 171 s; earned 667 + 36 corpses; spores 658; mass 42; hyphae 226 cells):
+
+| arm (run) | quarter worst / median | earned at 900 s, median (free + corpse) | mass held at 300 s → 900 s | hyphae cells at 900 s |
+|---|---|---|---|---|
+| cost 0.1, budget 110 (45618560672) | 168 s (seed 9) / 128 s | 144 (110–244) | 98 → 46 | 426 |
+| cost 0.3, budget 220 (45618565676) | 177 s (seed 6) / 135 s | 256 (225–369) | 127 → 7 | 600 |
+| cost 0.1, no budget (45618570073) | 168 s (seed 9) / 128 s | 2,077 (224–9,962) | 189 → 1,592 | 3,595 |
+
+- **P1 holds in every arm and moves the other way:** no seed is more than 10 % slower than baseline and 18 of 20 are more than 10 % faster (the two that are not are seeds 10 and 14). Seed 6, the baseline's worst, falls from 333 s to 132 s (arm A). The arm with and without the budget have identical quarter, half and queen times on every seed, because the budget binds only after the quarter (by 300 s in arm A).
+- **A spore at a tenth of the cost needs about a fifth of the earned mass:** a median 144 against about 700. Arm A's body holds 46 mass at 900 s, having fallen from 98 at 300 s: it is fed by corpses (median 34) alone after its reserve is spent. Arm B's body ends at 7 mass, spending 248 on spores: starved by the end.
+- **Without a budget a cheap spore runs away:** the free term keeps growing the body (median 2,077 earned, up to 9,962; mass up to 8,485), because a body that spends little on spores grows to its capacity and stays there.
+- **Why the game gets faster:** with spores cheap the body builds up early (mass 51 at 120 s against 24; hyphae 150 cells against 76) and spore output scales with body mass, so more spores go out sooner. The pace can be set back with the spore share (the Fruiting levels' 0.6 to 2 % of mass a second) if the owner wants today's pace.
+- **A cost the numbers show:** the free pool earns 0.25 × ground growth (`ground` includes what `feed` takes in). With earned mass of 144 it makes about 36 mutations a game against about 170 today, so the fungus's own upgrades (mycelium, knots, stalks, fruiting, lichen) would be nearly out of reach unless the earned income, or the share of it that counts, is larger.
+
 **Assays and targets.** The assay lands first (`ja-a2no.2`, no behaviour change): mass in by source and out by sink over time, per seed, on GitHub's `progression.yml` (`split` input already reports the growth split). Target: P1 by the worst seed against the baseline the owner chooses, seeds 1–20, confirmed on a second set; the late earning rate within a stated bound; goldens bit-exact with the setting off and re-recorded and said so with it on.
 
 **Cost (estimated).** None in Jev for steering. A `resource` value in the growth lane's situation (`ja-a2no.8`) is +48 situations (96 to 144) and a token bill to measure before it is chosen.
