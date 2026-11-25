@@ -240,6 +240,6 @@ test("up close, fog and remembered open ground are laid as strips, hexagons only
   assert.equal(unknown.hex, 0, "nothing sensed: no hexagon at all");
   assert.ok(unknown.strips > 0, "the fog is laid as strips");
   const some = hexes(true, true);
-  assert.ok(some.hex > 0 && some.hex < 100, `a rock cell and the like draw as hexagons, not every cell (${some.hex})`);
+  assert.ok(some.hex >= 20 && some.hex < 150, `the rock cell and the cells on the edge of the sensed ground draw as hexagons, not every cell (${some.hex})`);
   assert.ok(hexes(false, false).strips === 0, "without the fog, no strips under the hexagons");
 });
