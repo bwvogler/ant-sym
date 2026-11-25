@@ -28,6 +28,7 @@ Within one upgrade, levels still go in order. A level not listed below needs onl
 | Knots·many | Mycelium·a web | |
 | Stalks·a stalk | Fruiting·thick | a stalk spreads spores, worth little before there are many |
 | Stalks·a tall stalk | Fruiting·dense | |
+| Lichen·a partner | Mycelium·a borer | a hypha that takes an alga on rock is a borer's reach, and the partner is a free-pool level (docs/lichen.md, PRD §90) |
 | Senses·the full range | Recognition·one step, Trails·one step | the wide senses lever after a first step on both odour branches |
 | Stealth·hidden | Fruiting·thick | a choice between spreading and hiding comes early, then joins |
 | Royal·one step | Recognition·the full range | the queen's levers sit at the end of the odour branches |
