@@ -8253,9 +8253,11 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Decisions.**
 - **Owner (2026-11-25):** widen the odour space (more dimensions) and drive scents away on aggressive contact, "or some other mechanic grounded in literature".
-- **Proposed (needs the owner; beads `ja-zg1u.9`, `.10`, `.11`):**
-  - K = 3, tolerance 0.35, each axis a class of compounds, with per-species weights (default 1).
-  - Drive-apart is replaced by the **learned foe** (perceiver-side) as the literature-grounded version; explicit repulsion stays an owner option, marked design.
+- **Decided by the owner, 2026-11-25 (beads `ja-zg1u.9`, `.10`, `.11`, closed):**
+  - **K = 4 axes, tolerance 0.35** (not the recommended 3): kin pairs 4.5%, 99% of wild colonies strangers to both start colonies, about 78 mutual strangers in a random packing. The risk the choice takes on: more strangers means fewer unification outcomes and a longer way for the fungus to make its odour tolerated (permanent war), so the time-to-unity check and the host-shift cap in the space (S2) matter more, and the tolerance is tuned on the O1 and unity assays. Each axis a class of compounds, with per-species weights (default 1).
+  - **The learned foe** (perceiver-side, S4) instead of explicit repulsion: no source shows colony odours moving because of fights; explicit repulsion is not built.
+  - **Symmetric distance** by default; one-sided (directed aggression) is a later setting.
+  - The kin-neighbour question is moot at K = 4 (4.5% of pairs): wild odours stay a pure hash per axis (`ja-s37s` option c not needed).
   - Symmetric distance by default.
 - **Fixed by the plan, not by biology:** wild odour axes stay a pure hash of seed and site; a host's displacement toward the fungus is capped in the space (0.3), so "a host is never a stranger to its own nest" still holds in more dimensions (today's proof, `MAX_MASK` x 0.5 = 0.3, does not extend).
 
@@ -8270,6 +8272,6 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 **Beads.** `ja-zg1u` (this). Children in build order: `.1` research (abstract-only sources in full); `.2` S0 assays; `.3` S1 K-vector at K = 1; `.4` S2 K = 3 on; `.5` S3 species weights; `.6` S4 learned foe; `.7` S5 optional drift (P4); `.8` S6 Learn and colour. Owner calls: `.9` K and tolerance, `.10` repulsion or learned foe, `.11` symmetric distance. Supersedes `ja-s37s` (closed) options (b) and (c).
 
 **Still open.**
-- **Owner:** `.9`, `.10`, `.11`; whether about 12% kin wild neighbours at K = 3 is acceptable or wild odours should be chosen by rejection against neighbours' (`ja-s37s` option c, still pure).
+- **Owner:** `.9` (K = 4), `.10` (the learned foe) and `.11` (symmetric) are decided (above); no owner question is open.
 - **To read:** the abstract-only sources in `.1`; Langen 2000, Reeve 1989, Sturgis & Gordon 2013 and Martin & Drijfhout 2009 could not be reached; bioRxiv 614719 (already cited in `recognition.ts`) was not re-read.
 - **To measure:** the S0 assays; the kin share on the neighbours the endless world actually makes (the Monte Carlo uses uniform draws); the bench.

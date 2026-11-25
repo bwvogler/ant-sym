@@ -118,12 +118,12 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
   - *Cost creep*: the sparse bands growing with continuous host odours; the bench catches it.
 - **Owner decisions needed:** §Open questions.
 
-## Open questions
+## Decided (owner, 2026-11-25) and still open
 
-1. **K and weights.** K = 3 (kin 0.116) or K = 2 (0.276) or K = 4 (0.045)? Sources give "a few" axes, no number (`OWNER` bead).
-2. **Aggression-driven repulsion as the owner first put it.** Not supported by any source read, and Frizzi 2015 goes against it; the literature-grounded replacement is the learned foe (S4). If the owner still wants repulsion, it is **design** and must be marked so in the Learn entry (`OWNER` bead).
-3. **Symmetric or one-sided distance.** Guerrieri 2009 for one-sided (novel cues rejected, absent ones not), Neupert 2018 against (a missing component also makes a non-nestmate). Symmetric is the default (`OWNER` bead).
-4. **Are kin neighbours acceptable** for an ordinary species (about 12% of wild pairs at K = 3), or should wild odours be chosen by rejection against their neighbours' (`ja-s37s` option c, still pure since the neighbours' odours are pure)? Recommendation: accept, and measure in E6.
+1. **K = 4 axes, tolerance 0.35** (decided; the recommendation was 3). Kin pairs 4.5%, 99% of wild colonies strangers to both start colonies, about 78 mutual strangers in a random packing. The risk: fewer unification outcomes and a longer way for the fungus to make its odour tolerated, so the time-to-unity check, the host-shift cap in the space and the tolerance tuning (O1 and unity assays) carry more weight.
+2. **The learned foe, not explicit repulsion** (decided). Not supported by any source read, and Frizzi 2015 goes against explicit repulsion.
+3. **Symmetric distance** by default (decided); one-sided is a later setting.
+4. **Kin neighbours:** moot at K = 4 (4.5% of pairs); wild odours stay a pure hash per axis.
 5. **To measure:** the S0 assays; the kin share against the real neighbours the endless world makes (not uniform draws); the bench.
 
 ## Sources
