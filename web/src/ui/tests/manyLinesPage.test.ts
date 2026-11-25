@@ -295,7 +295,8 @@ test("the camera rig's host reads each layer's own map", () => {
     canvasRef: { current: null },
     follow: { current: null },
     followCb: { current: () => {} },
-  } as RigRefs;
+    sensed: { current: { knowledge: null } },
+  } as unknown as RigRefs;
   const host = rigHost(refs);
   assert.equal(host.view(), 2);
   assert.equal(host.map(PLANE), w.plane);

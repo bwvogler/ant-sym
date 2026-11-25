@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { centreX, centreY, CHUNK, encode, INFECTED, PLANE, type Colony, type Game } from "../../colony/index.ts";
+import { centreX, centreY, CHUNK, encode, generateEndlessPlane, INFECTED, PLANE, type Colony, type Game } from "../../colony/index.ts";
 import { Knowledge, type Source } from "../fog/knowledge.ts";
 import { fogCarried, loadFog, saveFog, sensedFor } from "../fog/sources.ts";
 import { record } from "../saves.ts";
@@ -307,4 +307,10 @@ test("the page hands a record's fog to the game it loads and writes the fog into
   const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
   assert.match(read("../useColony.ts"), /g\.load\(r\.game\);\s*if \(r\.fog\) fogCarried\.set\(g, r\.fog\);/);
   assert.match(read("../../ColonyApp.tsx"), /record\([^;]*saveFog\(n\.sensed\)\)/);
+});
+
+test("sensedFor lets a host sense the endless plane's rows above row 0 and leaves a bounded map's as they were", () => {
+  const plane = generateEndlessPlane(1);
+  assert.equal(sensedFor({ layers: [plane] } as unknown as Game, false).firstRow, -Infinity);
+  assert.equal(sensedFor({ layers: [] } as unknown as Game, false).firstRow, 0);
 });

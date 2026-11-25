@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { CHUNK, CURTAIN, generateEndlessPlane, PLANE, worldExtent, type WorldMap } from "../../colony/index.ts";
+import { CHUNK, CURTAIN, generateEndlessPlane, INFECTED, PLANE, R, worldExtent, type Colony, type WorldMap } from "../../colony/index.ts";
+import { Knowledge } from "../fog/knowledge.ts";
+import { SensedMap } from "../fungusSight.ts";
 import { clamp, fit, fitZoom, fromMinimap, miniFrame, minimapRect, MINI_CHUNKS_W, zoomBy, type Viewport } from "../camera.ts";
-import { CameraRig, extentOf, LINK_ZOOM, NEST_ZOOM, type RigHost } from "../field/rig.ts";
+import { CameraRig, extentOf, FOG_MARGIN, LINK_ZOOM, NEST_ZOOM, type RigHost } from "../field/rig.ts";
+import { readFileSync } from "node:fs";
 
 // The field's cameras (ja-fnd.6.3.11): one per view, and what moves them. The expectations are computed from `ui/camera.ts`'s maths and
 // `worldExtent`, never from the rig.
@@ -355,4 +358,121 @@ test("on an endless plane the minimap is the window round the camera: inMini tak
   // zoomed out below the level: no minimap
   rig.set({ x: at.x, y: at.y, zoom: 0.5 });
   assert.equal(rig.inMini(r.x + 1, r.y + 1), false);
+});
+
+// The camera under the fog (F7b, ja-1ypq.10): on an endless plane the view may go only where the fungus has explored plus FOG_MARGIN.
+
+/** A host at world point (x, y) on the plane. */
+const hostAtWorld = (x: number, y: number): Colony =>
+  ({
+    n: 1,
+    params: { sensorDistance: 3 },
+    alates: [],
+    alive: Uint8Array.of(1),
+    load: Float32Array.of(INFECTED),
+    layer: Uint8Array.of(PLANE),
+    x: Float32Array.of(x),
+    y: Float32Array.of(y),
+    holeCells: [],
+  }) as unknown as Colony;
+
+/** An endless plane with a fog that has explored the start nests and a place `chunks` chunks east of them. */
+function fogged(chunks: number) {
+  const plane = generateEndlessPlane(1);
+  const sensed = new SensedMap();
+  sensed.firstRow = -Infinity; // an endless plane has rows above 0 (sensedFor sets it)
+  const k = new Knowledge(sensed, []);
+  const [a] = plane.plane.startNests();
+  sensed.stamp([hostAtWorld(a.x, a.y)], 10);
+  if (chunks > 0) sensed.stamp([hostAtWorld(a.x + chunks * CHUNK, a.y)], 11);
+  return { plane, k, a };
+}
+
+test("under the fog the extent has no reach until something is explored, and no fog or a bounded map gives the extent it always did", () => {
+  const plane = generateEndlessPlane(1);
+  const bare = extentOf(plane);
+  assert.equal("reach" in bare, false);
+  assert.deepEqual(extentOf(plane, null), bare, "no fog");
+  const sensed = new SensedMap();
+  assert.deepEqual(extentOf(plane, new Knowledge(sensed, [])), bare, "a fog that has explored nothing");
+  const { k } = fogged(0);
+  assert.deepEqual(extentOf(PLANE_MAP, k), extentOf(PLANE_MAP), "a bounded map ignores the fog");
+  assert.deepEqual(extentOf(CURTAIN_MAP, k), extentOf(CURTAIN_MAP));
+});
+
+test("the reach is the explored chunks plus the margin, joined with the start view, so the start view is unchanged", () => {
+  const { plane, k } = fogged(0);
+  const box = k.bounds(PLANE)!;
+  const e = extentOf(plane, k);
+  const home = e.home!;
+  const r = e.reach!;
+  assert.ok(r.x0 <= home.x0 && r.y0 <= home.y0 && r.x0 + r.w >= home.x0 + home.w && r.y0 + r.h >= home.y0 + home.h, "holds the start view");
+  assert.ok(
+    r.x0 <= box.cx0 * CHUNK - FOG_MARGIN && r.x0 + r.w >= (box.cx1 + 1) * CHUNK + FOG_MARGIN,
+    "holds the explored chunks and the margin",
+  );
+  const v = { w: 800, h: 600, dpr: 1 };
+  const host: RigHost = {
+    view: () => PLANE,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => false,
+    unfollow: () => {},
+    fog: () => k,
+  };
+  assert.deepEqual(new CameraRig(host).camera(), fit(extentOf(plane), v), "the camera starts where it did without the fog");
+});
+
+test("the camera cannot pan past the explored ground and the margin, and goes on as far as that", () => {
+  const { plane, k } = fogged(10);
+  const box = k.bounds(PLANE)!;
+  const home = extentOf(plane).home!; // the reach always holds the start view too
+  const v = { w: 800, h: 600, dpr: 1 };
+  const host: RigHost = {
+    view: () => PLANE,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => false,
+    unfollow: () => {},
+    fog: () => k,
+  };
+  const rig = new CameraRig(host);
+  const zoom = 8; // half the view is 50 cells wide and 37.5 tall
+  rig.set({ x: 1e9, y: 0, zoom });
+  assert.equal(
+    rig.camera().x,
+    Math.max((box.cx1 + 1) * CHUNK + FOG_MARGIN, home.x0 + home.w) - 50,
+    "the view's right edge stops at the explored ground plus the margin",
+  );
+  rig.set({ x: -1e9, y: 0, zoom });
+  assert.equal(rig.camera().x, Math.min(box.cx0 * CHUNK - FOG_MARGIN, home.x0) + 50, "and its left edge");
+  rig.set({ x: 0, y: 1e9, zoom });
+  const near = (a: number, b: number, why: string) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} against ${b}`);
+  near(
+    rig.camera().y,
+    Math.max((box.cy1 + 1) * CHUNK * R + FOG_MARGIN * R, home.y0 + home.h) - 37.5,
+    "and its bottom edge (y in rows of R)",
+  );
+  rig.set({ x: 0, y: -1e9, zoom });
+  near(rig.camera().y, Math.min(box.cy0 * CHUNK * R - FOG_MARGIN * R, home.y0) + 37.5, "and its top edge");
+  // the ground explored far to the east is reachable, and so is the margin past it
+  rig.set({ x: (box.cx1 + 1) * CHUNK + 20, y: 0, zoom });
+  assert.equal(rig.camera().x, (box.cx1 + 1) * CHUNK + 20, "the margin past the edge can be looked at");
+  // with the fog gone (suspended for the builder) the plane is as free as before
+  const free = new CameraRig({ ...host, fog: () => null });
+  free.set({ x: 1e6, y: 0, zoom });
+  assert.equal(free.camera().x, 1e6);
+});
+
+test("the page hands the fog to the camera rig and to the frame's extent (the lines the pure tests cannot reach)", () => {
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  assert.match(read("../useCameraRig.ts"), /fog: \(\) => r\.sensed\.current\.knowledge/);
+  const binding = read("../field/binding.ts");
+  assert.equal(
+    (binding.match(/extentOf\([^)]*this\.#sensed\.knowledge\)/g) ?? []).length,
+    3,
+    "the constructor, #rebuild and each frame's bind",
+  );
 });

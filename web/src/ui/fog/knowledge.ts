@@ -58,6 +58,14 @@ interface Chunk {
   gone?: Set<string>;
 }
 
+/** The chunks explored on a layer, as a box: from chunk (cx0, cy0) to chunk (cx1, cy1), both inclusive. */
+export interface ChunkBox {
+  cx0: number;
+  cy0: number;
+  cx1: number;
+  cy1: number;
+}
+
 /** How many chunks `compact` checks in one call by default: each costs one regeneration of the plane's chunk when it is not cached (20-40 ms cold). */
 export const COMPACT_BUDGET = 1;
 
@@ -79,6 +87,8 @@ export class Knowledge {
   readonly #sourcesOf: (layer: number) => readonly Source[];
   readonly #liveAt: number;
   readonly #layers = new Map<number, Map<number, Chunk>>();
+  /** the box of chunks explored on each layer, grown when a chunk is first sensed (the camera's bound under the fog, F7b) */
+  readonly #boxes = new Map<number, ChunkBox>();
   /** the chunk looked up last: a draw reads a run of neighbouring cells, so most reads skip the two map lookups (hot on a phone) */
   #lastL = -1;
   #lastK = -1;
@@ -115,6 +125,7 @@ export class Knowledge {
     sensed.onSeen = (l, cx, cy, start, end) => this.#see(l, cx, cy, start, end);
     sensed.onReset = () => {
       this.#layers.clear();
+      this.#boxes.clear();
       this.#last = undefined;
       this.#queue = [];
       this.#regen.clear();
@@ -126,11 +137,13 @@ export class Knowledge {
     if (!chunks) this.#layers.set(l, (chunks = new Map()));
     const key = chunkKey(cx, cy);
     let c = chunks.get(key);
-    if (!c)
+    if (!c) {
       chunks.set(
         key,
         (c = { l, cx, cy, fresh: true, bits: new Uint32Array(WORDS), seen: new Float32Array(BLOCKS).fill(-1), snaps: new Map() }),
       );
+      this.#grow(l, cx, cy);
+    }
     c.fresh = true;
     for (let i = start; i < end; i++) c.bits[i >> 5]! |= 1 << (i & 31);
     // A run lies in one row, so its blocks are one block row's.
@@ -150,6 +163,22 @@ export class Knowledge {
       }
       for (let i = start; i < end; i++) snap[i] = truth[i]!;
     }
+  }
+
+  #grow(l: number, cx: number, cy: number): void {
+    const b = this.#boxes.get(l);
+    if (!b) this.#boxes.set(l, { cx0: cx, cy0: cy, cx1: cx, cy1: cy });
+    else {
+      b.cx0 = Math.min(b.cx0, cx);
+      b.cy0 = Math.min(b.cy0, cy);
+      b.cx1 = Math.max(b.cx1, cx);
+      b.cy1 = Math.max(b.cy1, cy);
+    }
+  }
+
+  /** The box of chunks any cell of which has been sensed on layer `l`, or undefined while none has (it only grows; read it, never change it). */
+  bounds(l: number): Readonly<ChunkBox> | undefined {
+    return this.#boxes.get(l);
   }
 
   /** Chunk (cx, cy) of layer `l`, if any cell of it has been sensed (the last one asked for is remembered). */
@@ -295,6 +324,7 @@ export class Knowledge {
   load(saved: unknown): void {
     const { layers } = decode(saved) as { layers: [number, SavedChunk[]][] };
     this.#layers.clear();
+    this.#boxes.clear();
     this.#last = undefined;
     this.#queue = [];
     this.#at = 0;
@@ -305,6 +335,7 @@ export class Knowledge {
         const c: Chunk = { l, cx: s.cx, cy: s.cy, bits: s.bits, seen: s.seen, snaps: new Map(s.snaps) };
         if (s.gone.length > 0) c.gone = new Set(s.gone);
         chunks.set(chunkKey(s.cx, s.cy), c);
+        this.#grow(l, s.cx, s.cy);
       }
       this.#layers.set(l, chunks);
     }

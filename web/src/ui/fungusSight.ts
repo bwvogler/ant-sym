@@ -49,6 +49,11 @@ export class SensedMap {
   #fresh = new Map<number, Map<number, number>>();
   /** per layer: every chunk a host has ever sensed (chunkKey) */
   #revealed = new Map<number, Set<number>>();
+  /**
+   * The first row a host can sense: 0 on a bounded map, which has no rows above it. An endless plane has rows above and below 0 (the start nests
+   * are at negative y), so the page sets this to -Infinity there (fog/sources.ts sensedFor): without it the fog never explored the plane's north.
+   */
+  firstRow = 0;
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
   #knowledge: Knowledge | null = null;
@@ -208,7 +213,7 @@ export class SensedMap {
     const cols = Math.ceil(r) + 1;
     const r2 = r * r;
     for (let gy = gy0 - rows; gy <= gy0 + rows; gy++) {
-      if (gy < 0) continue;
+      if (gy < this.firstRow) continue;
       const dy = centreY(gy) - y;
       const inside = (gx: number) => {
         const dx = centreX(gx, gy) - x;

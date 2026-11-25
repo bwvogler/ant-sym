@@ -97,6 +97,9 @@ export function loadFog(s: SensedMap, saved: FogSave): void {
 /** The sensed map for `game`: with the fog's knowledge hung on it when `fog`, and the fog a loaded save carried. */
 export function sensedFor(game: Game, fog: boolean): SensedMap {
   const s = new SensedMap();
+  // An endless plane has ground above row 0 too (SensedMap.firstRow).
+  const plane = game.layers[0];
+  if (plane && isEndless(plane)) s.firstRow = -Infinity;
   if (fog) {
     // The sources follow the game's layers: a line founded later (its curtain is a layer) is remembered too.
     s.knowledge = new Knowledge(s, (layer) => layerSources(game, layer));
