@@ -4,20 +4,7 @@
 // its own drawer adds a stage to the list, not a branch to draw(). The stages leave the 2D context's state as the frame's old inline code did
 // (docs/field-split.md, "the canvas state"): a stage's last property set is the next one's first, so the order of the list is the picture.
 
-import {
-  type AphidClump,
-  isCurtainLayer,
-  centreX,
-  centreY,
-  type Colony,
-  groundHeat,
-  OPEN,
-  PLANE,
-  R,
-  rockAt,
-  sunDown,
-  type WorldMap,
-} from "../../colony/index.ts";
+import { type AphidClump, isCurtainLayer, centreX, centreY, type Colony, groundHeat, OPEN, PLANE, R, sunDown } from "../../colony/index.ts";
 import { toScreen, visible } from "../camera.ts";
 import type { Followed } from "../follow.ts";
 import type { SensedMap } from "../fungusSight.ts";
@@ -31,7 +18,8 @@ import { workerLod } from "../workerSprites.ts";
 import { type AntFrame, drawAnts } from "./ants.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 import { drawFungusGround, drawStalksRaised } from "./fungus.ts";
-import { type Ground, groundPaper, peekCell } from "./ground.ts";
+import { type Ground, groundPaper } from "./ground.ts";
+import { peekCell, seenRock } from "../groundPeek.ts";
 import { drawAphids, drawFollowed, drawInspection, drawSpecimens, drawTraces, type MarkFrame } from "./marks.ts";
 import { drawNest, drawRememberedCorpses, type NestFrame } from "./nests.ts";
 import type { Minimap } from "./minimap.ts";
@@ -169,7 +157,7 @@ export function beginFrame(
 }
 
 /** The terrain of cell (x, y): the map's (on an endless plane read with `peek`, so drawing makes no chunk: an unmade chunk reads as rock). */
-const terrainAt = (m: WorldMap, x: number, y: number): number => (m.endless === true ? peekCell(m.rock, x, y) : rockAt(m, x, y));
+const terrainAt = seenRock;
 
 /** The page's paper over the whole canvas, and the ground's own paper over the map. */
 export const paperStage: Stage = ({ fc }) => {

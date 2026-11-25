@@ -759,3 +759,31 @@ test("a frozen colony draws its mound, nest, brood, queen and alates at half str
     assert.equal(asleep.state.globalAlpha, 1);
   }
 });
+
+test("on an endless plane the chambers' seeds read the ground with `peek`: an unmade chunk is rock (no seed, nothing made), a made one is read as it is (ja-qpv.4.8)", () => {
+  const log: string[] = [];
+  const open = new Uint8Array(64 * 64).fill(OPEN);
+  let made: Uint8Array | undefined;
+  const rock = {
+    empty: 1,
+    get: (x: number, y: number) => (log.push(`get(${x},${y})`), OPEN),
+    peek: (cx: number, cy: number) => (log.push(`peek(${cx},${cy})`), made),
+  };
+  const endless = (): Record<string, unknown> => ({ endless: true, rock, chambers: { list: [chamber({ food: 1 })], at: () => 1 } });
+  const f = { resourceLod: "tiny", hexes: true, resourceImage: new RecordedCanvas(1, 1) as unknown as HTMLCanvasElement } as const;
+  const unmade = setup({ m: endless(), f });
+  run(unmade);
+  assert.equal(callsOf(unmade.log, "drawImage").length, 0, "unmade ground is rock: no seed lies on it");
+  assert.ok(log.length > 0 && log.every((l) => l.startsWith("peek(")), `only peek: ${log.join(" ")}`);
+  made = open;
+  const there = setup({ m: endless(), f });
+  run(there);
+  assert.equal(callsOf(there.log, "drawImage").length, 1, "a made chunk's open cell holds its seed");
+  assert.ok(log.every((l) => l.startsWith("peek(")));
+  // a bounded map still reads with `get`
+  log.length = 0;
+  const bounded = setup({ m: { chambers: { list: [chamber({ food: 1 })], at: () => 1 }, rock }, f });
+  run(bounded);
+  assert.equal(callsOf(bounded.log, "drawImage").length, 1);
+  assert.ok(log.length > 0 && log.every((l) => l.startsWith("get(")), `bounded: only get: ${log.join(" ")}`);
+});

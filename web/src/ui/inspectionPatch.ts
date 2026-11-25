@@ -15,13 +15,13 @@ import {
   inBounds,
   nx,
   ny,
-  rockAt,
   type AphidClump,
 } from "../colony/index.ts";
 import { indexInspectedWorkers, inspectCell, type CellInspectionState } from "./cellInspection.ts";
 import type { LensWorld } from "./lens.ts";
 import { LIVE, UNKNOWN } from "./fog/knowledge.ts";
 import { SNAP } from "./fog/sources.ts";
+import { seenCell, seenRock } from "./groundPeek.ts";
 import type { SensedMap } from "./fungusSight.ts";
 import { voxelRegionBounds } from "./voxelViewport.ts";
 
@@ -137,10 +137,15 @@ function readPatch(
         // Under the fog the plane under the strip is what was last sensed there, and nothing where it never was.
         fog = sensed.knowledge,
         ps = fog ? fog.state(PLANE, px, py) : LIVE,
-        kind = ps === LIVE ? rockAt(g.world.plane, px, py) : (fog!.snapshot(PLANE, SNAP.rock, px, py) ?? OPEN);
+        kind = ps === LIVE ? seenRock(g.world.plane, px, py) : (fog!.snapshot(PLANE, SNAP.rock, px, py) ?? OPEN);
       if (ps !== UNKNOWN) {
         out.projectedGround = kind === OPEN ? "open" : kind === SOIL ? "soil" : "rock";
-        out.projectedSpoil = ps === LIVE ? (g.world.plane.spoil?.get(px, py) ?? 0) : (fog!.snapshot(PLANE, SNAP.spoil, px, py) ?? 0);
+        out.projectedSpoil =
+          ps === LIVE
+            ? g.world.plane.spoil
+              ? seenCell(g.world.plane, g.world.plane.spoil, px, py)
+              : 0
+            : (fog!.snapshot(PLANE, SNAP.spoil, px, py) ?? 0);
       }
       out.surfaceEntrance = g.colonies.some((c) => c.holeCells.some((h) => h.col === xx));
     }
@@ -158,10 +163,10 @@ function readPatch(
         const fs = fog ? fog.state(layer, a, b) : LIVE;
         if (fs === UNKNOWN) continue; // nothing of ground never sensed
         const snap = fs === LIVE ? null : fog!; // a remembered cell reads its snapshot, not the truth
-        const rock = snap ? (snap.snapshot(layer, SNAP.rock, a, b) ?? OPEN) : rockAt(map, a, b);
-        const quality = snap ? (snap.snapshot(layer, SNAP.quality, a, b) ?? 1) : (map.quality?.get(a, b) ?? 1);
+        const rock = snap ? (snap.snapshot(layer, SNAP.rock, a, b) ?? OPEN) : seenRock(map, a, b);
+        const quality = snap ? (snap.snapshot(layer, SNAP.quality, a, b) ?? 1) : map.quality ? seenCell(map, map.quality, a, b) : 1;
         if (rock === OPEN && Math.abs(quality - 1) <= 0.01)
-          surfaceFood.set(cellKey(a, b), snap ? (snap.snapshot(layer, SNAP.food, a, b) ?? 0) : map.food.get(a, b));
+          surfaceFood.set(cellKey(a, b), snap ? (snap.snapshot(layer, SNAP.food, a, b) ?? 0) : seenCell(map, map.food, a, b));
       }
     }
   return { selected, mode, cells, surfaceFood };
