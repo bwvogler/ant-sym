@@ -1,4 +1,4 @@
-import { cellKey, type Colony, type Game } from "../../colony/index.ts";
+import { cellKey, decode, encode, type Colony, type Game } from "../../colony/index.ts";
 import { type DecayStage, visibleCadavers } from "../cadaverVisual.ts";
 import { LIVE, type Knowledge } from "./knowledge.ts";
 
@@ -42,6 +42,21 @@ export class CorpseMemory {
   on(l: number): Iterable<RememberedCorpse> {
     const cells = this.#layers.get(l);
     return cells ? [...cells.values()].flat() : [];
+  }
+
+  /** The corpses remembered, as JSON: what a save of the page's fog holds. */
+  save(): unknown {
+    return encode({ layers: [...this.#layers].map(([l, cells]) => [l, [...cells]]) });
+  }
+
+  /** Put a `save()` back in place of what is remembered now. */
+  load(saved: unknown): void {
+    this.#layers.clear();
+    for (const [l, cells] of (decode(saved) as { layers: [number, [number, RememberedCorpse[]][]][] }).layers)
+      this.#layers.set(
+        l,
+        new Map(cells.map(([key, list]) => [key, list.map((c) => ({ x: c.x, y: c.y, heading: c.heading ?? undefined, stage: c.stage }))])),
+      );
   }
 
   /** Forget everything (time went back: a restart, a load). */

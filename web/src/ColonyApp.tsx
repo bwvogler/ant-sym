@@ -43,7 +43,8 @@ import { clampLine, MAX_SPEED, viewShowing, useColony, type ColonyStats, type Ev
 import StartScreen from "./ui/StartScreen.tsx";
 import TutorialCard from "./ui/Tutorial.tsx";
 import AimBar from "./ui/AimBar.tsx";
-import { fogFromUrl, sensedFor } from "./ui/fog/sources.ts";
+import { fogFromUrl, saveFog, sensedFor } from "./ui/fog/sources.ts";
+import type { SensedMap } from "./ui/fungusSight.ts";
 import { firstGame, skipTutorial, useTutorial } from "./ui/useTutorial.ts";
 import {
   AUTOSAVE,
@@ -290,6 +291,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
   });
   const games = useSaves(
     game,
+    sensed,
     settings,
     () => {
       const { aim, doctrines } = jev.snapshot();
@@ -1073,7 +1075,14 @@ export interface Saves {
  * Saved games (ja-lo8.6): the list (newest first), saving to a slot, and the autosave: every AUTOSAVE_MS while a game
  * is under way, and when the tab is hidden (the player may not come back to this tab).
  */
-function useSaves(game: Game, settings: GameSettings, player: () => PlayerState, stats: () => ColonyStats | null, started: boolean): Saves {
+function useSaves(
+  game: Game,
+  sensed: SensedMap,
+  settings: GameSettings,
+  player: () => PlayerState,
+  stats: () => ColonyStats | null,
+  started: boolean,
+): Saves {
   const store = useMemo(() => browserSaves(), []);
   const [list, setList] = useState<SaveRecord[]>([]);
   const refresh = useCallback(
@@ -1086,16 +1095,16 @@ function useSaves(game: Game, settings: GameSettings, player: () => PlayerState,
   );
   useEffect(refresh, [refresh]);
   // The latest of everything, for the timer and the hidden-tab handler (they outlive renders).
-  const now = useRef({ game, settings, playerState: player, stats, started });
+  const now = useRef({ game, sensed, settings, playerState: player, stats, started });
   useEffect(() => {
-    now.current = { game, settings, playerState: player, stats, started };
+    now.current = { game, sensed, settings, playerState: player, stats, started };
   });
   const save = useCallback(
     async (slot: number) => {
       const n = now.current;
       if (!n.started) return;
       try {
-        await store.put(record(slot, n.settings, n.playerState(), n.game.save(), n.stats()?.chapter.goal ?? ""));
+        await store.put(record(slot, n.settings, n.playerState(), n.game.save(), n.stats()?.chapter.goal ?? "", saveFog(n.sensed)));
         refresh();
       } catch (e) {
         pushToast(`Couldn't save: ${String(e)}`, "warn");

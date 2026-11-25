@@ -27,6 +27,9 @@ import { decayStage } from "./cadaverVisual.ts";
 
 /** Sim seconds over which a sensed cell fades from full to nothing. */
 export const SENSED_FADE = 20;
+
+/** Sim seconds between two compactions of the fog's snapshots (Knowledge.compact checks a chunk each). */
+export const COMPACT_EVERY = 1;
 /** How far past an ant's sensors its hosts' noses reach, in cells: the sensors probe sensorDistance ahead, to either side. */
 export const REACH_MARGIN = 1;
 
@@ -49,6 +52,7 @@ export class SensedMap {
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
   #knowledge: Knowledge | null = null;
+  #compactAt = -Infinity;
   #corpses: CorpseMemory | null = null;
   #known: KnownColonies<SideStats> | null = null;
   /**
@@ -142,6 +146,11 @@ export class SensedMap {
     }
     if (this.#knowledge) this.#corpses?.update(game, this.#knowledge, decayStage);
     if (this.#knowledge) this.#known?.update(game, this.#knowledge);
+    // The fog frees the snapshots the seed can make again, a chunk at a time and not every step (Knowledge.compact).
+    if (this.#knowledge && (now - this.#compactAt >= COMPACT_EVERY || now < this.#compactAt)) {
+      this.#compactAt = now;
+      this.#knowledge.compact();
+    }
     this.#forget();
   }
 
