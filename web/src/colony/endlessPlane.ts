@@ -12,6 +12,7 @@
 
 import { chunkKey, CHUNK, CHUNK_BITS, local } from "./chunks.ts";
 import { cellOf, CELL, centreX, centreY, hexDistance, nx, ny, R } from "./hex.ts";
+import { DEFAULT_SLEEP } from "./sleep.ts";
 import { chunkRock, hash01, hash4, mulberry32, type Nest, ROCK, rockCut } from "./world.ts";
 
 /** A new line starts only farther than this from every hole of every line and site (docs/endless-world.md §5): one unit, 140 cells. */
@@ -53,7 +54,7 @@ export const ENDLESS_PLANE: EndlessOptions = {
   foodPerCell: 12,
   nestGap: 140,
   foodMinDist: 24,
-  startClear: 312,
+  startClear: DEFAULT_SLEEP.distance + 32, // W and a margin: the wake test reads past W (bodyNear reaches W+11, holes snap to cells, the fungus lands at the rim; the measured threshold is about 285-288)
   regionChunks: 4,
   wildGap: 140,
   density: 1,

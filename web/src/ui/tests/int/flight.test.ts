@@ -76,6 +76,17 @@ test("the lost notice: a full map says so first; with no reason kept, no room to
   );
 });
 
+test("the lost notice on an endless plane: 7 colonies is not a full map; the game's own reason is named (review of #427, S2)", () => {
+  const g = game();
+  const f = fly(g, 0);
+  const endless = {
+    colonies: { length: MAX_COLONIES + 1 },
+    colonyLimit: Infinity,
+    lastLoss: { flight: f, reason: "no room" },
+  } as unknown as Game;
+  assert.equal(lostNotice(endless, f).text, `A new queen from ${colonyName(0)} was lost: no room.`);
+});
+
 test("the pen shut and the queen lost: no words set, the loss notice (review of #241, S2)", () => {
   const g = game();
   const w = words();

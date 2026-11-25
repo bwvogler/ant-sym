@@ -159,3 +159,22 @@ test("undo of a rain stroke does not write into a colony that sleeps now", () =>
     assert.equal(g.colonies[1]!.layers[PLANE]!.ph.fields[ch]!.get(x, y), 0, `${ch} not written into the sleeper`);
   }
 });
+
+test("a bounded game keeps its raid pointers at a beaten rival: they are cleared only while a colony sleeps (review of #427, S1)", () => {
+  const g = game();
+  run(g, 5);
+  const c0 = g.colonies[0]!;
+  const c1 = g.colonies[1]!;
+  assert.equal(c0.raidable, true, "a rival to raid");
+  assert.ok(c0.layers[PLANE]!.raidTarget, "pointing at it");
+  // the rival is beaten (no ants, no young), nobody sleeps: the awake rule is off, as in every bounded game
+  for (let i = 0; i < c1.n; i++) c1.alive[i] = 0;
+  c1.brood.items.length = 0;
+  assert.ok(Game.beaten(c1), "beaten");
+  run(g, 2);
+  assert.equal(c0.raidable, false, "no rival left");
+  assert.ok(
+    c0.layers[PLANE]!.raidTarget,
+    "the pointer stays at the beaten rival: nothing sleeps, so nothing is cleared (bounded games stay bit-exact)",
+  );
+});

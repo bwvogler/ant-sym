@@ -41,13 +41,15 @@ test("no wild site within W of either start nest, on seeds 1-20, and the lattice
   }
 });
 
-test("a game starts with exactly 2 colonies awake when the fungus lands by a start hole: no site wakes at second 0 (seeds 1-20)", () => {
-  for (let seed = 1; seed <= 20; seed++) {
-    const g = game(seed);
-    g.enableSleep();
-    g.land(seed % 2, 0); // by hole 0 on odd seeds, by hole 1 on even ones
-    for (let i = 0; i < 30 * 3; i++) g.tick(DT);
-    assert.equal(g.colonies.length, 2, `seed ${seed}: no wakeSite`);
-    assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [false, false], `seed ${seed}: both start colonies awake`);
-  }
+test("a game starts with exactly 2 colonies awake when the fungus lands by a start hole: no site wakes at second 0 (seeds 1-20, both holes)", () => {
+  for (let seed = 1; seed <= 20; seed++)
+    for (const hole of [0, 1]) {
+      // both holes on every seed: one hole a seed passed at 280 (review of #427, S2: seeds 1, 5 and 18 wake a site there, from the other hole)
+      const g = game(seed);
+      g.enableSleep();
+      g.land(hole, 0);
+      for (let i = 0; i < 30 * 3; i++) g.tick(DT);
+      assert.equal(g.colonies.length, 2, `seed ${seed}, hole ${hole}: no wakeSite`);
+      assert.deepEqual([g.isFrozen(0), g.isFrozen(1)], [false, false], `seed ${seed}, hole ${hole}: both start colonies awake`);
+    }
 });
