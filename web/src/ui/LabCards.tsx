@@ -12,6 +12,8 @@ import {
   type Journal,
 } from "../colony/index.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
+import type { KnownColonies } from "./fog/known.ts";
+import { foodView } from "./fog/knownView.ts";
 import Help from "./Help.tsx";
 import { journalLine } from "./journal.ts";
 import { LEVER_KIND, LEVER_KINDS } from "./leverKinds.ts";
@@ -74,18 +76,21 @@ function Card({ label, title, children, wide = false }: { label: string; title: 
   );
 }
 
-export function Colonies() {
+export function Colonies({ known = null }: { known?: KnownColonies<SideStats> | null }) {
   const stats = useStats(wholeStats);
-  const share = stats && stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0;
+  // Under the fog the world's food total is not the fungus's to know: the card shows what is stored and no total or share (fog/knownView.ts foodView).
+  const food = stats ? foodView(stats, known) : null;
   return (
     <Card label="colony stats" title="Colonies" wide>
       <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="min-w-[10rem]">
           <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-semibold text-fg tabular-nums">{stats ? stats.stored.toLocaleString() : "0"}</span>
-            <span className="text-xs text-fg-3">food home of {stats ? stats.foodTotal.toLocaleString() : "—"}</span>
+            <span className="font-mono text-2xl font-semibold text-fg tabular-nums">{food ? food.stored.toLocaleString() : "0"}</span>
+            <span className="text-xs text-fg-3">
+              {food?.total != null ? `food home of ${food.total.toLocaleString()}` : food ? "food home" : "food home of —"}
+            </span>
           </div>
-          <Bar value={share} />
+          {food?.share != null && <Bar value={food.share} />}
         </div>
         <Stat label="exploring" value={stats ? String(stats.counts.explore) : "—"} />
         <Stat label="following" value={stats ? String(stats.counts.follow) : "—"} />

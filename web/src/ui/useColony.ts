@@ -90,6 +90,13 @@ export const freshGame = (c: ColonyControls): ColonyControls => ({ ...c, line: 0
 export const clampLine = (line: number, lines: number): number => Math.max(0, Math.min(line, lines - 1));
 
 /**
+ * The controls that make a different game when they change (they are the game's memo deps): a patch touching one is a new game, so it begins on line 0 as
+ * Restart, New world and Start do (owner, 2026-11-25, `ja-bof4`). The Lab's seed, ants-per-colony and rival controls were new games that kept a stale line.
+ */
+export const NEW_GAME_KEYS = ["seed", "antCount", "rival", "species", "world"] as const;
+export const startsNewGame = (patch: Partial<ColonyControls>): boolean => NEW_GAME_KEYS.some((k) => k in patch);
+
+/**
  * The controls that show layer `view`: the plane is the "above" view; a line's curtain is the "below" view of that line (a picked line, E5.6). A layer
  * the world lacks reads as line 0 (`lineIndexOfLayer`), so a stale layer id cannot make an index past the lines.
  */
@@ -206,6 +213,13 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
   }, [game, controls.hide, controls.cull, controls.menu]);
+  // A load keeps the line the player had (the record holds none): written back clamped to the game's lines, so a stale line cannot jump to a line founded later.
+  useEffect(() => {
+    setControls((c) => {
+      const line = clampLine(c.line, game.world.lines.length);
+      return line === c.line ? c : { ...c, line };
+    });
+  }, [game]);
   // So do the Lab's settings for how ants draw their mode (ja-nan3), on every colony, founded later or not.
   useEffect(() => {
     game.setChoice({ sampleTemp: controls.sampleTemp, reroll: controls.reroll, steerLane: controls.steerLane ? 1 : 0 });
@@ -243,8 +257,9 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   const loadSave = useCallback((r: SaveRecord) => {
     pending.current = r;
     setGeneration(r.settings.generation);
+    // A load keeps the line the player was looking at, clamped to the loaded world's lines (owner, 2026-11-25, `ja-bof4`): the record does not hold one.
     setControls((c) => ({
-      ...freshGame(c),
+      ...c,
       species: r.settings.species,
       seed: r.settings.seed,
       antCount: r.settings.antCount,
@@ -297,7 +312,10 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     frameListeners.current.add(fn);
     return () => void frameListeners.current.delete(fn);
   }, []);
-  const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => ({ ...c, ...patch })), []);
+  const update = useCallback(
+    (patch: Partial<ColonyControls>) => setControls((c) => ({ ...(startsNewGame(patch) ? freshGame(c) : c), ...patch })),
+    [],
+  );
   const restart = useCallback(() => {
     setGeneration((g) => g + 1);
     setControls(freshGame);
