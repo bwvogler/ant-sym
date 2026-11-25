@@ -17,6 +17,7 @@ import {
   speciesById,
   type OneWorld,
 } from "../colony/index.ts";
+import { fogCarried } from "./fog/sources.ts";
 import { journalFromUrl } from "./journal.ts";
 import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
@@ -160,6 +161,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       pending.current = null;
       try {
         g.load(r.game);
+        if (r.fog) fogCarried.set(g, r.fog);
       } catch (e) {
         // A save this game can't read (another version, another shape): a fresh game of the same world rather than a
         // blank page (PR #42 review, B3). The notice waits until React has finished rendering.

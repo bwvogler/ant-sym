@@ -134,8 +134,8 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - **The camera** may go anywhere explored, plus a margin. That replaces the map's clamp, as [endless-world §8](endless-world.md#8-saves-and-the-page) asks.
 - **Lines.** Knowledge is keyed by layer, so each line's curtain keeps its own.
 - **Frozen colonies** need nothing special. A frozen colony is where the fungus is not, so it is remembered ground showing its last-seen state, which is what the endless note asks for.
-- **Memory** grows with ground explored: 512 B a chunk for the bits, which is 5 MB at 10,000 chunks, plus snapshots. A snapshot of a chunk unchanged since it was seen can be dropped and drawn from the seed plus the chunk's delta, so snapshots grow with ground changed out of sight. A soak measures it: a host walks 50 U out and back.
-- **Saves** carry the explored bits and the snapshots. No backward compatibility is needed (owner, 2026-11-10).
+- **Memory** grows with ground explored: 512 B a chunk for the bits (768 with the block times), which is 7.7 MB at 10,000 chunks, plus snapshots. Built (F7): on the endless plane's layers, a snapshot that matches what the seed makes of the chunk, on every explored cell, is dropped and drawn from the seed (`Knowledge.compact`, a chunk a second as the page plays), so snapshots remain only for ground changed while it was in sight. A host walking 50 U out and back explored 111 chunks, which cost 2.36 MB with every snapshot held and 768 B a chunk without them (`colony/tests/soak/fogEndless.test.ts`; PRD §89).
+- **Saves** carry the explored bits, block times and the snapshots still held, with the known colonies and the corpses remembered (`SaveRecord.fog`, `ui/saves.ts`). No backward compatibility is needed (owner, 2026-11-10).
 
 ## 7. Other organisms (`ja-1ypq.8`)
 

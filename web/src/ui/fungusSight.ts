@@ -27,6 +27,9 @@ import { decayStage } from "./cadaverVisual.ts";
 
 /** Sim seconds over which a sensed cell fades from full to nothing. */
 export const SENSED_FADE = 20;
+
+/** Sim seconds between two compactions of the fog's snapshots (Knowledge.compact checks a chunk each). */
+export const COMPACT_EVERY = 1;
 /** How far past an ant's sensors its hosts' noses reach, in cells: the sensors probe sensorDistance ahead, to either side. */
 export const REACH_MARGIN = 1;
 
@@ -49,6 +52,7 @@ export class SensedMap {
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
   #knowledge: Knowledge | null = null;
+  #compactAt = -Infinity;
   #corpses: CorpseMemory | null = null;
   #known: KnownColonies<SideStats> | null = null;
   /**
@@ -76,6 +80,10 @@ export class SensedMap {
   }
   set known(k: KnownColonies<SideStats> | null) {
     this.#known = k;
+  }
+  /** The fog's three memories whether or not it is suspended: a save must keep what the builder hides (fog/sources.ts saveFog). */
+  fogMemory(): { knowledge: Knowledge | null; corpses: CorpseMemory | null; known: KnownColonies<SideStats> | null } {
+    return { knowledge: this.#knowledge, corpses: this.#corpses, known: this.#known };
   }
   /** told, for each run of cells just sensed in one chunk row, where (flat indexes start..end of chunk (cx, cy)): the fog's knowledge (fog/knowledge.ts) hangs here */
   onSeen: ((l: number, cx: number, cy: number, start: number, end: number) => void) | null = null;
@@ -142,6 +150,12 @@ export class SensedMap {
     }
     if (this.#knowledge) this.#corpses?.update(game, this.#knowledge, decayStage);
     if (this.#knowledge) this.#known?.update(game, this.#knowledge);
+    // The fog frees the snapshots the seed can make again, a chunk at a time and not every step (Knowledge.compact).
+    // (`now < #compactAt` is defensive: the page makes a new SensedMap for a restart or a load, which is when time goes back)
+    if (this.#knowledge && (now - this.#compactAt >= COMPACT_EVERY || now < this.#compactAt)) {
+      this.#compactAt = now;
+      this.#knowledge.compact();
+    }
     this.#forget();
   }
 
