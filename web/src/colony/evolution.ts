@@ -478,6 +478,12 @@ export class Evolution {
     this.ground += mass;
   }
 
+  /** Growth from light (a lichen's alga, PRD §90 L2): it counts toward the free pool's mutations, but adds no mass. */
+  light(growth: number): void {
+    this.growth += growth;
+    this.ground += growth;
+  }
+
   /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */
   replicate(load: number): void {
     this.growth += load;
