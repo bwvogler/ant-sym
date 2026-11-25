@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Evolution, EARNED, MUTATION } from "../../evolution.ts";
 
-// A hungry fungus (FungusParams.hungry, PRD §91, ja-a2no.4): a cheap spore, a landing reserve, the free pool's higher share.
+// A hungry fungus (FungusParams.hungry, PRD §93, ja-a2no.4): a cheap spore, a landing reserve, the free pool's higher share.
 
 const grown = (hungry: boolean): Evolution => {
   const e = new Evolution(0);

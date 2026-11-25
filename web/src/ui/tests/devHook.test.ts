@@ -48,6 +48,8 @@ function make(over: Partial<DevDeps> = {}) {
       current: {
         camera: (v) => (calls.cameras.push(v), { x: v } as never),
         goNest: (k) => void calls.nests.push(k),
+        centreOn: (v, x, y) => void calls.cameras.push(v + x + y),
+        miniWindow: () => ({ x0: 0, y0: 0, w: 1, h: 1 }),
       },
     },
     openPen: () => void calls.pens++,

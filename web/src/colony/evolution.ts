@@ -38,7 +38,7 @@ export interface Need {
 }
 
 /** A spread trait an upgrade sets. */
-export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks" | "lichen";
+export type Trait = "transmission" | "decay" | "evasion" | "spores" | "capacity" | "knots" | "stalks" | "lichen" | "foci";
 
 export interface Upgrade {
   id: string;
@@ -69,7 +69,7 @@ export interface Upgrade {
 export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBudget: Infinity };
 
 /**
- * A hungry fungus (FungusParams.hungry, PRD §91, docs/energy.md §7; owner 2026-11-25): a spore costs `sporeCost` of mass (not 1),
+ * A hungry fungus (FungusParams.hungry, PRD §93, docs/energy.md §7; owner 2026-11-25): a spore costs `sporeCost` of mass (not 1),
  * the free term pays out only `reserve` mass over the game (the landing patch's reserve, until the litter is built), and the free
  * pool counts each unit of earned mass (growth on the ground, corpses) as `share` mutations, not MUTATION. Design numbers,
  * from the ledger's experiment: they keep P1 and the free pool near where they are.
@@ -107,7 +107,7 @@ export const POOLS = ["ants", "free"] as const;
 export type Pool = (typeof POOLS)[number];
 
 /** The fungus's own upgrades: what its mycelium makes outside a living host. Every other upgrade is the ants'. */
-const FREE_UPGRADES: ReadonlySet<string> = new Set(["mycelium", "knots", "stalks", "fruiting", "lichen"]);
+const FREE_UPGRADES: ReadonlySet<string> = new Set(["mycelium", "knots", "foci", "stalks", "fruiting", "lichen"]);
 
 /** The pool that pays for upgrade `id`. */
 export function poolOf(id: string): Pool {
@@ -195,6 +195,18 @@ export const UPGRADES: readonly Upgrade[] = [
     needs: [[{ id: "mycelium", level: 1 }], [{ id: "mycelium", level: 2 }]],
     trait: "knots",
     values: [0, 1, 2],
+  },
+  {
+    // Foci (ja-icc4, PRD §92, docs/foci.md; owner 2026-11-25: one level, after Knots): its value is the level fungus.ts #settle reads
+    // (0 none, 1 a closed flower of hyphae becomes a patch). Design: no paper shows an entomopathogen doing it.
+    id: "foci",
+    kind: "spread",
+    name: "Foci",
+    blurb: "whether hyphae that close a web round a cell make a new patch there: a new base with room to grow and spores of its own",
+    steps: ["none", "new bases"],
+    needs: [[{ id: "knots", level: 1 }]],
+    trait: "foci",
+    values: [0, 1],
   },
   {
     // Stalks (ja-2bw.10, PRD §63.12): its value is the level fungus.ts STALK reads (0 none, 1 a stalk, 2 a tall stalk).
@@ -355,6 +367,8 @@ export interface Traits {
   stalks: number;
   /** the Lichen level (fungus.ts): 0 none, 1 a partner */
   lichen: number;
+  /** the Foci level (fungus.ts #settle, PRD §92): 0 none, 1 a closed flower of hyphae becomes a patch */
+  foci: number;
 }
 
 export interface EvolutionSave {
@@ -534,7 +548,7 @@ export class Evolution {
 
   /** The spread traits at the levels chosen. */
   traits(): Traits {
-    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0, lichen: 0 };
+    const out: Traits = { transmission: 0, decay: 0, evasion: 0, spores: 0, capacity: 0, knots: 0, stalks: 0, lichen: 0, foci: 0 };
     for (const u of UPGRADES) if (u.trait && u.values) out[u.trait] = u.values[this.level(u.id)];
     return out;
   }

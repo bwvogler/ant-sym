@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pan, toWorld, zoomBy, type Camera, type Viewport } from "../camera.ts";
+import { generateEndlessPlane, PLANE } from "../../colony/index.ts";
+import { fromMinimap, miniFrame, minimapRect, pan, toWorld, zoomBy, type Camera, type Viewport } from "../camera.ts";
+import { CameraRig, extentOf } from "../field/rig.ts";
 import type { Followed } from "../follow.ts";
 import { NO_GESTURE, PointerController, type PointerHost, type PointerInput } from "../field/pointer.ts";
 
@@ -40,6 +42,8 @@ function setup(
     chambers: [] as [number, number][],
     links: [] as [number, number][],
     jumps: [] as [number, number][],
+    holds: 0,
+    releases: 0,
   };
   const host: PointerHost = {
     rig: {
@@ -51,7 +55,15 @@ function setup(
       viewport: () => VIEW,
       extent: () => EXTENT,
       inMini: st.mini,
-      jumpMini: (x, y) => st.jumps.push([x, y]),
+      jumpMini: (x, y) => {
+        st.log.push("jump");
+        st.jumps.push([x, y]);
+      },
+      holdMini: () => {
+        st.log.push("hold");
+        st.holds++;
+      },
+      releaseMini: () => st.releases++,
     },
     slop: () => SLOP,
     angled: () => st.angled,
@@ -247,6 +259,42 @@ test("the minimap: a main-button press in it jumps there, and a drag with the bu
   mid.ptr.down(mid.host, ev(1, 750, 50, { button: 1 }));
   assert.deepEqual(mid.st.jumps, [], "the middle button pans there as anywhere");
   assert.equal(mid.ptr.gesture.kind, "pan");
+});
+
+test("the minimap press freezes the endless window before it jumps; lifting, cancelling, a second finger or a lost press releases it; a plain pan holds none", () => {
+  const press = () => {
+    const s = setup();
+    s.ptr.down(s.host, ev(1, 750, 50));
+    assert.deepEqual(s.st.log, ["hold", "jump"], "held first, so the click and the drag read the window under the pointer");
+    assert.equal(s.st.holds, 1);
+    assert.equal(s.st.releases, 0);
+    return s;
+  };
+  const up = press();
+  up.ptr.up(up.host, ev(1, 750, 50));
+  assert.equal(up.st.releases, 1, "lifted");
+  const cancel = press();
+  cancel.ptr.up(cancel.host, ev(1, 750, 50), true);
+  assert.equal(cancel.st.releases, 1, "cancelled");
+  const pinch = press();
+  pinch.ptr.down(pinch.host, touch(2, 300, 300));
+  assert.equal(pinch.st.releases, 1, "a second finger makes it a pinch");
+  const lost = press();
+  lost.ptr.dropMini(lost.host);
+  assert.equal(lost.st.releases, 1, "capture lost or the page blurred");
+  assert.equal(lost.ptr.gesture, NO_GESTURE);
+  assert.equal(lost.ptr.pointers.size, 0);
+  lost.ptr.move(lost.host, ev(1, 760, 60));
+  assert.equal(lost.st.jumps.length, 1, "no jumping after the press was dropped");
+  lost.ptr.dropMini(lost.host);
+  assert.equal(lost.st.releases, 1, "dropping twice releases once (a lostpointercapture after the pointerup)");
+
+  const pan = setup();
+  pan.ptr.down(pan.host, ev(1, 100, 100));
+  pan.ptr.dropMini(pan.host);
+  assert.equal(pan.ptr.gesture.kind, "pan", "another gesture is left alone");
+  pan.ptr.up(pan.host, ev(1, 150, 150));
+  assert.equal(pan.st.holds + pan.st.releases, 0);
 });
 
 test("a tool in hand: a mouse paints at once and then by segments; a finger waits, places on a tap, or paints from where it landed once past the slop", () => {
@@ -476,4 +524,90 @@ test("only the main button clicks: a middle or right press that does not move pi
   ptr.up(host, ev(1, 300, 200, { button: 1, buttons: 0 }));
   assert.deepEqual(st.follows, []);
   assert.deepEqual(st.picks, []);
+});
+
+// ---- ja-qpv.4.7: on an endless plane the minimap window is frozen while the pointer is down, driven through the real rig ----
+
+function endlessRig(o: { following?: boolean } = {}) {
+  const plane = generateEndlessPlane(1);
+  const v = { w: 800, h: 600, dpr: 1 };
+  const st = { view: PLANE, following: o.following ?? false };
+  const rig = new CameraRig({
+    view: () => st.view,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => st.following,
+    unfollow: () => {
+      st.following = false;
+    },
+  });
+  rig.set({ x: 40000, y: -30000, zoom: 8 });
+  const { host, ptr } = setup();
+  const h: PointerHost = { ...host, rig, slop: () => SLOP };
+  return { rig, st, h, ptr, v, e: extentOf(plane) };
+}
+
+test("endless, through the real rig: a drag held off the minimap's middle pans by the pointer's own displacement and runs away no more; releasing lets the window follow the camera again", () => {
+  const { rig, h, ptr, v, e } = endlessRig();
+  const start = miniFrame(e, rig.camera());
+  const r = minimapRect(start, v, 1);
+  const x0 = r.x + r.w * 0.75;
+  const y0 = r.y + r.h / 2;
+  ptr.down(h, ev(1, x0, y0));
+  const [wx, wy] = fromMinimap(e, v, 1, x0, y0, undefined, start);
+  assert.deepEqual([rig.camera().x, rig.camera().y], [wx, wy], "a click recentres on the clicked place of the window it was drawn with");
+  // the pointer rests 25% right of the middle of the window the camera had; the camera must not creep off with each event
+  const cams: { x: number; y: number }[] = [];
+  for (let i = 0; i < 6; i++) {
+    ptr.move(h, ev(1, x0, y0));
+    cams.push({ x: rig.camera().x, y: rig.camera().y });
+  }
+  for (const c of cams) assert.deepEqual(c, { x: wx, y: wy }, "the same pointer place gives the same camera");
+  // a drag moves the camera by the displacement times the frozen picture's scale (world units per device pixel)
+  const unitsPerPx = start.w / r.w;
+  ptr.move(h, ev(1, x0 + 10, y0 - 6));
+  assert.ok(Math.abs(rig.camera().x - (wx + 10 * unitsPerPx)) < 1e-6);
+  assert.ok(Math.abs(rig.camera().y - (wy - 6 * (start.h / r.h))) < 1e-6);
+  assert.deepEqual(rig.frozenMini(), start, "the picture stays the one taken at the press, though the camera is chunks away");
+  ptr.up(h, ev(1, x0 + 10, y0 - 6));
+  assert.equal(rig.frozenMini(), null, "released: the window follows the camera");
+  assert.deepEqual(rig.miniWindow(), miniFrame(e, rig.camera()));
+});
+
+test("endless, through the real rig: a click and a cancel; the freeze is gone after each, and a lost press ends the gesture", () => {
+  const { rig, h, ptr, v, e } = endlessRig();
+  const r = minimapRect(miniFrame(e, rig.camera()), v, 1);
+  ptr.down(h, ev(1, r.x + 5, r.y + 5));
+  assert.notEqual(rig.frozenMini(), null);
+  ptr.up(h, ev(1, r.x + 5, r.y + 5), true);
+  assert.equal(rig.frozenMini(), null, "cancelled");
+  const r2 = minimapRect(miniFrame(e, rig.camera()), v, 1);
+  ptr.down(h, ev(1, r2.x + 5, r2.y + 5));
+  ptr.dropMini(h);
+  assert.equal(rig.frozenMini(), null, "blur or a lost capture");
+  assert.equal(ptr.gesture, NO_GESTURE);
+});
+
+test("bounded, through the real rig: the press holds nothing and a drag jumps as it always did", () => {
+  const bmap = { x0: 0, size: { w: 400, h: 300 } } as never;
+  const rig = new CameraRig({
+    view: () => PLANE,
+    map: () => bmap,
+    size: () => VIEW,
+    dpr: () => 1,
+    following: () => false,
+    unfollow: () => {},
+  });
+  rig.set({ x: 200, y: 150, zoom: 8 });
+  const { host, ptr } = setup();
+  const h: PointerHost = { ...host, rig, slop: () => SLOP };
+  const e = extentOf(bmap);
+  const r = minimapRect(e, VIEW, 1);
+  ptr.down(h, ev(1, r.x + r.w / 4, r.y + r.h / 4));
+  assert.equal(rig.frozenMini(), null, "a bounded minimap is a fixed picture already");
+  assert.deepEqual([rig.camera().x, rig.camera().y], fromMinimap(e, VIEW, 1, r.x + r.w / 4, r.y + r.h / 4));
+  ptr.move(h, ev(1, r.x + r.w / 2, r.y + r.h / 2));
+  assert.deepEqual([rig.camera().x, rig.camera().y], fromMinimap(e, VIEW, 1, r.x + r.w / 2, r.y + r.h / 2));
+  ptr.up(h, ev(1, r.x + r.w / 2, r.y + r.h / 2));
 });

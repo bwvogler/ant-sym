@@ -19,10 +19,11 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 /** Seed 7's small plane (160 × 100), hyphae on, the fungus landed by colony 0's hole and evolving. */
 const OLD_LAW = { piErrorLaw: 0, searchScale: 0 };
 
-function game(hyphae: boolean, flow = false): Game {
+/** The flower rule tests run ungated (fociGate off) unless they say otherwise: the gate has its own tests below. */
+function game(hyphae: boolean, flow = false, fungus: { fociGate?: boolean } = {}): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { autoFound: false, fungus: { hyphae, flow } },
+    { autoFound: false, fungus: { hyphae, flow, fociGate: false, ...fungus } },
     gameRng(7),
     [
       { antCount: 40, colony: { routeMemory: 0, ...OLD_LAW } },
@@ -659,11 +660,11 @@ for (const flow of [false, true])
 // flower (seven hyphae cells, a patch under the middle one only, 2026-11-24), which becomes a patch with no start of its own; at the landing's rim it makes none.
 
 /** A plane cell at least `far` cells from `from`, with its six neighbours open: a place for a corpse. */
-function openSpot(g: Game, from: { x: number; y: number }, far: number): [number, number] {
+function openSpot(g: Game, from: { x: number; y: number }, far: number, also: { x: number; y: number }[] = []): [number, number] {
   const plane = g.world!.plane;
   for (let y = 5; y < 95; y++)
     for (let x = 5; x < 155; x++) {
-      if (hexDistance(x, y, from.x, from.y) < far) continue;
+      if (hexDistance(x, y, from.x, from.y) < far || also.some((o) => hexDistance(x, y, o.x, o.y) < far)) continue;
       let ok = rockAt(plane, x, y) === OPEN;
       for (let d = 0; d < 6 && ok; d++) ok = rockAt(plane, nx(x, y, d), ny(y, d)) === OPEN;
       if (ok) return [x, y];
@@ -843,6 +844,58 @@ test("an infected queen's founding roots one tile and still sets out six tips (j
   assert.equal(e.patches, patches + 1, "it roots by her hole");
   assert.equal(g.fungus.patchOn(PLANE).length / 2, baseBefore + 1, "one tile");
   assert.equal(h.tips.length, tipsBefore + 6, "six tips set out from it");
+});
+
+test("with the Foci gate on, a closed flower is no patch until Foci is kept; a patch already formed stays (ja-icc4.2, PRD §92)", () => {
+  const g = game(true, false, { fociGate: true });
+  g.fungus.bindPolicy("growth", () => "rest");
+  const e = g.fungus.evolution!;
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  const around = (cx: number, cy: number) => {
+    h.addCell(cx, cy);
+    for (let d = 0; d < 6; d++) h.addCell(nx(cx, cy, d), ny(cy, d));
+  };
+  const [x, y] = openSpot(g, h.tips[0]!, 25);
+  const patches = e.patches;
+  around(x, y);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 0, "a closed flower is no patch without Foci");
+  assert.equal(e.patches, patches, "and the count stays");
+  assert.ok(!h.sources.has(hyphaKey(x, y)), "its middle is no source");
+  // Foci needs Knots (which needs Mycelium): kept in that order, with the mutations to buy them at once.
+  e.ground = 1e7;
+  assert.ok(keep(g.fungus, "knots"), "Knots can be kept");
+  const [kx, ky] = openSpot(g, { x, y }, 25);
+  around(kx, ky);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 0, "Knots alone does not lift the gate");
+  while (e.level("foci") < 1) assert.ok(keep(g.fungus, "foci"), "Foci can be kept once its path is paid for");
+  // A flower closed after the buy is a patch, and a save keeps it and the level.
+  const [x2, y2] = openSpot(g, { x: kx, y: ky }, 25, [{ x, y }]); // another place: the first was seen while gated, and its cells are not grown again
+  around(x2, y2);
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 1, "a flower closed after the buy makes a patch");
+  assert.equal(e.patches, patches + 1);
+  const saved = JSON.parse(JSON.stringify(g.save())) as GameSave;
+  const back = game(true, false, { fociGate: true });
+  back.load(JSON.parse(JSON.stringify(saved)) as GameSave);
+  assert.equal(back.fungus.evolution!.level("foci"), 1, "a save keeps the level");
+  assert.equal(back.fungus.flowers, 1);
+});
+
+test("with the Foci gate off, a closed flower is a patch as before, whatever is kept", () => {
+  const g = game(true);
+  g.fungus.bindPolicy("growth", () => "rest");
+  const e = g.fungus.evolution!;
+  const h = g.fungus.hyphaeOn(PLANE)!;
+  const [x, y] = openSpot(g, h.tips[0]!, 25);
+  h.addCell(x, y);
+  for (let d = 0; d < 6; d++) h.addCell(nx(x, y, d), ny(y, d));
+  const patches = e.patches;
+  runFor(g, 10);
+  assert.equal(g.fungus.flowers, 1);
+  assert.equal(e.patches, patches + 1);
+  assert.equal(e.level("foci"), 0, "Foci was never kept");
 });
 
 test("tips thickening in the curtain leave no list growing: every map's thickened cells are taken each round", () => {

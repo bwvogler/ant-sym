@@ -7,13 +7,19 @@
 // as the colony's counters tell), or still carrying the fungus at the end; and whether it went below (off the plane)
 // first. The tutorial's waiting hint and its watch timeout are chosen by the worst seed.
 //
-// Usage: node scripts/tutorial-first-host.mjs [seeds=1-20] [watch=180] [ants=600]
+// Usage: node scripts/tutorial-first-host.mjs [seeds=1-20] [watch=180] [ants=600] [--world endless|bounded]
+// --world: the world the page plays (PRD §66 E6): `endless` by default, as the page is; `bounded` reproduces the §61 numbers.
 import { INFECTED, PLANE } from "../web/src/colony/index.ts";
 import { buildGame, GAME_STRAIN, landingOf } from "../web/src/ui/useColony.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
-const [range = "1-20", watchArg = "180", antsArg = "600"] = process.argv.slice(2);
+const wi = process.argv.indexOf("--world");
+const world = wi >= 0 ? process.argv[wi + 1] : "endless";
+if (world !== "endless" && world !== "bounded") throw new Error(`--world is endless or bounded, not "${world}"`);
+const [range = "1-20", watchArg = "180", antsArg = "600"] = process.argv
+  .slice(2)
+  .filter((a, i, all) => a !== "--world" && all[i - 1] !== "--world");
 const [lo, hi = lo] = range.split("-").map(Number);
 const watch = Number(watchArg);
 const antCount = Number(antsArg);
@@ -22,7 +28,7 @@ const WAIT = 300; // give up on a first host after this many seconds
 
 const rows = [];
 for (let seed = lo; seed <= hi; seed++) {
-  const g = buildGame({ species: "generic", seed, antCount, rival: true, generation: 0 });
+  const g = buildGame({ species: "generic", seed, antCount, rival: true, generation: 0, world });
   const k = landingOf(g); // the colony the seed chose, as the page lands it (PRD §65)
   g.land(k, GAME_STRAIN, { evolve: true });
   const c = g.colonies[k];
@@ -69,7 +75,9 @@ for (let seed = lo; seed <= hi; seed++) {
 }
 
 const f1 = (x) => (x === null ? "—" : x.toFixed(1));
-console.log(`First host and its fate: seeds ${lo}–${hi}, ${antCount} + ${antCount} ants, watched ${watch} s after the first host\n`);
+console.log(
+  `First host and its fate: seeds ${lo}–${hi}, the ${world} world, ${antCount} + ${antCount} ants, watched ${watch} s after the first host\n`,
+);
 console.log("seed  colony  first host (s)  fate         after (s)  below at (s)  peak load  hosts then");
 for (const r of rows) {
   if (r.first === null) console.log(`${String(r.seed).padStart(4)}  none in ${WAIT} s`);

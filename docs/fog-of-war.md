@@ -131,7 +131,7 @@ A colony is **known** once an observer has sensed a cell of its nest disc or it 
 - The page's default flips to fog on once the owner has played it.
 
 ## 6. On the endless world (`ja-1ypq.7`, in E5 `ja-qpv.4`)
-- **The camera** may go anywhere explored, plus a margin. That replaces the map's clamp, as [endless-world §8](endless-world.md#8-saves-and-the-page) asks.
+- **The camera** may go anywhere in the box round everything explored, plus a margin (two separate explored regions let it roam the dark between them). That replaces the map's clamp, as [endless-world §8](endless-world.md#8-saves-and-the-page) asks. Built (F7b): `extentOf(m, knowledge)` sets the camera's reach to the explored chunk box (`Knowledge.bounds`) plus `FOG_MARGIN`, two chunks, joined with the start view (owner, 2026-11-25).
 - **Lines.** Knowledge is keyed by layer, so each line's curtain keeps its own.
 - **Frozen colonies** need nothing special. A frozen colony is where the fungus is not, so it is remembered ground showing its last-seen state, which is what the endless note asks for.
 - **Memory** grows with ground explored: 512 B a chunk for the bits (768 with the block times), which is 7.7 MB at 10,000 chunks, plus snapshots. Built (F7): on the endless plane's layers, a snapshot that matches what the seed makes of the chunk, on every explored cell, is dropped and drawn from the seed (`Knowledge.compact`, a chunk a second as the page plays), so snapshots remain only for ground changed while it was in sight. A host walking 50 U out and back explored 111 chunks, which cost 2.36 MB with every snapshot held and 768 B a chunk without them (`colony/tests/soak/fogEndless.test.ts`; PRD §89).

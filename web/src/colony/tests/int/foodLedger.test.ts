@@ -20,6 +20,22 @@ test("the ledger counts a chunk once, however often it is generated", () => {
   assert.equal(l.chunks, 3);
 });
 
+test("restore puts back what entries gave, and refuses a ledger that already counts chunks", () => {
+  const from = new FoodLedger();
+  from.generated("food", 1, 10);
+  from.generated("food", 2, 4.5);
+  const into = new FoodLedger();
+  into.restore(from.entries());
+  assert.equal(into.generatedTotal, 14.5);
+  assert.equal(into.chunks, 2);
+  assert.equal(into.generated("food", 1, 10), false, "counted once: a restored chunk counts nothing again");
+  assert.throws(() => into.generated("food", 2, 5), /FoodLedger/, "and its amount is checked");
+  assert.throws(() => into.restore(from.entries()), /already counts/, "a ledger that counts chunks is reset first");
+  into.reset();
+  into.restore(from.entries());
+  assert.equal(into.generatedTotal, 14.5);
+});
+
 test("a chunk that generates differently the second time is an error, not a silent first count", () => {
   const l = new FoodLedger();
   l.generated("plane", 7, 100);

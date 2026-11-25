@@ -192,7 +192,7 @@ export function useFieldFrame({
         fog: sensed.knowledge,
       });
       binding.fill(fctx);
-      Object.assign(fctx, { d, v, c });
+      Object.assign(fctx, { d, v, c, miniWin: rig.frozenMini() });
       inputs.show = layers.current;
       inputs.hover = hover.current;
       inputs.pen = penRef.current;

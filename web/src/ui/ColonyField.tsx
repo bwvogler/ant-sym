@@ -112,7 +112,8 @@ export default function ColonyField({
   /** the pointer over the canvas (device px), for the pen's preview; null when it left */
   const hover = useRef<[number, number] | null>(null);
   const worldRef = useLatest(world);
-  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb });
+  const sensedRef = useLatest(sensed);
+  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb, sensed: sensedRef });
 
   /** The shown view's map: the plane or the curtain. */
   const shownMap = (): WorldMap => mapOfLayer(world, shown.current);
@@ -191,6 +192,7 @@ export default function ColonyField({
       camera: (v) => rig.cams.get(v)?.cam ?? null,
       showAll: () => showAll(),
       goNest: (k) => goNest(k),
+      miniWindow: () => rig.miniWindow(),
     };
     return () => {
       apiRef.current = null;
@@ -311,11 +313,13 @@ export default function ColonyField({
         tabIndex={0}
         className={`absolute inset-0 block h-full w-full touch-none outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${build?.tool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"}`}
         role="application"
-        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map, n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there"}`}
+        aria-label={`colony field: drag to pan, wheel or pinch to zoom, arrow keys to move, plus and minus to zoom, 0 for the whole map (the start nests, on the endless world), n to cycle the nests; click an ant to follow it (with the lens on, i, a click says what is there instead)${pen && view === PLANE ? "; click where the new queen flies" : view === PLANE ? "; click the line to look below there" : "; click the ground strip to look above there"}`}
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
         onPointerCancel={onUp}
+        onLostPointerCapture={() => ptr.dropMini(ptrHost())}
+        onBlur={() => ptr.dropMini(ptrHost())}
         onPointerLeave={() => {
           hover.current = null;
           if (lensRef.current) probeCb.current?.(null);

@@ -10,6 +10,8 @@ import {
   chunkOf,
   R,
   type Colony,
+  isEndless,
+  PLANE,
   type Game,
 } from "../colony/index.ts";
 import { BODY_EVERY, bodySight, hostSight } from "./fog/observers.ts";
@@ -51,6 +53,11 @@ export class SensedMap {
   #revealed = new Map<number, Set<number>>();
   /** the time of the last stamp: what `sightOf` is read against */
   now = 0;
+  /**
+   * Whether the plane (layer 0) is endless: its rows run on below 0 (the plane is centred, ja-0iuy), so a host there senses them. A curtain, or a
+   * bounded map's plane, has no row below 0 and `mark` skips them. `stampGame` sets it from the game before it marks anything.
+   */
+  endless = false;
   #knowledge: Knowledge | null = null;
   #compactAt = -Infinity;
   #corpses: CorpseMemory | null = null;
@@ -140,6 +147,7 @@ export class SensedMap {
   stampGame(game: Game): void {
     const now = game.time;
     this.#begin(now);
+    this.endless = isEndless(game.layers[PLANE]!);
     this.asleep.clear();
     for (let k = 0; k < game.colonies.length; k++) if (game.isFrozen(k)) this.asleep.add(k);
     hostSight(game.colonies, REACH_MARGIN, (l, x, y, r) => this.mark(l, x, y, r));
@@ -207,8 +215,9 @@ export class SensedMap {
     const rows = Math.ceil(r / R) + 1;
     const cols = Math.ceil(r) + 1;
     const r2 = r * r;
+    const below = l === PLANE && this.endless; // rows under 0 are ground only on an endless plane
     for (let gy = gy0 - rows; gy <= gy0 + rows; gy++) {
-      if (gy < 0) continue;
+      if (gy < 0 && !below) continue;
       const dy = centreY(gy) - y;
       const inside = (gx: number) => {
         const dx = centreX(gx, gy) - x;

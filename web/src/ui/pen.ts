@@ -1,6 +1,5 @@
 import {
   INFECTED,
-  FLIGHT_2D,
   type Game,
   centreX,
   centreY,
@@ -39,7 +38,7 @@ export function penGate(f: Flight, revealed: readonly boolean[], lock: string | 
 }
 
 // One world (U5.2, owner 2026-11-10): the player's queen lands where the player clicks on the top view, within her
-// flight (FLIGHT_2D) of her mother's hole; she then settles where the founding rule allows (Game.settleAt), or is lost.
+// flight (Game.flightLength) of her mother's hole; she then settles where the founding rule allows (Game.settleAt), or is lost.
 
 /** The circle she may land in: her mother's hole on the plane (world units) and the flight's reach. */
 export interface PenCircle {
@@ -51,12 +50,12 @@ export interface PenCircle {
 /** Where a click in the pen sends her: the cell she settles on and the end of the line it grows, or why not. */
 export type Settle = { ok: true; cell: Cell; end: End; line?: number; newLine?: { heading: number } } | { ok: false; reason: string };
 
-/** The pen's circle for flight f in one world: FLIGHT_2D round her mother's hole on the plane; null off one world or with no hole. */
+/** The pen's circle for flight f in one world: `flightLength` round her mother's hole on the plane; null off one world or with no hole. */
 export function flightCircle(game: Game, f: Flight): PenCircle | null {
   if (!game.world) return null;
   const m = game.colonies[f.mother];
   const h = m?.holeCells[m.params.nest];
-  return h ? { x: centreX(h.px, h.py), y: centreY(h.py), r: FLIGHT_2D } : null;
+  return h ? { x: centreX(h.px, h.py), y: centreY(h.py), r: game.flightLength } : null;
 }
 
 /** Whether plane point p is inside the circle (its edge included). */

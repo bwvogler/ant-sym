@@ -207,7 +207,7 @@ export interface FungusParams {
    */
   flow: boolean;
   /**
-   * a hungry fungus (PRD §91, docs/energy.md §7, ja-a2no.4; owner 2026-11-25): a spore costs EARNED.sporeCost of mass, the free
+   * a hungry fungus (PRD §93, docs/energy.md §7, ja-a2no.4; owner 2026-11-25): a spore costs EARNED.sporeCost of mass, the free
    * term pays out only EARNED.reserve over a game, and the free pool counts earned mass at EARNED.share; off, as before
    */
   hungry: boolean;
@@ -224,6 +224,11 @@ export interface FungusParams {
    * tropism, ja-ogph.3), if that side has more ants than straight ahead; 0, never
    */
   trafficTropism: number;
+  /**
+   * a closed flower of hyphae becomes a patch only once the Foci upgrade is kept (docs/foci.md, PRD §92, ja-icc4.2; owner
+   * 2026-11-25); off, every web does as before (on by default since 2026-11-25)
+   */
+  fociGate: boolean;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -249,6 +254,9 @@ export const DEFAULT_FUNGUS: FungusParams = {
   trafficBias: "count",
   trafficRadius: 3,
   trafficTropism: 4,
+  // On since 2026-11-25 (owner: flower patches need the Foci unlock, PRD §92): with the assay's default buy order, which never
+  // buys Foci, no flower forms and every quarter, half and queen time on seeds 1-20 is bit-identical to the ungated game.
+  fociGate: true,
 };
 
 /**
@@ -1665,6 +1673,8 @@ export class Fungus {
     const lists = this.#hyphae.map((h) => h?.takeGrown() ?? []);
     const h = this.#hyphae[0];
     if (!e || !h) return;
+    // Foci (docs/foci.md): until kept, a closed flower is no patch. The lists are emptied above either way, so none grows.
+    if (this.params.fociGate && e.level("foci") < 1) return;
     const L = this.#layers[0] as SporeLayer;
     const base = new Set(L.base);
     const inPatch = (c: number): boolean => base.has(c) || h.sources.has(c);

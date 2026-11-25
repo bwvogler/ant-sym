@@ -13,8 +13,9 @@
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic] [--hungry]
-//          [--bias count|levels] [--radius 3] [--tropism N]
-// --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
+//          [--bias count|levels] [--radius 3] [--tropism N] [--no-foci]
+// The flower patches are behind the Foci upgrade (fungus.ts fociGate, on by default since 2026-11-25, PRD §92, docs/foci.md): until
+// it is kept no flower becomes a patch. The default --order ends knots,foci (arm C, the late order); an --order without them forms no flower (arm E). --no-foci runs the ungated game (flowers as before). --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
 // --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
 // the plane, for docs/hyphal-traffic.md (ja-ogph.2, PRD §88): the share of cells occupied in three distance bands (1, 2-3, 4-6),
 // how often the two cells a tip could turn into differ in the ants round them, and the share of hyphae near ant traffic.
@@ -23,7 +24,7 @@
 // worst-case "bought at once" that the order can't force, since a cheaper upgrade is bought while one waits).
 // --landing R sets the landing's radius for the first spores and the patch alike (game.ts LANDING.radius, 1 by default: a hex and its six neighbours, 7 cells, PRD §85; 2 is the old landing, 19 cells); --root-radius R only the patch's (the base cells and the first tips), the spores still painted at 2.
 // --price base,ratio sets the one price every level costs, round(base · ratio^kept) (evolution.ts PRICE, ja-52ui).
-// --hungry: the fungus is hungry (FungusParams.hungry, PRD §91): a cheap spore, a landing reserve, the free pool's higher share.
+// --hungry: the fungus is hungry (FungusParams.hungry, PRD §93): a cheap spore, a landing reserve, the free pool's higher share.
 // --lichen only reads (the game is the same bit for bit; ja-vlla.11.2, docs/lichen.md, PRD §90): every 5 s it counts the plane's rock cells
 // beside a hypha cell (the cells an alga film or a wild lichen would sit on, so the chance a hypha meets one), the first time
 // a hypha touched rock, and mutations earned a minute in the last three minutes (the light-income runaway gate, L2).
@@ -39,8 +40,9 @@ const opt = (name, fallback) => {
   return k < 0 ? fallback : args[k + 1];
 };
 const flag = (name) => args.includes(`--${name}`);
+// Knots and Foci last (owner 2026-11-25, PRD §92): the flower patches need Foci, so the default arm buys it once the rest has been bought.
 const DEFAULT_ORDER =
-  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth";
+  "mycelium,infectivity,persistence,infectivity,fruiting,recognition,trails,stealth,senses,mycelium,persistence,evasion,infectivity,recognition,trails,royal,fruiting,evasion,royal,stealth,knots,foci";
 
 if (isMainThread) {
   const [a, b = a] = opt("seeds", "1-3").split("-").map(Number);
@@ -72,6 +74,7 @@ if (isMainThread) {
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
     tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
+    noFoci: flag("no-foci"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -98,7 +101,7 @@ if (isMainThread) {
   );
   for (const r of results) {
     console.log(
-      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}) · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
+      `seed ${r.seed}: first host ${fmt(r.first)}, quarter ${fmt(r.quarter)}, half ${fmt(r.half)}, queen ${fmt(r.queen)}, rival's first ${fmt(r.rivalFirst)} · mutations earned ${r.earned} (growth ${r.growth}), kept ${r.spent}, mycelium ${r.mass}, patches ${r.patches} (flowers ${r.flowers}, spread ${r.spread}, mat cells ${r.mat}), first flower ${fmt(r.flowerFirst)} · hyphae ${r.cells} cells, spores on ${r.spores} cells · traffic leans ${r.leans}${r.lichenCells ? ` · lichen ${r.lichenCells} cells, first ${fmt(r.lichenFirst)}` : ""}`,
     );
     if (r.traffic) for (const [name, t] of Object.entries(r.traffic)) if (t) console.log(trafficLine(name, t));
     if (job.split)
@@ -145,6 +148,7 @@ if (isMainThread) {
     bias,
     radius,
     tropism,
+    noFoci,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -165,6 +169,7 @@ if (isMainThread) {
         ...(bias === null ? {} : { trafficBias: bias }),
         ...(radius === null ? {} : { trafficRadius: radius }),
         ...(tropism === null ? {} : { trafficTropism: tropism }),
+        ...(noFoci ? { fociGate: false } : {}),
       },
     },
     gameRng(seed, 0),
@@ -208,7 +213,7 @@ if (isMainThread) {
   // mass the free term pays out in a game, a stand-in for a start reserve), to test a cheap spore on a small earned income
   // (ja-a2no, docs/energy.md §7). Absent: the game as it is.
   if (workerData.earnedShare !== null) {
-    // --earned-share S: the free pool's share of earned mass when hungry (EARNED.share), a lab override (PRD §91).
+    // --earned-share S: the free pool's share of earned mass when hungry (EARNED.share), a lab override (PRD §93).
     const { EARNED } = await import("../../web/src/colony/evolution.ts");
     EARNED.share = Number(workerData.earnedShare);
   }
@@ -252,6 +257,7 @@ if (isMainThread) {
     leans: "",
     lichenCells: 0,
     lichenFirst: -1,
+    flowerFirst: -1,
     split,
     trace: [],
   };
@@ -299,6 +305,8 @@ if (isMainThread) {
     if (r.quarter < 0 && a.s >= 0.25) r.quarter = t;
     if (r.half < 0 && a.s >= 0.5) r.half = t;
     if (r.queen < 0 && g.revealed[0]) r.queen = t;
+    // The first closed flower, counting one that extended a patch (docs/foci.md): when the web first made a new base.
+    if (r.flowerFirst < 0 && g.fungus.flowers + g.fungus.spread > 0) r.flowerFirst = t;
     if (r.rivalFirst < 0 && b && b.n > 0) r.rivalFirst = t;
     if (k % (30 * 60) === 0 && k > 0) r.minutes.push(`${Math.round(100 * a.s)}/${a.resist.toFixed(2)}`);
   }

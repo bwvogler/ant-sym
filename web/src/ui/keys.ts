@@ -92,7 +92,7 @@ export const shortcuts = (speeds: readonly number[]): { group: string; rows: Sho
     rows: [
       { keys: ["←", "↑", "→", "↓"], does: "pan (or W A S D)", map: true },
       { keys: ["+", "−"], does: "zoom in, out", map: true },
-      { keys: ["0"], does: "the whole map", map: true },
+      { keys: ["0"], does: "the whole map (the start nests, on the endless world)", map: true },
       { keys: ["n"], does: "the next nest", map: true },
     ],
   },

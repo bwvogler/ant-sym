@@ -400,7 +400,7 @@ export const GUIDE: GuideEntry[] = [
     realAnts:
       "A ground-nesting ant's nest is descending shafts with flat chambers off them (Tschinkel's “shish-kebab”), largest near the top: one vertical sheet keeps that shape. A founding queen flies, then walks to a nest site on foot, and most founding queens fail.",
     inGame:
-      "Ants live on two layers: the plane, with the top-down maps' movement, and the curtain, a vertical sheet hung under the line, with the side view's; a hole is the only way between them. A new nest goes only beyond an end of the line, so the line stays one strip: its hole must be nearest an end hole, at least 16 from every hole, on open ground joined to the rest, and the new segment may not turn back more than 120° or come within 12 cells of the line. A new queen flies up to 140 from her mother's hole (with you in her, where you click on the top view, which shows where she would settle) and walks to the nearest spot the rule allows within 140 of where she landed; with none, she is lost, and the notice says why.",
+      "Ants live on two layers: the plane, with the top-down maps' movement, and the curtain, a vertical sheet hung under the line, with the side view's; a hole is the only way between them. A new nest goes only beyond an end of the line (on the endless world, one far from every line starts a line of its own), so a line stays one strip: its hole must be nearest an end hole, at least 16 from every hole, on open ground joined to the rest, and the new segment may not turn back more than 120° or come within 12 cells of the line. A new queen flies up to 140 (280 on the endless world) from her mother's hole (with you in her, where you click on the top view, which shows where she would settle) and walks to the nearest spot the rule allows within 140 of where she landed; with none, she is lost, and the notice says why.",
     sources: [
       { note: "one-world", anchor: "2-the-model-a-plane-and-a-curtain", label: "The model: a plane and a curtain" },
       { note: "one-world", anchor: "3-the-line-and-where-a-new-nest-may-go", label: "The line, and where a new nest may go" },
@@ -640,6 +640,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Tips that extend at a steady rate, branch to keep length per tip constant, slide along or split at walls; where it lives (topsoil, walls, corpses); cords, knots and stalks.",
   },
   {
+    note: "foci",
+    title: "Foci: new bases",
+    covers:
+      "Whether a mycelium that has colonised a new resource makes a new base there: cord-forming fungi grow out from a colonised bait, past a size threshold, and outgrowth patterns differ between species; nothing read shows an insect-killing fungus doing it. In the game a one-level upgrade after knots.",
+  },
+  {
     note: "hyphal-traffic",
     title: "Hyphae and ant traffic",
     covers:
@@ -751,6 +757,12 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
       "Castes by size, the fungus garden as the store, quarantined waste workers, and plants learned harmful. Planned (not built, PRD §64).",
   },
   {
+    note: "odour-space",
+    title: "Colony odour as a blend",
+    covers:
+      "A colony's smell is several hydrocarbon axes, a few of which decide who is a stranger; fights teach the ant that was hit, they do not push colonies' smells apart. Planned (not built, PRD §91).",
+  },
+  {
     note: "pharaoh-ant",
     title: "Pharaoh ants",
     covers: "Many queens across budding nests, a trail that lasts a day, colonies that move house. Planned (not built, PRD §64).",
@@ -776,7 +788,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "endless-world",
     title: "Endless world",
     covers:
-      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. In progress (PRD §66): many lines and waking wild colonies are in the simulation; the page still plays a bounded world.",
+      "A world with no edge: ground made from the seed as ants reach it, many lines each with its own curtain, wild colonies that wake when the fungus comes near. The page plays it by default (PRD §66 E6): many lines, wild colonies that wake, ground frozen where the fungus is far; ?world=bounded keeps the bounded game.",
   },
   {
     note: "fog-of-war",

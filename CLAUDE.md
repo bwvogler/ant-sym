@@ -36,7 +36,7 @@ npm run test:golden            # the fast golden masters (colony/tests/golden)
 node --test --test-name-pattern='stranger' web/src/colony/tests/int/colony.test.ts   # one file, or the tests of it whose name matches
 npm run format                 # Prettier over web/src, server, worker, shared and the scripts; CI runs `format:check`; a bulk reformat commit goes in .git-blame-ignore-revs
 npm run test:slow              # whole-game guards (colony/tests/slow): ~16 min; a PR gets them by the `slow-guards` label once approved, not a dispatch (steward skill)
-npm run e2e                    # one world in Chromium (scripts/e2e-one-world.mjs), the page's guard; ~150 s; spends nothing
+npm run e2e                    # Chromium, the page's guard (e2e-one-world.mjs; ?world=bounded is the old game; endless is default); ~6 min
 node scripts/colony-cost.mjs   # offline estimate of a game's cost: tokens per question, $/h (no key, no spend)
 npm run exp -- all --seeds 1-10   # assays (colony/experiment.ts), offline; many seeds: skill `running-assays`
 npm run exp -- game --seeds 1 --log summary   # watch a game, offline (skill `watching-a-game`); every scripts/*.mjs answers --help

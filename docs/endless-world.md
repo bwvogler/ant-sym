@@ -1,16 +1,16 @@
 # Endless world: chunks from the seed, many lines, far ground frozen
 
-*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Nothing here is built. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at b610e1c.*
+*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Built, and the page's default world since 2026-11-25 (E1–E6, PRD §66; `?world=bounded` keeps the bounded game). The text below is the design as it was written, with what was built marked where it differs. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at b610e1c.*
 
 ## TL;DR
 
 - **The world is the seed plus what the game changed.** Every chunk can be generated alone, in any order, from `(seed, chunk)` and pure inputs. What ants change (dug cells, food taken, spoil, chambers) is kept per chunk as a delta. Faded scent is dropped.
 - **Many lines** (owner, 2026-11-13). Underground stays a curtain under a line through holes ([one-world §2](one-world.md#2-the-model-a-plane-and-a-curtain)), but the world holds as many lines as it needs. A founding far from every line starts a new line; one near a line's end grows it. Each line's ground has its own salt.
-- **Queens fly farther** (owner, 2026-11-13). The 1 U flight was forced by the bounded plane's edges. On the endless plane it lengthens towards real queens' 5 U or more ([nest-spacing §3](nest-spacing.md#3-how-far-a-founding-queen-flies)), so daughters start lines of their own. The distance is measured at E6.
+- **Queens fly farther** (owner, 2026-11-13). The 1 U flight was forced by the bounded plane's edges. On the endless plane it lengthens towards real queens' 5 U or more ([nest-spacing §3](nest-spacing.md#3-how-far-a-founding-queen-flies)), so daughters start lines of their own. Measured at E6 and set to 2 U (280 cells) on the endless plane, a bounded game keeping 140 (owner, 2026-11-25).
 - **Far colonies are frozen, and only the fungus wakes them** (owner, 2026-11-13). Freezing is per colony: its ants, its scent and its curtain stop. Colonies in contact freeze together. A wild colony is a point on the map until the fungus's body comes within reach or an awake host enters its nest ground. Then it wakes, generated mature from its own seed. Other ants never wake anything, so waking can't chain. A cap on awake colonies may freeze even a colony the fungus lives in, by rank (owner, 2026-11-13).
 - **Wild colonies** come from a pure lattice of sites, sparser than real harvester-ant fields ([nest-spacing §1](nest-spacing.md#1-how-far-apart-mature-nests-are)), so foundings have room.
 - **Cost** is CPU and memory, not Jev. No situation field changes, and wild colonies of the game's species ask under a preset doctrine whose answers ship. The awake set, not the explored area, bounds the tick.
-- **Six stages, E1–E6** (§9), after S2 (one world only, `ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The bounded game stays bit-exact until E6 switches the page.
+- **Six stages, E1–E6** (§9), after S2 (one world only, `ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The bounded game stayed bit-exact until E6 switched the page (2026-11-25, owner: the endless world is the default, `?world=bounded` keeps the bounded game; PRD §66 "E6.1 built, the switch").
 
 ## 1. Where we are
 
@@ -42,7 +42,7 @@ One world is a bounded plane, 512 × 368 cells (`PLANE_WORLD.size`, `colony/worl
 
 **Edges assumed:** the camera's clamp and fit (`ui/camera.ts`); homing belief and search clamps (`colony.ts`, with `EDGE` in `tuning/homing.ts`); occupancy clamps in `battle.ts`, `recognition.ts` and `fungus.ts`; `Game.load`'s plane-size check; the e2e's camera clamp (`scripts/e2e-one-world.mjs`). ~~`cellKey` (`grid.ts:60`) is `y · 65536 + x`, so columns are capped at ±32k.~~ E1.3: one `cellKey` (`hex.ts`) for every packed cell, ±2,097,152 on both axes.
 
-**Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
+**Two colonies assumed:** `generateOneWorld` refuses more than two nests; `Game.rival` is `colonies[1]`; "the world's own colonies" are `colonies.length − founded.length` (`fallen`, `outcome`); names go by index (the minimap colours by odour since PRD §65); `MAX_COLONIES` is 6 (`game.ts:120`) on a bounded map and no limit on an endless plane (`Game.colonyLimit`, owner 2026-11-25, `ja-y4eg`). `ja-fnd.5.4.2` (Game over N colony specs) replaces these.
 
 **What it costs to run today:** a tick is 10.7–10.8 ms at 1,200 + 1,200 ants after `ja-web`, over the owner's 10 ms gate (`ja-lp4.6.7`), and the ants' step is ~73 % of it (PRD §51, U6a). Cost follows ants, not area: the pheromones already step only awake chunks.
 
@@ -156,7 +156,7 @@ Frozen hosts and the fungus's body inside a frozen curtain wake nothing. A wild 
 
 **A group freezes** when no member has had the awake fungus within W of its hole for T seconds. The start colonies are awake from the first tick and freeze by the same rule, together, once the fungus has left them. A daughter that lands beyond the fungus's reach freezes after T as a lone queen, until the fungus follows her.
 
-**The awake cap may freeze a colony the fungus lives in** (owner, 2026-11-13, by rank). The number of awake colonies is capped (proposed: 6, today's `MAX_COLONIES`, which PRD §50 took from the page's colony names, not from the tick; E4 measures the tick at the cap and may lower it).
+**The awake cap may freeze a colony the fungus lives in** (owner, 2026-11-13, by rank). The number of awake colonies is capped (owner 2026-11-25: set by colony size, 4 at 1,200 ants and 6 at 400, an awake-ant budget of about 5,000; `MAX_COLONIES` = 6 came from the page's colony names, not from the tick, and no longer limits an endless plane).
 - **The rank** of a colony is how long since the fungus last *touched* it: a host entering its nest ground, a new host made there, or the fungus's body growing within W of its hole. The most recent touch ranks highest. A colony woken just now was touched just now, so it ranks highest by the same rule.
 - **When a colony wakes** and the cap would be passed, the lowest-ranked awake groups freeze, with their hosts, until there is room. A group freezes whole, so it never splits. A group larger than the cap on its own may run over it; E4 counts how often.
 - **Hysteresis.** A colony frozen by the cap may not wake again for T.
@@ -220,6 +220,7 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 
 **Measured at E6:**
 - **The flight and the founding radius.** `ja-qpv`'s note asks for this. `FOUND_RADIUS` = 140 was set because edges failed half the flights at 70 ([nest-spacing §4](nest-spacing.md#4-the-numbers-for-the-game), proposal 2). Without edges, a shorter radius may fail mainly near strangers, which reads better. The flight is set in the same run.
+- **Measured offline, 2026-11-25** (PRD §66 "E6 measured (offline)"): flight 2 U (280) with `FOUND_RADIUS` 140 fails under 1 % of flights and starts a line on 61–65 % of foundings; the lattice as built is 0.22 sites a U², not §4's 0.35. A woken stranger loses its sleeping site's exclusion ring (`ja-lzwt`): accepted by the owner (2026-11-25), daughters beside strangers are the contact design. The under 1 % failure figure is for at most 8 own colonies (crowded own lines fail more, `ja-s994`).
 - **`ja-lp4.12`** (holes on the plane's rim) goes away with the rim.
 
 ## Play
@@ -246,10 +247,10 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 7. **A host wakes a colony only by entering its nest ground** (third review of #124, D4), about 16 cells round a hole; the fungus's body still wakes within W.
 
 **Still open, each with a recommendation:**
-1. **Wild density.** Recommend one site per 4 × 4 chunks to start, tuned at E6.
+1. ~~**Wild density.**~~ Decided (owner, 2026-11-25): one site per 4 × 4 chunks, as built (0.22 sites a U², PRD §66 "E6 measured").
 2. **A wild colony's size on waking.** Recommend the size a start colony reaches in 10 minutes, measured in E4.
 3. ~~**What reveals the fog.**~~ Decided (owner, 2026-11-23): the fungus's hosts and its living body, from the landing patch only; see [fog-of-war](fog-of-war.md).
-4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
-5. **The flight distance.** Recommend 2 U to start, set at E6.
+4. ~~**W, T, the nest ground and the awake cap.**~~ Decided (owner, 2026-11-25, `ja-dv98`, `ja-qpv.5.1`): W = 2 U (280 cells), T = 90 s, a nest ground of 16 cells, and a cap set by colony size as an awake-ant budget: `clamp(floor(5000 / antsPerColony), 2, 6)`, so 6 at 600 ants a colony (the page's), 4 at 1,200.
+5. ~~**The flight distance.**~~ Decided (owner, 2026-11-25): 280 cells (2 U) on the endless plane, `FLIGHT_ENDLESS` (`Game.flightLength`); a bounded game keeps 140. `FOUND_RADIUS` stays 140 and the wild lattice 4 × 4.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.
-7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.
+7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.  **Update (owner, 2026-11-25, `ja-qpv.5.1`):** it stays behind `?world=bounded` (the e2e, the pixel guard and the device guard open it; the goldens build their own games); the tutorial and the Lab play the page's world, which is the endless one (the first host is found and cleared on all 20 seeds there, PRD §66).
