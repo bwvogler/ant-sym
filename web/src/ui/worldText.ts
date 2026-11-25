@@ -12,7 +12,7 @@ export function worldSummary(game: Game): string {
   if (isEndless(map)) {
     const lines = game.world.lines.length;
     return (
-      `One world with no edge: the surface seen from above, made from the seed as ants reach it (${map.rock.count} chunks so far, with ${food} units of food in them), ` +
+      `One world with no edge: the surface seen from above, made from the seed as ants reach it (${map.rock.count} ${map.rock.count === 1 ? "chunk" : "chunks"} so far${map.foodTotal > 0 ? `, with ${food} units of food in them` : ""}), ` +
       `and the ground under each line through the holes, unrolled below it, where the nests are dug (${lines} ${lines === 1 ? "line" : "lines"} now). ` +
       `Colonies the fungus is far from sleep, and wild colonies wake when it comes near. ${tail}`
     );

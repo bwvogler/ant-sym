@@ -134,6 +134,16 @@ test("the Lab's World card quotes no size for a world with no edge, and the boun
   assert.match(worldSummary(bounded), /cells unrolled below it/);
 });
 
+test("the World card's chunk count is a plural and says nothing of food while there is none (review of #434)", () => {
+  const fake = (chunks: number, food: number) =>
+    ({ map: { endless: true, rock: { count: chunks }, foodTotal: food }, world: { lines: [{}] } }) as unknown as Parameters<
+      typeof worldSummary
+    >[0];
+  assert.match(worldSummary(fake(1, 0)), /\(1 chunk so far\), /, "one chunk, no food yet: singular, no food clause");
+  assert.doesNotMatch(worldSummary(fake(1, 0)), /units of food/);
+  assert.match(worldSummary(fake(40, 1200)), /\(40 chunks so far, with 1,200 units of food in them\), /);
+});
+
 test("the page's startup reads make no chunk: the fog's sight and the landing leave an endless game's ground as a game never looked at has it", () => {
   const counts = (g: ReturnType<typeof buildGame>) => {
     const p = g.world.plane as unknown as { rock: { count: number }; food: { count: number }; gen: { misses: number; prefetched: number } };
