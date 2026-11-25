@@ -1,16 +1,16 @@
 # Endless world: chunks from the seed, many lines, far ground frozen
 
-*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Nothing here is built. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at b610e1c.*
+*Design note, 2026-11-13, epic `ja-qpv` (MR 9). Built, and the page's default world since 2026-11-25 (E1–E6, PRD §66; `?world=bounded` keeps the bounded game). The text below is the design as it was written, with what was built marked where it differs. It answers the owner's request (2026-11-13) to start on an endless world, and builds on [one-world](one-world.md), whose model it extends. Decisions: PRD §66. Revised after the review of #124 (2026-11-13). Code references are to `web/src/` on main at b610e1c.*
 
 ## TL;DR
 
 - **The world is the seed plus what the game changed.** Every chunk can be generated alone, in any order, from `(seed, chunk)` and pure inputs. What ants change (dug cells, food taken, spoil, chambers) is kept per chunk as a delta. Faded scent is dropped.
 - **Many lines** (owner, 2026-11-13). Underground stays a curtain under a line through holes ([one-world §2](one-world.md#2-the-model-a-plane-and-a-curtain)), but the world holds as many lines as it needs. A founding far from every line starts a new line; one near a line's end grows it. Each line's ground has its own salt.
-- **Queens fly farther** (owner, 2026-11-13). The 1 U flight was forced by the bounded plane's edges. On the endless plane it lengthens towards real queens' 5 U or more ([nest-spacing §3](nest-spacing.md#3-how-far-a-founding-queen-flies)), so daughters start lines of their own. The distance is measured at E6.
+- **Queens fly farther** (owner, 2026-11-13). The 1 U flight was forced by the bounded plane's edges. On the endless plane it lengthens towards real queens' 5 U or more ([nest-spacing §3](nest-spacing.md#3-how-far-a-founding-queen-flies)), so daughters start lines of their own. Measured at E6 and set to 2 U (280 cells) on the endless plane, a bounded game keeping 140 (owner, 2026-11-25).
 - **Far colonies are frozen, and only the fungus wakes them** (owner, 2026-11-13). Freezing is per colony: its ants, its scent and its curtain stop. Colonies in contact freeze together. A wild colony is a point on the map until the fungus's body comes within reach or an awake host enters its nest ground. Then it wakes, generated mature from its own seed. Other ants never wake anything, so waking can't chain. A cap on awake colonies may freeze even a colony the fungus lives in, by rank (owner, 2026-11-13).
 - **Wild colonies** come from a pure lattice of sites, sparser than real harvester-ant fields ([nest-spacing §1](nest-spacing.md#1-how-far-apart-mature-nests-are)), so foundings have room.
 - **Cost** is CPU and memory, not Jev. No situation field changes, and wild colonies of the game's species ask under a preset doctrine whose answers ship. The awake set, not the explored area, bounds the tick.
-- **Six stages, E1–E6** (§9), after S2 (one world only, `ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The bounded game stays bit-exact until E6 switches the page.
+- **Six stages, E1–E6** (§9), after S2 (one world only, `ja-fnd.3`) and N colony specs (`ja-fnd.5.4.2`). The bounded game stayed bit-exact until E6 switched the page (2026-11-25, owner: the endless world is the default, `?world=bounded` keeps the bounded game; PRD §66 "E6.1 built, the switch").
 
 ## 1. Where we are
 
@@ -247,10 +247,10 @@ Each stage is one PR. The bounded game's golden masters stay bit-exact through E
 7. **A host wakes a colony only by entering its nest ground** (third review of #124, D4), about 16 cells round a hole; the fungus's body still wakes within W.
 
 **Still open, each with a recommendation:**
-1. **Wild density.** Recommend one site per 4 × 4 chunks to start, tuned at E6.
+1. ~~**Wild density.**~~ Decided (owner, 2026-11-25): one site per 4 × 4 chunks, as built (0.22 sites a U², PRD §66 "E6 measured").
 2. **A wild colony's size on waking.** Recommend the size a start colony reaches in 10 minutes, measured in E4.
 3. ~~**What reveals the fog.**~~ Decided (owner, 2026-11-23): the fungus's hosts and its living body, from the landing patch only; see [fog-of-war](fog-of-war.md).
-4. **W, T, the nest ground and the awake cap.** Recommend W = 2 U (280 cells), T = 60 s, a nest ground of 16 cells and a cap of 6, rechecked against the tick at E4.
-5. **The flight distance.** Recommend 2 U to start, set at E6.
+4. ~~**W, T, the nest ground and the awake cap.**~~ Decided (owner, 2026-11-25, `ja-dv98`, `ja-qpv.5.1`): W = 2 U (280 cells), T = 90 s, a nest ground of 16 cells, and a cap set by colony size as an awake-ant budget: `clamp(floor(5000 / antsPerColony), 2, 6)`, so 6 at 600 ants a colony (the page's), 4 at 1,200.
+5. ~~**The flight distance.**~~ Decided (owner, 2026-11-25): 280 cells (2 U) on the endless plane, `FLIGHT_ENDLESS` (`Game.flightLength`); a bounded game keeps 140. `FOUND_RADIUS` stays 140 and the wild lattice 4 × 4.
 6. **Lines joining.** Recommend not yet. The clearance keeps them apart until polydomy.
-7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.
+7. **Whether the bounded game stays.** Recommend keeping it as a test bed for the goldens and assays until E6, then deciding with the owner, as the side and top-down maps went (PRD §55). **Decided (owner, 2026-11-24, `ja-jqws`):** it stays beside the endless world as the tutorial or Lab until E6's assays match.  **Update (owner, 2026-11-25, `ja-qpv.5.1`):** it stays behind `?world=bounded` (the e2e, the pixel guard and the device guard open it; the goldens build their own games); the tutorial and the Lab play the page's world, which is the endless one (the first host is found and cleared on all 20 seeds there, PRD §66).

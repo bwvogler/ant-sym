@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { type Colony, type OneWorld } from "../colony/index.ts";
+import { isEndless, type Colony, type OneWorld } from "../colony/index.ts";
+import { homeName } from "./worldKind.ts";
 import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { hasChamberLabels } from "./fieldGoTo.ts";
 import type { KnownColonies } from "./fog/known.ts";
@@ -64,7 +65,7 @@ export default function FieldGoToMenu({
         className={button}
         aria-expanded={goOpen}
         onClick={() => setGoOpen((o) => !o)}
-        title="Whole map, a colony's nest, chamber labels"
+        title={`${homeName(isEndless(world.plane))}, a colony's nest, chamber labels`}
       >
         Go to ▾
       </button>
@@ -74,8 +75,13 @@ export default function FieldGoToMenu({
           role="group"
           aria-label="go to"
         >
-          <button type="button" className={item} onClick={() => (showAll(), setGoOpen(false))} title="Show the whole map (0)">
-            Whole map
+          <button
+            type="button"
+            className={item}
+            onClick={() => (showAll(), setGoOpen(false))}
+            title={isEndless(world.plane) ? "Back to the start nests (0)" : "Show the whole map (0)"}
+          >
+            {homeName(isEndless(world.plane))}
           </button>
           {colonies.map((_, k) =>
             !isKnown(known, k) ? null : (

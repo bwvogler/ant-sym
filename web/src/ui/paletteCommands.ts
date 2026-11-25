@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
-import type { Game } from "../colony/index.ts";
+import { isEndless, type Game } from "../colony/index.ts";
+import { homeName } from "./worldKind.ts";
 import type { KnownColonies } from "./fog/known.ts";
 import { isKnown } from "./fog/knownView.ts";
 import type { SideStats } from "./stats.ts";
@@ -99,7 +100,14 @@ export function paletteCommands(ctx: PaletteCtx): PaletteCommand[] {
         }))
       : []),
     { id: "host", label: "Follow a host of yours", group: "Game", key: "f", words: "infected ant", run: followHost },
-    { id: "whole", label: "Whole map", group: "Map", key: "0", words: "zoom out fit", run: () => field.current?.showAll() },
+    {
+      id: "whole",
+      label: homeName(isEndless(game.map)),
+      group: "Map",
+      key: "0",
+      words: "zoom out fit home start",
+      run: () => field.current?.showAll(),
+    },
     // Under the fog only the nests the fungus knows (the Go-to menu's twin).
     ...game.colonies.flatMap((_, k) =>
       !isKnown(known, k)

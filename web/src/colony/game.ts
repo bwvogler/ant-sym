@@ -93,6 +93,11 @@ export const FLIGHT = { land: 48, radius: 96 };
  */
 export const FLIGHT_2D = 140;
 /**
+ * The same flight on an endless plane (owner, 2026-11-25, PRD §66 E6): 2 U, 280 cells. At 140 a daughter lands exactly the new-line gap from her mother's line
+ * and could never start a line of her own; at 280 she starts one on 61-65 % of foundings and fails under 1 % (without edges). A bounded game keeps FLIGHT_2D.
+ */
+export const FLIGHT_ENDLESS = 280;
+/**
  * One world: how far nearestValid may move a founding to where the founding rule allows it (the founding radius, owner,
  * 2026-11-08, ja-lp4.10): her walk after landing. None within it: the founding fails, and a flown queen is lost.
  */
@@ -1000,7 +1005,7 @@ export class Game {
   lastLoss: { flight: Flight; reason: string } | null = null;
 
   /**
-   * Where a queen flown from colony `mother` lands by default (U4a): FLIGHT_2D from its hole on the plane, in a direction
+   * Where a queen flown from colony `mother` lands by default (U4a): `flightLength` from its hole on the plane, in a direction
    * drawn from the game's stream; addColony then moves her to the nearest spot the founding rule allows within
    * FOUND_RADIUS, or she is lost. Null if the colony has no hole.
    */
@@ -1009,7 +1014,13 @@ export class Game {
     const h = m?.holeCells[m.params.nest];
     if (!h) return null;
     const a = this.#rng() * 2 * Math.PI;
-    return { x: centreX(h.px, h.py) + FLIGHT_2D * Math.cos(a), y: centreY(h.py) + FLIGHT_2D * Math.sin(a) };
+    const f = this.flightLength;
+    return { x: centreX(h.px, h.py) + f * Math.cos(a), y: centreY(h.py) + f * Math.sin(a) };
+  }
+
+  /** How far a queen flies from her mother's hole, in cells: FLIGHT_ENDLESS on an endless plane, FLIGHT_2D on a bounded map (which has edges a longer flight cannot get past). */
+  get flightLength(): number {
+    return isEndless(this.map) ? FLIGHT_ENDLESS : FLIGHT_2D;
   }
 
   /** How many colonies a map holds: MAX_COLONIES on a bounded map (the page's names, PRD §50), none on an endless plane, where the awake cap bounds the cost (`ja-y4eg`; a woken site never had the limit). */
@@ -1249,7 +1260,7 @@ export class Game {
 
   /**
    * The lab's founding (U4a; the page reaches it from U5): a colony of `antCount` ants at the first
-   * colony's odour (kin), founded FLIGHT_2D past the line's `end` hole, straight on along its end segment, moved by
+   * colony's odour (kin), founded `flightLength` past the line's `end` hole, straight on along its end segment, moved by
    * addColony to the nearest spot the founding rule allows. Returns its index, or why there is none (NO_ROOM) with the
    * game left as it was: a typed result the lab shows (ja-fnd.6.2), where foundBeyond throws.
    */
@@ -1257,7 +1268,8 @@ export class Game {
     const holes = this.world.line.holes;
     const v = end === "start" ? holes[0]! : holes[holes.length - 1]!;
     const [ux, uy] = outward(holes, end);
-    const at = { x: centreX(v.x, v.y) + FLIGHT_2D * ux, y: centreY(v.y) + FLIGHT_2D * uy };
+    const f = this.flightLength;
+    const at = { x: centreX(v.x, v.y) + f * ux, y: centreY(v.y) + f * uy };
     const s = this.settleAt(at);
     if (s.ok === false) return s;
     return {

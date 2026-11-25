@@ -24,6 +24,7 @@ import { TOKENS_PER_SITUATION, useJevState } from "./useColonyJev.ts";
 import { tokensPerQuestion } from "./prompt.ts";
 import { useFps, useGameRead, useStats } from "./session.ts";
 import { sameRecord, wholeStats } from "./statSelect.ts";
+import { worldSummary } from "./worldText.ts";
 import { Bar, NEAR_CAP, Slider } from "./widgets.tsx";
 import { AUTOSAVE, describe, readable, SLOTS, type SaveRecord } from "./saves.ts";
 
@@ -246,7 +247,6 @@ export function FungusNumbers() {
 }
 
 export function World({ game, controls, update, restart, newWorld }: Props) {
-  const { size } = game.map;
   return (
     <Card label="world" title="World">
       <div className="mt-3 flex items-center gap-2">
@@ -275,12 +275,7 @@ export function World({ game, controls, update, restart, newWorld }: Props) {
           Restart
         </button>
       </div>
-      <p className="mt-2 text-xs text-fg-3">
-        One world: the surface, {size.w}×{size.h} cells seen from above (rock, ground and {game.map.foodTotal.toLocaleString()} units of
-        food), and the ground under the line through the holes, {game.world.curtain.size.w}×{game.world.curtain.size.h} cells unrolled below
-        it, where the nests are dug. Above and below (v) are two views of one game. The queen lays eggs while there is food; larvae fed by
-        nurses become new ants.
-      </p>
+      <p className="mt-2 text-xs text-fg-3">{worldSummary(game)}</p>
       <label className="mt-2 flex items-center justify-between">
         <span>Two colonies</span>
         <input type="checkbox" checked={controls.rival} onChange={(e) => update({ rival: e.target.checked })} />

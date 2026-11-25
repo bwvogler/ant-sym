@@ -28,6 +28,17 @@ export interface SleepParams {
 
 export const DEFAULT_SLEEP: SleepParams = { distance: 280, delay: 90, nestGround: 16, cap: 6, every: 1 };
 
+/**
+ * The page's awake cap by colony size (owner, 2026-11-25, PRD §66 E6): an awake-ant budget, not a colony count. The tick follows the ants awake, so a game of
+ * big colonies wakes fewer: `clamp(floor(AWAKE_ANT_BUDGET / antsPerColony), 2, DEFAULT_SLEEP.cap)`, which is 6 at 400 ants a colony or fewer, 4 at 1,200, 2 at
+ * 2,500 or more. Never below 2, so the two start colonies stay awake together.
+ */
+export const AWAKE_ANT_BUDGET = 5000;
+export function awakeCapFor(antsPerColony: number): number {
+  const n = Math.floor(AWAKE_ANT_BUDGET / Math.max(1, antsPerColony));
+  return Math.max(2, Math.min(DEFAULT_SLEEP.cap, n));
+}
+
 /** What the game read this second, per colony (by index). */
 export interface SleepInputs {
   time: number;
