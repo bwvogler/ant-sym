@@ -61,8 +61,8 @@ interface Chunk {
 /** How many chunks `compact` checks in one call by default: each costs one regeneration of the plane's chunk when it is not cached (20-40 ms cold). */
 export const COMPACT_BUDGET = 1;
 
-/** How many regenerated chunk arrays `Knowledge` keeps for reading dropped snapshots (each up to 16 KB): a screenful of chunks. */
-export const REGEN_KEPT = 64;
+/** How many regenerated chunk arrays `Knowledge` keeps for reading dropped snapshots (rock 4 KB, food 16 KB: at most about 8 MB): a zoomed-out view, and the minimap's window, of dropped chunks. */
+export const REGEN_KEPT = 512;
 
 /** The snapshot of a chunk saved: its parts as plain values (typed arrays), encoded for JSON by `Knowledge.save`. */
 interface SavedChunk {
@@ -194,7 +194,7 @@ export class Knowledge {
     const cells = this.#sourcesOf(c.l)
       .find((s) => s.name === name)
       ?.regen?.(c.cx, c.cy);
-    if (this.#regen.size >= REGEN_KEPT) this.#regen.clear();
+    if (this.#regen.size >= REGEN_KEPT) this.#regen.delete(this.#regen.keys().next().value as string); // the oldest goes, not all of them
     this.#regen.set(key, cells);
     return cells;
   }

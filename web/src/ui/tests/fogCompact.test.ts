@@ -244,6 +244,31 @@ test("reading a dropped chunk regenerates it once for each source, not once for 
   assert.equal(calls.food! - checked.food!, 1, "food regenerated once for all those reads");
 });
 
+test("a view of 100 dropped chunks regenerates each once, however often it is painted", () => {
+  let calls = 0;
+  const truth = new Map<string, Uint8Array>();
+  const source: Source = {
+    name: "food",
+    layer: PLANE,
+    at: (cx, cy) => {
+      const k = `${cx},${cy}`;
+      if (!truth.has(k)) truth.set(k, Uint8Array.from(generated));
+      return truth.get(k);
+    },
+    regen: () => (calls++, generated),
+  };
+  const s = new SensedMap();
+  const k = new Knowledge(s, [source]);
+  for (let cx = 0; cx < 10; cx++) for (let cy = 0; cy < 10; cy++) s.stamp([hostAt(cx * CHUNK + 40, cy * CHUNK + 40)], 10);
+  s.stamp([none()], 10 + SENSED_FADE + 5);
+  while (k.compact(64) > 0);
+  assert.equal(k.bytes(), 100 * BYTES, "all 100 dropped");
+  const checked = calls;
+  for (let frame = 0; frame < 3; frame++)
+    for (let cx = 0; cx < 10; cx++) for (let cy = 0; cy < 10; cy++) k.view(PLANE, cx, cy)?.snap("food");
+  assert.equal(calls - checked, 100, "once for each chunk over three paints of all of them");
+});
+
 /** What `record` and the page's save and load carry, with the pieces the page uses. */
 const fakeGame = { layers: [] } as unknown as Game;
 

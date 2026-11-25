@@ -1,4 +1,4 @@
-import { CHUNK, isEndless, type Cells, type ChunkLayer, type Game } from "../../colony/index.ts";
+import { CHUNK, isEndless, type Cells, type ChunkLayer, type EndlessMap, type Game } from "../../colony/index.ts";
 import { sideOf } from "../stats.ts";
 import { CorpseMemory } from "./corpses.ts";
 import { KnownColonies } from "./known.ts";
@@ -10,6 +10,8 @@ import { SensedMap } from "../fungusSight.ts";
 
 /** The names the painter asks the snapshot by. */
 export const SNAP = { rock: "rock", food: "food", quality: "quality", spoil: "spoil", chamber: "chamber" } as const;
+
+type PlaneChunk = ReturnType<EndlessMap["plane"]["chunk"]>;
 
 /** A chunk of `layer`'s `empty`, which a source of a layer with no generator regenerates. */
 function blank(layer: ChunkLayer<Cells>): () => Cells {
@@ -25,18 +27,25 @@ export function layerSources(game: Game, layer: number): Source[] {
   const m = game.layers[layer];
   if (!m) return [];
   const plane = isEndless(m) ? m.plane : null;
+  // The plane's chunk is a pure function of the seed and costs a regeneration (20-40 ms cold) that makes rock and food together: the rock and the
+  // food of one chunk, asked one after the other, share one.
+  let made: { cx: number; cy: number; chunk: PlaneChunk } | null = null;
+  const own = (cx: number, cy: number): PlaneChunk => {
+    if (!made || made.cx !== cx || made.cy !== cy) made = { cx, cy, chunk: plane!.chunk(cx, cy) };
+    return made.chunk;
+  };
   const out: Source[] = [];
   out.push({
     name: SNAP.rock,
     layer,
     at: (cx, cy) => m.rock.chunk(cx, cy),
-    regen: plane ? (cx, cy) => plane.chunk(cx, cy).rock : undefined,
+    regen: plane ? (cx, cy) => own(cx, cy).rock : undefined,
   });
   out.push({
     name: SNAP.food,
     layer,
     at: (cx, cy) => m.food.chunk(cx, cy),
-    regen: plane ? (cx, cy) => plane.chunk(cx, cy).food : undefined,
+    regen: plane ? (cx, cy) => own(cx, cy).food : undefined,
   });
   if (m.quality) {
     const q = blank(m.quality);
