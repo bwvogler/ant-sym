@@ -8232,3 +8232,44 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 **Still open.**
 - **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; the trait's place in the upgrade order is decided: after the borer (2026-11-24), and L1 and the assay are measured at borer-level games.
 - **To read:** Heinken 2007 has no open copy; Chen 2000, Stretch & Viles 2002 and Joneson & Lutzoni 2009 could not be reached; the rest of the unverified list is abstract-only (`ja-vlla.11.1`, second read 2026-11-24). No lichen weathering rate and no carbon-share figure were found.
+
+## 91. Odour space: a short vector, a distance against a tolerance, and a perceiver that learns its enemies (design, ja-zg1u, 2026-11-25)
+
+**Research basis:** [odour-space.md](odour-space.md). FT is full text read; ABS is abstract only, with numbers **unverified**.
+- **A blend, a few axes that matter:** colony odour is a point in an n-dimensional CHC space (Bos & d'Ettorre 2012, FT; Esponda & Gordon 2015, FT), but recognition rests on "relatively few compounds" (Martin et al. 2008, abstract and methods read), homologues carry the same information (van Wilgenburg et al. 2010, FT) and aggression tracked genetic, not overall chemical, difference in *Brachymyrmex* (Eyer et al. 2021, ABS).
+- **A distance against a threshold, per ant:** ants compare a label with a template and attack above a threshold; each ant has its own boundary, habituated by calm contact and sensitised by aggression (Esponda & Gordon 2015, a model). Whether the distance is one-sided is disputed (Guerrieri 2009 ABS for; Neupert 2018 ABS against).
+- **Not what the owner first asked:** nothing found shows a colony's CHC profile moving because of fights. Against: the colonies that fought most were the chemically closest, and profiles followed the environment (Frizzi et al. 2015, FT). Odours diverge by separation, different food and drift, and converge on a shared diet or by fusion (Silverman & Liang 2001, Buczkowski 2005, Drescher 2010, all ABS).
+- **What is supported for the same visible outcome:** aggression teaches the perceiver an enemy template (Bey et al. 2025, ABS) and the nasty-neighbour effect is the commoner finding (Gordon 1989, Newey 2010, Frizzi 2015); against, weaver ants showed no rapid learning in 10 days (Newey 2010).
+- **Supercolonies and identities:** kin neighbours come from lost cue diversity (Tsutsui 2000, 2003; Giraud 2002; all FT) but native supercolonies exist too (Pedersen 2006, ABS); dense multicolonial populations hold a colony every 2.5 m (Eyer 2021, ABS).
+
+**The problem (measured).** Odour is one float in [0, 1], tolerance 0.35 (`TOLERANCE`, `recognition.ts`). By a 200,000-draw Monte Carlo over uniform odours (scratch script, not in the repo): two random colonies are kin with probability **0.578**; a wild colony (`hash01(seed, 101, rx, ry)`, `Game.wakeSite`) is a stranger to both start colonies (0 and 1) **30%** of the time; the largest set of mutual strangers is about **2.7** (0, 0.5, 1). In the endless world most neighbours are therefore kin or allies, the opposite of a multicolonial population. At K axes with a Euclidean tolerance of 0.35 the same Monte Carlo gives:
+
+| K | kin pair | wild colony a stranger to both start colonies | mutual strangers (random packing) |
+|---|---|---|---|
+| 1 (today) | 0.578 | 30% | 2.7 |
+| 2 | 0.276 | 81% | 8.2 |
+| 3 | 0.116 | 96% | 26 |
+| 4 | 0.045 | 99% | 78 |
+
+**Decisions.**
+- **Owner (2026-11-25):** widen the odour space (more dimensions) and drive scents away on aggressive contact, "or some other mechanic grounded in literature".
+- **Proposed (needs the owner; beads `ja-zg1u.9`, `.10`, `.11`):**
+  - K = 3, tolerance 0.35, each axis a class of compounds, with per-species weights (default 1).
+  - Drive-apart is replaced by the **learned foe** (perceiver-side) as the literature-grounded version; explicit repulsion stays an owner option, marked design.
+  - Symmetric distance by default.
+- **Fixed by the plan, not by biology:** wild odour axes stay a pure hash of seed and site; a host's displacement toward the fungus is capped in the space (0.3), so "a host is never a stranger to its own nest" still holds in more dimensions (today's proof, `MAX_MASK` x 0.5 = 0.3, does not extend).
+
+**The mechanic.** Cue: contact with another ant's odour vector. Response: stranger or not (the existing `enemy`, fights, alarm). Local rule: `d = sqrt(sum w_k (o_k - t_k)^2) > tolerance + STRANGER_EPS`, `t` the perceiver's own odour. "Off" is K = 1, weight 1: today's game bit for bit. Retires: nothing new; no global read is added. Stages in [odour-space.md](odour-space.md#the-mechanic): S0 assays, S1 the K = 1 refactor (sparse recognition bands, since the bitmask caps at 31 bands; save version 16), S2 K = 3 on (own PR, goldens re-recorded), S3 weights, S4 learned foe (off by default), S5 optional drift, S6 Learn and the colour readout.
+
+**Play.** The wild world's colonies are strangers to nearly everyone; a border fight leaves the fighters more hostile to that colour for minutes (S4). The fungus's odour levers (blend, mask, calm, the odour weapon) now work over a distance, so which colonies it works, and for how long, matters more. No lever on ants. Risks: permanent war (kin share is the dial), unification starved (time to unity in the Garden games), a foe memory that makes a border war permanent, a 3-axis odour the player cannot read (the lens is in the plan).
+
+**Assays and targets.** New assays land first, no behaviour change (S0, `ja-zg1u.2`): O1 kin share and mutual-stranger set (target: K = 3 over 90% of wild colonies strangers to both start colonies, kin rare but present); O2 the own-nest invariant at every K; O3 a recognition tick bench. S2's gate adds time-to-unity in the Garden scenarios against §22, §29 and §37, seeds 1-10 by the worst seed, confirmed on 11-20. S4's gate is hysteresis in a borderline-colony assay without a runaway (G, G-prime, the long games).
+
+**Cost (estimated).** No situation field, legend or question changes: odour never enters a question, and `enemy` is an index of the situation (`situation.ts`). Every lane's questions and $/h stay at the figures of §50.19 and §54.4-54.5; a cached game spends nothing. Each PR re-runs `npm run colony-cost` and `node scripts/fungus-cost.mjs` and says so. The cost that moves is CPU, per tick, in recognition (S0's bench sets the budget in ms).
+
+**Beads.** `ja-zg1u` (this). Children in build order: `.1` research (abstract-only sources in full); `.2` S0 assays; `.3` S1 K-vector at K = 1; `.4` S2 K = 3 on; `.5` S3 species weights; `.6` S4 learned foe; `.7` S5 optional drift (P4); `.8` S6 Learn and colour. Owner calls: `.9` K and tolerance, `.10` repulsion or learned foe, `.11` symmetric distance. Supersedes `ja-s37s` (closed) options (b) and (c).
+
+**Still open.**
+- **Owner:** `.9`, `.10`, `.11`; whether about 12% kin wild neighbours at K = 3 is acceptable or wild odours should be chosen by rejection against neighbours' (`ja-s37s` option c, still pure).
+- **To read:** the abstract-only sources in `.1`; Langen 2000, Reeve 1989, Sturgis & Gordon 2013 and Martin & Drijfhout 2009 could not be reached; bioRxiv 614719 (already cited in `recognition.ts`) was not re-read.
+- **To measure:** the S0 assays; the kin share on the neighbours the endless world actually makes (the Monte Carlo uses uniform draws); the bench.
