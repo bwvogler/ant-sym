@@ -2,7 +2,7 @@
 // shut or on the player's from the pen, and what the page says about it. Plain TypeScript over the Game and the doctrine setter, so
 // the rules are tested without React: ColonyApp keeps the hooks, the camera and the toasts, and shows what these return.
 
-import { MAX_COLONIES, type Flight, type Game } from "../colony/index.ts";
+import { type Flight, type Game } from "../colony/index.ts";
 import { colonyName } from "./names.ts";
 import type { ToastTone } from "./toasts.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
@@ -31,8 +31,8 @@ export function lostNotice(game: Game, f: Flight): Notice {
   const why = game.lastLoss?.flight === f ? game.lastLoss.reason : null;
   return {
     text:
-      game.colonies.length >= MAX_COLONIES
-        ? `A new queen from ${mother} flew, but the map already holds ${MAX_COLONIES} colonies: she was lost.`
+      game.colonies.length >= game.colonyLimit
+        ? `A new queen from ${mother} flew, but the map already holds ${game.colonyLimit} colonies: she was lost.`
         : why
           ? `A new queen from ${mother} was lost: ${why}.`
           : `A new queen from ${mother} found no room to land, and was lost.`,

@@ -356,3 +356,86 @@ test("on an endless plane the minimap is the window round the camera: inMini tak
   rig.set({ x: at.x, y: at.y, zoom: 0.5 });
   assert.equal(rig.inMini(r.x + 1, r.y + 1), false);
 });
+
+// ---- ja-qpv.4.7: the endless minimap's window is frozen from the press to its release ----
+
+function endlessRig(o: { following?: boolean } = {}) {
+  const plane = generateEndlessPlane(1);
+  const v = { w: 800, h: 600, dpr: 1 };
+  const st = { view: PLANE, following: o.following ?? false, unfollowed: 0 };
+  const rig = new CameraRig({
+    view: () => st.view,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => st.following,
+    unfollow: () => {
+      st.following = false;
+      st.unfollowed++;
+    },
+  });
+  rig.set({ x: 40000, y: -30000, zoom: 8 });
+  return { rig, st, v, e: extentOf(plane) };
+}
+
+test("holdMini keeps the window taken at the press: inMini, jumpMini and frozenMini read it though the camera moves (a followed ant), until releaseMini", () => {
+  const { rig, st, v, e } = endlessRig({ following: true });
+  const win = miniFrame(e, rig.camera());
+  assert.equal(rig.frozenMini(), null, "following until pressed");
+  rig.holdMini();
+  assert.deepEqual(rig.frozenMini(), win);
+  // the camera is carried five chunks east (what a follow does): the live window would move, the frozen one does not
+  rig.set({ ...rig.camera(), x: rig.camera().x + 5 * CHUNK });
+  assert.notDeepEqual(miniFrame(e, rig.camera()), win);
+  assert.deepEqual(rig.miniWindow(), win);
+  assert.deepEqual(rig.frozenMini(), win);
+  const r = minimapRect(win, v, 1);
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), true);
+  rig.jumpMini(r.x + r.w / 4, r.y + r.h / 4);
+  const want = { x: win.x0 + win.w / 4, y: win.y0 + win.h / 4 };
+  assert.ok(Math.abs(rig.camera().x - want.x) < 1e-6 && Math.abs(rig.camera().y - want.y) < 1e-6, "in the frozen window's coordinates");
+  assert.equal(st.unfollowed, 1);
+  // the same pointer place again: the same camera (no joystick)
+  const first = rig.camera();
+  rig.jumpMini(r.x + r.w / 4, r.y + r.h / 4);
+  rig.jumpMini(r.x + r.w / 4, r.y + r.h / 4);
+  assert.deepEqual(rig.camera(), first);
+  rig.releaseMini();
+  assert.equal(rig.frozenMini(), null);
+  assert.deepEqual(rig.miniWindow(), miniFrame(e, rig.camera()), "the window follows the camera again");
+});
+
+test("a freeze ends of itself: zoomed out (no minimap), another view, a new game; a bounded map never takes one", () => {
+  const out = endlessRig();
+  out.rig.holdMini();
+  assert.notEqual(out.rig.frozenMini(), null);
+  out.rig.set({ ...out.rig.camera(), zoom: 0.5 });
+  assert.equal(out.rig.frozenMini(), null, "zoomed out while down");
+  out.rig.set({ ...out.rig.camera(), zoom: 8 });
+  assert.equal(out.rig.frozenMini(), null, "and it does not come back when zoomed in again");
+
+  const sw = endlessRig();
+  sw.rig.holdMini();
+  sw.st.view = CURTAIN;
+  sw.rig.set({ x: 40000, y: -30000, zoom: 8 }); // zoomed in there too: only the view tells it from the one the press was in
+  assert.equal(sw.rig.frozenMini(), null, "switching view");
+  sw.st.view = PLANE;
+  assert.equal(sw.rig.frozenMini(), null);
+
+  const clr = endlessRig();
+  clr.rig.holdMini();
+  clr.rig.clear();
+  clr.rig.set({ x: 40000, y: -30000, zoom: 8 });
+  assert.equal(clr.rig.frozenMini(), null, "a new game");
+
+  const { rig } = setup();
+  const view = { w: 800, h: 600, dpr: 1 };
+  rig.set(fit(ext(PLANE_MAP), view));
+  rig.set({ ...rig.camera(), zoom: 20 });
+  rig.holdMini();
+  assert.equal(rig.frozenMini(), null, "bounded: nothing to freeze");
+  const e = ext(PLANE_MAP);
+  assert.deepEqual(rig.miniWindow(), miniFrame(e));
+  const r = minimapRect(e, view, 1);
+  assert.equal(rig.inMini(r.x + 1, r.y + 1), true);
+});

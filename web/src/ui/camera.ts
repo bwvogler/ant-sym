@@ -164,7 +164,7 @@ export function miniFrame(world: Extent, c?: { x: number; y: number }): Reach {
 
 /**
  * The world point under minimap pixel (mx, my) (device px, as pointer events give them): where a click there jumps. On an endless plane the minimap
- * is the window round the camera `c` (miniFrame).
+ * is the window round the camera `c` (miniFrame), or `frame`, the window the rig froze while the pointer is down (field/rig.ts).
  */
 export function fromMinimap(
   world: Extent,
@@ -173,8 +173,9 @@ export function fromMinimap(
   mx: number,
   my: number,
   c?: { x: number; y: number },
+  frame?: Reach,
 ): [number, number] {
-  const f = miniFrame(world, c);
+  const f = frame ?? miniFrame(world, c);
   const r = minimapRect(f, view, dpr);
   return [f.x0 + ((mx - r.x) / r.w) * f.w, f.y0 + ((my - r.y) / r.h) * f.h];
 }

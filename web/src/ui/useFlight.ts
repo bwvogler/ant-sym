@@ -1,5 +1,5 @@
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Flight, MAX_COLONIES, PLANE, type Game, type OneWorld } from "../colony/index.ts";
+import { type Flight, PLANE, type Game, type OneWorld } from "../colony/index.ts";
 import type { FieldApi, FieldPen } from "./ColonyField.tsx";
 import { type Founded, foundOnMothers, foundOnWords } from "./flight.ts";
 import type { GameLoop } from "./gameLoop.ts";
@@ -124,8 +124,8 @@ export function useFlight({
       ...circle,
       preview: (p) =>
         penSettle(circle, p, mother, (q) =>
-          game.colonies.length >= MAX_COLONIES
-            ? { ok: false, reason: `the map already holds ${MAX_COLONIES} colonies` }
+          game.colonies.length >= game.colonyLimit
+            ? { ok: false, reason: `the map already holds ${game.colonyLimit} colonies` }
             : game.settleAt(q, penGround(oneWorld)),
         ),
       onPick: (p) => {
