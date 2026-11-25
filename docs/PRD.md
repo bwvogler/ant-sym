@@ -8232,7 +8232,8 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 - It **needs Knots 1** (so Mycelium 1) (owner, 2026-11-25; the order is design, no paper orders them).
 - Until it is kept a closed flower does not become a patch; the landing patch and an infected queen's one-tile patch are unaffected (owner, 2026-11-25).
 - Patches already formed stay; an old save forms no new ones until Foci is kept (owner, 2026-11-25).
-- The default buy order (the assay's and the page's) reaches Knots and Foci; where in the order is measured (owner, 2026-11-25).
+- The default buy order reaches Knots and Foci; where in the order is measured (owner, 2026-11-25). **Measured below: it costs progression, so `DEFAULT_ORDER` is unchanged and the call goes back to the owner.**
+- `fociGate` is on by default since 2026-11-25 (arm E below met the pre-set rule: no seed more than 10 % slower to a quarter).
 - The seed-5 runaway moving to after the buy is accepted, bounded by the price; `ja-27w1` stays open until measured with the gate (owner, 2026-11-25).
 
 **The mechanic.** `Fungus.#settle` reads `evolution.level("foci")`: at 0 it empties the grown lists and does nothing, at 1 it is today's rule. Built behind a fungus param `fociGate` whose off setting is main bit for bit; the default flips after the assay, as the tropism's did (§88). Shape copied from the Lichen upgrade (`evolution.ts`, the drawer branch, `upgradeText.ts`).
@@ -8245,5 +8246,19 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 
 **Beads.** `ja-icc4` (this); `.1` assay arm; `.2` the upgrade behind `fociGate`; `.3` measure on seeds 1-20 and flip the default.
 
-**Still open.** Where in the buy order Foci goes; the price of Foci in play; the seed-5 web under the gate.
+**Results (PR #428; seeds 1-20, `unite`, hyphae, growth answers, flow, 600 s; runs 45557115301 A, 45557119561 B, 45557122875 C, 45557126056 D on `f2aa1828`, 45559245463 E on `337819c8`).** A: gate off, the old order (baseline). E: gate on, the old order (which never buys Foci). B: gate on and D: gate off, `knots,foci` after the first `mycelium`. C: gate on, `knots,foci` last.
+
+| arm | quarter median / worst | queen median / worst | flowers (games) | seeds >10 % slower to a quarter than A |
+|---|---|---|---|---|
+| A | 171 s / 333 s (seed 6) | 210.5 s / 365 s | 40 (6) | none |
+| E | 171 s / 333 s | 210.5 s / 365 s | 0 (0) | none: all 20 seeds bit-identical to A |
+| B = D | 179.5 s / 270 s (seed 9) | 213 s / 291 s | 8 (2) | 9: seed 10 +36 %, 8 +22 %, 15 +21 %, 14 +20 %, 4 +19 %, 12 +19 %, 3 +15 %, 16 +13 %, 11 +10.2 % (seeds 5, 6, 17, 18, 19 faster) |
+| C | 167.5 s / 448 s (seed 6) | 212 s / 467 s | 57 (6) | 2: seed 6 +35 %, seed 9 +33 % |
+
+- **The gate works and costs nothing in P1.** E forms no flower and its quarter, half and queen times equal A's on every seed; with no Foci bought, seed 5 ends with 505 hyphae cells where A has 3,581 (the `ja-27w1` runaway needs Foci).
+- **B and D are identical cell for cell:** Foci is bought before any flower closes, so the gate never fires there. The cost in B, C and D is therefore not the gate: it is Knots and Foci displacing other purchases, and Knots changing the web (D, gate off, has 8 flowers to A's 40; C has 57, with seeds 3, 4 and 5 at 9, 18 and 26 patches after the late buy).
+- **Reaching Foci through Knots in the assay's order costs progression** (9 seeds too slow early, 2 seeds up to +35 % late), so `DEFAULT_ORDER` is **not** changed. The default CI progression now shows no flowers; a flower arm is `foci` plus an `order` that reaches `knots,foci`. First-flower and Foci-bought times are in the lab's seed lines, not the CI table.
+- Not measured: the Foci price in play (about 2 mutations is an estimate); an infected queen's one-tile start (no progression seed founds one).
+
+**Still open.** Whether the default buy order should reach Foci despite the cost above (owner); the price of Foci in play; the seed-5 web under the gate.
 

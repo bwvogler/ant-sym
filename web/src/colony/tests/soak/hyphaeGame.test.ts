@@ -19,10 +19,11 @@ const GARDEN = STRAINS.findIndex((s) => s.id === "garden");
 /** Seed 7's small plane (160 × 100), hyphae on, the fungus landed by colony 0's hole and evolving. */
 const OLD_LAW = { piErrorLaw: 0, searchScale: 0 };
 
+/** The flower rule tests run ungated (fociGate off) unless they say otherwise: the gate has its own tests below. */
 function game(hyphae: boolean, flow = false, fungus: { fociGate?: boolean } = {}): Game {
   const g = new Game(
     generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }),
-    { autoFound: false, fungus: { hyphae, flow, ...fungus } },
+    { autoFound: false, fungus: { hyphae, flow, fociGate: false, ...fungus } },
     gameRng(7),
     [
       { antCount: 40, colony: { routeMemory: 0, ...OLD_LAW } },

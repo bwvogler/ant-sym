@@ -221,7 +221,7 @@ export interface FungusParams {
   trafficTropism: number;
   /**
    * a closed flower of hyphae becomes a patch only once the Foci upgrade is kept (docs/foci.md, PRD §91, ja-icc4.2; owner
-   * 2026-11-25); off, every web does as before. A fungus param so that off is main bit for bit
+   * 2026-11-25); off, every web does as before (on by default since 2026-11-25)
    */
   fociGate: boolean;
 }
@@ -248,7 +248,9 @@ export const DEFAULT_FUNGUS: FungusParams = {
   trafficBias: "count",
   trafficRadius: 3,
   trafficTropism: 4,
-  fociGate: false,
+  // On since 2026-11-25 (owner: flower patches need the Foci unlock, PRD §91): with the assay's default buy order, which never
+  // buys Foci, no flower forms and every quarter, half and queen time on seeds 1-20 is bit-identical to the ungated game.
+  fociGate: true,
 };
 
 /**
