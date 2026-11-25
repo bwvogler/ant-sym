@@ -219,6 +219,11 @@ export interface FungusParams {
    * tropism, ja-ogph.3), if that side has more ants than straight ahead; 0, never
    */
   trafficTropism: number;
+  /**
+   * a closed flower of hyphae becomes a patch only once the Foci upgrade is kept (docs/foci.md, PRD §91, ja-icc4.2; owner
+   * 2026-11-25); off, every web does as before. A fungus param so that off is main bit for bit
+   */
+  fociGate: boolean;
 }
 
 export const DEFAULT_FUNGUS: FungusParams = {
@@ -243,6 +248,7 @@ export const DEFAULT_FUNGUS: FungusParams = {
   trafficBias: "count",
   trafficRadius: 3,
   trafficTropism: 4,
+  fociGate: false,
 };
 
 /**
@@ -1656,6 +1662,8 @@ export class Fungus {
     const lists = this.#hyphae.map((h) => h?.takeGrown() ?? []);
     const h = this.#hyphae[0];
     if (!e || !h) return;
+    // Foci (docs/foci.md): until kept, a closed flower is no patch. The lists are emptied above either way, so none grows.
+    if (this.params.fociGate && e.level("foci") < 1) return;
     const L = this.#layers[0] as SporeLayer;
     const base = new Set(L.base);
     const inPatch = (c: number): boolean => base.has(c) || h.sources.has(c);

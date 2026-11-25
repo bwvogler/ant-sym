@@ -103,11 +103,11 @@ test("the drawer's branches hold every upgrade once, Infectivity first (ja-52ui)
   assert.equal(ids[0], "infectivity", "the e2e check opens the first row's next level: Infectivity fair");
 });
 
-test("the tree's tiers, left to right: 7 roots, then 12, 6, 1 and 1 (owner 2026-11-16, ja-52ui.8)", async () => {
+test("the tree's tiers, left to right: 7 roots, then 12, 7, 1 and 1 (owner 2026-11-16, ja-52ui.8; Foci, a tier-2 level, 2026-11-25)", async () => {
   const { tierOf, TIER_COUNT } = await import("../upgradeBranches.ts");
   const count = new Array(TIER_COUNT).fill(0);
   for (const u of UPGRADES) for (let k = 1; k < u.steps.length; k++) count[tierOf(u.id, k)]++;
-  assert.deepEqual(count, [7, 12, 6, 1, 1]);
+  assert.deepEqual(count, [7, 12, 7, 1, 1]);
   assert.equal(tierOf("infectivity", 1), 0, "a root");
   assert.equal(tierOf("infectivity", 3), 2, "virulent follows strong and Immune evasion: some, a tier each");
   assert.equal(tierOf("crown", 1), 4, "the last level in the game, after Royal and the Odour weapon");

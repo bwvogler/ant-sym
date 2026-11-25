@@ -13,8 +13,9 @@
 // Usage: node scripts/lab/progression.mjs [--seeds 1-3] [--seconds 900] [--aim unite|spread|peace] [--evolve]
 //          [--order stealth,infectivity,...] [--strain garden] [--no-buy] [--hyphae] [--growth]
 //          [--grant knots,...] [--sun 4] [--flow] [--price 3,1.38] [--split] [--traffic]
-//          [--bias count|levels] [--radius 3] [--tropism N]
-// --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
+//          [--bias count|levels] [--radius 3] [--tropism N] [--foci]
+// --foci puts the flower patches behind the Foci upgrade (fungus.ts fociGate, PRD §91, docs/foci.md): until it is kept no flower
+// becomes a patch; put knots,foci in --order to buy it. --bias, --radius and --tropism set the tips' traffic lean (fungus.ts trafficBias, trafficRadius, trafficTropism, PRD §88, ja-ogph.3): bias count (more ants within --radius cells of a side), levels (the higher level of occupied cells) or off; tropism N (a growing tip leans toward ants on every N-th cell, 0 never). Unset, the fungus's own defaults (count, 3, 4 since 2026-11-23).
 // --traffic only reads (the game is the same bit for bit): every 5 s it samples the ants' occupancy round each hypha tip on
 // the plane, for docs/hyphal-traffic.md (ja-ogph.2, PRD §88): the share of cells occupied in three distance bands (1, 2-3, 4-6),
 // how often the two cells a tip could turn into differ in the ants round them, and the share of hyphae near ant traffic.
@@ -66,6 +67,7 @@ if (isMainThread) {
     bias: opt("bias", null),
     radius: opt("radius", null) === null ? null : Number(opt("radius", null)),
     tropism: opt("tropism", null) === null ? null : Number(opt("tropism", null)),
+    foci: flag("foci"),
   };
   const width = Math.min(seeds.length, Math.max(1, availableParallelism() - 1));
   const results = [];
@@ -137,6 +139,7 @@ if (isMainThread) {
     bias,
     radius,
     tropism,
+    foci,
   } = workerData;
   if (landing !== null) (await import("../../web/src/colony/game.ts")).LANDING.radius = landing;
   if (price) {
@@ -156,6 +159,7 @@ if (isMainThread) {
         ...(bias === null ? {} : { trafficBias: bias }),
         ...(radius === null ? {} : { trafficRadius: radius }),
         ...(tropism === null ? {} : { trafficTropism: tropism }),
+        ...(foci ? { fociGate: true } : {}),
       },
     },
     gameRng(seed, 0),
