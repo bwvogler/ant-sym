@@ -60,6 +60,23 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      sporecost:
+        description: "The mass a spore costs (--spore-cost, ja-a2no): lab override; empty: the game's 1"
+        default: ""
+      freebudget:
+        description: "The most mass the free term pays out in a game (--free-budget, ja-a2no): lab override, a stand-in for a start reserve; empty: no limit"
+        default: ""
+      ledger:
+        description: "Also print each seed's energy ledger at 2, 5 and 10 minutes and the end: mass made by source and spent by sink, and what the mycelium holds (--ledger, ja-a2no.2; reads only)"
+        type: boolean
+        default: false
+      split:
+        description: "Report where each seed's growth was made: the mycelium on the ground, corpses and hosts (--split, PRD §85 M3)"
+        type: boolean
+        default: false
+      light:
+        description: "The lichen's light income, growth a second a lichen cell (--light, ja-vlla.11.4); empty: the design number"
+        default: ""
       lichen:
         description: "Also probe the rock the hyphae lie beside and the late earning rate (--lichen; reads only, docs/lichen.md, ja-vlla.11.2)"
         type: boolean
@@ -90,6 +107,11 @@ jobs:
           TRAFFIC: ${{ inputs.traffic }}
           LICHEN: ${{ inputs.lichen }}
           ORDER: ${{ inputs.order }}
+          LIGHT: ${{ inputs.light }}
+          SPLIT: ${{ inputs.split }}
+          LEDGER: ${{ inputs.ledger }}
+          SPORECOST: ${{ inputs.sporecost }}
+          FREEBUDGET: ${{ inputs.freebudget }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -103,6 +125,9 @@ jobs:
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
           [[ "$BIAS" =~ ^(default|off|count|levels)$ ]] || bad "bias: default, off, count or levels"
           [[ -z "$ORDER" || "$ORDER" =~ ^[a-z]+(,[a-z]+)*$ ]] || bad "order: upgrade ids, comma-separated"
+          [[ -z "$LIGHT" || "$LIGHT" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "light: empty or a number"
+          [[ -z "$SPORECOST" || "$SPORECOST" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "sporecost: empty or a number"
+          [[ -z "$FREEBUDGET" || "$FREEBUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "freebudget: empty or a number"
           [[ -z "$RADIUS" || "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: empty or 1 to 6"
           [[ -z "$TROPISM" || "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: empty or 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
@@ -115,6 +140,11 @@ jobs:
           [ "$LICHEN" = "true" ] && args="$args --lichen"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$ORDER" ] && args="$args --order $ORDER"
+          [ -n "$LIGHT" ] && args="$args --light $LIGHT"
+          [ "$SPLIT" = "true" ] && args="$args --split"
+          [ "$LEDGER" = "true" ] && args="$args --ledger"
+          [ -n "$SPORECOST" ] && args="$args --spore-cost $SPORECOST"
+          [ -n "$FREEBUDGET" ] && args="$args --free-budget $FREEBUDGET"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
@@ -210,4 +240,16 @@ jobs:
             { echo; echo 'Seeds whose fungus made lichen:'; echo '```'; grep -h ' · lichen [0-9]* cells' out/seed-*.txt | sed -E 's/^(seed [0-9]+):.* · (lichen .*)$/\1: \2/' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           else
             echo 'No seed made any lichen.' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --split's line (one per seed): where the growth that mutations come from was made.
+      - name: growth split
+        run: |
+          if grep -q '^  growth made' out/seed-*.txt; then
+            { echo; echo 'Growth made, by where (ground = the mycelium growing on its own, corpses = fed in, hosts = made in ants):'; echo '```'; grep -H '^  growth made' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --ledger's lines (four a seed): the energy ledger (ja-a2no.2, docs/energy.md).
+      - name: energy ledger
+        run: |
+          if grep -q '^  ledger @' out/seed-*.txt; then
+            { echo; echo 'Energy ledger (mass made by source, spent by sink, and held):'; echo '```'; grep -H '^  ledger @' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi

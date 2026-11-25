@@ -8231,3 +8231,30 @@ Parked ideas (P4): wet and dry pulses `ja-ve8t`, rings and age `ja-zar4`, the li
 **Still open.**
 - **Owner:** the design rates, once measured; L3b's go after L3a; L4 and L5 after `.1`; the trait's place in the upgrade order is decided: after the borer (2026-11-24), and L1 and the assay are measured at borer-level games.
 - **To read:** Heinken 2007 has no open copy; Chen 2000, Stretch & Viles 2002 and Joneson & Lutzoni 2009 could not be reached; the rest of the unverified list is abstract-only (`ja-vlla.11.1`, second read 2026-11-24). No lichen weathering rate and no carbon-share figure were found.
+
+## 91. A hungry fungus: its growth comes from a source (design, ja-a2no, 2026-11-25)
+
+**Research basis:** [energy.md](energy.md). FT is full text read; ABS is abstract only, with numbers **unverified**; NR is not read.
+
+- Outside a host *Metarhizium* mostly waits as spores: bulk-soil counts fell from 10⁵ to 10³ propagules a gram over months and stayed at 10⁵ near roots (Hu & St. Leger 2002, FT). No source measured free mycelium in bulk soil.
+- Its carbon comes from living roots (plant ¹³C reached the fungus over 7 to 21 days, Behie 2017, FT) and from cadavers, a small finite resource that ants can erase (Hughes 2004, Pull 2018, FT).
+- Carbon becomes mycelium at a yield of about 0.3 to 0.7 (Lameiras 2018 FT; Sinsabaugh 2013 ABS), outgrowth follows the share of a resource used (Fukasawa & Kaga 2020, FT), and starved hyphae are recycled (Emri 2004 and 2008, ABS). **Not found:** a hyphal growth rate or mycelial mass for *Metarhizium* or *Beauveria* in soil, or conidia per ant cadaver; any such number is **design**.
+
+**The problem (measured).** `Evolution.grow` gives mass from no source: `0.03 × mass × (1 − mass / (capacity × patches))` a second. On seeds 1–20 (900 s, default order, no lichen, run 45531246163, main of 2026-11-25) the growth made on the ground, which is this term, has median **667** (630 to 5,009); corpses give a median **36.5** (1 to 115); hosts give a median **42,951**, which counts toward the ants' pool and never becomes mass. So the free term is about 95 % of the mass the fungus makes and corpses about 5 %. Quarter of hosts: worst 333 s (seed 6), median 171 s. **The energy ledger** (`ja-a2no.2`, run 45539333590, same seeds): at 900 s the free term made a median 667, of which a median **96 %** was paid out as spores (46 % at 120 s, 82 % at 300 s, 93 % at 600 s); the mycelium holds about 42 mass; its hyphae are a median 226 cells, so about **57 mass** is embodied in hypha (cells × 0.25); hypha lost to cuts is about 1. So the free term is **fuel for spores** (about 0.7 mass a second to hold a body of about 40), not the cost of building the mycelium. A fungus that grows from nothing cannot be hungry; a hungry one must find carbon to sporulate, and spore output is what infects the first hosts.
+
+**Decisions.**
+- **Owner, 2026-11-25:** make the free term earn its place: the fungus is hungry, and growth must come from somewhere the player can find (litter or substrate, cadavers, light, hosts).
+- **Owner, 2026-11-25:** litter model **A**, patchy ground as map content (energy.md §7); **mostly earned**: the free term retired with a start reserve kept; **P1's baseline is decided after the ledger** (`ja-a2no.2`); **#425 is held**, the docs riding in it.
+- **Proposed, needs the owner:** plane only with no roots (the default), or the curtain and roots as well. Tracked in `ja-a2no.1`.
+
+**The mechanic.** Each milestone is a PR behind a setting whose off is main bit for bit. Cue → response: a hypha on a source takes up its carbon, at a yield below one, into the body's mass; the free term is off or replaced by a start reserve; corpses are drawn down, not given in a lump; the lichen's light becomes carbon (L2 reworked); starved hyphae fade and return mass.
+
+**Play.** The player sees where the ground is rich and where the fungus has run out; chooses where to grow; and a hungry fungus that stops shows why. Risks: starving before it finds anything, a worst seed far worse than today's, litter the player cannot see (energy.md, Play).
+
+**Assays and targets.** The assay lands first (`ja-a2no.2`, no behaviour change): mass in by source and out by sink over time, per seed, on GitHub's `progression.yml` (`split` input already reports the growth split). Target: P1 by the worst seed against the baseline the owner chooses, seeds 1–20, confirmed on a second set; the late earning rate within a stated bound; goldens bit-exact with the setting off and re-recorded and said so with it on.
+
+**Cost (estimated).** None in Jev for steering. A `resource` value in the growth lane's situation (`ja-a2no.8`) is +48 situations (96 to 144) and a token bill to measure before it is chosen.
+
+**Beads.** `ja-a2no` (this). Children in build order: `.1` the owner's decisions, `.2` the energy-ledger assay, `.3` research gaps, `.4` earned growth behind a setting, `.5` a cadaver is a finite draw, `.6` light is carbon, `.7` starvation and a hunger readout, `.8` tips choose richer ground (only if measured to be needed), `.9` Learn entries.
+
+**Still open.** The owner's five questions (`ja-a2no.1`); the numbers marked design (yield, uptake rate, litter richness, start reserve); the papers not read (energy.md, Open questions).

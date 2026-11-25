@@ -60,8 +60,13 @@ export interface Upgrade {
   nest?: boolean;
 }
 
-/** The mycelium at its landing: the mass it starts with, how fast it grows (per second, logistic), and the mass one unit of spores costs. */
-export const BODY = { start: 4, growth: 0.03, sporeMass: 1 };
+/**
+ * The mycelium at its landing: the mass it starts with, how fast it grows (per second, logistic), the mass one unit of spores
+ * stands for (it sets how many spores a share of the mass makes), and the mass one unit of spores costs to make (`sporeCost`,
+ * ja-a2no: 1, as `sporeMass`, until the owner chooses a cheaper spore; a lab override sets it, docs/energy.md §7), and the most mass
+ * the free term pays out over a game (`freeBudget`, ja-a2no: no limit; a lab override stands in for a start reserve).
+ */
+export const BODY = { start: 4, growth: 0.03, sporeMass: 1, sporeCost: 1, freeBudget: Infinity };
 
 /** Mutations per unit of new fungus (its growth on the ground and in hosts). */
 export const MUTATION = 0.25;
@@ -375,6 +380,13 @@ export class Evolution {
   spentFree = 0;
   /** mutations a second, averaged over the last RATE_TAU seconds: what the panel shows */
   rate = 0;
+  /**
+   * Where the mass came from and where it went, over the game (ja-a2no.2, docs/energy.md §6): counts for the assays, not saved,
+   * so the save and the goldens are as they were. `free` is the logistic term, `corpse` what `feed` took in, `light` what light
+   * added to the mutations (no mass); `spores` is the mass paid out as spores net of what came back, `cut` hypha lost to digging
+   * and in transit, `knot` mass stored in knots.
+   */
+  readonly ledger = { free: 0, corpse: 0, light: 0, spores: 0, cut: 0, knot: 0 };
   readonly #levels: Record<string, number>;
 
   constructor(strain: number) {
@@ -452,30 +464,46 @@ export class Evolution {
   grow(dt: number): number {
     if (this.patches === 0) return 0;
     const t = this.traits();
-    const grown = Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt);
+    const grown = Math.min(
+      Math.max(0, BODY.growth * this.mass * (1 - this.mass / (t.capacity * this.patches)) * dt),
+      Math.max(0, BODY.freeBudget - this.ledger.free),
+    );
     this.mass += grown;
     this.growth += grown;
     this.ground += grown;
+    this.ledger.free += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
-    this.mass -= spores * BODY.sporeMass;
+    this.mass -= spores * BODY.sporeCost;
+    this.ledger.spores += spores * BODY.sporeCost;
     return spores;
   }
 
   /** Spores its patch could not hold go back into the mycelium's mass. */
   refund(spores: number): void {
-    this.mass += spores * BODY.sporeMass;
+    this.mass += spores * BODY.sporeCost;
+    this.ledger.spores -= spores * BODY.sporeCost;
   }
 
   /** Hypha cut and lost (ja-2bw.4: ants digging through it): the mass it held is gone. */
-  lose(mass: number): void {
+  lose(mass: number, to: "cut" | "knot" = "cut"): void {
+    const before = this.mass;
     this.mass = Math.max(0, this.mass - mass);
+    this.ledger[to] += before - this.mass;
   }
 
   /** A corpse it grows out of (ja-2bw.7): the cadaver's substance joins the mycelium, as new fungus that counts toward mutations. */
   feed(mass: number): void {
+    this.ledger.corpse += mass;
     this.mass += mass;
     this.growth += mass;
     this.ground += mass;
+  }
+
+  /** Growth from light (a lichen's alga, PRD §90 L2): it counts toward the free pool's mutations, but adds no mass. */
+  light(growth: number): void {
+    this.ledger.light += growth;
+    this.growth += growth;
+    this.ground += growth;
   }
 
   /** Fungus grown in hosts (load passed on by contact): it counts toward mutations. */

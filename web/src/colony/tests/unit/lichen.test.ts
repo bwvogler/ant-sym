@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Evolution, canKeep, pathTo } from "../../evolution.ts";
+import { Evolution, MUTATION, canKeep, pathTo } from "../../evolution.ts";
 import { cellKey, nx, ny } from "../../hex.ts";
 import { algaAt, Lichen, LICHEN } from "../../lichen.ts";
 import { generateWorld, ROCK, rockAt, type WorldMap } from "../../world.ts";
@@ -116,4 +116,13 @@ test("a fungus holds no more than LICHEN.cap lichen cells: contact and the rim a
   const before = l.cells.size;
   l.step(map, LICHEN.every * 3);
   assert.equal(l.cells.size, before, "the rim at the cap");
+});
+
+test("light income: growth from light fills the free pool, adds no mass and none to the ants' pool (L2, ja-vlla.11.4)", () => {
+  const e = new Evolution(0);
+  const [mass, ants, free] = [e.mass, e.pools.ants, e.pools.free];
+  e.light(100);
+  assert.equal(e.mass, mass, "no mass");
+  assert.equal(e.pools.ants, ants, "the ants' pool is untouched");
+  assert.ok(Math.abs(e.pools.free - (free + MUTATION * 100)) < 1e-9, "the free pool earns MUTATION a unit");
 });

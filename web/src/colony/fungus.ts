@@ -47,7 +47,7 @@ import {
   stepRound,
   TIP_STEP,
 } from "./hyphae.ts";
-import { Lichen } from "./lichen.ts";
+import { Lichen, LICHEN } from "./lichen.ts";
 
 // The fungus, pure: the player. It is spores on the ground and load inside ants
 // (docs/fungus-policy.md), and in the game a mycelium where it landed, which
@@ -1400,10 +1400,10 @@ export class Fungus {
         budget.tips += p.flow
           ? h.resprout(g, level) +
             h.sproutKnots(g, knots, { free: Infinity, tips: budget.tips }, level, (m, k) => {
-              e.refund(m / BODY.sporeMass);
+              e.refund(m / BODY.sporeCost);
               h.addLoad(k, m);
             })
-          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeMass));
+          : h.resprout(g, level, budget) + h.sproutKnots(g, knots, budget, level, (m) => e.refund(m / BODY.sporeCost));
       stepRound(maps, level, budget, this.growthPolicy);
       this.#settle();
       stepped = true;
@@ -1416,6 +1416,7 @@ export class Fungus {
         const base = (this.#layers[0] as SporeLayer).base[0];
         if (stepped) lichen.touch(this.map, plane.parent.keys(), base === undefined ? null : keyCell(base), this.#elapsed);
         lichen.step(this.map, dt);
+        e.light(LICHEN.light * lichen.cells.size * dt);
       }
     }
     this.#elapsed += dt;
@@ -1433,7 +1434,7 @@ export class Fungus {
     if (stepped && knots > 0)
       for (const { h } of maps) {
         const stored = h.harden(knots);
-        if (stored > 0) e.lose(stored);
+        if (stored > 0) e.lose(stored, "knot");
       }
     // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
     if (stepped)
@@ -1478,10 +1479,10 @@ export class Fungus {
         for (let d = 0; d < 6 && !at; d++) if (g.kind(nx(x, y, d), ny(y, d)) === "open") at = [nx(x, y, d), ny(y, d)];
         if (!at) continue;
         const v = L.spores.get(at[0], at[1]);
-        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeMass));
+        const put = Math.max(0, Math.min(knot.store, KNOT.rate * dt, (p.maxSpores - v) * BODY.sporeCost));
         if (put <= 0) continue;
         knot.store -= put;
-        L.spores.set(at[0], at[1], v + put / BODY.sporeMass);
+        L.spores.set(at[0], at[1], v + put / BODY.sporeCost);
         L.sporeStrain.set(at[0], at[1], e.strain);
         L.sporeCells.add(cellKey(at[0], at[1]));
       }
