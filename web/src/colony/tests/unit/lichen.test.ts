@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Evolution, canKeep, pathTo } from "../../evolution.ts";
-import { cellKey } from "../../hex.ts";
+import { cellKey, nx, ny } from "../../hex.ts";
 import { algaAt, Lichen, LICHEN } from "../../lichen.ts";
 import { generateWorld, ROCK, rockAt, type WorldMap } from "../../world.ts";
 
@@ -84,4 +84,36 @@ test("the lichen upgrade is the free pool's and comes only after a borer", () =>
   assert.deepEqual(pathTo({ mycelium: 0, lichen: 0 }, "lichen"), ["mycelium", "lichen"]);
   assert.equal(canKeep({ mycelium: 1, lichen: 0 }, { ants: 0, free: 99 }, "lichen"), true);
   assert.equal(canKeep({ mycelium: 1, lichen: 0 }, { ants: 99, free: 0 }, "lichen"), false, "paid from the free pool only");
+});
+
+const firstFilm = (map: WorldMap): [number, number] => {
+  for (let y = 0; y < map.size.h; y++) for (let x = map.x0; x < map.x0 + map.size.w; x++) if (algaAt(map, x, y) === "film") return [x, y];
+  throw new Error("no film on this map");
+};
+const beside = (map: WorldMap, [x, y]: [number, number]): number => {
+  for (let d = 0; d < 6; d++) if (rockAt(map, nx(x, y, d), ny(y, d)) !== ROCK) return cellKey(nx(x, y, d), ny(y, d));
+  throw new Error("a film has a non-rock neighbour");
+};
+
+test("a film within LICHEN.keepOut of the landing is not taken; one beyond it is", () => {
+  const map = generateWorld(3);
+  const film = firstFilm(map);
+  const hypha = [beside(map, film)];
+  const inside = new Lichen();
+  assert.equal(inside.touch(map, hypha, [film[0] + LICHEN.keepOut - 1, film[1]], 1), 0, "inside the keep-out: none");
+  const outside = new Lichen();
+  assert.ok(outside.touch(map, hypha, [film[0] + LICHEN.keepOut, film[1]], 1) >= 1, "at the keep-out's edge: taken");
+});
+
+test("a fungus holds no more than LICHEN.cap lichen cells: contact and the rim add none past it", () => {
+  const map = generateWorld(3);
+  assert.ok(LICHEN.cap > 0 && LICHEN.cap <= 5000, "the cap is a bound on work, not a number to raise freely");
+  const l = new Lichen();
+  for (let i = 0; i < LICHEN.cap; i++) l.cells.add(cellKey(-1000 - i, -1000));
+  assert.equal(l.touch(map, [beside(map, firstFilm(map))], null, 1), 0, "contact at the cap");
+  const [x, y] = rockCells(map, 1)[0] as [number, number];
+  l.cells.add(cellKey(x, y)); // already over: the rim must not grow it
+  const before = l.cells.size;
+  l.step(map, LICHEN.every * 3);
+  assert.equal(l.cells.size, before, "the rim at the cap");
 });

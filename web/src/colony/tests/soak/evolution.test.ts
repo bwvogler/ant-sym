@@ -454,9 +454,9 @@ test("the fungus's save holds every private field it declares, or the field is d
   } as Record<string, string>;
   // menuSeq counts menu changes for readers caching the menu (ja-d87): a load sets the menu, which bumps it.
   const derived = ["reach", "evade", "listed", "menuSeq"];
-  const scratch = ["made", "nb", "seen", "sporeSpots", "elapsed"];
-  // The lichen (ja-vlla.11.3) is saved as `lichen` only once the fungus has made some, so a game without it saves as it always has (the goldens hash the save).
-  const conditional = ["lichen"];
+  const scratch = ["made", "nb", "seen", "sporeSpots"];
+  // The lichen (ja-vlla.11.3) is saved as `lichen` (with `elapsed` inside it) only once the fungus has kept the upgrade, so a game without it saves as it always has (the goldens hash the save).
+  const conditional = ["lichen", "elapsed"];
   // Each map's spores, base and step grids (ja-lp4.3): layer 0's spore cells and base are saved; its grids are per-step scratch.
   const layered = { layers: ["sporeCells", "base"] } as Record<string, string[]>;
   assert.deepEqual(

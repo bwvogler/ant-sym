@@ -502,7 +502,7 @@ export class Fungus {
         y: number,
       ) => { x: number; y: number; /** the curtain it opens into (default: the first line's) */ layer?: number } | null)
     | null = null;
-  /** seconds the hyphae have grown (counts only once the lichen upgrade is kept, so a game without it saves as it did) */
+  /** seconds the hyphae have grown, counted on every growth step; saved inside the `lichen` record once there is one, and only stamps `Lichen.first` */
   #elapsed = 0;
   /** the corpses lying at (x, y) on map `layer` (the midden's), for a hypha that reaches one; set by the game */
   corpseAt: ((layer: number, x: number, y: number) => number) | null = null;
@@ -1735,7 +1735,6 @@ export class Fungus {
     return [...(this.#corpses[layer] ?? [])].filter(([k, left]) => left > 0 && this.#stalked(layer, k, level)).map(([k]) => k);
   }
 
-  /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
   /** The lichen cells on the plane (cellKey), for the renderer and the assays; empty without any. */
   lichenCells(): ReadonlySet<number> {
     return this.#lichen?.cells ?? new Set();
@@ -1746,6 +1745,7 @@ export class Fungus {
     return this.#lichen?.first ?? null;
   }
 
+  /** Map `layer`'s corpses the fungus has grown out of, and the free spores each still has (the renderer, the tests). */
   corpsesOn(layer: number): ReadonlyMap<number, number> {
     return this.#corpses[layer] ?? new Map();
   }
@@ -2046,7 +2046,7 @@ export class Fungus {
       // Only once a flower has become a patch: a game with none saves as it always has (the goldens hash the save).
       ...(this.flowers ? { flowers: this.flowers } : {}),
       ...(this.spread ? { spread: this.spread } : {}),
-      ...(this.#lichen ? { lichen: this.#lichen.save() } : {}),
+      ...(this.#lichen ? { lichen: { ...this.#lichen.save(), elapsed: this.#elapsed } } : {}),
       base: [...L.base],
       hyphae: this.#hyphae.map((h) => h?.save() ?? null),
       corpses: this.#corpses.map((m) => [...m]),
@@ -2082,6 +2082,7 @@ export class Fungus {
     this.flowers = (r.flowers as number | undefined) ?? 0;
     this.spread = (r.spread as number | undefined) ?? 0;
     this.#lichen = r.lichen ? Lichen.load(r.lichen as ReturnType<Lichen["save"]>) : null;
+    this.#elapsed = (r.lichen as { elapsed?: number } | undefined)?.elapsed ?? 0;
     const layers = r.layers as Record<string, unknown>[] | undefined;
     if (layers) {
       if (layers.length !== this.#layers.length - 1)

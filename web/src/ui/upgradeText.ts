@@ -66,7 +66,7 @@ const WHY: Record<string, string> = {
   weapon:
     "Lethal, and off until you turn it on. Two keys: putting it on the menu is your permission, and this upgrade is the fungus's power to use it. Without both a host runs as is, so no power comes free.",
   lichen:
-    "A free-pool upgrade, after the borer. Scarce alga films lie on rock beside open ground, and a few wild lichens. A hypha that reaches one takes the alga: its rock cell becomes lichen, which then spreads over the rock from its rim. Ants can't cut lichen on rock. Not built yet: what lichen gives (light, soil from rock) comes in later steps.",
+    "A free-pool upgrade, after the borer. Scarce alga films lie on rock beside open ground, and a few wild lichens. A hypha that reaches one takes the alga: its rock cell becomes lichen, which then spreads over the rock from its rim. Not built yet: what lichen gives (light, soil from rock) comes in later steps.",
   crown:
     "Lethal, and off until you turn it on. Two keys: putting it on the menu is your permission, and this upgrade is the fungus's power to use it. Without both a host runs as is. Only where there is a nest.",
 };
