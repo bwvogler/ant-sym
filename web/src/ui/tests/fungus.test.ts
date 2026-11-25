@@ -139,7 +139,7 @@ function field(o: Setup = {}) {
     hyphaeOn: (l: number) => (l === lv ? h : null),
     stalksOn: (l: number) => (l === lv ? (o.stalks ?? []) : []),
     corpsesOn: (l: number) => (l === lv ? (o.corpses ?? new Map<number, number>()) : new Map<number, number>()),
-    evolution: { level: () => o.level ?? 0 },
+    evolution: { level: (id: string) => (id === "lichen" ? 0 : (o.level ?? 0)) },
   } as unknown as Fungus;
   const colonies = [
     { time: 100, home: 0, corpses: (o.cadavers ?? []).map((c) => ({ ...c, held: -1, died: 99 })), remains: [] },

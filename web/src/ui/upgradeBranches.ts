@@ -6,7 +6,7 @@ import { upgrade, UPGRADES } from "../colony/index.ts";
 /** The drawer's branches, in the order drawn: every upgrade is in one (a test pins it). */
 export const BRANCHES: readonly { name: string; ids: readonly string[] }[] = [
   { name: "Body", ids: ["infectivity", "persistence", "evasion"] },
-  { name: "Mycelium and spores", ids: ["mycelium", "knots", "fruiting", "stalks"] },
+  { name: "Mycelium and spores", ids: ["mycelium", "lichen", "knots", "fruiting", "stalks"] },
   { name: "Reach", ids: ["stealth", "recognition", "trails", "senses", "royal"] },
   { name: "Lethal", ids: ["weapon", "crown"] },
 ];

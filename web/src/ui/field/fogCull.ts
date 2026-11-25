@@ -1,4 +1,5 @@
-import { OPEN, PLANE, R, rockAt, SIDE } from "../../colony/index.ts";
+import { OPEN, PLANE, R, SIDE } from "../../colony/index.ts";
+import { seenCell, seenRock } from "../groundPeek.ts";
 import { type FogState, LIVE, REMEMBERED, UNKNOWN } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
@@ -40,7 +41,13 @@ export function dimPx(px: Uint8ClampedArray, o: number, fogPx: readonly number[]
 export function planeGround(k: FieldCtx, qx: number, qy: number): { state: FogState; rock: number; food: number; spoil: number } {
   const plane = k.world.plane;
   const fog = k.fog;
-  if (!fog) return { state: LIVE, rock: rockAt(plane, qx, qy), food: plane.food.get(qx, qy), spoil: plane.spoil?.get(qx, qy) ?? 0 };
+  if (!fog)
+    return {
+      state: LIVE,
+      rock: seenRock(plane, qx, qy),
+      food: seenCell(plane, plane.food, qx, qy),
+      spoil: plane.spoil ? seenCell(plane, plane.spoil, qx, qy) : 0,
+    };
   const state = fog.state(PLANE, qx, qy);
   if (state === UNKNOWN) return { state, rock: OPEN, food: 0, spoil: 0 };
   return {
