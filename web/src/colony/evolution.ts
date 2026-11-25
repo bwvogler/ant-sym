@@ -375,6 +375,13 @@ export class Evolution {
   spentFree = 0;
   /** mutations a second, averaged over the last RATE_TAU seconds: what the panel shows */
   rate = 0;
+  /**
+   * Where the mass came from and where it went, over the game (ja-a2no.2, docs/energy.md §6): counts for the assays, not saved,
+   * so the save and the goldens are as they were. `free` is the logistic term, `corpse` what `feed` took in, `light` what light
+   * added to the mutations (no mass); `spores` is the mass paid out as spores net of what came back, `cut` hypha lost to digging
+   * and in transit, `knot` mass stored in knots.
+   */
+  readonly ledger = { free: 0, corpse: 0, light: 0, spores: 0, cut: 0, knot: 0 };
   readonly #levels: Record<string, number>;
 
   constructor(strain: number) {
@@ -456,23 +463,29 @@ export class Evolution {
     this.mass += grown;
     this.growth += grown;
     this.ground += grown;
+    this.ledger.free += grown;
     const spores = (t.spores * this.mass * dt) / BODY.sporeMass;
     this.mass -= spores * BODY.sporeMass;
+    this.ledger.spores += spores * BODY.sporeMass;
     return spores;
   }
 
   /** Spores its patch could not hold go back into the mycelium's mass. */
   refund(spores: number): void {
     this.mass += spores * BODY.sporeMass;
+    this.ledger.spores -= spores * BODY.sporeMass;
   }
 
   /** Hypha cut and lost (ja-2bw.4: ants digging through it): the mass it held is gone. */
-  lose(mass: number): void {
+  lose(mass: number, to: "cut" | "knot" = "cut"): void {
+    const before = this.mass;
     this.mass = Math.max(0, this.mass - mass);
+    this.ledger[to] += before - this.mass;
   }
 
   /** A corpse it grows out of (ja-2bw.7): the cadaver's substance joins the mycelium, as new fungus that counts toward mutations. */
   feed(mass: number): void {
+    this.ledger.corpse += mass;
     this.mass += mass;
     this.growth += mass;
     this.ground += mass;
@@ -480,6 +493,7 @@ export class Evolution {
 
   /** Growth from light (a lichen's alga, PRD §90 L2): it counts toward the free pool's mutations, but adds no mass. */
   light(growth: number): void {
+    this.ledger.light += growth;
     this.growth += growth;
     this.ground += growth;
   }

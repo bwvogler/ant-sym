@@ -60,6 +60,10 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      ledger:
+        description: "Also print each seed's energy ledger at 2, 5 and 10 minutes and the end: mass made by source and spent by sink, and what the mycelium holds (--ledger, ja-a2no.2; reads only)"
+        type: boolean
+        default: false
       split:
         description: "Report where each seed's growth was made: the mycelium on the ground, corpses and hosts (--split, PRD §85 M3)"
         type: boolean
@@ -99,6 +103,7 @@ jobs:
           ORDER: ${{ inputs.order }}
           LIGHT: ${{ inputs.light }}
           SPLIT: ${{ inputs.split }}
+          LEDGER: ${{ inputs.ledger }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -127,6 +132,7 @@ jobs:
           [ -n "$ORDER" ] && args="$args --order $ORDER"
           [ -n "$LIGHT" ] && args="$args --light $LIGHT"
           [ "$SPLIT" = "true" ] && args="$args --split"
+          [ "$LEDGER" = "true" ] && args="$args --ledger"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
@@ -228,4 +234,10 @@ jobs:
         run: |
           if grep -q '^  growth made' out/seed-*.txt; then
             { echo; echo 'Growth made, by where (ground = the mycelium growing on its own, corpses = fed in, hosts = made in ants):'; echo '```'; grep -H '^  growth made' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --ledger's lines (four a seed): the energy ledger (ja-a2no.2, docs/energy.md).
+      - name: energy ledger
+        run: |
+          if grep -q '^  ledger @' out/seed-*.txt; then
+            { echo; echo 'Energy ledger (mass made by source, spent by sink, and held):'; echo '```'; grep -H '^  ledger @' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi

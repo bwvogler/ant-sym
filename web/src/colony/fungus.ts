@@ -1434,7 +1434,7 @@ export class Fungus {
     if (stepped && knots > 0)
       for (const { h } of maps) {
         const stored = h.harden(knots);
-        if (stored > 0) e.lose(stored);
+        if (stored > 0) e.lose(stored, "knot");
       }
     // Hypha the ants have dug through is cut, and the mass it held is lost (ja-2bw.4: the colonies' counterplay).
     if (stepped)
