@@ -678,7 +678,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "energy",
     title: "Where the fungus gets its energy",
     covers:
-      "A plan for a hungry fungus: in soil it mostly waits as spores, and the carbon it grows on comes from living roots, from cadavers (a small, finite resource that ants can bury) and, with a partner, from an alga. Carbon becomes mycelium at a yield below one, and starved hyphae are recycled. The game's free growth is to be replaced by growth that must reach a source. Not built.",
+      "A plan for a hungry fungus: in soil it mostly waits as spores, and the carbon it grows on comes from living roots, from cadavers (a small, finite resource that ants can bury) and, with a partner, from an alga. Carbon becomes mycelium at a yield below one, and starved hyphae are recycled. The game's free growth is to be replaced by growth that must reach a source. A first slice (a cheap spore and a landing reserve) is built behind a setting that is off; the rest is planned.",
   },
   {
     note: "builder",

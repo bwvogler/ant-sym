@@ -1,6 +1,6 @@
 # Where the fungus's energy to grow comes from
 
-*Research + design (not built, `ja-a2no`, PRD §93). The question: the game's mycelium makes mass from no source, a logistic curve that settles at a capacity. What does a fungus like this actually grow on, and what should the game's fungus grow on? Searched 2026-11-25 through Europe PMC, PubMed, Crossref and Semantic Scholar; every DOI below was checked against Crossref. **FT** is full text read; **ABS** is abstract only, so its numbers are **unverified**; **NR** is not read (cited from another paper or from memory). Europe PMC returned 502 for part of the session, so some papers could only be read as abstracts.*
+*Research + design (slice 4a built behind `FungusParams.hungry`, off by default; the rest not built, `ja-a2no`, PRD §93). The question: the game's mycelium makes mass from no source, a logistic curve that settles at a capacity. What does a fungus like this actually grow on, and what should the game's fungus grow on? Searched 2026-11-25 through Europe PMC, PubMed, Crossref and Semantic Scholar; every DOI below was checked against Crossref. **FT** is full text read; **ABS** is abstract only, so its numbers are **unverified**; **NR** is not read (cited from another paper or from memory). Europe PMC returned 502 for part of the session, so some papers could only be read as abstracts.*
 
 ## TL;DR
 
@@ -101,7 +101,7 @@ Owner (2026-11-25): **make the free term earn its place.** The fungus is hungry,
 
 ## Open questions
 
-Owner decisions, answered 2026-11-25: **1 → A** (patchy ground, litter as map content); **2 → mostly earned** (the free term retired, a start reserve kept so the first minutes work); **3 → decide after the ledger** (the energy-ledger assay, `ja-a2no.2`, shows how slow a hungry fungus is, and the owner then sets the bar); **5 → hold #425**, with these docs riding in it for now. **4** (plane or curtain, and roots) is not yet asked: the default is the plane only, with no roots.
+Owner decisions, answered 2026-11-25: **1 → A** (patchy ground, litter as map content); **2 → mostly earned** (the free term retired, a start reserve kept so the first minutes work); **3 → P1 by the worst seed against the new main** (no more than 10 % above the not-hungry game's worst, after the ledger showed how a hungry fungus fares; PRD §93); **5 → hold #425** (L2 only); these docs ride in #438. **4** (plane or curtain, and roots) is not yet asked: the default is the plane only, with no roots.
 
 **Later, 2026-11-25:** the owner asked for a cheaper spore (`BODY.sporeCost`); the experiment (PRD §93) shows 0.1 with a small reserve holds P1 and makes the game faster, and the owner said a faster game is fine.
 

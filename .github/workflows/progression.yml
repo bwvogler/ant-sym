@@ -65,13 +65,13 @@ on:
         type: boolean
         default: false
       earnedshare:
-        description: "The free pool's share of earned mass when hungry (--earned-share, PRD §93): lab override; empty: EARNED.share"
+        description: "The free pool's share of earned mass when hungry (--earned-share, PRD §93): lab override; only with hungry; empty: EARNED.share"
         default: ""
       sporecost:
-        description: "The mass a spore costs (--spore-cost, ja-a2no): lab override; empty: the game's 1"
+        description: "The mass a spore costs (--spore-cost, ja-a2no): lab override of the not-hungry game; ignored with hungry (EARNED applies); empty: the game's 1"
         default: ""
       freebudget:
-        description: "The most mass the free term pays out in a game (--free-budget, ja-a2no): lab override, a stand-in for a start reserve; empty: no limit"
+        description: "The most mass the free term pays out in a game (--free-budget, ja-a2no): lab override of the not-hungry game, a stand-in for a start reserve; ignored with hungry (EARNED applies); empty: no limit"
         default: ""
       ledger:
         description: "Also print each seed's energy ledger at 2, 5 and 10 minutes and the end: mass made by source and spent by sink, and what the mycelium holds (--ledger, ja-a2no.2; reads only)"
