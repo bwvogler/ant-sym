@@ -1,6 +1,7 @@
 import { SAVE_VERSION, SPECIES, type GameSave } from "../colony/index.ts";
 import type { FogSave } from "./fog/sources.ts";
 import type { DoctrineChoice } from "./useColonyJev.ts";
+import type { WorldKind } from "./worldKind.ts";
 
 // Saved games (the fungus game, ja-lo8.6): a game is long (queen births are rare: PRD §50), so it is kept between
 // sittings. A record is the game's own save (Game.save) plus what the page needs to build the same game again (its
@@ -16,6 +17,8 @@ export interface GameSettings {
   antCount: number;
   rival: boolean;
   generation: number;
+  /** which world the game is on (PRD §66 E6): absent in a save from before the endless world, which is bounded (`worldOf`, worldKind.ts); `buildGame` reads absent as bounded too */
+  world?: WorldKind;
 }
 
 /** The player's side of the game: the fungus's policy, and the colonies' doctrines as they stand. */
