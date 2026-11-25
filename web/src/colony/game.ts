@@ -1012,17 +1012,23 @@ export class Game {
     return { x: centreX(h.px, h.py) + FLIGHT_2D * Math.cos(a), y: centreY(h.py) + FLIGHT_2D * Math.sin(a) };
   }
 
+  /** How many colonies a map holds: MAX_COLONIES on a bounded map (the page's names, PRD §50), none on an endless plane, where the awake cap bounds the cost (`ja-y4eg`; a woken site never had the limit). */
+  get colonyLimit(): number {
+    return isEndless(this.map) ? Infinity : MAX_COLONIES;
+  }
+
   /**
    * Found flight f's colony with its queen landed at (x, y) (default: landing()): a daughter of its mother (addColony
-   * with `mother`). Returns the new colony's index, or −1 when she is lost: no room, MAX_COLONIES already, or f is not
+   * with `mother`). Returns the new colony's index, or −1 when she is lost: no room, `colonyLimit` colonies already (MAX_COLONIES on a bounded map), or f is not
    * a pending flight (already founded or lost: PR #47 review, S2).
    */
   found(f: Flight, at: { x: number; y: number } | null = this.landing(f.mother)): number {
     if (!this.flights.includes(f)) return -1;
     this.#dropFlight(f);
     const mother = this.colonies[f.mother];
-    if (!at || !mother || this.colonies.length >= MAX_COLONIES) {
-      this.#lost(f, this.colonies.length >= MAX_COLONIES ? `${MAX_COLONIES} colonies already` : "no room to land within her flight");
+    const limit = this.colonyLimit;
+    if (!at || !mother || this.colonies.length >= limit) {
+      this.#lost(f, this.colonies.length >= limit ? `${limit} colonies already` : "no room to land within her flight");
       return -1;
     }
     // No room for her hole after all (nowhere the founding rule allows within FOUND_RADIUS): she is lost, and the game says why.
