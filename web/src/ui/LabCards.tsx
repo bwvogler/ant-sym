@@ -76,7 +76,7 @@ function Card({ label, title, children, wide = false }: { label: string; title: 
   );
 }
 
-export function Colonies({ known = null }: { known?: KnownColonies<SideStats> | null }) {
+export function Colonies({ known }: { known: KnownColonies<SideStats> | null }) {
   const stats = useStats(wholeStats);
   // Under the fog the world's food total is not the fungus's to know: the card shows what is stored and no total or share (fog/knownView.ts foodView).
   const food = stats ? foodView(stats, known) : null;

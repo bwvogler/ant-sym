@@ -94,7 +94,14 @@ export const clampLine = (line: number, lines: number): number => Math.max(0, Ma
  * Restart, New world and Start do (owner, 2026-11-25, `ja-bof4`). The Lab's seed, ants-per-colony and rival controls were new games that kept a stale line.
  */
 export const NEW_GAME_KEYS = ["seed", "antCount", "rival", "species", "world"] as const;
-export const startsNewGame = (patch: Partial<ColonyControls>): boolean => NEW_GAME_KEYS.some((k) => k in patch);
+export const startsNewGame = (c: ColonyControls, patch: Partial<ColonyControls>): boolean =>
+  NEW_GAME_KEYS.some((k) => patch[k] !== undefined && patch[k] !== c[k]);
+
+/** The controls after a patch: a patch that changes what makes a different game (`startsNewGame`) begins on line 0, and the patch's own values win (a patch may set `line`). */
+export const applyPatch = (c: ColonyControls, patch: Partial<ColonyControls>): ColonyControls => ({
+  ...(startsNewGame(c, patch) ? freshGame(c) : c),
+  ...patch,
+});
 
 /**
  * The controls that show layer `view`: the plane is the "above" view; a line's curtain is the "below" view of that line (a picked line, E5.6). A layer
@@ -312,10 +319,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     frameListeners.current.add(fn);
     return () => void frameListeners.current.delete(fn);
   }, []);
-  const update = useCallback(
-    (patch: Partial<ColonyControls>) => setControls((c) => ({ ...(startsNewGame(patch) ? freshGame(c) : c), ...patch })),
-    [],
-  );
+  const update = useCallback((patch: Partial<ColonyControls>) => setControls((c) => applyPatch(c, patch)), []);
   const restart = useCallback(() => {
     setGeneration((g) => g + 1);
     setControls(freshGame);
