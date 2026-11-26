@@ -21,7 +21,7 @@ import {
   SPORE_SHOWN,
 } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
-import { chunkOf, peekCell, seenCell, seenRock } from "../groundPeek.ts";
+import { chunkOf, peekCell } from "../groundPeek.ts";
 import { SENSED_FADE, sightOf } from "../fungusSight.ts";
 import { moundBalls, type DirtBall } from "../inspectionMound.ts";
 import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "../inspectionGround.ts";
@@ -127,6 +127,7 @@ export class Ground {
   /** per frame, under the fog: each cell in view's colour (-1: none) and whether a strip shows it (drawHexes) */
   private keys = new Int32Array(0);
   private plains = new Uint8Array(0);
+  private readonly stripInputs = new Float64Array(CHUNK * 4);
   private readonly env: FieldEnv;
   constructor(env: FieldEnv) {
     this.env = env;
@@ -225,9 +226,29 @@ export class Ground {
     }
   }
 
+  /** The plane values that determine this chunk's strip, including the visibility of each column. */
+  private readStrip(k: FieldCtx, x0: number): Float64Array {
+    const line = lineOfLayer(k.world, k.lv);
+    const inputs = this.stripInputs;
+    inputs.fill(0);
+    for (let x = 0; x < CHUNK; x++) {
+      const i = x * 4;
+      if (!cellAt(line, x0 + x)) {
+        inputs[i] = -1;
+        continue;
+      }
+      const { state, rock, food, spoil } = planeGround(k, CELL[0], CELL[1]);
+      inputs[i] = state;
+      inputs[i + 1] = rock;
+      inputs[i + 2] = food;
+      inputs[i + 3] = spoil;
+    }
+    return inputs;
+  }
+
   /** Paint chunk colours: rock/soil, trails, and legacy food washes unless aerial sprites will show the food. */
   paintChunk(k: FieldCtx, show: GroundShow, cx: number, cy: number, c: ChunkCanvas, rc: Uint8Array, foodAsSprites: boolean): void {
-    const { theme, m, world, smellAll, strip } = k;
+    const { theme, m, smellAll } = k;
     const [gx0, gw, gh] = [m.x0, m.size.w, m.size.h];
     // An endless plane's rows run from -gh/2 (camera.ts reachOf), not from 0, and its layers are read with `peek` (no chunk is made to be painted).
     const endless = m.endless === true;
@@ -291,39 +312,39 @@ export class Ground {
     const px = c.img.data;
     const x0 = cx * CHUNK;
     const y0 = cy * CHUNK;
-    // The strip also depends on projected plane cells; keep its existing live repaint path.
-    if (!(strip && world && cy === STRIP >> 6)) {
-      const tag = JSON.stringify([
-        foodAsSprites,
-        !!fog,
-        show.food,
-        show.home,
-        smellAll,
-        gx0,
-        gw,
-        gh,
-        // The clock matters only where it scales a scent (a trail or alarm here) or decides the fog's live ground: a chunk with neither does not repaint as time passes.
-        sensedC && !smellAll && (fog || trailC.length > 0 || alarmC.length > 0) ? now : 0,
-        chambers?.list.map((ch) => ch.role),
-        trailC.map((t) => t.tone),
-      ]);
-      if (
-        !this.tiles.needsPaint(c, tag, [
-          rc,
-          fc,
-          qc,
-          fogV?.bits,
-          sensedC,
-          sporeC,
-          spoilC,
-          chamberC,
-          ...trailC.flatMap((t) => [t.food, t.home]),
-          ...alarmC,
-        ])
-      ) {
-        this.hits++;
-        return;
-      }
+    // Read the projected plane once per column, so the strip can share the exact tile cache.
+    const projected = stripChunk ? this.readStrip(k, x0) : undefined;
+    const tag = JSON.stringify([
+      foodAsSprites,
+      !!fog,
+      show.food,
+      show.home,
+      smellAll,
+      gx0,
+      gw,
+      gh,
+      // The clock matters only where it scales a scent (a trail or alarm here) or decides the fog's live ground: a chunk with neither does not repaint as time passes.
+      sensedC && !smellAll && (fog || trailC.length > 0 || alarmC.length > 0) ? now : 0,
+      chambers?.list.map((ch) => ch.role),
+      trailC.map((t) => t.tone),
+    ]);
+    if (
+      !this.tiles.needsPaint(c, tag, [
+        rc,
+        fc,
+        qc,
+        fogV?.bits,
+        sensedC,
+        sporeC,
+        spoilC,
+        chamberC,
+        projected,
+        ...trailC.flatMap((t) => [t.food, t.home]),
+        ...alarmC,
+      ])
+    ) {
+      this.hits++;
+      return;
     }
     this.paints++;
     c.version++;
@@ -432,23 +453,20 @@ export class Ground {
     }
     // One world's side view: the strip and the mound's cut over it, drawn from the plane under the line (the curtain
     // stores neither: one-world §8 item 6). A chunk's width of columns, each the strip and its cut's height.
-    if (strip && cy === STRIP >> 6) {
-      const line = lineOfLayer(world, k.lv);
-      const plane = world.plane;
+    if (projected) {
       const ly = STRIP - y0;
+      const fogPx = fogRgb(theme);
       for (let lx = 0; lx < CHUNK; lx++) {
-        if (!cellAt(line, x0 + lx)) continue;
-        const qx = CELL[0];
-        const qy = CELL[1];
+        const i = lx * 4;
+        const state = projected[i]!;
+        if (state < 0) continue;
         let o = (ly * CHUNK + lx) * 4;
-        // Under the fog the strip is the plane as last sensed there: fog where nothing was, dimmed where nobody senses it now.
-        const pg = fog ? planeGround(k, qx, qy) : null;
-        const food = pg ? pg.food : seenCell(plane, plane.food, qx, qy);
-        if (pg?.state === UNKNOWN) {
-          setPx(px, o, fogRgb(theme), 255);
+        if (state === UNKNOWN) {
+          setPx(px, o, fogPx, 255);
           continue;
         }
-        if ((pg ? pg.rock : seenRock(plane, qx, qy)) !== OPEN) {
+        const food = projected[i + 2]!;
+        if (projected[i + 1] !== OPEN) {
           px[o] = theme.rock[0];
           px[o + 1] = theme.rock[1];
           px[o + 2] = theme.rock[2];
@@ -459,16 +477,16 @@ export class Ground {
           px[o + 2] = fb;
           px[o + 3] = 120 + Math.min(135, food * 12);
         } else px[o + 3] = 0; // open ground: the paper, as the side view's walkway
-        const dim = pg !== null && pg.state !== LIVE;
-        if (dim) dimPx(px, o, fogRgb(theme));
-        const cut = Math.min(CUT_MAX, pg ? pg.spoil : plane.spoil ? seenCell(plane, plane.spoil, qx, qy) : 0);
+        const dim = state !== LIVE;
+        if (dim) dimPx(px, o, fogPx);
+        const cut = Math.min(CUT_MAX, projected[i + 3]!);
         for (let up = 1; up <= cut; up++) {
           o = ((ly - up) * CHUNK + lx) * 4;
           px[o] = theme.spoil[0];
           px[o + 1] = theme.spoil[1];
           px[o + 2] = theme.spoil[2];
           px[o + 3] = 255;
-          if (dim) dimPx(px, o, fogRgb(theme));
+          if (dim) dimPx(px, o, fogPx);
         }
       }
     }
