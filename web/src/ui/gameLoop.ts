@@ -1,4 +1,6 @@
 import type { Game, Journal } from "../colony/index.ts";
+import { FixedStepClock, MAX_STEP } from "./fixedStepClock.ts";
+import type { SimTasks } from "./simTasks.ts";
 import { decisionsOf, statsOf, type ColonyStats } from "./stats.ts";
 
 // The game's animation loop as a plain class (ja-fnd.6.1, docs/refactor.md S5.1): it steps the game each frame, takes the stats every
@@ -6,8 +8,7 @@ import { decisionsOf, statsOf, type ColonyStats } from "./stats.ts";
 // restarted on every pause and speed change; now playing and speed are set on the loop, which goes on. No React in here: the frame
 // source is injected, so the tests drive it by hand and the page gives it requestAnimationFrame.
 
-/** Longest single sim step: sensing a trail 3 cells ahead needs steps well under a cell. */
-export const MAX_STEP = 1 / 30;
+export { MAX_STEP };
 /** Longest wall time one frame counts: a tab that was hidden doesn't leap ahead. */
 const MAX_FRAME = 0.05;
 /** Stop catching up after this much simulation work so input and rendering get a turn. */
@@ -36,6 +37,8 @@ export interface LoopOptions {
   /** called after every frame (the renderer, the sight map, the history), in order of subscription; the page shares one set across games */
   frame?: Set<() => void>;
   env?: FrameEnv;
+  /** When supplied, simulation steps run in their own tasks and frames only present the game. */
+  simTasks?: SimTasks;
   /** the loop of the game before, when the page builds a new game: its stats and frame count stay on show until this one's first frame (as they did when they were React state) */
   carry?: GameLoop;
 }
@@ -48,6 +51,10 @@ export class GameLoop {
   #frame: Set<() => void>;
   #playing: boolean;
   #speed: number;
+  #simTasks: SimTasks | undefined;
+  #simClock: FixedStepClock | undefined;
+  #cancelSim: (() => void) | undefined;
+  #visible = true;
   #raf = 0;
   #running = false;
   #stats: ColonyStats | null = null;
@@ -71,6 +78,8 @@ export class GameLoop {
     this.#frame = o.frame ?? new Set();
     this.#playing = o.playing;
     this.#speed = o.speed;
+    this.#simTasks = o.simTasks;
+    if (o.simTasks) this.#simClock = new FixedStepClock(o.speed);
     if (o.carry) {
       this.#stats = o.carry.stats();
       this.#fps = o.carry.fps();
@@ -109,6 +118,14 @@ export class GameLoop {
     this.#playing = playing;
     this.#speed = speed;
     this.#restartWindows(this.#env.now());
+    this.#resetSim();
+  }
+
+  /** Hidden wall time is discarded by the independent clock. */
+  setVisible(visible: boolean): void {
+    if (visible === this.#visible) return;
+    this.#visible = visible;
+    this.#resetSim();
   }
 
   start(): void {
@@ -118,12 +135,53 @@ export class GameLoop {
     this.#last = t;
     this.#restartWindows(t);
     this.#raf = this.#env.request(this.#loop);
+    this.#resetSim();
   }
 
   stop(): void {
     if (!this.#running) return;
     this.#running = false;
     this.#env.cancel(this.#raf);
+    this.#resetSim();
+  }
+
+  #canRunSim(): boolean {
+    return this.#running && this.#playing && this.#visible && this.#speed > 0;
+  }
+
+  #resetSim(): void {
+    const clock = this.#simClock;
+    if (!clock) return;
+    this.#cancelSim?.();
+    this.#cancelSim = undefined;
+    clock.speed = this.#speed;
+    clock.reset(this.#env.now());
+    if (this.#canRunSim()) this.#cancelSim = this.#simTasks?.((MAX_STEP * 1000) / clock.speed, this.#pumpSim);
+  }
+
+  #pumpSim = (): void => {
+    this.#cancelSim = undefined;
+    const clock = this.#simClock;
+    if (!clock || !this.#canRunSim()) return;
+    const delay = clock.pump(
+      this.#env.now(),
+      () => {
+        this.advance(MAX_STEP);
+        this.#pauseForFlight();
+        return this.#canRunSim() && !this.#cancelSim;
+      },
+      () => this.#env.now(),
+    );
+    if (this.#canRunSim() && !this.#cancelSim) this.#cancelSim = this.#simTasks?.(delay, this.#pumpSim);
+  };
+
+  /** A new queen has flown: the game waits for the page to found her. */
+  #pauseForFlight(): boolean {
+    if (!this.game.flights.length) return false;
+    this.#onFlight();
+    this.#playing = false;
+    this.#lastStats = 0;
+    return true;
   }
 
   /** Every measure over a window starts now: the pace begins at the speed asked (0 paused), the rate at 0, the frame count at 0. */
@@ -146,7 +204,7 @@ export class GameLoop {
     // Clamped both ways: a first frame stamped before `last` would step the sim backwards (negative trail).
     const dt = Math.max(0, Math.min(MAX_FRAME, (t - this.#last) / 1000));
     this.#last = t;
-    if (this.#playing) {
+    if (this.#playing && !this.#simClock) {
       const total = dt * this.#speed;
       const steps = Math.max(1, Math.ceil(total / MAX_STEP));
       const deadline = this.#env.now() + SIM_BUDGET_MS;
@@ -154,13 +212,7 @@ export class GameLoop {
         // Always make progress. Drop overdue steps so slow frames do not build up a backlog.
         if (k > 0 && this.#env.now() >= deadline) break;
         this.advance(total / steps);
-        // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
-        if (game.flights.length) {
-          this.#onFlight();
-          this.#playing = false;
-          this.#lastStats = 0;
-          break;
-        }
+        if (this.#pauseForFlight()) break;
       }
     }
     if (t - this.#paceAt.wall >= 1000) {

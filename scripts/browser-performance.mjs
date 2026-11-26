@@ -2,6 +2,7 @@
 // Usage: node scripts/browser-performance.mjs <baseline-web> <candidate-web> [seconds-per-sample=4]
 // Requires Playwright with Chromium and installed web dependencies in both checkouts. Uses the keyless dev server for the game metrics.
 // PERF_RESULTS optionally names a JSON output file. PERF_SEEDS optionally overrides the comma-separated seeds (default 1,7).
+// PERF_CLOCK_ONLY=1 runs only the paired full-game clock comparison on the candidate checkout.
 import assert from "node:assert/strict";
 import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -19,6 +20,7 @@ assert.ok(
   seeds.every((seed) => Number.isSafeInteger(seed) && seed > 0),
   "Seeds must be positive integers",
 );
+const clockOnly = process.env.PERF_CLOCK_ONLY === "1";
 const web = { base: resolve(baselinePath), candidate: resolve(candidatePath) };
 const { chromium, devices } = createRequire(import.meta.url)("playwright");
 const { defaultBrowserType: _engine, ...phone } = devices["Pixel 6 Pro"];
@@ -76,16 +78,19 @@ async function gesture(cdp, page, zoom) {
   await send("touchEnd", []);
 }
 
-async function sample(page, isTrial) {
+async function sample(page, isTrial, view) {
   const cdp = await page.context().newCDPSession(page);
   try {
     const read = page.evaluate(
-      ({ duration, isTrial }) =>
+      ({ duration, isTrial, view }) =>
         new Promise((resolve) => {
-          const game = isTrial ? undefined : Reflect.get(window, "jevAnts")?.game;
+          const dev = isTrial ? undefined : Reflect.get(window, "jevAnts");
+          const game = dev?.game;
           const readTime = () => game?.time ?? Number(document.querySelector("output[data-sim-time]")?.getAttribute("data-sim-time"));
           const ticks = [];
           const tick = game?.tick;
+          const currentCamera = dev?.camera(view, dev.line());
+          const camera = currentCamera ? { ...currentCamera } : undefined;
           if (game && tick) {
             game.tick = function (step) {
               const start = performance.now();
@@ -116,6 +121,7 @@ async function sample(page, isTrial) {
             if (game && tick) game.tick = tick;
             resolve({
               pace: ((readTime() - sim) * 1000) / elapsed,
+              camera,
               frames: gaps.length,
               frameP95: percentile(gaps, 0.95),
               tickMean: ticks.length ? ticks.reduce((sum, tick) => sum + tick, 0) / ticks.length : null,
@@ -124,7 +130,7 @@ async function sample(page, isTrial) {
           }
           requestAnimationFrame(frame);
         }),
-      { duration: seconds * 1000, isTrial },
+      { duration: seconds * 1000, isTrial, view },
     );
     await page.waitForTimeout(500);
     await gesture(cdp, page, true);
@@ -143,15 +149,19 @@ async function scenario(browser, server, revision, seed, worker, view, options =
     page.on("pageerror", (error) => errors.push(error.message));
     await openGame(page, server.url, seed, worker, options);
     if (view === "below") await page.getByRole("button", { name: "below", exact: true }).tap();
+    if (options.clock) {
+      const populations = await page.evaluate(() => Reflect.get(window, "jevAnts")?.game.colonies.map((colony) => colony.params.antCount));
+      assert.deepEqual(populations, [600, 600], "both colonies use the full starting population");
+    }
     // Let the trial HUD settle after the pause before taking its first timestamp.
     await page.waitForTimeout(1200);
-    const paused = await sample(page, worker !== null);
+    const paused = await sample(page, worker !== null, view);
     assert.equal(paused.pace, 0, "The game stayed paused");
     await page.locator("canvas").first().focus();
     await page.keyboard.press("0");
     await page.getByRole("button", { name: "Play", exact: true }).tap();
     await page.waitForTimeout(1200);
-    const playing = await sample(page, worker !== null);
+    const playing = await sample(page, worker !== null, view);
     assert.ok(playing.pace > 0, "The game advanced");
     assert.deepEqual(errors, [], "The browser reported no errors");
     return { revision, seed, view, paused, playing };
@@ -164,25 +174,39 @@ const results = [];
 const browser = await chromium.launch();
 const servers = [];
 try {
-  for (const root of [web.base, web.candidate]) servers.push(await startDevServer(root));
-  // Alternate which revision goes first on successive seeds to reduce run-order effects.
+  if (!clockOnly) servers[0] = await startDevServer(web.base);
+  servers[1] = await startDevServer(web.candidate);
+  if (!clockOnly) {
+    // Alternate which revision goes first on successive seeds to reduce run-order effects.
+    for (let i = 0; i < seeds.length; i++) {
+      const view = i % 2 === 0 ? "above" : "below";
+      for (const which of i % 2 === 0 ? [0, 1] : [1, 0]) {
+        results.push(await scenario(browser, servers[which], which === 0 ? "base" : "PR", seeds[i], null, view));
+      }
+    }
+    if (existsSync(join(web.candidate, "src/ui/playbackOptions.ts"))) {
+      results.push(await scenario(browser, servers[1], "PR, 300 ants per colony", seeds[0], null, "above", { ants: 300 }));
+      results.push(await scenario(browser, servers[1], "PR, 1× canvas resolution", seeds[0], null, "above", { dpr: 1 }));
+    }
+    if (existsSync(join(web.candidate, "src/experiments/MapTrialPage.tsx"))) {
+      for (const worker of [0, 1]) {
+        results.push(await scenario(browser, servers[1], worker ? "Worker trial" : "Main-thread trial", seeds[0], worker, "above"));
+      }
+    }
+  }
   for (let i = 0; i < seeds.length; i++) {
     const view = i % 2 === 0 ? "above" : "below";
-    for (const which of i % 2 === 0 ? [0, 1] : [1, 0]) {
-      results.push(await scenario(browser, servers[which], which === 0 ? "base" : "PR", seeds[i], null, view));
+    const pair = [];
+    for (const clock of i % 2 === 0 ? ["frame", "independent"] : ["independent", "frame"]) {
+      const label = clock === "frame" ? "PR, frame clock" : "PR, independent clock";
+      pair.push(await scenario(browser, servers[1], label, seeds[i], null, view, { clock }));
     }
-  }
-  if (existsSync(join(web.candidate, "src/ui/playbackOptions.ts"))) {
-    results.push(await scenario(browser, servers[1], "PR, 300 ants per colony", seeds[0], null, "above", { ants: 300 }));
-    results.push(await scenario(browser, servers[1], "PR, 1× canvas resolution", seeds[0], null, "above", { dpr: 1 }));
-  }
-  if (existsSync(join(web.candidate, "src/experiments/MapTrialPage.tsx"))) {
-    for (const worker of [0, 1]) {
-      results.push(await scenario(browser, servers[1], worker ? "Worker trial" : "Main-thread trial", seeds[0], worker, "above"));
-    }
+    assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
+    assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "clock comparisons start at the same camera");
+    results.push(...pair);
   }
 } finally {
-  for (const server of servers) server.stop();
+  for (const server of servers) server?.stop();
   await browser.close();
 }
 

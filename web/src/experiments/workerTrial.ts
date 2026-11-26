@@ -1,13 +1,10 @@
 import { AIMS, DOCTRINES, GENERIC_ANT, INFECTED, PLANE, SPECIES } from "../colony/index.ts";
 import { ColonyJev } from "../ui/colonyJev.ts";
-import { MAX_STEP } from "../ui/gameLoop.ts";
+import { FixedStepClock, MAX_STEP } from "../ui/fixedStepClock.ts";
 import { DEFAULT_ANTS } from "../ui/playbackOptions.ts";
 import { loadPrecache } from "../ui/precache.ts";
 import { buildGame, GAME_SPEED, GAME_STRAIN, landingOf } from "../ui/useColony.ts";
 
-const STEP_MS = MAX_STEP * 1000;
-const MAX_DEBT_MS = 8 * STEP_MS;
-const SLICE_MS = 12;
 export const SNAPSHOT_MS = 1000 / 30;
 export const ANT_STRIDE = 5;
 
@@ -23,27 +20,9 @@ export interface TrialFrame {
 }
 export type TrialMessage = TrialFrame | { type: "error"; message: string };
 
-/** Both trial modes use the same fixed steps, bounded backlog and work per turn. */
-export class TrialClock {
-  #last = 0;
-  #debt = 0;
-
-  speed = GAME_SPEED;
-
-  reset(now: number): void {
-    this.#last = now;
-    this.#debt = 0;
-  }
-
-  pump(now: number, tick: () => void, readClock = () => performance.now()): number {
-    this.#debt = Math.min(MAX_DEBT_MS, this.#debt + Math.max(0, now - this.#last) * this.speed);
-    this.#last = now;
-    while (this.#debt >= STEP_MS) {
-      this.#debt -= STEP_MS;
-      tick();
-      if (readClock() - now >= SLICE_MS) break;
-    }
-    return Math.max(0, (STEP_MS - this.#debt) / this.speed - (readClock() - now));
+export class TrialClock extends FixedStepClock {
+  constructor() {
+    super(GAME_SPEED);
   }
 }
 

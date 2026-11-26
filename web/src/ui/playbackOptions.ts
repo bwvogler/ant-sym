@@ -8,6 +8,11 @@ export function antsFromUrl(search = browserSearch()): number {
   return Number.isInteger(value) && value >= 100 && value <= 2000 ? value : DEFAULT_ANTS;
 }
 
+/** Run fixed simulation steps in browser tasks separate from rendering. */
+export function independentClockFromUrl(search = browserSearch()): boolean {
+  return new URLSearchParams(search).get("clock") === "independent";
+}
+
 /** An opt-in low-resolution map. All map drawing and pointer projection use the same scale. */
 export function mapPixelRatioCap(search = browserSearch()): number {
   return new URLSearchParams(search).get("dpr") === "1" ? 1 : 2;
