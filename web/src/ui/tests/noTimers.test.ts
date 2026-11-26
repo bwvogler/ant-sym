@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 // A component that draws afresh on a schedule takes its pace from the game loop's stats ticks (useSimTick or useGameRead, ui/session.ts),
-// not from a timer of its own (ja-fnd.6.1): the loop stands still with a hidden tab, and there is one clock. This holds the line for the
+// not from a timer of its own (ja-fnd.6.1): the loop stands still with a hidden tab. This holds the line for the
 // page's components. Rather than a list of the shapes a forced redraw can take, every timer or frame request in them is named below, with
 // what it is for; a new one fails until it is named (or a hook is used), and a name that no longer matches a line fails too.
 
@@ -57,7 +57,12 @@ const NAMED: { file: string; line: string; why: string }[] = [
   {
     file: "ui/gameLoop.ts",
     line: "request: (cb) => requestAnimationFrame(cb),",
-    why: "the one clock: the game loop's own frame source (GameLoop takes it as its env)",
+    why: "the game loop's own frame source (GameLoop takes it as its env)",
+  },
+  {
+    file: "ui/simTasks.ts",
+    line: "setTimeout(run, delay)",
+    why: "the independent simulation clock waits for the next tick when no work is due",
   },
   {
     file: "ui/voxelFieldReview.ts",
