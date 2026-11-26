@@ -1,6 +1,6 @@
 // The colony's free functions over the map (cells, tunnels, soil, walls, steering helpers): pure, moved out of colony.ts as they were (docs/refactor.md S3.3, the `grid` module).
 
-import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
+import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, hexLine, nx as stepX, ny as stepY } from "./hex.ts";
 export { cellKey, keyX, keyY } from "./hex.ts";
 import { NO_KEY } from "./ants.ts";
 import { CHUNK, CHUNK_BITS } from "./chunks.ts";
@@ -165,13 +165,36 @@ export function inReachShared(map: WorldMap, x0: number, y0: number, x1: number,
   const bx = CELL[0];
   const by = CELL[1];
   cellOf(x0, y0);
-  const ax = CELL[0];
-  const ay = CELL[1];
+  return inReachSharedCells(map, CELL[0], CELL[1], bx, by);
+}
+
+// The short hex lines the sensors can ask for, indexed by their start row's parity and end offset.
+const sensorLines = [0, 1].map((parity) =>
+  Array.from({ length: SHARED_W * SHARED_W }, (_, i) => {
+    const dx = (i % SHARED_W) - SENSE_STEPS;
+    const dy = Math.floor(i / SHARED_W) - SENSE_STEPS;
+    const line = hexLine(0, parity, dx, dy + parity);
+    for (let k = 1; k < line.length; k += 2) line[k] -= parity;
+    return line;
+  }),
+);
+
+/** The same reach check when the sensor has already identified both hex cells. */
+export function inReachSharedCells(map: WorldMap, ax: number, ay: number, bx: number, by: number): boolean {
   if (ax === bx && ay === by) return true;
   if (hexDistance(ax, ay, bx, by) > SENSE_STEPS) return false;
   const top = topRow(map);
-  if (straightReach(map, ax, ay, bx, by, top)) return true;
-  if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) searchWindow(map, ax, ay, top);
+  if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) {
+    // Any unobstructed shortest path can answer yes. For a blocked line the search still tries all other paths.
+    const line = sensorLines[ay & 1]![(by - ay + SENSE_STEPS) * SHARED_W + bx - ax + SENSE_STEPS]!;
+    let k = 2;
+    for (; k < line.length; k += 2) {
+      const y = ay + line[k + 1]!;
+      if (rockAt(map, ax + line[k]!, y) !== OPEN || y < top) break;
+    }
+    if (k === line.length) return true;
+    searchWindow(map, ax, ay, top);
+  }
   // Within SENSE_STEPS of (ax, ay) (checked above), so inside the window.
   return ((sharedSeen[by - ay + SENSE_STEPS]! >> (bx - ax + SENSE_STEPS)) & 1) === 1;
 }

@@ -3,7 +3,7 @@
 import { deliveryAttempt, requestedDelivery } from "./deliveryAction.ts";
 import { paceReturns } from "./invite.ts";
 import type { Colony, HoleCell, Layer } from "./colony.ts";
-import { inReachShared } from "./grid.ts";
+import { inReachSharedCells } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, discOffsets } from "./hex.ts";
 import { SEEN } from "./params.ts";
 import { MARKS, MAX_LEVEL, swapBroodStore, type Mark } from "./pheromone.ts";
@@ -108,7 +108,7 @@ export function placeOn(c: Colony, i: number): Where {
  * s[slot + 6] (alarm): the trail, the edge or rock as −1, and food (or the nest, for home) as SEEN. Its reach checks share one
  * search per ant (inReachShared): a caller outside perceive, which resets it, calls freshReach() first.
  */
-export function sense(c: Colony, i: number, dx: number, dy: number, slot: number): void {
+export function sense(c: Colony, i: number, dx: number, dy: number, slot: number, ax?: number, ay?: number): void {
   const d = c.params.sensorDistance;
   const sx = c.x[i] + dx * d;
   const sy = c.y[i] + dy * d;
@@ -127,7 +127,15 @@ export function sense(c: Colony, i: number, dx: number, dy: number, slot: number
   // Food is sensed only through open ground: a pocket sealed off by soil is not, however near (ja-juiu, see inReach).
   // With scentReach, so is scent: a tip out of reach (another tunnel, behind a wall) reads none (ja-uvhw).
   const hasFood = map.food.get(cx, cy) > 0;
-  const reach = hasFood || c.params.scentReach > 0 ? inReachShared(map, c.x[i], c.y[i], sx, sy) : true;
+  let reach = true;
+  if (hasFood || c.params.scentReach > 0) {
+    if (ax === undefined || ay === undefined) {
+      cellOf(c.x[i], c.y[i]);
+      ax = CELL[0];
+      ay = CELL[1];
+    }
+    reach = inReachSharedCells(map, ax, ay, cx, cy);
+  }
   if (!reach && c.params.scentReach > 0) {
     s[slot] = s[slot + 3] = s[slot + 6] = 0;
     return;

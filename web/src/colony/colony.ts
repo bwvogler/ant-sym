@@ -26,7 +26,7 @@ import {
   PLANE,
   CURTAIN,
 } from "./vocab.ts";
-import { type AntDraw, type Draw, unitOf } from "./weighted.ts";
+import { hashText, type AntDraw, type Draw, unitOf } from "./weighted.ts";
 import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
@@ -541,15 +541,30 @@ export class Colony {
   drawSalt = -1;
   /** the ant antDraw is handing out draws for */
   #drawAnt = 0;
+  #drawCacheSalt = NaN;
+  readonly #drawPrefixes: { gen: number; hash: number; phase: number; epoch: number; epochHash: number }[] = [];
   readonly #antDraw: AntDraw = Object.defineProperty(
     (salt: string): number => {
       if (this.drawSalt < 0) this.drawSalt = this.rng();
       const i = this.#drawAnt;
-      // Its own clock: an ant draws afresh every `reroll` seconds, each ant at its own phase (not the whole colony at once).
-      const at = `${this.drawSalt}|${i}|${this.gen[i]}`;
+      if (this.#drawCacheSalt !== this.drawSalt) {
+        this.#drawCacheSalt = this.drawSalt;
+        this.#drawPrefixes.length = 0;
+      }
+      const gen = this.gen[i]!;
+      let prefix = this.#drawPrefixes[i];
+      if (!prefix || prefix.gen !== gen) {
+        const hash = hashText(`${this.drawSalt}|${i}|${gen}`);
+        prefix = this.#drawPrefixes[i] = { gen, hash, phase: unitOf("", hash), epoch: NaN, epochHash: 0 };
+      }
+      // Each ant's clock changes the common part of all its response draws at the same moment.
       const r = this.params.reroll;
-      const epoch = r > 0 ? Math.floor(this.time / r + unitOf(at)) : 0;
-      return unitOf(`${at}|${epoch}|${salt}`);
+      const epoch = r > 0 ? Math.floor(this.time / r + prefix.phase) : 0;
+      if (prefix.epoch !== epoch) {
+        prefix.epoch = epoch;
+        prefix.epochHash = hashText(`|${epoch}|`, prefix.hash);
+      }
+      return unitOf(salt, prefix.epochHash);
     },
     "temperature",
     { get: () => this.params.sampleTemp },
@@ -557,9 +572,8 @@ export class Colony {
 
   /**
    * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
-   * situation while the ant holds it, until its next `reroll`. One object for every ant, so handing it out allocates nothing; a
-   * draw itself hashes two strings (a game whose six hooks all draw ran 10–14 % slower, review of #223: cache the ant's part of
-   * the hash if a response lane is ever asked on the page).
+   * situation while the ant holds it, until its next `reroll`. One draw function serves every ant. Its cached prefix is
+   * derived from the saved draw salt, slot, generation and current reroll epoch.
    */
   antDraw(i: number): AntDraw {
     this.#drawAnt = i;

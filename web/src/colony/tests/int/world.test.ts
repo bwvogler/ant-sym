@@ -524,3 +524,19 @@ test("golden: the generator is deterministic (rock, food and nests of two hex wo
     assert.deepEqual([fnv(rock), fnv(food), fnv(JSON.stringify(m.nests)), m.foodTotal], want, `seed ${seed}`);
   }
 });
+
+test("ChunkLayer reads replacements after put, drop, and dropAll in the same chunk", () => {
+  const layer = new ChunkLayer((n) => new Uint8Array(n), 5);
+  const data = (value: number) => new Uint8Array(CHUNK * CHUNK).fill(value);
+  assert.equal(layer.get(0, 0), 5);
+  layer.put(0, 0, data(2));
+  assert.equal(layer.get(0, 0), 2);
+  layer.put(0, 0, data(3));
+  assert.equal(layer.get(0, 0), 3);
+  layer.drop(0, 0);
+  assert.equal(layer.get(0, 0), 5);
+  layer.set(0, 0, 4);
+  assert.equal(layer.get(0, 0), 4);
+  layer.dropAll();
+  assert.equal(layer.get(0, 0), 5);
+});

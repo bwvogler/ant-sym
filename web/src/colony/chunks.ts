@@ -68,6 +68,10 @@ export class ChunkLayer<A extends Cells> {
   #live: number[] = [];
   #regions = 0;
   #count = 0;
+  // Consecutive cell reads often land in the same chunk, including empty chunks on sparse layers.
+  #readCx = NaN;
+  #readCy = NaN;
+  #readChunk: A | undefined;
 
   /**
    * `make` allocates a chunk's array; `empty` is what a cell no one wrote reads as. `generate`, if given, fills a new
@@ -143,6 +147,7 @@ export class ChunkLayer<A extends Cells> {
     const i = ((cy & REGION_MASK) << REGION_BITS) | (cx & REGION_MASK);
     const old = r[i];
     r[i] = a;
+    if (cx === this.#readCx && cy === this.#readCy) this.#readChunk = a;
     if (old === undefined) {
       this.#count++;
       ChunkLayer.live++;
@@ -168,6 +173,7 @@ export class ChunkLayer<A extends Cells> {
       this.#count--;
       ChunkLayer.live--;
       r[i] = undefined;
+      if (cx === this.#readCx && cy === this.#readCy) this.#readChunk = undefined;
       const live = this.#live[ti]! - 1;
       this.#live[ti] = live;
       if (live === 0) {
@@ -180,13 +186,14 @@ export class ChunkLayer<A extends Cells> {
 
   /** The cell at integer coordinates (x, y); callers floor first (a fraction like −0.5 would read cell 0). */
   get(x: number, y: number): number {
-    // Every ant's sensors read through here: the common case (a chunk that exists) is kept small enough to inline.
     const cx = x >> CHUNK_BITS;
     const cy = y >> CHUNK_BITS;
-    const tx = (cx >> REGION_BITS) - this.#rx0;
-    const ty = (cy >> REGION_BITS) - this.#ry0;
-    const r = tx >= 0 && ty >= 0 && tx < this.#rw && ty < this.#rh ? this.#table[ty * this.#rw + tx] : undefined;
-    const a = r === undefined ? undefined : r[((cy & REGION_MASK) << REGION_BITS) | (cx & REGION_MASK)];
+    if (cx !== this.#readCx || cy !== this.#readCy) {
+      this.#readCx = cx;
+      this.#readCy = cy;
+      this.#readChunk = this.#at(cx, cy);
+    }
+    const a = this.#readChunk;
     return a !== undefined ? a[((y & MASK) << CHUNK_BITS) | (x & MASK)] : this.#missing(x, y);
   }
 
@@ -219,6 +226,7 @@ export class ChunkLayer<A extends Cells> {
   /** Forget every chunk: the layer reads as `empty` everywhere and holds nothing (a save's restore, save.ts). */
   dropAll(): void {
     this.#table.fill(undefined);
+    this.#readChunk = undefined;
     this.#live.fill(0);
     this.#regions = 0;
     ChunkLayer.live -= this.#count;

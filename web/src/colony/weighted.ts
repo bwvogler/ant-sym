@@ -128,10 +128,15 @@ export interface AntDraw {
   readonly temperature: number;
 }
 
-/** A uniform in [0, 1) from a string (FNV-1a, then murmur3's finaliser so that near strings land far apart). */
-export function unitOf(text: string): number {
-  let h = 0x811c9dc5;
+/** The FNV-1a state after reading text, optionally continuing a prefix. */
+export function hashText(text: string, h = 0x811c9dc5): number {
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return h;
+}
+
+/** A uniform in [0, 1) from a string (FNV-1a, then murmur3's finaliser so that near strings land far apart). */
+export function unitOf(text: string, prefix?: number): number {
+  let h = hashText(text, prefix);
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
