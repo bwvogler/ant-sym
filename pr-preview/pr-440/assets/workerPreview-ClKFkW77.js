@@ -1,4 +1,4 @@
-import{n as e,r as t}from"./workerTrial-BGe7lLn2.js";async function n(n,r){n.innerHTML=`
+import{n as e,r as t}from"./workerTrial-DGMLe_lF.js";async function n(n,r){n.innerHTML=`
     <main class="flex h-dvh flex-col bg-stone-950 text-stone-100">
       <header class="flex flex-wrap items-center gap-3 p-3">
         <h1 class="font-semibold">Simulation preview</h1>
