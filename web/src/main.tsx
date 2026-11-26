@@ -7,10 +7,16 @@ import { applyTheme, getTheme } from "./ui/theme.ts";
 
 applyTheme(getTheme());
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ErrorBoundary>
-      <ColonyApp />
-    </ErrorBoundary>
-  </StrictMode>,
-);
+const root = document.getElementById("root")!;
+const preview = new URLSearchParams(location.search).get("worker-preview");
+if (preview === "main" || preview === "worker") {
+  void import("./experiments/workerPreview.ts").then(({ mountWorkerPreview }) => mountWorkerPreview(root, preview));
+} else {
+  createRoot(root).render(
+    <StrictMode>
+      <ErrorBoundary>
+        <ColonyApp />
+      </ErrorBoundary>
+    </StrictMode>,
+  );
+}
