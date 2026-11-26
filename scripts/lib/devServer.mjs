@@ -13,8 +13,9 @@ const freePort = () =>
     const s = createServer();
     s.once("error", fail);
     s.listen(0, "127.0.0.1", () => {
-      const { port } = s.address();
-      s.close(() => ok(port));
+      const address = s.address();
+      if (!address || typeof address === "string") throw Error("Expected a TCP port for the dev server");
+      s.close(() => ok(address.port));
     });
   });
 
