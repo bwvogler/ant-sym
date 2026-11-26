@@ -3,6 +3,9 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { startDevServer } from "./lib/devServer.mjs";
+import { helpAndExit } from "./lib/usage.mjs";
+
+helpAndExit(import.meta.url);
 
 const [throttleArg = "4", secondsArg = "8", previewUrl] = process.argv.slice(2);
 const cpuThrottle = Number(throttleArg);

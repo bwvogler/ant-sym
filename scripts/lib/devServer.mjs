@@ -20,15 +20,15 @@ const freePort = () =>
   });
 
 /** Start the dev server and wait until it answers. Returns { url, stop }. */
-export async function startDevServer() {
+export async function startDevServer(web = WEB) {
   const port = await freePort();
   const env = { ...process.env };
   delete env.JEV_API_KEY;
   const vite = spawn(
     process.execPath,
-    [join(WEB, "node_modules/vite/bin/vite.js"), "--port", String(port), "--host", "127.0.0.1", "--strictPort"],
+    [join(web, "node_modules/vite/bin/vite.js"), "--port", String(port), "--host", "127.0.0.1", "--strictPort"],
     {
-      cwd: WEB,
+      cwd: web,
       env,
       stdio: ["ignore", "pipe", "pipe"],
     },
