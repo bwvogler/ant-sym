@@ -1,3 +1,4 @@
+import { mapPixelRatio } from "./playbackOptions.ts";
 import { mapOrbit } from "./inspectionOrbit.ts";
 import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { type Colony, CURTAIN, mapOfLayer, PLANE, type WorldMap } from "../colony/index.ts";
@@ -163,7 +164,7 @@ export default function ColonyField({
 
   // ——— input: one pointer drags (pans), two pinch; a click picks an ant; the minimap jumps ———
 
-  const dpr = () => Math.min(2, window.devicePixelRatio || 1);
+  const dpr = mapPixelRatio;
   const slop = () => CLICK_SLOP_PX * dpr();
   const camera = () => rig.camera();
   const viewport = () => rig.viewport();

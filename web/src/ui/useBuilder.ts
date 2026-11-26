@@ -1,3 +1,4 @@
+import { mapPixelRatio } from "./playbackOptions.ts";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type BuildEvent, Builder, type Game, PLANE } from "../colony/index.ts";
 import type { FieldApi, FieldBuild } from "./ColonyField.tsx";
@@ -109,7 +110,7 @@ export function useBuilder({
         // on the colony the fungus landed by, unless the view is close already.
         const v = view === "above" ? PLANE : belowLayer;
         const cam = field.current?.camera(v);
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const dpr = mapPixelRatio();
         if (!cam || cam.zoom < 6 * dpr) {
           const nest = game.colonies[game.landed?.colony ?? 0]?.layers[v]?.nest ?? game.colonies[0]?.nest;
           if (nest) field.current?.centreOn(v, nest.x, nest.y, { close: true });

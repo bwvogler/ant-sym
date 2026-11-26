@@ -48,7 +48,7 @@ export interface MapTrialFrame {
 }
 
 export type MapTrialReply = MapTrialFrame | { type: "error" | "end"; message: string };
-export type MapTrialCommand = { type: "init"; seed: number } | { type: "clock"; playing: boolean; speed: number };
+export type MapTrialCommand = { type: "init"; seed: number; antCount: number } | { type: "clock"; playing: boolean; speed: number };
 
 export class MapTrialSnapshots {
   readonly #previous = new Map<number, Map<number, Cells>>();

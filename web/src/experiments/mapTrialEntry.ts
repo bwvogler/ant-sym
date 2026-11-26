@@ -52,7 +52,7 @@ tasks.port1.onmessage = () => {
 
 self.addEventListener("message", ({ data }: MessageEvent<MapTrialCommand>) => {
   if (data.type === "init") {
-    void buildTrialGame(data.seed)
+    void buildTrialGame(data.seed, data.antCount)
       .then((fresh) => {
         game = fresh;
         publish(performance.now(), true);

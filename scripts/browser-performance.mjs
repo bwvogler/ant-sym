@@ -23,12 +23,13 @@ const web = { base: resolve(baselinePath), candidate: resolve(candidatePath) };
 const { chromium, devices } = createRequire(import.meta.url)("playwright");
 const { defaultBrowserType: _engine, ...phone } = devices["Pixel 6 Pro"];
 
-async function openGame(page, url, seed, worker) {
+async function openGame(page, url, seed, worker, options) {
   const target = new URL(url);
   if (worker !== null) {
     target.searchParams.set("worker", String(worker));
     target.searchParams.set("seed", String(seed));
   }
+  for (const [key, value] of Object.entries(options)) target.searchParams.set(key, String(value));
   await page.goto(target.href);
   if (worker === null) {
     await page.getByLabel("world seed").fill(String(seed));
@@ -135,12 +136,12 @@ async function sample(page, isTrial) {
   }
 }
 
-async function scenario(browser, server, revision, seed, worker, view) {
+async function scenario(browser, server, revision, seed, worker, view, options = {}) {
   const page = await browser.newPage(phone);
   try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await openGame(page, server.url, seed, worker);
+    await openGame(page, server.url, seed, worker, options);
     if (view === "below") await page.getByRole("button", { name: "below", exact: true }).tap();
     // Let the trial HUD settle after the pause before taking its first timestamp.
     await page.waitForTimeout(1200);
@@ -171,6 +172,10 @@ try {
       results.push(await scenario(browser, servers[which], which === 0 ? "base" : "PR", seeds[i], null, view));
     }
   }
+  if (existsSync(join(web.candidate, "src/ui/playbackOptions.ts"))) {
+    results.push(await scenario(browser, servers[1], "PR, 300 ants per colony", seeds[0], null, "above", { ants: 300 }));
+    results.push(await scenario(browser, servers[1], "PR, 1× canvas resolution", seeds[0], null, "above", { dpr: 1 }));
+  }
   if (existsSync(join(web.candidate, "src/experiments/MapTrialPage.tsx"))) {
     for (const worker of [0, 1]) {
       results.push(await scenario(browser, servers[1], worker ? "Worker trial" : "Main-thread trial", seeds[0], worker, "above"));
@@ -183,7 +188,9 @@ try {
 
 const format = (n, places = 1) => (n == null ? "—" : n.toFixed(places));
 console.log("## Chromium on a Pixel 6 Pro viewport\n");
-console.log("Development build, default game settings, 4× target, pinch and pan during each sample. Hosted-runner values vary.\n");
+console.log(
+  "Development build, default game settings unless noted, 4× target, pinch and pan during each sample. Hosted-runner values vary.\n",
+);
 console.log("| Revision | Seed | View | Paused p95 frame ms | 4× p95 frame ms | Actual pace | Tick mean ms | Tick p95 ms |");
 console.log("|---|---:|---|---:|---:|---:|---:|---:|");
 for (const { revision, seed, view, paused, playing } of results) {

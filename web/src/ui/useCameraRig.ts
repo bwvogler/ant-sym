@@ -1,3 +1,4 @@
+import { mapPixelRatio } from "./playbackOptions.ts";
 import { useState, type RefObject } from "react";
 import { mapOfLayer, type OneWorld } from "../colony/index.ts";
 import { CameraRig, type RigHost } from "./field/rig.ts";
@@ -21,7 +22,7 @@ export function rigHost(r: RigRefs): RigHost {
     view: () => r.shown.current,
     map: (v) => mapOfLayer(r.worldRef.current, v),
     size: () => ({ w: r.canvasRef.current?.width ?? 1, h: r.canvasRef.current?.height ?? 1 }),
-    dpr: () => Math.min(2, window.devicePixelRatio || 1),
+    dpr: mapPixelRatio,
     following: () => !!r.follow.current,
     unfollow: () => {
       r.follow.current = null;

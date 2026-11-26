@@ -1,3 +1,4 @@
+import { mapPixelRatio } from "../playbackOptions.ts";
 // What a frame needs from the outside world (ja-fnd.6.3.13, docs/field-split.md "FieldEnv"): the clock, the device pixel ratio, whether this is a
 // dev build, the reduced-motion preference, and the sprite sets. ColonyField takes them from the browser; a Node test gives fakes (sprite sets
 // that report ready, a fixed clock), which is what lets the frame's layers run headless. The theme is not a port: it is plain data the shell reads
@@ -46,7 +47,7 @@ export function browserEnv(dev: boolean): FieldEnv {
   let motion: MediaQueryList | null = null;
   return {
     now: () => performance.now(),
-    dpr: () => Math.min(2, window.devicePixelRatio || 1),
+    dpr: mapPixelRatio,
     dev,
     reducedMotion: () => (motion ??= matchMedia("(prefers-reduced-motion: reduce)")).matches,
     newPath: () => new Path2D(),

@@ -25,6 +25,7 @@ import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { landingOf } from "./landing.ts";
 import { worldFromUrl, worldOf, type WorldKind } from "./worldKind.ts";
+import { antsFromUrl } from "./playbackOptions.ts";
 import { GameLoop, MAX_STEP } from "./gameLoop.ts";
 import type { ColonyStats, EvolutionStats, SideStats } from "./stats.ts";
 
@@ -102,7 +103,7 @@ export const viewShowing = (
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   species: GENERIC_ANT.id,
   seed: 1,
-  antCount: 600,
+  antCount: antsFromUrl(),
   speed: GAME_SPEED,
   playing: false,
   started: false,

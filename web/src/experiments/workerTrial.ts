@@ -1,6 +1,7 @@
 import { AIMS, DOCTRINES, GENERIC_ANT, INFECTED, PLANE, SPECIES } from "../colony/index.ts";
 import { ColonyJev } from "../ui/colonyJev.ts";
 import { MAX_STEP } from "../ui/gameLoop.ts";
+import { DEFAULT_ANTS } from "../ui/playbackOptions.ts";
 import { loadPrecache } from "../ui/precache.ts";
 import { buildGame, GAME_SPEED, GAME_STRAIN, landingOf } from "../ui/useColony.ts";
 
@@ -46,18 +47,18 @@ export class TrialClock {
   }
 }
 
-export const trialSettings = (seed: number) => ({
+export const trialSettings = (seed: number, antCount = DEFAULT_ANTS) => ({
   species: GENERIC_ANT.id,
   seed,
-  antCount: 600,
+  antCount,
   rival: true,
   generation: 0,
   world: "endless" as const,
 });
 
-/** Two 600-ant colonies with the same bundled policy path in both modes. */
-export async function buildTrialGame(seed = 1) {
-  const game = buildGame(trialSettings(seed));
+/** Two equally sized colonies with the same bundled policy path in both modes. */
+export async function buildTrialGame(seed = 1, antCount = DEFAULT_ANTS) {
+  const game = buildGame(trialSettings(seed, antCount));
   const jev = new ColonyJev();
   jev.setDoctrine(DOCTRINES[0]!.text);
   jev.setAim(AIMS[0]!.text);

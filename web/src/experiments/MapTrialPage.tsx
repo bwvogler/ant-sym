@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CURTAIN, PLANE, type Game } from "../colony/index.ts";
 import ColonyField, { type FieldApi } from "../ui/ColonyField.tsx";
+import { antsFromUrl } from "../ui/playbackOptions.ts";
 import Segmented from "../ui/Segmented.tsx";
 import { fogFromUrl, sensedFor } from "../ui/fog/sources.ts";
 import type { Followed } from "../ui/follow.ts";
@@ -27,6 +28,7 @@ export default function MapTrialPage({ workerMode }: { workerMode: boolean }) {
   const endpoint = useRef<Worker | undefined>(undefined);
   const clock = useRef(new TrialClock());
   const controls = useRef({ playing, speed });
+  const [antCount] = useState(antsFromUrl);
   const [seed] = useState(() => {
     const raw = Number(new URLSearchParams(location.search).get("seed"));
     return Number.isSafeInteger(raw) && raw > 0 ? raw : 1;
@@ -49,14 +51,14 @@ export default function MapTrialPage({ workerMode }: { workerMode: boolean }) {
 
     async function init(): Promise<void> {
       if (!workerMode) {
-        const game = await buildTrialGame(seed);
+        const game = await buildTrialGame(seed, antCount);
         if (cancelled) return;
         const initial = makeView(game);
         initial.sensed.stampGame(game);
         setWorld(initial);
         return;
       }
-      const mirror = makeView(buildGame(trialSettings(seed)));
+      const mirror = makeView(buildGame(trialSettings(seed, antCount)));
       worker = new Worker(new URL("./mapTrialEntry.ts", import.meta.url), { type: "module" });
       endpoint.current = worker;
       worker.onmessage = ({ data }: MessageEvent<MapTrialReply>) => {
@@ -78,7 +80,7 @@ export default function MapTrialPage({ workerMode }: { workerMode: boolean }) {
         setPlaying(false);
         setError(event.message || "Could not run the simulation worker");
       };
-      worker.postMessage({ type: "init", seed } satisfies MapTrialCommand);
+      worker.postMessage({ type: "init", seed, antCount } satisfies MapTrialCommand);
     }
 
     void init().catch((cause: unknown) => {
@@ -89,7 +91,7 @@ export default function MapTrialPage({ workerMode }: { workerMode: boolean }) {
       worker?.terminate();
       endpoint.current = undefined;
     };
-  }, [seed, workerMode]);
+  }, [seed, workerMode, antCount]);
 
   useEffect(() => {
     controls.current = { playing, speed };
@@ -200,7 +202,7 @@ export default function MapTrialPage({ workerMode }: { workerMode: boolean }) {
         </div>
         <div className={`pointer-events-auto flex flex-wrap items-center gap-x-2 ${FLOAT}`}>
           <span>
-            {workerMode ? "Web Worker" : "Main thread"} · Seed {seed}
+            {workerMode ? "Web Worker" : "Main thread"} · Seed {seed} · {antCount} ants per colony
           </span>
           <a className="underline" href={peerUrl.href}>
             {workerMode ? "Try main thread" : "Try Web Worker"}
