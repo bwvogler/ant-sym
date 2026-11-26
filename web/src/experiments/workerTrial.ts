@@ -27,26 +27,37 @@ export class TrialClock {
   #last = 0;
   #debt = 0;
 
+  speed = GAME_SPEED;
+
   reset(now: number): void {
     this.#last = now;
     this.#debt = 0;
   }
 
   pump(now: number, tick: () => void, readClock = () => performance.now()): number {
-    this.#debt = Math.min(MAX_DEBT_MS, this.#debt + Math.max(0, now - this.#last) * GAME_SPEED);
+    this.#debt = Math.min(MAX_DEBT_MS, this.#debt + Math.max(0, now - this.#last) * this.speed);
     this.#last = now;
     while (this.#debt >= STEP_MS) {
       this.#debt -= STEP_MS;
       tick();
       if (readClock() - now >= SLICE_MS) break;
     }
-    return Math.max(0, (STEP_MS - this.#debt) / GAME_SPEED - (readClock() - now));
+    return Math.max(0, (STEP_MS - this.#debt) / this.speed - (readClock() - now));
   }
 }
 
-/** Seed 1, two 600-ant colonies, with the same bundled policy path in both modes. */
-export async function buildTrial() {
-  const game = buildGame({ species: GENERIC_ANT.id, seed: 1, antCount: 600, rival: true, generation: 0, world: "endless" });
+export const trialSettings = (seed: number) => ({
+  species: GENERIC_ANT.id,
+  seed,
+  antCount: 600,
+  rival: true,
+  generation: 0,
+  world: "endless" as const,
+});
+
+/** Two 600-ant colonies with the same bundled policy path in both modes. */
+export async function buildTrialGame(seed = 1) {
+  const game = buildGame(trialSettings(seed));
   const jev = new ColonyJev();
   jev.setDoctrine(DOCTRINES[0]!.text);
   jev.setAim(AIMS[0]!.text);
@@ -56,8 +67,13 @@ export async function buildTrial() {
   });
   jev.attachColonies(game.colonies, game.params.species, true);
   jev.attachFungus(game.fungus);
+  game.land(landingOf(game), GAME_STRAIN, { evolve: true });
+  return game;
+}
+
+export async function buildTrial() {
+  const game = await buildTrialGame();
   const landing = landingOf(game);
-  game.land(landing, GAME_STRAIN, { evolve: true });
   const colony = game.colonies[landing]!;
   const above = { ...colony.layers[PLANE]!.nest, layer: PLANE };
   const below = { ...colony.nest, layer: colony.home };

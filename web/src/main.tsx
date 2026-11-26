@@ -8,9 +8,19 @@ import { applyTheme, getTheme } from "./ui/theme.ts";
 applyTheme(getTheme());
 
 const root = document.getElementById("root")!;
-const preview = new URLSearchParams(location.search).get("worker-preview");
+const query = new URLSearchParams(location.search);
+const preview = query.get("worker-preview");
+const worker = query.get("worker");
 if (preview === "main" || preview === "worker") {
   void import("./experiments/workerPreview.ts").then(({ mountWorkerPreview }) => mountWorkerPreview(root, preview));
+} else if (worker === "0" || worker === "1") {
+  void import("./experiments/MapTrialPage.tsx").then(({ default: MapTrialPage }) =>
+    createRoot(root).render(
+      <ErrorBoundary>
+        <MapTrialPage workerMode={worker === "1"} />
+      </ErrorBoundary>,
+    ),
+  );
 } else {
   createRoot(root).render(
     <StrictMode>
