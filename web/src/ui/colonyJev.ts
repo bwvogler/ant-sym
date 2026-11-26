@@ -496,9 +496,9 @@ export class ColonyJev {
    * no current answer is queued to be asked, under any words, preset or the player's own; while none is, the miss is
    * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
-  #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S): A {
+  #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S, key?: string): A {
     if (l.asks && !l.asks(s)) return l.local(s);
-    const key = l.key(s);
+    key ??= l.key(s);
     const hit = this.#cache(l).get(key);
     const running = this.#state.phase === "running";
     if (running && LANE_KINDS[l.name].countsHits) {
@@ -746,9 +746,10 @@ export class ColonyJev {
         const l = d.actions[hook];
         if (!l) continue;
         (bound as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
-          const answer = this.#lookup(l, t, snapshotTouch);
+          const key = l.key(t);
+          const answer = this.#lookup(l, t, snapshotTouch, key);
           if (!answer) return base[hook](t, draw);
-          const choice = responseOf(hook, l.key(t), answer, draw);
+          const choice = responseOf(hook, key, answer, draw);
           if (
             hook === "carry" &&
             t.carrying === "food" &&

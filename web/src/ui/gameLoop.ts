@@ -10,6 +10,8 @@ import { decisionsOf, statsOf, type ColonyStats } from "./stats.ts";
 export const MAX_STEP = 1 / 30;
 /** Longest wall time one frame counts: a tab that was hidden doesn't leap ahead. */
 const MAX_FRAME = 0.05;
+/** Stop catching up after this much simulation work so input and rendering get a turn. */
+const SIM_BUDGET_MS = 12;
 /** How often the stats are taken, in ms. */
 const STATS_EVERY = 150;
 
@@ -147,7 +149,10 @@ export class GameLoop {
     if (this.#playing) {
       const total = dt * this.#speed;
       const steps = Math.max(1, Math.ceil(total / MAX_STEP));
+      const deadline = this.#env.now() + SIM_BUDGET_MS;
       for (let k = 0; k < steps; k++) {
+        // Always make progress. Drop overdue steps so slow frames do not build up a backlog.
+        if (k > 0 && this.#env.now() >= deadline) break;
         this.advance(total / steps);
         // A new queen has flown (ja-lo8.9): the game waits for the page to found her (the queen's pen, or her mother's words).
         if (game.flights.length) {
