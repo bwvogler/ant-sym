@@ -8,6 +8,8 @@ on:
       - "scripts/lab/nest-milling*.mjs"
       - "scripts/lab/porter-*.mjs"
       - "web/src/colony/bypassPolicy.ts"
+      - "web/src/colony/backtrackEscape.ts"
+      - "scripts/lab/backtrack-escape.test.mjs"
       - "web/src/colony/porterObservation.ts"
       - "web/src/colony/nestWork.ts"
       - "web/src/colony/tunnel.ts"
@@ -39,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         seed: [7, 17, 29, 43]
-        mode: [current, trace, trace-repair, trace-bypass, trace-entry]
+        mode: [current, trace, trace-repair, trace-bypass, trace-entry, escape]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -82,8 +84,9 @@ jobs:
           porter_rows = []
           detour_rows = []
           milling_rows = []
+          escape_rows = []
           for seed in (7, 17, 29, 43):
-              for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry"):
+              for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry", "escape"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
                   assert report["seed"] == seed
                   populations.add(report["antsPerColony"])
@@ -135,6 +138,13 @@ jobs:
                                        m["otherLoopWorkerSeconds"], "—" if share is None else f"{share:.2%}",
                                        m["completedIslandCircuits"], m["islandCircuitWorkerSeconds"],
                                        "—" if hotspot is None else f"({hotspot['x']}, {hotspot['y']})"))
+                  if mode in ("current", "escape"):
+                      e = point["escape"] or {}
+                      assert 0 <= m["loadedBacktrackWorkerSeconds"] <= m["repeatedBacktrackWorkerSeconds"]
+                      escape_rows.append((seed, mode, e.get("tries", 0), e.get("noExit", 0),
+                                          m["loadedBacktrackWorkerSeconds"], point["foodDelivered"],
+                                          porter["completed"], porter["started"], porter["outstanding"],
+                                          "—" if p95_value is None else f"{p95_value:.2f}"))
           assert len(populations) == 1
           print("\n### First handoff of incoming food\n")
           cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
@@ -166,6 +176,13 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in milling_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Loaded workers escaping repeated reversals\n")
+          cols = ("Seed", "Mode", "Escape tries", "No alternate exit", "Loaded backtrack worker-s",
+                  "Food delivered", "Porter trips completed", "Porter trips started", "Outstanding", "Porter p95 s")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in escape_rows:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

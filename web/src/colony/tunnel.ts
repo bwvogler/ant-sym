@@ -1,5 +1,6 @@
 // Walking a tunnel (docs/refactor.md S3.3): an ant underground steers along the walls, widens a crowded chamber, and goes for food, brood or the way out. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { backtrackEscapes } from "./backtrackEscape.ts";
 import { bypassPolicies } from "./bypassPolicy.ts";
 import { localDelivery, DELIVERY_SEARCH, DELIVERY_TRAVEL } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
@@ -326,6 +327,13 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
     }
     if (delivering) col.deliveryState[i] = best < 0 ? DELIVERY_SEARCH : DELIVERY_TRAVEL;
     dir = best < 0 ? handOnWall(map, cx, cy, dir, -col.hand[i]) : best;
+    const escape =
+      col.params.backtrackEscape && mode === RETURN && col.cur === col.home && !col.onPlane && !onSky
+        ? backtrackEscapes.get(col)
+        : undefined;
+    if (escape && dir >= 0) {
+      dir = escape.choose(i, cx, cy, dir, (tx, ty) => (signs ? signs.get(tx, ty) * signGain : 0) + (delivering ? 0 : field.get(tx, ty)));
+    }
   } else if (mode === EXPLORE && ent && isSky(map, cx, cy)) {
     // On the ground line (side view) an explorer walks on along the ground the way it is going, turning back only
     // at its end. A hand on the wall (searching a tunnel's branches) turned explorers round at every step of the

@@ -82,3 +82,9 @@ A stationary interval starts counting after five seconds without changing cells,
 A separate diagnostic counts each completed circuit around a solid cell even if it never repeats, and reports circuit time and its hotspot. A single circuit can be a useful route around an obstacle, so its time is excluded from the suspected-waste total.
 
 These are movement proxies. Slow, irregular, or longer loops and interactions between samples may escape detection. Some stationary workers may be resting or doing work the observer cannot see. Metrics are cumulative at each minute and serve only the assay.
+
+## One-step escape after two reversals
+
+The assay-only `escape` variant uses the original colony policy and changes one underground steering choice. After a loaded worker actually walks A → B → A → B, it can try a different adjacent open cell if its ordinary tunnel choice is about to send it back to A. The worker ranks exits with the same home scent and destination marks it can already sense. It makes one attempt per detected sequence. With no available exit, with expired move memory, or after changing load, ordinary movement applies. One-world surface movement, excavation, and backfill are outside the experiment.
+
+The workflow reports escape attempts, occasions with no alternate exit, loaded-worker backtrack time, and porter started, completed and outstanding trips. Evaluate these alongside food delivered. The assessor reads world statistics for comparison. The policy uses its own last steps and immediately adjacent cells.

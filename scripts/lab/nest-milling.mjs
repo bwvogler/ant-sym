@@ -74,6 +74,7 @@ export function observeNestMilling(colony, sampleSeconds) {
   let stationary = 0;
   let loadedStationary = 0;
   let backtrack = 0;
+  let loadedBacktrack = 0;
   let islandLoop = 0;
   let otherLoop = 0;
   let loadedLoop = 0;
@@ -143,6 +144,7 @@ export function observeNestMilling(colony, sampleSeconds) {
     current.coveredUntil = now;
     if (lap.period === 2) {
       backtrack += seconds;
+      if (load) loadedBacktrack += seconds;
     } else {
       const island = current.loop?.period === lap.period ? current.loop.island : enclosedSolid(map, lap.cells);
       current.loop = { period: lap.period, island };
@@ -166,6 +168,7 @@ export function observeNestMilling(colony, sampleSeconds) {
       stationaryWorkerSeconds: round(stationary * sampleSeconds),
       loadedStationaryWorkerSeconds: round(loadedStationary * sampleSeconds),
       repeatedBacktrackWorkerSeconds: round(backtrack),
+      loadedBacktrackWorkerSeconds: round(loadedBacktrack),
       islandLoopWorkerSeconds: round(islandLoop),
       otherLoopWorkerSeconds: round(otherLoop),
       loadedLoopWorkerSeconds: round(loadedLoop),

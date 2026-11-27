@@ -1,6 +1,7 @@
 // Paired, offline one-world nest assay. All workers move and work under normal game ticks.
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { backtrackEscapes, createBacktrackEscape } from "../../web/src/colony/backtrackEscape.ts";
 import { observeNestMilling } from "./nest-milling.mjs";
 import { installPorterBypass } from "./porter-bypass.mjs";
 import { distribution, observePorterTrips } from "./porter-trips.mjs";
@@ -20,7 +21,8 @@ if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
 }
 const allModes = ["current", "trace", "trace-repair"];
 const modes = process.env.NEST_ASSAY_MODE ? [process.env.NEST_ASSAY_MODE] : allModes;
-if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass" && m !== "trace-entry")) throw Error("Unknown NEST_ASSAY_MODE");
+if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass" && m !== "trace-entry" && m !== "escape"))
+  throw Error("Unknown NEST_ASSAY_MODE");
 const tickRate = 30;
 const sampleTicks = 6;
 const checkpointSeconds = 60;
@@ -314,16 +316,20 @@ function run(mode) {
   const colony =
     mode === "current"
       ? undefined
-      : {
-          backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
-          ...(mode === "trace-entry" ? { backfillTraceEntry: true } : {}),
-          ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
-        };
+      : mode === "escape"
+        ? { backtrackEscape: true }
+        : {
+            backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
+            ...(mode === "trace-entry" ? { backfillTraceEntry: true } : {}),
+            ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
+          };
   const specs = [{ antCount: ants, ...(colony ? { colony } : {}) }, { antCount: ants }];
   const game = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(seed), specs);
   const first = game.colonies[0];
+  const escape = mode === "escape" ? createBacktrackEscape(first) : null;
+  if (escape) backtrackEscapes.set(first, escape);
   const backfillSituations = new Map();
-  if (colony) {
+  if (colony?.backfillTraceSeconds) {
     const base = first.responses;
     first.responses = {
       ...base,
@@ -352,6 +358,7 @@ function run(mode) {
         ...watch.checkpoint(tick / tickRate),
         porterTrips: porters.checkpoint(),
         bypass: bypass?.checkpoint() ?? null,
+        escape: escape?.checkpoint() ?? null,
       });
     }
   }

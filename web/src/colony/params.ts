@@ -484,6 +484,8 @@ export interface ColonyParams {
   backfillTraceSeconds?: number;
   /** Guard stale-branch entry with recent passage at its mouth. */
   backfillTraceEntry?: boolean;
+  /** Assay-only escape from repeated two-cell reversals. */
+  backtrackEscape?: boolean;
   /** In the trace experiment, ask the ordinary drop question for repair of chamber floors. */
   backfillFloorRepair?: boolean;
   /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
