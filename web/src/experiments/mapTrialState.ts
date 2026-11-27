@@ -1,5 +1,4 @@
-import type { Colony, Game } from "../colony/index.ts";
-import { chunkKey, chunkOf, type Cells, type ChunkLayer } from "../colony/chunks.ts";
+import { chunkKey, chunkOf, type Cells, type ChunkLayer, type Colony, type Game } from "../colony/index.ts";
 
 const antFields = ["x", "y", "heading", "layer", "alive", "gen", "load", "odour", "carrying", "quality", "pellet", "corpse"] as const;
 type AntField = (typeof antFields)[number];

@@ -82,12 +82,13 @@ export function PerformancePanel({ profile, seed, view, requestedSpeed, starting
           >
             {copied ? "Copied" : "Copy results"}
           </button>
-          <textarea
+          <pre
             aria-label="Performance results JSON"
-            className="block h-20 w-full rounded border border-line p-1 font-mono"
-            readOnly
-            value={json}
-          />
+            className="max-h-20 overflow-auto rounded border border-line p-1 font-mono"
+            tabIndex={0}
+          >
+            {json}
+          </pre>
         </details>
       )}
     </aside>

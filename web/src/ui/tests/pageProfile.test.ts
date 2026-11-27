@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeEngineProfile, EngineProfile, profileSteering, withEngineProfile } from "../../colony/engineProfile.ts";
+import { activeEngineProfile, EngineProfile, profileSteering, withEngineProfile } from "../../colony/index.ts";
 import { PageProfile } from "../pageProfile.ts";
 
 const scene = { seed: 7, view: "below", requestedSpeed: 4, startingAntsPerColony: 600, clock: "independent" };

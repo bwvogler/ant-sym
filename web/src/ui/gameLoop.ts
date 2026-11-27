@@ -1,6 +1,5 @@
-import { withEngineProfile } from "../colony/engineProfile.ts";
 import { pageProfile } from "./pageProfile.ts";
-import type { Game, Journal } from "../colony/index.ts";
+import { withEngineProfile, type Game, type Journal } from "../colony/index.ts";
 import { FixedStepClock, MAX_STEP } from "./fixedStepClock.ts";
 import type { SimTasks } from "./simTasks.ts";
 import { decisionsOf, statsOf, type ColonyStats } from "./stats.ts";

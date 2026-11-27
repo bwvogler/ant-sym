@@ -1,4 +1,4 @@
-import { EngineProfile } from "../colony/engineProfile.ts";
+import { EngineProfile } from "../colony/index.ts";
 import { profileFromUrl } from "./playbackOptions.ts";
 
 const DURATION_MS = 10_000;

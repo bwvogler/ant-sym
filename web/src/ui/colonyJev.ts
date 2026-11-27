@@ -1,4 +1,3 @@
-import { activeEngineProfile } from "../colony/engineProfile.ts";
 import {
   errorOf,
   GAME_CAPS,
@@ -55,6 +54,7 @@ import {
   type AntDraw,
   type ResponseAnswer,
   responseOf,
+  activeEngineProfile,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
