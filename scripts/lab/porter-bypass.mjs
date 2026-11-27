@@ -43,7 +43,7 @@ function routeDistance(map, from, to) {
 function openingDetour(map, x, y) {
   const ring = Array.from({ length: 6 }, (_, d) => {
     const xx = nx(x, y, d);
-    const yy = ny(x, y, d);
+    const yy = ny(y, d);
     return undergroundOpen(map, xx, yy) ? cellKey(xx, yy) : null;
   });
   const groups = [];
