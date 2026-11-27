@@ -156,6 +156,7 @@ interface Lane<S, A extends string> {
   /** the words its requests carry: a colony's doctrine, or the fungus's aim */
   words: string;
   context: string;
+  cache?: PolicyCache<A>;
   /**
    * The contexts this lane asked under before, newest first (at most FALLBACKS): while the current words have no
    * answer for a situation and Jev can't answer (canAsk false), the newest earlier answer acts, marked stale (ja-lo8.3);
@@ -439,7 +440,8 @@ export class ColonyJev {
   }
 
   #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
-    return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+    if (context !== l.context) return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+    return (l.cache ??= this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>);
   }
 
   /** The cache of a context, loaded from the store on first use, keeping only stored answers `valid` (its lane's question) accepts. */
@@ -691,6 +693,7 @@ export class ColonyJev {
     const before = l.context;
     l.fallback = [before, ...l.fallback.filter((c) => c !== before)].filter((c) => c !== context).slice(0, FALLBACKS);
     l.context = context;
+    l.cache = undefined;
     l.queue.clear();
     this.#set(this.#counts());
     return true;

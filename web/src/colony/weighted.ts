@@ -78,6 +78,7 @@ const distributions = new Map<string, Distribution>();
 function distributionOf(answer: string, temperature: number): Distribution | undefined {
   const cached = distributions.get(answer);
   if (cached?.temperature === temperature) return cached;
+  if (!isWeighted(answer)) return undefined;
   const weights = weightsOf(answer);
   if (!weights || weights.length < 2) return undefined;
   let total = 0;
@@ -104,11 +105,14 @@ export function pick(
   draw?: (() => number) & { readonly temperature?: number },
   temperature = draw?.temperature ?? 1,
 ): string {
-  if (!draw || !isWeighted(answer) || !(temperature > 0)) return topOf(answer);
+  if (!draw || !(temperature > 0)) return topOf(answer);
   const distribution = distributionOf(answer, temperature);
   if (!distribution) return topOf(answer); // a certain answer ("return=1") is not drawn from
-  const { weights, total } = distribution;
-  let u = draw() * total;
+  return sampleDistribution(distribution, draw());
+}
+
+function sampleDistribution({ weights, total }: Distribution, uniform: number): string {
+  let u = uniform * total;
   for (const [choice, weight] of weights) {
     u -= weight;
     if (u < 0) return choice;
@@ -145,5 +149,8 @@ export function unitOf(text: string, prefix?: number): number {
 /** `pick` for a response: drawn with the ant's draw for `salt` (once), or with no draw Jev's choice. */
 export function pickFor(answer: string, draw: AntDraw | undefined, salt: string): string {
   if (!draw) return topOf(answer);
-  return pick(answer, () => draw(salt), draw.temperature);
+  const temperature = draw.temperature;
+  if (!(temperature > 0)) return topOf(answer);
+  const distribution = distributionOf(answer, temperature);
+  return distribution ? sampleDistribution(distribution, draw(salt)) : topOf(answer);
 }

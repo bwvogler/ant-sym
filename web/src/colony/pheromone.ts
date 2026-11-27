@@ -124,6 +124,9 @@ export class Pheromones {
   #nbRock: (Uint8Array | undefined)[] = new Array(9);
   #nbField: (Float32Array | undefined)[] = new Array(9);
 
+  readonly #rowStarts = new Uint8Array(CHUNK);
+  readonly #rowEnds = new Int8Array(CHUNK);
+
   /** the channels a species lacks (ja-fnd.5.11): never laid, so they hold nothing and every read of them is 0; null: it has them all */
   readonly #absent: ReadonlySet<Channel> | null;
 
@@ -299,14 +302,40 @@ export class Pheromones {
         next.push({ cx, cy, out, max });
         continue;
       }
-      // Interior cells: every neighbour is in this chunk. Most cells of an awake chunk hold nothing
-      // and neither do their neighbours; those are zero without looking at the rock.
+      // Floor marks only evaporate. There is no need to read six neighbours for each cell.
+      if (k === 0) {
+        for (let i = 0; i < CHUNK_CELLS; i++) {
+          const nv = rock[i] ? 0 : flush(f[i] * keep);
+          out[i] = nv;
+          if (nv > max) max = nv;
+        }
+        next.push({ cx, cy, out, max });
+        continue;
+      }
+      // A zero cell with six zero neighbours stays zero. Bound each interior row's
+      // stencil by the scent in its three input rows; the borders still read across chunks.
+      const starts = this.#rowStarts;
+      const ends = this.#rowEnds;
+      for (let y = 0; y < CHUNK; y++) {
+        const row = y << CHUNK_BITS;
+        let first = 0;
+        while (first < CHUNK && f[row + first] === 0) first++;
+        let last = EDGE;
+        if (first === CHUNK) last = -1;
+        else while (last > first && f[row + last] === 0) last--;
+        starts[y] = first;
+        ends[y] = last;
+      }
+      out.fill(0);
       for (let ly = 1; ly < EDGE; ly++) {
         const row = ly << CHUNK_BITS;
+        const first = Math.max(1, Math.min(starts[ly - 1], starts[ly], starts[ly + 1]) - 1);
+        const last = Math.min(EDGE - 1, Math.max(ends[ly - 1], ends[ly], ends[ly + 1]) + 1);
         // The rows above and below: an even row's neighbours there are x − 1 and x, an odd row's x and x + 1.
         const o = (ly & 1) - 1;
-        for (let lx = 1; lx < EDGE; lx++) {
+        for (let lx = first; lx <= last; lx++) {
           const i = row | lx;
+          if (rock[i]) continue;
           const ua = i - CHUNK + o;
           const da = i + CHUNK + o;
           const v = f[i];
@@ -316,14 +345,7 @@ export class Pheromones {
           const f2 = f[ua + 1];
           const f3 = f[da];
           const f4 = f[da + 1];
-          if (v === 0 && fl === 0 && fr === 0 && f1 === 0 && f2 === 0 && f3 === 0 && f4 === 0) {
-            out[i] = 0;
-            continue;
-          }
-          if (rock[i]) {
-            out[i] = 0;
-            continue;
-          }
+          if (v === 0 && fl === 0 && fr === 0 && f1 === 0 && f2 === 0 && f3 === 0 && f4 === 0) continue;
           // Mean of the open neighbours; rock counts as this cell, so nothing leaks into it.
           const sum =
             (rock[i - 1] ? v : fl) +

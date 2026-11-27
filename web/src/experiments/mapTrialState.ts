@@ -45,8 +45,19 @@ export type MapTrialReply =
   MapTrialFrame | { type: "world"; state: ReturnType<Game["save"]> } | { type: "error" | "notice"; message: string };
 export type MapTrialCommand = { type: "init"; seed: number; antCount: number } | MapTrialAction;
 
+// Compare four bytes at a time without a per-cell callback, including Float32 trails.
+function chunkWords(cells: Cells): Uint32Array {
+  return new Uint32Array(cells.buffer, cells.byteOffset, cells.byteLength / Uint32Array.BYTES_PER_ELEMENT);
+}
+
+function sameChunk(cells: Cells, previous: Uint32Array): boolean {
+  const words = chunkWords(cells);
+  for (let i = 0; i < words.length; i++) if (words[i] !== previous[i]) return false;
+  return true;
+}
+
 export class MapTrialSnapshots {
-  readonly #previous = new Map<number, Map<number, Cells>>();
+  readonly #previous = new Map<number, Map<number, Uint32Array>>();
 
   frame(game: Game, includeGround: boolean): MapTrialFrame {
     return {
@@ -67,16 +78,16 @@ export class MapTrialSnapshots {
     const changes: ChunkChange[] = [];
     layersOf(game).forEach((layer, index) => {
       if (!layer) return;
-      const previous = this.#previous.get(index) ?? new Map<number, Cells>();
+      const previous = this.#previous.get(index) ?? new Map<number, Uint32Array>();
       if (!this.#previous.has(index)) this.#previous.set(index, previous);
       const present = new Set<number>();
       layer.forEach((cx, cy, cells) => {
         const key = chunkKey(cx, cy);
         present.add(key);
         const before = previous.get(key);
-        if (before && cells.every((v, k) => v === before[k])) return;
+        if (before && sameChunk(cells, before)) return;
         const copy = cells.slice();
-        previous.set(key, copy);
+        previous.set(key, chunkWords(copy));
         changes.push([index, cx, cy, copy]);
       });
       for (const key of previous.keys()) {
