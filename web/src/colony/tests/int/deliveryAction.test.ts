@@ -6,7 +6,9 @@ import { CURTAIN, PLANE } from "../../colony.ts";
 import { chooseDelivery, deliveryExplanation, requestedDelivery, localDelivery } from "../../deliveryAction.ts";
 import { port, becomePorter, nurse } from "../../nestWork.ts";
 import { putDown } from "../../dig.ts";
-import { responses } from "../../responses.ts";
+import { packResponseRequest, responseKey } from "../../colonyBrain.ts";
+import { newPassageTrace, rememberPassage } from "../../passageTrace.ts";
+import { localResponses, responses, type Touch } from "../../responses.ts";
 import { destMark } from "../../homing.ts";
 import { walkTunnel } from "../../tunnel.ts";
 import { digCell, OPEN, rockAt } from "../../world.ts";
@@ -132,6 +134,58 @@ test("a chamber food pickup can be refused without changing stock or committing 
   assert.ok(c.portTo[0] >= 0);
   assert.equal(store.food, 0);
   assert.equal(c.larder + c.inJaws, food);
+});
+
+test("traffic-aware pickup leaves surplus at the source or commits it to an eligible alternate", () => {
+  const { c, ch, store, brood: source, y } = setup();
+  const alternate = ch.add(0, y, "store");
+  ch.claim(alternate.id, 20, y, (x, yy) => rockAt(c.map, x, yy) === OPEN);
+  source.role = "reception";
+  c.stock(source, 2);
+  c.stock(alternate, 50);
+  c.params.porterDispatch = true;
+  c.params.backfillTraceSeconds = 12;
+  c.passageTrace = newPassageTrace();
+  rememberPassage(c.passageTrace, 24, y, c.time);
+  c.carrying[0] = 0;
+  c.mode[0] = EXPLORE;
+  c.age[0] = 0;
+  put(c, 0, 24, y);
+  c.portViewAt = c.time;
+  c.want.clear();
+  c.enRouteTo.set(store.id, 8);
+  c.enRouteTo.set(alternate.id, 8);
+  const offers: Touch[] = [];
+  c.responses = responses({
+    get(t) {
+      offers.push({ ...t });
+      return localResponses.get(t);
+    },
+  });
+
+  const food = c.larder + c.inJaws;
+  port(c, 0, 1);
+  assert.equal(source.food, 2);
+  assert.equal(c.portTo[0], -1);
+  assert.deepEqual(
+    offers.map((t) => t.porterDispatch),
+    [
+      { candidate: "preferred", inbound: "saturated", sourcePassage: "recent" },
+      { candidate: "alternate", inbound: "saturated", sourcePassage: "recent" },
+    ],
+  );
+
+  c.enRouteTo.set(alternate.id, 0);
+  port(c, 0, 1);
+  assert.equal(c.portTo[0], alternate.id);
+  assert.equal(source.food, 1);
+  assert.equal(c.larder + c.inJaws, food);
+  const [preferred, alternateOffer] = offers;
+  const { porterDispatch: _context, ...ordinary } = preferred!;
+  assert.notEqual(responseKey("get", preferred!), responseKey("get", ordinary));
+  assert.notEqual(responseKey("get", preferred!), responseKey("get", alternateOffer!));
+  assert.match(JSON.stringify(packResponseRequest("get", [{ id: "a", situation: preferred! }], "")), /porterDispatch/);
+  assert.doesNotMatch(JSON.stringify(packResponseRequest("carry", [{ id: "a", situation: preferred! }], "")), /porterDispatch/);
 });
 
 for (const [label, x, destinationX] of [

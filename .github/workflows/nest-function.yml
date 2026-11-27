@@ -9,6 +9,9 @@ on:
       - "web/src/colony/bypassPolicy.ts"
       - "web/src/colony/porterObservation.ts"
       - "web/src/colony/nestWork.ts"
+      - "web/src/colony/colonyBrain.ts"
+      - "web/src/colony/responses.ts"
+      - "web/src/colony/params.ts"
       - "web/src/colony/tunnel.ts"
       - "web/src/colony/move.ts"
       - "web/src/colony/passageTrace.ts"
@@ -37,7 +40,7 @@ jobs:
       fail-fast: false
       matrix:
         seed: [7, 17, 29, 43]
-        mode: [current, trace, trace-repair, trace-bypass]
+        mode: [current, trace, trace-repair, trace-bypass, trace-dispatch]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -78,8 +81,9 @@ jobs:
           populations = set()
           handoff_rows = []
           porter_rows = []
+          dispatch_rows = []
           for seed in (7, 17, 29, 43):
-              for mode in ("current", "trace", "trace-repair", "trace-bypass"):
+              for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-dispatch"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
                   assert report["seed"] == seed
                   populations.add(report["antsPerColony"])
@@ -116,6 +120,11 @@ jobs:
                                       porter["outstandingOver30s"], "—" if p95_value is None else f"{p95_value:.2f}",
                                       porter["sampledReversals"], porter["sampledAdjacentMoves"], bypass.get("peakEligibleFaces", 0),
                                       len(sites), sum(site["porterEntries"] for site in sites)))
+                  if mode == "trace-dispatch":
+                      d = point["dispatch"]
+                      assert d["preferredOffers"] == d["preferredAccepted"] + d["alternateAccepted"] + d["deferred"]
+                      dispatch_rows.append((seed, d["preferredOffers"], d["preferredAccepted"], d["alternateOffers"],
+                                            d["alternateAccepted"], d["deferred"], item["dispatchRequests"]["uniqueSituations"]))
           assert len(populations) == 1
           print("\n### First handoff of incoming food\n")
           cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
@@ -131,6 +140,11 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in porter_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Pickup decisions for store redistribution\n")
+          print("| Seed | Preferred offered | Preferred accepted | Alternate offered | Alternate accepted | Deferred | Jev situations |")
+          print("| --- | --- | --- | --- | --- | --- | --- |")
+          for row in dispatch_rows:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

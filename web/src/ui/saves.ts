@@ -20,6 +20,7 @@ export interface GameSettings {
   /** which world the game is on (PRD §66 E6): absent in a save from before the endless world, which is bounded (`worldOf`, worldKind.ts); `buildGame` reads absent as bounded too */
   world?: WorldKind;
   strategicBackfill?: boolean;
+  porterDispatch?: boolean;
 }
 
 /** The player's side of the game: the fungus's policy, and the colonies' doctrines as they stand. */

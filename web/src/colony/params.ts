@@ -484,6 +484,8 @@ export interface ColonyParams {
   backfillTraceSeconds?: number;
   /** In the trace experiment, ask the ordinary drop question for repair of chamber floors. */
   backfillFloorRepair?: boolean;
+  /** Offer store-bound pickup through the porter dispatch policy. */
+  porterDispatch?: boolean;
   /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
   tunnelDrift: number;
 }

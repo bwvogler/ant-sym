@@ -19,7 +19,7 @@ if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
 }
 const allModes = ["current", "trace", "trace-repair"];
 const modes = process.env.NEST_ASSAY_MODE ? [process.env.NEST_ASSAY_MODE] : allModes;
-if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass")) throw Error("Unknown NEST_ASSAY_MODE");
+if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass" && m !== "trace-dispatch")) throw Error("Unknown NEST_ASSAY_MODE");
 const tickRate = 30;
 const sampleTicks = 6;
 const checkpointSeconds = 60;
@@ -274,16 +274,35 @@ function run(mode) {
       ? undefined
       : {
           backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
+          ...(mode === "trace-dispatch" ? { porterDispatch: true } : {}),
           ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
         };
   const specs = [{ antCount: ants, ...(colony ? { colony } : {}) }, { antCount: ants }];
   const game = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(seed), specs);
   const first = game.colonies[0];
   const backfillSituations = new Map();
+  const dispatchSituations = new Map();
+  const dispatch =
+    mode === "trace-dispatch" ? { preferredOffers: 0, preferredAccepted: 0, alternateOffers: 0, alternateAccepted: 0 } : null;
   if (colony) {
     const base = first.responses;
     first.responses = {
       ...base,
+      get(t, draw) {
+        const accepted = base.get(t, draw);
+        const context = t.porterDispatch;
+        if (dispatch && context) {
+          dispatchSituations.set(responseKey("get", t), { ...t });
+          if (context.candidate === "preferred") {
+            dispatch.preferredOffers++;
+            if (accepted) dispatch.preferredAccepted++;
+          } else {
+            dispatch.alternateOffers++;
+            if (accepted) dispatch.alternateAccepted++;
+          }
+        }
+        return accepted;
+      },
       drop(t, draw) {
         if (t.backfillTraffic !== undefined) backfillSituations.set(responseKey("drop", t), { ...t });
         return base.drop(t, draw);
@@ -309,16 +328,27 @@ function run(mode) {
         ...watch.checkpoint(tick / tickRate),
         porterTrips: porters.checkpoint(),
         bypass: bypass?.checkpoint() ?? null,
+        dispatch: dispatch
+          ? {
+              ...dispatch,
+              deferred: dispatch.preferredOffers - dispatch.preferredAccepted - dispatch.alternateAccepted,
+            }
+          : null,
       });
     }
   }
   const meanMs = tickMs.reduce((a, b) => a + b, 0) / tickMs.length;
   tickMs.sort((a, b) => a - b);
   const situations = [...backfillSituations.values()].map((situation, i) => ({ id: `s${i}`, situation }));
+  const dispatchItems = [...dispatchSituations.values()].map((situation, i) => ({ id: `s${i}`, situation }));
   const exampleBytes = situations.length === 0 ? 0 : Buffer.byteLength(JSON.stringify(packResponseRequest("drop", situations, "")));
   return {
     mode,
     tickTiming: { meanMs, p95Ms: tickMs[Math.ceil(tickMs.length * 0.95) - 1] },
+    dispatchRequests: {
+      uniqueSituations: dispatchItems.length,
+      exampleBatchBytes: dispatchItems.length ? Buffer.byteLength(JSON.stringify(packResponseRequest("get", dispatchItems, ""))) : 0,
+    },
     backfillRequests: { uniqueSituations: situations.length, exampleBatchBytes: exampleBytes },
     checkpoints,
   };

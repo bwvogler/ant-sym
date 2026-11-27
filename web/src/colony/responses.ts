@@ -50,7 +50,15 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
  */
 export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "reception";
 
+export interface PorterDispatchContext {
+  candidate: "preferred" | "alternate";
+  inbound: "light" | "busy" | "saturated";
+  sourcePassage: BackfillTraffic | "unknown";
+}
+
 export interface Touch {
+  /** Only for a chamber food pickup offered for redistribution to a store. */
+  porterDispatch?: PorterDispatchContext;
   /** Only for an adjacent, eligible underground soil placement. */
   backfillTraffic?: BackfillTraffic;
   /** Nearby hostile attack cue for the local contact fallback. Set only during the contact call. */
@@ -172,7 +180,10 @@ export interface Responses {
  * porter carriers lay nothing; shy from alarm unless fighting or digging; always raise it in a fight.
  */
 export const localResponses: Responses = {
-  get: (t) => t.offered !== "food" || t.mode !== "fight",
+  get: (t) =>
+    (t.offered !== "food" || t.mode !== "fight") &&
+    t.porterDispatch?.inbound !== "saturated" &&
+    !(t.porterDispatch?.inbound === "busy" && t.porterDispatch.sourcePassage === "quiet"),
   carry: () => "take",
   drop: (t) => t.backfillTraffic !== "recent",
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
@@ -233,7 +244,7 @@ export const CROWD = ["few", "many"] as const;
  * key order; porter, digging and enemy read as words, and quality only when it isn't "fair" (so keys from before quality still
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
-const TOUCH_FIELDS: readonly FieldOf<Omit<Touch, "recentAttack" | "backfillTraffic">>[] = [
+const TOUCH_FIELDS: readonly FieldOf<Omit<Touch, "recentAttack" | "backfillTraffic" | "porterDispatch">>[] = [
   { name: "deliveryTarget", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryTarget:${v}` },
   { name: "deliveryPlace", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryPlace:${v}` },
   { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },

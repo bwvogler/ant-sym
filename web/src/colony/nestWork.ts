@@ -1,5 +1,7 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { recentPassage } from "./passageTrace.ts";
+import type { PorterDispatchContext } from "./responses.ts";
 import { porterObservers } from "./porterObservation.ts";
 import { foodHandoffObservers } from "./foodHandoffObservation.ts";
 import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
@@ -318,23 +320,74 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   // stocked, counting what porters are already taking there), as harvesters keep their seeds deep. Counted by what
   // lay there alone, a store nobody reached stayed least stocked and drew every porter: 41 at once held food over
   // 120 s, all for one single-cell store (F1's runs, PRD §40).
+  let approved = false;
   if (to < 0 && c.role !== "store") {
     portView(col);
+    let preferred: Chamber | undefined;
+    let alternate: Chamber | undefined;
     let least = Infinity;
+    let second = Infinity;
     for (const s of ch.list) {
       if (s.colony !== col.params.nest || s.role !== "store" || s.cells === 0) continue;
       const stock = s.food + (col.enRouteTo.get(s.id) ?? 0);
       if (stock < least) {
+        alternate = preferred;
+        second = least;
+        preferred = s;
         least = stock;
-        to = s.id;
+      } else if (stock < second) {
+        alternate = s;
+        second = stock;
       }
     }
+    if (preferred && col.params.porterDispatch && !col.onPlane && col.cur === col.home) {
+      to = dispatchToStore(col, i, preferred, alternate, cx, cy, enemy);
+      approved = true;
+    } else to = preferred?.id ?? -1;
   }
   if (to < 0 || to === here) return false;
-  if (!col.responses.get(touch(col, i, enemy, col.mode[i], "none", "food"), col.antDraw(i))) return false;
+  if (!approved && !col.responses.get(touch(col, i, enemy, col.mode[i], "none", "food"), col.antDraw(i))) return false;
   col.stock(c, -1);
   becomePorter(col, i, to);
   return false;
+}
+
+function dispatchToStore(
+  col: Colony,
+  i: number,
+  preferred: Chamber,
+  alternate: Chamber | undefined,
+  x: number,
+  y: number,
+  enemy: boolean,
+): number {
+  const trace = col.passageTrace;
+  const sourcePassage =
+    trace && col.gainMarks[i] >= 0.5
+      ? recentPassage(trace, x, y, col.time, col.params.backfillTraceSeconds ?? 0)
+        ? "recent"
+        : "quiet"
+      : "unknown";
+  const draw = col.antDraw(i);
+  const offer = (store: Chamber, candidate: PorterDispatchContext["candidate"]) => {
+    const inboundCount = col.enRouteTo.get(store.id) ?? 0;
+    const inbound =
+      inboundCount >= Math.max(8, 4 * store.floor) ? "saturated" : inboundCount >= Math.max(4, 2 * store.floor) ? "busy" : "light";
+    return col.responses.get(
+      {
+        ...touch(col, i, enemy, col.mode[i], "none", "food"),
+        porterDispatch: {
+          candidate,
+          inbound,
+          sourcePassage,
+        },
+      },
+      draw,
+    );
+  };
+  if (offer(preferred, "preferred")) return preferred.id;
+  if (alternate && offer(alternate, "alternate")) return alternate.id;
+  return -1;
 }
 
 /**
