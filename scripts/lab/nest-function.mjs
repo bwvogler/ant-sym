@@ -5,9 +5,10 @@ import { packResponseRequest, responseKey } from "../../web/src/colony/colonyBra
 import { Game, generateOneWorld, gameRng } from "../../web/src/colony/index.ts";
 import { CELL, cellKey, cellOf, hexDistance, keyX, keyY, nx, ny } from "../../web/src/colony/hex.ts";
 import { OPEN, isSky, rockAt, topRow } from "../../web/src/colony/world.ts";
+import { GAME_STARTING_ANTS } from "../../web/src/colony/params.ts";
 import { BACKFILL_TRACE_SECONDS } from "../../web/src/colony/passageTrace.ts";
 
-const [seedText = "1", secondsText = "600", antsText = "100", out] = process.argv.slice(2);
+const [seedText = "1", secondsText = "600", antsText = String(GAME_STARTING_ANTS), out] = process.argv.slice(2);
 const [seed, seconds, ants] = [seedText, secondsText, antsText].map(Number);
 if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
   throw Error("Usage: nest-function.mjs seed simulated-seconds ants-per-colony [output.json]");

@@ -18,12 +18,12 @@ In the earlier scheduled-traffic fixture, a 12-second passage trace preserved th
 
 ## Nest function assay
 
-The **Nest function assay** workflow compares current backfill and the trace fallback using paired world and random-stream starting seeds. The first colony gets the treatment, and the rival keeps the current rules. Both use the bounded one-world map, with no live Jev calls or fungus intervention. The PR workflow plays both variants for 600 simulated seconds. Seeds 17 and 29 start with 100 workers per colony, and seeds 7 and 43 with 300. Once the workflow is available on the default branch, manual dispatch offers 300, 600 or 1,200 seconds. Each runner uploads one JSON file with minute checkpoints, and the summary compares final checkpoints.
+The **Nest function assay** workflow compares current backfill and the trace fallback using paired world and random-stream starting seeds. The first colony gets the treatment, and the rival keeps the current rules. Both use the bounded one-world map, with no live Jev calls or fungus intervention. The PR workflow plays both variants for 600 simulated seconds on seeds 7, 17, 29 and 43. Each colony starts with 600 workers, using the same starting-count constant as the browser game. Once the workflow is available on the default branch, manual dispatch offers 300, 600 or 1,200 seconds. Each runner uploads one JSON file with minute checkpoints, and the summary compares final checkpoints.
 
 Run a pair locally with Node 22.18 or newer:
 
 ```sh
-node scripts/lab/nest-function.mjs 17 600 100 nest-17.json
+node scripts/lab/nest-function.mjs 17 600 > nest-17.json
 ```
 
 | Metric | How to read it |
@@ -37,7 +37,7 @@ node scripts/lab/nest-function.mjs 17 600 100 nest-17.json
 | Tick timings and trace decisions | Compare engine cost and check whether the policy received fresh evidence. A measured tick excludes assay observation and rendering. |
 | Unique experimental drop situations and example batch bytes | Workload and request-size diagnostics. The assay spends no live tokens. Default behavior introduces zero new Jev situations. |
 
-An initial local ten-minute run at 100 workers per colony found no eligible placements in seeds 17 and 29. Both policies delivered the same amounts (353 and 852 food units) on those seeds. Those runs verify the long-game metric path and do not establish an effect on nest function.
+The initial lower-population runs were pilots. Interpret their results in that context. The workflow evaluates typical starting population on a bounded map, with fungus intervention disabled to isolate the worker response.
 
 Analyses should retain paired seed results. Trajectories and random draws can diverge after a different move. Compare food and useful access together, since lower soil hauling or faster travel could come at the cost of an effectively smaller nest.
 

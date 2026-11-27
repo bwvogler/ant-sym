@@ -29,11 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { seed: 7, ants: 300 }
-          - { seed: 17, ants: 100 }
-          - { seed: 29, ants: 100 }
-          - { seed: 43, ants: 300 }
+        seed: [7, 17, 29, 43]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -42,9 +38,8 @@ jobs:
       - name: Play paired worlds
         env:
           SEED: ${{ matrix.seed }}
-          ANTS: ${{ matrix.ants }}
           SECONDS_TO_PLAY: ${{ inputs.seconds || '600' }}
-        run: node scripts/lab/nest-function.mjs "$SEED" "$SECONDS_TO_PLAY" "$ANTS" "nest-$SEED.json"
+        run: node scripts/lab/nest-function.mjs "$SEED" "$SECONDS_TO_PLAY" > "nest-$SEED.json"
       - uses: actions/upload-artifact@v7
         with:
           name: nest-function-seed-${{ matrix.seed }}
@@ -68,9 +63,11 @@ jobs:
 
           print("| Seed | Mode | Sim s | Start ants per colony | Food | Port trips | Food in jaws below | Reachable cells | Dead ends | Dug cells used later | Filled | Re-digs observed | Recent fills declined | Reversal % | Tick p95 ms |")
           print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+          starting_counts = set()
           for seed in (7, 17, 29, 43):
               report = json.loads(Path(f"out/nest-{seed}.json").read_text())
               assert report["seed"] == seed
+              starting_counts.add(report["antsPerColony"])
               assert [item["mode"] for item in report["results"]] == ["current", "trace"]
               for item in report["results"]:
                   point = item["checkpoints"][-1]
@@ -82,5 +79,6 @@ jobs:
                          point["laterUsedDugCells"], point["filled"], point["redigCellsObserved"],
                          trace.get("recentKept", "—"), f"{rate:.2f}", f"{item['tickTiming']['p95Ms']:.2f}")
                   print("| " + " | ".join(map(str, row)) + " |")
+          assert len(starting_counts) == 1
           print("\nBoth variants use the same starting seed. JSON artifacts include one checkpoint per simulated minute. See docs/strategic-backfill.md for metric definitions.")
           PY

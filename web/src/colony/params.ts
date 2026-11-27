@@ -26,6 +26,9 @@ export const BACKFILL = Object.freeze({
 /** The backfill tuning as a type, each number free to vary (ColonyParams.backfill). */
 export type BackfillTuning = { readonly [K in keyof typeof BACKFILL]: number };
 
+/** Starting workers per colony in a new browser game and its representative assays. */
+export const GAME_STARTING_ANTS = 600;
+
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
 export const YOUNG = 0.15;
 

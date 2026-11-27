@@ -19,6 +19,7 @@ import {
   speciesById,
   type OneWorld,
 } from "../colony/index.ts";
+import { GAME_STARTING_ANTS } from "../colony/params.ts";
 import { BACKFILL_TRACE_SECONDS } from "../colony/passageTrace.ts";
 import { fogCarried } from "./fog/sources.ts";
 import { journalFromUrl } from "./journal.ts";
@@ -119,7 +120,7 @@ export const viewShowing = (
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   species: GENERIC_ANT.id,
   seed: 1,
-  antCount: 600,
+  antCount: GAME_STARTING_ANTS,
   speed: GAME_SPEED,
   playing: false,
   started: false,
