@@ -30,5 +30,14 @@ export function gpuGroundFromUrl(search = browserSearch()): boolean {
 
 /** Enable the local, on-demand performance capture. */
 export function profileFromUrl(search = browserSearch()): boolean {
-  return new URLSearchParams(search).get("profile") === "1";
+  const query = new URLSearchParams(search);
+  return query.get("profile") === "1" && query.get("pace") !== "1";
+}
+
+export function trailVariantFromUrl(search = browserSearch()): "baseline" | "optimized" {
+  return new URLSearchParams(search).get("trail") === "baseline" ? "baseline" : "optimized";
+}
+
+export function paceFromUrl(search = browserSearch()): boolean {
+  return new URLSearchParams(search).get("pace") === "1";
 }

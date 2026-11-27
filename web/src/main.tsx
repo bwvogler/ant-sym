@@ -1,3 +1,5 @@
+import { setTrailOptimizations } from "./colony/index.ts";
+import { trailVariantFromUrl } from "./ui/playbackOptions.ts";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
@@ -22,6 +24,7 @@ if (preview === "main" || preview === "worker") {
     ),
   );
 } else {
+  setTrailOptimizations(trailVariantFromUrl() === "optimized");
   createRoot(root).render(
     <StrictMode>
       <ErrorBoundary>

@@ -1,3 +1,5 @@
+import { PacePanel } from "./ui/PacePanel.tsx";
+import { paceFromUrl, trailVariantFromUrl } from "./ui/playbackOptions.ts";
 import { PerformancePanel } from "./ui/PerformancePanel.tsx";
 import { pageProfile } from "./ui/pageProfile.ts";
 import {
@@ -107,6 +109,8 @@ type DrawerId = "fungus" | "evolve" | "colonies" | "saves" | "settings";
 
 /** The speeds the HUD offers (4× is the game's default; PRD §50); the Lab's World tab has the slider for the rest. */
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
+
+const paceVariant = paceFromUrl() ? trailVariantFromUrl() : null;
 
 export default function ColonyApp() {
   const colony = useColony();
@@ -383,6 +387,16 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     });
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
+      {paceVariant && (
+        <PacePanel
+          variant={paceVariant}
+          game={game}
+          view={controls.view}
+          speed={controls.speed}
+          canStart={controls.started && controls.playing}
+          onFrame={onFrame}
+        />
+      )}
       {pageProfile && (
         <PerformancePanel
           profile={pageProfile}

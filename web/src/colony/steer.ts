@@ -1,4 +1,5 @@
 import { activeEngineProfile, profileSteering } from "./engineProfile.ts";
+import { trailOptimizations } from "./responses.ts";
 // Steer (docs/refactor.md S3.4): the fourth stage of an ant's step in tick. The heading it walks this step: homing to where it believes its goal is (its vector, the hole, a pellet up the shaft, trails, walls, backfill and stale tunnels), following a trail, fighting or raiding, exploring and digging; then fleeing, alarm, the trail it lays, the wait at home, and the last stretch into its hole. Moved out of Colony.tick verbatim but for `this` becoming `col`; the heading goes to the next stages through the step record.
 import { localDelivery } from "./deliveryAction.ts";
 import { NO_KEY } from "./ants.ts";
@@ -623,7 +624,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   const trailStart = profile?.steeringClock();
   const tt = touch(col, i, toEnemy !== null, mode, item);
   const choiceStart = profile?.steeringClock();
-  const trail = resp.trail(tt, col.antDraw(i, true));
+  const trail = resp.trail(tt, col.antDraw(i, trailOptimizations));
   const writeStart = profile?.steeringClock();
   if (trail !== "none") {
     const laid =
