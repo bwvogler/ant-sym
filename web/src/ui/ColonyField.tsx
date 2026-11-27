@@ -113,7 +113,7 @@ export default function ColonyField({
   const hover = useRef<[number, number] | null>(null);
   const worldRef = useLatest(world);
   const sensedRef = useLatest(sensed);
-  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb, sensed: sensedRef });
+  const rig = useCameraRig({ shown, worldRef, canvasRef, follow, followCb, sensed: sensedRef, pen: penRef });
 
   /** The shown view's map: the plane or the curtain. */
   const shownMap = (): WorldMap => mapOfLayer(world, shown.current);

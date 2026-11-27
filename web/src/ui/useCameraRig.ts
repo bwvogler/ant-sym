@@ -1,6 +1,6 @@
 import { useState, type RefObject } from "react";
 import { mapOfLayer, type OneWorld } from "../colony/index.ts";
-import { CameraRig, type RigHost } from "./field/rig.ts";
+import { CameraRig, type Disc, type RigHost } from "./field/rig.ts";
 import type { Followed } from "./follow.ts";
 import type { SensedMap } from "./fungusSight.ts";
 
@@ -13,6 +13,8 @@ export interface RigRefs {
   followCb: RefObject<(f: Followed | null) => void>;
   /** what the hosts have sensed: the fog's knowledge bounds the camera (F7b) */
   sensed: RefObject<SensedMap>;
+  /** the open flight pen (its circle), or null: the camera may go to its rim (ja-qpv.5.1.1) */
+  pen: RefObject<Disc | null>;
 }
 
 /** What the rig reads of the page: each view's map is its layer's (the plane, or the curtain of the line that layer is). Exported for its test. */
@@ -28,6 +30,7 @@ export function rigHost(r: RigRefs): RigHost {
       r.followCb.current(null);
     },
     fog: () => r.sensed.current.knowledge,
+    pen: () => r.pen.current,
   };
 }
 

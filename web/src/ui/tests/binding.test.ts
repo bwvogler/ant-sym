@@ -53,7 +53,7 @@ function setup(shown = PLANE) {
     sensed as never,
     ground as never,
     minimap as never,
-    { shown: () => st.shown, smell: () => st.smell },
+    { shown: () => st.shown, smell: () => st.smell, pen: () => null },
     (n) => (n === "--heat" ? "10 20 30" : n.startsWith("--") ? "#102030" : ""),
     colonies[0] as never,
   );
