@@ -1,3 +1,4 @@
+import { pageProfile } from "./pageProfile.ts";
 import type { Game, Journal } from "../colony/index.ts";
 import { FixedStepClock, MAX_STEP } from "./fixedStepClock.ts";
 import type { SimTasks } from "./simTasks.ts";
@@ -94,9 +95,13 @@ export class GameLoop {
 
   /** One sim step of `dt`: the game ticks, the step subscribers run, the journal sees it. Every way the page steps the game goes through here, so nothing keeping up with the sim misses one. */
   advance(dt: number): void {
+    const profile = pageProfile?.getSnapshot().running ? pageProfile : null;
+    const start = profile ? this.#env.now() : 0;
     this.game.tick(dt);
+    const afterEngine = profile ? this.#env.now() : 0;
     for (const fn of this.#steps) fn();
     this.#journal?.observe(this.game);
+    if (profile) profile.tick(dt, afterEngine - start, this.#env.now() - afterEngine);
   }
 
   /** The latest stats (null until the first is taken). */
@@ -238,6 +243,7 @@ export class GameLoop {
     }
     if (changed) this.#notify();
     for (const fn of this.#frame) fn();
+    if (pageProfile?.getSnapshot().running) pageProfile.frame(t, this.#env.now());
     if (this.#running) this.#raf = this.#env.request(this.#loop);
   };
 }

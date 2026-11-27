@@ -1,3 +1,4 @@
+import { pageProfile } from "./pageProfile.ts";
 import { BrickGpu } from "./field/brickGpu.ts";
 import { gpuGroundFromUrl } from "./playbackOptions.ts";
 import { useEffect, type RefObject } from "react";
@@ -176,7 +177,8 @@ export function useFieldFrame({
     const parts: FieldParts = { ground, minimap, voxelMap, sinks };
     const renderer = new FieldRenderer();
     const draw = () => {
-      const started = env.dev ? env.now() : 0;
+      const profile = pageProfile?.getSnapshot().running ? pageProfile : null;
+      const started = env.dev || profile ? env.now() : 0;
       binding.bind();
       const d = env.dpr();
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
@@ -219,6 +221,7 @@ export function useFieldFrame({
             : { started, f, fcol, fHere },
         ),
       );
+      if (profile) profile.draw(env.now() - started);
       if (tryGpu && canvas.dataset.groundBackend !== ground.brickBackend) canvas.dataset.groundBackend = ground.brickBackend;
     };
     binding.load(draw);

@@ -27,3 +27,8 @@ export function mapPixelRatio(): number {
 export function gpuGroundFromUrl(search = browserSearch()): boolean {
   return new URLSearchParams(search).get("renderer") === "gpu";
 }
+
+/** Enable the local, on-demand performance capture. */
+export function profileFromUrl(search = browserSearch()): boolean {
+  return new URLSearchParams(search).get("profile") === "1";
+}
