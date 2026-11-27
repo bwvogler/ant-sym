@@ -1,3 +1,4 @@
+import { activeEngineProfile } from "./engineProfile.ts";
 import { snapshotAttackCue } from "./attackCue.ts";
 import { centreX, centreY, R } from "./hex.ts";
 import { around, CountGrid, resolveFights, occupancy, DEFAULT_FIGHT, type FightParams } from "./battle.ts";
@@ -1599,6 +1600,8 @@ export class Game {
       }
       c.flown.length = 0;
     });
+    const profile = activeEngineProfile;
+    const occupancyStart = profile ? profile.now() : 0;
     const fungal = this.fungus.due(dt);
     // Occupancy is needed every tick with a rival (fights, recognition), underground (crowded digging, backfill), or when the fungus steps.
     if (this.colonies.length > 1 || fungal || this.layers.some((m) => m.hasSoil)) this.#refresh();
@@ -1622,6 +1625,7 @@ export class Game {
       // Whether the colonies meet as allies (unity, ja-i0f): read after odours move, from this tick's occupancy.
       this.#meet(dt);
     }
+    if (profile) profile.occupancy(profile.now() - occupancyStart);
     // After fights: the dead neither pass load on nor groom (the occupancy grids still count them as groomers for this one step).
     // The fungus steps every few ticks (fungus.ts advance); when it is idle its clock does not run.
     // The midden's spores (nest slices 7–8) are laid as each corpse is buried: see onBury in the constructor.
@@ -1629,10 +1633,12 @@ export class Game {
     this.colonies.forEach((c, k) => {
       if (!this.revealed[k] && c.queen && c.queen.load >= INFECTED) this.revealed[k] = true;
     });
+    const fungusStart = profile ? profile.now() : 0;
     if (this.fungus.active) {
       const recs = this.colonies.length > 1 ? this.#recs : null;
       this.fungus.advanceLayers(awake, this.#frozen.size ? this.#grids.map((gs) => this.#awakeOf(gs)) : this.#grids, dt, recs);
     }
+    if (profile) profile.fungus(profile.now() - fungusStart);
     if (this.#sleep && this.time >= this.#sleepNext) this.#decideSleep();
     if (isEndless(this.map)) this.#chunkStep(this.map);
     if (this.time >= this.#nextRivalCheck) {

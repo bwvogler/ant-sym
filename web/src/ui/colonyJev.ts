@@ -1,3 +1,4 @@
+import { activeEngineProfile } from "../colony/engineProfile.ts";
 import {
   errorOf,
   GAME_CAPS,
@@ -497,6 +498,17 @@ export class ColonyJev {
    * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
   #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S, key?: string): A {
+    const profile = activeEngineProfile;
+    if (!profile?.sampledAnt) return this.#answer(l, s, snapshot, key);
+    const start = profile.now();
+    try {
+      return this.#answer(l, s, snapshot, key);
+    } finally {
+      profile.policy(profile.now() - start);
+    }
+  }
+
+  #answer<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S, key?: string): A {
     if (l.asks && !l.asks(s)) return l.local(s);
     key ??= l.key(s);
     const hit = this.#cache(l).get(key);

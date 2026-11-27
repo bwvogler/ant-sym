@@ -56,6 +56,15 @@ export function PerformancePanel({ profile, seed, view, requestedSpeed, starting
             95th percentile · tick {report.tick?.p95Ms.toFixed(1) ?? "—"} ms · after tick {report.afterTick?.p95Ms.toFixed(1) ?? "—"} ms ·
             draw {report.mapDraw?.p95Ms.toFixed(1) ?? "—"} ms · frame gap {report.frameGap?.p95Ms.toFixed(1) ?? "—"} ms
           </p>
+          <p className="my-1">
+            Mean per tick · ants {report.engine.meanMsPerTick.ants.toFixed(1)} ms · pheromones{" "}
+            {report.engine.meanMsPerTick.pheromones.toFixed(1)} ms · colony maintenance{" "}
+            {report.engine.meanMsPerTick.colonyMaintenance.toFixed(1)} ms
+          </p>
+          <p className="my-1">
+            Estimated per tick · steering {report.engine.estimatedAntStageMsPerTick.steering.toFixed(1)} ms · policy lookup{" "}
+            {report.engine.estimatedAntStageMsPerTick.policyLookupWithinStages.toFixed(1)} ms within ant stages
+          </p>
           <button
             type="button"
             className="mb-1 rounded border border-line px-2 py-1"

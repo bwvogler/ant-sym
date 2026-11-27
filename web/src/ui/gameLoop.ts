@@ -1,3 +1,4 @@
+import { withEngineProfile } from "../colony/engineProfile.ts";
 import { pageProfile } from "./pageProfile.ts";
 import type { Game, Journal } from "../colony/index.ts";
 import { FixedStepClock, MAX_STEP } from "./fixedStepClock.ts";
@@ -97,11 +98,15 @@ export class GameLoop {
   advance(dt: number): void {
     const profile = pageProfile?.getSnapshot().running ? pageProfile : null;
     const start = profile ? this.#env.now() : 0;
-    this.game.tick(dt);
+    if (profile) withEngineProfile(profile.engine, () => this.game.tick(dt));
+    else this.game.tick(dt);
     const afterEngine = profile ? this.#env.now() : 0;
     for (const fn of this.#steps) fn();
     this.#journal?.observe(this.game);
-    if (profile) profile.tick(dt, afterEngine - start, this.#env.now() - afterEngine);
+    if (profile) {
+      profile.engine.endTick(afterEngine - start);
+      profile.tick(dt, afterEngine - start, this.#env.now() - afterEngine);
+    }
   }
 
   /** The latest stats (null until the first is taken). */

@@ -1,3 +1,4 @@
+import { EngineProfile } from "../colony/engineProfile.ts";
 import { profileFromUrl } from "./playbackOptions.ts";
 
 const DURATION_MS = 10_000;
@@ -13,6 +14,7 @@ interface Report extends Scene {
   afterTick: Stats;
   mapDraw: Stats;
   frameGap: Stats;
+  engine: ReturnType<EngineProfile["report"]>;
 }
 
 type Status = Readonly<{ running: boolean; report: Report | null }>;
@@ -27,6 +29,7 @@ function summarize(values: number[]): Stats {
 
 /** One short capture of the real game. Recorders do no timing work outside a capture. */
 export class PageProfile {
+  engine = new EngineProfile();
   private status: Status = { running: false, report: null };
   private readonly listeners = new Set<() => void>();
   private scene: Scene | null = null;
@@ -50,6 +53,7 @@ export class PageProfile {
   }
 
   start(scene: Scene, now: number): void {
+    this.engine = new EngineProfile();
     this.scene = scene;
     this.startAt = now;
     this.lastFrame = null;
@@ -93,6 +97,7 @@ export class PageProfile {
       afterTick: summarize(this.afterTicks),
       mapDraw: summarize(this.draws),
       frameGap: summarize(this.gaps),
+      engine: this.engine.report(),
     };
     this.scene = null;
     this.publish({ running: false, report });

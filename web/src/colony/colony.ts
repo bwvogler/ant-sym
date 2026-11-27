@@ -1,3 +1,4 @@
+import { activeEngineProfile } from "./engineProfile.ts";
 import type { AttackCue } from "./attackCue.ts";
 import { combatObservers } from "./combatObservation.ts";
 import { leaveRate } from "./invite.ts";
@@ -1485,6 +1486,8 @@ export class Colony {
       this.holeIn = 0;
     }
     // Energy and felt hunger (ja-xu6.1): the curtain, where there is a queen and brood.
+    const profile = activeEngineProfile;
+    const bodyStart = profile ? profile.now() : 0;
     if (this.housed) body(this, dt);
     // Heat (ja-rf5.5): only a species with a day of heat.
     if (this.params.heatDay > 0) heatStep(this, dt);
@@ -1509,6 +1512,8 @@ export class Colony {
     s.threatLeak = threatLeak;
     s.crowdKeep = crowdKeep;
     const combatObserver = combatObservers.get(this);
+    const antStart = profile ? profile.now() : 0;
+    if (profile) profile.colony(antStart - bodyStart);
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -1530,17 +1535,36 @@ export class Colony {
         s.crowdKeep = crowdKeep;
       }
       if (map.sky) unbury(this, i);
+      const sampled = profile?.sampleAnt(i) ? profile : null;
+      let stageStart = sampled ? sampled.now() : 0;
       perceive(this, i, s);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("sense", now - stageStart);
+        stageStart = now;
+      }
       stanceStep(this, i, s);
       decide(this, i, s, combatObserver, attackCue);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("decide", now - stageStart);
+        stageStart = now;
+      }
       steer(this, i, s);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("steer", now - stageStart);
+        stageStart = now;
+      }
       const moveDigDone = moveDig(this, i, s);
-      if (moveDigDone) continue;
-
-      const arriveDone = arrive(this, i, s);
-      if (arriveDone) continue;
-      this.heading[i] = s.h;
+      if (!moveDigDone && !arrive(this, i, s)) this.heading[i] = s.h;
+      if (sampled) {
+        sampled.antStage("move", sampled.now() - stageStart);
+        sampled.sampledAnt = false;
+      }
     }
+    const antEnd = profile ? profile.now() : 0;
+    if (profile) profile.ants(antEnd - antStart);
     this.gateHeld = s.heldNow;
     // Colony-wide work from here on is the home layer's (the nest, its count of ants in and out, its brood).
     if (multi) this.bind(this.home);
@@ -1552,13 +1576,17 @@ export class Colony {
       this.outside = out;
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
+    const scentStart = profile ? profile.now() : 0;
     for (const L of this.layers) if (L) L.ph.advance(dt);
+    const scentEnd = profile ? profile.now() : 0;
+    if (profile) profile.pheromones(scentEnd - scentStart);
     for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.housed) {
       nestLife(this, dt);
       middenSmell(this, dt);
     } else if (p.mortalWithoutQueen) ageWorkers(this, dt);
+    if (profile) profile.colony(scentStart - antEnd + profile.now() - scentEnd);
   }
 
   /** This colony's state for a save (colonySave.ts saveColony). */
