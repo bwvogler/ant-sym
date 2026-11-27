@@ -1,4 +1,4 @@
-import { backfillObservers } from "./backfillObservation.ts";
+import { backfillObservers, branchEntryObservers } from "./backfillObservation.ts";
 import { recentPassage } from "./passageTrace.ts";
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
@@ -232,6 +232,17 @@ export function enterStale(self: Colony, i: number, cx: number, cy: number): boo
   if (wayV >= staleBelow(self, cx, cy, tx, ty)) return false;
   if (rockAt(map, bx, by) === OPEN && wayV >= staleBelow(self, bx, by, tx, ty)) return false; // no staler than the path behind
   if (self.rng() >= self.params.backfill.enterStale) return false;
+  const observe = branchEntryObservers.get(self);
+  const trace = self.cur === self.home && !self.onPlane && self.gainMarks[i] >= 0.5 ? self.passageTrace : undefined;
+  if (trace && (self.params.backfillTraceEntry || observe)) {
+    const lifetime = self.params.backfillTraceSeconds ?? 0;
+    const corridorRecent = recentPassage(trace, cx, cy, self.time, lifetime);
+    if (self.params.backfillTraceEntry && recentPassage(trace, tx, ty, self.time, lifetime)) {
+      observe?.(i, "skipped", corridorRecent);
+      return false;
+    }
+    observe?.(i, "entered", corridorRecent);
+  } else observe?.(i, "entered", false);
   self.staleWalk[i] = 1;
   self.gdir[i] = way;
   self.gx[i] = tx;

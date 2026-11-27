@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { BACKFILL, besideRefill, chooseDig, Colony, DIG_FACE, GLANCE, refilled, soilFace, stub, type ColonyParams } from "../../colony.ts";
+import { rememberPassage } from "../../passageTrace.ts";
 import { CELL, cellOf, centreX, centreY, nx, ny } from "../../hex.ts";
 import { fillCell, mulberry32, OPEN, rockAt, SOIL, worldFromArrays, type WorldMap } from "../../world.ts";
 import { nestAt, put } from "../hexmaps.ts";
@@ -136,6 +137,30 @@ test("a carrier detours into a stale branch, walks it to its end and fills it ba
   }
   assert.equal(rockAt(live, b3[0], b3[1]), OPEN, "live branch: not filled");
   assert.ok(!entered, "and not entered");
+});
+
+test("a fresh mouth mark saves a detour while a quiet or expired mouth still permits tip-first backfill", () => {
+  const branch: [number, number][] = [
+    [12, 5],
+    [13, 4],
+    [13, 3],
+  ];
+  const tuned = { backfill: { ...BACKFILL, enterStale: 1 }, backfillTraceSeconds: 12, backfillTraceEntry: true };
+  for (const scenario of ["fresh", "expired", "quiet", "blind", "placement-only"] as const) {
+    const map = build(branch);
+    const c = carrierOn(map, path, 2, { ...tuned, backfillTraceEntry: scenario !== "placement-only" });
+    c.entrance = { x: centreX(3, 5), y: centreY(5), r: 0.5 };
+    c.entranceCol = 3;
+    c.entranceRow = 5;
+    if (scenario !== "quiet") rememberPassage(c.passageTrace!, 12, 5, scenario === "expired" ? -20 : 0);
+    rememberPassage(c.passageTrace!, 12, 6, 0);
+    if (scenario === "blind") c.gainMarks[0] = 0;
+    run(c, 6);
+    assert.equal(rockAt(map, 13, 3), scenario === "fresh" ? OPEN : SOIL, scenario);
+    assert.equal(rockAt(map, 13, 4), OPEN, "a successful first fill is at the tip");
+    assert.equal(rockAt(map, 12, 5), OPEN, "the branch mouth stays open after one trip");
+    assert.ok(joined(map, 16, 6, 3, 6), "the through-route stays open");
+  }
 });
 
 test("fresh pellets draw more: a side cell too busy to fill on its own is filled next to a pellet put down moments ago", () => {

@@ -13,6 +13,7 @@ on:
       - "web/src/colony/move.ts"
       - "web/src/colony/passageTrace.ts"
       - "web/src/colony/dig.ts"
+      - "web/src/colony/backfillObservation.ts"
       - "web/src/colony/foodHandoffObservation.ts"
   workflow_dispatch:
     inputs:
@@ -37,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         seed: [7, 17, 29, 43]
-        mode: [current, trace, trace-repair, trace-bypass]
+        mode: [current, trace, trace-repair, trace-bypass, trace-entry]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -78,8 +79,9 @@ jobs:
           populations = set()
           handoff_rows = []
           porter_rows = []
+          detour_rows = []
           for seed in (7, 17, 29, 43):
-              for mode in ("current", "trace", "trace-repair", "trace-bypass"):
+              for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
                   assert report["seed"] == seed
                   populations.add(report["antsPerColony"])
@@ -116,6 +118,12 @@ jobs:
                                       porter["outstandingOver30s"], "—" if p95_value is None else f"{p95_value:.2f}",
                                       porter["sampledReversals"], porter["sampledAdjacentMoves"], bypass.get("peakEligibleFaces", 0),
                                       len(sites), sum(site["porterEntries"] for site in sites)))
+                  detour = point["branchDetours"]
+                  assert detour["entered"] == detour["endedWithFill"] + detour["endedWithoutFill"] + detour["active"]
+                  detour_rows.append((seed, mode, detour["entered"], detour["skippedAtRecentMouth"],
+                                      detour["endedWithFill"], detour["endedWithoutFill"], detour["active"],
+                                      detour["workerSeconds"], point["undergroundSoilCarrierSeconds"],
+                                      point["laterUsedDugCells"], point["redigCellsObserved"]))
           assert len(populations) == 1
           print("\n### First handoff of incoming food\n")
           cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
@@ -131,6 +139,14 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in porter_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Stale branch detours and soil work\n")
+          cols = ("Seed", "Mode", "Detours started", "Skipped at fresh mouth", "Ended with fill",
+                  "Ended without fill", "Still active", "Detour worker-s", "Underground soil worker-s",
+                  "Later-used dug cells", "Observed re-digs")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in detour_rows:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

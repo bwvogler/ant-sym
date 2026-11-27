@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { installPorterBypass } from "./porter-bypass.mjs";
 import { distribution, observePorterTrips } from "./porter-trips.mjs";
 import { foodHandoffObservers } from "../../web/src/colony/foodHandoffObservation.ts";
-import { backfillObservers } from "../../web/src/colony/backfillObservation.ts";
+import { backfillObservers, branchEntryObservers } from "../../web/src/colony/backfillObservation.ts";
 import { packResponseRequest, responseKey } from "../../web/src/colony/colonyBrain.ts";
 import { Game, generateOneWorld, gameRng } from "../../web/src/colony/index.ts";
 import { CELL, cellKey, cellOf, hexDistance, keyX, keyY, nx, ny } from "../../web/src/colony/hex.ts";
@@ -19,7 +19,7 @@ if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
 }
 const allModes = ["current", "trace", "trace-repair"];
 const modes = process.env.NEST_ASSAY_MODE ? [process.env.NEST_ASSAY_MODE] : allModes;
-if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass")) throw Error("Unknown NEST_ASSAY_MODE");
+if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass" && m !== "trace-entry")) throw Error("Unknown NEST_ASSAY_MODE");
 const tickRate = 30;
 const sampleTicks = 6;
 const checkpointSeconds = 60;
@@ -78,6 +78,24 @@ function observer(colony) {
   let reversals = 0;
   let foodCarriers = 0;
   let soilCarriers = 0;
+  let soilCarrierSeconds = 0;
+  let branchCarrierSeconds = 0;
+  const detouring = new Set();
+  let branchEntered = 0;
+  let branchEnteredFromRecent = 0;
+  let branchSkipped = 0;
+  let branchFilled = 0;
+  let branchEndedWithoutFill = 0;
+  branchEntryObservers.set(colony, (ant, outcome, corridorRecent) => {
+    if (outcome === "skipped") {
+      branchSkipped++;
+      return;
+    }
+    if (detouring.has(ant)) branchEndedWithoutFill++;
+    detouring.add(ant);
+    branchEntered++;
+    if (corridorRecent) branchEnteredFromRecent++;
+  });
   const carryingSince = new Map();
   let peakFoodCarriers = 0;
   let foodCarrierSeconds = 0;
@@ -114,6 +132,7 @@ function observer(colony) {
   let freshFloorFills = 0;
   let fillDecisions = 0;
   backfillObservers.set(colony, (cell, ant, floor, recent, outcome) => {
+    if (outcome === "filled" && colony.staleWalk[ant] && detouring.delete(ant)) branchFilled++;
     fillDecisions++;
     let site = backfillSites.get(cell);
     if (!site) {
@@ -136,6 +155,11 @@ function observer(colony) {
       if (colony.alive[ant] && colony.layer[ant] === colony.home && colony.carrying[ant] && !colony.porter[ant]) continue;
       incoming.delete(ant);
       interrupted++;
+    }
+    for (const ant of detouring) {
+      if (colony.alive[ant] && colony.layer[ant] === colony.home && colony.pellet[ant] && colony.staleWalk[ant]) continue;
+      detouring.delete(ant);
+      branchEndedWithoutFill++;
     }
     for (let i = 0; i < colony.n; i++) {
       if (!colony.alive[i] || colony.layer[i] !== colony.home) {
@@ -169,6 +193,8 @@ function observer(colony) {
     peakFoodCarriers = Math.max(peakFoodCarriers, foodCarriers);
     peakLongHeld = Math.max(peakLongHeld, heldOver30);
     foodCarrierSeconds += (foodCarriers * sampleTicks) / tickRate;
+    soilCarrierSeconds += (soilCarriers * sampleTicks) / tickRate;
+    branchCarrierSeconds += (detouring.size * sampleTicks) / tickRate;
   }
 
   function checkpoint(at) {
@@ -215,6 +241,7 @@ function observer(colony) {
       }));
     const lastMinuteHandoff = distribution(handoffTimes.slice(minuteHandoffStart));
     minuteHandoffStart = handoffTimes.length;
+    if (branchEntered !== branchFilled + branchEndedWithoutFill + detouring.size) throw Error("Branch detour accounting");
     return {
       seconds: at,
       foodDelivered: colony.stored,
@@ -245,6 +272,16 @@ function observer(colony) {
       floorFills,
       freshFloorFills,
       undergroundSoilCarriers: soilCarriers,
+      undergroundSoilCarrierSeconds: Math.round(soilCarrierSeconds * 10) / 10,
+      branchDetours: {
+        entered: branchEntered,
+        enteredFromRecentCorridor: branchEnteredFromRecent,
+        skippedAtRecentMouth: branchSkipped,
+        endedWithFill: branchFilled,
+        endedWithoutFill: branchEndedWithoutFill,
+        active: detouring.size,
+        workerSeconds: Math.round(branchCarrierSeconds * 10) / 10,
+      },
       population: colony.population,
       births: colony.births,
       losses: colony.losses,
@@ -274,6 +311,7 @@ function run(mode) {
       ? undefined
       : {
           backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
+          ...(mode === "trace-entry" ? { backfillTraceEntry: true } : {}),
           ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
         };
   const specs = [{ antCount: ants, ...(colony ? { colony } : {}) }, { antCount: ants }];

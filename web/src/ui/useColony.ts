@@ -63,6 +63,7 @@ export interface ColonyControls {
   world: WorldKind;
   /** Enables the experimental passage cue for starting colonies. */
   strategicBackfill?: boolean;
+  strategicBackfillEntry?: boolean;
   /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
   view: View;
   /** which line's curtain the below view shows (docs/endless-world.md §8): the line clicked, chosen by Go to, or the followed ant's; an index into the world's lines */
@@ -132,6 +133,7 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   rival: true,
   world: worldFromUrl(),
   strategicBackfill: typeof location !== "undefined" && new URLSearchParams(location.search).get("backfill") === "1",
+  strategicBackfillEntry: typeof location !== "undefined" && new URLSearchParams(location.search).get("backfill") === "entry",
   view: "above",
   line: 0,
   sampleTemp: DEFAULT_COLONY.sampleTemp,
@@ -152,7 +154,10 @@ export function buildGame(s: GameSettings): Game {
   const endless = worldOf(s) === "endless";
   const map = endless ? generateEndlessWorld(s.seed) : generateOneWorld(s.seed);
   const species = speciesById(s.species);
-  const colony = s.strategicBackfill ? { backfillTraceSeconds: BACKFILL_TRACE_SECONDS } : undefined;
+  const colony =
+    s.strategicBackfill || s.strategicBackfillEntry
+      ? { backfillTraceSeconds: BACKFILL_TRACE_SECONDS, backfillTraceEntry: s.strategicBackfillEntry }
+      : undefined;
   const spec = { antCount: s.antCount, ...(colony ? { colony } : {}) };
   const game = new Game(
     map,
@@ -190,6 +195,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         rival: controls.rival,
         world: controls.world,
         strategicBackfill: controls.strategicBackfill,
+        strategicBackfillEntry: controls.strategicBackfillEntry,
         generation,
       });
     const g = build();
@@ -202,6 +208,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       r.settings.rival === controls.rival &&
       worldOf(r.settings) === controls.world &&
       Boolean(r.settings.strategicBackfill) === Boolean(controls.strategicBackfill) &&
+      Boolean(r.settings.strategicBackfillEntry) === Boolean(controls.strategicBackfillEntry) &&
       r.settings.generation === generation
     ) {
       pending.current = null;
@@ -224,7 +231,17 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.species, controls.seed, controls.antCount, controls.rival, controls.world, controls.strategicBackfill, generation, loads]);
+  }, [
+    controls.species,
+    controls.seed,
+    controls.antCount,
+    controls.rival,
+    controls.world,
+    controls.strategicBackfill,
+    controls.strategicBackfillEntry,
+    generation,
+    loads,
+  ]);
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
@@ -282,6 +299,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       rival: r.settings.rival,
       world: worldOf(r.settings),
       strategicBackfill: r.settings.strategicBackfill ?? false,
+      strategicBackfillEntry: r.settings.strategicBackfillEntry ?? false,
       started: true,
       playing: true,
     }));
@@ -307,6 +325,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     rival: controls.rival,
     world: controls.world,
     ...(controls.strategicBackfill ? { strategicBackfill: true } : {}),
+    ...(controls.strategicBackfillEntry ? { strategicBackfillEntry: true } : {}),
     generation,
   };
 

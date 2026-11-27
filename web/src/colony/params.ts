@@ -482,6 +482,8 @@ export interface ColonyParams {
   backfill: BackfillTuning;
   /** Experimental lifetime of local worker passage marks. Omitted or zero keeps legacy backfill. */
   backfillTraceSeconds?: number;
+  /** Guard stale-branch entry with recent passage at its mouth. */
+  backfillTraceEntry?: boolean;
   /** In the trace experiment, ask the ordinary drop question for repair of chamber floors. */
   backfillFloorRepair?: boolean;
   /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
