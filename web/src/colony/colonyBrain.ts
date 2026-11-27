@@ -227,16 +227,14 @@ export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
 export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail", "contact", "leave"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
 
-export function responseQuestion(hook: ResponseHook, id: string, backfill = false, porterDispatch = false): JevRequest["questions"] {
+export function responseQuestion(hook: ResponseHook, id: string, backfill = false): JevRequest["questions"] {
   const ant = `ant \`${id}\``;
   switch (hook) {
     case "get":
       return {
         [`${id}_get`]: {
           type: "noul",
-          instructions: porterDispatch
-            ? `Going by the doctrine, ${ant} can take one unit of food from this chamber to an eligible store. porterDispatch.candidate says preferred or alternate. An alternate is a store adjacent to the worker. porterPassage is light, heavy or unknown and describes recent crossings by workers carrying food at the pickup cell. sourcePassage is recent, quiet or unknown at the same cell. Should the worker take this load for the offered store? If it declines, another eligible store may be offered. If neither is accepted, the food stays in the source chamber.`
-            : `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?`,
+          instructions: `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?`,
         },
       };
     case "drop":
@@ -314,7 +312,6 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     // alarm and odds only to `contact`; returns only to `leave`.
     const {
       backfillTraffic,
-      porterDispatch,
       offered,
       quality,
       alarm,
@@ -344,9 +341,7 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
                   : { ...rest, returns, crowd }
                 : { ...rest };
     if (backfill) ants[it.id]!.backfillTraffic = backfillTraffic;
-    const dispatch = hook === "get" && porterDispatch !== undefined;
-    if (dispatch) ants[it.id]!.porterDispatch = porterDispatch;
-    Object.assign(questions, responseQuestion(hook, it.id, backfill, dispatch));
+    Object.assign(questions, responseQuestion(hook, it.id, backfill));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
 }
@@ -418,10 +413,6 @@ export function responseOf(hook: ResponseHook, key: string, answer: string, draw
 export function responseKey(hook: ResponseHook, t: Touch): string {
   // Version this opt-in question independently. Its cache entries never overlap ordinary drop.
   if (hook === "drop" && t.backfillTraffic !== undefined) return `${touchKey(t)}|backfill-v1:${t.backfillTraffic}`;
-  if (hook === "get" && t.porterDispatch) {
-    const { candidate, porterPassage, sourcePassage } = t.porterDispatch;
-    return `${touchKey(t)}|porter-v2:${candidate}:${porterPassage}:${sourcePassage}`;
-  }
   return hook === "carry"
     ? CARRY_KEY.key(t)
     : hook === "contact"

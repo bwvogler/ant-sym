@@ -100,7 +100,6 @@ export function backfill(self: Colony, i: number, cx: number, cy: number, enemy 
     observe?.(key, i, floor, recent, "filled");
     if (trace) {
       trace.cells.delete(key);
-      trace.porterCrossings?.delete(key);
       if (recent) trace.recentFilled++;
     }
     // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent

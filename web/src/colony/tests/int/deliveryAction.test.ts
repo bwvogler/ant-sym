@@ -6,9 +6,7 @@ import { CURTAIN, PLANE } from "../../colony.ts";
 import { chooseDelivery, deliveryExplanation, requestedDelivery, localDelivery } from "../../deliveryAction.ts";
 import { port, becomePorter, nurse } from "../../nestWork.ts";
 import { putDown } from "../../dig.ts";
-import { packResponseRequest, responseKey } from "../../colonyBrain.ts";
-import { newPassageTrace, porterPassage, rememberPassage, rememberPorterCrossing } from "../../passageTrace.ts";
-import { localResponses, responses, type Touch } from "../../responses.ts";
+import { responses } from "../../responses.ts";
 import { destMark } from "../../homing.ts";
 import { walkTunnel } from "../../tunnel.ts";
 import { digCell, OPEN, rockAt } from "../../world.ts";
@@ -134,60 +132,6 @@ test("a chamber food pickup can be refused without changing stock or committing 
   assert.ok(c.portTo[0] >= 0);
   assert.equal(store.food, 0);
   assert.equal(c.larder + c.inJaws, food);
-});
-
-test("traffic-aware pickup leaves surplus at the source or commits it to an eligible alternate", () => {
-  const { c, ch, brood: source, y } = setup();
-  const alternate = ch.add(0, y, "store");
-  ch.claim(alternate.id, 23, y, (x, yy) => rockAt(c.map, x, yy) === OPEN);
-  source.role = "reception";
-  c.stock(source, 2);
-  c.stock(alternate, 50);
-  c.params.porterDispatch = true;
-  c.params.backfillTraceSeconds = 12;
-  c.passageTrace = newPassageTrace();
-  rememberPassage(c.passageTrace, 24, y, c.time);
-  for (let crossing = 0; crossing < 8; crossing++) rememberPorterCrossing(c.passageTrace, 24, y, c.time);
-  assert.equal(porterPassage(c.passageTrace, 23, y, c.time), "light");
-  assert.equal(porterPassage(c.passageTrace, 24, y, c.time + 4), "light");
-  c.carrying[0] = 0;
-  c.mode[0] = EXPLORE;
-  c.age[0] = 0;
-  put(c, 0, 24, y);
-  c.portViewAt = c.time;
-  c.want.clear();
-  let allowAlternate = false;
-  const offers: Touch[] = [];
-  c.responses = responses({
-    get(t) {
-      offers.push({ ...t });
-      return localResponses.get(t) && (t.porterDispatch?.candidate !== "alternate" || allowAlternate);
-    },
-  });
-
-  const food = c.larder + c.inJaws;
-  port(c, 0, 1);
-  assert.equal(source.food, 2);
-  assert.equal(c.portTo[0], -1);
-  assert.deepEqual(
-    offers.map((t) => t.porterDispatch),
-    [
-      { candidate: "preferred", porterPassage: "heavy", sourcePassage: "recent" },
-      { candidate: "alternate", porterPassage: "heavy", sourcePassage: "recent" },
-    ],
-  );
-
-  allowAlternate = true;
-  port(c, 0, 1);
-  assert.equal(c.portTo[0], alternate.id);
-  assert.equal(source.food, 1);
-  assert.equal(c.larder + c.inJaws, food);
-  const [preferred, alternateOffer] = offers;
-  const { porterDispatch: _context, ...ordinary } = preferred!;
-  assert.notEqual(responseKey("get", preferred!), responseKey("get", ordinary));
-  assert.notEqual(responseKey("get", preferred!), responseKey("get", alternateOffer!));
-  assert.match(JSON.stringify(packResponseRequest("get", [{ id: "a", situation: preferred! }], "")), /porterDispatch/);
-  assert.doesNotMatch(JSON.stringify(packResponseRequest("carry", [{ id: "a", situation: preferred! }], "")), /porterDispatch/);
 });
 
 for (const [label, x, destinationX] of [
