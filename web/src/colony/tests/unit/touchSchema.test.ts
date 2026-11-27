@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { RESPONSE_HOOKS, RESPONSE_LEGEND, responseKey } from "../../colonyBrain.ts";
-import { ITEMS, QUALITY, WHERE, touchKey, touchSchemaOf, type Touch } from "../../responses.ts";
+import { ITEMS, QUALITY, TOUCH_KEY_FIELDS, WHERE, touchKey, touchSchemaOf, type Touch } from "../../responses.ts";
 import { MODES, STANCES } from "../../vocab.ts";
 
 // The response lanes' cache keys and legend (ja-fnd.5.6): Touch on a schema must leave every key and the legend byte for
@@ -61,10 +61,12 @@ function* touches(): Generator<Touch> {
 }
 
 test("touchKey and every hook's responseKey are the hand-written keys, for every combination of the key's fields", () => {
+  const commonSchema = touchSchemaOf(TOUCH_KEY_FIELDS);
   let n = 0;
   for (const t of touches()) {
     n++;
     assert.equal(touchKey(t), touchKeyByHand(t));
+    assert.equal(touchKey(t), commonSchema.key(t));
     for (const hook of RESPONSE_HOOKS) assert.equal(responseKey(hook, t), responseKeyByHand(hook, t));
   }
   assert.equal(n, 4 * 5 * 2 * 2 * 4 * 5 * 2 * 3 * 3);

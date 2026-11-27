@@ -622,7 +622,9 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   // Which trail, and how much, are the trail and trailRate responses.
   const trailStart = profile?.steeringClock();
   const tt = touch(col, i, toEnemy !== null, mode, item);
-  const trail = resp.trail(tt, col.antDraw(i));
+  const choiceStart = profile?.steeringClock();
+  const trail = resp.trail(tt, col.antDraw(i, true));
+  const writeStart = profile?.steeringClock();
   if (trail !== "none") {
     const laid =
       p.deposit *
@@ -648,7 +650,11 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     );
   }
 
-  if (trailStart !== undefined) profile?.steeringSpan("trailResponseAndDeposit", trailStart);
+  if (profile && trailStart !== undefined && choiceStart !== undefined && writeStart !== undefined) {
+    const trailEnd = profile.steeringClock();
+    profile.trailParts(choiceStart - trailStart, writeStart - choiceStart, trailEnd - writeStart);
+    profile.steeringSpan("trailResponseAndDeposit", trailStart, trailEnd);
+  }
 
   // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
   // nest's centre at the turn rate, it circled the hole it was over.

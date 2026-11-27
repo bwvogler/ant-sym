@@ -542,8 +542,17 @@ export class Colony {
   drawSalt = -1;
   /** the ant antDraw is handing out draws for */
   #drawAnt = 0;
+  #reuseDraw = false;
   #drawCacheSalt = NaN;
-  readonly #drawPrefixes: { gen: number; hash: number; phase: number; epoch: number; epochHash: number }[] = [];
+  readonly #drawPrefixes: {
+    gen: number;
+    hash: number;
+    phase: number;
+    epoch: number;
+    epochHash: number;
+    lastSalt: string | undefined;
+    lastDraw: number;
+  }[] = [];
   readonly #antDraw: AntDraw = Object.defineProperty(
     (salt: string): number => {
       if (this.drawSalt < 0) this.drawSalt = this.rng();
@@ -556,7 +565,15 @@ export class Colony {
       let prefix = this.#drawPrefixes[i];
       if (!prefix || prefix.gen !== gen) {
         const hash = hashText(`${this.drawSalt}|${i}|${gen}`);
-        prefix = this.#drawPrefixes[i] = { gen, hash, phase: unitOf("", hash), epoch: NaN, epochHash: 0 };
+        prefix = this.#drawPrefixes[i] = {
+          gen,
+          hash,
+          phase: unitOf("", hash),
+          epoch: NaN,
+          epochHash: 0,
+          lastSalt: undefined,
+          lastDraw: 0,
+        };
       }
       // Each ant's clock changes the common part of all its response draws at the same moment.
       const r = this.params.reroll;
@@ -564,8 +581,16 @@ export class Colony {
       if (prefix.epoch !== epoch) {
         prefix.epoch = epoch;
         prefix.epochHash = hashText(`|${epoch}|`, prefix.hash);
+        prefix.lastSalt = undefined;
       }
-      return unitOf(salt, prefix.epochHash);
+      if (!this.#reuseDraw) return unitOf(salt, prefix.epochHash);
+      // The trail response is asked every tick. Reuse its uniform when the
+      // same key is asked again within this ant's reroll epoch.
+      if (prefix.lastSalt !== salt) {
+        prefix.lastSalt = salt;
+        prefix.lastDraw = unitOf(salt, prefix.epochHash);
+      }
+      return prefix.lastDraw;
     },
     "temperature",
     { get: () => this.params.sampleTemp },
@@ -574,10 +599,11 @@ export class Colony {
   /**
    * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
    * situation while the ant holds it, until its next `reroll`. One draw function serves every ant. Its cached prefix is
-   * derived from the saved draw salt, slot, generation and current reroll epoch.
+   * derived from the saved draw salt, slot, generation and current reroll epoch. A hot hook can also keep its last uniform.
    */
-  antDraw(i: number): AntDraw {
+  antDraw(i: number, reuseDraw = false): AntDraw {
     this.#drawAnt = i;
+    this.#reuseDraw = reuseDraw;
     return this.#antDraw;
   }
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */

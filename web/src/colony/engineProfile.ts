@@ -26,6 +26,9 @@ export class EngineProfile {
     trailResponseAndDeposit: 0,
   };
   private steeringAccountedMs = 0;
+  private trailInputsMs = 0;
+  private trailChoiceMs = 0;
+  private trailWritesMs = 0;
   sampledAnt = false;
 
   readonly now: () => number;
@@ -71,10 +74,16 @@ export class EngineProfile {
     return this.now() - this.steeringAccountedMs;
   }
 
-  steeringSpan(part: SteeringPart, start: number): void {
-    const ms = this.steeringClock() - start;
+  steeringSpan(part: SteeringPart, start: number, end = this.steeringClock()): void {
+    const ms = end - start;
     this.steeringParts[part] += ms;
     this.steeringAccountedMs += ms;
+  }
+
+  trailParts(inputs: number, choice: number, writes: number): void {
+    this.trailInputsMs += inputs;
+    this.trailChoiceMs += choice;
+    this.trailWritesMs += writes;
   }
 
   ants(ms: number): void {
@@ -114,6 +123,11 @@ export class EngineProfile {
       },
       sampledAnts: this.samples,
       sampledPolicyLookups: this.policySamples,
+      estimatedTrailMsPerTick: {
+        prepareInputs: estimate(this.trailInputsMs),
+        chooseTrail: estimate(this.trailChoiceMs),
+        rateAndWrite: estimate(this.trailWritesMs),
+      },
       estimatedSteeringMsPerTick: {
         ...Object.fromEntries(STEERING_PARTS.map((part) => [part, estimate(this.steeringParts[part])])),
         other: estimate(this.steeringMs - this.steeringAccountedMs),

@@ -82,6 +82,10 @@ test("steering helper timings are exclusive inside homing and sum to the steerin
     assert.equal(probe(), true);
     now += 1;
     profile.steeringSpan("homing", start);
+    const trailStart = profile.steeringClock();
+    now += 1.5;
+    profile.trailParts(0.25, 1, 0.25);
+    profile.steeringSpan("trailResponseAndDeposit", trailStart);
     profile.antStage("steer", 8);
     profile.ants(8);
   });
@@ -92,9 +96,10 @@ test("steering helper timings are exclusive inside homing and sum to the steerin
     homing: 4,
     scentProbes: 0,
     terrainChecks: 2,
-    trailResponseAndDeposit: 0,
-    other: 2,
+    trailResponseAndDeposit: 1.5,
+    other: 0.5,
   });
+  assert.deepEqual(report.estimatedTrailMsPerTick, { prepareInputs: 0.25, chooseTrail: 1, rateAndWrite: 0.25 });
   assert.equal(report.estimatedAntStageMsPerTick.steering, 8);
   assert.equal(probe(), true);
   assert.deepEqual(profile.report(), report, "helpers do not record after the capture");
