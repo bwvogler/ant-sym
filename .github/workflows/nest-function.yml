@@ -110,6 +110,7 @@ jobs:
                   assert porter["started"] == porter["completed"] + porter["interrupted"] + porter["outstanding"]
                   bypass = point["bypass"] or {}
                   sites = bypass.get("opened", [])
+                  assert len(sites) <= 4
                   p95_value = porter["pickupToDeposit"]["p95Seconds"]
                   porter_rows.append((seed, mode, porter["started"], porter["completed"], porter["outstanding"],
                                       porter["outstandingOver30s"], "—" if p95_value is None else f"{p95_value:.2f}",

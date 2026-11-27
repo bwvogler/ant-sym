@@ -1,5 +1,5 @@
 import { bypassPolicies } from "../../web/src/colony/bypassPolicy.ts";
-import { refilled } from "../../web/src/colony/grid.ts";
+import { NO_CELL, refilled } from "../../web/src/colony/grid.ts";
 import { cellKey, keyX, keyY, nx, ny } from "../../web/src/colony/hex.ts";
 import { OPEN, SOIL, isSky, rockAt } from "../../web/src/colony/world.ts";
 
@@ -116,7 +116,17 @@ export function installPorterBypass(colony) {
       const key = cellKey(x, y);
       const choice = aimed.get(ant);
       aimed.delete(ant);
-      if (choice?.face === key) opened.set(key, { x, y, seconds: colony.time, previousRouteSteps: choice.detour, porterEntries: 0 });
+      if (choice?.face !== key || opened.size >= excavationLimit) return;
+      opened.set(key, { x, y, seconds: colony.time, previousRouteSteps: choice.detour, porterEntries: 0 });
+      if (opened.size < excavationLimit) return;
+      // Release workers still aiming to start another bypass when the budget is exhausted.
+      for (const [worker, pending] of aimed) {
+        if (colony.gx[worker] !== keyX(pending.face) || colony.gy[worker] !== keyY(pending.face)) continue;
+        colony.gx[worker] = NO_CELL;
+        colony.digAim[worker] = NaN;
+        colony.digT[worker] = 0;
+      }
+      aimed.clear();
     },
   });
   return {
