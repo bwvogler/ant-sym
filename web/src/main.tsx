@@ -13,7 +13,15 @@ const root = document.getElementById("root")!;
 const query = new URLSearchParams(location.search);
 const preview = query.get("worker-preview");
 const worker = query.get("worker");
-if (preview === "main" || preview === "worker") {
+if (query.get("benchmark") === "trail") {
+  void import("./experiments/TrailBenchmarkPage.tsx").then(({ default: TrailBenchmarkPage }) =>
+    createRoot(root).render(
+      <ErrorBoundary>
+        <TrailBenchmarkPage />
+      </ErrorBoundary>,
+    ),
+  );
+} else if (preview === "main" || preview === "worker") {
   void import("./experiments/workerPreview.ts").then(({ mountWorkerPreview }) => mountWorkerPreview(root, preview));
 } else if (worker === "0" || worker === "1") {
   void import("./experiments/MapTrialPage.tsx").then(({ default: MapTrialPage }) =>

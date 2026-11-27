@@ -36,7 +36,7 @@ export const trialSettings = (seed: number, antCount = DEFAULT_ANTS) => ({
 });
 
 /** Two equally sized colonies with the same bundled policy path in both modes. */
-export async function buildTrialGame(seed = 1, antCount = DEFAULT_ANTS) {
+export async function buildTrialGame(seed = 1, antCount = DEFAULT_ANTS, requireTrailAnswers = false) {
   const game = buildGame(trialSettings(seed, antCount));
   const jev = new ColonyJev();
   jev.setDoctrine(DOCTRINES[0]!.text);
@@ -47,6 +47,7 @@ export async function buildTrialGame(seed = 1, antCount = DEFAULT_ANTS) {
   });
   jev.attachColonies(game.colonies, game.params.species, true);
   jev.attachFungus(game.fungus);
+  if (requireTrailAnswers && !jev.state.lanes.trail.cached) throw new Error("The bundled trail answers could not be loaded. Try again.");
   game.land(landingOf(game), GAME_STRAIN, { evolve: true });
   return game;
 }
