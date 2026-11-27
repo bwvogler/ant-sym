@@ -79,4 +79,6 @@ The assay treats each own reception chamber and the two-cell radius around the e
 
 A stationary interval starts counting after five seconds without changing cells, with digging and observed crop changes resetting the clock. Unloaded stationary time in brood and royal chambers is excluded from the stall count since nearby workers can contribute to care. The observer also detects two successive passes of the same cycle of up to 16 cells, with each lap taking up to 12 seconds and no gap between steps longer than two seconds. It reports two-cell backtracking separately. A larger cycle counts as an island loop if it encloses a solid cell. Confirmed laps contribute their elapsed time once, even when detections overlap. The JSON includes representative enclosed cells ranked by time.
 
+A separate diagnostic counts each completed circuit around a solid cell even if it never repeats, and reports circuit time and its hotspot. A single circuit can be a useful route around an obstacle, so its time is excluded from the suspected-waste total.
+
 These are movement proxies. Slow, irregular, or longer loops and interactions between samples may escape detection. Some stationary workers may be resting or doing work the observer cannot see. Metrics are cumulative at each minute and serve only the assay.

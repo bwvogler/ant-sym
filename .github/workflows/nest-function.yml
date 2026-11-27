@@ -129,10 +129,11 @@ jobs:
                   m = point["nonLobbyMilling"]
                   assert 0 <= m["suspectedWorkerSeconds"] <= m["outsideLobbyWorkerSeconds"]
                   share = m["suspectedShare"]
-                  hotspot = (m["busiestIslands"] or [None])[0]
+                  hotspot = (m["busiestCircuitIslands"] or [None])[0]
                   milling_rows.append((seed, mode, m["outsideLobbyWorkerSeconds"], m["stationaryWorkerSeconds"],
                                        m["repeatedBacktrackWorkerSeconds"], m["islandLoopWorkerSeconds"],
                                        m["otherLoopWorkerSeconds"], "—" if share is None else f"{share:.2%}",
+                                       m["completedIslandCircuits"], m["islandCircuitWorkerSeconds"],
                                        "—" if hotspot is None else f"({hotspot['x']}, {hotspot['y']})"))
           assert len(populations) == 1
           print("\n### First handoff of incoming food\n")
@@ -160,7 +161,8 @@ jobs:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\n### Stalls and repeated laps outside the lobby\n")
           cols = ("Seed", "Mode", "Worker-s outside lobby", "Stationary worker-s", "Backtrack worker-s",
-                  "Island-loop worker-s", "Other-loop worker-s", "Suspected share", "Busiest island")
+                  "Island-loop worker-s", "Other-loop worker-s", "Suspected share", "Island circuits",
+                  "Circuit worker-s", "Busiest island")
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in milling_rows:

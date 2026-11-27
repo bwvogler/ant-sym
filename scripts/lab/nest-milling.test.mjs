@@ -44,10 +44,15 @@ test("two laps count their elapsed time once and identify the enclosed solid cel
   colony.carrying[0] = 1;
   for (let k = 0; k <= 6; k++) step(ring[k % 6]);
   assert.equal(checkpoint().islandLoopWorkerSeconds, 0);
+  assert.equal(checkpoint().completedIslandCircuits, 1);
+  assert.equal(checkpoint().islandCircuitWorkerSeconds, 6);
   for (let k = 7; k <= 13; k++) step(ring[k % 6]);
   const result = checkpoint();
   assert.equal(result.outsideLobbyWorkerSeconds, 14);
   assert.equal(result.islandLoopWorkerSeconds, 13);
+  assert.equal(result.completedIslandCircuits, 2);
+  assert.equal(result.islandCircuitWorkerSeconds, 12);
+  assert.deepEqual(result.busiestCircuitIslands, [{ x, y, workerSeconds: 12 }]);
   assert.equal(result.loadedLoopWorkerSeconds, 13);
   assert.equal(result.repeatedBacktrackWorkerSeconds, 0);
   assert.deepEqual(result.busiestIslands, [{ x, y, workerSeconds: 13 }]);

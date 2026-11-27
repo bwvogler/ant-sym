@@ -28,6 +28,20 @@ function enclosedSolid(map, keys) {
   return null;
 }
 
+function islandCircuit(map, trail, coveredUntil) {
+  const end = trail.length - 1;
+  for (let start = end - 3; start >= Math.max(0, end - maxLapCells); start--) {
+    const at = trail[start].at;
+    if (at < coveredUntil || trail[end].at - at > maxLapSeconds) break;
+    if (trail[start].cell !== trail[end].cell) continue;
+    const cells = trail.slice(start, end).map(({ cell }) => cell);
+    if (new Set(cells).size !== cells.length) continue;
+    const island = enclosedSolid(map, cells);
+    if (island !== null) return { island, at };
+  }
+  return null;
+}
+
 function repeatedLap(trail) {
   const end = trail.length - 1;
   for (let period = 2; period <= maxLapCells && 2 * period <= end; period++) {
@@ -53,6 +67,7 @@ export function observeNestMilling(colony, sampleSeconds) {
   const map = colony.layers[colony.home].map;
   const tracks = new Map();
   const sites = new Map();
+  const circuitSites = new Map();
   let outsideLobby = 0;
   let lobby = 0;
   let entrance = 0;
@@ -62,6 +77,8 @@ export function observeNestMilling(colony, sampleSeconds) {
   let islandLoop = 0;
   let otherLoop = 0;
   let loadedLoop = 0;
+  let completedCircuits = 0;
+  let islandCircuitSeconds = 0;
 
   function sample(ant, x, y) {
     if (x === undefined || isSky(map, x, y)) {
@@ -92,7 +109,7 @@ export function observeNestMilling(colony, sampleSeconds) {
       return;
     }
     if (!current || current.load !== load || current.age > colony.age[ant]) {
-      tracks.set(ant, { crop, load, age: colony.age[ant], trail: [{ cell, at: now }], coveredUntil: now });
+      tracks.set(ant, { crop, load, age: colony.age[ant], trail: [{ cell, at: now }], coveredUntil: now, circuitCoveredUntil: now });
       return;
     }
     current.age = colony.age[ant];
@@ -109,6 +126,14 @@ export function observeNestMilling(colony, sampleSeconds) {
     if (now - last.at > maxStepSeconds || hexDistance(x, y, keyX(last.cell), keyY(last.cell)) !== 1) trail.length = 0;
     trail.push({ cell, at: now });
     if (trail.length > maxLapCells * 2 + 1) trail.shift();
+    const circuit = islandCircuit(map, trail, current.circuitCoveredUntil);
+    if (circuit) {
+      const seconds = now - circuit.at;
+      current.circuitCoveredUntil = now;
+      completedCircuits++;
+      islandCircuitSeconds += seconds;
+      circuitSites.set(circuit.island, (circuitSites.get(circuit.island) ?? 0) + seconds);
+    }
     const lap = repeatedLap(trail);
     if (!lap) {
       current.loop = undefined;
@@ -146,6 +171,12 @@ export function observeNestMilling(colony, sampleSeconds) {
       loadedLoopWorkerSeconds: round(loadedLoop),
       suspectedWorkerSeconds: round(suspected),
       suspectedShare: outsideLobbySeconds > 0 ? suspected / outsideLobbySeconds : null,
+      completedIslandCircuits: completedCircuits,
+      islandCircuitWorkerSeconds: round(islandCircuitSeconds),
+      busiestCircuitIslands: [...circuitSites]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([key, seconds]) => ({ x: keyX(key), y: keyY(key), workerSeconds: round(seconds) })),
       busiestIslands: [...sites]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
