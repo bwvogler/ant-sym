@@ -1,6 +1,6 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
-import { recentPassage } from "./passageTrace.ts";
+import { porterPassage, recentPassage } from "./passageTrace.ts";
 import type { PorterDispatchContext } from "./responses.ts";
 import { porterObservers } from "./porterObservation.ts";
 import { foodHandoffObservers } from "./foodHandoffObservation.ts";
@@ -324,24 +324,17 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   if (to < 0 && c.role !== "store") {
     portView(col);
     let preferred: Chamber | undefined;
-    let alternate: Chamber | undefined;
     let least = Infinity;
-    let second = Infinity;
     for (const s of ch.list) {
       if (s.colony !== col.params.nest || s.role !== "store" || s.cells === 0) continue;
       const stock = s.food + (col.enRouteTo.get(s.id) ?? 0);
       if (stock < least) {
-        alternate = preferred;
-        second = least;
         preferred = s;
         least = stock;
-      } else if (stock < second) {
-        alternate = s;
-        second = stock;
       }
     }
     if (preferred && col.params.porterDispatch && !col.onPlane && col.cur === col.home) {
-      to = dispatchToStore(col, i, preferred, alternate, cx, cy, enemy);
+      to = dispatchToStore(col, i, preferred, cx, cy, enemy);
       approved = true;
     } else to = preferred?.id ?? -1;
   }
@@ -352,41 +345,30 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   return false;
 }
 
-function dispatchToStore(
-  col: Colony,
-  i: number,
-  preferred: Chamber,
-  alternate: Chamber | undefined,
-  x: number,
-  y: number,
-  enemy: boolean,
-): number {
+function dispatchToStore(col: Colony, i: number, preferred: Chamber, x: number, y: number, enemy: boolean): number {
   const trace = col.passageTrace;
-  const sourcePassage =
-    trace && col.gainMarks[i] >= 0.5
-      ? recentPassage(trace, x, y, col.time, col.params.backfillTraceSeconds ?? 0)
-        ? "recent"
-        : "quiet"
-      : "unknown";
+  const sensed = col.gainMarks[i] >= 0.5 ? trace : undefined;
+  const sourcePassage = sensed
+    ? recentPassage(sensed, x, y, col.time, col.params.backfillTraceSeconds ?? 0)
+      ? "recent"
+      : "quiet"
+    : "unknown";
+  const flow = sensed ? porterPassage(sensed, x, y, col.time) : "unknown";
   const draw = col.antDraw(i);
-  const offer = (store: Chamber, candidate: PorterDispatchContext["candidate"]) => {
-    const inboundCount = col.enRouteTo.get(store.id) ?? 0;
-    const inbound =
-      inboundCount >= Math.max(8, 4 * store.floor) ? "saturated" : inboundCount >= Math.max(4, 2 * store.floor) ? "busy" : "light";
-    return col.responses.get(
-      {
-        ...touch(col, i, enemy, col.mode[i], "none", "food"),
-        porterDispatch: {
-          candidate,
-          inbound,
-          sourcePassage,
-        },
-      },
+  const offer = (candidate: PorterDispatchContext["candidate"]) =>
+    col.responses.get(
+      { ...touch(col, i, enemy, col.mode[i], "none", "food"), porterDispatch: { candidate, porterPassage: flow, sourcePassage } },
       draw,
     );
-  };
-  if (offer(preferred, "preferred")) return preferred.id;
-  if (alternate && offer(alternate, "alternate")) return alternate.id;
+  if (offer("preferred")) return preferred.id;
+  const chambers = col.map.chambers!;
+  for (let d = 0; d < 6; d++) {
+    const xx = stepX(x, y, d);
+    const yy = stepY(y, d);
+    const adjacent = chambers.list[chambers.at(xx, yy)];
+    if (adjacent?.role !== "store" || adjacent.colony !== col.params.nest || adjacent.id === preferred.id) continue;
+    if (rockAt(col.map, xx, yy) === OPEN) return offer("alternate") ? adjacent.id : -1;
+  }
   return -1;
 }
 

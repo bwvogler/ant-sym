@@ -7,7 +7,7 @@ import { chooseDelivery, deliveryExplanation, requestedDelivery, localDelivery }
 import { port, becomePorter, nurse } from "../../nestWork.ts";
 import { putDown } from "../../dig.ts";
 import { packResponseRequest, responseKey } from "../../colonyBrain.ts";
-import { newPassageTrace, rememberPassage } from "../../passageTrace.ts";
+import { newPassageTrace, porterPassage, rememberPassage, rememberPorterCrossing } from "../../passageTrace.ts";
 import { localResponses, responses, type Touch } from "../../responses.ts";
 import { destMark } from "../../homing.ts";
 import { walkTunnel } from "../../tunnel.ts";
@@ -137,9 +137,9 @@ test("a chamber food pickup can be refused without changing stock or committing 
 });
 
 test("traffic-aware pickup leaves surplus at the source or commits it to an eligible alternate", () => {
-  const { c, ch, store, brood: source, y } = setup();
+  const { c, ch, brood: source, y } = setup();
   const alternate = ch.add(0, y, "store");
-  ch.claim(alternate.id, 20, y, (x, yy) => rockAt(c.map, x, yy) === OPEN);
+  ch.claim(alternate.id, 23, y, (x, yy) => rockAt(c.map, x, yy) === OPEN);
   source.role = "reception";
   c.stock(source, 2);
   c.stock(alternate, 50);
@@ -147,19 +147,21 @@ test("traffic-aware pickup leaves surplus at the source or commits it to an elig
   c.params.backfillTraceSeconds = 12;
   c.passageTrace = newPassageTrace();
   rememberPassage(c.passageTrace, 24, y, c.time);
+  for (let crossing = 0; crossing < 8; crossing++) rememberPorterCrossing(c.passageTrace, 24, y, c.time);
+  assert.equal(porterPassage(c.passageTrace, 23, y, c.time), "light");
+  assert.equal(porterPassage(c.passageTrace, 24, y, c.time + 4), "light");
   c.carrying[0] = 0;
   c.mode[0] = EXPLORE;
   c.age[0] = 0;
   put(c, 0, 24, y);
   c.portViewAt = c.time;
   c.want.clear();
-  c.enRouteTo.set(store.id, 8);
-  c.enRouteTo.set(alternate.id, 8);
+  let allowAlternate = false;
   const offers: Touch[] = [];
   c.responses = responses({
     get(t) {
       offers.push({ ...t });
-      return localResponses.get(t);
+      return localResponses.get(t) && (t.porterDispatch?.candidate !== "alternate" || allowAlternate);
     },
   });
 
@@ -170,12 +172,12 @@ test("traffic-aware pickup leaves surplus at the source or commits it to an elig
   assert.deepEqual(
     offers.map((t) => t.porterDispatch),
     [
-      { candidate: "preferred", inbound: "saturated", sourcePassage: "recent" },
-      { candidate: "alternate", inbound: "saturated", sourcePassage: "recent" },
+      { candidate: "preferred", porterPassage: "heavy", sourcePassage: "recent" },
+      { candidate: "alternate", porterPassage: "heavy", sourcePassage: "recent" },
     ],
   );
 
-  c.enRouteTo.set(alternate.id, 0);
+  allowAlternate = true;
   port(c, 0, 1);
   assert.equal(c.portTo[0], alternate.id);
   assert.equal(source.food, 1);

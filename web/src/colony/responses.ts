@@ -52,7 +52,7 @@ export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "recept
 
 export interface PorterDispatchContext {
   candidate: "preferred" | "alternate";
-  inbound: "light" | "busy" | "saturated";
+  porterPassage: "light" | "heavy" | "unknown";
   sourcePassage: BackfillTraffic | "unknown";
 }
 
@@ -182,8 +182,7 @@ export interface Responses {
 export const localResponses: Responses = {
   get: (t) =>
     (t.offered !== "food" || t.mode !== "fight") &&
-    t.porterDispatch?.inbound !== "saturated" &&
-    !(t.porterDispatch?.inbound === "busy" && t.porterDispatch.sourcePassage === "quiet"),
+    !(t.porterDispatch?.candidate === "preferred" && t.porterDispatch.porterPassage === "heavy"),
   carry: () => "take",
   drop: (t) => t.backfillTraffic !== "recent",
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),

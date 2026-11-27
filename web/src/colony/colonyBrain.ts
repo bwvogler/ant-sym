@@ -235,7 +235,7 @@ export function responseQuestion(hook: ResponseHook, id: string, backfill = fals
         [`${id}_get`]: {
           type: "noul",
           instructions: porterDispatch
-            ? `Going by the doctrine, ${ant} can take one unit of food from this chamber to an eligible store. porterDispatch.candidate says preferred or alternate. inbound describes how many porters are headed to that store relative to its floor: light, busy or saturated. sourcePassage is recent, quiet or unknown at the pickup site. Should the worker take this load for the offered store? If it declines, another eligible store may be offered. If neither is accepted, the food stays in the source chamber.`
+            ? `Going by the doctrine, ${ant} can take one unit of food from this chamber to an eligible store. porterDispatch.candidate says preferred or alternate. An alternate is a store adjacent to the worker. porterPassage is light, heavy or unknown and describes recent crossings by workers carrying food at the pickup cell. sourcePassage is recent, quiet or unknown at the same cell. Should the worker take this load for the offered store? If it declines, another eligible store may be offered. If neither is accepted, the food stays in the source chamber.`
             : `Going by the doctrine, ${ant} has empty jaws and the thing named by offered within reach: should it pick it up?`,
         },
       };
@@ -419,8 +419,8 @@ export function responseKey(hook: ResponseHook, t: Touch): string {
   // Version this opt-in question independently. Its cache entries never overlap ordinary drop.
   if (hook === "drop" && t.backfillTraffic !== undefined) return `${touchKey(t)}|backfill-v1:${t.backfillTraffic}`;
   if (hook === "get" && t.porterDispatch) {
-    const { candidate, inbound, sourcePassage } = t.porterDispatch;
-    return `${touchKey(t)}|porter-v1:${candidate}:${inbound}:${sourcePassage}`;
+    const { candidate, porterPassage, sourcePassage } = t.porterDispatch;
+    return `${touchKey(t)}|porter-v2:${candidate}:${porterPassage}:${sourcePassage}`;
   }
   return hook === "carry"
     ? CARRY_KEY.key(t)
