@@ -1,6 +1,7 @@
 // Paired, offline one-world nest assay. All workers move and work under normal game ticks.
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { foodHandoffObservers } from "../../web/src/colony/foodHandoffObservation.ts";
 import { backfillObservers } from "../../web/src/colony/backfillObservation.ts";
 import { packResponseRequest, responseKey } from "../../web/src/colony/colonyBrain.ts";
 import { Game, generateOneWorld, gameRng } from "../../web/src/colony/index.ts";
@@ -63,6 +64,12 @@ function describeGeometry(colony, map) {
   };
 }
 
+function distribution(values) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = (fraction) => sorted[Math.ceil(fraction * sorted.length) - 1] ?? null;
+  return { count: sorted.length, p50Seconds: at(0.5), p95Seconds: at(0.95) };
+}
+
 function observer(colony) {
   const map = colony.layers[colony.home].map;
   const newest = new Map();
@@ -81,12 +88,44 @@ function observer(colony) {
   let peakLongHeld = 0;
   let heldOver30 = 0;
   const backfillSites = new Map();
+  const incoming = new Map();
+  const handoffTimes = [];
+  const routeTimes = [];
+  const serviceTimes = [];
+  let minuteHandoffStart = 0;
+  let entered = 0;
+  let deposited = 0;
+  let selfPorted = 0;
+  let interrupted = 0;
+  foodHandoffObservers.set(colony, (ant, event) => {
+    const trip = incoming.get(ant);
+    if (event === "entry") {
+      if (trip) interrupted++;
+      entered++;
+      incoming.set(ant, { enteredAt: colony.time, readyAt: null });
+    } else if (trip && event === "ready") {
+      trip.readyAt ??= colony.time;
+    } else if (trip) {
+      if (event === "deposit") deposited++;
+      else selfPorted++;
+      handoffTimes.push(colony.time - trip.enteredAt);
+      routeTimes.push((trip.readyAt ?? colony.time) - trip.enteredAt);
+      serviceTimes.push(colony.time - (trip.readyAt ?? colony.time));
+      incoming.delete(ant);
+    }
+  });
   let floorFills = 0;
   let freshFloorFills = 0;
   let fillDecisions = 0;
-  backfillObservers.set(colony, (cell, _ant, floor, recent, outcome) => {
+  backfillObservers.set(colony, (cell, ant, floor, recent, outcome) => {
     fillDecisions++;
-    backfillSites.set(cell, (backfillSites.get(cell) ?? 0) + 1);
+    let site = backfillSites.get(cell);
+    if (!site) {
+      site = { decisions: 0, slots: new Map() };
+      backfillSites.set(cell, site);
+    }
+    site.decisions++;
+    site.slots.set(ant, (site.slots.get(ant) ?? 0) + 1);
     if (floor && outcome === "filled") {
       floorFills++;
       if (recent) freshFloorFills++;
@@ -97,6 +136,11 @@ function observer(colony) {
     foodCarriers = 0;
     soilCarriers = 0;
     heldOver30 = 0;
+    for (const ant of incoming.keys()) {
+      if (colony.alive[ant] && colony.layer[ant] === colony.home && colony.carrying[ant] && !colony.porter[ant]) continue;
+      incoming.delete(ant);
+      interrupted++;
+    }
     for (let i = 0; i < colony.n; i++) {
       if (!colony.alive[i] || colony.layer[i] !== colony.home) {
         carryingSince.delete(i);
@@ -148,6 +192,33 @@ function observer(colony) {
       }
     });
     const trace = colony.passageTrace;
+    const held = { approaching: 0, ready: 0, entranceVicinity: 0, inChamber: 0, other: 0, over30s: 0 };
+    const ages = [];
+    for (const [ant, trip] of incoming) {
+      if (trip.readyAt === null) held.approaching++;
+      else held.ready++;
+      const age = colony.time - trip.enteredAt;
+      ages.push(age);
+      if (age >= 30) held.over30s++;
+      cellOf(colony.x[ant], colony.y[ant]);
+      const [x, y] = CELL;
+      if (hexDistance(x, y, colony.entranceCol, colony.entranceRow) <= 4) held.entranceVicinity++;
+      else if ((map.chambers?.at(x, y) ?? -1) >= 0) held.inChamber++;
+      else held.other++;
+    }
+    if (entered !== deposited + selfPorted + interrupted + incoming.size) throw Error("Incoming load accounting");
+    const busiestSites = [...backfillSites]
+      .sort((a, b) => b[1].decisions - a[1].decisions)
+      .slice(0, 8)
+      .map(([cell, site]) => ({
+        x: keyX(cell),
+        y: keyY(cell),
+        decisions: site.decisions,
+        workerSlots: site.slots.size,
+        mostByOneWorkerSlot: Math.max(...site.slots.values()),
+      }));
+    const lastMinuteHandoff = distribution(handoffTimes.slice(minuteHandoffStart));
+    minuteHandoffStart = handoffTimes.length;
     return {
       seconds: at,
       foodDelivered: colony.stored,
@@ -160,7 +231,21 @@ function observer(colony) {
       peakUndergroundFoodHeldOver30s: peakLongHeld,
       fillDecisions,
       uniqueFillSites: backfillSites.size,
-      maxDecisionsAtFillSite: [...backfillSites.values()].reduce((max, n) => Math.max(max, n), 0),
+      maxDecisionsAtFillSite: busiestSites[0]?.decisions ?? 0,
+      busiestFillSites: busiestSites,
+      incomingFood: {
+        entered,
+        deposited,
+        selfPorted,
+        interrupted,
+        outstanding: incoming.size,
+        entryToHandoff: distribution(handoffTimes),
+        entryToEligibleSite: distribution(routeTimes),
+        eligibleSiteToHandoff: distribution(serviceTimes),
+        lastMinuteHandoff,
+        outstandingAge: distribution(ages),
+        outstandingLocation: held,
+      },
       floorFills,
       freshFloorFills,
       undergroundSoilCarriers: soilCarriers,

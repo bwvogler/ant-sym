@@ -7,6 +7,7 @@ on:
       - "scripts/lab/nest-function.mjs"
       - "web/src/colony/passageTrace.ts"
       - "web/src/colony/dig.ts"
+      - "web/src/colony/foodHandoffObservation.ts"
   workflow_dispatch:
     inputs:
       seconds:
@@ -69,6 +70,7 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           populations = set()
+          handoff_rows = []
           for seed in (7, 17, 29, 43):
               for mode in ("current", "trace", "trace-repair"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
@@ -85,6 +87,25 @@ jobs:
                          f"{point['fillDecisions']} / {point['uniqueFillSites']}", point["maxDecisionsAtFillSite"],
                          f"{timing['meanMs']:.2f}", f"{timing['p95Ms']:.2f}")
                   print("| " + " | ".join(map(str, row)) + " |")
+                  h = point["incomingFood"]
+                  loc = h["outstandingLocation"]
+                  assert h["entered"] == h["deposited"] + h["selfPorted"] + h["interrupted"] + h["outstanding"]
+                  def p95(stage):
+                      value = h[stage]["p95Seconds"]
+                      return f"{value:.2f}" if value is not None else "—"
+                  hottest = (point["busiestFillSites"] or [{}])[0]
+                  handoff_rows.append((seed, mode, h["entered"], h["deposited"] + h["selfPorted"], h["interrupted"],
+                                       p95("entryToHandoff"), p95("entryToEligibleSite"), p95("eligibleSiteToHandoff"),
+                                       h["outstanding"], loc["approaching"], loc["entranceVicinity"], loc["over30s"],
+                                       hottest.get("mostByOneWorkerSlot", 0)))
           assert len(populations) == 1
+          print("\n### First handoff of incoming food\n")
+          cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
+                  "At-site p95 s", "Outstanding", "Yet to reach a site", "Near entrance", "Outstanding >30 s",
+                  "Max checks by one slot at busiest fill site")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in handoff_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

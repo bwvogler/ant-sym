@@ -1,5 +1,6 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { foodHandoffObservers } from "./foodHandoffObservation.ts";
 import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
 import { putDown } from "./dig.ts";
 import { DEFAULT_COLONY } from "./params.ts";
@@ -187,6 +188,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
   const cy = CELL[1];
   let here = ch.at(cx, cy);
   if (col.carrying[i]) {
+    const observe = col.porter[i] ? undefined : foodHandoffObservers.get(col);
     const destination = requestedDelivery(col, i);
     if (destination) {
       // Only the chamber physically underfoot: no address, neighbour deposit or
@@ -201,6 +203,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         perceivedPlace(col, i, site.role) !== destination
       )
         return false;
+      observe?.(i, "ready");
       if (!col.responses.drop(touch(col, i, enemy, col.mode[i], "food"), col.antDraw(i))) {
         col.deliveryState[i] = DELIVERY_KEEP;
         return releaseAfterRefusal(col, i, dt, enemy);
@@ -211,6 +214,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
         col.portTrips++;
         col.inJaws--;
       } else col.stored++;
+      observe?.(i, "deposit");
       col.portTo[i] = -1;
       col.porter[i] = 0;
       col.mode[i] = EXPLORE;
@@ -240,6 +244,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
       if (here < 0) return false;
     }
     const c = ch.list[here]!;
+    observe?.(i, "ready");
     if (!col.porter[i] && c.role === "reception" && c.food >= 1) {
       // Food waiting here already: the porters aren't keeping up. The forager carries its own on (a seed harvester's
       // foragers drop seeds in the top chambers; with a backlog there, a larva starved below while food piled up).
@@ -247,6 +252,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
       if (to >= 0) {
         col.stored++;
         col.handedOn++;
+        observe?.(i, "self-port");
         becomePorter(col, i, to);
         return false;
       }
@@ -260,6 +266,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
     col.stock(c, 1);
     if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
     else col.stored++;
+    observe?.(i, "deposit");
     col.portTo[i] = -1;
     col.porter[i] = 0;
     col.mode[i] = EXPLORE;

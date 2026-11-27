@@ -49,6 +49,12 @@ The `trace-repair` variant uses the normal soil drop question for eligible candi
 
 The expanded assay records cumulative worker-seconds spent carrying food underground, the peak number of such workers, and peak and final counts observed holding food below for at least 30 seconds. These are sampled every 0.2 simulated seconds, and loss, delivery and exit all end an observed interval. Hold counts are workload markers rather than a measurement of delivery time. It also counts eligible placement decisions, unique cells considered, the maximum decisions at one cell, and successful floor repairs. A high repeat count warrants tracing individual jobs. Tick mean and p95 measure headless execution, and comparisons across runners are approximate.
 
+## Trace food from entry to first handoff
+
+The assay observes incoming food when a non-porter uses its own entrance. It records the first time the carrier reaches an eligible handoff site, then a real chamber deposit or the decision to continue as a porter at reception. It reports p50 and p95 for completed trips, separately for travel and time after the first eligible site. Those stage percentiles need not add up. An interrupted trip leaves the tracked state without a handoff, for example when its carrier exits, loses the load, or dies. An outstanding trip is still being tracked at the checkpoint. The artifact reports its age and whether it is near the entrance, in a chamber, or elsewhere, and whether it has ever reached an eligible handoff site. This separates inbound trips from subsequent internal porter trips.
+
+Placement instrumentation also reports the eight busiest fill sites. It distinguishes the number of slots involved from the largest count for one worker slot at each site. Slots can be reused, so this is an upper bound on repeat checks by an individual at that site.
+
 ## Sources
 
 - [Lenoir et al. (2009), hydrocarbons in nest and home-range marking](https://doi.org/10.1007/s10886-009-9669-6)
