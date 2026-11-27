@@ -61,6 +61,18 @@ export const ENDLESS_PLANE: EndlessOptions = {
   cacheChunks: 2048,
 };
 
+/**
+ * The generator's version: bump it whenever the plane makes something else for the same seed and options (rock, food, nests, sites). A save carries it
+ * with the plane's options (`planeFingerprint`), and a load into another version, or other options, is refused up front (`ja-qpv.5.9`) instead of drifting.
+ */
+export const GENERATOR_VERSION = 1;
+
+/** The plane's options as a save records them: all of them but `cacheChunks`, which only sizes the caches (a game plays the same with any). */
+export function planeFingerprint(options: EndlessOptions): Record<string, number> {
+  const { cacheChunks: _caches, ...rest } = options;
+  return rest;
+}
+
 /** A wild colony's nest before it wakes (§4): a point, and the heading of the one-hole line it will start (radians, a line has no direction). */
 export interface Site extends Nest {
   rx: number;

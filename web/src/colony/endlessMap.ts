@@ -17,7 +17,7 @@
 
 import { chunkKey, CHUNK, ChunkLayer, type Cells } from "./chunks.ts";
 import { encode, fillLayer, type SavedChunks } from "./save.ts";
-import { EndlessPlane, type EndlessOptions, type PlaneChunk } from "./endlessPlane.ts";
+import { EndlessPlane, GENERATOR_VERSION, planeFingerprint, type EndlessOptions, type PlaneChunk } from "./endlessPlane.ts";
 import { FoodLedger } from "./foodLedger.ts";
 import { editLayers, type WorldMap } from "./world.ts";
 
@@ -211,13 +211,15 @@ function writtenChunks(layer: ChunkLayer<Cells>): SavedChunks {
  * chunks of rock and food that differ from what the plane generates (`dropClean`'s notion of unchanged), the other layers' written chunks (dig
  * headings, dug and filled times, quality, the mound), the food counters, and the chunks whose food was counted (`madeFood`: one 24-byte entry for every chunk
  * ever read, evicted ones too: 3.4 KB at 140 chunks, under 1% of the map save). The rest follows the ground changed, not the ground seen. A load into a plane
- * made with other options than the save's is not detected (the save records the seed only): `ja-qpv.5.9`.
+ * made with other options, or another generator version, than the save's is refused at the load (`checkPlane`, `ja-qpv.5.9`).
  */
 export function saveEndless(map: EndlessMap): Record<string, unknown> {
   const spoil = map.spoil;
   return {
     endless: true,
     seed: map.seed,
+    // the plane this is the delta of: a load into another is refused (`checkPlane`)
+    plane: { generator: GENERATOR_VERSION, options: planeFingerprint(map.plane.options) },
     rock: changedChunks(map, map.rock, (c) => c.rock),
     food: changedChunks(map, map.food, (c) => c.food),
     quality: writtenChunks(map.quality),
@@ -243,9 +245,27 @@ export function saveEndless(map: EndlessMap): Record<string, unknown> {
  * and the food counters rebuilt: the saved offsets, plus the food of each chunk as it is generated again (the changed ones are counted here, from the
  * plane's own chunk). `onFood` hooks (the game's regrowth piles) hear of each chunk counted.
  */
+/**
+ * Refuse a save made on another plane than `map`'s: another generator version, or other options, name what differs. A save with no `plane` (made before this was
+ * recorded) is not checked. Before the load changes anything, so a refused load leaves the map as it was.
+ */
+function checkPlane(map: EndlessMap, saved: unknown): void {
+  if (saved === undefined) return;
+  const p = saved as { generator?: number; options?: Record<string, number> };
+  if (p.generator !== GENERATOR_VERSION)
+    throw new Error(`save: another plane (generator version ${String(p.generator)} in the save, ${GENERATOR_VERSION} in this build)`);
+  const here = planeFingerprint(map.plane.options);
+  const there = p.options ?? {};
+  const differ = [...new Set([...Object.keys(here), ...Object.keys(there)])]
+    .filter((k) => here[k] !== there[k])
+    .map((k) => `${k} ${String(there[k] ?? "absent")} in the save, ${String(here[k] ?? "absent")} in this map`);
+  if (differ.length > 0) throw new Error(`save: another plane (${differ.join("; ")})`);
+}
+
 export function loadEndless(map: EndlessMap, saved: Record<string, unknown>): void {
   if (saved.endless !== true || saved.seed !== map.seed)
     throw new Error(`save: another plane (seed ${String(saved.seed)}, this map's: ${map.seed})`);
+  checkPlane(map, saved.plane);
   map.ledger.reset();
   // A save made since the ledger was kept carries the chunks counted (`madeFood`): restored, the counters equal the original game's at once, and a chunk made
   // again later counts nothing the second time. An older save has none, and counts the chunks as they are made.
