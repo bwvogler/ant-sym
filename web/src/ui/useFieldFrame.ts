@@ -117,7 +117,7 @@ export function useFieldFrame({
       sensed,
       ground,
       minimap,
-      { shown: () => shown.current, smell: () => !!buildRef.current?.smell },
+      { shown: () => shown.current, smell: () => !!buildRef.current?.smell, pen: () => penRef.current },
       cssVar,
       anyColony,
     );

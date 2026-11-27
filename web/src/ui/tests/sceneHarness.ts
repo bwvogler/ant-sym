@@ -184,7 +184,7 @@ export function renderScene(s: Scene = {}): {
       sensed,
       ground,
       minimap,
-      { shown: () => lv, smell: () => !!s.smell },
+      { shown: () => lv, smell: () => !!s.smell, pen: () => null },
       s.dark ? DARK : LIGHT,
       game.colonies[0]!,
     );

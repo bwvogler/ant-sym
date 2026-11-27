@@ -29,12 +29,20 @@ import type { ViewCam } from "./prelude.ts";
  */
 export const FOG_MARGIN = 2 * CHUNK;
 
+/** A disc on the plane in world units: the open pen's circle (`FieldPen` and `PenCircle` are this shape; the camera takes the shape, not the pen module). */
+export interface Disc {
+  x: number;
+  y: number;
+  r: number;
+}
+
 /**
  * A map's extent in world units, from its first column (x0: one world's curtain starts below 0): what the camera fits and clamps to. On an endless
  * plane under the fog (`knowledge`, null with the fog off or suspended) the view may go only where the fungus has explored plus FOG_MARGIN, and
  * where `fit` starts (the home rectangle): `reach`, the one bound (camera.ts reachOf). A bounded map, or no fog, is as it always was (F7b, ja-1ypq.10).
+ * An open flight pen's circle (`pen`) is part of the reach too, so the player can always pan to its rim (ja-qpv.5.1.1; the circle is wider than the margin).
  */
-export function extentOf(m: WorldMap, knowledge: Knowledge | null = null): Extent & { x0: number } {
+export function extentOf(m: WorldMap, knowledge: Knowledge | null = null, pen: Disc | null = null): Extent & { x0: number } {
   const e = { x0: m.x0, ...worldExtent(m) };
   if (!isEndless(m)) return e;
   // An endless plane (camera.ts header): no whole map to fit, so `fit` shows the start nests and a margin.
@@ -47,10 +55,17 @@ export function extentOf(m: WorldMap, knowledge: Knowledge | null = null): Exten
   const box = knowledge?.bounds(PLANE);
   if (!box) return out;
   // The explored chunks (x in cells, y in rows of R) and the margin, joined with home so the reach is never narrower than the start view.
-  const rx0 = Math.min(box.cx0 * CHUNK - FOG_MARGIN, home.x0);
-  const ry0 = Math.min(box.cy0 * CHUNK * R - FOG_MARGIN * R, home.y0);
-  const rx1 = Math.max((box.cx1 + 1) * CHUNK + FOG_MARGIN, home.x0 + home.w);
-  const ry1 = Math.max((box.cy1 + 1) * CHUNK * R + FOG_MARGIN * R, home.y0 + home.h);
+  let rx0 = Math.min(box.cx0 * CHUNK - FOG_MARGIN, home.x0);
+  let ry0 = Math.min(box.cy0 * CHUNK * R - FOG_MARGIN * R, home.y0);
+  let rx1 = Math.max((box.cx1 + 1) * CHUNK + FOG_MARGIN, home.x0 + home.w);
+  let ry1 = Math.max((box.cy1 + 1) * CHUNK * R + FOG_MARGIN * R, home.y0 + home.h);
+  if (pen) {
+    // the circle's bounding box, no margin (world units, as everything here)
+    rx0 = Math.min(rx0, pen.x - pen.r);
+    ry0 = Math.min(ry0, pen.y - pen.r);
+    rx1 = Math.max(rx1, pen.x + pen.r);
+    ry1 = Math.max(ry1, pen.y + pen.r);
+  }
   return { ...out, reach: { x0: rx0, y0: ry0, w: rx1 - rx0, h: ry1 - ry0 } };
 }
 
@@ -82,6 +97,8 @@ export interface RigHost {
   unfollow: () => void;
   /** the fog's knowledge, when the page runs with it and it is not suspended (the camera goes only where it has explored); absent: no fog */
   fog?: () => Knowledge | null;
+  /** the flight pen's circle while it is open (the camera may go to its rim); absent or null: none */
+  pen?: () => Disc | null;
 }
 
 export class CameraRig {
@@ -115,7 +132,7 @@ export class CameraRig {
 
   /** The shown map's extent, read afresh: one world's curtain widens when a colony is founded. */
   extent(): Extent & { x0: number } {
-    return extentOf(this.host.map(this.host.view()), this.host.fog?.() ?? null);
+    return extentOf(this.host.map(this.host.view()), this.host.fog?.() ?? null, this.host.pen?.() ?? null);
   }
 
   viewport(): Viewport {
@@ -163,7 +180,7 @@ export class CameraRig {
     if (v === this.host.view() && this.host.following() && !how.keepFollow) this.host.unfollow();
     const s = this.of(v);
     // (the fog is passed for the same extent as everywhere else; this reads only its start view and zoom level, never the reach)
-    const we = extentOf(this.host.map(v), this.host.fog?.() ?? null);
+    const we = extentOf(this.host.map(v), this.host.fog?.() ?? null, this.host.pen?.() ?? null);
     const vp = this.viewport();
     const now = this.cams.get(this.host.view())?.cam?.zoom ?? fitZoom(we, vp);
     const zoom = how.span ? Math.min(vp.w, vp.h) / how.span : how.close ? Math.max(now, LINK_ZOOM * this.host.dpr()) : now;

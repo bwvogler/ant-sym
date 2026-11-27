@@ -8,7 +8,7 @@ import type { FieldCtx, FieldTheme } from "./ctx.ts";
 import type { FieldEnv, SpriteSets } from "./env.ts";
 import type { Ground } from "./ground.ts";
 import type { Minimap } from "./minimap.ts";
-import { extentOf } from "./rig.ts";
+import { extentOf, type Disc } from "./rig.ts";
 
 export function rgb(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
@@ -75,6 +75,8 @@ export interface BindingInputs {
   shown(): number;
   /** the builder's smell vision is on */
   smell(): boolean;
+  /** the open flight pen's circle, or null: part of the camera's reach (ja-qpv.5.1.1) */
+  pen(): Disc | null;
 }
 
 export class FieldBinding {
@@ -134,7 +136,7 @@ export class FieldBinding {
     this.gx0 = this.m.x0;
     this.gw = this.m.size.w;
     this.gh = this.m.size.h;
-    this.ext = extentOf(this.m, this.#sensed.knowledge);
+    this.ext = extentOf(this.m, this.#sensed.knowledge, this.#inputs.pen());
     this.bind();
     this.retheme();
   }
@@ -145,7 +147,7 @@ export class FieldBinding {
     this.gx0 = map.x0;
     this.gw = map.size.w;
     this.gh = map.size.h;
-    this.ext = extentOf(map, this.#sensed.knowledge);
+    this.ext = extentOf(map, this.#sensed.knowledge, this.#inputs.pen());
     this.#ground.clear();
     this.#minimap.resize(this.ext);
   }
@@ -156,7 +158,7 @@ export class FieldBinding {
     const m = (this.m = mapOfLayer(this.#world, lv));
     if (m !== this.#geoMap || m.x0 !== this.gx0 || m.size.w !== this.gw || m.size.h !== this.gh) this.#rebuild(m);
     // Under the fog an endless plane's reach follows the ground explored: the same extent the camera rig reads (F7b), a few numbers a frame.
-    else if (this.ext.endless) this.ext = extentOf(m, this.#sensed.knowledge);
+    else if (this.ext.endless) this.ext = extentOf(m, this.#sensed.knowledge, this.#inputs.pen());
     this.spores = this.#fungus.sporesOn(lv)?.spores ?? this.#fungus.spores;
     this.strip = isCurtainLayer(lv);
     this.trails = [];
