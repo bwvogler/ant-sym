@@ -10,6 +10,7 @@ on:
       - "web/src/colony/bypassPolicy.ts"
       - "web/src/colony/backtrackEscape.ts"
       - "scripts/lab/backtrack-escape.test.mjs"
+      - "scripts/lab/reversal-sites*.mjs"
       - "web/src/colony/porterObservation.ts"
       - "web/src/colony/nestWork.ts"
       - "web/src/colony/tunnel.ts"
@@ -85,6 +86,7 @@ jobs:
           detour_rows = []
           milling_rows = []
           escape_rows = []
+          reversal_rows = []
           for seed in (7, 17, 29, 43):
               for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry", "escape"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
@@ -140,6 +142,19 @@ jobs:
                                        "—" if hotspot is None else f"({hotspot['x']}, {hotspot['y']})"))
                   if mode in ("current", "escape"):
                       e = point["escape"] or {}
+                      sites = point["reversalSites"]
+                      assert sum(site["events"] for site in sites) == e["noExit"]
+                      assert e["tries"] == (e["withExit"] if mode == "escape" else 0)
+                      repeat = [site for site in sites if site["peakSlotsIn20s"] >= 2]
+                      candidates = [(site, face) for site in sites for face in site["faces"]
+                                    if face["opens"] == "other-open-ground" and face["peakSlotsIn20s"] >= 2]
+                      best = max(candidates, key=lambda pair: pair[1]["peakSlotsIn20s"], default=None)
+                      location = "—"
+                      if best:
+                          site, face = best
+                          location = f"({site['x']}, {site['y']}) → ({face['x']}, {face['y']})"
+                      reversal_rows.append((seed, mode, e["noExit"], e["withExit"], len(sites), len(repeat),
+                                            len(candidates), location))
                       assert 0 <= m["loadedBacktrackWorkerSeconds"] <= m["repeatedBacktrackWorkerSeconds"]
                       escape_rows.append((seed, mode, e.get("tries", 0), e.get("noExit", 0),
                                           m["loadedBacktrackWorkerSeconds"], point["foodDelivered"],
@@ -183,6 +198,13 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in escape_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Reversal sites with no alternate exit\n")
+          cols = ("Seed", "Mode", "No exit", "With exit", "Affected cells", "Shared within 20 s",
+                  "Shared faces touching other open ground", "Top site → face")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in reversal_rows:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

@@ -19,10 +19,15 @@ function loadOf(colony: Colony, ant: number): number {
   return Number(Boolean(colony.carrying[ant])) | (Number(Boolean(colony.pellet[ant])) << 1) | (Number(Boolean(colony.broodHeld[ant])) << 2);
 }
 
-export function createBacktrackEscape(colony: Colony) {
+export function createBacktrackEscape(
+  colony: Colony,
+  steer = true,
+  onNoExit?: (ant: number, x: number, y: number, backX: number, backY: number, load: number) => void,
+) {
   const trails = new Map<number, Trail>();
   let tries = 0;
   let noExit = 0;
+  let withExit = 0;
 
   function moved(ant: number, x: number, y: number, toX: number, toY: number) {
     const load = loadOf(colony, ant);
@@ -72,11 +77,14 @@ export function createBacktrackEscape(colony: Colony) {
     trail.reversals = 0;
     if (best < 0) {
       noExit++;
+      onNoExit?.(ant, x, y, nx(x, y, planned), ny(y, planned), trail.load);
       return planned;
     }
+    withExit++;
+    if (!steer) return planned;
     tries++;
     return best;
   }
 
-  return { moved, choose, checkpoint: () => ({ tries, noExit }) };
+  return { moved, choose, checkpoint: () => ({ tries, noExit, withExit }) };
 }

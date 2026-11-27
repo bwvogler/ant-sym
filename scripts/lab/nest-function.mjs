@@ -2,6 +2,7 @@
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { backtrackEscapes, createBacktrackEscape } from "../../web/src/colony/backtrackEscape.ts";
+import { observeReversalSites } from "./reversal-sites.mjs";
 import { observeNestMilling } from "./nest-milling.mjs";
 import { installPorterBypass } from "./porter-bypass.mjs";
 import { distribution, observePorterTrips } from "./porter-trips.mjs";
@@ -314,19 +315,18 @@ function observer(colony) {
 
 function run(mode) {
   const colony =
-    mode === "current"
-      ? undefined
-      : mode === "escape"
-        ? { backtrackEscape: true }
-        : {
-            backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
-            ...(mode === "trace-entry" ? { backfillTraceEntry: true } : {}),
-            ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
-          };
+    mode === "current" || mode === "escape"
+      ? { backtrackEscape: true }
+      : {
+          backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
+          ...(mode === "trace-entry" ? { backfillTraceEntry: true } : {}),
+          ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
+        };
   const specs = [{ antCount: ants, ...(colony ? { colony } : {}) }, { antCount: ants }];
   const game = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(seed), specs);
   const first = game.colonies[0];
-  const escape = mode === "escape" ? createBacktrackEscape(first) : null;
+  const reversalSites = mode === "current" || mode === "escape" ? observeReversalSites(first) : null;
+  const escape = reversalSites ? createBacktrackEscape(first, mode === "escape", reversalSites.record) : null;
   if (escape) backtrackEscapes.set(first, escape);
   const backfillSituations = new Map();
   if (colony?.backfillTraceSeconds) {
@@ -359,6 +359,7 @@ function run(mode) {
         porterTrips: porters.checkpoint(),
         bypass: bypass?.checkpoint() ?? null,
         escape: escape?.checkpoint() ?? null,
+        reversalSites: reversalSites?.checkpoint() ?? null,
       });
     }
   }
