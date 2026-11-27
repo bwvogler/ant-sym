@@ -30,7 +30,7 @@ import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts } from "../f
 import { hasChamberLabels } from "../fieldGoTo.ts";
 import { canTiltMap } from "../mapVoxel.ts";
 import { specimenRow } from "../specimens.ts";
-import { clampLine, DEFAULT_COLONY_CONTROLS, freshGame } from "../useColony.ts";
+import { applyPatch, clampLine, DEFAULT_COLONY_CONTROLS, freshGame, NEW_GAME_KEYS, startsNewGame } from "../useColony.ts";
 import { rigHost, type RigRefs } from "../useCameraRig.ts";
 import { RecordedCanvas, RecordedPath, callsOf, recordingContext } from "./recordingContext.ts";
 
@@ -315,17 +315,43 @@ test("the codex and the specimen row place an ant on curtain 2 below ground", ()
   assert.equal(specimenRow(g.colonies, { k: 1, i, gen: c.gen[i]!, no: 1 })!.below, true);
 });
 
-test("a new game begins on line 0 (Restart, New world, Start and a load), and the page clamps what it reads", () => {
+test("a new game begins on line 0 (Restart, New world, Start, and a Lab setting that rebuilds the game); a load keeps the line, clamped; the page clamps what it reads", () => {
   const ended = { ...DEFAULT_COLONY_CONTROLS, line: 3 };
   assert.equal(freshGame(ended).line, 0);
   assert.deepEqual({ ...freshGame(ended), line: 3 }, ended, "and changes nothing else");
   assert.deepEqual([clampLine(3, 2), clampLine(1, 2), clampLine(0, 1), clampLine(-1, 2), clampLine(5, 0)], [1, 1, 0, 0, 0]);
-  // The four hooks' callbacks go through freshGame (React is not run here: the hook source is what holds that)
+  assert.deepEqual([...NEW_GAME_KEYS].sort(), ["antCount", "rival", "seed", "species", "world"], "the controls that make a different game");
+  // a patch that changes what makes a different game is a new game; one that does not, or that sets a key to its current value, is not (owner, 2026-11-25, ja-bof4)
+  const D = DEFAULT_COLONY_CONTROLS;
+  const other = (v: unknown) => (typeof v === "number" ? v + 1 : typeof v === "boolean" ? !v : v === "endless" ? "bounded" : "other");
+  for (const k of NEW_GAME_KEYS) {
+    assert.equal(startsNewGame(D, { [k]: other(D[k]) }), true, `${k} changed makes a different game`);
+    assert.equal(startsNewGame(D, { [k]: D[k] }), false, `${k} set to what it is does not`);
+  }
+  for (const patch of [{ playing: false }, { speed: 4 }, { hide: true }, { line: 1 }, {}] as const)
+    assert.equal(startsNewGame(D, patch), false, JSON.stringify(patch));
+  // applyPatch: the patch is applied, a new game begins on line 0, and the patch's own line wins
+  const on3 = { ...D, line: 3 };
+  assert.deepEqual(applyPatch(on3, { seed: 9 }), { ...D, seed: 9, line: 0 }, "a new seed is applied and resets the line");
+  assert.deepEqual(applyPatch(on3, { speed: 2 }), { ...on3, speed: 2 }, "another setting is applied and keeps the line");
+  assert.deepEqual(applyPatch(on3, { seed: 9, line: 2 }), { ...D, seed: 9, line: 2 }, "a patch that sets the line keeps it");
+  assert.deepEqual(applyPatch(on3, { seed: on3.seed }), on3, "a key set to its current value is no new game");
+  // The hooks' callbacks (React is not run here: the hook source is what holds that)
   const src = readFileSync(new URL("../useColony.ts", import.meta.url), "utf8");
-  for (const name of ["loadSave", "start", "restart", "newWorld"]) {
+  const bodyOf = (name: string) => {
     const from = src.indexOf(`const ${name} = useCallback(`);
     assert.ok(from >= 0, name);
-    const body = src.slice(from, src.indexOf("useCallback(", from + 30) > 0 ? src.indexOf("useCallback(", from + 30) : undefined);
-    assert.ok(/freshGame/.test(body), `${name} starts the new game on line 0`);
-  }
+    return src.slice(from, src.indexOf("useCallback(", from + 30) > 0 ? src.indexOf("useCallback(", from + 30) : undefined);
+  };
+  for (const name of ["start", "restart", "newWorld"]) assert.ok(/freshGame/.test(bodyOf(name)), `${name} starts the new game on line 0`);
+  assert.ok(!/freshGame/.test(bodyOf("loadSave")), "a load keeps the line (the record holds none)");
+  assert.ok(/applyPatch\(c, patch\)/.test(bodyOf("update")), "update applies a patch through applyPatch");
+  // the same controls rebuild the game: they are its memo's dependencies
+  const deps = src.slice(src.indexOf("}, [controls.species"), src.indexOf("]", src.indexOf("}, [controls.species")));
+  for (const k of NEW_GAME_KEYS) assert.ok(deps.includes(`controls.${k}`), `the game is rebuilt when ${k} changes`);
+  assert.match(
+    src,
+    /clampLine\(c\.line, game\.world\.lines\.length\)[\s\S]*?\}, \[game\]\);/,
+    "and a kept line is written back clamped to the loaded game's lines, whenever the game changes",
+  );
 });

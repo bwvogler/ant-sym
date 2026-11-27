@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { centreX, centreY, INFECTED, type Colony, type Game } from "../../colony/index.ts";
-import { asOf, endingKnown, lastKnownText, isKnown, knowsAll, knownCodexStats, knownSides } from "../fog/knownView.ts";
+import { asOf, endingKnown, foodView, lastKnownText, isKnown, knowsAll, knownCodexStats, knownSides } from "../fog/knownView.ts";
 import { KnownColonies } from "../fog/known.ts";
 import { Knowledge } from "../fog/knowledge.ts";
 import { sensedFor } from "../fog/sources.ts";
@@ -191,4 +192,28 @@ test("the nest tab's last-known line says when, and what was last known; and the
       .filter((id) => id.startsWith("nest-"));
   assert.deepEqual(ids(null), ["nest-0", "nest-1", "nest-2"], "no fog: every nest");
   assert.deepEqual(ids(k), ["nest-0", "nest-1"], "the fog: the known ones");
+});
+
+test("the Colonies card shows the food stored always, and the world's food total and the share home of it only without the fog (ja-qpv.5.3)", () => {
+  const s = { stored: 120, foodTotal: 480 };
+  assert.deepEqual(foodView(s, null), { stored: 120, total: 480, share: 0.25 }, "no fog: all of it");
+  const { k } = known();
+  assert.deepEqual(foodView(s, k), { stored: 120, total: null, share: null }, "under the fog: what is stored, no total, no share");
+  assert.deepEqual(
+    foodView({ stored: 5, foodTotal: 0 }, null),
+    { stored: 5, total: 0, share: 0 },
+    "a world with no food is not a division by zero",
+  );
+});
+
+test("the page hands the fog to the Colonies card (the line the pure test cannot reach)", () => {
+  const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
+  assert.match(read("../../ColonyApp.tsx"), /<Colonies known=\{sensed\.known\} \/>/);
+  const card = read("../LabCards.tsx");
+  assert.match(card, /foodView\(stats, known\)/, "the card reads the numbers through foodView");
+  assert.doesNotMatch(
+    card.slice(card.indexOf("export function Colonies"), card.indexOf("export function JevCard")),
+    /foodTotal/,
+    "and does not reach round it to the total",
+  );
 });
