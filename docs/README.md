@@ -6,6 +6,7 @@ Start with **[vision.md](vision.md)**. It covers what the repo is for, what an a
 
 | Note | Kind | What it covers |
 |---|---|---|
+| [strategic-backfill.md](strategic-backfill.md) | research + design (experimental) | Passage evidence for the soil drop decision, and paired longer-run nest function assays. |
 | [delivery-actions.md](delivery-actions.md) | research + design (experimental; code only in draft PR #281) | Food destination choices, local floor cues, commitment and misdelivery tests, and the paired calibration of timeout release (PRD §84). |
 | [contact-actions.md](contact-actions.md) | research + design (experimental; code only in draft PR #281) | Directed aggression, peaceful encounters, and asymmetric recognition. |
 | [ant-communication.md](ant-communication.md) | research | Signal channels (trail, alarm, contact, vibration, trophallaxis), their ranges and lifetimes, recognising rival colonies, and combat laws. |

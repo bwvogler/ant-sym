@@ -1,3 +1,4 @@
+import { newPassageTrace, prunePassages, type PassageTrace } from "./passageTrace.ts";
 import type { AttackCue } from "./attackCue.ts";
 import { combatObservers } from "./combatObservation.ts";
 import { leaveRate } from "./invite.ts";
@@ -504,6 +505,8 @@ export class Colony {
   /** pellets put back into unused space on the way home (backfill), and pellets lost with ants that died carrying them */
   soilFilled = 0;
   soilLost = 0;
+  /** The experimental trace lives on this colony’s home curtain. The default game allocates none. */
+  declare passageTrace?: PassageTrace;
   /** ants lost */
   losses = 0;
   births = 0;
@@ -589,6 +592,7 @@ export class Colony {
     this.params = { ...DEFAULT_COLONY, ...params };
     // Its own copy: a save loads into it, and a sweep changes it, for this colony alone.
     this.params.backfill = { ...this.params.backfill };
+    if ((this.params.backfillTraceSeconds ?? 0) > 0) this.passageTrace = newPassageTrace();
     if (params.maxAnts === undefined) this.params.maxAnts = Math.max(this.params.antCount, Math.round(this.params.antCount * 1.5));
     this.nest = map.nests?.[this.params.nest] ?? map.nest;
     if (map.sky && this.nest.entrance) {
@@ -1459,6 +1463,7 @@ export class Colony {
     const ca = Math.cos(a);
     const sa = Math.sin(a);
     this.time += dt;
+    if (this.passageTrace) prunePassages(this.passageTrace, this.time, this.params.backfillTraceSeconds ?? 0);
     // The gates (raids by trail and each ant's own stance on open ground, where there is no hole into the layer; the curtain's
     // hold at the top of the shaft: gatesFor). A colony on two layers works them out for each layer once a tick, and each ant takes its own's.
     const one = this.line !== null;

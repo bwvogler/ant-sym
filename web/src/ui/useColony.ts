@@ -19,6 +19,7 @@ import {
   speciesById,
   type OneWorld,
 } from "../colony/index.ts";
+import { BACKFILL_TRACE_SECONDS } from "../colony/passageTrace.ts";
 import { fogCarried } from "./fog/sources.ts";
 import { journalFromUrl } from "./journal.ts";
 import { pushToast } from "./toasts.ts";
@@ -59,6 +60,8 @@ export interface ColonyControls {
   rival: boolean;
   /** the world the game is on (PRD §66 E6): the endless plane by default, the bounded one behind `?world=bounded` (worldKind.ts); a loaded save puts back the world it was made in */
   world: WorldKind;
+  /** Enables the experimental passage cue for starting colonies. */
+  strategicBackfill?: boolean;
   /** one world's view: the plane from above, or the curtain below; a camera switch, not a new game (it is no build input) */
   view: View;
   /** which line's curtain the below view shows (docs/endless-world.md §8): the line clicked, chosen by Go to, or the followed ant's; an index into the world's lines */
@@ -127,6 +130,7 @@ export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   cull: false,
   rival: true,
   world: worldFromUrl(),
+  strategicBackfill: typeof location !== "undefined" && new URLSearchParams(location.search).get("backfill") === "1",
   view: "above",
   line: 0,
   sampleTemp: DEFAULT_COLONY.sampleTemp,
@@ -147,6 +151,8 @@ export function buildGame(s: GameSettings): Game {
   const endless = worldOf(s) === "endless";
   const map = endless ? generateEndlessWorld(s.seed) : generateOneWorld(s.seed);
   const species = speciesById(s.species);
+  const colony = s.strategicBackfill ? { backfillTraceSeconds: BACKFILL_TRACE_SECONDS } : undefined;
+  const spec = { antCount: s.antCount, ...(colony ? { colony } : {}) };
   const game = new Game(
     map,
     {
@@ -158,7 +164,7 @@ export function buildGame(s: GameSettings): Game {
     },
     gameRng(s.seed, s.generation),
     // The settings' ant count and rival box name the colonies the game starts with: one, or a pair of the same size.
-    s.rival ? [{ antCount: s.antCount }, { antCount: s.antCount }] : [{ antCount: s.antCount }],
+    s.rival ? [spec, spec] : [spec],
   );
   // The endless plane freezes what the fungus is far from (W 280, T 90 s, nest ground 16: the rule's defaults), at most `awakeCapFor(antsPerColony)` colonies awake.
   if (endless) game.enableSleep({ cap: awakeCapFor(s.antCount) });
@@ -182,6 +188,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         antCount: controls.antCount,
         rival: controls.rival,
         world: controls.world,
+        strategicBackfill: controls.strategicBackfill,
         generation,
       });
     const g = build();
@@ -193,6 +200,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       r.settings.antCount === controls.antCount &&
       r.settings.rival === controls.rival &&
       worldOf(r.settings) === controls.world &&
+      Boolean(r.settings.strategicBackfill) === Boolean(controls.strategicBackfill) &&
       r.settings.generation === generation
     ) {
       pending.current = null;
@@ -215,7 +223,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     // `loads` rebuilds the game when a save has the same settings as the game now. `view` is not here: one world's two
     // views are one game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [controls.species, controls.seed, controls.antCount, controls.rival, controls.world, generation, loads]);
+  }, [controls.species, controls.seed, controls.antCount, controls.rival, controls.world, controls.strategicBackfill, generation, loads]);
   // The player's policy settings outlive a game: apply them to every new one's fungus.
   useEffect(() => {
     game.fungus.configure({ hide: controls.hide, cull: controls.cull }, controls.menu);
@@ -272,6 +280,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       antCount: r.settings.antCount,
       rival: r.settings.rival,
       world: worldOf(r.settings),
+      strategicBackfill: r.settings.strategicBackfill ?? false,
       started: true,
       playing: true,
     }));
@@ -296,6 +305,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
     antCount: controls.antCount,
     rival: controls.rival,
     world: controls.world,
+    ...(controls.strategicBackfill ? { strategicBackfill: true } : {}),
     generation,
   };
 

@@ -1,0 +1,86 @@
+name: Nest function assay
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/nest-function.yml"
+      - "scripts/lab/nest-function.mjs"
+      - "web/src/colony/passageTrace.ts"
+      - "web/src/colony/dig.ts"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Simulated seconds for each variant"
+        type: choice
+        options: ["300", "600", "1200"]
+        default: "600"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nest-function-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { seed: 7, ants: 300 }
+          - { seed: 17, ants: 100 }
+          - { seed: 29, ants: 100 }
+          - { seed: 43, ants: 300 }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - name: Play paired worlds
+        env:
+          SEED: ${{ matrix.seed }}
+          ANTS: ${{ matrix.ants }}
+          SECONDS_TO_PLAY: ${{ inputs.seconds || '600' }}
+        run: node scripts/lab/nest-function.mjs "$SEED" "$SECONDS_TO_PLAY" "$ANTS" "nest-$SEED.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nest-function-seed-${{ matrix.seed }}
+          path: nest-${{ matrix.seed }}.json
+          if-no-files-found: error
+          retention-days: 30
+  report:
+    needs: world
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: nest-function-seed-*
+          path: out
+          merge-multiple: true
+      - name: Report final checkpoints
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          print("| Seed | Mode | Sim s | Start ants per colony | Food | Port trips | Food in jaws below | Reachable cells | Dead ends | Dug cells used later | Filled | Re-digs observed | Recent fills declined | Reversal % | Tick p95 ms |")
+          print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
+          for seed in (7, 17, 29, 43):
+              report = json.loads(Path(f"out/nest-{seed}.json").read_text())
+              assert report["seed"] == seed
+              assert [item["mode"] for item in report["results"]] == ["current", "trace"]
+              for item in report["results"]:
+                  point = item["checkpoints"][-1]
+                  assert point["seconds"] == report["seconds"]
+                  trace = point["trace"] or {}
+                  rate = 100 * point["sampledReversals"] / max(1, point["sampledAdjacentMoves"])
+                  row = (seed, item["mode"], point["seconds"], report["antsPerColony"], point["foodDelivered"], point["portTrips"],
+                         point["undergroundFoodCarriers"], point["reachableCells"], point["deadEnds"],
+                         point["laterUsedDugCells"], point["filled"], point["redigCellsObserved"],
+                         trace.get("recentKept", "—"), f"{rate:.2f}", f"{item['tickTiming']['p95Ms']:.2f}")
+                  print("| " + " | ".join(map(str, row)) + " |")
+          print("\nBoth variants use the same starting seed. JSON artifacts include one checkpoint per simulated minute. See docs/strategic-backfill.md for metric definitions.")
+          PY

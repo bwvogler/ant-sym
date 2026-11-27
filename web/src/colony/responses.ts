@@ -1,3 +1,4 @@
+import type { BackfillTraffic } from "./passageTrace.ts";
 import { defineSchema, type FieldOf } from "./schema.ts";
 import { MODES, STANCES, type Mode, type Stance } from "./vocab.ts";
 import type { AntDraw } from "./weighted.ts";
@@ -50,6 +51,8 @@ export const TRAIL_BY_QUALITY: Record<Quality, number> = { poor: 0.83, fair: 1, 
 export type DeliveryContextRole = "none" | "royal" | "brood" | "store" | "reception";
 
 export interface Touch {
+  /** Only for an adjacent, eligible underground soil placement. */
+  backfillTraffic?: BackfillTraffic;
   /** Nearby hostile attack cue for the local contact fallback. Set only during the contact call. */
   recentAttack?: boolean;
   /** Own commitment and recognised chamber underfoot; sent only to carry. */
@@ -171,7 +174,7 @@ export interface Responses {
 export const localResponses: Responses = {
   get: (t) => t.offered !== "food" || t.mode !== "fight",
   carry: () => "take",
-  drop: () => true,
+  drop: (t) => t.backfillTraffic !== "recent",
   trail: (t) => (t.porter || t.carrying === "soil" || t.carrying === "corpse" ? "none" : t.carrying === "food" ? "food" : "home"),
   trailRate: (t) => (t.carrying === "food" ? TRAIL_BY_QUALITY[t.quality] : 1),
   // Graded (behaviour MR 4; docs/combat.md: low doses attract, ten times more repel): a faint alarm draws an empty-jawed
@@ -230,7 +233,7 @@ export const CROWD = ["few", "many"] as const;
  * key order; porter, digging and enemy read as words, and quality only when it isn't "fair" (so keys from before quality still
  * match). The fields only some lanes are sent read as "name:value" (colonyBrain.responseKey).
  */
-const TOUCH_FIELDS: readonly FieldOf<Omit<Touch, "recentAttack">>[] = [
+const TOUCH_FIELDS: readonly FieldOf<Omit<Touch, "recentAttack" | "backfillTraffic">>[] = [
   { name: "deliveryTarget", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryTarget:${v}` },
   { name: "deliveryPlace", values: ["none", "royal", "brood", "store", "reception"], key: (v) => `deliveryPlace:${v}` },
   { name: "deliveryAttempt", values: ["none", "brief", "long"], key: (v) => `deliveryAttempt:${v}` },

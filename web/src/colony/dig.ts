@@ -1,3 +1,4 @@
+import { recentPassage } from "./passageTrace.ts";
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
 import { endDelivery, DELIVERY_RELEASED } from "./deliveryAction.ts";
@@ -79,8 +80,21 @@ export function backfill(self: Colony, i: number, cx: number, cy: number, enemy 
     // The grids are a tick old: a nestmate that stepped in earlier this tick isn't in them (and walling it
     // in would bury it). Rare enough (every other test passed) to look at each ant.
     if (occupied(self, tx, ty)) continue;
-    if (!self.responses.drop(touch(self, i, enemy, self.mode[i], "soil"), self.antDraw(i))) return false;
+    const t = touch(self, i, enemy, self.mode[i], "soil");
+    const trace = self.cur === self.home && !self.onPlane ? self.passageTrace : undefined;
+    const recent =
+      trace !== undefined && self.gainMarks[i] >= 0.5 && recentPassage(trace, tx, ty, self.time, self.params.backfillTraceSeconds ?? 0);
+    if (trace) trace.checks++;
+    const drop = self.responses.drop(trace ? { ...t, backfillTraffic: recent ? "recent" : "quiet" } : t, self.antDraw(i));
+    if (!drop) {
+      if (trace && recent) trace.recentKept++;
+      return false;
+    }
     if (!fillCell(map, tx, ty, self.time)) continue;
+    if (trace) {
+      trace.cells.delete(cellKey(tx, ty));
+      if (recent) trace.recentFilled++;
+    }
     // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent
     // this deep, was measured worse: it soon tires and walks home empty. Seeds 3, 4, 6–8: 12 % less food home.)
     if (self.soil[i] !== SOIL_DUG) self.looseFilled++;

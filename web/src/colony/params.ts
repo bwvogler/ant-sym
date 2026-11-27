@@ -477,6 +477,8 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
   /** the backfill tuning (BACKFILL): a test or sweep changes it for the colonies it builds, not for the process */
   backfill: BackfillTuning;
+  /** Experimental lifetime of local worker passage marks. Omitted or zero keeps legacy backfill. */
+  backfillTraceSeconds?: number;
   /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
   tunnelDrift: number;
 }

@@ -227,7 +227,7 @@ export const RESPONSE_LEGEND = legendOf(TOUCH_SCHEMA, {
 export const RESPONSE_HOOKS = ["get", "carry", "drop", "trail", "contact", "leave"] as const;
 export type ResponseHook = (typeof RESPONSE_HOOKS)[number];
 
-export function responseQuestion(hook: ResponseHook, id: string): JevRequest["questions"] {
+export function responseQuestion(hook: ResponseHook, id: string, backfill = false): JevRequest["questions"] {
   const ant = `ant \`${id}\``;
   switch (hook) {
     case "get":
@@ -241,7 +241,9 @@ export function responseQuestion(hook: ResponseHook, id: string): JevRequest["qu
       return {
         [`${id}_drop`]: {
           type: "noul",
-          instructions: `Going by the doctrine, ${ant} can put down the load named by carrying: should it put the load down here?`,
+          instructions: backfill
+            ? `Going by the doctrine, ${ant} can place one soil pellet in an adjacent underground cell. backfillTraffic is recent if it senses a fresh passage mark on that cell, or quiet if it senses none. Quiet is weak evidence of disuse. Should it place the pellet? If no, it keeps carrying.`
+            : `Going by the doctrine, ${ant} can put down the load named by carrying: should it put the load down here?`,
         },
       };
     case "carry":
@@ -309,6 +311,7 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
     // offered only means something to `get`, and quality to `get` and `trail`; the other lanes don't pay for them.
     // alarm and odds only to `contact`; returns only to `leave`.
     const {
+      backfillTraffic,
       offered,
       quality,
       alarm,
@@ -322,6 +325,7 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
       recentAttack: _recentAttack,
       ...rest
     } = t;
+    const backfill = hook === "drop" && backfillTraffic !== undefined;
     ants[it.id] =
       hook === "carry"
         ? { ...rest, deliveryAttempt, deliveryTarget, deliveryPlace }
@@ -336,7 +340,8 @@ export function packResponseRequest(hook: ResponseHook, items: { id: string; sit
                   ? { ...rest, raid }
                   : { ...rest, returns, crowd }
                 : { ...rest };
-    Object.assign(questions, responseQuestion(hook, it.id));
+    if (backfill) ants[it.id]!.backfillTraffic = backfillTraffic;
+    Object.assign(questions, responseQuestion(hook, it.id, backfill));
   }
   return { state: { legend: RESPONSE_LEGEND, doctrine, ants }, questions };
 }
@@ -406,6 +411,8 @@ export function responseOf(hook: ResponseHook, key: string, answer: string, draw
  * the returns (the other lanes aren't sent them, so they don't key on them: review of #38).
  */
 export function responseKey(hook: ResponseHook, t: Touch): string {
+  // Version this opt-in question independently. Its cache entries never overlap ordinary drop.
+  if (hook === "drop" && t.backfillTraffic !== undefined) return `${touchKey(t)}|backfill-v1:${t.backfillTraffic}`;
   return hook === "carry"
     ? CARRY_KEY.key(t)
     : hook === "contact"
