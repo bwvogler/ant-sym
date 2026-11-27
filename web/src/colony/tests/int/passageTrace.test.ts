@@ -75,3 +75,29 @@ test("backfill uses the soil drop decision and keeps its cache and payload separ
   assert.equal(rockAt(map, x + 1, y), SOIL);
   assert.equal(passageTrace!.cells.size, 0);
 });
+
+test("floor repair uses the ordinary drop question even when the cell has a fresh trace", () => {
+  const c = game().colonies[0]!;
+  c.params.backfillFloorRepair = true;
+  const { map, passageTrace } = c;
+  const cx = c.entranceCol + 19;
+  const cy = c.entranceRow + 7;
+  const tx = cx + 1;
+  for (let row = cy - 2; row <= cy + 2; row++) {
+    for (let col = cx - 2; col <= cx + 3; col++) setRock(map, col, row, ROCK);
+  }
+  const floorRoomX = tx + (cy & 1) - 1;
+  setRock(map, cx, cy, OPEN);
+  setRock(map, tx, cy, OPEN);
+  setRock(map, floorRoomX, cy - 1, OPEN);
+  const room = map.chambers!.add(c.params.nest, cy - 1, "brood");
+  map.chambers!.claim(room.id, floorRoomX, cy - 1, (x, y) => rockAt(map, x, y) === OPEN);
+  put(c, 0, cx, cy);
+  c.pellet[0] = 1;
+  c.time = 30;
+  c.ph.fields.home.set(cx, cy, 1);
+  rememberPassage(passageTrace!, tx, cy, 25);
+  assert.equal(backfill(c, 0, cx, cy), true);
+  assert.equal(rockAt(map, tx, cy), SOIL);
+  assert.equal(passageTrace!.recentFilled, 1);
+});

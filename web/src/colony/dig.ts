@@ -1,3 +1,4 @@
+import { backfillObservers } from "./backfillObservation.ts";
 import { recentPassage } from "./passageTrace.ts";
 // Digging and spoil (docs/refactor.md S3.3): picking up and putting down pellets, dropping spoil on the mound or the midden, backfilling stale tunnels, unburying, the crust and where a chamber is dug. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `self`.
 
@@ -65,10 +66,12 @@ export function backfill(self: Colony, i: number, cx: number, cy: number, enemy 
   const { map } = self;
   const home = self.ph.fields.home;
   const food = self.ph.fields.food;
+  const observe = backfillObservers.get(self);
   for (let d = 0; d < 6; d++) {
     const tx = stepX(cx, cy, d);
     const ty = stepY(cy, d);
-    if (cellKey(tx, ty) === self.lastDug[i]) continue; // the cell it just dug: not straight back in
+    const key = cellKey(tx, ty);
+    if (key === self.lastDug[i]) continue; // the cell it just dug: not straight back in
     if (self.time - map.dugAt.get(tx, ty) < self.params.backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
     if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, self.params.backfill.maxOpen)) continue;
     if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= staleBelow(self, cx, cy, tx, ty)) continue;
@@ -84,15 +87,19 @@ export function backfill(self: Colony, i: number, cx: number, cy: number, enemy 
     const trace = self.cur === self.home && !self.onPlane ? self.passageTrace : undefined;
     const recent =
       trace !== undefined && self.gainMarks[i] >= 0.5 && recentPassage(trace, tx, ty, self.time, self.params.backfillTraceSeconds ?? 0);
+    const floor = (observe !== undefined || (trace !== undefined && self.params.backfillFloorRepair === true)) && floorGround(map, tx, ty);
+    const repair = floor && self.params.backfillFloorRepair === true;
     if (trace) trace.checks++;
-    const drop = self.responses.drop(trace ? { ...t, backfillTraffic: recent ? "recent" : "quiet" } : t, self.antDraw(i));
+    const drop = self.responses.drop(trace && !repair ? { ...t, backfillTraffic: recent ? "recent" : "quiet" } : t, self.antDraw(i));
     if (!drop) {
       if (trace && recent) trace.recentKept++;
+      observe?.(key, i, floor, recent, "kept");
       return false;
     }
     if (!fillCell(map, tx, ty, self.time)) continue;
+    observe?.(key, i, floor, recent, "filled");
     if (trace) {
-      trace.cells.delete(cellKey(tx, ty));
+      trace.cells.delete(key);
       if (recent) trace.recentFilled++;
     }
     // A fresh trip out from here. (Letting its trip clock run on instead, so it lays only faint home scent

@@ -1,6 +1,7 @@
 // Paired, offline one-world nest assay. All workers move and work under normal game ticks.
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { backfillObservers } from "../../web/src/colony/backfillObservation.ts";
 import { packResponseRequest, responseKey } from "../../web/src/colony/colonyBrain.ts";
 import { Game, generateOneWorld, gameRng } from "../../web/src/colony/index.ts";
 import { CELL, cellKey, cellOf, hexDistance, keyX, keyY, nx, ny } from "../../web/src/colony/hex.ts";
@@ -13,6 +14,9 @@ const [seed, seconds, ants] = [seedText, secondsText, antsText].map(Number);
 if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
   throw Error("Usage: nest-function.mjs seed simulated-seconds ants-per-colony [output.json]");
 }
+const allModes = ["current", "trace", "trace-repair"];
+const modes = process.env.NEST_ASSAY_MODE ? [process.env.NEST_ASSAY_MODE] : allModes;
+if (modes.some((m) => !allModes.includes(m))) throw Error("Unknown NEST_ASSAY_MODE");
 const tickRate = 30;
 const sampleTicks = 6;
 const checkpointSeconds = 60;
@@ -71,17 +75,41 @@ function observer(colony) {
   let reversals = 0;
   let foodCarriers = 0;
   let soilCarriers = 0;
+  const carryingSince = new Map();
+  let peakFoodCarriers = 0;
+  let foodCarrierSeconds = 0;
+  let peakLongHeld = 0;
+  let heldOver30 = 0;
+  const backfillSites = new Map();
+  let floorFills = 0;
+  let freshFloorFills = 0;
+  let fillDecisions = 0;
+  backfillObservers.set(colony, (cell, _ant, floor, recent, outcome) => {
+    fillDecisions++;
+    backfillSites.set(cell, (backfillSites.get(cell) ?? 0) + 1);
+    if (floor && outcome === "filled") {
+      floorFills++;
+      if (recent) freshFloorFills++;
+    }
+  });
 
   function sample() {
     foodCarriers = 0;
     soilCarriers = 0;
+    heldOver30 = 0;
     for (let i = 0; i < colony.n; i++) {
       if (!colony.alive[i] || colony.layer[i] !== colony.home) {
+        carryingSince.delete(i);
         newest.delete(i);
         previous.delete(i);
         continue;
       }
-      foodCarriers += Number(Boolean(colony.carrying[i]));
+      if (colony.carrying[i]) {
+        foodCarriers++;
+        const since = carryingSince.get(i) ?? colony.time;
+        carryingSince.set(i, since);
+        if (colony.time - since >= 30) heldOver30++;
+      } else carryingSince.delete(i);
       soilCarriers += Number(Boolean(colony.pellet[i]));
       cellOf(colony.x[i], colony.y[i]);
       const [x, y] = CELL;
@@ -98,6 +126,9 @@ function observer(colony) {
       } else previous.delete(i);
       newest.set(i, key);
     }
+    peakFoodCarriers = Math.max(peakFoodCarriers, foodCarriers);
+    peakLongHeld = Math.max(peakLongHeld, heldOver30);
+    foodCarrierSeconds += (foodCarriers * sampleTicks) / tickRate;
   }
 
   function checkpoint(at) {
@@ -123,6 +154,15 @@ function observer(colony) {
       portTrips: colony.portTrips,
       larder: colony.larder,
       undergroundFoodCarriers: foodCarriers,
+      peakUndergroundFoodCarriers: peakFoodCarriers,
+      undergroundFoodCarrierSeconds: foodCarrierSeconds,
+      undergroundFoodHeldOver30s: heldOver30,
+      peakUndergroundFoodHeldOver30s: peakLongHeld,
+      fillDecisions,
+      uniqueFillSites: backfillSites.size,
+      maxDecisionsAtFillSite: [...backfillSites.values()].reduce((max, n) => Math.max(max, n), 0),
+      floorFills,
+      freshFloorFills,
       undergroundSoilCarriers: soilCarriers,
       population: colony.population,
       births: colony.births,
@@ -148,12 +188,18 @@ function observer(colony) {
 }
 
 function run(mode) {
-  const colony = mode === "trace" ? { backfillTraceSeconds: BACKFILL_TRACE_SECONDS } : undefined;
+  const colony =
+    mode === "current"
+      ? undefined
+      : {
+          backfillTraceSeconds: BACKFILL_TRACE_SECONDS,
+          ...(mode === "trace-repair" ? { backfillFloorRepair: true } : {}),
+        };
   const specs = [{ antCount: ants, ...(colony ? { colony } : {}) }, { antCount: ants }];
   const game = new Game(generateOneWorld(seed, { plane: { size: { w: 160, h: 100 } } }), {}, gameRng(seed), specs);
   const first = game.colonies[0];
   const backfillSituations = new Map();
-  if (mode === "trace") {
+  if (colony) {
     const base = first.responses;
     first.responses = {
       ...base,
@@ -192,7 +238,7 @@ const report = {
   seed,
   seconds,
   antsPerColony: ants,
-  results: [run("current"), run("trace")],
+  results: modes.map(run),
 };
 const json = JSON.stringify(report, null, 2) + "\n";
 if (out) writeFileSync(out, json);

@@ -18,7 +18,7 @@ In the earlier scheduled-traffic fixture, a 12-second passage trace preserved th
 
 ## Nest function assay
 
-The **Nest function assay** workflow compares current backfill and the trace fallback using paired world and random-stream starting seeds. The first colony gets the treatment, and the rival keeps the current rules. Both use the bounded one-world map, with no live Jev calls or fungus intervention. The PR workflow plays both variants for 600 simulated seconds on seeds 7, 17, 29 and 43. Each colony starts with 600 workers, using the same starting-count constant as the browser game. Once the workflow is available on the default branch, manual dispatch offers 300, 600 or 1,200 seconds. Each runner uploads one JSON file with minute checkpoints, and the summary compares final checkpoints.
+The **Nest function assay** workflow compares current backfill, the trace fallback, and an assay-only floor-repair variant using paired world and random-stream starting seeds. The first colony gets the treatment, and the rival keeps the current rules. Both use the bounded one-world map, with no live Jev calls or fungus intervention. The PR workflow plays all three variants for 600 simulated seconds on seeds 7, 17, 29 and 43. Each colony starts with 600 workers, using the same starting-count constant as the browser game. Once the workflow is available on the default branch, manual dispatch offers 300, 600 or 1,200 seconds. Each seed and variant gets its own runner and uploads one JSON file with minute checkpoints, and the summary compares final checkpoints.
 
 Run a pair locally with Node 22.18 or newer:
 
@@ -40,6 +40,14 @@ node scripts/lab/nest-function.mjs 17 600 > nest-17.json
 The initial lower-population runs were pilots. Interpret their results in that context. The workflow evaluates typical starting population on a bounded map, with fungus intervention disabled to isolate the worker response.
 
 Analyses should retain paired seed results. Trajectories and random draws can diverge after a different move. Compare food and useful access together, since lower soil hauling or faster travel could come at the cost of an effectively smaller nest.
+
+## Floor repair and repeated fill checks
+
+At 600 workers per colony, the first trace sweep saw less usable chamber floor on seeds 7 and 43. Food delivery fell on three seeds. Seed 29 also finished with more food held below and fewer internal port trips. These observations motivate a closer look at both repair and logistics.
+
+The `trace-repair` variant uses the normal soil drop question for eligible candidates that the existing geometry classifies as chamber-floor support. Non-floor candidates still use the trace cue. Occupancy, food, brood and no-cut checks apply as usual. This variant is currently in the assay. The playable URL still uses the original trace policy.
+
+The expanded assay records cumulative worker-seconds spent carrying food underground, the peak number of such workers, and peak and final counts observed holding food below for at least 30 seconds. These are sampled every 0.2 simulated seconds, and loss, delivery and exit all end an observed interval. Hold counts are workload markers rather than a measurement of delivery time. It also counts eligible placement decisions, unique cells considered, the maximum decisions at one cell, and successful floor repairs. A high repeat count warrants tracing individual jobs. Tick mean and p95 measure headless execution, and comparisons across runners are approximate.
 
 ## Sources
 
