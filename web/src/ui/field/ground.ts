@@ -35,6 +35,7 @@ import type { FieldCtx } from "./ctx.ts";
 import { dimPx, fogRgb, planeGround, setPx } from "./fogCull.ts";
 import type { FieldEnv } from "./env.ts";
 import type { CellWindow } from "./fungus.ts";
+import type { BrickGpu } from "./brickGpu.ts";
 import { HEX_ZOOM } from "./zoom.ts";
 
 /** The mound's cut drawn on the side view's strip: at most this many levels (the curtain's sky is STRIP rows). */
@@ -120,6 +121,7 @@ export class Ground {
   /** chunks painted and chunk paints served from the cache, this frame */
   paints = 0;
   hits = 0;
+  brickBackend: "canvas" | "webgl2" = "canvas";
   private readonly tiles = new MapChunkPaintCache();
   private readonly paths = new Map<number, Path2D>();
   /** under the fog, the hexagons of the strip-shown cells on an edge, by colour: drawn under the mound tint and the pellets (drawHexes) */
@@ -129,8 +131,10 @@ export class Ground {
   private plains = new Uint8Array(0);
   private readonly stripInputs = new Float64Array(CHUNK * 4);
   private readonly env: FieldEnv;
-  constructor(env: FieldEnv) {
+  private readonly gpu: BrickGpu | null;
+  constructor(env: FieldEnv, gpu: BrickGpu | null = null) {
     this.env = env;
+    this.gpu = gpu;
   }
 
   /** The chunk (cx, cy)'s canvas and colour buffer, made on first use. */
@@ -148,6 +152,7 @@ export class Ground {
 
   /** The shown map is another, or has grown: no chunk is kept. */
   clear(): void {
+    for (const chunk of this.chunks.values()) this.gpu?.release(chunk);
     this.chunks.clear();
   }
 
@@ -159,6 +164,7 @@ export class Ground {
   /** A frame begins: its counters start from nothing. */
   beginFrame(): void {
     this.paints = this.hits = 0;
+    this.brickBackend = "canvas";
   }
 
   /** Whether cell (x, y) of the shown map has nothing painted over the ground (its pixel is clear): the terrain's grain shows there. */
@@ -176,19 +182,29 @@ export class Ground {
     const { m } = k;
     const { rx0, rx1, ry0, ry1 } = win;
     const endless = m.endless === true;
+    const gpu = hexMix === 0 && this.gpu?.begin(k.v.w, k.v.h) ? this.gpu : null;
+    const gpuChunks: ChunkCanvas[] = [];
+    let gpuReady = true;
     for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
       for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
         const rc = chunkOf(endless, m.rock, cx, cy);
         if (!rc) {
           // A chunk the game has not made (or has since freed) has no canvas: nothing here makes it, and a canvas of one it let go is dropped.
-          if (endless) this.chunks.delete(`${cx},${cy}`);
+          if (endless) this.dropChunk(`${cx},${cy}`);
           continue;
         }
         const cc = this.chunkCanvas(cx, cy);
         this.paintChunk(k, show, cx, cy, cc, rc, foodAsSprites);
         if (hexMix > 0) continue;
-        this.layBricks(k, win, cx, cy, cc);
+        if (gpu) {
+          gpuChunks.push(cc);
+          if (gpuReady) gpuReady = this.layBricks(k, win, cc, gpu);
+        } else this.layBricks(k, win, cc);
       }
+    if (gpu) {
+      if (gpuReady && gpu.composite(k.ctx)) this.brickBackend = "webgl2";
+      else for (const chunk of gpuChunks) this.layBricks(k, win, chunk);
+    }
     if (hexMix > 0) this.drawHexes(k, win, hexMix);
     if (endless) this.evict(win);
   }
@@ -205,15 +221,22 @@ export class Ground {
     let dropped = 0;
     for (const [key, cc] of this.chunks)
       if (cc.cx < x0 || cc.cx > x1 || cc.cy < y0 || cc.cy > y1) {
-        this.chunks.delete(key);
+        this.dropChunk(key);
         dropped++;
       }
     return dropped;
   }
 
+  private dropChunk(key: string): void {
+    const chunk = this.chunks.get(key);
+    if (chunk) this.gpu?.release(chunk);
+    this.chunks.delete(key);
+  }
+
   /** Chunk (cx, cy)'s rows laid on the canvas as bricks: a strip a cell high for each row, odd rows shifted half a cell. */
-  private layBricks(k: FieldCtx, win: CellWindow, cx: number, cy: number, cc: ChunkCanvas): void {
+  private layBricks(k: FieldCtx, win: CellWindow, cc: ChunkCanvas, gpu?: BrickGpu): boolean {
     const { ctx, c, v } = k;
+    const { cx, cy } = cc;
     const ly0 = Math.max(0, win.ry0 - cy * CHUNK);
     const ly1 = Math.min(CHUNK - 1, win.ry1 - cy * CHUNK);
     for (let ly = ly0; ly <= ly1; ly++) {
@@ -222,8 +245,17 @@ export class Ground {
       const [bx, by] = toScreen(c, v, (cx + 1) * CHUNK + 0.5 * (y & 1), (y + 1) * R);
       const dx = Math.round(ax);
       const dy = Math.round(ay);
-      ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, Math.round(bx) - dx, Math.round(by) - dy);
+      const w = Math.round(bx) - dx;
+      const h = Math.round(by) - dy;
+      if (gpu) {
+        const offset = 4 * (ly - ly0);
+        gpu.rects[offset] = dx;
+        gpu.rects[offset + 1] = dy;
+        gpu.rects[offset + 2] = w;
+        gpu.rects[offset + 3] = h;
+      } else ctx.drawImage(cc.canvas, 0, ly, CHUNK, 1, dx, dy, w, h);
     }
+    return gpu ? gpu.draw(cc, ly0, ly1 - ly0 + 1) : true;
   }
 
   /** The plane values that determine this chunk's strip, including the visibility of each column. */
@@ -526,7 +558,7 @@ export class Ground {
       for (let cy = ry0 >> 6; cy <= ry1 >> 6; cy++)
         for (let cx = rx0 >> 6; cx <= rx1 >> 6; cx++) {
           const cc = this.chunks.get(`${cx},${cy}`);
-          if (cc) this.layBricks(k, win, cx, cy, cc);
+          if (cc) this.layBricks(k, win, cc);
         }
     // At the distant end these six vertices describe the same staggered rectangles as the chunk pass.
     const x = c.zoom * 0.5 * (1 + 0.04 * hexMix);

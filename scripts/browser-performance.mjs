@@ -2,7 +2,7 @@
 // Usage: node scripts/browser-performance.mjs <baseline-web> <candidate-web> [seconds-per-sample=4]
 // Requires Playwright with Chromium and installed web dependencies in both checkouts. Uses the keyless dev server for the game metrics.
 // PERF_RESULTS optionally names a JSON output file. PERF_SEEDS optionally overrides the comma-separated seeds (default 1,7).
-// PERF_CLOCK_ONLY=1 runs only the paired full-game clock comparison on the candidate checkout.
+// PERF_CLOCK_ONLY=1 or PERF_GPU_ONLY=1 selects one full-game comparison on the candidate checkout.
 import assert from "node:assert/strict";
 import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -21,6 +21,7 @@ assert.ok(
   "Seeds must be positive integers",
 );
 const clockOnly = process.env.PERF_CLOCK_ONLY === "1";
+const gpuOnly = process.env.PERF_GPU_ONLY === "1";
 const web = { base: resolve(baselinePath), candidate: resolve(candidatePath) };
 const { chromium, devices } = createRequire(import.meta.url)("playwright");
 const { defaultBrowserType: _engine, ...phone } = devices["Pixel 6 Pro"];
@@ -78,11 +79,11 @@ async function gesture(cdp, page, zoom) {
   await send("touchEnd", []);
 }
 
-async function sample(page, isTrial, view) {
+async function sample(page, isTrial, view, renderer) {
   const cdp = await page.context().newCDPSession(page);
   try {
     const read = page.evaluate(
-      ({ duration, isTrial, view }) =>
+      ({ duration, isTrial, view, renderer }) =>
         new Promise((resolve) => {
           const dev = isTrial ? undefined : Reflect.get(window, "jevAnts");
           const game = dev?.game;
@@ -98,6 +99,9 @@ async function sample(page, isTrial, view) {
               ticks.push(performance.now() - start);
             };
           }
+          const canvas = renderer ? document.querySelector("canvas[data-field-draw-ms]") : null;
+          const drawTimes = [];
+          let gpuFrames = 0;
           const gaps = [];
           let start = -1;
           let last = -1;
@@ -111,7 +115,12 @@ async function sample(page, isTrial, view) {
               start = now;
               sim = readTime();
             }
-            if (last >= 0) gaps.push(now - last);
+            if (last >= 0) {
+              gaps.push(now - last);
+              if (canvas?.getAttribute("data-ground-backend") === "webgl2") gpuFrames++;
+              const drawMs = Number(canvas?.getAttribute("data-field-draw-ms"));
+              if (canvas && Number.isFinite(drawMs)) drawTimes.push(drawMs);
+            }
             last = now;
             const elapsed = now - start;
             if (elapsed < duration) {
@@ -124,13 +133,15 @@ async function sample(page, isTrial, view) {
               camera,
               frames: gaps.length,
               frameP95: percentile(gaps, 0.95),
+              drawP95: percentile(drawTimes, 0.95),
+              gpuFrames,
               tickMean: ticks.length ? ticks.reduce((sum, tick) => sum + tick, 0) / ticks.length : null,
               tickP95: percentile(ticks, 0.95),
             });
           }
           requestAnimationFrame(frame);
         }),
-      { duration: seconds * 1000, isTrial, view },
+      { duration: seconds * 1000, isTrial, view, renderer },
     );
     await page.waitForTimeout(500);
     await gesture(cdp, page, true);
@@ -149,19 +160,19 @@ async function scenario(browser, server, revision, seed, worker, view, options =
     page.on("pageerror", (error) => errors.push(error.message));
     await openGame(page, server.url, seed, worker, options);
     if (view === "below") await page.getByRole("button", { name: "below", exact: true }).tap();
-    if (options.clock) {
+    if (options.clock || options.renderer) {
       const populations = await page.evaluate(() => Reflect.get(window, "jevAnts")?.game.colonies.map((colony) => colony.params.antCount));
       assert.deepEqual(populations, [600, 600], "both colonies use the full starting population");
     }
     // Let the trial HUD settle after the pause before taking its first timestamp.
     await page.waitForTimeout(1200);
-    const paused = await sample(page, worker !== null, view);
+    const paused = await sample(page, worker !== null, view, options.renderer);
     assert.equal(paused.pace, 0, "The game stayed paused");
     await page.locator("canvas").first().focus();
     await page.keyboard.press("0");
     await page.getByRole("button", { name: "Play", exact: true }).tap();
     await page.waitForTimeout(1200);
-    const playing = await sample(page, worker !== null, view);
+    const playing = await sample(page, worker !== null, view, options.renderer);
     assert.ok(playing.pace > 0, "The game advanced");
     assert.deepEqual(errors, [], "The browser reported no errors");
     return { revision, seed, view, paused, playing };
@@ -171,12 +182,12 @@ async function scenario(browser, server, revision, seed, worker, view, options =
 }
 
 const results = [];
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--enable-unsafe-swiftshader"] });
 const servers = [];
 try {
-  if (!clockOnly) servers[0] = await startDevServer(web.base);
+  if (!clockOnly && !gpuOnly) servers[0] = await startDevServer(web.base);
   servers[1] = await startDevServer(web.candidate);
-  if (!clockOnly) {
+  if (!clockOnly && !gpuOnly) {
     // Alternate which revision goes first on successive seeds to reduce run-order effects.
     for (let i = 0; i < seeds.length; i++) {
       const view = i % 2 === 0 ? "above" : "below";
@@ -194,16 +205,32 @@ try {
       }
     }
   }
-  for (let i = 0; i < seeds.length; i++) {
-    const view = i % 2 === 0 ? "above" : "below";
-    const pair = [];
-    for (const clock of i % 2 === 0 ? ["frame", "independent"] : ["independent", "frame"]) {
-      const label = clock === "frame" ? "PR, frame clock" : "PR, independent clock";
-      pair.push(await scenario(browser, servers[1], label, seeds[i], null, view, { clock }));
+  if (!gpuOnly)
+    for (let i = 0; i < seeds.length; i++) {
+      const view = i % 2 === 0 ? "above" : "below";
+      const pair = [];
+      for (const clock of i % 2 === 0 ? ["frame", "independent"] : ["independent", "frame"]) {
+        const label = clock === "frame" ? "PR, frame clock" : "PR, independent clock";
+        pair.push(await scenario(browser, servers[1], label, seeds[i], null, view, { clock }));
+      }
+      assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
+      assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "clock comparisons start at the same camera");
+      results.push(...pair);
     }
-    assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
-    assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "clock comparisons start at the same camera");
-    results.push(...pair);
+  if (!clockOnly) {
+    for (let i = 0; i < seeds.length; i++) {
+      const view = i % 2 === 0 ? "below" : "above";
+      const pair = [];
+      for (const renderer of i % 2 === 0 ? ["canvas", "gpu"] : ["gpu", "canvas"]) {
+        const label = renderer === "gpu" ? "PR, WebGL2 ground" : "PR, Canvas ground";
+        const result = await scenario(browser, servers[1], label, seeds[i], null, view, { clock: "independent", renderer });
+        if (renderer === "gpu") assert.ok(result.playing.gpuFrames > 0, "WebGL2 drew the terrain in the full game");
+        pair.push(result);
+      }
+      assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
+      assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "renderer comparisons start at the same camera");
+      results.push(...pair);
+    }
   }
 } finally {
   for (const server of servers) server?.stop();
@@ -215,11 +242,13 @@ console.log("## Chromium on a Pixel 6 Pro viewport\n");
 console.log(
   "Development build, default game settings unless noted, 4× target, pinch and pan during each sample. Hosted-runner values vary.\n",
 );
-console.log("| Revision | Seed | View | Paused p95 frame ms | 4× p95 frame ms | Actual pace | Tick mean ms | Tick p95 ms |");
-console.log("|---|---:|---|---:|---:|---:|---:|---:|");
+console.log(
+  "| Revision | Seed | View | Paused p95 frame ms | 4× p95 frame ms | Actual pace | Tick mean ms | Tick p95 ms | Draw p95 ms | GPU frames |",
+);
+console.log("|---|---:|---|---:|---:|---:|---:|---:|---:|---:|");
 for (const { revision, seed, view, paused, playing } of results) {
   console.log(
-    `| ${revision} | ${seed} | ${view} | ${format(paused.frameP95)} | ${format(playing.frameP95)} | ${format(playing.pace, 2)}× | ${format(playing.tickMean)} | ${format(playing.tickP95)} |`,
+    `| ${revision} | ${seed} | ${view} | ${format(paused.frameP95)} | ${format(playing.frameP95)} | ${format(playing.pace, 2)}× | ${format(playing.tickMean)} | ${format(playing.tickP95)} | ${format(playing.drawP95)} | ${playing.gpuFrames}/${playing.frames} |`,
   );
 }
 if (process.env.PERF_RESULTS) writeFileSync(process.env.PERF_RESULTS, JSON.stringify(results, null, 2) + "\n");

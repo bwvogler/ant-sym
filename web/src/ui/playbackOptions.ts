@@ -22,3 +22,8 @@ const cap = mapPixelRatioCap();
 export function mapPixelRatio(): number {
   return Math.min(cap, window.devicePixelRatio || 1);
 }
+
+/** Try WebGL2 for the zoomed-out terrain of the full game. */
+export function gpuGroundFromUrl(search = browserSearch()): boolean {
+  return new URLSearchParams(search).get("renderer") === "gpu";
+}
