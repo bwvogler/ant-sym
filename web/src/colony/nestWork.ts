@@ -1,5 +1,6 @@
 // Work in the nest (docs/refactor.md S3.3): porters stock food, nurses carry brood, undertakers take the dead to the midden, and the nest's life (eclosion, castes, alates leaving). Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { porterObservers } from "./porterObservation.ts";
 import { foodHandoffObservers } from "./foodHandoffObservation.ts";
 import { requestedDelivery, endDelivery, DELIVERY_KEEP, DELIVERY_DONE } from "./deliveryAction.ts";
 import { putDown } from "./dig.ts";
@@ -159,6 +160,7 @@ export function becomePorter(col: Colony, i: number, to: number): void {
   col.mode[i] = RETURN;
   col.homeAfresh(i);
   col.gx[i] = NO_CELL;
+  porterObservers.get(col)?.start(i, to);
 }
 
 function releaseAfterRefusal(col: Colony, i: number, dt: number, enemy: boolean): boolean {
@@ -213,6 +215,7 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
       if (col.porter[i]) {
         col.portTrips++;
         col.inJaws--;
+        porterObservers.get(col)?.deposit(i, site.id);
       } else col.stored++;
       observe?.(i, "deposit");
       col.portTo[i] = -1;
@@ -264,8 +267,11 @@ export function port(col: Colony, i: number, dt: number, enemy = false): boolean
     col.dropRefusalTime[i] = 0;
     col.carrying[i] = 0;
     col.stock(c, 1);
-    if (col.porter[i]) (col.portTrips++, (col.inJaws -= 1));
-    else col.stored++;
+    if (col.porter[i]) {
+      col.portTrips++;
+      col.inJaws--;
+      porterObservers.get(col)?.deposit(i, c.id);
+    } else col.stored++;
     observe?.(i, "deposit");
     col.portTo[i] = -1;
     col.porter[i] = 0;

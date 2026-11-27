@@ -1,5 +1,6 @@
 // Walking a tunnel (docs/refactor.md S3.3): an ant underground steers along the walls, widens a crowded chamber, and goes for food, brood or the way out. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `col`.
 
+import { bypassPolicies } from "./bypassPolicy.ts";
 import { localDelivery, DELIVERY_SEARCH, DELIVERY_TRAVEL } from "./deliveryAction.ts";
 import type { Colony } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
@@ -177,6 +178,20 @@ export function walkTunnel(col: Colony, i: number, mode: number, step: number): 
   // Raiding in the side view (slice 7): out of its own nest, along the ground to the rival's hole, cell by cell.
   const raiding = mode === FIGHT && !col.onPlane && col.stanceOf(i) === "raid" && col.raidTarget !== null;
   const onSky = isSky(map, fresh ? hx : col.gx[i], fresh ? hy : col.gy[i]);
+  if (mode === EXPLORE && !onSky && !col.onPlane && col.cur === col.home) {
+    const bypass = bypassPolicies.get(col);
+    if (bypass && !col.carrying[i] && !col.pellet[i] && !col.broodHeld[i] && col.digs(i)) {
+      const face = bypass.choose(i, hx, hy);
+      if (face >= 0) {
+        col.noTunnel[i] = col.chamberCell[i] = NO_KEY;
+        col.gdir[i] = face;
+        col.gx[i] = stepX(hx, hy, face);
+        col.gy[i] = stepY(hy, face);
+        col.digAim[i] = DIR_ANGLE[face];
+        return true;
+      }
+    }
+  }
   // Homing underground with the hole still its goal: in at another hole than its own (see homeGoal). It climbs back out.
   const climbing = mode === RETURN && !col.onPlane && !onSky && col.goalKind[i] === 1 && col.pellet[i] === 0;
   const groundHome = climbing || ((mode === RETURN || raiding) && !col.onPlane && onSky);

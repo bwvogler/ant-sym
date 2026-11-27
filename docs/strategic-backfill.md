@@ -60,3 +60,9 @@ Placement instrumentation also reports the eight busiest fill sites. It distingu
 - [Lenoir et al. (2009), hydrocarbons in nest and home-range marking](https://doi.org/10.1007/s10886-009-9669-6)
 - [Heyman et al. (2017), chemical road signs inside nests](https://doi.org/10.1038/ncomms15414)
 - [Tschinkel and Seal (2016), underground deposition and backfilled chambers and shafts](https://doi.org/10.1371/journal.pone.0158920)
+
+## Internal porter trips and a one-cell bypass
+
+The assay records internal porter trips from starting a carry to the actual chamber deposit. Each checkpoint reports completed and unfinished trips, age of unfinished trips, their intended chambers, reroutes, deposits at alternate destinations, and sampled reversals by cell. Adjacent transitions are sampled every 0.2 simulated seconds, so a reversal count is a sample rather than an exhaustive trace. The p95 excludes unfinished trips. Inspect both the completion fraction and the ages of outstanding trips.
+
+The optional assay variant `trace-bypass` applies one local excavation rule on top of passage-aware backfill. An eligible worker passing a cell can aim to dig an adjacent soil face if at least three porter slots reversed there in 20 seconds. The face must join exactly two runs of underground neighbors whose shortest existing route takes five to ten steps. The rule prefers the longest eligible detour and caps excavations at four. Workers still use ordinary dig timing, produce spoil, and obey the protection for refilled ground and the surface crust. Output includes eligible faces, actual excavations, and sampled loaded porter entries into the opened cells. The variant runs offline using this candidate rule. Playable policy and Jev defaults are unaffected.

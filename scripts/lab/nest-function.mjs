@@ -1,6 +1,8 @@
 // Paired, offline one-world nest assay. All workers move and work under normal game ticks.
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { installPorterBypass } from "./porter-bypass.mjs";
+import { distribution, observePorterTrips } from "./porter-trips.mjs";
 import { foodHandoffObservers } from "../../web/src/colony/foodHandoffObservation.ts";
 import { backfillObservers } from "../../web/src/colony/backfillObservation.ts";
 import { packResponseRequest, responseKey } from "../../web/src/colony/colonyBrain.ts";
@@ -17,7 +19,7 @@ if (![seed, seconds, ants].every((x) => Number.isSafeInteger(x) && x > 0)) {
 }
 const allModes = ["current", "trace", "trace-repair"];
 const modes = process.env.NEST_ASSAY_MODE ? [process.env.NEST_ASSAY_MODE] : allModes;
-if (modes.some((m) => !allModes.includes(m))) throw Error("Unknown NEST_ASSAY_MODE");
+if (modes.some((m) => !allModes.includes(m) && m !== "trace-bypass")) throw Error("Unknown NEST_ASSAY_MODE");
 const tickRate = 30;
 const sampleTicks = 6;
 const checkpointSeconds = 60;
@@ -62,12 +64,6 @@ function describeGeometry(colony, map) {
     chambers: chambers.length,
     chamberFloor: chambers.reduce((sum, room) => sum + room.floor, 0),
   };
-}
-
-function distribution(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const at = (fraction) => sorted[Math.ceil(fraction * sorted.length) - 1] ?? null;
-  return { count: sorted.length, p50Seconds: at(0.5), p95Seconds: at(0.95) };
 }
 
 function observer(colony) {
@@ -295,15 +291,25 @@ function run(mode) {
     };
   }
   const watch = observer(first);
+  const bypass = mode === "trace-bypass" ? installPorterBypass(first) : null;
+  const porters = observePorterTrips(first, bypass?.reversal, bypass?.visit);
   const checkpoints = [];
   const tickMs = [];
   for (let tick = 1; tick <= seconds * tickRate; tick++) {
     const start = performance.now();
     game.tick(1 / tickRate);
     tickMs.push(performance.now() - start);
-    if (tick % sampleTicks === 0) watch.sample();
+    if (tick % sampleTicks === 0) {
+      watch.sample();
+      porters.sample();
+      if (tick % tickRate === 0) bypass?.refresh();
+    }
     if (tick % (checkpointSeconds * tickRate) === 0 || tick === seconds * tickRate) {
-      checkpoints.push(watch.checkpoint(tick / tickRate));
+      checkpoints.push({
+        ...watch.checkpoint(tick / tickRate),
+        porterTrips: porters.checkpoint(),
+        bypass: bypass?.checkpoint() ?? null,
+      });
     }
   }
   const meanMs = tickMs.reduce((a, b) => a + b, 0) / tickMs.length;
