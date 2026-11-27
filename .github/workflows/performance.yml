@@ -89,6 +89,15 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           node candidate/scripts/browser-performance.mjs baseline/web candidate/web |
             tee "$RUNNER_TEMP/performance/browser.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare sustained underground play with and without a worker
+        if: ${{ hashFiles('candidate/web/src/experiments/mapTrialRuntime.ts') != '' }}
+        env:
+          PERF_WORKER_ONLY: "1"
+          PERF_SEEDS: "17,17"
+          PERF_RESULTS: ${{ runner.temp }}/performance/worker-play.json
+        run: |
+          node candidate/scripts/browser-performance.mjs candidate/web candidate/web 25 |
+            tee "$RUNNER_TEMP/performance/worker-play.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload measurements
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7

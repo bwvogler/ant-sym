@@ -92,7 +92,7 @@ export interface EvolutionStats {
 }
 
 /** The game's fungus's body and evolution, read off the game. */
-function evolutionStats(game: Game): EvolutionStats | null {
+export function evolutionStats(game: Game): EvolutionStats | null {
   const e = game.fungus.evolution;
   if (!e) return null;
   let inHosts = 0;
@@ -155,7 +155,7 @@ export function sideOf(c: Colony, fungus: Fungus): SideStats {
 }
 
 /** The chapter for a game: the colony the fungus landed by (or would land by), and how far into it it is. */
-function chapterFor(game: Game): ChapterView {
+export function chapterFor(game: Game): ChapterView {
   const k = landingOf(game);
   const c = game.colonies[k] ?? game.colonies[0]!;
   const f = game.fungus.census(c);

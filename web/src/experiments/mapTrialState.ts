@@ -1,5 +1,7 @@
 import { chunkKey, chunkOf, type Cells, type ChunkLayer, type Colony, type Game } from "../colony/index.ts";
 
+import type { MapTrialAction, MapTrialProgress } from "./mapTrialRuntime.ts";
+
 const antFields = ["x", "y", "heading", "layer", "alive", "gen", "load", "odour", "carrying", "quality", "pellet", "corpse"] as const;
 type AntField = (typeof antFields)[number];
 
@@ -31,33 +33,25 @@ type Ground = {
   maps: { dug: number; filled: number; foodLeft: number; moundCells?: number }[];
 };
 
-export function mapTrialBoundary(game: Game): string {
-  if (game.founded.length > 0) return "Trial ended when a new colony opened";
-  if (game.flights.length > 0) return "Trial ended at the first queen flight";
-  return "";
-}
-
 export interface MapTrialFrame {
   type: "frame";
   time: number;
-  playing: boolean;
-  end: string;
+  progress?: MapTrialProgress;
   colonies: ReturnType<typeof colonyView>[];
   ground?: Ground;
 }
 
-export type MapTrialReply = MapTrialFrame | { type: "error" | "end"; message: string };
-export type MapTrialCommand = { type: "init"; seed: number; antCount: number } | { type: "clock"; playing: boolean; speed: number };
+export type MapTrialReply =
+  MapTrialFrame | { type: "world"; state: ReturnType<Game["save"]> } | { type: "error" | "notice"; message: string };
+export type MapTrialCommand = { type: "init"; seed: number; antCount: number } | MapTrialAction;
 
 export class MapTrialSnapshots {
   readonly #previous = new Map<number, Map<number, Cells>>();
 
-  frame(game: Game, playing: boolean, includeGround: boolean): MapTrialFrame {
+  frame(game: Game, includeGround: boolean): MapTrialFrame {
     return {
       type: "frame",
       time: game.time,
-      playing,
-      end: mapTrialBoundary(game),
       colonies: game.colonies.map(colonyView),
       ground: includeGround
         ? {

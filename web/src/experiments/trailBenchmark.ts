@@ -46,7 +46,7 @@ export function summarizeTrailPairs(pairs: Pair[]): TrailBenchmarkResult {
 /** Replay the same simulation segment in both variants. Worker time is engine-only. */
 export async function runTrailBenchmark(progress: (pairs: number) => void): Promise<TrailBenchmarkResult> {
   setTrailOptimizations(true);
-  const game = await buildTrialGame(TRAIL_BENCH_SEED, TRAIL_BENCH_ANTS, true);
+  const { game } = await buildTrialGame(TRAIL_BENCH_SEED, TRAIL_BENCH_ANTS, true);
   const advance = (ticks: number) => {
     for (let i = 0; i < ticks; i++) game.tick(MAX_STEP);
   };

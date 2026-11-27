@@ -45,15 +45,16 @@ export async function buildTrialGame(seed = 1, antCount = DEFAULT_ANTS, requireT
     const ant = species === undefined ? GENERIC_ANT : SPECIES[species];
     return ant ? jev.seed(context, entries, ant) : 0;
   });
-  jev.attachColonies(game.colonies, game.params.species, true);
+  const bindColonies = () => jev.attachColonies(game.colonies, game.params.species, true);
+  bindColonies();
   jev.attachFungus(game.fungus);
   if (requireTrailAnswers && !jev.state.lanes.trail.cached) throw new Error("The bundled trail answers could not be loaded. Try again.");
   game.land(landingOf(game), GAME_STRAIN, { evolve: true });
-  return game;
+  return { game, bindColonies };
 }
 
 export async function buildTrial() {
-  const game = await buildTrialGame();
+  const { game } = await buildTrialGame();
   const landing = landingOf(game);
   const colony = game.colonies[landing]!;
   const above = { ...colony.layers[PLANE]!.nest, layer: PLANE };
