@@ -17,10 +17,7 @@ const [baselinePath, candidatePath, secondsArg = "4"] = process.argv.slice(2);
 const seconds = Number(secondsArg);
 const seeds = (process.env.PERF_SEEDS ?? "1,7").split(",").map(Number);
 assert.ok(baselinePath && candidatePath, "Provide the two web directories");
-assert.ok(
-  Number.isFinite(seconds) && seconds >= 2 && seconds <= 30,
-  "Sample duration must be 2–30 seconds",
-);
+assert.ok(Number.isFinite(seconds) && seconds >= 2 && seconds <= 30, "Sample duration must be 2–30 seconds");
 assert.ok(
   seeds.every((seed) => Number.isSafeInteger(seed) && seed > 0),
   "Seeds must be positive integers",
@@ -39,25 +36,18 @@ async function openGame(page, url, seed, worker, options) {
     target.searchParams.set("worker", String(worker));
     target.searchParams.set("seed", String(seed));
   }
-  for (const [key, value] of Object.entries(options))
-    target.searchParams.set(key, String(value));
+  for (const [key, value] of Object.entries(options)) target.searchParams.set(key, String(value));
   await page.goto(target.href);
   if (worker === null) {
     await page.getByLabel("world seed").fill(String(seed));
-    await page
-      .getByRole("button", { name: "Start without the tutorial", exact: true })
-      .tap();
+    await page.getByRole("button", { name: "Start without the tutorial", exact: true }).tap();
   } else {
     await page.getByRole("button", { name: "Play", exact: true }).tap();
   }
   await page.waitForFunction(
     (isTrial) => {
       const time = isTrial
-        ? Number(
-            document
-              .querySelector("output[data-sim-time]")
-              ?.getAttribute("data-sim-time"),
-          )
+        ? Number(document.querySelector("output[data-sim-time]")?.getAttribute("data-sim-time"))
         : Reflect.get(window, "jevAnts")?.game.time;
       return time >= 2;
     },
@@ -97,7 +87,7 @@ async function gesture(cdp, page, zoom) {
   await send("touchEnd", []);
 }
 
-async function sample(page, isTrial, view, renderer) {
+async function sample(page, isTrial, view, renderer, durationSeconds = seconds) {
   const cdp = await page.context().newCDPSession(page);
   try {
     const read = page.evaluate(
@@ -105,13 +95,7 @@ async function sample(page, isTrial, view, renderer) {
         new Promise((resolve) => {
           const dev = isTrial ? undefined : Reflect.get(window, "jevAnts");
           const game = dev?.game;
-          const readTime = () =>
-            game?.time ??
-            Number(
-              document
-                .querySelector("output[data-sim-time]")
-                ?.getAttribute("data-sim-time"),
-            );
+          const readTime = () => game?.time ?? Number(document.querySelector("output[data-sim-time]")?.getAttribute("data-sim-time"));
           const ticks = [];
           const tick = game?.tick;
           const currentCamera = dev?.camera(view, dev.line());
@@ -123,9 +107,7 @@ async function sample(page, isTrial, view, renderer) {
               ticks.push(performance.now() - start);
             };
           }
-          const canvas = renderer
-            ? document.querySelector("canvas[data-field-draw-ms]")
-            : null;
+          const canvas = renderer ? document.querySelector("canvas[data-field-draw-ms]") : null;
           const drawTimes = [];
           let gpuFrames = 0;
           const gaps = [];
@@ -134,11 +116,7 @@ async function sample(page, isTrial, view, renderer) {
             if (event.pointerType !== "touch") return;
             const at = event.timeStamp;
             // By the second rAF, the first frame following the event has had a chance to paint.
-            requestAnimationFrame(() =>
-              requestAnimationFrame(() =>
-                touchToFrame.push(performance.now() - at),
-              ),
-            );
+            requestAnimationFrame(() => requestAnimationFrame(() => touchToFrame.push(performance.now() - at)));
           };
           const field = isTrial ? document.querySelector("canvas") : null;
           field?.addEventListener("pointermove", onTouchMove);
@@ -157,8 +135,7 @@ async function sample(page, isTrial, view, renderer) {
             }
             if (last >= 0) {
               gaps.push(now - last);
-              if (canvas?.getAttribute("data-ground-backend") === "webgl2")
-                gpuFrames++;
+              if (canvas?.getAttribute("data-ground-backend") === "webgl2") gpuFrames++;
               const drawMs = Number(canvas?.getAttribute("data-field-draw-ms"));
               if (canvas && Number.isFinite(drawMs)) drawTimes.push(drawMs);
             }
@@ -180,22 +157,20 @@ async function sample(page, isTrial, view, renderer) {
               frameP95: percentile(gaps, 0.95),
               drawP95: percentile(drawTimes, 0.95),
               gpuFrames,
-              tickMean: ticks.length
-                ? ticks.reduce((sum, tick) => sum + tick, 0) / ticks.length
-                : null,
+              tickMean: ticks.length ? ticks.reduce((sum, tick) => sum + tick, 0) / ticks.length : null,
               tickP95: percentile(ticks, 0.95),
             });
           }
           requestAnimationFrame(frame);
         }),
-      { duration: seconds * 1000, isTrial, view, renderer },
+      { duration: durationSeconds * 1000, isTrial, view, renderer },
     );
     await page.waitForTimeout(500);
     await gesture(cdp, page, true);
     await page.waitForTimeout(400);
     await gesture(cdp, page, false);
     if (workerOnly) {
-      for (let i = 0; i < Math.floor(seconds / 4) - 1; i++) {
+      for (let i = 0; i < Math.floor(durationSeconds / 4) - 1; i++) {
         await page.waitForTimeout(3000);
         await gesture(cdp, page, false);
       }
@@ -206,49 +181,27 @@ async function sample(page, isTrial, view, renderer) {
   }
 }
 
-async function scenario(
-  browser,
-  server,
-  revision,
-  seed,
-  worker,
-  view,
-  options = {},
-) {
+async function scenario(browser, server, revision, seed, worker, view, options = {}) {
   const page = await browser.newPage(phone);
   try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await openGame(page, server.url, seed, worker, options);
-    if (view === "below")
-      await page.getByRole("button", { name: "below", exact: true }).tap();
+    if (view === "below") await page.getByRole("button", { name: "below", exact: true }).tap();
     if (worker !== null) {
-      assert.ok(
-        (await page.getByText(/600 ants per colony/).count()) > 0,
-        "Both colonies start at full population",
-      );
+      assert.ok((await page.getByText(/600 ants per colony/).count()) > 0, "Both colonies start at full population");
       const evolution = page.getByRole("button", { name: /^Evolution/ });
       await evolution.tap();
-      assert.ok(
-        await page.getByRole("region", { name: "Evolution" }).isVisible(),
-      );
+      assert.ok(await page.getByRole("region", { name: "Evolution" }).isVisible());
       await evolution.tap();
     }
     if (options.clock || options.renderer) {
-      const populations = await page.evaluate(() =>
-        Reflect.get(window, "jevAnts")?.game.colonies.map(
-          (colony) => colony.params.antCount,
-        ),
-      );
-      assert.deepEqual(
-        populations,
-        [600, 600],
-        "both colonies use the full starting population",
-      );
+      const populations = await page.evaluate(() => Reflect.get(window, "jevAnts")?.game.colonies.map((colony) => colony.params.antCount));
+      assert.deepEqual(populations, [600, 600], "both colonies use the full starting population");
     }
     // Let the trial HUD settle after the pause before taking its first timestamp.
     await page.waitForTimeout(1200);
-    const paused = await sample(page, worker !== null, view, options.renderer);
+    const paused = await sample(page, worker !== null, view, options.renderer, workerOnly ? 3 : seconds);
     assert.equal(paused.pace, 0, "The game stayed paused");
     await page.locator("canvas").first().focus();
     await page.keyboard.press("0");
@@ -256,11 +209,7 @@ async function scenario(
     await page.waitForTimeout(1200);
     const playing = await sample(page, worker !== null, view, options.renderer);
     assert.ok(playing.pace > 0, "The game advanced");
-    if (workerOnly)
-      assert.ok(
-        playing.touchSamples >= 2,
-        "The canvas received touch movement during play",
-      );
+    if (workerOnly) assert.ok(playing.touchSamples >= 2, "The canvas received touch movement during play");
     assert.deepEqual(errors, [], "The browser reported no errors");
     return { revision, seed, view, paused, playing };
   } finally {
@@ -275,24 +224,12 @@ const browser = await chromium.launch({
 });
 const servers = [];
 try {
-  if (!clockOnly && !gpuOnly && !workerOnly)
-    servers[0] = await startDevServer(web.base);
-  servers[1] = previewUrl
-    ? { url: previewUrl, stop() {} }
-    : await startDevServer(web.candidate);
+  if (!clockOnly && !gpuOnly && !workerOnly) servers[0] = await startDevServer(web.base);
+  servers[1] = previewUrl ? { url: previewUrl, stop() {} } : await startDevServer(web.candidate);
   if (workerOnly) {
     for (let i = 0; i < seeds.length; i++) {
       for (const worker of i % 2 === 0 ? [0, 1] : [1, 0]) {
-        results.push(
-          await scenario(
-            browser,
-            servers[1],
-            worker ? "Web Worker" : "Main thread",
-            seeds[i],
-            worker,
-            "below",
-          ),
-        );
+        results.push(await scenario(browser, servers[1], worker ? "Web Worker" : "Main thread", seeds[i], worker, "below"));
       }
     }
   }
@@ -301,54 +238,16 @@ try {
     for (let i = 0; i < seeds.length; i++) {
       const view = i % 2 === 0 ? "above" : "below";
       for (const which of i % 2 === 0 ? [0, 1] : [1, 0]) {
-        results.push(
-          await scenario(
-            browser,
-            servers[which],
-            which === 0 ? "base" : "PR",
-            seeds[i],
-            null,
-            view,
-          ),
-        );
+        results.push(await scenario(browser, servers[which], which === 0 ? "base" : "PR", seeds[i], null, view));
       }
     }
     if (existsSync(join(web.candidate, "src/ui/playbackOptions.ts"))) {
-      results.push(
-        await scenario(
-          browser,
-          servers[1],
-          "PR, 300 ants per colony",
-          seeds[0],
-          null,
-          "above",
-          { ants: 300 },
-        ),
-      );
-      results.push(
-        await scenario(
-          browser,
-          servers[1],
-          "PR, 1× canvas resolution",
-          seeds[0],
-          null,
-          "above",
-          { dpr: 1 },
-        ),
-      );
+      results.push(await scenario(browser, servers[1], "PR, 300 ants per colony", seeds[0], null, "above", { ants: 300 }));
+      results.push(await scenario(browser, servers[1], "PR, 1× canvas resolution", seeds[0], null, "above", { dpr: 1 }));
     }
     if (existsSync(join(web.candidate, "src/experiments/MapTrialPage.tsx"))) {
       for (const worker of [0, 1]) {
-        results.push(
-          await scenario(
-            browser,
-            servers[1],
-            worker ? "Worker trial" : "Main-thread trial",
-            seeds[0],
-            worker,
-            "above",
-          ),
-        );
+        results.push(await scenario(browser, servers[1], worker ? "Worker trial" : "Main-thread trial", seeds[0], worker, "above"));
       }
     }
   }
@@ -356,11 +255,8 @@ try {
     for (let i = 0; i < seeds.length; i++) {
       const view = i % 2 === 0 ? "above" : "below";
       const pair = [];
-      for (const clock of i % 2 === 0
-        ? ["frame", "independent"]
-        : ["independent", "frame"]) {
-        const label =
-          clock === "frame" ? "PR, frame clock" : "PR, independent clock";
+      for (const clock of i % 2 === 0 ? ["frame", "independent"] : ["independent", "frame"]) {
+        const label = clock === "frame" ? "PR, frame clock" : "PR, independent clock";
         pair.push(
           await scenario(browser, servers[1], label, seeds[i], null, view, {
             clock,
@@ -368,44 +264,21 @@ try {
         );
       }
       assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
-      assert.deepEqual(
-        pair[0].playing.camera,
-        pair[1].playing.camera,
-        "clock comparisons start at the same camera",
-      );
+      assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "clock comparisons start at the same camera");
       results.push(...pair);
     }
   if (!clockOnly && !workerOnly) {
     for (let i = 0; i < seeds.length; i++) {
       const view = i % 2 === 0 ? "below" : "above";
       const pair = [];
-      for (const renderer of i % 2 === 0
-        ? ["canvas", "gpu"]
-        : ["gpu", "canvas"]) {
-        const label =
-          renderer === "gpu" ? "PR, WebGL2 ground" : "PR, Canvas ground";
-        const result = await scenario(
-          browser,
-          servers[1],
-          label,
-          seeds[i],
-          null,
-          view,
-          { clock: "independent", renderer },
-        );
-        if (renderer === "gpu")
-          assert.ok(
-            result.playing.gpuFrames > 0,
-            "WebGL2 drew the terrain in the full game",
-          );
+      for (const renderer of i % 2 === 0 ? ["canvas", "gpu"] : ["gpu", "canvas"]) {
+        const label = renderer === "gpu" ? "PR, WebGL2 ground" : "PR, Canvas ground";
+        const result = await scenario(browser, servers[1], label, seeds[i], null, view, { clock: "independent", renderer });
+        if (renderer === "gpu") assert.ok(result.playing.gpuFrames > 0, "WebGL2 drew the terrain in the full game");
         pair.push(result);
       }
       assert.ok(pair[0].playing.camera, "the game exposes the initial camera");
-      assert.deepEqual(
-        pair[0].playing.camera,
-        pair[1].playing.camera,
-        "renderer comparisons start at the same camera",
-      );
+      assert.deepEqual(pair[0].playing.camera, pair[1].playing.camera, "renderer comparisons start at the same camera");
       results.push(...pair);
     }
   }
@@ -420,9 +293,7 @@ console.log(
   `${previewUrl ? "Production build" : "Development build"}, default game settings unless noted, 4× target, pinch and pan during each sample. Hosted-runner values vary.\n`,
 );
 if (workerOnly) {
-  console.log(
-    "| Engine location | Seed | Wall seconds | Actual pace | p95 frame gap | p95 touch-to-frame proxy | Touch samples |",
-  );
+  console.log("| Engine location | Seed | Wall seconds | Actual pace | p95 frame gap | p95 touch-to-frame proxy | Touch samples |");
   console.log("|---|---:|---:|---:|---:|---:|---:|");
   for (const { revision, seed, playing } of results) {
     console.log(
@@ -440,8 +311,4 @@ if (workerOnly) {
     );
   }
 }
-if (process.env.PERF_RESULTS)
-  writeFileSync(
-    process.env.PERF_RESULTS,
-    JSON.stringify(results, null, 2) + "\n",
-  );
+if (process.env.PERF_RESULTS) writeFileSync(process.env.PERF_RESULTS, JSON.stringify(results, null, 2) + "\n");
