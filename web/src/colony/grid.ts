@@ -148,6 +148,16 @@ let sharedMap: WorldMap | null = null;
 let sharedAx = 0;
 let sharedAy = 0;
 
+// A bounded table per map. Verify the current open-cell rows on a hit: digging,
+// refilling, builder edits and direct writes to chunk arrays are all visible.
+interface ReachWindow {
+  x: number;
+  y: number;
+  open: Int32Array;
+  seen: Int32Array;
+}
+const reachWindows = new WeakMap<WorldMap, ReachWindow[]>();
+
 /** Forget the shared search: call before an ant's sensors ask inReachShared (perceive), so no answer outlives a change of soil. */
 export function freshReach(): void {
   sharedMap = null;
@@ -225,8 +235,23 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
       }
     }
     sharedOpen[k] = bits;
-    sharedSeen[k] = 0;
   }
+  let windows = reachWindows.get(map);
+  if (!windows) reachWindows.set(map, (windows = []));
+  const slot = (Math.imul(ax, 31) + ay) & 255;
+  let entry = windows[slot];
+  sharedMap = map;
+  sharedAx = ax;
+  sharedAy = ay;
+  if (entry?.x === ax && entry.y === ay) {
+    let row = 0;
+    while (row < SHARED_W && entry.open[row] === sharedOpen[row]) row++;
+    if (row === SHARED_W) {
+      sharedSeen.set(entry.seen);
+      return;
+    }
+  }
+  sharedSeen.fill(0);
   sharedSeen[S] = 1 << S;
   for (let spread = 1; spread <= S; spread++) {
     // Until this round, rows outside S ± (spread − 1) were all zero. Carry the old row
@@ -249,9 +274,11 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
     }
     if (!changed) break; // no frontier remains
   }
-  sharedMap = map;
-  sharedAx = ax;
-  sharedAy = ay;
+  if (!entry) windows[slot] = entry = { x: ax, y: ay, open: new Int32Array(SHARED_W), seen: new Int32Array(SHARED_W) };
+  entry.x = ax;
+  entry.y = ay;
+  entry.open.set(sharedOpen);
+  entry.seen.set(sharedSeen);
 }
 
 /**

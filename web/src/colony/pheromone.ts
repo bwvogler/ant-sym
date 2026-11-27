@@ -254,6 +254,30 @@ export class Pheromones {
     const keep = Math.max(0, 1 - this.params[ch].evaporation * dt);
     const k = Math.min(0.25, this.params[ch].diffusion * dt);
 
+    // Evaporation alone is a diagonal transform. Each cell can be updated in
+    // place, with the same Float32 rounding and sleep test at every scheduled step.
+    if (k === 0) {
+      for (const key of awake) {
+        const [cx, cy] = chunkOf(key);
+        const levels = layer.ensure(cx, cy);
+        const rock = map.rock.chunk(cx, cy);
+        let max = 0;
+        if (rock) {
+          for (let i = 0; i < levels.length; i++) {
+            const nv = rock[i] ? 0 : flush(levels[i] * keep);
+            levels[i] = nv;
+            if (nv > max) max = nv;
+          }
+        }
+        if (max < SLEEP) {
+          awake.delete(key);
+          layer.drop(cx, cy);
+          this.#spare(levels);
+        }
+      }
+      return;
+    }
+
     // Wake the neighbours that scent can spread into this step: any whose shared edge holds some.
     // A chunk fed this way may not sleep this step, even if what reached it is still below SLEEP:
     // otherwise faint scent at a border would be wiped every step and never cross it.
@@ -299,16 +323,6 @@ export class Pheromones {
       let max = 0;
       if (!rock) {
         out.fill(0); // no ground here: nothing to hold
-        next.push({ cx, cy, out, max });
-        continue;
-      }
-      // Floor marks only evaporate. There is no need to read six neighbours for each cell.
-      if (k === 0) {
-        for (let i = 0; i < CHUNK_CELLS; i++) {
-          const nv = rock[i] ? 0 : flush(f[i] * keep);
-          out[i] = nv;
-          if (nv > max) max = nv;
-        }
         next.push({ cx, cy, out, max });
         continue;
       }

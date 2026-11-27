@@ -12,6 +12,45 @@ import { RETURNS_MANY } from "./tuning.ts";
 import { ENEMY, MODES, PLANE, trailLevel, type CellCounts, type Mode } from "./vocab.ts";
 import { OPEN, blocked, inBounds, isSky, qualityAt, rockAt, topRow } from "./world.ts";
 
+/** The colony reuses one response situation. Specialized cues are read by the
+ * policies that request them. Spreading the object snapshots every getter. */
+export function createTouch(c: Colony): Touch {
+  return {
+    mode: "explore",
+    carrying: "none",
+    porter: false,
+    digging: false,
+    get place() {
+      return c.place(c.ti);
+    },
+    offered: "none",
+    enemy: false,
+    stance: "forage",
+    quality: "fair",
+    alarm: "none",
+    odds: "none",
+    get returns() {
+      if (c.params.invitePace > 0) return paceReturns(c.params, c.pace[c.ti]);
+      const few = c.params.leaveGate;
+      const met = c.met[c.ti];
+      return few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
+    },
+    get crowd() {
+      return c.crowd[c.ti] >= c.params.crowdAt ? "many" : "few";
+    },
+    get deliveryAttempt() {
+      return deliveryAttempt(c, c.ti);
+    },
+    get deliveryTarget() {
+      return requestedDelivery(c, c.ti) ?? "none";
+    },
+    get deliveryPlace() {
+      return c.params.deliveryLane > 0 && this.carrying === "food" ? deliveryPlace(c, c.ti) : "none";
+    },
+    raid: "none",
+  };
+}
+
 /**
  * Ant i's situation for a response, in the shared Touch object (read it, don't keep it): its mode, load and where it
  * is now. `enemy` comes from the caller (the tick's enemy look, or the fights).
@@ -38,9 +77,6 @@ export function touch(
 /** touch, with ant i's layer bound. */
 export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item: Item, offered: Item): Touch {
   const t = c.t;
-  t.deliveryAttempt = deliveryAttempt(c, i);
-  t.deliveryTarget = requestedDelivery(c, i) ?? "none";
-  t.deliveryPlace = c.params.deliveryLane > 0 && item === "food" ? deliveryPlaceOn(c, i) : "none";
   t.mode = MODES[mode] as Mode;
   t.carrying = item;
   t.porter = c.porter[i] === 1;
@@ -56,27 +92,26 @@ export function touchOn(c: Colony, i: number, enemy: boolean, mode: number, item
   } else t.quality = item === "food" ? qualityOf(c.quality[i]) : "fair";
   t.alarm = i === c.alarmAnt ? c.alarmSmelt : "none";
   t.odds = i === c.alarmAnt ? c.oddsNow : "none";
-  const few = c.params.leaveGate;
-  const met = c.met[i];
-  t.returns = few <= 0 || met < few ? "none" : met < RETURNS_MANY * few ? "few" : "many";
-  // The invitation (ja-rf5.6): where finders invite by pace, its returns are its own pace, raised by the finders that passed it.
-  if (c.params.invitePace > 0) t.returns = paceReturns(c.params, c.pace[i]);
+  // Raid sensing also updates shared spatial scratch used by the arrival pass.
   t.raid = raidSmelt(c, i);
-  t.crowd = c.crowd[i] >= c.params.crowdAt ? "many" : "few";
   return t;
 }
 
-/** Existing floor-mark recognition at the physical cell, with this ant's layer bound. */
-function deliveryPlaceOn(c: Colony, i: number): DeliveryContextRole {
-  if (c.onPlane) return "none";
+/** Read floor marks on the observed ant's layer, restoring the caller's layer and cell. */
+function deliveryPlace(c: Colony, i: number): DeliveryContextRole {
+  const previous = c.cur;
+  const layer = c.layer[i];
   const x = CELL[0],
     y = CELL[1];
+  if (layer !== previous) c.bind(layer);
   try {
+    if (c.onPlane) return "none";
     c.antCell(i);
     if (rockAt(c.map, CELL[0], CELL[1]) !== OPEN) return "none";
     const role = perceivedPlace(c, i, c.placeAt(CELL[0], CELL[1]));
     return role === "royal" || role === "brood" || role === "store" || role === "reception" ? role : "none";
   } finally {
+    if (layer !== previous) c.bind(previous);
     CELL[0] = x;
     CELL[1] = y;
   }

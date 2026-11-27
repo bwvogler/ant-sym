@@ -53,7 +53,7 @@ import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from ".
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { placeOn, touch } from "./sense.ts";
+import { createTouch, placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
@@ -296,28 +296,7 @@ export class Colony {
   alarmSmelt: Trail = "none";
   /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
   oddsNow: Odds = "none";
-  t: Touch = Object.defineProperty(
-    {
-      mode: "explore",
-      carrying: "none",
-      porter: false,
-      digging: false,
-      place: "out",
-      offered: "none",
-      enemy: false,
-      stance: "forage",
-      quality: "fair",
-      alarm: "none",
-      odds: "none",
-      returns: "none",
-      crowd: "few",
-      deliveryAttempt: "none",
-      deliveryTarget: "none",
-      deliveryPlace: "none",
-    } as Touch,
-    "place",
-    { get: () => this.place(this.ti), enumerable: true },
-  );
+  t: Touch = createTouch(this);
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   /** the curtain: steps to this colony's hole through its tunnels, per cell (see outField), the cells it reached, and the ground's version and time it was built at */

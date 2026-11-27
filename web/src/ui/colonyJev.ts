@@ -55,6 +55,7 @@ import {
   type ResponseAnswer,
   responseOf,
   activeEngineProfile,
+  trailOptimizations,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -259,6 +260,43 @@ export function cachedActionTrace(colony: Colony, i: number): ActionTrace[] {
 
 // Touch is shared by all ants and its place is a getter over the current ant.
 const snapshotTouch = (t: Touch): Touch => ({ ...t });
+
+/** Only the situation key is reusable. Answers, draws and traces still follow the current policy. */
+function trailKeyReader(keyOf: (t: Touch) => string) {
+  type Fields = Pick<Touch, "mode" | "carrying" | "porter" | "digging" | "place" | "offered" | "enemy" | "stance" | "quality">;
+  const last: (Fields & { key: string })[] = [];
+  return (i: number, t: Touch): string => {
+    const place = t.place;
+    const entry = last[i];
+    if (
+      entry &&
+      entry.place === place &&
+      entry.mode === t.mode &&
+      entry.carrying === t.carrying &&
+      entry.porter === t.porter &&
+      entry.digging === t.digging &&
+      entry.offered === t.offered &&
+      entry.enemy === t.enemy &&
+      entry.stance === t.stance &&
+      entry.quality === t.quality
+    )
+      return entry.key;
+    const key = keyOf(t);
+    last[i] = {
+      mode: t.mode,
+      carrying: t.carrying,
+      porter: t.porter,
+      digging: t.digging,
+      place,
+      offered: t.offered,
+      enemy: t.enemy,
+      stance: t.stance,
+      quality: t.quality,
+      key,
+    };
+    return key;
+  };
+}
 
 function actionLane(hook: ResponseHook, words: string): Lane<Touch, string> {
   const row = LANES[hook];
@@ -760,8 +798,9 @@ export class ColonyJev {
       for (const hook of RESPONSE_HOOKS) {
         const l = d.actions[hook];
         if (!l) continue;
+        const trailKey = hook === "trail" ? trailKeyReader(l.key) : undefined;
         (bound as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
-          const key = l.key(t);
+          const key = trailKey && trailOptimizations ? trailKey(colony.ti, t) : l.key(t);
           const answer = this.#lookup(l, t, snapshotTouch, key);
           if (!answer) return base[hook](t, draw);
           const choice = responseOf(hook, key, answer, draw);
