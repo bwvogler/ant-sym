@@ -143,7 +143,6 @@ const CHUNK_MASK = CHUNK - 1;
 const sharedOpen = new Int32Array(SHARED_W);
 /** The same rows: the cells reached from (ax, ay) in at most SENSE_STEPS moves through open cells. */
 const sharedSeen = new Int32Array(SHARED_W);
-const sharedNext = new Int32Array(SHARED_W);
 /** Whose search sharedSeen holds: the map and start cell, or null since freshReach. */
 let sharedMap: WorldMap | null = null;
 let sharedAx = 0;
@@ -229,23 +228,26 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
     sharedSeen[k] = 0;
   }
   sharedSeen[S] = 1 << S;
-  for (let step = 0; step < S; step++) {
-    for (let k = 0; k < SHARED_W; k++) {
-      const m = sharedSeen[k]!;
-      // The same row: east and west.
-      let nb = (m << 1) | (m >> 1);
-      // The rows above and below: from a cell on an even row, the cells x − 1 and x; on an odd row, x and x + 1 (hex.ts NX).
-      if (k > 0) {
-        const u = sharedSeen[k - 1]!;
-        nb |= ((ay + k - 1 - S) & 1) === 0 ? u | (u >> 1) : u | (u << 1);
-      }
-      if (k < SHARED_W - 1) {
-        const d = sharedSeen[k + 1]!;
-        nb |= ((ay + k + 1 - S) & 1) === 0 ? d | (d >> 1) : d | (d << 1);
-      }
-      sharedNext[k] = m | (nb & sharedOpen[k]! & SHARED_FULL);
+  for (let spread = 1; spread <= S; spread++) {
+    // Until this round, rows outside S ± (spread − 1) were all zero. Carry the old row
+    // forward in a register so expanding a row never reads another row's new bits.
+    const first = S - spread;
+    const last = S + spread;
+    let above = 0;
+    let current = sharedSeen[first]!;
+    let changed = false;
+    for (let k = first; k <= last; k++) {
+      const below = k < last ? sharedSeen[k + 1]! : 0;
+      const across = (current << 1) | (current >> 1);
+      const adjacent = above | below;
+      const diagonal = (ay + k - S) & 1 ? adjacent >> 1 : adjacent << 1;
+      const next = current | ((across | adjacent | diagonal) & sharedOpen[k]! & SHARED_FULL);
+      changed ||= next !== current;
+      sharedSeen[k] = next;
+      above = current;
+      current = below;
     }
-    sharedSeen.set(sharedNext);
+    if (!changed) break; // no frontier remains
   }
   sharedMap = map;
   sharedAx = ax;

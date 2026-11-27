@@ -5,7 +5,7 @@ import { antResets } from "./ants.ts";
 import type { ColonyParams } from "./params.ts";
 import { foodOf, isFed, LARVA } from "./brood.ts";
 import { SOIL_DUG } from "./grid.ts";
-import { CELL, cellOf, discOffsets, hexDistance } from "./hex.ts";
+import { CELL, cellKey, cellOf, discOffsets, hexDistance } from "./hex.ts";
 import {
   ADULT_DRAIN,
   ADULT_DRAIN_OUT,
@@ -164,6 +164,13 @@ export function dropBrood(col: Colony, i: number, atX = NaN, atY = NaN): void {
   col.question[i] = -1;
 }
 
+// The second body pass reads two stable neighbourhood fields. Nearby ants can
+// share the readings, with a fixed-size scratch cache cleared for each pass.
+const BODY_CELLS = 512;
+const bodyKeys = new Float64Array(BODY_CELLS);
+const bodyMean = new Float64Array(BODY_CELLS);
+const bodyHunger = new Float64Array(BODY_CELLS);
+
 /**
  * Energy and felt hunger, once a tick before the ants move (the side view; ja-xu6.1, hunger.ts). Every ant uses energy
  * (twice as fast out on the ground). Once below EAT_BELOW it eats from food lying in its own nest within two cells, not
@@ -289,6 +296,7 @@ export function body(col: Colony, dt: number): void {
       q.held = 0;
     }
   }
+  bodyKeys.fill(-1);
   for (let i = 0; i < col.n; i++) {
     if (!col.alive[i]) continue;
     let now = 0;
@@ -297,7 +305,14 @@ export function body(col: Colony, dt: number): void {
       col.antCell(i);
       const cx = CELL[0];
       const cy = CELL[1];
-      const m = scentSum.mean(cx, cy);
+      const key = cellKey(cx, cy);
+      const slot = (Math.imul(cx, 0x9e3779b1) ^ Math.imul(cy, 0x85ebca6b)) & (BODY_CELLS - 1);
+      if (bodyKeys[slot] !== key) {
+        bodyKeys[slot] = key;
+        bodyMean[slot] = scentSum.mean(cx, cy);
+        bodyHunger[slot] = felt.near(cx, cy);
+      }
+      const m = bodyMean[slot]!;
       if (!Number.isNaN(m)) sc += (m - sc) * share;
       if (supply > 0 && hexDistance(cx, cy, qx, qy) <= 1) sc += supply;
       perceived.put(cx, cy, sc * col.scentGain[i]);
@@ -313,7 +328,7 @@ export function body(col: Colony, dt: number): void {
           }
         }
       }
-      now = felt.near(cx, cy);
+      now = bodyHunger[slot]!;
       // Mouth to mouth (ja-638i): feeling need, it takes from the fullest crop it touches, if that nestmate feels less.
       if (crops && col.need[i] >= NEED_FETCH && crop[i] < cap) {
         const d = cropDonors.near(cx, cy, crop);
