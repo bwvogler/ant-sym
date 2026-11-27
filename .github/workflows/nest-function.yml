@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/nest-function.yml"
       - "scripts/lab/nest-function.mjs"
+      - "scripts/lab/nest-milling*.mjs"
       - "scripts/lab/porter-*.mjs"
       - "web/src/colony/bypassPolicy.ts"
       - "web/src/colony/porterObservation.ts"
@@ -80,6 +81,7 @@ jobs:
           handoff_rows = []
           porter_rows = []
           detour_rows = []
+          milling_rows = []
           for seed in (7, 17, 29, 43):
               for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry"):
                   report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
@@ -124,6 +126,14 @@ jobs:
                                       detour["endedWithFill"], detour["endedWithoutFill"], detour["active"],
                                       detour["workerSeconds"], point["undergroundSoilCarrierSeconds"],
                                       point["laterUsedDugCells"], point["redigCellsObserved"]))
+                  m = point["nonLobbyMilling"]
+                  assert 0 <= m["suspectedWorkerSeconds"] <= m["outsideLobbyWorkerSeconds"]
+                  share = m["suspectedShare"]
+                  hotspot = (m["busiestIslands"] or [None])[0]
+                  milling_rows.append((seed, mode, m["outsideLobbyWorkerSeconds"], m["stationaryWorkerSeconds"],
+                                       m["repeatedBacktrackWorkerSeconds"], m["islandLoopWorkerSeconds"],
+                                       m["otherLoopWorkerSeconds"], "—" if share is None else f"{share:.2%}",
+                                       "—" if hotspot is None else f"({hotspot['x']}, {hotspot['y']})"))
           assert len(populations) == 1
           print("\n### First handoff of incoming food\n")
           cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
@@ -147,6 +157,13 @@ jobs:
           print("| " + " | ".join(cols) + " |")
           print("| " + " | ".join(["---"] * len(cols)) + " |")
           for row in detour_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Stalls and repeated laps outside the lobby\n")
+          cols = ("Seed", "Mode", "Worker-s outside lobby", "Stationary worker-s", "Backtrack worker-s",
+                  "Island-loop worker-s", "Other-loop worker-s", "Suspected share", "Busiest island")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in milling_rows:
               print("| " + " | ".join(map(str, row)) + " |")
           print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
           PY

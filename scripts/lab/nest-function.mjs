@@ -1,6 +1,7 @@
 // Paired, offline one-world nest assay. All workers move and work under normal game ticks.
 import { writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { observeNestMilling } from "./nest-milling.mjs";
 import { installPorterBypass } from "./porter-bypass.mjs";
 import { distribution, observePorterTrips } from "./porter-trips.mjs";
 import { foodHandoffObservers } from "../../web/src/colony/foodHandoffObservation.ts";
@@ -68,6 +69,7 @@ function describeGeometry(colony, map) {
 
 function observer(colony) {
   const map = colony.layers[colony.home].map;
+  const milling = observeNestMilling(colony, sampleTicks / tickRate);
   const newest = new Map();
   const previous = new Map();
   const visited = new Set();
@@ -163,6 +165,7 @@ function observer(colony) {
     }
     for (let i = 0; i < colony.n; i++) {
       if (!colony.alive[i] || colony.layer[i] !== colony.home) {
+        milling.sample(i);
         carryingSince.delete(i);
         newest.delete(i);
         previous.delete(i);
@@ -177,6 +180,7 @@ function observer(colony) {
       soilCarriers += Number(Boolean(colony.pellet[i]));
       cellOf(colony.x[i], colony.y[i]);
       const [x, y] = CELL;
+      milling.sample(i, x, y);
       const key = cellKey(x, y);
       visited.add(key);
       const dugAt = map.dugAt.get(x, y);
@@ -244,6 +248,7 @@ function observer(colony) {
     if (branchEntered !== branchFilled + branchEndedWithoutFill + detouring.size) throw Error("Branch detour accounting");
     return {
       seconds: at,
+      nonLobbyMilling: milling.checkpoint(),
       foodDelivered: colony.stored,
       portTrips: colony.portTrips,
       larder: colony.larder,
