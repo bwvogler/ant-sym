@@ -1,3 +1,4 @@
+import { activeEngineProfile, profileSteering } from "./engineProfile.ts";
 // Steer (docs/refactor.md S3.4): the fourth stage of an ant's step in tick. The heading it walks this step: homing to where it believes its goal is (its vector, the hole, a pellet up the shaft, trails, walls, backfill and stale tunnels), following a trail, fighting or raiding, exploring and digging; then fleeing, alarm, the trail it lays, the wait at home, and the last stretch into its hole. Moved out of Colony.tick verbatim but for `this` becoming `col`; the heading goes to the next stages through the step record.
 import { localDelivery } from "./deliveryAction.ts";
 import { NO_KEY } from "./ants.ts";
@@ -8,18 +9,18 @@ import {
   choose,
   climb,
   freshReach,
-  handOnWall,
+  handOnWall as findWallDirection,
   inReach,
   inReachSharedCells,
   NO_CELL,
   SOIL_FILL,
-  tunnel,
+  tunnel as isTunnel,
   turnToward,
 } from "./grid.ts";
 import { CELL, cellOf, centreX, centreY, hexDistance, SIDE, nx as stepX, ny as stepY } from "./hex.ts";
-import { believe, homeScentNear, routeFail, searchOn } from "./homing.ts";
+import { believe as believedNest, homeScentNear as readHomeScent, routeFail, searchOn } from "./homing.ts";
 import { LOOP_AT, NO_ENTRY_DROP, NO_ENTRY_PAINTED, NO_ENTRY_RATE, NO_ENTRY_TRAIL, SEEN } from "./params.ts";
-import { touch, touchProbe } from "./sense.ts";
+import { touch, touchProbe as probeTerrain } from "./sense.ts";
 import type { AntStep } from "./step.ts";
 import {
   BY_VECTOR,
@@ -33,9 +34,9 @@ import {
   TUNNEL_STALL,
   WALL_LOST,
 } from "./tuning.ts";
-import { fetches, walkTunnel } from "./tunnel.ts";
+import { fetches, walkTunnel as navigateTunnel } from "./tunnel.ts";
 import { EXPLORE, FAINT, FIGHT, FOLLOW, PLANE, RETURN, STEER_NEUTRAL, steerLevel } from "./vocab.ts";
-import { isSky, OPEN, rockAt } from "./world.ts";
+import { isSky as isTerrainSky, OPEN, rockAt as terrainAt } from "./world.ts";
 import { mill, nearFind, onMLine, siteAim } from "./plane.ts";
 import type { Channel } from "./pheromone.ts";
 
@@ -50,7 +51,7 @@ export const VECTOR_W = 0.3;
 export const NEST_W = 0.5;
 
 /** Read one chamber scent at a tip, through open ground below the surface. */
-function markAt(col: Colony, x: number, y: number, ax: number, ay: number, b: number, channel: Channel): number {
+function readMark(col: Colony, x: number, y: number, ax: number, ay: number, b: number, channel: Channel): number {
   const d = col.params.sensorDistance;
   const sx = x + Math.cos(b) * d;
   const sy = y + Math.sin(b) * d;
@@ -66,7 +67,34 @@ function markAt(col: Colony, x: number, y: number, ax: number, ay: number, b: nu
   return v !== 0 && inReachSharedCells(map, ax, ay, bx, by) ? v : 0;
 }
 
+const steeringHelpers = {
+  walkTunnel: navigateTunnel,
+  believe: believedNest,
+  markAt: readMark,
+  homeScentNear: readHomeScent,
+  touchProbe: probeTerrain,
+  handOnWall: findWallDirection,
+  tunnel: isTunnel,
+  isSky: isTerrainSky,
+  rockAt: terrainAt,
+};
+const profiledSteeringHelpers: typeof steeringHelpers = {
+  walkTunnel: profileSteering("tunnelNavigation", navigateTunnel),
+  believe: profileSteering("homing", believedNest),
+  markAt: profileSteering("scentProbes", readMark),
+  homeScentNear: profileSteering("scentProbes", readHomeScent),
+  touchProbe: profileSteering("terrainChecks", probeTerrain),
+  handOnWall: profileSteering("terrainChecks", findWallDirection),
+  tunnel: profileSteering("terrainChecks", isTunnel),
+  isSky: profileSteering("terrainChecks", isTerrainSky),
+  rockAt: profileSteering("terrainChecks", terrainAt),
+};
+
 export function steer(col: Colony, i: number, s: AntStep): void {
+  const profile = activeEngineProfile?.sampledAnt ? activeEngineProfile : null;
+  const { walkTunnel, believe, markAt, homeScentNear, touchProbe, handOnWall, tunnel, isSky, rockAt } = profile
+    ? profiledSteeringHelpers
+    : steeringHelpers;
   const p = s.p;
   const rng = s.rng;
   const map = s.map;
@@ -147,6 +175,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
     if (walkTunnel(col, i, RETURN, p.speed * dt)) h = col.towardTarget(i);
     else h += noise * p.wander;
   } else if (mode === RETURN) {
+    const homingStart = profile?.steeringClock();
     // Homing uses only what an ant has: its home vector (path integration: real ants count steps
     // against a sky compass), its antennae, and touch. A straight line home walks into the same
     // wall forever (reviews reproduced games where every homing ant of a colony was stuck), so a
@@ -376,6 +405,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
         if (col.wall[i] !== 0) h = col.towardTarget(i);
       }
     }
+    if (homingStart !== undefined) profile?.steeringSpan("homing", homingStart);
   } else if (memoryLead) {
     // Memory over the trail (Grüter, Czaczkes & Ratnieks 2011): back to where it found food, as site fidelity steers.
     // This comes before the explorer's plume branches below (food, aphid) on purpose: with the weight at +1 a remembering ant keeps to its
@@ -590,6 +620,7 @@ export function steer(col: Colony, i: number, s: AntStep): void {
   // The fungus can make it louder or quieter, and have a food carrier leak its food trail into the other colony's
   // field (exact as-is: × 1, nothing leaked).
   // Which trail, and how much, are the trail and trailRate responses.
+  const trailStart = profile?.steeringClock();
   const tt = touch(col, i, toEnemy !== null, mode, item);
   const trail = resp.trail(tt, col.antDraw(i));
   if (trail !== "none") {
@@ -616,6 +647,8 @@ export function steer(col: Colony, i: number, s: AntStep): void {
       p.deposit * p.raidLay * Math.min(3, 0.5 + col.foes[i]) * Math.exp(-col.since[i] / p.depositDecay) * dt,
     );
   }
+
+  if (trailStart !== undefined) profile?.steeringSpan("trailResponseAndDeposit", trailStart);
 
   // One world: going in, within the disc round its hole, it makes straight for the hole's cell. Steering for the
   // nest's centre at the turn rate, it circled the hole it was over.

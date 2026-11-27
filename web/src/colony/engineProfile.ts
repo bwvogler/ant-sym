@@ -1,3 +1,6 @@
+const STEERING_PARTS = ["tunnelNavigation", "homing", "scentProbes", "terrainChecks", "trailResponseAndDeposit"] as const;
+type SteeringPart = (typeof STEERING_PARTS)[number];
+
 /** Timing for one on-demand capture. Pass timings are measured, ant stages are sampled. */
 export class EngineProfile {
   private static readonly STRIDE = 16;
@@ -15,9 +18,21 @@ export class EngineProfile {
   private policyMs = 0;
   private samples = 0;
   private policySamples = 0;
+  private readonly steeringParts = {
+    tunnelNavigation: 0,
+    homing: 0,
+    scentProbes: 0,
+    terrainChecks: 0,
+    trailResponseAndDeposit: 0,
+  };
+  private steeringAccountedMs = 0;
   sampledAnt = false;
 
-  readonly now = () => performance.now();
+  readonly now: () => number;
+
+  constructor(now = () => performance.now()) {
+    this.now = now;
+  }
 
   beginTick(): void {
     this.ticks++;
@@ -49,6 +64,17 @@ export class EngineProfile {
   policy(ms: number): void {
     this.policyMs += ms;
     this.policySamples++;
+  }
+
+  /** Clock with already-attributed work removed, so a homing span excludes the probes and tunnel work inside it. */
+  steeringClock(): number {
+    return this.now() - this.steeringAccountedMs;
+  }
+
+  steeringSpan(part: SteeringPart, start: number): void {
+    const ms = this.steeringClock() - start;
+    this.steeringParts[part] += ms;
+    this.steeringAccountedMs += ms;
   }
 
   ants(ms: number): void {
@@ -88,6 +114,10 @@ export class EngineProfile {
       },
       sampledAnts: this.samples,
       sampledPolicyLookups: this.policySamples,
+      estimatedSteeringMsPerTick: {
+        ...Object.fromEntries(STEERING_PARTS.map((part) => [part, estimate(this.steeringParts[part])])),
+        other: estimate(this.steeringMs - this.steeringAccountedMs),
+      } as Record<SteeringPart | "other", number>,
       estimatedAntStageMsPerTick: {
         sensing: estimate(this.sensedMs),
         stanceAndDecisions: estimate(this.decisionsMs),
@@ -112,4 +142,19 @@ export function withEngineProfile(profile: EngineProfile, tick: () => void): voi
     profile.sampledAnt = false;
     activeEngineProfile = previous;
   }
+}
+
+/** Time a steering helper only for the existing ant sample. These wrappers live at the steering call sites. */
+export function profileSteering<Args extends unknown[], Result>(
+  part: SteeringPart,
+  run: (...args: Args) => Result,
+): (...args: Args) => Result {
+  return (...args) => {
+    const profile = activeEngineProfile;
+    if (!profile?.sampledAnt) return run(...args);
+    const start = profile.steeringClock();
+    const result = run(...args);
+    profile.steeringSpan(part, start);
+    return result;
+  };
 }

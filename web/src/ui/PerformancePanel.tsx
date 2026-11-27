@@ -65,6 +65,11 @@ export function PerformancePanel({ profile, seed, view, requestedSpeed, starting
             Estimated per tick · steering {report.engine.estimatedAntStageMsPerTick.steering.toFixed(1)} ms · policy lookup{" "}
             {report.engine.estimatedAntStageMsPerTick.policyLookupWithinStages.toFixed(1)} ms within ant stages
           </p>
+          <p className="my-1">
+            Within steering · tunnels {report.engine.estimatedSteeringMsPerTick.tunnelNavigation.toFixed(1)} ms · homing{" "}
+            {report.engine.estimatedSteeringMsPerTick.homing.toFixed(1)} ms · trail responses{" "}
+            {report.engine.estimatedSteeringMsPerTick.trailResponseAndDeposit.toFixed(1)} ms
+          </p>
           <button
             type="button"
             className="mb-1 rounded border border-line px-2 py-1"

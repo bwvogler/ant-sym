@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeEngineProfile, withEngineProfile } from "../../colony/engineProfile.ts";
+import { activeEngineProfile, EngineProfile, profileSteering, withEngineProfile } from "../../colony/engineProfile.ts";
 import { PageProfile } from "../pageProfile.ts";
 
 const scene = { seed: 7, view: "below", requestedSpeed: 4, startingAntsPerColony: 600, clock: "independent" };
@@ -66,4 +66,36 @@ test("engine stages reconcile to tick time and policy samples remain nested", ()
   assert.equal(engine?.sampledPolicyLookups, 1);
   assert.equal(engine?.estimatedAntStageMsPerTick.stanceAndDecisions, 2);
   assert.equal(engine?.estimatedAntStageMsPerTick.policyLookupWithinStages, 0.5);
+});
+
+test("steering helper timings are exclusive inside homing and sum to the steering estimate", () => {
+  let now = 0;
+  const profile = new EngineProfile(() => now);
+  const probe = profileSteering("terrainChecks", () => {
+    now += 2;
+    return true;
+  });
+  withEngineProfile(profile, () => {
+    assert.equal(profile.sampleAnt(1), true);
+    const start = profile.steeringClock();
+    now += 3;
+    assert.equal(probe(), true);
+    now += 1;
+    profile.steeringSpan("homing", start);
+    profile.antStage("steer", 8);
+    profile.ants(8);
+  });
+  profile.endTick(8);
+  const report = profile.report();
+  assert.deepEqual(report.estimatedSteeringMsPerTick, {
+    tunnelNavigation: 0,
+    homing: 4,
+    scentProbes: 0,
+    terrainChecks: 2,
+    trailResponseAndDeposit: 0,
+    other: 2,
+  });
+  assert.equal(report.estimatedAntStageMsPerTick.steering, 8);
+  assert.equal(probe(), true);
+  assert.deepEqual(profile.report(), report, "helpers do not record after the capture");
 });
