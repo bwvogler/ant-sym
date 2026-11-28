@@ -60,6 +60,27 @@ on:
       order:
         description: "The upgrades the fungus keeps, in order, comma-separated (--order); empty: the script's default. Lichen: put `lichen` after the first `mycelium` (ja-vlla.11.3)"
         default: ""
+      hungry:
+        description: "The fungus is hungry (--hungry, FungusParams.hungry, PRD §93): a cheap spore, a landing reserve and the free pool's higher share"
+        type: boolean
+        default: false
+      earnedshare:
+        description: "The free pool's share of earned mass when hungry (--earned-share, PRD §93): lab override; only with hungry; empty: EARNED.share"
+        default: ""
+      sporecost:
+        description: "The mass a spore costs (--spore-cost, ja-a2no): lab override of the not-hungry game; ignored with hungry (EARNED applies); empty: the game's 1"
+        default: ""
+      freebudget:
+        description: "The most mass the free term pays out in a game (--free-budget, ja-a2no): lab override of the not-hungry game, a stand-in for a start reserve; ignored with hungry (EARNED applies); empty: no limit"
+        default: ""
+      ledger:
+        description: "Also print each seed's energy ledger at 2, 5 and 10 minutes and the end: mass made by source and spent by sink, and what the mycelium holds (--ledger, ja-a2no.2; reads only)"
+        type: boolean
+        default: false
+      split:
+        description: "Report where each seed's growth was made: the mycelium on the ground, corpses and hosts (--split, PRD §85 M3)"
+        type: boolean
+        default: false
       nofoci:
         description: "Run the ungated game: flower patches form without the Foci upgrade (--no-foci, docs/foci.md, PRD §92). Default: gated, so none forms until Foci is kept; the default order ends `knots,foci` (arm C), an order without them forms no flower (arm E)"
         type: boolean
@@ -95,6 +116,12 @@ jobs:
           LICHEN: ${{ inputs.lichen }}
           NOFOCI: ${{ inputs.nofoci }}
           ORDER: ${{ inputs.order }}
+          SPLIT: ${{ inputs.split }}
+          LEDGER: ${{ inputs.ledger }}
+          SPORECOST: ${{ inputs.sporecost }}
+          HUNGRY: ${{ inputs.hungry }}
+          EARNEDSHARE: ${{ inputs.earnedshare }}
+          FREEBUDGET: ${{ inputs.freebudget }}
           BIAS: ${{ inputs.bias }}
           RADIUS: ${{ inputs.radius }}
           TROPISM: ${{ inputs.tropism }}
@@ -108,6 +135,9 @@ jobs:
           [[ "$AIM" =~ ^(unite|spread|peace)$ ]] || bad "aim: unite, spread or peace"
           [[ "$BIAS" =~ ^(default|off|count|levels)$ ]] || bad "bias: default, off, count or levels"
           [[ -z "$ORDER" || "$ORDER" =~ ^[a-z]+(,[a-z]+)*$ ]] || bad "order: upgrade ids, comma-separated"
+          [[ -z "$SPORECOST" || "$SPORECOST" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "sporecost: empty or a number"
+          [[ -z "$FREEBUDGET" || "$FREEBUDGET" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "freebudget: empty or a number"
+          [[ -z "$EARNEDSHARE" || "$EARNEDSHARE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || bad "earnedshare: empty or a number"
           [[ -z "$RADIUS" || "$RADIUS" =~ ^[1-6]$ ]] || bad "radius: empty or 1 to 6"
           [[ -z "$TROPISM" || "$TROPISM" =~ ^[0-9]{1,2}$ ]] || bad "tropism: empty or 0 to 99"
           # --map one: the script's default was the side world, since removed (ja-fnd.3.4); a ref from before that needs it, a
@@ -121,6 +151,12 @@ jobs:
           [ "$NOFOCI" = "true" ] && args="$args --no-foci"
           [ "$BIAS" != "default" ] && args="$args --bias $BIAS"
           [ -n "$ORDER" ] && args="$args --order $ORDER"
+          [ "$SPLIT" = "true" ] && args="$args --split"
+          [ "$LEDGER" = "true" ] && args="$args --ledger"
+          [ "$HUNGRY" = "true" ] && args="$args --hungry"
+          [ -n "$EARNEDSHARE" ] && args="$args --earned-share $EARNEDSHARE"
+          [ -n "$SPORECOST" ] && args="$args --spore-cost $SPORECOST"
+          [ -n "$FREEBUDGET" ] && args="$args --free-budget $FREEBUDGET"
           [ -n "$RADIUS" ] && args="$args --radius $RADIUS"
           [ -n "$TROPISM" ] && args="$args --tropism $TROPISM"
           seeds=$(node -e '
@@ -216,4 +252,16 @@ jobs:
             { echo; echo 'Seeds whose fungus made lichen:'; echo '```'; grep -h ' · lichen [0-9]* cells' out/seed-*.txt | sed -E 's/^(seed [0-9]+):.* · (lichen .*)$/\1: \2/' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           else
             echo 'No seed made any lichen.' | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --split's line (one per seed): where the growth that mutations come from was made.
+      - name: growth split
+        run: |
+          if grep -q '^  growth made' out/seed-*.txt; then
+            { echo; echo 'Growth made, by where (ground = the mycelium growing on its own, corpses = fed in, hosts = made in ants):'; echo '```'; grep -H '^  growth made' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      # --ledger's lines (four a seed): the energy ledger (ja-a2no.2, docs/energy.md).
+      - name: energy ledger
+        run: |
+          if grep -q '^  ledger @' out/seed-*.txt; then
+            { echo; echo 'Energy ledger (mass made by source, spent by sink, and held):'; echo '```'; grep -H '^  ledger @' out/seed-*.txt | sed 's/^out\///' | sort -V; echo '```'; } | tee -a "$GITHUB_STEP_SUMMARY"
           fi

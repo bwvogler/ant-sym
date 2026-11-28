@@ -504,14 +504,80 @@ test("explored far west, east, north or south, the far edge of the reach is the 
   near(north.reach.y0 + north.reach.h, home.y0 + home.h, "north: the bottom edge is the start view");
 });
 
-test("the page hands the fog to the camera rig and to the frame's extent (the lines the pure tests cannot reach)", () => {
+// The open flight pen's circle is part of the reach (ja-qpv.5.1.1): the circle is wider than the margin, so without it the rim could not be panned to.
+
+test("an open pen's circle beyond the explored ground is inside the reach, on the sides it pokes out, and the rest of the reach is unchanged", () => {
+  const near = (a: number, b: number, why: string) => assert.ok(Math.abs(a - b) < 1e-9, `${why}: ${a} against ${b}`);
+  const { plane, k, a } = fogged(0);
+  const without = extentOf(plane, k).reach!;
+  const pen = { x: a.x + 600, y: a.y + 400, r: 280 };
+  const e = extentOf(plane, k, pen);
+  const r = e.reach!;
+  near(r.x0 + r.w, pen.x + pen.r, "the right edge is the circle's rim");
+  near(r.y0 + r.h, pen.y + pen.r, "the bottom edge is the circle's rim");
+  near(r.x0, without.x0, "the left edge is as without the pen");
+  near(r.y0, without.y0, "the top edge is as without the pen");
+  const home = e.home!;
+  assert.ok(
+    r.x0 <= home.x0 && r.y0 <= home.y0 && r.x0 + r.w >= home.x0 + home.w && r.y0 + r.h >= home.y0 + home.h,
+    "and it still holds the start view",
+  );
+  // a circle on the other side pokes out there instead
+  const west = extentOf(plane, k, { x: a.x - 700, y: a.y - 500, r: 280 }).reach!;
+  near(west.x0, a.x - 700 - 280, "the left edge is the circle's rim");
+  near(west.y0, a.y - 500 - 280, "the top edge is the circle's rim");
+  near(west.x0 + west.w, without.x0 + without.w, "the right edge is as without the pen");
+});
+
+test("a pen circle inside the reach, no pen, no fog and a bounded map leave the extent as it was", () => {
+  const { plane, k, a } = fogged(0);
+  assert.deepEqual(extentOf(plane, k, null), extentOf(plane, k), "no pen");
+  assert.deepEqual(extentOf(plane, k, { x: a.x, y: a.y, r: 20 }), extentOf(plane, k), "a circle inside the reach adds nothing");
+  const far = { x: a.x + 5000, y: a.y, r: 280 };
+  assert.deepEqual(extentOf(plane, null, far), extentOf(plane), "no fog: the pen is inside the nominal box already, so no reach appears");
+  assert.deepEqual(extentOf(PLANE_MAP, k, far), extentOf(PLANE_MAP), "a bounded map ignores the pen");
+  assert.deepEqual(extentOf(CURTAIN_MAP, k, far), extentOf(CURTAIN_MAP));
+});
+
+test("the camera can pan to an open pen's rim, and stops at the explored ground plus the margin without it", () => {
+  const { plane, k, a } = fogged(0);
+  const v = { w: 800, h: 600, dpr: 1 };
+  let pen: { x: number; y: number; r: number } | null = { x: a.x + 600, y: a.y, r: 280 };
+  const host: RigHost = {
+    view: () => PLANE,
+    map: () => plane,
+    size: () => v,
+    dpr: () => 1,
+    following: () => false,
+    unfollow: () => {},
+    fog: () => k,
+    pen: () => pen,
+  };
+  const rig = new CameraRig(host);
+  const zoom = 8; // half the view is 50 cells wide
+  rig.set({ x: 1e9, y: a.y, zoom });
+  assert.ok(Math.abs(rig.camera().x - (a.x + 600 + 280 - 50)) < 1e-9, "the view's right edge reaches the circle's rim");
+  const explored = extentOf(plane, k).reach!;
+  pen = null; // the pen closes: the reach is the explored ground again
+  rig.set({ x: 1e9, y: a.y, zoom });
+  assert.ok(
+    Math.abs(rig.camera().x - (explored.x0 + explored.w - 50)) < 1e-9,
+    "and stops at the explored ground plus the margin once it is closed",
+  );
+});
+
+test("the page hands the fog and the open pen to the camera rig and to the frame's extent (the lines the pure tests cannot reach)", () => {
   const read = (f: string) => readFileSync(new URL(f, import.meta.url), "utf8");
-  assert.match(read("../useCameraRig.ts"), /fog: \(\) => r\.sensed\.current\.knowledge/);
+  const rigSrc = read("../useCameraRig.ts");
+  assert.match(rigSrc, /fog: \(\) => r\.sensed\.current\.knowledge/);
+  assert.match(rigSrc, /pen: \(\) => r\.pen\.current/);
+  assert.match(read("../ColonyField.tsx"), /useCameraRig\(\{[^}]*pen: penRef[^}]*\}\)/, "the field gives the rig its pen ref");
+  assert.match(read("../useFieldFrame.ts"), /pen: \(\) => penRef\.current/, "and the frame's binding");
   const binding = read("../field/binding.ts");
   assert.equal(
-    (binding.match(/extentOf\([^)]*this\.#sensed\.knowledge\)/g) ?? []).length,
+    (binding.match(/extentOf\([^)]*this\.#sensed\.knowledge, this\.#inputs\.pen\(\)\)/g) ?? []).length,
     3,
-    "the constructor, #rebuild and each frame's bind",
+    "the constructor, #rebuild and each frame's bind, all with the pen",
   );
 });
 

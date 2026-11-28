@@ -558,7 +558,7 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
         {drawer === "colonies" && (
           <Drawer label="colonies" title="Colonies" onClose={closeDrawer}>
             <BareCards>
-              <Colonies />
+              <Colonies known={sensed.known} />
             </BareCards>
           </Drawer>
         )}

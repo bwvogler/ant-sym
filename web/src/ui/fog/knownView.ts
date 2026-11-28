@@ -60,3 +60,15 @@ export function lastKnownText(side: SideStats | null, now: number, at: number): 
 
 /** "as of 12 s ago", for numbers no host is in. */
 export const asOf = (now: number, at: number): string => `as of ${Math.max(0, Math.round(now - at))} s ago`;
+
+/**
+ * The food numbers the Colonies card shows: what the colonies have stored always, and the food of the whole world (the total and the share home of it) only
+ * without the fog. The total is global knowledge the fungus cannot sense, so under the fog it is null (owner, 2026-11-25, `ja-jqhh`). The Lab's own cards stay omniscient.
+ */
+export function foodView(
+  stats: Pick<ColonyStats, "stored" | "foodTotal">,
+  known: KnownColonies<SideStats> | null,
+): { stored: number; total: number | null; share: number | null } {
+  if (known) return { stored: stats.stored, total: null, share: null };
+  return { stored: stats.stored, total: stats.foodTotal, share: stats.foodTotal > 0 ? stats.stored / stats.foodTotal : 0 };
+}
