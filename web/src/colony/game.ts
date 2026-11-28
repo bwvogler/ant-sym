@@ -11,6 +11,8 @@ import {
   GAME_ODOUR_AXES,
   driftAimVec,
   driftDirection,
+  checkOdourWeights,
+  odourDiameter,
   odourDistance,
   odourSalt,
   odourVector,
@@ -332,6 +334,11 @@ export function wildOdour(seed: number, rx: number, ry: number, K: number): numb
   return Array.from({ length: K }, (_, k) => hash01(seed, odourSalt(k), rx, ry));
 }
 
+/** How much of the way from "strangers" to "one population" the nests' odours are: 1 at a gap within the tolerance (or a tolerance of the whole space), 0 at the space's diameter D (the unity score's first factor). */
+export function recognitionShare(tol: number, D: number, gap: number): number {
+  return tol >= D ? 1 : Math.min(1, Math.max(0, (D - gap) / (D - tol)));
+}
+
 /**
  * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
  * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
@@ -341,7 +348,7 @@ export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: 
   let target: Colony | null = null;
   let best = Infinity;
   for (const o of colonies) {
-    if (o === c || Game.beaten(o) || odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0) <= tolerance) continue;
+    if (o === c || Game.beaten(o) || odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0, c.odourW) <= tolerance) continue;
     const e = holeOf(o);
     const d = Math.hypot(e.x - at.x, e.y - at.y);
     if (d < best) {
@@ -395,6 +402,8 @@ export class Game {
   readonly recognition: Recognition;
   /** each layer's recognition, built from the ants on it: `recognition` is layer 0's */
   #recs: Recognition[];
+  /** the species' checked odour axis weights, for the measures that belong to no one colony (unity's gap and diameter); each colony's own are `odourW` */
+  readonly #odourW: Float64Array | null;
   /** the recognition parameters every layer's Recognition is made from (a line that begins mid-game makes one more) */
   #recognition: Partial<RecognitionParams>;
   params: GameParams;
@@ -462,7 +471,9 @@ export class Game {
     // Fights are judged by the recognition's tolerance: a species' own (the invasive garden ant's one supercolony: ja-e668.3) unless the game
     // names one. Every colony of a game is its species, so the game takes it from there.
     const axes = params.recognition?.odourAxes ?? GAME_ODOUR_AXES;
-    const tol = this.params.species.neverStranger ? Math.sqrt(axes) : this.params.species.params.tolerance;
+    // The species' odour axis weights (S3, PRD §91; null: all 1): the space's diameter, the neverStranger tolerance, is sqrt(sum w).
+    this.#odourW = checkOdourWeights(this.params.species.params.odourWeights, axes);
+    const tol = this.params.species.neverStranger ? odourDiameter(axes, this.#odourW) : this.params.species.params.tolerance;
     const recognition = { odourAxes: GAME_ODOUR_AXES, ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
     this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
@@ -1247,7 +1258,7 @@ export class Game {
       c.feed(f.reserve ?? FOUNDING_RESERVE);
       // Its direction is a hash of the world's seed and where she landed (pure: the same on every load), 1.5 tolerances from her mother's odour.
       const dir = c.odourAxes > 1 ? driftDirection(this.world.seed, f.x, f.y, c.odourAxes) : null;
-      c.aimVec.set(driftAimVec(odourVector(f.odour, c.odourAxes), this.recognition.params.tolerance, dir));
+      c.aimVec.set(driftAimVec(odourVector(f.odour, c.odourAxes), this.recognition.params.tolerance, dir, c.odourW));
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
@@ -1498,7 +1509,7 @@ export class Game {
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++)
-        gap = Math.max(gap, odourDistance(K, (live[a] as Colony).nestVec, 0, (live[b] as Colony).nestVec, 0));
+        gap = Math.max(gap, odourDistance(K, (live[a] as Colony).nestVec, 0, (live[b] as Colony).nestVec, 0, this.#odourW));
     // Mixing: each colony's ants within tolerance of another colony's nest odour (with two: the other one).
     let near = 0;
     let living = 0;
@@ -1506,11 +1517,11 @@ export class Game {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         living++;
-        if (live.some((other) => other !== c && odourDistance(K, c.odour, i * K, other.nestVec, 0) <= tol)) near++;
+        if (live.some((other) => other !== c && odourDistance(K, c.odour, i * K, other.nestVec, 0, c.odourW) <= tol)) near++;
       }
     // With a tolerance of the space's diameter (one supercolony) every gap is within it: recognition is whole. The diameter is 1 with one axis.
-    const D = Math.sqrt(K);
-    const recognition = tol >= D ? 1 : Math.min(1, Math.max(0, (D - gap) / (D - tol)));
+    const D = odourDiameter(K, this.#odourW);
+    const recognition = recognitionShare(tol, D, gap);
     const unified = gap <= tol && quiet >= QUIET && (met >= MET || this.#haveMet) && live.every((c) => !Game.beaten(c));
     return {
       gap,
@@ -1558,7 +1569,10 @@ export class Game {
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++)
-        gap = Math.max(gap, odourDistance(K, (this.colonies[live[a]] as Colony).nestVec, 0, (this.colonies[live[b]] as Colony).nestVec, 0));
+        gap = Math.max(
+          gap,
+          odourDistance(K, (this.colonies[live[a]] as Colony).nestVec, 0, (this.colonies[live[b]] as Colony).nestVec, 0, this.#odourW),
+        );
     this.colonies.forEach((c, k) => {
       // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
       // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
@@ -1576,7 +1590,7 @@ export class Game {
           let cy = 0;
           for (const d of live) {
             if (d === k) continue;
-            if (odourDistance(K, c.odour, i * K, (this.colonies[d] as Colony).nestVec, 0) > tol) continue;
+            if (odourDistance(K, c.odour, i * K, (this.colonies[d] as Colony).nestVec, 0, c.odourW) > tol) continue;
             if (!placed) {
               placed = true;
               c.antCell(i);
@@ -1682,7 +1696,8 @@ export class Game {
       const tol = this.recognition.params.tolerance;
       if (
         !this.colonies.some(
-          (o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0) > tol,
+          (o, j) =>
+            j !== k && !this.#frozen.has(j) && !Game.beaten(o) && odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0, c.odourW) > tol,
         )
       ) {
         c.raidable = false;

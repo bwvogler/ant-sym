@@ -296,7 +296,7 @@ export function enemyHeading(c: Colony, i: number): number | null {
   const g = c.enemies;
   if (!g) return null;
   // Strangers to this ant, as it perceives them: its own odour, its own tolerance.
-  g.look?.(c.odour, i * c.odourAxes, c.tolerance[i]);
+  g.look?.(c.odour, i * c.odourAxes, c.tolerance[i], c.odourW);
   const map = c.map;
   c.antCell(i);
   const cx = CELL[0];

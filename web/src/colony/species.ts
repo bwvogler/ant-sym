@@ -15,7 +15,8 @@ export interface Species {
   responses: Responses;
   /**
    * One population: no two odours in the space are ever strangers (L. neglectus, neglectus.ts). The Game then sets the tolerance to the space's diameter,
-   * sqrt(K) for K odour axes (1 with one axis, the `params.tolerance` it names), so a game of more axes keeps one population.
+   * sqrt(K) for K odour axes (1 with one axis, the `params.tolerance` it names), so a game of more axes keeps one population. With `params.odourWeights` (S3) it is the weighted
+   * diameter, sqrt(sum w), so the species keeps one population on the axes it smells.
    */
   neverStranger?: boolean;
   /**

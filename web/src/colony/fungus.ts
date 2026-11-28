@@ -1202,9 +1202,9 @@ export class Fungus {
     let foreign = 0;
     if (rec) {
       const tol = rec.params.tolerance;
-      rec.look(c.nestVec, 0, tol);
+      rec.look(c.nestVec, 0, tol, c.odourW);
       foreign = rec.around(cx, cy, L.map, 1, true);
-      if (own >= 0 && bandDistance(c.odour, own * c.odourAxes, c.nestVec, 0, c.odourAxes) > tol + STRANGER_EPS) foreign -= 1;
+      if (own >= 0 && bandDistance(c.odour, own * c.odourAxes, c.nestVec, 0, c.odourAxes, c.odourW) > tol + STRANGER_EPS) foreign -= 1;
     }
     return foreign > 0.5 ? "foreigner" : others - foreign > 0.5 ? "nestmate" : "none";
   }

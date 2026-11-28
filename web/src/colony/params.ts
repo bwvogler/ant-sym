@@ -461,6 +461,12 @@ export interface ColonyParams {
   odourAxes: number;
   /** odours further apart than this are strangers, as a healthy ant perceives it */
   tolerance: number;
+  /**
+   * How much each odour axis counts in the distance this colony's ants measure (S3 of docs/odour-space.md, PRD §91): d = sqrt(sum w_k (a_k − b_k)^2), one weight
+   * per axis, each from 0 to 1 (recognition.ts checkOdourWeights says why not more), at least one above 0. Absent: every axis counts fully, the distance the
+   * game ran before S3, bit for bit. A species' trait (Martin et al. 2008: a few compounds carry recognition): its ants judge strangers on those axes only.
+   */
+  odourWeights?: readonly number[];
   /** cells round an ant it checks for enemies (the hex disc of this radius) */
   enemyRange: number;
   /** evaporation and spread of the colony's pheromone channels, per channel and field; those left out keep their defaults */
