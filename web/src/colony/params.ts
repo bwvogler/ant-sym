@@ -26,6 +26,9 @@ export const BACKFILL = Object.freeze({
 /** The backfill tuning as a type, each number free to vary (ColonyParams.backfill). */
 export type BackfillTuning = { readonly [K in keyof typeof BACKFILL]: number };
 
+/** Starting workers per colony in a new browser game and its representative assays. */
+export const GAME_STARTING_ANTS = 600;
+
 /** Age bands, as shares of LIFESPAN: young below YOUNG, middle-aged below MIDDLE, old beyond. */
 export const YOUNG = 0.15;
 
@@ -479,6 +482,14 @@ export interface ColonyParams {
   arrive: "explore" | "follow" | "return";
   /** the backfill tuning (BACKFILL): a test or sweep changes it for the colonies it builds, not for the process */
   backfill: BackfillTuning;
+  /** Experimental lifetime of local worker passage marks. Omitted or zero keeps legacy backfill. */
+  backfillTraceSeconds?: number;
+  /** Guard stale-branch entry with recent passage at its mouth. */
+  backfillTraceEntry?: boolean;
+  /** Assay-only escape from repeated two-cell reversals. */
+  backtrackEscape?: boolean;
+  /** In the trace experiment, ask the ordinary drop question for repair of chamber floors. */
+  backfillFloorRepair?: boolean;
   /** how much a tunnel's run drifts per cell dug (radians, standard deviation): the meander. 0 = tunnels run straight. */
   tunnelDrift: number;
 }

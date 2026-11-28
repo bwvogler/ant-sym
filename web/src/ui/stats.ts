@@ -44,6 +44,7 @@ export interface SideStats {
   filled: number;
   /** the side view: loose pellets taken off the mound and put back underground (soil already counted on the mound, moved again) */
   refilled: number;
+  backfillRecentKept?: number;
 }
 
 export interface ColonyStats {
@@ -151,6 +152,7 @@ export function sideOf(c: Colony, fungus: Fungus): SideStats {
     mound: c.soilOut,
     filled: c.soilFilled,
     refilled: c.looseFilled,
+    ...(c.passageTrace ? { backfillRecentKept: c.passageTrace.recentKept } : {}),
   };
 }
 

@@ -1,0 +1,210 @@
+name: Nest function assay
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/nest-function.yml"
+      - "scripts/lab/nest-function.mjs"
+      - "scripts/lab/nest-milling*.mjs"
+      - "scripts/lab/porter-*.mjs"
+      - "web/src/colony/bypassPolicy.ts"
+      - "web/src/colony/backtrackEscape.ts"
+      - "scripts/lab/backtrack-escape.test.mjs"
+      - "scripts/lab/reversal-sites*.mjs"
+      - "web/src/colony/porterObservation.ts"
+      - "web/src/colony/nestWork.ts"
+      - "web/src/colony/tunnel.ts"
+      - "web/src/colony/move.ts"
+      - "web/src/colony/passageTrace.ts"
+      - "web/src/colony/dig.ts"
+      - "web/src/colony/backfillObservation.ts"
+      - "web/src/colony/foodHandoffObservation.ts"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Simulated seconds for each variant"
+        type: choice
+        options: ["300", "600", "1200"]
+        default: "600"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nest-function-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [7, 17, 29, 43]
+        mode: [current, trace, trace-repair, trace-bypass, trace-entry, escape]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+      - name: Simulate world
+        env:
+          SEED: ${{ matrix.seed }}
+          NEST_ASSAY_MODE: ${{ matrix.mode }}
+          SECONDS_TO_PLAY: ${{ inputs.seconds || '600' }}
+        run: node scripts/lab/nest-function.mjs "$SEED" "$SECONDS_TO_PLAY" > "nest-$SEED-$NEST_ASSAY_MODE.json"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nest-function-seed-${{ matrix.seed }}-${{ matrix.mode }}
+          path: nest-${{ matrix.seed }}-${{ matrix.mode }}.json
+          if-no-files-found: error
+          retention-days: 30
+  report:
+    needs: world
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: nest-function-seed-*
+          path: out
+          merge-multiple: true
+      - name: Report final checkpoints
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          cols = ("Seed", "Mode", "Sim s", "Starting workers", "Food delivered", "Food held below",
+                  "Peak held >30 s", "Reachable cells", "Chamber floor", "Floor fills", "Fill decisions / sites",
+                  "Max tries at site", "Tick mean ms", "Tick p95 ms")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          populations = set()
+          handoff_rows = []
+          porter_rows = []
+          detour_rows = []
+          milling_rows = []
+          escape_rows = []
+          reversal_rows = []
+          for seed in (7, 17, 29, 43):
+              for mode in ("current", "trace", "trace-repair", "trace-bypass", "trace-entry", "escape"):
+                  report = json.loads(Path(f"out/nest-{seed}-{mode}.json").read_text())
+                  assert report["seed"] == seed
+                  populations.add(report["antsPerColony"])
+                  [item] = report["results"]
+                  assert item["mode"] == mode
+                  point = item["checkpoints"][-1]
+                  assert point["seconds"] == report["seconds"]
+                  timing = item["tickTiming"]
+                  row = (seed, mode, point["seconds"], report["antsPerColony"], point["foodDelivered"],
+                         point["undergroundFoodCarriers"], point["peakUndergroundFoodHeldOver30s"],
+                         point["reachableCells"], point["chamberFloor"], point["floorFills"],
+                         f"{point['fillDecisions']} / {point['uniqueFillSites']}", point["maxDecisionsAtFillSite"],
+                         f"{timing['meanMs']:.2f}", f"{timing['p95Ms']:.2f}")
+                  print("| " + " | ".join(map(str, row)) + " |")
+                  h = point["incomingFood"]
+                  loc = h["outstandingLocation"]
+                  assert h["entered"] == h["deposited"] + h["selfPorted"] + h["interrupted"] + h["outstanding"]
+                  def p95(stage):
+                      value = h[stage]["p95Seconds"]
+                      return f"{value:.2f}" if value is not None else "—"
+                  hottest = (point["busiestFillSites"] or [{}])[0]
+                  handoff_rows.append((seed, mode, h["entered"], h["deposited"] + h["selfPorted"], h["interrupted"],
+                                       p95("entryToHandoff"), p95("entryToEligibleSite"), p95("eligibleSiteToHandoff"),
+                                       h["outstanding"], loc["approaching"], loc["entranceVicinity"], loc["over30s"],
+                                       hottest.get("mostByOneWorkerSlot", 0)))
+                  porter = point["porterTrips"]
+                  assert porter["completed"] == point["portTrips"]
+                  assert porter["started"] == porter["completed"] + porter["interrupted"] + porter["outstanding"]
+                  bypass = point["bypass"] or {}
+                  sites = bypass.get("opened", [])
+                  assert len(sites) <= 4
+                  p95_value = porter["pickupToDeposit"]["p95Seconds"]
+                  porter_rows.append((seed, mode, porter["started"], porter["completed"], porter["outstanding"],
+                                      porter["outstandingOver30s"], "—" if p95_value is None else f"{p95_value:.2f}",
+                                      porter["sampledReversals"], porter["sampledAdjacentMoves"], bypass.get("peakEligibleFaces", 0),
+                                      len(sites), sum(site["porterEntries"] for site in sites)))
+                  detour = point["branchDetours"]
+                  assert detour["entered"] == detour["endedWithFill"] + detour["endedWithoutFill"] + detour["active"]
+                  detour_rows.append((seed, mode, detour["entered"], detour["skippedAtRecentMouth"],
+                                      detour["endedWithFill"], detour["endedWithoutFill"], detour["active"],
+                                      detour["workerSeconds"], point["undergroundSoilCarrierSeconds"],
+                                      point["laterUsedDugCells"], point["redigCellsObserved"]))
+                  m = point["nonLobbyMilling"]
+                  assert 0 <= m["suspectedWorkerSeconds"] <= m["outsideLobbyWorkerSeconds"]
+                  share = m["suspectedShare"]
+                  hotspot = (m["busiestCircuitIslands"] or [None])[0]
+                  milling_rows.append((seed, mode, m["outsideLobbyWorkerSeconds"], m["stationaryWorkerSeconds"],
+                                       m["repeatedBacktrackWorkerSeconds"], m["islandLoopWorkerSeconds"],
+                                       m["otherLoopWorkerSeconds"], "—" if share is None else f"{share:.2%}",
+                                       m["completedIslandCircuits"], m["islandCircuitWorkerSeconds"],
+                                       "—" if hotspot is None else f"({hotspot['x']}, {hotspot['y']})"))
+                  if mode in ("current", "escape"):
+                      e = point["escape"] or {}
+                      sites = point["reversalSites"]
+                      assert sum(site["events"] for site in sites) == e["noExit"]
+                      assert e["tries"] == (e["withExit"] if mode == "escape" else 0)
+                      repeat = [site for site in sites if site["peakSlotsIn20s"] >= 2]
+                      candidates = [(site, face) for site in sites for face in site["faces"]
+                                    if face["opens"] == "other-open-ground" and face["peakSlotsIn20s"] >= 2]
+                      best = max(candidates, key=lambda pair: pair[1]["peakSlotsIn20s"], default=None)
+                      location = "—"
+                      if best:
+                          site, face = best
+                          location = f"({site['x']}, {site['y']}) → ({face['x']}, {face['y']})"
+                      reversal_rows.append((seed, mode, e["noExit"], e["withExit"], len(sites), len(repeat),
+                                            len(candidates), location))
+                      assert 0 <= m["loadedBacktrackWorkerSeconds"] <= m["repeatedBacktrackWorkerSeconds"]
+                      escape_rows.append((seed, mode, e.get("tries", 0), e.get("noExit", 0),
+                                          m["loadedBacktrackWorkerSeconds"], point["foodDelivered"],
+                                          porter["completed"], porter["started"], porter["outstanding"],
+                                          "—" if p95_value is None else f"{p95_value:.2f}"))
+          assert len(populations) == 1
+          print("\n### First handoff of incoming food\n")
+          cols = ("Seed", "Mode", "Entries", "Handoffs", "Interrupted", "Handoff p95 s", "Route p95 s",
+                  "At-site p95 s", "Outstanding", "Yet to reach a site", "Near entrance", "Outstanding >30 s",
+                  "Max checks by one slot at busiest fill site")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in handoff_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Internal porter trips and bypass excavation\n")
+          cols = ("Seed", "Mode", "Started", "Completed", "Outstanding", "Outstanding ≥30 s", "Trip p95 s",
+                  "Sampled reversals", "Sampled steps", "Peak eligible faces", "Bypasses opened", "Porter entries into bypasses")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in porter_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Stale branch detours and soil work\n")
+          cols = ("Seed", "Mode", "Detours started", "Skipped at fresh mouth", "Ended with fill",
+                  "Ended without fill", "Still active", "Detour worker-s", "Underground soil worker-s",
+                  "Later-used dug cells", "Observed re-digs")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in detour_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Stalls and repeated laps outside the lobby\n")
+          cols = ("Seed", "Mode", "Worker-s outside lobby", "Stationary worker-s", "Backtrack worker-s",
+                  "Island-loop worker-s", "Other-loop worker-s", "Suspected share", "Island circuits",
+                  "Circuit worker-s", "Busiest island")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in milling_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Loaded workers escaping repeated reversals\n")
+          cols = ("Seed", "Mode", "Escape tries", "No alternate exit", "Loaded backtrack worker-s",
+                  "Food delivered", "Porter trips completed", "Porter trips started", "Outstanding", "Porter p95 s")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in escape_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\n### Reversal sites with no alternate exit\n")
+          cols = ("Seed", "Mode", "No exit", "With exit", "Affected cells", "Shared within 20 s",
+                  "Shared faces touching other open ground", "Top site → face")
+          print("| " + " | ".join(cols) + " |")
+          print("| " + " | ".join(["---"] * len(cols)) + " |")
+          for row in reversal_rows:
+              print("| " + " | ".join(map(str, row)) + " |")
+          print("\nPaired initial seeds. JSON artifacts include minute checkpoints. Tick times are from separate headless runners.")
+          PY

@@ -1,3 +1,6 @@
+import { backtrackEscapes } from "./backtrackEscape.ts";
+import { bypassPolicies } from "./bypassPolicy.ts";
+import { rememberPassage } from "./passageTrace.ts";
 // Move and dig (docs/refactor.md S3.4): the fifth stage of an ant's step in tick. It takes the step its heading gives: into open ground; against soil, a face to glance off, start digging or dig on (a pellet when it is done); blocked otherwise, wall-following home by touch or a bump that turns it; up out of the hole onto the plane (crossing, which ends its step). Moved out of Colony.tick verbatim but for `this` becoming `col`; a step that ends here returns true, and tick moves on to the next ant.
 import { NO_KEY } from "./ants.ts";
 import type { Colony } from "./colony.ts";
@@ -89,6 +92,15 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
     )
       face = DIG_FACE;
   }
+  const bypass = face !== NO_FACE && !col.onPlane && col.cur === col.home ? bypassPolicies.get(col) : undefined;
+  if (
+    bypass?.aimedAt(i, lx, ly) &&
+    col.gx[i] === lx &&
+    col.gy[i] === ly &&
+    !refilled(map, lx, ly, col.time, p.backfill.hold) &&
+    col.digs(i)
+  )
+    face = DIG_FACE;
   if (face === DIG_FACE && map.sky) {
     cellOf(nx, ny);
     col.antCell(i);
@@ -133,6 +145,7 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
         );
         col.digAim[i] = NaN;
         col.soilDug++;
+        bypass?.opened(i, fx, fy);
         col.pellet[i] = 1;
         col.since[i] = 0;
         col.lastDug[i] = cellKey(fx, fy);
@@ -244,6 +257,15 @@ export function moveDig(col: Colony, i: number, s: AntStep): boolean {
         crowd.add?.(ox, oy, -1);
         crowd.add?.(lx, ly, 1);
       }
+    }
+    const escape = p.backtrackEscape ? backtrackEscapes.get(col) : undefined;
+    const trace = col.passageTrace && !pellet && col.cur === col.home && !col.onPlane ? col.passageTrace : undefined;
+    if (trace || escape) {
+      col.antCell(i);
+      escape?.moved(i, CELL[0], CELL[1], lx, ly);
+      if (trace && (CELL[0] !== lx || CELL[1] !== ly)) rememberPassage(trace, lx, ly, col.time);
+      CELL[0] = lx;
+      CELL[1] = ly;
     }
     col.x[i] = nx;
     col.y[i] = ny;

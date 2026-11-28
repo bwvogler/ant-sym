@@ -578,6 +578,11 @@ function SideRow({ name, tone, s }: { name: string; tone: string; s: SideStats }
       >
         {s.dug.toLocaleString()} / {s.mound.toLocaleString()} / {s.filled.toLocaleString()}
         {s.refilled > 0 ? ` +${s.refilled.toLocaleString()}` : ""}
+        {s.backfillRecentKept !== undefined && (
+          <small className="block" title="Eligible soil placements declined while a fresh passage mark was sensed">
+            {s.backfillRecentKept.toLocaleString()} recent fills declined
+          </small>
+        )}
       </dd>
       <dd>{s.stance}</dd>
     </>

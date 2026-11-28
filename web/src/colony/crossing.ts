@@ -1,5 +1,6 @@
 // Crossing between layers (docs/refactor.md S3.3): an ant going up out of the hole onto the plane or down into it, what it carries out, and the gate it waits at. Moved out of class Colony as functions over the colony, verbatim but for `this` becoming `c`.
 
+import { foodHandoffObservers } from "./foodHandoffObservation.ts";
 import type { Colony, HoleCell } from "./colony.ts";
 import { NO_KEY } from "./ants.ts";
 import { NO_CELL, SOIL_FILL, SOIL_LOOSE, gauss, planeMoundReach } from "./grid.ts";
@@ -144,6 +145,7 @@ export function crossDown(c: Colony, i: number, k: number): void {
   if (!c.carrying[i] && gated && p.invitePace > 0) c.holeIn += c.rouse[i];
   if (c.carrying[i]) {
     c.carriedDown++;
+    if (k === p.nest && !c.porter[i]) foodHandoffObservers.get(c)?.(i, "entry");
     if (gated) {
       c.holeIn++;
       c.leaveOk[i] = 1;
