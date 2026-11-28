@@ -76,6 +76,37 @@ export const odourSalt = (axis: number): number => (axis === 0 ? 101 : 200 + axi
 export const MAX_AXES = 8;
 
 /**
+ * A species' odour axis weights, checked and ready (S3 of docs/odour-space.md, PRD §91): null for none or all 1 (the unweighted distance, the code every
+ * earlier stage ran), else a Float64Array of K numbers in [0, 1], at least one above 0. They are held to [0, 1] on purpose: a weight above 1 would let the
+ * weighted displacement of a host exceed hostCap (derived for the plain Euclidean distance), and 1 is the most an axis can count, since a bigger weight is
+ * only a smaller tolerance. With every weight at most 1 the weighted distance never exceeds the plain one, so each bound proved without weights (a host is
+ * never a stranger to its own nest; the space's diameter is at most sqrt(K)) still holds. A weight of 0 is an axis the species cannot smell.
+ */
+export function checkOdourWeights(w: ArrayLike<number> | null | undefined, K: number): Float64Array | null {
+  if (w === null || w === undefined) return null;
+  if (w.length !== K) throw new Error(`odour weights: ${w.length} given, the game has ${K} odour axes`);
+  let ones = 0;
+  let any = false;
+  for (let k = 0; k < K; k++) {
+    const v = w[k] as number;
+    if (!(v >= 0 && v <= 1))
+      throw new Error(`odour weights: axis ${k} is ${v}; a weight is a number from 0 to 1 (more than 1 would break the host cap)`);
+    if (v === 1) ones++;
+    if (v > 0) any = true;
+  }
+  if (!any) throw new Error("odour weights: all 0 (a species that smells no axis never has a stranger: use neverStranger)");
+  return ones === K ? null : Float64Array.from(w as ArrayLike<number>);
+}
+
+/** The widest two odours can be apart under weights w (null: all 1): sqrt(sum w), sqrt(K) unweighted (the space's diameter, which a tolerance at least as big never exceeds). */
+export function odourDiameter(K: number, w: ArrayLike<number> | null): number {
+  if (w === null) return Math.sqrt(K);
+  let s = 0;
+  for (let k = 0; k < K; k++) s += w[k] as number;
+  return Math.sqrt(s);
+}
+
+/**
  * The distance between two odours, ant i's vector at `a[ia..ia+K)` and the other's at `b[ib..ib+K)`: the Euclidean distance, sqrt(sum w_k (a_k − b_k)^2)
  * (docs/odour-space.md, "The mechanic": symmetric, a weight per axis, default 1). With one axis and no weights (the game today) it is |a − b|, with no
  * square root, so every comparison a scalar odour made comes out in the same bits. A stranger is further than tolerance + STRANGER_EPS.
@@ -283,7 +314,12 @@ export function driftDirection(seed: number, x: number, y: number, K: number): F
  * 1.5 tolerances from the mother in `direction` (driftDirection: fixed by the seed and the site); a component that would leave the cube is turned about
  * the mother (so the distance holds), and past that clamped to it.
  */
-export function driftAimVec(mother: ArrayLike<number>, tolerance: number, direction: ArrayLike<number> | null = null): Float64Array {
+export function driftAimVec(
+  mother: ArrayLike<number>,
+  tolerance: number,
+  direction: ArrayLike<number> | null = null,
+  w: ArrayLike<number> | null = null,
+): Float64Array {
   const K = mother.length;
   const aim = new Float64Array(K);
   if (K === 1 || direction === null) {
@@ -291,10 +327,28 @@ export function driftAimVec(mother: ArrayLike<number>, tolerance: number, direct
     return aim;
   }
   const d = 1.5 * tolerance;
+  // A perceiver with axis weights measures 1.5 tolerances in its own metric: the direction is taken over the axes it smells (weight above 0) and
+  // stretched by 1/sqrt(w) on each, so the weighted length of the step is d. Unweighted: the direction as it is.
+  let dir: ArrayLike<number> = direction;
+  if (w !== null) {
+    const u = new Float64Array(K);
+    let len = 0;
+    for (let k = 0; k < K; k++) {
+      const wk = w[k] as number;
+      u[k] = wk > 0 ? (direction[k] as number) / Math.sqrt(wk) : 0;
+      len += wk * u[k] * u[k];
+    }
+    len = Math.sqrt(len);
+    if (len === 0) {
+      const first = Array.from(w).findIndex((x) => x > 0);
+      u[first] = 1 / Math.sqrt(w[first] as number);
+    } else for (let k = 0; k < K; k++) u[k] = (u[k] as number) / len;
+    dir = u;
+  }
   for (let k = 0; k < K; k++) {
     const m = mother[k] as number;
-    let v = m + d * (direction[k] as number);
-    if (v < 0 || v > 1) v = m - d * (direction[k] as number);
+    let v = m + d * (dir[k] as number);
+    if (v < 0 || v > 1) v = m - d * (dir[k] as number);
     aim[k] = Math.min(1, Math.max(0, v));
   }
   return aim;
@@ -339,6 +393,8 @@ export class Recognition {
   /** the odour and tolerance the mask was made for: consecutive ants mostly share them */
   #lookOdour: Float64Array;
   #lookTolerance = NaN;
+  /** the weights the mask was made for (the perceiver's: the same array, or null, between its ants) */
+  #lookWeights: ArrayLike<number> | null = null;
   #clock = 0;
   /** whether the last odour step found anything to move: false means the gestalt is at rest */
   #moving = true;
@@ -402,11 +458,11 @@ export class Recognition {
     this.#setOccupied(occupied, calmed ? everyone : null);
   }
 
-  /** From now on, count the bands that are strangers to the odour at odour[at..] (K numbers) at `tolerance`. */
-  look(odour: ArrayLike<number>, at: number, tolerance: number): void {
+  /** From now on, count the bands that are strangers to the odour at odour[at..] (K numbers) at `tolerance`, as a perceiver with axis weights `w` (null: all 1) measures. */
+  look(odour: ArrayLike<number>, at: number, tolerance: number, w: ArrayLike<number> | null = null): void {
     const K = this.params.odourAxes;
     const last = this.#lookOdour;
-    if (tolerance === this.#lookTolerance) {
+    if (tolerance === this.#lookTolerance && w === this.#lookWeights) {
       let same = true;
       for (let k = 0; k < K; k++)
         if (odour[at + k] !== last[k]) {
@@ -415,7 +471,7 @@ export class Recognition {
         }
       if (same) return;
     }
-    this.#maskN = strangers(this.#mask, this.#occupied, this.#occupiedGrids, this.#centres, K, odour, at, tolerance);
+    this.#maskN = strangers(this.#mask, this.#occupied, this.#occupiedGrids, this.#centres, K, odour, at, tolerance, w);
     this.#sameMask = !this.#calmed;
     if (this.#calmed)
       this.#maskEveryoneN = strangers(
@@ -427,9 +483,11 @@ export class Recognition {
         odour,
         at,
         tolerance,
+        w,
       );
     for (let k = 0; k < K; k++) last[k] = odour[at + k];
     this.#lookTolerance = tolerance;
+    this.#lookWeights = w;
   }
 
   /** Strangers (weighted) in cell (x, y), to the odour last looked at. */
@@ -667,14 +725,21 @@ function strangers(
   odour: ArrayLike<number>,
   at: number,
   tolerance: number,
+  w: ArrayLike<number> | null,
 ): number {
   const far = tolerance + STRANGER_EPS;
   let n = 0;
-  if (K === 1) {
+  if (K === 1 && w === null) {
     // One axis (every game so far): the band's centre against the odour, as the scalar code judged it.
     const o = odour[at] as number;
     for (let b = 0; b < keys.length; b++) if (Math.abs(binCentre(keys[b] as number) - o) > far) out[n++] = grids[b] as SumGrid;
-  } else for (let b = 0; b < keys.length; b++) if (odourDistance(K, centres, b * K, odour, at) > far) out[n++] = grids[b] as SumGrid;
+  } else if (K === 1) {
+    const o = odour[at] as number;
+    for (let b = 0; b < keys.length; b++) {
+      const d = binCentre(keys[b] as number) - o;
+      if (Math.sqrt((w as ArrayLike<number>)[0] * d * d) > far) out[n++] = grids[b] as SumGrid;
+    }
+  } else for (let b = 0; b < keys.length; b++) if (odourDistance(K, centres, b * K, odour, at, w) > far) out[n++] = grids[b] as SumGrid;
   return n;
 }
 

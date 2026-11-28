@@ -71,7 +71,7 @@ export function backfill(self: Colony, i: number, cx: number, cy: number, enemy 
     if (self.time - map.dugAt.get(tx, ty) < self.params.backfill.young && !floorGround(map, tx, ty)) continue; // dug lately: the live frontier, not excess
     if (rockAt(map, tx, ty) !== OPEN || !stub(map, tx, ty, self.params.backfill.maxOpen)) continue;
     if (map.food.get(tx, ty) > 0 || home.get(tx, ty) + food.get(tx, ty) >= staleBelow(self, cx, cy, tx, ty)) continue;
-    self.enemies?.look?.(self.odour, i * self.odourAxes, -1); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
+    self.enemies?.look?.(self.odour, i * self.odourAxes, -1, self.odourW); // any ant of another colony, stranger or not (a tolerance below 0 counts every band)
     if ((self.friends?.get(tx, ty) ?? 0) > 0 || (self.enemies?.get(tx, ty) ?? 0) > 0) continue;
     if (byANest(self, tx, ty)) continue;
     if (self.brood.items.some((b) => b.held < 0 && b.x === tx && b.y === ty)) continue; // brood lies there (a nurse died carrying it)
