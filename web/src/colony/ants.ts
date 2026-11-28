@@ -8,7 +8,10 @@ export const NO_KEY = -0x80000000;
 
 /** The colony parameters the table reads: a fill that starts as a parameter, and the one array whose length depends on one. */
 export interface AntParams {
-  odour: number;
+  /** the colony's odour at the start: one number for every axis, or one per axis */
+  odour: number | readonly number[];
+  /** how many numbers an odour is (recognition.ts odourAxes): ant i's odour is odour[i × odourAxes ..] */
+  odourAxes: number;
   tolerance: number;
   routeStep: number;
   routeMax: number;
@@ -27,9 +30,11 @@ interface ArrayField {
   /** what every ant starts with; absent: 0 */
   readonly fill?: number;
   /** what every ant starts with when that is a colony parameter */
-  readonly fillParam?: keyof AntParams;
+  readonly fillParam?: "tolerance" | "routeStep" | "routeMax";
   /** elements per ant, when it is not one (the array is n times this) */
   readonly perAnt?: (p: AntParams) => number;
+  /** what element k of every ant's row starts with, when the row's elements start differently */
+  readonly fillAt?: (p: AntParams, k: number) => number;
   /**
    * Where a newborn's slot goes back to its start: "spawn" (the colony's spawn resets it), or "asIs" (also reset by Colony.asIs, a host made healthy: the
    * fungus's gains and its odour cues). To its fill, or to `resetTo`. Absent: spawn leaves it (it computes it, or a cache is kept). Adding a per-ant field
@@ -170,8 +175,15 @@ export const ANT_FIELDS = {
   /** how strongly it perceives that scent (the fungus's queen-scent lever: 1 as it is) */
   scentGain: { type: Float32Array, fill: 1, reset: "asIs" },
   // Recognition (recognition.ts): who is a stranger is a matter of odour, not of colony.
-  /** the ant's odour, 0..1: a blend of cuticular hydrocarbons; strangers are ants whose odour differs by more than a tolerance */
-  odour: { type: Float32Array, fillParam: "odour" },
+  /**
+   * the ant's odour, K axes of 0..1 each (K = odourAxes: one in every game so far), interleaved, ant i's at odour[i × K ..]: a blend of cuticular
+   * hydrocarbons; strangers are ants whose odour is further from the perceiver's than a tolerance (recognition.ts odourDistance)
+   */
+  odour: {
+    type: Float32Array,
+    perAnt: (p) => p.odourAxes,
+    fillAt: (p, k) => (typeof p.odour === "number" ? p.odour : (p.odour[k] as number)),
+  },
   /** how far apart an odour must be for this ant to perceive a stranger (params.tolerance, widened by the fungus) */
   tolerance: { type: Float32Array, fillParam: "tolerance", reset: "asIs" },
   /** the calming cue the ant gives off, 0..1 (the fungus's): it counts as (1 − calm) of an enemy, and charges at (1 − calm) of the pace */
@@ -371,8 +383,10 @@ export function antResets(p: AntParams, asIs = false): [string, number][] {
 export function makeAntArrays(n: number, p: AntParams): AntArrays {
   const a: Record<string, ArrayLike<number>> = {};
   for (const [k, f] of Object.entries(ANT_FIELDS) as [string, ArrayField][]) {
-    const v = new f.type(n * (f.perAnt ? f.perAnt(p) : 1));
-    if (f.fillParam !== undefined) v.fill(p[f.fillParam]);
+    const row = f.perAnt ? f.perAnt(p) : 1;
+    const v = new f.type(n * row);
+    if (f.fillAt !== undefined) for (let i = 0; i < n; i++) for (let k = 0; k < row; k++) v[i * row + k] = f.fillAt(p, k);
+    else if (f.fillParam !== undefined) v.fill(p[f.fillParam] as number);
     else if (f.fill !== undefined) v.fill(f.fill);
     a[k] = v;
   }

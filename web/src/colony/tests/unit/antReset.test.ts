@@ -58,7 +58,13 @@ test("asIs resets exactly the fields it always has, to the values it always gave
 
 test("the table says what asIs and spawn reset: asIs by hand (it runs for every healthy host each step), checked against the table here", () => {
   const c = make();
-  const params = { odour: c.params.odour, tolerance: c.params.tolerance, routeStep: c.params.routeStep, routeMax: c.params.routeMax };
+  const params = {
+    odour: c.params.odour,
+    odourAxes: c.params.odourAxes,
+    tolerance: c.params.tolerance,
+    routeStep: c.params.routeStep,
+    routeMax: c.params.routeMax,
+  };
   // asIs: the fields the table marks "asIs", to their reset values, and nothing else changes.
   scribble(c, 5);
   const before = dump(c, 5);

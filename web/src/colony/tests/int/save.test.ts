@@ -47,6 +47,7 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
   // The public properties a save writes into `fields` by default, pinned: a new property of the colony that holds a reference (a map, a cache, the
   // game) would otherwise be written into every save and poured back on load. Adding one is an edit here, or to COLONY_SKIP when it is code or rebuilt.
   const SAVED_FIELDS = [
+    "aimVec",
     "alates",
     "births",
     "brood",
@@ -85,8 +86,8 @@ test("what a colony saves: its public properties in `fields`, COLONY_STATE in `p
     "midden",
     "moundLost",
     "n",
-    "nestOdour",
-    "odourAim",
+    "nestVec",
+    "odourAxes",
     "outside",
     "params",
     "ph",

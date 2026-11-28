@@ -50,6 +50,7 @@ import {
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
+import { odourVector } from "./recognition.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
 import { placeOn, touch } from "./sense.ts";
@@ -453,10 +454,30 @@ export class Colony {
   recruits = 0;
   /** enemy ants per cell, kept by the game each tick; null when there is no rival */
   enemies: CellCounts | null = null;
-  /** the colony's odour: the nest's gestalt, which ants at the nest relax toward and newborns take */
-  nestOdour: number;
-  /** where a daughter colony's nest odour drifts to from her mother's (ja-lo8.9.1, recognition.ts driftAim); NaN: it doesn't drift */
-  odourAim = NaN;
+  /** how many numbers an odour is (params.odourAxes): ant i's odour is odour[i × odourAxes ..] */
+  readonly odourAxes: number;
+  /** the colony's odour, one number per axis: the nest's gestalt, which ants at the nest relax toward and newborns take */
+  readonly nestVec: Float64Array;
+  /** where a daughter colony's nest odour drifts to from her mother's (ja-lo8.9.1, recognition.ts driftAimVec), per axis; NaN: it doesn't drift */
+  readonly aimVec: Float64Array;
+  /** the nest odour's first axis: the whole odour while the game has one axis, and what the page colours a colony by */
+  get nestOdour(): number {
+    return this.nestVec[0] as number;
+  }
+  set nestOdour(v: number) {
+    this.nestVec[0] = v;
+  }
+  /** the drift aim's first axis (NaN: none) */
+  get odourAim(): number {
+    return this.aimVec[0] as number;
+  }
+  set odourAim(v: number) {
+    this.aimVec[0] = v;
+  }
+  /** ant i's odour on one axis (the page reads axis 0 for colour) */
+  odourAt(i: number, axis = 0): number {
+    return this.odour[i * this.odourAxes + axis] as number;
+  }
   /** another colony's scent, for ants whose perception reads it: the one this colony would raid, its nearest rival (set by the game; null with no rival) */
   foreign: Pheromones | null = null;
   /** what can be felt by touch on each cell this tick (hunger.ts): begging larvae, a hungry queen, need passed on; rebuilt every tick, not saved */
@@ -651,6 +672,9 @@ export class Colony {
     seeHoles(this);
     const n = this.params.maxAnts;
     this.n = n;
+    this.odourAxes = this.params.odourAxes;
+    this.nestVec = odourVector(this.params.odour, this.odourAxes);
+    this.aimVec = new Float64Array(this.odourAxes).fill(NaN);
     Object.assign(this, makeAntArrays(n, this.params));
     // The queen lies on the royal chamber's floor: its bottom row, in the cell nearest the chamber's centre.
     if (this.entrance && map.chambers)
@@ -666,7 +690,6 @@ export class Colony {
         unfed: 0,
         held: 0,
       };
-    this.nestOdour = this.params.odour;
     // Colonies step their fields on different ticks, so a tick never pays for every colony's at once.
     this.ph.phase((this.params.nest % 2) * 0.5);
     if (world) (this.layers[PLANE] as Layer).ph.phase((this.params.nest % 2) * 0.5);

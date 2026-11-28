@@ -35,8 +35,11 @@ export function hashGame(g: Game): string {
       view(a);
     }
   };
+  // The odour vectors (nestVec, aimVec) are hashed as the scalars they were at one axis (c.nestOdour, c.odourAim below), and whole beyond it,
+  // so the hash of a one-axis game is the one it had before the odour was a vector.
   const walk = (o: object) => {
-    for (const [, v] of Object.entries(o)) {
+    for (const [k, v] of Object.entries(o)) {
+      if (k === "nestVec" || k === "aimVec") continue;
       if (ArrayBuffer.isView(v)) view(v);
       else if (v instanceof ChunkLayer) layer(v);
     }
@@ -78,6 +81,7 @@ export function hashGame(g: Game): string {
       c.nestOdour,
       c.odourAim,
     ]);
+    if (c.odourAxes > 1) text([c.nestVec, c.aimVec]);
     // Its private fields too, as its save holds them: the hash above sees only what can be read from outside.
     text(c.saveState().private);
   }
