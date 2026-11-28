@@ -7,7 +7,10 @@
 // nest odour its own odour is within tolerance of, in its cell or the six around, on its layer: Game.#meet's rule) on the
 // plane against the curtain.
 //
-// Usage: node scripts/unity.mjs [--seeds 1-3] [--ants 300,600] [--seconds 600] [--jobs N]
+// "alike at" is when the nests' odour gap first fell within the tolerance (Unity.alike): the odours' side of unity, which the fungus alone brings
+// about and which does not wait on a meeting. --axes N plays a game of N odour axes (default the game's, 4; 1 is the scalar game before S2, PRD §91).
+//
+// Usage: node scripts/unity.mjs [--seeds 1-3] [--ants 300,600] [--seconds 600] [--jobs N] [--axes N]
 //   One world (generateOneWorld(seed)) is the only game (S2.3d); --one is accepted and ignored. The side view this once
 //   compared never unified (≤ 0.34 % met in 10 min, PRD §53).
 import { availableParallelism } from "node:os";
@@ -31,6 +34,7 @@ async function main() {
   let ants = [300, 600];
   let seconds = 600;
   let jobs = availableParallelism();
+  let axes = 0;
   for (let k = 0; k < args.length; k++) {
     const a = args[k];
     if (a === "--one") continue;
@@ -38,12 +42,13 @@ async function main() {
     else if (a === "--ants") ants = args[++k].split(",").map(Number);
     else if (a === "--seconds") seconds = Number(args[++k]);
     else if (a === "--jobs") jobs = Number(args[++k]);
+    else if (a === "--axes") axes = Number(args[++k]);
     else {
       console.error(`unknown argument ${a}`);
       process.exit(1);
     }
   }
-  const queue = ants.flatMap((n) => seeds.map((seed) => ({ seed, ants: n, seconds })));
+  const queue = ants.flatMap((n) => seeds.map((seed) => ({ seed, ants: n, seconds, axes })));
   const out = [];
   const t0 = performance.now();
   await Promise.all(
@@ -65,25 +70,25 @@ async function main() {
   const pct = (v) => `${(100 * v).toFixed(2)} %`;
   console.log(`Unity with Garden in both colonies, one world, ${seconds} s (MET = 1 % met is whole)\n`);
   console.log(
-    `| ants | seed | peak met | met at end | unified at | gap at end | quiet at end | ants lost | allied contact: plane / curtain (ant-s) | wall |`,
+    `| ants | seed | peak met | met at end | alike at | unified at | gap at end | quiet at end | ants lost | allied contact: plane / curtain (ant-s) | wall |`,
   );
-  console.log("|---|---|---|---|---|---|---|---|---|---|");
+  console.log("|---|---|---|---|---|---|---|---|---|---|---|");
   for (const r of out)
     console.log(
-      `| ${r.ants} + ${r.ants} | ${r.seed} | ${pct(r.peakMet)} at ${r.peakAt.toFixed(0)} s | ${pct(r.met)} | ${Number.isNaN(r.unifiedAt) ? "never" : `${r.unifiedAt.toFixed(0)} s`}${r.outcome === "unified" ? "" : ` (ends ${r.outcome})`} | ${r.gap.toFixed(3)} | ${r.quiet.toFixed(0)} s | ${r.deaths} | ${r.plane.toFixed(0)} / ${r.curtain.toFixed(0)} | ${r.wall.toFixed(0)} s |`,
+      `| ${r.ants} + ${r.ants} | ${r.seed} | ${pct(r.peakMet)} at ${r.peakAt.toFixed(0)} s | ${pct(r.met)} | ${Number.isNaN(r.alikeAt) ? "never" : `${r.alikeAt.toFixed(0)} s`} | ${Number.isNaN(r.unifiedAt) ? "never" : `${r.unifiedAt.toFixed(0)} s`}${r.outcome === "unified" ? "" : ` (ends ${r.outcome})`} | ${r.gap.toFixed(3)} | ${r.quiet.toFixed(0)} s | ${r.deaths} | ${r.plane.toFixed(0)} / ${r.curtain.toFixed(0)} | ${r.wall.toFixed(0)} s |`,
     );
   console.error(`${out.length} runs in ${((performance.now() - t0) / 1000).toFixed(0)} s on ${jobs} threads`);
 }
 
 async function work() {
-  const { seed, ants, seconds } = workerData;
+  const { seed, ants, seconds, axes } = workerData;
   const { CURTAIN } = await import("../web/src/colony/index.ts");
   const { STRAINS } = await import("../web/src/colony/index.ts");
   const { GAME_REGROW, Game, gameRng, odourDistance } = await import("../web/src/colony/index.ts");
   const { CELL, cellOf, discOffsets } = await import("../web/src/colony/index.ts");
   const { generateOneWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
-  const game = new Game(generateOneWorld(seed), { regrow: GAME_REGROW, autoFound: false }, gameRng(seed), [
+  const game = new Game(generateOneWorld(seed), { regrow: GAME_REGROW, autoFound: false, ...(axes ? { recognition: { odourAxes: axes } } : {}) }, gameRng(seed), [
     { antCount: ants },
     { antCount: ants },
   ]);
@@ -100,6 +105,7 @@ async function work() {
   let peakMet = 0;
   let peakAt = 0;
   let unifiedAt = NaN;
+  let alikeAt = NaN;
   let deaths = 0;
   const lost0 = game.colonies.map((c) => c.losses);
   for (let k = 1; k <= Math.round(seconds / DT); k++) {
@@ -110,6 +116,7 @@ async function work() {
       peakMet = u.met;
       peakAt = game.time;
     }
+    if (Number.isNaN(alikeAt) && u.alike) alikeAt = game.time;
     if (Number.isNaN(unifiedAt) && game.outcome() === "unified") unifiedAt = game.time;
     // Allied contact per layer, as Game.#meet counts it: cells occupied per layer and colony, then each ant's ring.
     const occ = game.layers.map(() => game.colonies.map(() => new Map()));
@@ -149,6 +156,7 @@ async function work() {
     peakAt,
     met: u.met,
     unifiedAt,
+    alikeAt,
     outcome: game.outcome(),
     gap: u.gap,
     quiet: u.quiet,
