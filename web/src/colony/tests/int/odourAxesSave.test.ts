@@ -44,6 +44,11 @@ test("at four axes the start colonies sit on the diagonal (a number is every axi
   assert.equal(g.unity().gap, 2);
   run(g, 5);
   assert.ok(g.colonies.every((c) => c.population > 0));
+  // with no fungus every living ant smells of its nest, on every axis (the odour step's stride)
+  for (const c of g.colonies)
+    for (let i = 0; i < c.n; i++)
+      if (c.alive[i])
+        for (let k = 0; k < 4; k++) assert.equal(c.odour[i * 4 + k], Math.fround(c.nestVec[k] as number), `ant ${i} axis ${k}`);
 });
 
 test("a save of one axis count is refused by a game of another", () => {
@@ -58,4 +63,22 @@ test("a wild site's odour is a hash per axis, salt 101 + axis: axis 0 is the one
   assert.equal(v.length, 4);
   assert.equal(new Set(v).size, 4);
   assert.deepEqual(v, wildOdour(5, 3, 4, 4), "pure: the same site, the same vector");
+});
+
+test("at four axes a colony's own vector (not the diagonal) is what its ants smell of, axis by axis, and the nests drift to their ants' mean", () => {
+  const vec = [
+    [0.1, 0.9, 0.3, 0.6],
+    [0.8, 0.2, 0.7, 0.4],
+  ];
+  const g = new Game(generateOneWorld(7, { plane: { size: { w: 160, h: 100 } } }), { recognition: { odourAxes: 4 } }, gameRng(7), [
+    { antCount: 40, odour: vec[0]! },
+    { antCount: 40, odour: vec[1]! },
+  ]);
+  run(g, 8);
+  g.colonies.forEach((c, k) => {
+    for (let a = 0; a < 4; a++) assert.ok(Math.abs((c.nestVec[a] as number) - (vec[k]![a] as number)) < 1e-6, `nest ${k} axis ${a} stays`);
+    for (let i = 0; i < c.n; i++)
+      if (c.alive[i])
+        for (let a = 0; a < 4; a++) assert.equal(c.odour[i * 4 + a], Math.fround(c.nestVec[a] as number), `ant ${i} axis ${a}`);
+  });
 });
