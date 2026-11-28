@@ -26,7 +26,7 @@ import {
 } from "../../colony/index.ts";
 import { isZoomedIn, miniFrame, minimapRect, type Extent, type Reach } from "../camera.ts";
 import { holeOwner } from "../lens.ts";
-import { odourRgb } from "./colour.ts";
+import { nestRgb } from "./colour.ts";
 import type { FieldCtx } from "./ctx.ts";
 import { SNAP } from "../fog/sources.ts";
 import { UNKNOWN, LIVE } from "../fog/knowledge.ts";
@@ -148,7 +148,7 @@ export class Minimap {
       for (let n = colonies.length - 1; n >= 0; n--) {
         const col = colonies[n] as Colony;
         // By the colony's odour, as the field colours its ants and nests: no colony by its index (PRD §65).
-        const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+        const tone = sick ? host : nestRgb(theme.inkRgb, theme.warnRgb, col);
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || col.layer[i] !== lv || col.load[i] >= INFECTED !== sick) continue;
           const mx = Math.floor((col.x[i] - gx0) / 2);
@@ -224,7 +224,7 @@ export class Minimap {
     for (const sick of [false, true])
       for (let n = colonies.length - 1; n >= 0; n--) {
         const col = colonies[n] as Colony;
-        const tone = sick ? host : odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour);
+        const tone = sick ? host : nestRgb(theme.inkRgb, theme.warnRgb, col);
         for (let i = 0; i < col.n; i++) {
           if (!col.alive[i] || col.layer[i] !== lv || col.load[i] >= INFECTED !== sick) continue;
           const mx = Math.floor((col.x[i]! - win.x0) / step);
@@ -292,7 +292,7 @@ export class Minimap {
       if (!arrow) continue;
       const own = holeOwner(k.colonies, PLANE, h.x, h.y);
       const col = own >= 0 ? k.colonies[own] : undefined;
-      const [cr, cg, cb] = col ? odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour) : theme.inkRgb;
+      const [cr, cg, cb] = col ? nestRgb(theme.inkRgb, theme.warnRgb, col) : theme.inkRgb;
       const [ax, ay] = [r.x + (arrow.x - win.x0) * scale, r.y + (arrow.y - win.y0) * scale];
       const [ux, uy] = [Math.cos(arrow.angle), Math.sin(arrow.angle)];
       ctx.fillStyle = `rgb(${cr}, ${cg}, ${cb})`;

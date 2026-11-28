@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AUTOSAVE, describe, memorySaves, newestReadable, readable, record } from "../saves.ts";
+import { AUTOSAVE, describe, loadFailure, memorySaves, newestReadable, readable, record } from "../saves.ts";
 import { Game, mulberry32, generateOneWorld } from "../../colony/index.ts";
 
 /** A small one-world game: the page plays one world only (PRD §55), so only its saves are offered. */
@@ -84,4 +84,40 @@ test("a record of another species than the page plays is listed, not loaded", ()
     true,
     "the desert ant is playable now",
   );
+});
+
+test("a one-axis game's save loaded into a four-axis game is refused with a message about the odour space, not the error's own words (review of #445, N3)", () => {
+  const settings = { species: "generic", seed: 4, antCount: 30, rival: true, generation: 0 };
+  const player = { aim: { id: "unite", text: "One colony." }, doctrines: [], menu: [], hide: false, cull: false };
+  const one = new Game(generateOneWorld(4, { plane: { size: { w: 120, h: 80 } } }), { recognition: { odourAxes: 1 } }, mulberry32(4), [
+    { antCount: 30 },
+    { antCount: 30 },
+  ]);
+  const r = { ...record(1, settings, player, one.save(), "1. land"), savedAt: 1000 };
+  assert.equal(readable(r), true, "the version is the same, so the save is listed and Continue offers it");
+  let thrown: unknown;
+  try {
+    small(4).load(r.game);
+  } catch (e) {
+    thrown = e;
+  }
+  assert.ok(thrown instanceof Error, "and the load refuses it");
+  const said = loadFailure(thrown);
+  assert.match(said, /different odour space/);
+  assert.match(said, /1 odour axis; this game's colonies smell in 4/);
+  assert.doesNotMatch(said, /recognition of|Error|save:/, "none of the code's own words");
+});
+
+test("what the page says of a refused load: odour space, version, or the error's words for anything else", () => {
+  assert.match(
+    loadFailure(new Error("save: recognition of 4 odour axes, this game has 1")),
+    /4 odour axes; this game's colonies smell in 1/,
+  );
+  assert.match(loadFailure(new Error("recognition: a colony with 2 odour axes in a game of 4")), /different odour space \(2 odour axes/);
+  assert.match(loadFailure(new Error("save: version 12, this game reads 16")), /another version of the game/);
+  assert.equal(
+    loadFailure(new Error("save: something new")),
+    "That save couldn't be loaded (save: something new); this is a fresh game of its world.",
+  );
+  assert.match(loadFailure("a string"), /\(a string\)/);
 });

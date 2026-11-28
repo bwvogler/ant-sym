@@ -28,7 +28,7 @@ import { CLOSE_SPRITE_GROUND, INSPECTION_GROUND } from "../inspectionGround.ts";
 import { ALARM_FULL, ALARM_SHOWN, FOOD_FULL, HOME_FULL, TRAIL_SHOWN } from "../lens.ts";
 import { MapChunkPaintCache } from "../mapChunkPaintCache.ts";
 import { HOME_RGB, ROLE_RGB } from "../palette.ts";
-import { odourRgb } from "./colour.ts";
+import { nestRgb } from "./colour.ts";
 import { GRACE, LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { SNAP } from "../fog/sources.ts";
 import type { FieldCtx } from "./ctx.ts";
@@ -272,7 +272,7 @@ export class Ground {
           trailC.push({
             food,
             home,
-            tone: smellAll ? odourRgb(theme.inkRgb, theme.warnRgb, t.odour) : (theme.trail as [number, number, number]),
+            tone: smellAll ? nestRgb(theme.inkRgb, theme.warnRgb, t.nest) : (theme.trail as [number, number, number]),
           });
       }
       for (const a of k.alarms) {

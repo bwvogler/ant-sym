@@ -8,7 +8,7 @@ import type { CorpseMemory } from "../fog/corpses.ts";
 import type { Knowledge } from "../fog/knowledge.ts";
 import type { Camera, Extent, Reach, Viewport } from "../camera.ts";
 import type { PenCircle, Settle } from "../pen.ts";
-import type { Rgb } from "./colour.ts";
+import type { NestOdour, Rgb } from "./colour.ts";
 import type { FieldEnv, SpriteSets } from "./env.ts";
 
 /** The page's colours as the field draws with them: CSS colours for strokes and fills, triples for what is mixed pixel by pixel. */
@@ -40,7 +40,8 @@ export interface FieldTheme {
 export interface TrailLayers {
   food: ChunkLayer<Float32Array>;
   home: ChunkLayer<Float32Array>;
-  odour: number;
+  /** the colony's nest odour: the tone of its food trail in smell vision (colour.ts nestRgb) */
+  nest: NestOdour;
 }
 
 /** The queen's pen as the field draws it: her flight's circle, the settle preview under the pointer, and the click (pen.ts). */

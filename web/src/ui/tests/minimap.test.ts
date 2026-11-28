@@ -233,6 +233,8 @@ test("paint: the ants are dots in their colony's tone, the infected over the hea
     y: ys,
     load: loads,
     nestOdour: odour,
+    nestVec: [odour],
+    odourAxes: 1,
   });
   const colonies = [
     // colony 0: over pixel (0, 0); a dead one over (1, 0); one on the curtain over (2, 0); one off the map; a healthy one over (1, 1)
@@ -413,6 +415,8 @@ test("under the fog a pixel is fog where nothing was sensed, the snapshot while 
   const ant = (gx: number, gy: number) => ({
     n: 1,
     nestOdour: 0,
+    nestVec: [0],
+    odourAxes: 1,
     alive: Uint8Array.of(1),
     layer: Uint8Array.of(PLANE),
     load: Float32Array.of(0),
@@ -464,6 +468,8 @@ test("under the fog the minimap's food and mound come from the snapshot too, not
   const hosts = {
     n: 2,
     nestOdour: 0,
+    nestVec: [0],
+    odourAxes: 1,
     alive: Uint8Array.of(1, 1),
     layer: Uint8Array.of(PLANE, PLANE),
     load: Float32Array.of(INFECTED, INFECTED),
@@ -726,6 +732,8 @@ test("endless paint: a healthy ant is a dot in its colony's odour colour, an inf
   const colony = {
     n: 4,
     nestOdour: 0.3,
+    nestVec: [0.3],
+    odourAxes: 1,
     alive: [true, true, false, true],
     layer: [PLANE, PLANE, PLANE, CURTAIN],
     load: [0, INFECTED, 0, 0],
@@ -758,7 +766,17 @@ test("endless paint, under the fog: remembered ground is the snapshot, dimmed, a
   const want = new Uint8ClampedArray([...THEME.rock, 255]);
   dimPx(want, 0, fogRgb(THEME));
   assert.deepEqual(paintedPixel(s, 40, 50), [...want], "the snapshot's rock, dimmed, not what the world holds now");
-  const colony = { n: 1, nestOdour: 0.3, alive: [true], layer: [PLANE], load: [0], x: [win.x0 + 161], y: [win.y0 + 201] };
+  const colony = {
+    n: 1,
+    nestOdour: 0.3,
+    nestVec: [0.3],
+    odourAxes: 1,
+    alive: [true],
+    layer: [PLANE],
+    load: [0],
+    x: [win.x0 + 161],
+    y: [win.y0 + 201],
+  };
   s.minimap.paint({ ...s.k, colonies: [colony], fog: stub(LIVE, REMEMBERED) } as unknown as FieldCtx);
   assert.notDeepEqual(
     paintedPixel(s, 40, 50).slice(0, 3),

@@ -161,11 +161,12 @@ export const GUIDE: GuideEntry[] = [
     id: "strangers",
     title: "Strangers and battles",
     swatch: ["var(--ink)", "var(--warn)"],
-    onScreen: "Ants are coloured by their odour: Ink's start dark, Amber's in the warn tone. Fights break out where they meet.",
+    onScreen:
+      "Every colony's ants and nest are drawn in one colour made from its four odour numbers. The two start colonies are Ink (dark) and Amber (the warn tone), at opposite corners of the odour space; the colonies of the wider map are the other hues, and a colony the fungus has brought to the middle of the space is the middle tone, between them. Two colonies in clearly different colours are strangers nearly always. Two in one colour usually smell alike, but not always: four numbers cannot all show in one colour (in the real map's wild colonies, about nine in ten strangers differ in colour clearly, so about one in ten does not; it is least visible to a colour-blind eye). For the numbers, follow an ant (its card shows the four, its nest's, and the distance against the tolerance) or open the Lab's Numbers tab (the Odour card: every colony's four, and how far it is from each other). Fights break out where strangers meet.",
     realAnts:
-      "Colony identity is a blend of cuticular hydrocarbons, read by touch: an ant knows a stranger only on contact. At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
+      "Colony identity is a blend of cuticular hydrocarbons (waxy compounds on the body), read by touch: an ant knows a stranger only on contact. The blend is many compounds, but a few that matter most: in one wood ant most of the difference was in a short series of alkenes, and in Argentine ants whole groups of related compounds move together; no source gives a number of independent axes. An ant compares what it feels with a template of its own colony's blend and attacks when the difference passes a threshold; the template adjusts slowly, over hours (abstract only: unverified). What moves a colony's smell is separation, a different diet and shared nest material, over days to weeks. No source read shows a fight shifting a colony's smell: what a fight teaches, in the one study that tests it, is the ant that was attacked (it is more aggressive to that colony a day later). At food, the ant that didn't start an encounter usually retreats. Fire-ant battles follow a roughly linear law, not Lanchester's square law; narrow, cluttered ground lets a few strong defenders hold off many attackers, open ground favours numbers.",
     inGame:
-      "An ant whose odour is far enough from its own is a stranger. Meeting one, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, drop its load and run, or ignore it. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. By default, nearby strangers create combat pressure even when they retreat. The experimental directed-combat rules count only ants choosing to attack: mutual peace is safe, but ignoring an attacker gives no protection. Both use the odds in the cells around.",
+      "A colony's odour is four numbers, each from 0 to 1 (four is a design choice: no source gives the count). The distance between two odours is the straight-line distance across the four, and an ant whose odour is further than 0.35 from its own nest's is a stranger. The start colonies sit at opposite corners (0 on every axis, and 1 on every axis, 2 apart), each wild colony's odour is fixed by where it lies, a daughter colony drifts away from its mother's in a fixed direction, and the fungus's own odour is the centre of the space. A host's odour is moved toward the fungus's, by at most 0.25 from its nest's, so a host is never a stranger to its own nest; to make two colonies one, the fungus has to bring both nests' odours within 0.35 of each other, which takes longer across four axes than it did across one. A fight does not change anyone's smell here. Meeting a stranger, an ant senses the odds by touch (outnumbered, even or outnumbering) and chooses to fight, flee, drop its load and run, or ignore it. Without Jev: a carrier takes its load home, raiders and defenders fight, and foragers turn away. On the surface an ant defends only while it senses a threat near its own nest; far out it forages. By default, nearby strangers create combat pressure even when they retreat. The experimental directed-combat rules count only ants choosing to attack: mutual peace is safe, but ignoring an attacker gives no protection. Both use the odds in the cells around.",
     scripted: {
       bead: "ja-k4k.6",
       reads:
@@ -173,6 +174,21 @@ export const GUIDE: GuideEntry[] = [
     },
     sources: [
       { note: "ant-communication", anchor: "3-rival-colonies", label: "Rival colonies" },
+      {
+        note: "odour-space",
+        anchor: "1-a-colonys-odour-is-a-blend-of-cuticular-hydrocarbons-a-point-in-a-many-dimensional-space",
+        label: "A colony's odour is a blend: a point in a space",
+      },
+      {
+        note: "odour-space",
+        anchor: "2-similarity-is-a-template-to-label-distance-against-a-threshold-not-an-identity-match",
+        label: "A distance against a threshold",
+      },
+      {
+        note: "odour-space",
+        anchor: "5-aggression-teaches-the-perceiver-an-enemy-template-the-sources-do-not-show-it-moving-the-colonys-odour",
+        label: "What a fight teaches",
+      },
       { note: "combat", anchor: "meeting-a-stranger-fight-flee-or-drop-and-run", label: "Meeting a stranger" },
       { note: "combat", anchor: "terrain-narrow-ground-lets-the-few-hold-off-the-many", label: "Terrain" },
     ],
@@ -760,7 +776,7 @@ export const NOTES: { note: string; title: string; covers: string }[] = [
     note: "odour-space",
     title: "Colony odour as a blend",
     covers:
-      "A colony's smell is several hydrocarbon axes, a few of which decide who is a stranger; fights teach the ant that was hit, they do not push colonies' smells apart. Planned (not built, PRD §91).",
+      "A colony's smell is several hydrocarbon axes, a few of which decide who is a stranger; fights teach the ant that was hit, they do not push colonies' smells apart. Four axes are built and drawn (PRD §91); the per-species weights and the learned foe are not.",
   },
   {
     note: "pharaoh-ant",

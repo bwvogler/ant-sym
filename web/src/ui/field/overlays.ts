@@ -22,7 +22,7 @@ import { holeOwner } from "../lens.ts";
 import { badgeParts, nestBadge } from "../badges.ts";
 import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
-import { odourColour } from "./colour.ts";
+import { nestColour } from "./colour.ts";
 import type { FieldCtx, FieldInputs } from "./ctx.ts";
 
 /** Parts of text side by side in one rounded box, centred on (x, y): a nest's badge, the followed ant's tag (PRD §69.2). */
@@ -242,7 +242,7 @@ export function drawStripAnts(k: FieldCtx, len: number, crumb: number, inView: (
         if (col.carrying[i]) carriers++;
       }
     }
-    ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+    ctx.strokeStyle = nestColour(theme.inkRgb, theme.warnRgb, col);
     ctx.globalAlpha = 0.85 * dim;
     ctx.stroke();
     ctx.globalAlpha = 1;

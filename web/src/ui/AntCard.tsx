@@ -25,6 +25,8 @@ import { cachedActionTrace, type DecidedBy } from "./colonyJev.ts";
 import { useJevSession } from "./jevContext.tsx";
 import type { JevSession } from "./jevSession.ts";
 import { useSimTick } from "./session.ts";
+import { antOdour, distanceText } from "./odourLens.ts";
+import { OdourBars, OdourSwatch } from "./OdourBars.tsx";
 
 // The followed ant, up close: what it is doing, the situation it was in
 // when it last chose, and who made the choice: Jev's cached answer for
@@ -153,6 +155,7 @@ export default function AntCard({ followed, colonies, fungus, onClose, fields, p
         <p className="mt-2 text-xs text-fg-3">Not asked yet.</p>
       )}
       <Fungal col={col} i={i} fungus={fungus} explain={explainFungus} />
+      {col.odourAxes > 1 && <AntOdour col={col} i={i} />}
     </section>
   );
 }
@@ -237,9 +240,14 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
         <span className="text-spore">
           {strain?.name ?? "fungus"} {Math.round(100 * load)}%
         </span>
-        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {col.odourAt(i).toFixed(2)} (its nest{" "}
-        {col.nestOdour.toFixed(2)}
-        ). The ant's situation above is what it perceives; its own policy chose.
+        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""}
+        {col.odourAxes === 1 && (
+          <>
+            {" "}
+            · odour {col.odourAt(i).toFixed(2)} (its nest {col.nestOdour.toFixed(2)})
+          </>
+        )}
+        . The ant's situation above is what it perceives; its own policy chose.
       </p>
     </>
   );
@@ -261,4 +269,23 @@ function steeringWords(code: number): string {
   return STEER_WEIGHTS.filter((w) => s[w] !== 0)
     .map((w) => STEER_WORDS[w][s[w] < 0 ? 0 : 1])
     .join(" · ");
+}
+
+/** The followed ant's odour as its neighbours' contact sense reads it: its numbers against its nest's, and the distance against its tolerance. */
+function AntOdour({ col, i }: { col: Colony; i: number }) {
+  const r = antOdour(col, i);
+  return (
+    <div className="mt-2 text-xs text-fg-3" aria-label="the ant's odour">
+      <p className="flex items-center gap-1.5">
+        <OdourSwatch values={r.axes.map((a) => a.value)} label="the ant's colour on the map" />
+        <span>
+          Odour, read by touch <Help to={{ tab: "guide", id: "strangers" }} label="strangers" />
+        </span>
+      </p>
+      <div className="mt-1">
+        <OdourBars rows={r.axes} />
+      </div>
+      <p className="mt-1 font-mono">{distanceText(r, "its nest")}</p>
+    </div>
+  );
 }

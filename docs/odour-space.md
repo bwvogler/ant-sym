@@ -131,7 +131,7 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
 - **S3, the species weights** (`odourWeights`), default 1; the neglectus species keeps its wide tolerance.
 - **S4, learned foe** behind `foeMemory` (off). **Gate:** the borderline-colony assay shows hysteresis (a pair that fought stays hostile at a gap where a pair that never met makes peace) without a runaway (no colony ends permanently at war with every neighbour, assay G and the long games).
 - **S5, optional:** the slow random walk of colony vectors (Drescher 2010); strain-specific fungal odour (two strains smell different; **design**).
-- **S6, Learn entry and the colour lens**, then strike the sense and gap rows.
+- **S6, Learn entry and the colour lens** (built, `ja-zg1u.8`; PRD §91), and the sense row updated (no gap row named it).
 
 ## Play
 
@@ -162,6 +162,10 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
 - **Read in full this pass:** Bos et al. 2011 (numbers in §5), Bey preprint. **Abstract re-read, still unverified:** Newey, Gordon, Leonhardt, Thomas, Pedersen, Roux, Silverman & Liang, Buczkowski, Johnson, Liang et al., Martin & Drijfhout, Martin 2011. Their open copies exist (Leonhardt: the Konstanz repository; Roux: HAL; Buczkowski: Purdue) on hosts this container could not reach; the publisher pages are bot-walled.
 - **New sources found:** Cohen 2025, Walsh 2020 (§1), van Wilgenburg 2022 and Thomas 2006's closing inference (§6), Csata 2023 and Bey 2026 (§6). All abstract only except Cohen's quoted passages.
 - **Not changed:** the K = 4 choice (§1), the 0.35 tolerance, the Monte Carlo figures, the vision.md sense row.
+
+## What S6 built (`ja-zg1u.8`, 2026-11-28)
+
+- A fixed colour map of the four axes (a Lab line from ink to warn along their mean plus a fitted offset: `ui/field/colour.ts`), used on the field, minimap and cards; measured on the real world's wild colonies (PRD §91: about 91 % of stranger pairs drawn 12 CIEDE2000 apart, against 89 % / 75 % for the old one-axis tone; kin look alike in only about half of cases). A lens: the four numbers and the distance against the tolerance on an ant's card and in the Lab's Odour card. The Learn entry under "Strangers and battles". The unity numbers scale with sqrt(K); a save of another odour space is refused in plain words. Nothing in the research above changed.
 
 ## What this note has not read
 
