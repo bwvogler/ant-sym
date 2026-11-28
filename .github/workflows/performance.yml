@@ -1,0 +1,124 @@
+name: Performance comparison
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+    paths:
+      - "web/**"
+      - "scripts/**"
+      - ".github/workflows/performance.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Revision to compare with the selected branch"
+        default: main
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'perf/') || contains(github.event.pull_request.labels.*.name, 'performance')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PLAYWRIGHT_VERSION: 1.63.0
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || inputs.base }}
+          path: baseline
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.18
+          cache: npm
+          cache-dependency-path: |
+            baseline/web/package-lock.json
+            candidate/web/package-lock.json
+      - name: Install dependencies and Chromium
+        run: |
+          npm --prefix baseline/web ci
+          npm --prefix candidate/web ci
+          npm install --no-save --no-package-lock --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+      - name: Compare offline simulation tick cost
+        run: |
+          mkdir -p "$RUNNER_TEMP/performance"
+          result="$RUNNER_TEMP/performance/ticks.txt"
+          for seed in 1 7; do
+            for revision in baseline candidate; do
+              for ants in 600 300; do
+                echo "[$revision]" | tee -a "$result"
+                node --expose-gc "$revision/scripts/page-bench.mjs" 15 "$seed" "$ants" --no-save | tee -a "$result"
+              done
+            done
+          done
+          {
+            echo "## Offline tick timings"
+            echo
+            echo 'Local policies, two colonies, 15 simulated seconds per run.'
+            echo
+            echo '~~~text'
+            cat "$result"
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure consecutive full-population game segments
+        run: |
+          result="$RUNNER_TEMP/performance/sustained.jsonl"
+          for revision in baseline candidate; do
+            if [[ ! -f "$revision/web/src/experiments/workerTrial.ts" ]]; then continue; fi
+            if [[ "$revision" == baseline ]]; then
+              cp candidate/scripts/lab/sustained-pace.mjs baseline/scripts/lab/sustained-pace.mjs
+            fi
+            node "$revision/scripts/lab/sustained-pace.mjs" 17 | jq -c --arg rev "$revision" '. + {revision: $rev}' | tee -a "$result"
+          done
+          {
+            echo '## Seed 17 · 600 starting ants per colony · engine only'
+            echo '| Revision | Simulated seconds | Mean tick (ms) | Engine pace |'
+            echo '|---|---|---:|---:|'
+            jq -r '"| \(.revision) | \(.start)–\(.end) | \(.meanTickMs * 100 | round / 100) | \(.enginePace * 100 | round / 100)× |"' "$result"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare browser play and touch gestures
+        env:
+          PERF_RESULTS: ${{ runner.temp }}/performance/browser.json
+        run: |
+          {
+            echo '## Paired revisions'
+            printf '\n- Base `%s`\n' "$(git -C baseline rev-parse HEAD)"
+            printf -- '- Candidate `%s`\n\n' "$(git -C candidate rev-parse HEAD)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node candidate/scripts/browser-performance.mjs baseline/web candidate/web |
+            tee "$RUNNER_TEMP/performance/browser.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare sustained underground play with and without a worker
+        if: ${{ hashFiles('candidate/web/src/experiments/mapTrialRuntime.ts') != '' }}
+        env:
+          PERF_WORKER_ONLY: "1"
+          PERF_SEEDS: "17,17"
+          PERF_RESULTS: ${{ runner.temp }}/performance/worker-play.json
+        run: |
+          node candidate/scripts/browser-performance.mjs candidate/web candidate/web 25 |
+            tee "$RUNNER_TEMP/performance/worker-play.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload measurements
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: performance
+          path: ${{ runner.temp }}/performance/
+          retention-days: 14
+          if-no-files-found: ignore

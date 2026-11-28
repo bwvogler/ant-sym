@@ -160,3 +160,31 @@ test("the local responses never draw: a game on them takes no salt from the rng"
   for (const c of g.colonies) assert.equal(c.drawSalt, -1);
   assert.equal(localResponses.contact(near), "flee");
 });
+
+test("cached response prefixes match full-string draws after a clock rewind, a new ant and a restored salt", () => {
+  const c = colony();
+  const salt = "contact|near";
+  const check = (i: number) => {
+    const draw = c.antDraw(i)(salt);
+    const trail = "trail|near";
+    const reserved = c.antDraw(i, true)(trail);
+    assert.equal(c.antDraw(i, true)(trail), reserved);
+    const prefix = `${c.drawSalt}|${i}|${c.gen[i]}`;
+    const epoch = c.params.reroll > 0 ? Math.floor(c.time / c.params.reroll + unitOf(prefix)) : 0;
+    assert.equal(draw, unitOf(`${prefix}|${epoch}|${salt}`));
+    assert.equal(reserved, unitOf(`${prefix}|${epoch}|${trail}`));
+    assert.equal(c.antDraw(i, true)(trail + "b"), unitOf(`${prefix}|${epoch}|${trail}b`));
+    assert.equal(c.antDraw(i, true)(trail), reserved);
+  };
+  check(0);
+  c.time = 30;
+  check(0);
+  check(1);
+  c.time = 0;
+  check(0);
+  c.gen[0]!++;
+  check(0);
+  c.drawSalt = 0.75;
+  check(0);
+  check(1);
+});

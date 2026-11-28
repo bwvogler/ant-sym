@@ -1,3 +1,6 @@
+import { pageProfile } from "./pageProfile.ts";
+import { BrickGpu } from "./field/brickGpu.ts";
+import { gpuGroundFromUrl } from "./playbackOptions.ts";
 import { useEffect, type RefObject } from "react";
 import type { AphidClump, Colony, Fungus, OneWorld } from "../colony/index.ts";
 import type { Viewport } from "./camera.ts";
@@ -104,7 +107,9 @@ export function useFieldFrame({
     // What the frame takes from the outside world: the clock, the pixel ratio, the dev flag, reduced motion and the sprite sets (field/env.ts).
     const env = browserEnv(import.meta.env.DEV);
     const voxelMap = new MapVoxelPass(() => draw());
-    const ground = new Ground(env);
+    const tryGpu = gpuGroundFromUrl();
+    const gpu = tryGpu ? BrickGpu.create(env.newCanvas(1, 1)) : null;
+    const ground = new Ground(env, gpu);
     const sinks: FrameSinks = { dataset: canvas.dataset, orbit, orbitAxes, angled, flatOrbit: mapOrbit, dev: env.dev };
     // The minimap's picture of the whole map (2 world units a pixel), redrawn twice a second: ground, food, ants (field/minimap.ts).
     const minimap = new Minimap(env);
@@ -172,7 +177,8 @@ export function useFieldFrame({
     const parts: FieldParts = { ground, minimap, voxelMap, sinks };
     const renderer = new FieldRenderer();
     const draw = () => {
-      const started = env.dev ? env.now() : 0;
+      const profile = pageProfile?.getSnapshot().running ? pageProfile : null;
+      const started = env.dev || profile ? env.now() : 0;
       binding.bind();
       const d = env.dpr();
       const v: Viewport = { w: canvas.width, h: canvas.height, dpr: d };
@@ -215,6 +221,8 @@ export function useFieldFrame({
             : { started, f, fcol, fHere },
         ),
       );
+      if (profile) profile.draw(env.now() - started);
+      if (tryGpu && canvas.dataset.groundBackend !== ground.brickBackend) canvas.dataset.groundBackend = ground.brickBackend;
     };
     binding.load(draw);
     const off = onFrame(draw);
@@ -232,6 +240,7 @@ export function useFieldFrame({
     return () => {
       off();
       voxelMap.dispose();
+      gpu?.dispose();
       binding.dispose();
       ro.disconnect();
       mq.removeEventListener("change", retheme);

@@ -1,3 +1,4 @@
+import { activeEngineProfile } from "./engineProfile.ts";
 import type { AttackCue } from "./attackCue.ts";
 import { combatObservers } from "./combatObservation.ts";
 import { leaveRate } from "./invite.ts";
@@ -26,7 +27,7 @@ import {
   PLANE,
   CURTAIN,
 } from "./vocab.ts";
-import { type AntDraw, type Draw, unitOf } from "./weighted.ts";
+import { hashText, type AntDraw, type Draw, unitOf } from "./weighted.ts";
 import type { Schema } from "./schema.ts";
 import { DonorGrid, FeltGrid } from "./hunger.ts";
 import { type Alate, scentShare, MeanGrid } from "./royal.ts";
@@ -52,7 +53,7 @@ import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from ".
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
-import { placeOn, touch } from "./sense.ts";
+import { createTouch, placeOn, touch } from "./sense.ts";
 import { ageWorkers, body, feedHome, killOn, placeNewborn, spawnHome } from "./body.ts";
 import { perceive } from "./perceive.ts";
 import { layerView, loadLayer, seeHoles, SLOTS, storeLayer, type LayerSlots, type LayerView } from "./layers.ts";
@@ -295,28 +296,7 @@ export class Colony {
   alarmSmelt: Trail = "none";
   /** the odds the ant whose sensors were last read met, with strangers in reach (else none) */
   oddsNow: Odds = "none";
-  t: Touch = Object.defineProperty(
-    {
-      mode: "explore",
-      carrying: "none",
-      porter: false,
-      digging: false,
-      place: "out",
-      offered: "none",
-      enemy: false,
-      stance: "forage",
-      quality: "fair",
-      alarm: "none",
-      odds: "none",
-      returns: "none",
-      crowd: "few",
-      deliveryAttempt: "none",
-      deliveryTarget: "none",
-      deliveryPlace: "none",
-    } as Touch,
-    "place",
-    { get: () => this.place(this.ti), enumerable: true },
-  );
+  t: Touch = createTouch(this);
   /** capacity: every per-ant array has this length; `alive` says which slots hold an ant */
   readonly n: number;
   /** the curtain: steps to this colony's hole through its tunnels, per cell (see outField), the cells it reached, and the ground's version and time it was built at */
@@ -541,15 +521,55 @@ export class Colony {
   drawSalt = -1;
   /** the ant antDraw is handing out draws for */
   #drawAnt = 0;
+  #reuseDraw = false;
+  #drawCacheSalt = NaN;
+  readonly #drawPrefixes: {
+    gen: number;
+    hash: number;
+    phase: number;
+    epoch: number;
+    epochHash: number;
+    lastSalt: string | undefined;
+    lastDraw: number;
+  }[] = [];
   readonly #antDraw: AntDraw = Object.defineProperty(
     (salt: string): number => {
       if (this.drawSalt < 0) this.drawSalt = this.rng();
       const i = this.#drawAnt;
-      // Its own clock: an ant draws afresh every `reroll` seconds, each ant at its own phase (not the whole colony at once).
-      const at = `${this.drawSalt}|${i}|${this.gen[i]}`;
+      if (this.#drawCacheSalt !== this.drawSalt) {
+        this.#drawCacheSalt = this.drawSalt;
+        this.#drawPrefixes.length = 0;
+      }
+      const gen = this.gen[i]!;
+      let prefix = this.#drawPrefixes[i];
+      if (!prefix || prefix.gen !== gen) {
+        const hash = hashText(`${this.drawSalt}|${i}|${gen}`);
+        prefix = this.#drawPrefixes[i] = {
+          gen,
+          hash,
+          phase: unitOf("", hash),
+          epoch: NaN,
+          epochHash: 0,
+          lastSalt: undefined,
+          lastDraw: 0,
+        };
+      }
+      // Each ant's clock changes the common part of all its response draws at the same moment.
       const r = this.params.reroll;
-      const epoch = r > 0 ? Math.floor(this.time / r + unitOf(at)) : 0;
-      return unitOf(`${at}|${epoch}|${salt}`);
+      const epoch = r > 0 ? Math.floor(this.time / r + prefix.phase) : 0;
+      if (prefix.epoch !== epoch) {
+        prefix.epoch = epoch;
+        prefix.epochHash = hashText(`|${epoch}|`, prefix.hash);
+        prefix.lastSalt = undefined;
+      }
+      if (!this.#reuseDraw) return unitOf(salt, prefix.epochHash);
+      // The trail response is asked every tick. Reuse its uniform when the
+      // same key is asked again within this ant's reroll epoch.
+      if (prefix.lastSalt !== salt) {
+        prefix.lastSalt = salt;
+        prefix.lastDraw = unitOf(salt, prefix.epochHash);
+      }
+      return prefix.lastDraw;
     },
     "temperature",
     { get: () => this.params.sampleTemp },
@@ -557,12 +577,12 @@ export class Colony {
 
   /**
    * The draw ant `i`'s response hooks are handed (ja-m7rr; weighted.ts AntDraw): the same uniform for the same hook and
-   * situation while the ant holds it, until its next `reroll`. One object for every ant, so handing it out allocates nothing; a
-   * draw itself hashes two strings (a game whose six hooks all draw ran 10–14 % slower, review of #223: cache the ant's part of
-   * the hash if a response lane is ever asked on the page).
+   * situation while the ant holds it, until its next `reroll`. One draw function serves every ant. Its cached prefix is
+   * derived from the saved draw salt, slot, generation and current reroll epoch. A hot hook can also keep its last uniform.
    */
-  antDraw(i: number): AntDraw {
+  antDraw(i: number, reuseDraw = false): AntDraw {
     this.#drawAnt = i;
+    this.#reuseDraw = reuseDraw;
     return this.#antDraw;
   }
   /** sensor readings for the ant being stepped: food, home, alarm × left, front, right */
@@ -1471,6 +1491,8 @@ export class Colony {
       this.holeIn = 0;
     }
     // Energy and felt hunger (ja-xu6.1): the curtain, where there is a queen and brood.
+    const profile = activeEngineProfile;
+    const bodyStart = profile ? profile.now() : 0;
     if (this.housed) body(this, dt);
     // Heat (ja-rf5.5): only a species with a day of heat.
     if (this.params.heatDay > 0) heatStep(this, dt);
@@ -1495,6 +1517,8 @@ export class Colony {
     s.threatLeak = threatLeak;
     s.crowdKeep = crowdKeep;
     const combatObserver = combatObservers.get(this);
+    const antStart = profile ? profile.now() : 0;
+    if (profile) profile.colony(antStart - bodyStart);
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i]) continue;
       // An ant on another layer than the one bound: bind its own (a colony on one layer never does).
@@ -1516,17 +1540,36 @@ export class Colony {
         s.crowdKeep = crowdKeep;
       }
       if (map.sky) unbury(this, i);
+      const sampled = profile?.sampleAnt(i) ? profile : null;
+      let stageStart = sampled ? sampled.now() : 0;
       perceive(this, i, s);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("sense", now - stageStart);
+        stageStart = now;
+      }
       stanceStep(this, i, s);
       decide(this, i, s, combatObserver, attackCue);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("decide", now - stageStart);
+        stageStart = now;
+      }
       steer(this, i, s);
+      if (sampled) {
+        const now = sampled.now();
+        sampled.antStage("steer", now - stageStart);
+        stageStart = now;
+      }
       const moveDigDone = moveDig(this, i, s);
-      if (moveDigDone) continue;
-
-      const arriveDone = arrive(this, i, s);
-      if (arriveDone) continue;
-      this.heading[i] = s.h;
+      if (!moveDigDone && !arrive(this, i, s)) this.heading[i] = s.h;
+      if (sampled) {
+        sampled.antStage("move", sampled.now() - stageStart);
+        sampled.sampledAnt = false;
+      }
     }
+    const antEnd = profile ? profile.now() : 0;
+    if (profile) profile.ants(antEnd - antStart);
     this.gateHeld = s.heldNow;
     // Colony-wide work from here on is the home layer's (the nest, its count of ants in and out, its brood).
     if (multi) this.bind(this.home);
@@ -1538,13 +1581,17 @@ export class Colony {
       this.outside = out;
     }
     // Every layer's fields evaporate and spread (on one layer, `ph`'s).
+    const scentStart = profile ? profile.now() : 0;
     for (const L of this.layers) if (L) L.ph.advance(dt);
+    const scentEnd = profile ? profile.now() : 0;
+    if (profile) profile.pheromones(scentEnd - scentStart);
     for (let j = this.remains.length - 1; j >= 0; j--) if (this.time - this.remains[j]!.died > CORPSE_ROT) this.remains.splice(j, 1);
     // Growth: the queen and brood (nestLife). A colony with no queen (a bare one on a field) grows no more, and ages only if its species is mortal.
     if (this.housed) {
       nestLife(this, dt);
       middenSmell(this, dt);
     } else if (p.mortalWithoutQueen) ageWorkers(this, dt);
+    if (profile) profile.colony(scentStart - antEnd + profile.now() - scentEnd);
   }
 
   /** This colony's state for a save (colonySave.ts saveColony). */

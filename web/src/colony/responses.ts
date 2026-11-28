@@ -261,7 +261,14 @@ export function touchSchemaOf(names: readonly (keyof Touch)[]) {
 
 /** The fields every response lane is keyed on (the rest go to some lanes only: colonyBrain.responseKey). */
 export const TOUCH_KEY_FIELDS = ["mode", "carrying", "porter", "digging", "place", "offered", "enemy", "stance", "quality"] as const;
-const TOUCH_KEY = touchSchemaOf(TOUCH_KEY_FIELDS);
+
+const schemaTouchKey = touchSchemaOf(TOUCH_KEY_FIELDS);
+export let trailOptimizations = true;
+
+/** Set once when loading a preview variant, before the first game is built. */
+export function setTrailOptimizations(enabled: boolean): void {
+  trailOptimizations = enabled;
+}
 
 /**
  * A situation as a cache key: 4 modes × 5 items × porter × digging × 4 places × 5 offered × enemy × 3 stances, then
@@ -269,5 +276,9 @@ const TOUCH_KEY = touchSchemaOf(TOUCH_KEY_FIELDS);
  * odds are the contact lane's alone (colonyBrain.responseKey): the other lanes are never sent them.
  */
 export function touchKey(t: Touch): string {
-  return TOUCH_KEY.key(t);
+  if (!trailOptimizations) return schemaTouchKey.key(t);
+  // This common response key sits on the per-ant hot path. The exhaustive
+  // schema test pins these tokens and their order against the lane format.
+  const base = `${t.mode}|${t.carrying}|${t.porter ? "porter" : "-"}|${t.digging ? "digging" : "-"}|${t.place}|${t.offered}|${t.enemy ? "enemy" : "clear"}|${t.stance}`;
+  return t.quality === "fair" ? base : `${base}|${t.quality}`;
 }

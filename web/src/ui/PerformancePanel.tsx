@@ -1,0 +1,96 @@
+import { useEffect, useState, useSyncExternalStore } from "react";
+import type { PageProfile } from "./pageProfile.ts";
+import { independentClockFromUrl } from "./playbackOptions.ts";
+
+interface Props {
+  profile: PageProfile;
+  seed: number;
+  view: string;
+  requestedSpeed: number;
+  startingAntsPerColony: number;
+  canStart: boolean;
+}
+
+export function PerformancePanel({ profile, seed, view, requestedSpeed, startingAntsPerColony, canStart }: Props) {
+  const { running, report } = useSyncExternalStore(profile.subscribe, profile.getSnapshot);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const cancelIfHidden = () => {
+      if (document.hidden) profile.cancel();
+    };
+    document.addEventListener("visibilitychange", cancelIfHidden);
+    return () => {
+      document.removeEventListener("visibilitychange", cancelIfHidden);
+      profile.cancel();
+    };
+  }, [profile, seed, view, requestedSpeed, canStart]);
+
+  const json = report && JSON.stringify(report, null, 2);
+  return (
+    <aside
+      aria-label="Performance profile"
+      className="absolute bottom-20 left-3 z-10 max-w-[calc(100%-1.5rem)] rounded-md bg-panel p-2 text-xs shadow-lg"
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canStart || running}
+          className="rounded border border-line px-2 py-1 disabled:opacity-50"
+          onClick={() => {
+            setCopied(false);
+            profile.start(
+              { seed, view, requestedSpeed, startingAntsPerColony, clock: independentClockFromUrl() ? "independent" : "frame" },
+              performance.now(),
+            );
+          }}
+        >
+          {running ? "Measuring…" : "Measure 10 seconds"}
+        </button>
+        {!canStart && !report && <span>Start or resume the game</span>}
+        {report && <span data-profile-pace={report.pace}>{report.pace.toFixed(2)}× actual</span>}
+      </div>
+      {report && json && (
+        <details className="mt-1">
+          <summary className="cursor-pointer">Performance results</summary>
+          <p className="my-1">
+            95th percentile · tick {report.tick?.p95Ms.toFixed(1) ?? "—"} ms · after tick {report.afterTick?.p95Ms.toFixed(1) ?? "—"} ms ·
+            draw {report.mapDraw?.p95Ms.toFixed(1) ?? "—"} ms · frame gap {report.frameGap?.p95Ms.toFixed(1) ?? "—"} ms
+          </p>
+          <p className="my-1">
+            Mean per tick · ants {report.engine.meanMsPerTick.ants.toFixed(1)} ms · pheromones{" "}
+            {report.engine.meanMsPerTick.pheromones.toFixed(1)} ms · colony maintenance{" "}
+            {report.engine.meanMsPerTick.colonyMaintenance.toFixed(1)} ms
+          </p>
+          <p className="my-1">
+            Estimated per tick · steering {report.engine.estimatedAntStageMsPerTick.steering.toFixed(1)} ms · policy lookup{" "}
+            {report.engine.estimatedAntStageMsPerTick.policyLookupWithinStages.toFixed(1)} ms within ant stages
+          </p>
+          <p className="my-1">
+            Within steering · tunnels {report.engine.estimatedSteeringMsPerTick.tunnelNavigation.toFixed(1)} ms · homing{" "}
+            {report.engine.estimatedSteeringMsPerTick.homing.toFixed(1)} ms · trail responses{" "}
+            {report.engine.estimatedSteeringMsPerTick.trailResponseAndDeposit.toFixed(1)} ms
+          </p>
+          <button
+            type="button"
+            className="mb-1 rounded border border-line px-2 py-1"
+            onClick={() =>
+              void navigator.clipboard?.writeText(json).then(
+                () => setCopied(true),
+                () => setCopied(false),
+              )
+            }
+          >
+            {copied ? "Copied" : "Copy results"}
+          </button>
+          <pre
+            aria-label="Performance results JSON"
+            className="max-h-20 overflow-auto rounded border border-line p-1 font-mono"
+            tabIndex={0}
+          >
+            {json}
+          </pre>
+        </details>
+      )}
+    </aside>
+  );
+}

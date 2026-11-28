@@ -54,6 +54,8 @@ import {
   type AntDraw,
   type ResponseAnswer,
   responseOf,
+  activeEngineProfile,
+  trailOptimizations,
 } from "../colony/index.ts";
 
 // The colonies' Jev client: the counterpart of JevScheduler for the colony
@@ -155,6 +157,7 @@ interface Lane<S, A extends string> {
   /** the words its requests carry: a colony's doctrine, or the fungus's aim */
   words: string;
   context: string;
+  cache?: PolicyCache<A>;
   /**
    * The contexts this lane asked under before, newest first (at most FALLBACKS): while the current words have no
    * answer for a situation and Jev can't answer (canAsk false), the newest earlier answer acts, marked stale (ja-lo8.3);
@@ -257,6 +260,43 @@ export function cachedActionTrace(colony: Colony, i: number): ActionTrace[] {
 
 // Touch is shared by all ants and its place is a getter over the current ant.
 const snapshotTouch = (t: Touch): Touch => ({ ...t });
+
+/** Only the situation key is reusable. Answers, draws and traces still follow the current policy. */
+function trailKeyReader(keyOf: (t: Touch) => string) {
+  type Fields = Pick<Touch, "mode" | "carrying" | "porter" | "digging" | "place" | "offered" | "enemy" | "stance" | "quality">;
+  const last: (Fields & { key: string })[] = [];
+  return (i: number, t: Touch): string => {
+    const place = t.place;
+    const entry = last[i];
+    if (
+      entry &&
+      entry.place === place &&
+      entry.mode === t.mode &&
+      entry.carrying === t.carrying &&
+      entry.porter === t.porter &&
+      entry.digging === t.digging &&
+      entry.offered === t.offered &&
+      entry.enemy === t.enemy &&
+      entry.stance === t.stance &&
+      entry.quality === t.quality
+    )
+      return entry.key;
+    const key = keyOf(t);
+    last[i] = {
+      mode: t.mode,
+      carrying: t.carrying,
+      porter: t.porter,
+      digging: t.digging,
+      place,
+      offered: t.offered,
+      enemy: t.enemy,
+      stance: t.stance,
+      quality: t.quality,
+      key,
+    };
+    return key;
+  };
+}
 
 function actionLane(hook: ResponseHook, words: string): Lane<Touch, string> {
   const row = LANES[hook];
@@ -438,7 +478,8 @@ export class ColonyJev {
   }
 
   #cache<S, A extends string>(l: Lane<S, A>, context = l.context): PolicyCache<A> {
-    return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+    if (context !== l.context) return this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>;
+    return (l.cache ??= this.#cacheAt(context, l.valid) as unknown as PolicyCache<A>);
   }
 
   /** The cache of a context, loaded from the store on first use, keeping only stored answers `valid` (its lane's question) accepts. */
@@ -496,9 +537,20 @@ export class ColonyJev {
    * no current answer is queued to be asked, under any words, preset or the player's own; while none is, the miss is
    * told to `wantsRun`, which may start one (PR #42 review S7: spend nothing while every situation met is cached).
    */
-  #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S): A {
+  #lookup<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S, key?: string): A {
+    const profile = activeEngineProfile;
+    if (!profile?.sampledAnt) return this.#answer(l, s, snapshot, key);
+    const start = profile.now();
+    try {
+      return this.#answer(l, s, snapshot, key);
+    } finally {
+      profile.policy(profile.now() - start);
+    }
+  }
+
+  #answer<S, A extends string>(l: Lane<S, A>, s: S, snapshot?: (s: S) => S, key?: string): A {
     if (l.asks && !l.asks(s)) return l.local(s);
-    const key = l.key(s);
+    key ??= l.key(s);
     const hit = this.#cache(l).get(key);
     const running = this.#state.phase === "running";
     if (running && LANE_KINDS[l.name].countsHits) {
@@ -679,6 +731,7 @@ export class ColonyJev {
     const before = l.context;
     l.fallback = [before, ...l.fallback.filter((c) => c !== before)].filter((c) => c !== context).slice(0, FALLBACKS);
     l.context = context;
+    l.cache = undefined;
     l.queue.clear();
     this.#set(this.#counts());
     return true;
@@ -745,10 +798,12 @@ export class ColonyJev {
       for (const hook of RESPONSE_HOOKS) {
         const l = d.actions[hook];
         if (!l) continue;
+        const trailKey = hook === "trail" ? trailKeyReader(l.key) : undefined;
         (bound as Record<ResponseHook, (t: Touch, draw?: AntDraw) => ResponseAnswer>)[hook] = (t, draw) => {
-          const answer = this.#lookup(l, t, snapshotTouch);
+          const key = trailKey && trailOptimizations ? trailKey(colony.ti, t) : l.key(t);
+          const answer = this.#lookup(l, t, snapshotTouch, key);
           if (!answer) return base[hook](t, draw);
-          const choice = responseOf(hook, l.key(t), answer, draw);
+          const choice = responseOf(hook, key, answer, draw);
           if (
             hook === "carry" &&
             t.carrying === "food" &&

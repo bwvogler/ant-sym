@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { freshReach, inReach, inReachShared } from "../../grid.ts";
+import { freshReach, inReach, inReachShared, inReachSharedCells } from "../../grid.ts";
 import { mulberry32, OPEN, ROCK, SOIL, worldFromArrays } from "../../world.ts";
 import { nestAt } from "../hexmaps.ts";
 import { CHUNK_BITS } from "../../chunks.ts";
@@ -51,4 +51,25 @@ test("inReachShared answers as inReach: random ground, random tips, by the edges
     }
   }
   assert.ok(open > asked / 5 && open < asked, `both answers met: ${open} of ${asked} reachable`);
+});
+
+test("a reused origin sees a detour open and close after terrain edits", () => {
+  const w = 16;
+  const map = worldFromArrays({ w, h: 16 }, [], { rock: new Uint8Array(w * 16).fill(SOIL), food: new Float32Array(w * 16) });
+  for (const [x, y] of [
+    [4, 8],
+    [6, 8],
+    [4, 9],
+  ])
+    map.rock.set(x!, y!, OPEN);
+  const canReach = () => {
+    freshReach();
+    return inReachSharedCells(map, 4, 8, 6, 8);
+  };
+  assert.equal(canReach(), false);
+  map.rock.set(5, 9, OPEN);
+  assert.equal(canReach(), true);
+  // Raw chunk edits also invalidate the window, even without a soil change counter.
+  map.rock.chunk(0, 0)![9 * 64 + 5] = ROCK;
+  assert.equal(canReach(), false);
 });

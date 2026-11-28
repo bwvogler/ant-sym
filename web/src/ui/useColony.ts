@@ -25,6 +25,8 @@ import { pushToast } from "./toasts.ts";
 import type { GameSettings, SaveRecord } from "./saves.ts";
 import { landingOf } from "./landing.ts";
 import { worldFromUrl, worldOf, type WorldKind } from "./worldKind.ts";
+import { antsFromUrl, independentClockFromUrl } from "./playbackOptions.ts";
+import { browserSimTasks } from "./simTasks.ts";
 import { GameLoop, MAX_STEP } from "./gameLoop.ts";
 import type { ColonyStats, EvolutionStats, SideStats } from "./stats.ts";
 
@@ -116,7 +118,7 @@ export const viewShowing = (
 export const DEFAULT_COLONY_CONTROLS: ColonyControls = {
   species: GENERIC_ANT.id,
   seed: 1,
-  antCount: 600,
+  antCount: antsFromUrl(),
   speed: GAME_SPEED,
   playing: false,
   started: false,
@@ -234,6 +236,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
   // The frame loop (gameLoop.ts) goes on across pauses and speed changes: playing and speed are set on it, not a reason to rebuild it.
   const frameListeners = useRef(new Set<() => void>());
   const lastLoop = useRef<GameLoop | null>(null);
+  const independentClock = independentClockFromUrl();
   const loop = useMemo(
     () =>
       new GameLoop(game, journal, {
@@ -243,16 +246,25 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
         // A new queen has flown (ja-lo8.9): the game waits for the page to found her.
         onFlight: () => setControls((c) => ({ ...c, playing: false })),
         frame: frameListeners.current,
+        simTasks: independentClock ? browserSimTasks : undefined,
       }),
     // A new game is a new loop; `controls` reaches an existing one through loop.set, below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [game, journal],
+    [game, journal, independentClock],
   );
   useEffect(() => {
+    const visibilityChanged = () => loop.setVisible(document.visibilityState !== "hidden");
+    if (independentClock) {
+      visibilityChanged();
+      document.addEventListener("visibilitychange", visibilityChanged);
+    }
     loop.start();
     lastLoop.current = loop;
-    return () => loop.stop();
-  }, [loop]);
+    return () => {
+      if (independentClock) document.removeEventListener("visibilitychange", visibilityChanged);
+      loop.stop();
+    };
+  }, [loop, independentClock]);
   useEffect(() => loop.set(controls.playing, controls.speed), [loop, controls.playing, controls.speed]);
 
   // The dev hook (window.jevAnts, the game and the page's views) is dev/hook.ts, installed by ColonyApp.

@@ -1,6 +1,6 @@
 // The colony's free functions over the map (cells, tunnels, soil, walls, steering helpers): pure, moved out of colony.ts as they were (docs/refactor.md S3.3, the `grid` module).
 
-import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, nx as stepX, ny as stepY } from "./hex.ts";
+import { CELL, DIR_ANGLE, R, cellOf, centreX, centreY, dirOf, discOffsets, hexDistance, hexLine, nx as stepX, ny as stepY } from "./hex.ts";
 export { cellKey, keyX, keyY } from "./hex.ts";
 import { NO_KEY } from "./ants.ts";
 import { CHUNK, CHUNK_BITS } from "./chunks.ts";
@@ -143,11 +143,20 @@ const CHUNK_MASK = CHUNK - 1;
 const sharedOpen = new Int32Array(SHARED_W);
 /** The same rows: the cells reached from (ax, ay) in at most SENSE_STEPS moves through open cells. */
 const sharedSeen = new Int32Array(SHARED_W);
-const sharedNext = new Int32Array(SHARED_W);
 /** Whose search sharedSeen holds: the map and start cell, or null since freshReach. */
 let sharedMap: WorldMap | null = null;
 let sharedAx = 0;
 let sharedAy = 0;
+
+// A bounded table per map. Verify the current open-cell rows on a hit: digging,
+// refilling, builder edits and direct writes to chunk arrays are all visible.
+interface ReachWindow {
+  x: number;
+  y: number;
+  open: Int32Array;
+  seen: Int32Array;
+}
+const reachWindows = new WeakMap<WorldMap, ReachWindow[]>();
 
 /** Forget the shared search: call before an ant's sensors ask inReachShared (perceive), so no answer outlives a change of soil. */
 export function freshReach(): void {
@@ -165,13 +174,36 @@ export function inReachShared(map: WorldMap, x0: number, y0: number, x1: number,
   const bx = CELL[0];
   const by = CELL[1];
   cellOf(x0, y0);
-  const ax = CELL[0];
-  const ay = CELL[1];
+  return inReachSharedCells(map, CELL[0], CELL[1], bx, by);
+}
+
+// The short hex lines the sensors can ask for, indexed by their start row's parity and end offset.
+const sensorLines = [0, 1].map((parity) =>
+  Array.from({ length: SHARED_W * SHARED_W }, (_, i) => {
+    const dx = (i % SHARED_W) - SENSE_STEPS;
+    const dy = Math.floor(i / SHARED_W) - SENSE_STEPS;
+    const line = hexLine(0, parity, dx, dy + parity);
+    for (let k = 1; k < line.length; k += 2) line[k] -= parity;
+    return line;
+  }),
+);
+
+/** The same reach check when the sensor has already identified both hex cells. */
+export function inReachSharedCells(map: WorldMap, ax: number, ay: number, bx: number, by: number): boolean {
   if (ax === bx && ay === by) return true;
   if (hexDistance(ax, ay, bx, by) > SENSE_STEPS) return false;
   const top = topRow(map);
-  if (straightReach(map, ax, ay, bx, by, top)) return true;
-  if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) searchWindow(map, ax, ay, top);
+  if (sharedMap !== map || sharedAx !== ax || sharedAy !== ay) {
+    // Any unobstructed shortest path can answer yes. For a blocked line the search still tries all other paths.
+    const line = sensorLines[ay & 1]![(by - ay + SENSE_STEPS) * SHARED_W + bx - ax + SENSE_STEPS]!;
+    let k = 2;
+    for (; k < line.length; k += 2) {
+      const y = ay + line[k + 1]!;
+      if (rockAt(map, ax + line[k]!, y) !== OPEN || y < top) break;
+    }
+    if (k === line.length) return true;
+    searchWindow(map, ax, ay, top);
+  }
   // Within SENSE_STEPS of (ax, ay) (checked above), so inside the window.
   return ((sharedSeen[by - ay + SENSE_STEPS]! >> (bx - ax + SENSE_STEPS)) & 1) === 1;
 }
@@ -203,30 +235,50 @@ function searchWindow(map: WorldMap, ax: number, ay: number, top: number): void 
       }
     }
     sharedOpen[k] = bits;
-    sharedSeen[k] = 0;
   }
-  sharedSeen[S] = 1 << S;
-  for (let step = 0; step < S; step++) {
-    for (let k = 0; k < SHARED_W; k++) {
-      const m = sharedSeen[k]!;
-      // The same row: east and west.
-      let nb = (m << 1) | (m >> 1);
-      // The rows above and below: from a cell on an even row, the cells x − 1 and x; on an odd row, x and x + 1 (hex.ts NX).
-      if (k > 0) {
-        const u = sharedSeen[k - 1]!;
-        nb |= ((ay + k - 1 - S) & 1) === 0 ? u | (u >> 1) : u | (u << 1);
-      }
-      if (k < SHARED_W - 1) {
-        const d = sharedSeen[k + 1]!;
-        nb |= ((ay + k + 1 - S) & 1) === 0 ? d | (d >> 1) : d | (d << 1);
-      }
-      sharedNext[k] = m | (nb & sharedOpen[k]! & SHARED_FULL);
-    }
-    sharedSeen.set(sharedNext);
-  }
+  let windows = reachWindows.get(map);
+  if (!windows) reachWindows.set(map, (windows = []));
+  const slot = (Math.imul(ax, 31) + ay) & 255;
+  let entry = windows[slot];
   sharedMap = map;
   sharedAx = ax;
   sharedAy = ay;
+  if (entry?.x === ax && entry.y === ay) {
+    let row = 0;
+    while (row < SHARED_W && entry.open[row] === sharedOpen[row]) row++;
+    if (row === SHARED_W) {
+      sharedSeen.set(entry.seen);
+      return;
+    }
+  }
+  sharedSeen.fill(0);
+  sharedSeen[S] = 1 << S;
+  for (let spread = 1; spread <= S; spread++) {
+    // Until this round, rows outside S ± (spread − 1) were all zero. Carry the old row
+    // forward in a register so expanding a row never reads another row's new bits.
+    const first = S - spread;
+    const last = S + spread;
+    let above = 0;
+    let current = sharedSeen[first]!;
+    let changed = false;
+    for (let k = first; k <= last; k++) {
+      const below = k < last ? sharedSeen[k + 1]! : 0;
+      const across = (current << 1) | (current >> 1);
+      const adjacent = above | below;
+      const diagonal = (ay + k - S) & 1 ? adjacent >> 1 : adjacent << 1;
+      const next = current | ((across | adjacent | diagonal) & sharedOpen[k]! & SHARED_FULL);
+      changed ||= next !== current;
+      sharedSeen[k] = next;
+      above = current;
+      current = below;
+    }
+    if (!changed) break; // no frontier remains
+  }
+  if (!entry) windows[slot] = entry = { x: ax, y: ay, open: new Int32Array(SHARED_W), seen: new Int32Array(SHARED_W) };
+  entry.x = ax;
+  entry.y = ay;
+  entry.open.set(sharedOpen);
+  entry.seen.set(sharedSeen);
 }
 
 /**

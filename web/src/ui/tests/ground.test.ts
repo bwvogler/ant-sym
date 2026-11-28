@@ -379,7 +379,7 @@ function columnCell(g: Game, s: number): [number, number] {
   return [CELL[0], CELL[1]];
 }
 
-test("the side view's strip: the plane cell under each column of the line, its ground and the mound's cut, painted in the chunk that holds the strip's row and always afresh", () => {
+test("the side view's strip: the plane cell under each column of the line, its ground and the mound's cut, repainted when the projected plane changes", () => {
   const g = buildGame({ species: "generic", seed: 3, antCount: 20, rival: true, generation: 0 });
   const { plane, curtain } = g.world;
   const s = g.world.line.sHole[0]! + 3;
@@ -412,9 +412,10 @@ test("the side view's strip: the plane cell under each column of the line, its g
     "the buffer reaches the canvas",
   );
   f.ground.paintChunk(f.k, SHOW, cx, 0, cc, rc, false);
-  assert.deepEqual([f.ground.paints, f.ground.hits], [2, 0], "the strip's chunk is never served from the cache");
+  assert.deepEqual([f.ground.paints, f.ground.hits], [1, 1], "unchanged projected terrain reuses the chunk");
   plane.spoil!.set(mx, my, 99);
   f.ground.paintChunk(f.k, SHOW, cx, 0, cc, rc, false);
+  assert.deepEqual([f.ground.paints, f.ground.hits], [2, 1], "a change on the plane repaints the strip");
   assert.deepEqual(px(cc.img, lx(s + 3), 0), [...THEME.spoil, 255], "a tall mound's cut reaches the top of the sky (STRIP levels)");
   // stripAt: the same, one cell at a time
   plane.spoil!.set(mx, my, 3);

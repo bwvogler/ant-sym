@@ -65,6 +65,35 @@ export function weightedValid(answer: string, ok: (choice: string) => boolean): 
   return w !== null && w.length > 0 && w.every(([c]) => ok(c));
 }
 
+interface Distribution {
+  temperature: number;
+  weights: [string, number][];
+  total: number;
+}
+
+// Many ants draw from the same answers every tick. Keep the last temperature used for each answer.
+const DISTRIBUTION_LIMIT = 1024;
+const distributions = new Map<string, Distribution>();
+
+function distributionOf(answer: string, temperature: number): Distribution | undefined {
+  const cached = distributions.get(answer);
+  if (cached?.temperature === temperature) return cached;
+  if (!isWeighted(answer)) return undefined;
+  const weights = weightsOf(answer);
+  if (!weights || weights.length < 2) return undefined;
+  let total = 0;
+  for (const entry of weights) {
+    if (temperature !== 1) entry[1] = entry[1] ** (1 / temperature);
+    total += entry[1];
+  }
+  if (!cached && distributions.size >= DISTRIBUTION_LIMIT) {
+    distributions.delete(distributions.keys().next().value!);
+  }
+  const distribution = { temperature, weights, total };
+  distributions.set(answer, distribution);
+  return distribution;
+}
+
 /**
  * The option to act on: one drawn by its probability, sharpened or flattened by the temperature (p^(1/T): 1 as Jev gave
  * it, under 1 toward its choice, over 1 toward even; `draw.temperature` unless given), with `draw()` called exactly once.
@@ -76,17 +105,19 @@ export function pick(
   draw?: (() => number) & { readonly temperature?: number },
   temperature = draw?.temperature ?? 1,
 ): string {
-  if (!draw || !isWeighted(answer) || !(temperature > 0)) return topOf(answer);
-  const w = weightsOf(answer);
-  if (!w || w.length < 2) return topOf(answer); // a certain answer ("return=1") is not drawn from
-  const scaled = temperature === 1 ? w.map(([, p]) => p) : w.map(([, p]) => p ** (1 / temperature));
-  const total = scaled.reduce((a, b) => a + b, 0);
-  let u = draw() * total;
-  for (let k = 0; k < w.length; k++) {
-    u -= scaled[k]!;
-    if (u < 0) return w[k]![0];
+  if (!draw || !(temperature > 0)) return topOf(answer);
+  const distribution = distributionOf(answer, temperature);
+  if (!distribution) return topOf(answer); // a certain answer ("return=1") is not drawn from
+  return sampleDistribution(distribution, draw());
+}
+
+function sampleDistribution({ weights, total }: Distribution, uniform: number): string {
+  let u = uniform * total;
+  for (const [choice, weight] of weights) {
+    u -= weight;
+    if (u < 0) return choice;
   }
-  return w[w.length - 1]![0];
+  return weights[weights.length - 1]![0];
 }
 
 /**
@@ -101,10 +132,15 @@ export interface AntDraw {
   readonly temperature: number;
 }
 
-/** A uniform in [0, 1) from a string (FNV-1a, then murmur3's finaliser so that near strings land far apart). */
-export function unitOf(text: string): number {
-  let h = 0x811c9dc5;
+/** The FNV-1a state after reading text, optionally continuing a prefix. */
+export function hashText(text: string, h = 0x811c9dc5): number {
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return h;
+}
+
+/** A uniform in [0, 1) from a string (FNV-1a, then murmur3's finaliser so that near strings land far apart). */
+export function unitOf(text: string, prefix?: number): number {
+  let h = hashText(text, prefix);
   h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
   h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
@@ -113,6 +149,8 @@ export function unitOf(text: string): number {
 /** `pick` for a response: drawn with the ant's draw for `salt` (once), or with no draw Jev's choice. */
 export function pickFor(answer: string, draw: AntDraw | undefined, salt: string): string {
   if (!draw) return topOf(answer);
-  const one = () => draw(salt);
-  return pick(answer, Object.assign(one, { temperature: draw.temperature }));
+  const temperature = draw.temperature;
+  if (!(temperature > 0)) return topOf(answer);
+  const distribution = distributionOf(answer, temperature);
+  return distribution ? sampleDistribution(distribution, draw(salt)) : topOf(answer);
 }

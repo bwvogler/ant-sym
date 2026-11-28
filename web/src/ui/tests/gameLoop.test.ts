@@ -5,6 +5,7 @@ import { fakeEnv } from "./fakeFrames.ts";
 import { buildGame, DEFAULT_COLONY_CONTROLS } from "../useColony.ts";
 import type { Journal } from "../../colony/index.ts";
 import { decisionsOf } from "../stats.ts";
+import type { SimTasks } from "../simTasks.ts";
 import type { GameSettings } from "../saves.ts";
 
 // The frame loop without React or a browser (ja-fnd.6.1): the page's requestAnimationFrame is a hand-driven env, so a test steps
@@ -63,6 +64,85 @@ test("play, pause and speed changes go on without stopping the loop (no cancel, 
   clock.frames(2);
   assert.equal(clock.calls.cancel, 0, "nothing was torn down");
   assert.equal(clock.calls.request, 1 + 3, "the start's request and one per frame");
+});
+
+test("expensive simulation yields to frame listeners without carrying a backlog", () => {
+  const { game, clock, loop, frame } = make({ speed: 4 });
+  const wall = clock.env.now;
+  let spent = 0;
+  clock.env.now = () => wall() + spent;
+  const ticks = recordTicks(game);
+  const drawn: number[] = [];
+  // Include post-tick sight and journal work in the frame budget.
+  const stopCost = loop.onStep(() => (spent += 20));
+  frame.add(() => {
+    drawn.push(ticks.length);
+    spent = 0;
+  });
+  loop.start();
+  clock.frames(2, 50);
+  assert.deepEqual(drawn, [1, 2], "one expensive tick per frame");
+  assert.ok(ticks.every((dt) => dt <= MAX_STEP));
+  // After the costly subscriber stops, only the current frame's wall time is owed.
+  stopCost();
+  clock.frame(50);
+  assert.deepEqual(drawn, [1, 2, 8], "six ticks for the current frame only");
+});
+
+test("independent tasks advance the full game between frames, and pause, hide and stop drop pending work", () => {
+  const game = buildGame(SETTINGS);
+  const clock = fakeEnv();
+  let now = 0;
+  clock.env.now = () => now;
+  const pending = new Set<() => void>();
+  const schedule: SimTasks = (_delay, run) => {
+    pending.add(run);
+    return () => void pending.delete(run);
+  };
+  const pump = (ms: number) => {
+    now += ms;
+    assert.equal(pending.size, 1);
+    const run = [...pending][0]!;
+    pending.delete(run);
+    run();
+  };
+  let flights = 0;
+  let steps = 0;
+  const loop = new GameLoop(game, null, { playing: true, speed: 4, onFlight: () => flights++, env: clock.env, simTasks: schedule });
+  const ticks = recordTicks(game);
+  loop.onStep(() => steps++);
+  loop.start();
+  pump(10);
+  pump(10);
+  assert.deepEqual(ticks, [MAX_STEP, MAX_STEP], "the scheduler runs before any animation frame");
+  assert.equal(steps, ticks.length, "all simulation subscribers run normally");
+  clock.frame();
+  assert.equal(ticks.length, 2, "render frames never tick in this mode");
+
+  loop.set(false, 4);
+  assert.equal(pending.size, 0);
+  now += 5000;
+  loop.set(true, 2);
+  pump(10);
+  assert.equal(ticks.length, 2, "paused wall time was dropped and the lower speed is used");
+  loop.setVisible(false);
+  assert.equal(pending.size, 0);
+  now += 5000;
+  loop.setVisible(true);
+  pump(18);
+  assert.equal(ticks.length, 3, "hidden wall time was dropped");
+
+  const c = game.colonies[0]!;
+  game.flights.push({ mother: 0, x: c.nest.x, y: c.nest.y, load: 0, strain: 0, at: game.time, food: 1 });
+  pump(100);
+  assert.equal(ticks.length, 4, "work stops after the first tick with a flight even with overdue steps");
+  assert.equal(flights, 1);
+  assert.equal(pending.size, 0);
+  game.flights.length = 0;
+  loop.set(true, 4);
+  assert.equal(pending.size, 1);
+  loop.stop();
+  assert.equal(pending.size, 0);
 });
 
 test("stop cancels the pending frame and stops the frames; start again goes on", () => {

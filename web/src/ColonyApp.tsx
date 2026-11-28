@@ -1,3 +1,7 @@
+import { PacePanel } from "./ui/PacePanel.tsx";
+import { paceFromUrl, trailVariantFromUrl } from "./ui/playbackOptions.ts";
+import { PerformancePanel } from "./ui/PerformancePanel.tsx";
+import { pageProfile } from "./ui/pageProfile.ts";
 import {
   CURTAIN,
   curtainLayerOf,
@@ -105,6 +109,8 @@ type DrawerId = "fungus" | "evolve" | "colonies" | "saves" | "settings";
 
 /** The speeds the HUD offers (4× is the game's default; PRD §50); the Lab's World tab has the slider for the rest. */
 const SPEEDS = [1, 2, 4, MAX_SPEED] as const;
+
+const paceVariant = paceFromUrl() ? trailVariantFromUrl() : null;
 
 export default function ColonyApp() {
   const colony = useColony();
@@ -381,6 +387,26 @@ function Page({ colony }: { colony: ReturnType<typeof useColony> }) {
     });
   return (
     <main className="fixed inset-0 overflow-hidden bg-ground text-fg">
+      {paceVariant && (
+        <PacePanel
+          variant={paceVariant}
+          game={game}
+          view={controls.view}
+          speed={controls.speed}
+          canStart={controls.started && controls.playing}
+          onFrame={onFrame}
+        />
+      )}
+      {pageProfile && (
+        <PerformancePanel
+          profile={pageProfile}
+          seed={settings.seed}
+          view={controls.view}
+          requestedSpeed={controls.speed}
+          startingAntsPerColony={settings.antCount}
+          canStart={controls.started && controls.playing}
+        />
+      )}
       {/* The stage: the map and all over it. In Lab mode it gives the workbench the bottom of the screen (PRD §69.7). */}
       <div className={`absolute inset-x-0 top-0 ${lab ? "bottom-[42dvh]" : "bottom-0"}`}>
         <div className="absolute inset-0">
