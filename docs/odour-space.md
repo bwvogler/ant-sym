@@ -130,7 +130,7 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
 2. **The learned foe, not explicit repulsion** (decided). Not supported by any source read, and Frizzi 2015 goes against explicit repulsion.
 3. **Symmetric distance** by default (decided); one-sided is a later setting.
 4. **Kin neighbours:** moot at K = 4 (about 4.4% of pairs); wild odours stay a pure hash per axis.
-5. **To measure:** the S0 assays; the kin share against the real neighbours the endless world makes (not uniform draws); the bench.
+5. **Measured (S0, `ja-zg1u.2`, 2026-11-28; PRD §91 has the table):** against the real endless-world neighbours (seeds 1-10, confirmed on 11-20) K = 4 gives kin 0.043 of neighbour pairs and 98.9% of wild colonies strangers to both start colonies (worst seed 98.2%): the over-95% target is met. The 78 mutual strangers is a random packing that depends on the draws tried (4,000 draws: 81; 40,000: 96; 200,000: 105), so it is a lower figure; a world's own sites hold about 54, and one border at most 7. **The own-nest invariant fails at K >= 2 under today's rule (worst 0.50, 0.61, 0.70) and the planned 0.3 cap alone still fails by band rounding (worst 0.384 at K = 4): S2 must cap at 0.35 - sqrt(K) x 0.05 or use finer bands (`ja-zg1u.4`).** The recognition tick costs 0.03 / 0.05 / 0.22 ms at 10 / 100 / 1,000 occupied cells (0.5 ms with all bands occupied); budget in PRD §91.
 
 ## What this note has not read
 
