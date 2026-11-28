@@ -8,7 +8,7 @@ import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
 import {
   type BandsSave,
-  DEFAULT_RECOGNITION,
+  GAME_ODOUR_AXES,
   driftAimVec,
   driftDirection,
   odourDistance,
@@ -461,9 +461,9 @@ export class Game {
     this.#rng = rng;
     // Fights are judged by the recognition's tolerance: a species' own (the invasive garden ant's one supercolony: ja-e668.3) unless the game
     // names one. Every colony of a game is its species, so the game takes it from there.
-    const axes = params.recognition?.odourAxes ?? DEFAULT_RECOGNITION.odourAxes;
+    const axes = params.recognition?.odourAxes ?? GAME_ODOUR_AXES;
     const tol = this.params.species.neverStranger ? Math.sqrt(axes) : this.params.species.params.tolerance;
-    const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
+    const recognition = { odourAxes: GAME_ODOUR_AXES, ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
     this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
     // Every layer's recognition (one world's curtain too) takes the same tolerance.

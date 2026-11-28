@@ -233,11 +233,14 @@ export interface RecognitionParams {
   nestDrift: number;
   /** seconds between odour steps (Game.tick) */
   interval: number;
-  /** how many numbers an odour is, game-wide (the game's default is 4, S2 of docs/odour-space.md, PRD §91; 1 is the scalar odour of every game before it, kept for the tests that pin it); at most MAX_AXES */
+  /** how many numbers an odour is, game-wide (a Game's default is GAME_ODOUR_AXES; 1 is the scalar odour of every game before S2); at most MAX_AXES */
   odourAxes: number;
 }
 
-export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1, odourAxes: 4 };
+export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1, odourAxes: 1 };
+
+/** The odour axes a Game plays with unless its settings say otherwise (S2 of docs/odour-space.md, PRD §91; owner, 2026-11-25). A Recognition or Colony built alone keeps one, so the tests that pin the scalar rule still run it. */
+export const GAME_ODOUR_AXES = 4;
 
 /** Seconds for a daughter colony's odour to drift most of the way from her mother's (ja-lo8.9.1, Colony.odourAim). */
 export const ODOUR_DRIFT = 500;

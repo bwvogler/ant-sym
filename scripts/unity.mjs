@@ -79,7 +79,7 @@ async function work() {
   const { seed, ants, seconds } = workerData;
   const { CURTAIN } = await import("../web/src/colony/index.ts");
   const { STRAINS } = await import("../web/src/colony/index.ts");
-  const { GAME_REGROW, Game, gameRng } = await import("../web/src/colony/index.ts");
+  const { GAME_REGROW, Game, gameRng, odourDistance } = await import("../web/src/colony/index.ts");
   const { CELL, cellOf, discOffsets } = await import("../web/src/colony/index.ts");
   const { generateOneWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
@@ -133,7 +133,7 @@ async function work() {
         const o = ring[cy & 1];
         let met = false;
         game.colonies.forEach((d, di) => {
-          if (met || di === ci || Math.abs(c.odourAt(i) - d.nestOdour) > tol) return;
+          if (met || di === ci || odourDistance(c.odourAxes, c.odour, i * c.odourAxes, d.nestVec, 0) > tol) return;
           for (let j = 0; j < o.length && !met; j += 2) if (occ[l][di].get((cy + o[j + 1]) * 65536 + cx + o[j])) met = true;
         });
         if (met) contact[l] += 1;

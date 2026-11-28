@@ -100,7 +100,7 @@ export function gridsFromLiving(g: Game): GameSave["grids"] {
   return {
     counts: g.layers.map((_, l) => g.colonies.map((c) => occupancy(c, new CountGrid(), one ? -1 : l).saveState())),
     bands: g.layers.map((_, l) => {
-      const r = new Recognition();
+      const r = new Recognition({ odourAxes: g.recognition.params.odourAxes });
       r.build(g.colonies, one ? -1 : l);
       return r.saveBands();
     }),

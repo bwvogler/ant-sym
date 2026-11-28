@@ -1,13 +1,13 @@
 // Offline, no key, no spend (ja-zg1u.2, S0, PRD §91, docs/odour-space.md): the odour-space assays that need no game, measuring what K = 1..4 odour axes
 // would do to the wild world the endless plane really makes. Nothing here changes behaviour: it reads the plane (generateEndlessWorld, plane.sitesIn) and
 // computes the symmetric distance d = sqrt(sum_k (o_k - t_k)^2) > TOLERANCE + STRANGER_EPS (the owner's choice, 2026-11-28; K = 1 is today's |o - t|).
-//   Wild site axis k odour = hash01(seed, 101 + k, rx, ry) (axis 0 is today's salt 101); the start colonies sit on the main diagonal, (0,..,0) and (1,..,1).
+//   Wild site axis k odour = hash01(seed, odourSalt(k), rx, ry) (salt 101 for axis 0, 201 up for the rest: S2, PRD §91; S0 used 101 + k); the start colonies sit on the main diagonal, (0,..,0) and (1,..,1).
 //   Neighbours = wild site pairs within DEFAULT_SLEEP.distance (W = 280, the wake distance), over the sites in a box of ±BOX units round the origin.
 // Per K it prints: kin share among neighbour pairs; share of wild colonies that are strangers to BOTH start colonies; the largest mutual-stranger set:
 //   (a) in the unit cube by random packing (the note's ~78 at K = 4: draws accepted while a stranger to every accepted one), (b) among a world's sites, and
 //   (c) among one site and its neighbours (the most any single border holds). Also the uniform-draw Monte Carlo the note's table came from, for comparison.
 // Usage, from the repo root: node scripts/lab/odour-space.mjs [--seeds 1-10] [--box 3000] [--pack 40] [--draws 40000]
-import { DEFAULT_SLEEP, generateEndlessWorld, hash01, STRANGER_EPS, TOLERANCE } from "../../web/src/colony/index.ts";
+import { DEFAULT_SLEEP, generateEndlessWorld, hash01, odourSalt, STRANGER_EPS, TOLERANCE } from "../../web/src/colony/index.ts";
 
 const arg = (name, dflt) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -69,7 +69,7 @@ for (let seed = s0; seed <= s1; seed++) {
       }
   for (const K of KS) {
     const r = rows[K];
-    const v = sites.map((s) => Array.from({ length: K }, (_, k) => hash01(seed, 101 + k, s.rx, s.ry)));
+    const v = sites.map((s) => Array.from({ length: K }, (_, k) => hash01(seed, odourSalt(k), s.rx, s.ry)));
     const lo = Array(K).fill(0);
     const hi = Array(K).fill(1);
     let kin = 0;

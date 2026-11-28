@@ -179,7 +179,7 @@ test("ants at matching coordinates on different layers cannot attack each other"
     c.attackLayer[0] = k;
     put(c, 0, 20, 20);
   });
-  const rec = new Recognition();
+  const rec = new Recognition({ odourAxes: g.recognition.params.odourAxes });
   rec.build(g.colonies, 0);
   const grids = g.colonies.map((c) => occupancy(c, new CountGrid(), 0));
   assert.deepEqual(
