@@ -133,6 +133,8 @@ test("plane ants over the strip, and the crumbs on the carriers, are drawn only 
   const colony = {
     n: 2,
     nestOdour: 0,
+    nestVec: [0],
+    odourAxes: 1,
     alive: Uint8Array.of(1, 1),
     layer: Uint8Array.of(PLANE, PLANE),
     carrying: Uint8Array.of(1, 1),

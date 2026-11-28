@@ -4,7 +4,7 @@
 // context. It leaves the 2D context's state as the frame's old inline code did (docs/field-split.md, "the canvas state": the next colony's
 // nest stage sets its own widths and alpha, and the strip's ants after the last colony set theirs).
 
-import { BINS, binOf, type Colony, INFECTED } from "../../colony/index.ts";
+import { BINS, bandKey, binCentre, binOf, type Colony, INFECTED } from "../../colony/index.ts";
 import { toScreen } from "../camera.ts";
 import { decayStage } from "../cadaverVisual.ts";
 import { carriedBroodOn } from "../mapCargo.ts";
@@ -13,7 +13,7 @@ import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite, foodKind } from "../resourceSprites.ts";
 import { drawWorkerSprite, workerLod } from "../workerSprites.ts";
 import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
-import { odourColour } from "./colour.ts";
+import { odourToneRgb, quantiseTone, type Rgb } from "./colour.ts";
 import type { FieldCtx } from "./ctx.ts";
 import type { NestFrame } from "./nests.ts";
 import { HEX_ZOOM } from "./zoom.ts";
@@ -22,6 +22,46 @@ import { HEX_ZOOM } from "./zoom.ts";
 export interface AntFrame extends NestFrame {
   half: number;
   crumb: number;
+}
+
+/** The tones of a colony's ants on layer `lv`: each ant's tone key (`of`), and the colour of each key in view, in key order. */
+export interface AntTones {
+  of: Int32Array;
+  rgb: Map<number, Rgb>;
+}
+
+/**
+ * One axis: the ant's band of odour is its tone (the key), the colour as ever from ink to the warn tone. More axes: the colour of its band's centre
+ * (the vector of a band: ants whose odours are in one band are one colour), on the grid of quantiseTone, and the key that colour. The colours of
+ * bands are worked out once a frame (a band takes a Lab conversion), not once an ant.
+ */
+export function antTones(theme: FieldCtx["theme"], col: Colony, lv: number): AntTones {
+  const K = col.odourAxes;
+  const of = new Int32Array(col.n);
+  const byBand = new Map<number, number>();
+  const found = new Map<number, Rgb>();
+  const centre = new Float64Array(K);
+  for (let i = 0; i < col.n; i++) {
+    if (!col.alive[i] || col.layer[i] !== lv) continue;
+    const band = bandKey(col.odour, i * K, K);
+    let key = byBand.get(band);
+    if (key === undefined) {
+      let rgb: Rgb;
+      if (K === 1) {
+        const b = binOf(col.odourAt(i));
+        key = b;
+        rgb = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1))) as Rgb;
+      } else {
+        for (let k = 0; k < K; k++) centre[k] = binCentre(binOf(col.odourAt(i, k)));
+        rgb = quantiseTone(odourToneRgb(theme.inkRgb, theme.warnRgb, centre, 0, K));
+        key = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
+      }
+      byBand.set(band, key);
+      found.set(key, rgb);
+    }
+    of[i] = key;
+  }
+  return { of, rgb: new Map([...found].sort((x, y) => x[0] - y[0])) };
 }
 
 /** Draw colony `col`'s ants on the shown layer. */
@@ -40,17 +80,15 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
   // A front-facing curtain worker is the same silhouette as the aerial worker against its walking plane.
   // The surface strip is a separate diagrammatic projection, not another underground population.
   const lod = workerLod(c.zoom, d);
-  // One stroke per odour band (most frames: one band per colony).
-  let bands = 0;
-  for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === lv) bands |= 1 << binOf(col.odourAt(i));
-  for (let b = 0; b < BINS; b++) {
-    if (!(bands & (1 << b))) continue;
-    const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
+  // One stroke per tone: one axis, a band of odour (most frames: one band per colony); more axes, a band of the vector, shown as one colour on a
+  // grid (quantiseTone), so the strokes and the sprites stay few.
+  const tones = antTones(theme, col, lv);
+  for (const [tone, colour] of tones.rgb) {
     const sprite = hexes ? workerSprites.get(lod, colour, darkSprites) : null;
     const spriteMix = sprite ? Math.min(1, (zoom - HEX_ZOOM) / 2) : 0;
     ctx.beginPath();
     for (let i = 0; i < col.n; i++) {
-      if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odourAt(i)) !== b || !inView(col.x[i], col.y[i])) continue;
+      if (!col.alive[i] || col.layer[i] !== lv || tones.of[i] !== tone || !inView(col.x[i], col.y[i])) continue;
       const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
       if (sprite && spriteMix > 0) {
         ctx.globalAlpha = spriteMix * dim;
@@ -70,7 +108,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
     if (spriteMix < 1) {
       ctx.beginPath();
       for (let i = 0; i < col.n; i++) {
-        if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odourAt(i)) !== b || !inView(col.x[i], col.y[i])) continue;
+        if (!col.alive[i] || col.layer[i] !== lv || tones.of[i] !== tone || !inView(col.x[i], col.y[i])) continue;
         const [x, y] = toScreen(c, v, col.x[i], col.y[i]),
           co = Math.cos(col.heading[i]),
           si = Math.sin(col.heading[i]),
@@ -80,7 +118,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
         ctx.moveTo(ax - si * w, ay + co * w);
         ctx.lineTo(ax + si * w, ay - co * w);
       }
-      ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, b / (BINS - 1));
+      ctx.strokeStyle = `rgb(${colour[0]}, ${colour[1]}, ${colour[2]})`;
       ctx.stroke();
     }
   }

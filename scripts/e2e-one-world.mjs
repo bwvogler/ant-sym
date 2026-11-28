@@ -53,6 +53,8 @@
 //     cap 6 at 600 ants, flight 280, "Start" where a bounded map says "Whole map"); the camera pans 20 U with no clamp and the minimap's window follows;
 //     a click and the lens 20 U from the nests make no chunk; a save says its world and loads as it (an endless one on a page asked for the bounded world,
 //     a bounded one on the default page); the fog reveals ground at negative y; frame times, printed beside the bounded game's under the same conditions.
+//  20. the colour of a four-axis odour (PRD §91, ja-zg1u.8): two colonies that are strangers but agree on axis 0 are drawn in different colours on the field and the minimap; a
+//     followed ant's card shows its four odour axes against its nest's and the tolerance.
 // Sections 1–18 are the bounded game's: they open the page with `?world=bounded`.
 // Steps 1–6 start without the tutorial (each context is a fresh browser, where Start would run it).
 // No fixed waits before a camera is read: each is polled until it holds still or is where it should be.
@@ -68,6 +70,8 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { binCentre, binOf } from "../web/src/colony/index.ts";
+import { nestRgb, odourRgb, odourToneRgb, quantiseTone } from "../web/src/ui/field/colour.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
@@ -3025,6 +3029,118 @@ try {
     await card.getByRole("button", { name: "Follow it", exact: true }).click();
     await until(async () => /groom it/.test((await card.textContent()) ?? ""), "the watch card on the endless world");
     await tc.close();
+  }
+  // ——— 20. The colour of a four-axis odour (ja-zg1u.8, PRD §91) ———
+  // The page colours a colony by all four of its odour numbers, not the first alone: two colonies that are strangers by the other three axes are drawn in
+  // different colours on the field (the ants' strokes) and on the minimap (their dots). The second colony is made a stranger of the first that agrees with it on
+  // axis 0 ((0, 0, 0, 0) against (0, 1, 1, 1), sqrt(3) = 1.7 apart): the old reading, by axis 0, drew them in one colour.
+  section("20. the colour of a four-axis odour");
+  {
+    const { c: oc, p: op } = await openEndless("?fog=0");
+    await op.getByRole("button", { name: "Pause", exact: true }).click();
+    check((await op.evaluate(() => window.jevAnts.game.colonies[0].odourAxes)) === 4, "the endless page's colonies smell in four axes");
+    const theme = await op.evaluate(() => {
+      const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+      return { ink: css("--ink"), warn: css("--warn") };
+    });
+    const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const [ink, warn] = [hexRgb(theme.ink), hexRgb(theme.warn)];
+    const odours = [
+      [0, 0, 0, 0],
+      [0, 1, 1, 1],
+    ];
+    check(odours[0][0] === odours[1][0], "the two odours agree on axis 0, where the old colouring looked");
+    check(
+      odourRgb(ink, warn, odours[0][0]).join() === odourRgb(ink, warn, odours[1][0]).join(),
+      "so the old colouring drew the two colonies in one colour",
+    );
+    // What the page should draw: a colony's nest and dot in the tone of its nest odour (the minimap), an ant's stroke in the tone of its band's centre on the grid.
+    const nestTone = odours.map((o) => nestRgb(ink, warn, { nestVec: o, odourAxes: 4 }));
+    const antTone = odours.map((o) =>
+      quantiseTone(
+        odourToneRgb(
+          ink,
+          warn,
+          o.map((v) => binCentre(binOf(v))),
+          0,
+          4,
+        ),
+      ),
+    );
+    const css = (t) => `rgb(${t[0]}, ${t[1]}, ${t[2]})`;
+    check(
+      nestTone[0].join() !== nestTone[1].join() && antTone[0].join() !== antTone[1].join(),
+      "the four-axis tones of the two colonies differ",
+    );
+    // Put each colony's ants in view, a way apart (the minimap draws the first colony's over the second's on one pixel), the camera on them, zoomed out of the sprites.
+    await op.evaluate(
+      ([odours]) => {
+        const g = window.jevAnts.game;
+        const cam = window.jevAnts.camera("above");
+        cam.zoom = 6;
+        odours.forEach((o, k) => {
+          const c = g.colonies[k];
+          c.nestVec.set(o);
+          let put = 0;
+          for (let i = 0; i < c.n && put < 3; i++) {
+            if (!c.alive[i]) continue;
+            c.odour.set(o, i * c.odourAxes);
+            c.putAnt(i, 0, cam.x + (k === 0 ? -20 : 20) + put * 3, cam.y);
+            put++;
+          }
+        });
+        // Record every stroke colour the field sets and every minimap pixel colour it paints, from here.
+        window.__strokes = new Set();
+        window.__wanted = [];
+        window.__found = {};
+        const proto = CanvasRenderingContext2D.prototype;
+        const d = Object.getOwnPropertyDescriptor(proto, "strokeStyle");
+        Object.defineProperty(proto, "strokeStyle", {
+          ...d,
+          set(v) {
+            window.__strokes.add(String(v));
+            d.set.call(this, v);
+          },
+        });
+        const put = proto.putImageData;
+        proto.putImageData = function (img, ...rest) {
+          const px = img.data;
+          for (let i = 0; i < px.length; i += 4)
+            for (const w of window.__wanted)
+              if (px[i] === w[0] && px[i + 1] === w[1] && px[i + 2] === w[2] && px[i + 3] === 255)
+                window.__found[w.join()] = (window.__found[w.join()] ?? 0) + 1;
+          return put.call(this, img, ...rest);
+        };
+      },
+      [odours],
+    );
+    await op.evaluate((w) => void (window.__wanted = w), nestTone);
+    await sleep(500); // a few frames: the field and the minimap draw what is now there
+    await op.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
+    const strokes = await op.evaluate(() => [...window.__strokes]);
+    check(strokes.includes(css(antTone[0])), `the field strokes colony 0's ants in ${css(antTone[0])}`);
+    check(strokes.includes(css(antTone[1])), `and colony 1's, a stranger that shares its axis 0, in ${css(antTone[1])}: another colour`);
+    const found = await op.evaluate(() => window.__found);
+    check((found[nestTone[0].join()] ?? 0) > 0, `the minimap paints colony 0's dots in ${css(nestTone[0])}`);
+    check((found[nestTone[1].join()] ?? 0) > 0, `and colony 1's in ${css(nestTone[1])}: another colour`);
+    // The ant's card and the Lab's Odour card show the four numbers beside the tone.
+    await op.evaluate(() => {
+      const g = window.jevAnts.game;
+      const c = g.colonies[1];
+      const i = [...Array(c.n).keys()].find((j) => c.alive[j]);
+      window.jevAnts.follow(1, i);
+    });
+    const card = op.getByRole("region", { name: "followed ant" });
+    await until(async () => (await card.getByLabel("the ant's odour").count()) === 1, "the followed ant's odour readout", 5000, 100);
+    check(
+      (await card.getByRole("group", { name: "odour axes" }).locator("[data-axis]").count()) === 4,
+      "the followed ant's card shows its four odour axes",
+    );
+    check(
+      /from its nest, (within|past) the tolerance 0\.35: a (nestmate|stranger)/.test((await card.textContent()) ?? ""),
+      "and its distance to its nest against the tolerance",
+    );
+    await oc.close();
   }
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join("; ")}` : ""}`);
   console.log(`e2e-one-world: all passed in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

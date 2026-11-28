@@ -5,9 +5,10 @@ import { ESCAPE_LAYER, useEscape } from "./escape.ts";
 import { History, niceMax, perColony } from "./history.ts";
 import HistoryChart from "./HistoryChart.tsx";
 import { Icon } from "./kit.tsx";
-import { Debug, FungusNumbers, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
+import { Debug, FungusNumbers, OdourCard, JevCard, JournalCard, Lab as Levers, type LabProps, World } from "./LabCards.tsx";
 import { closeLab, type LabTab, type LabTarget, openLab, useLab } from "./labStore.ts";
 import { colonyName } from "./names.ts";
+import { axesOf, gapTitle, odourSpan } from "./odourScale.ts";
 import PolicyTab, { type PolicyProps } from "./PolicyTab.tsx";
 import { useGameRead, useSimTick } from "./session.ts";
 
@@ -168,7 +169,7 @@ export default function LabBench(
         role="tabpanel"
         aria-label={TABS.find(([t]) => t === tab)?.[1]}
       >
-        {tab === "history" && <HistoryTab history={history} />}
+        {tab === "history" && <HistoryTab history={history} axes={axesOf(game)} />}
         {tab === "policy" && (
           <div className="max-w-3xl">
             <PolicyTab {...props.policy} focus={target.id} ping={target} />
@@ -181,7 +182,8 @@ export default function LabBench(
             {tab === "levers" && <Levers {...props} />}
             {tab === "numbers" && (
               <>
-                <FungusNumbers />
+                <FungusNumbers axes={axesOf(game)} />
+                <OdourCard game={game} />
                 <Debug />
               </>
             )}
@@ -194,7 +196,7 @@ export default function LabBench(
 }
 
 /** The history: four charts sharing game time, and the same numbers as a table. Read once a second. */
-function HistoryTab({ history }: { history: History }) {
+function HistoryTab({ history, axes }: { history: History; axes: number }) {
   useSimTick(1000);
   const xs = history.samples;
   if (xs.length < 2) return <p className="text-xs text-fg-3">The charts start once the game has run a couple of seconds.</p>;
@@ -233,12 +235,12 @@ function HistoryTab({ history }: { history: History }) {
           format={whole}
         />
         <HistoryChart
-          title="The odours apart: 1 at the start, 0 when they smell alike"
+          title={gapTitle(axes)}
           samples={xs}
           series={[{ name: "gap", color: seriesColor(0), values: xs.map((s) => s.gap) }]}
           yMax={niceMax(
             xs.map((s) => s.gap),
-            1,
+            odourSpan(axes),
           )}
           format={(v) => v.toFixed(2)}
         />

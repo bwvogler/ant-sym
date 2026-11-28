@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Game } from "../colony/index.ts";
+import { axesOf, odourSpan } from "./odourScale.ts";
 import { codexNumbers, cues, listed, loadAll, loadSeen, newlyOpen, saveAll, saveSeen, UNLOCK } from "./codex.ts";
 import { guideFor } from "./guide.ts";
 import { browserStorage } from "./storage.ts";
@@ -77,7 +78,7 @@ export function useCodexWatch(game: Game, onFrame: (fn: () => void) => () => voi
       const t = performance.now();
       if (t - last < EVERY_MS || state.held) return;
       last = t;
-      const open = newlyOpen(ids, state.seen, cues(game.colonies, codexNumbers(now.current())));
+      const open = newlyOpen(ids, state.seen, cues(game.colonies, codexNumbers(now.current(), odourSpan(axesOf(game)))));
       if (!open.length) return;
       // With what another tab has saved since (N5): each tab adds to the notebook, none overwrites it. Untested: the e2e
       // drives one tab.

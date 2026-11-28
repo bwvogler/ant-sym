@@ -13,7 +13,7 @@ import { BROOD_RGB } from "../palette.ts";
 import { drawResourceSprite } from "../resourceSprites.ts";
 import { workerLod } from "../workerSprites.ts";
 import { ASLEEP_DIM, colonyAsleep } from "./asleep.ts";
-import { odourColour, odourRgb } from "./colour.ts";
+import { nestColour, nestRgb } from "./colour.ts";
 import { LIVE, UNKNOWN } from "../fog/knowledge.ts";
 import type { FieldCtx } from "./ctx.ts";
 
@@ -73,7 +73,7 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   }
   ctx.beginPath();
   if (structure) ctx.arc(nx, ny, Math.max(4, nest.r * c.zoom), 0, Math.PI * 2);
-  ctx.strokeStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+  ctx.strokeStyle = nestColour(theme.inkRgb, theme.warnRgb, col);
   ctx.lineWidth = 2;
   ctx.globalAlpha = 0.7 * dim;
   ctx.stroke();
@@ -145,14 +145,14 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
   ctx.stroke();
   if (home && col.queen && inView(col.queen.x, col.queen.y)) {
     const [x, y] = toScreen(c, v, col.queen.x, col.queen.y);
-    const queenImage = hexes ? k.sprites.nest.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
+    const queenImage = hexes ? k.sprites.nest.get(resourceLod, nestRgb(theme.inkRgb, theme.warnRgb, col), darkSprites) : null;
     if (queenImage) {
       drawNestSprite(ctx, queenImage, resourceLod, col.queen.alive ? "queen" : "queen-dead", x, y, c.zoom);
     } else {
       const qr = Math.max(3, len * 0.9);
       ctx.beginPath();
       ctx.ellipse(x, y, qr * 1.4, qr * 0.8, 0, 0, Math.PI * 2);
-      const qc = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+      const qc = nestColour(theme.inkRgb, theme.warnRgb, col);
       ctx.lineWidth = Math.max(1, d);
       if (col.queen.alive) {
         ctx.fillStyle = qc;
@@ -177,14 +177,14 @@ export function drawNest(k: FieldCtx, f: NestFrame, col: Colony): (() => void) |
       if (!home || !inView(al.x, al.y)) continue;
       const [x, y] = toScreen(c, v, al.x, al.y);
       const ar = Math.max(2.5, len * 0.7);
-      const alateImage = hexes ? k.sprites.nest.get(resourceLod, odourRgb(theme.inkRgb, theme.warnRgb, col.nestOdour), darkSprites) : null;
+      const alateImage = hexes ? k.sprites.nest.get(resourceLod, nestRgb(theme.inkRgb, theme.warnRgb, col), darkSprites) : null;
       if (alateImage) {
         drawNestSprite(ctx, alateImage, resourceLod, "alate-wings", x, y, c.zoom);
         drawNestSprite(ctx, alateImage, resourceLod, "alate-body", x, y, c.zoom);
       } else {
         ctx.beginPath();
         ctx.ellipse(x, y, ar * 1.3, ar * 0.7, 0, 0, Math.PI * 2);
-        ctx.fillStyle = odourColour(theme.inkRgb, theme.warnRgb, col.nestOdour);
+        ctx.fillStyle = nestColour(theme.inkRgb, theme.warnRgb, col);
         ctx.fill();
         ctx.beginPath();
         ctx.ellipse(x - ar * 0.6, y - ar * 0.9, ar * 0.9, ar * 0.4, -0.5, 0, Math.PI * 2);

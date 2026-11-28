@@ -39,6 +39,9 @@ import { moundBalls } from "../inspectionMound.ts";
 import { HOME_RGB, ROLE_RGB } from "../palette.ts";
 import { toScreen } from "../camera.ts";
 import { odourRgb } from "../field/colour.ts";
+
+/** A colony whose nest odour is one axis, v (the scalar game: the tone is ink to warn). */
+const nestAt = (v: number) => ({ nestVec: [v], odourAxes: 1 });
 import { buildGame } from "../useColony.ts";
 import { RecordedCanvas, RecordedPath, callsOf, recordingContext } from "./recordingContext.ts";
 
@@ -157,7 +160,7 @@ function field(game: Game | null, o: Over = {}) {
     fungus: {},
     smellAll: false,
     strip: false,
-    trails: food || home ? [{ food: layer(food), home: layer(home), odour: 0.5 }] : [],
+    trails: food || home ? [{ food: layer(food), home: layer(home), nest: nestAt(0.5) }] : [],
     alarms: alarm ? [layer(alarm)] : [],
     spores: layer(spores),
     sensedLayer: sensed ? layer(sensed) : null,
@@ -304,7 +307,7 @@ test("scent edge cases: an alarm past its full strength is capped, a colony with
   const f = field(null, {
     sensed,
     alarm,
-    trails: [{ food: layer(undefined), home: layer(home), odour: 0 }] as unknown as FieldCtx["trails"],
+    trails: [{ food: layer(undefined), home: layer(home), nest: nestAt(0) }] as unknown as FieldCtx["trails"],
   });
   const img = paint(f);
   assert.deepEqual(px(img, 1, 1), [...THEME.alarm, 190], "capped at full: 40 + 150");
@@ -616,7 +619,7 @@ test("the cache keeps a snapshot of every input: a change in any layer, setting,
   changes(
     "a colony's tone in smell vision",
     () => {},
-    { ...f.k, smellAll: true, trails: [{ ...f.k.trails[0]!, odour: 0.9 }] } as FieldCtx,
+    { ...f.k, smellAll: true, trails: [{ ...f.k.trails[0]!, nest: nestAt(0.9) }] } as FieldCtx,
     { food: false, home: false },
     true,
   );
@@ -659,8 +662,8 @@ test("trails: where two colonies' trails are equally strong, the first colony's 
   const k = {
     ...f.k,
     trails: [
-      { food: layer(food), home: layer(undefined), odour: 0.2 },
-      { food: layer(second), home: layer(undefined), odour: 0.8 },
+      { food: layer(food), home: layer(undefined), nest: nestAt(0.2) },
+      { food: layer(second), home: layer(undefined), nest: nestAt(0.8) },
     ],
   } as FieldCtx;
   const img = paint({ ...f, k } as typeof f);

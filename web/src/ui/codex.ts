@@ -47,7 +47,10 @@ export const UNLOCK: Record<string, { cue: Cue; hint: string }> = {
   unity: { cue: "unity", hint: "the colonies' odours drawing together" },
 };
 
-/** The two nests' odours this far apart, or nearer (1 at the start: Unity.gap), counts as drawing together. */
+/**
+ * The two nests' odours this share of the space's span apart, or nearer, counts as drawing together (the gap starts at the span: 1 with one axis, sqrt(K)
+ * with K; ja-zg1u.8): 0.9 of it, which is 0.9 at one axis as it always was.
+ */
 export const UNITY_SEEN = 0.9;
 
 /** The game's numbers the cues read. */
@@ -55,6 +58,8 @@ export interface CodexNumbers {
   deaths: number;
   unityGap: number;
   mutations: number;
+  /** the widest two odours can be apart (odourScale.ts odourSpan: sqrt of the axes); 1 when not given, the one-axis game's */
+  span?: number;
 }
 
 /**
@@ -64,12 +69,15 @@ export interface CodexNumbers {
  */
 export function codexNumbers(
   st: { sides: readonly { losses: number; population: number }[]; unity: { gap: number }; evolution: { mutations: number } | null } | null,
+  span = 1,
 ): CodexNumbers {
-  if (!st) return { deaths: 0, unityGap: 1, mutations: 0 };
+  // `span` only when it is not 1: a one-axis game's numbers are as they were.
+  if (!st) return { deaths: 0, unityGap: span, mutations: 0, ...(span !== 1 ? { span } : {}) };
   return {
     deaths: st.sides.reduce((n, s) => n + s.losses, 0),
-    unityGap: st.sides.filter((s) => s.population > 0).length >= 2 ? st.unity.gap : 1,
+    unityGap: st.sides.filter((s) => s.population > 0).length >= 2 ? st.unity.gap : span,
     mutations: st.evolution?.mutations ?? 0,
+    ...(span !== 1 ? { span } : {}),
   };
 }
 
@@ -77,7 +85,7 @@ export function codexNumbers(
 export function cues(colonies: readonly Colony[], g: CodexNumbers): Set<Cue> {
   const out = new Set<Cue>(["start"]);
   if (g.deaths > 0) out.add("death");
-  if (g.unityGap <= UNITY_SEEN) out.add("unity");
+  if (g.unityGap <= UNITY_SEEN * (g.span ?? 1)) out.add("unity");
   if (g.mutations > 0) out.add("mutation");
   for (const c of colonies) {
     for (let i = 0; i < c.n; i++) {
