@@ -88,10 +88,12 @@ async function work() {
   const { CELL, cellOf, discOffsets } = await import("../web/src/colony/index.ts");
   const { generateOneWorld } = await import("../web/src/colony/index.ts");
   const t0 = performance.now();
-  const game = new Game(generateOneWorld(seed), { regrow: GAME_REGROW, autoFound: false, ...(axes ? { recognition: { odourAxes: axes } } : {}) }, gameRng(seed), [
-    { antCount: ants },
-    { antCount: ants },
-  ]);
+  const game = new Game(
+    generateOneWorld(seed),
+    { regrow: GAME_REGROW, autoFound: false, ...(axes ? { recognition: { odourAxes: axes } } : {}) },
+    gameRng(seed),
+    [{ antCount: ants }, { antCount: ants }],
+  );
   const garden = STRAINS.findIndex((s) => s.id === "garden");
   // By each royal chamber: the colony's nest on its home layer, the curtain.
   for (const c of game.colonies) {
