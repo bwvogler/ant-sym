@@ -261,14 +261,24 @@ export class Recognition {
   readonly #everyone = new Map<number, SumGrid>();
   /** whether `#everyone` holds this build's ants (some ant was calmed); otherwise read `bins` for it */
   #calmed = false;
-  /** the keys of the bands that hold someone, ascending (most games use two: a look skips the rest) */
+  /** the bands that hold someone, ascending by key (most games use two: a look skips the rest): the keys, and their grids alongside */
   #occupied: number[] = [];
+  #occupiedGrids: SumGrid[] = [];
+  /** the occupied bands' centres, K numbers a band (read by a look beyond one axis, so it need not take a key apart) */
+  #centres: Float64Array = new Float64Array(0);
   /** the same, counting every ant (calmed or not) */
   #occupiedEveryone: number[] = [];
-  /** the grids of the bands that are strangers to the odour last looked at and hold someone, ascending by key */
-  #mask: SumGrid[] = [];
-  /** the same over `#everyone`'s bands, made only while some ant is calmed (else it is `#mask`) */
-  #maskEveryone: SumGrid[] = [];
+  #occupiedEveryoneGrids: SumGrid[] = [];
+  #centresEveryone: Float64Array = new Float64Array(0);
+  /** the grids of the bands that are strangers to the odour last looked at and hold someone, ascending by key (refilled in place by each look) */
+  readonly #mask: SumGrid[] = [];
+  /** the same over `#everyone`'s bands, made only while some ant is calmed (else `#mask` is read) */
+  readonly #maskEveryone: SumGrid[] = [];
+  /** how many of each hold the current look's grids (the arrays only grow: a shorter look does not free them) */
+  #maskN = 0;
+  #maskEveryoneN = 0;
+  /** whether `#mask` stands for both (nobody is calmed) */
+  #sameMask = true;
   /** the odour and tolerance the mask was made for: consecutive ants mostly share them */
   #lookOdour: Float64Array;
   #lookTolerance = NaN;
@@ -332,11 +342,7 @@ export class Recognition {
         g.add(cx, cy, weight);
       }
     }
-    occupied.sort(ascending);
-    this.#occupied = occupied;
-    if (calmed) everyone.sort(ascending);
-    this.#occupiedEveryone = calmed ? everyone : occupied;
-    this.#lookTolerance = NaN; // the bands changed: the next look rebuilds its mask
+    this.#setOccupied(occupied, calmed ? everyone : null);
   }
 
   /** From now on, count the bands that are strangers to the odour at odour[at..] (K numbers) at `tolerance`. */
@@ -352,8 +358,19 @@ export class Recognition {
         }
       if (same) return;
     }
-    this.#mask = strangers(this.bins, this.#occupied, K, odour, at, tolerance);
-    this.#maskEveryone = this.#calmed ? strangers(this.#everyone, this.#occupiedEveryone, K, odour, at, tolerance) : this.#mask;
+    this.#maskN = strangers(this.#mask, this.#occupied, this.#occupiedGrids, this.#centres, K, odour, at, tolerance);
+    this.#sameMask = !this.#calmed;
+    if (this.#calmed)
+      this.#maskEveryoneN = strangers(
+        this.#maskEveryone,
+        this.#occupiedEveryone,
+        this.#occupiedEveryoneGrids,
+        this.#centresEveryone,
+        K,
+        odour,
+        at,
+        tolerance,
+      );
     for (let k = 0; k < K; k++) last[k] = odour[at + k];
     this.#lookTolerance = tolerance;
   }
@@ -362,13 +379,13 @@ export class Recognition {
   get(x: number, y: number): number {
     let s = 0;
     const m = this.#mask;
-    for (let b = 0; b < m.length; b++) s += (m[b] as SumGrid).get(x, y);
+    for (let b = 0, n = this.#maskN; b < n; b++) s += (m[b] as SumGrid).get(x, y);
     return s;
   }
 
   any(x0: number, y0: number, x1: number, y1: number): boolean {
     const m = this.#mask;
-    for (let b = 0; b < m.length; b++) if ((m[b] as SumGrid).any(x0, y0, x1, y1)) return true;
+    for (let b = 0, n = this.#maskN; b < n; b++) if ((m[b] as SumGrid).any(x0, y0, x1, y1)) return true;
     return false;
   }
 
@@ -378,9 +395,11 @@ export class Recognition {
    * different, which calming does not change: what the fungus senses as contact).
    */
   around(cx: number, cy: number, map: Bounds, r = 1, byOdour = false): number {
-    const m = byOdour ? this.#maskEveryone : this.#mask;
+    const every = byOdour && !this.#sameMask;
+    const m = every ? this.#maskEveryone : this.#mask;
+    const n = every ? this.#maskEveryoneN : this.#maskN;
     let s = 0;
-    for (let b = 0; b < m.length; b++) {
+    for (let b = 0; b < n; b++) {
       const g = m[b] as SumGrid;
       if (!g.any(cx - r - 1, cy - r, cx + r + 1, cy + r)) continue;
       const o = discOffsets(r)[cy & 1] as Int16Array;
@@ -526,31 +545,71 @@ export class Recognition {
       }
       return keys.sort(ascending);
     };
-    this.#occupied = put(this.bins, b.bins);
+    const occupied = put(this.bins, b.bins);
     this.#calmed = b.everyone !== null;
-    if (b.everyone) this.#occupiedEveryone = put(this.#everyone, b.everyone);
+    if (b.everyone) this.#setOccupied(occupied, put(this.#everyone, b.everyone));
     else {
       for (const g of this.#everyone.values()) g.reset();
-      this.#occupiedEveryone = this.#occupied;
+      this.#setOccupied(occupied, null);
     }
-    this.#lookTolerance = NaN; // the bands changed: the next look rebuilds its mask, as after a build
+  }
+
+  /** The occupied bands (keys, in any order) are now these: sorted ascending, each with its grid; `everyone`: the calmed count's, or null (the same bands). */
+  #setOccupied(occupied: number[], everyone: number[] | null): void {
+    occupied.sort(ascending);
+    this.#occupied = occupied;
+    this.#occupiedGrids = occupied.map((key) => this.bins.get(key) as SumGrid);
+    const K = this.params.odourAxes;
+    this.#centres = K > 1 ? centresOf(occupied, K) : this.#centres;
+    if (everyone) {
+      everyone.sort(ascending);
+      this.#occupiedEveryone = everyone;
+      this.#occupiedEveryoneGrids = everyone.map((key) => this.#everyone.get(key) as SumGrid);
+      this.#centresEveryone = K > 1 ? centresOf(everyone, K) : this.#centresEveryone;
+    } else {
+      this.#occupiedEveryone = occupied;
+      this.#occupiedEveryoneGrids = this.#occupiedGrids;
+      this.#centresEveryone = this.#centres;
+    }
+    this.#lookTolerance = NaN; // the bands changed: the next look rebuilds its mask
   }
 }
 
 const ascending = (a: number, b: number): number => a - b;
 
-/** The grids of the occupied bands (ascending keys) that are strangers to the odour at odour[at..]. */
+/** The centre vectors of bands `keys`, K numbers apiece. */
+function centresOf(keys: readonly number[], K: number): Float64Array {
+  const out = new Float64Array(keys.length * K);
+  keys.forEach((key, b) => {
+    let r = key;
+    for (let k = 0; k < K; k++) {
+      const digit = r % BINS;
+      r = (r - digit) / BINS;
+      out[b * K + k] = binCentre(digit);
+    }
+  });
+  return out;
+}
+
+/** The first n of `out` become the grids of the occupied bands (ascending keys, `grids` alongside) that are strangers to the odour at odour[at..]; returns n. */
 function strangers(
-  grids: Map<number, SumGrid>,
+  out: SumGrid[],
   keys: readonly number[],
+  grids: readonly SumGrid[],
+  centres: Float64Array,
   K: number,
   odour: ArrayLike<number>,
   at: number,
   tolerance: number,
-): SumGrid[] {
-  const out: SumGrid[] = [];
-  for (const key of keys) if (keyDistance(key, K, odour, at) > tolerance + STRANGER_EPS) out.push(grids.get(key) as SumGrid);
-  return out;
+): number {
+  const far = tolerance + STRANGER_EPS;
+  let n = 0;
+  if (K === 1) {
+    // One axis (every game so far): the band's centre against the odour, as the scalar code judged it.
+    const o = odour[at] as number;
+    for (let b = 0; b < keys.length; b++) if (Math.abs(binCentre(keys[b] as number) - o) > far) out[n++] = grids[b] as SumGrid;
+  } else for (let b = 0; b < keys.length; b++) if (odourDistance(K, centres, b * K, odour, at) > far) out[n++] = grids[b] as SumGrid;
+  return n;
 }
 
 /** The grid of band `key` in `grids`, made when there is none. */
