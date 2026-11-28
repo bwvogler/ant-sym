@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Game } from "../../game.ts";
+import { driftAimVec, driftDirection, odourVector } from "../../recognition.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
 import { mulberry32 } from "../../world.ts";
 import { run, smallOne } from "../builders.ts";
@@ -46,4 +47,22 @@ test("a founded colony that falls does not end the game; the world's own colonie
   assert.ok(Game.beaten(c), "the founded colony is beaten");
   assert.equal(g.fallen(), -1);
   assert.notEqual(g.outcome(), "fallen");
+});
+
+test("a daughter founded at four odour axes aims along the hashed direction from her landing, and another site aims another way (S2, ja-zg1u.4)", () => {
+  const g = new Game(smallOne(), {}, mulberry32(11), [{ antCount: 120 }]);
+  run(g, 3);
+  assert.equal(g.recognition.params.odourAxes, 4);
+  const from = [0.2, 0.3, 0.4, 0.5];
+  const at = beyondStart(g);
+  const k = g.addColony({ ...at, antCount: 30, odour: from, mother: 0 });
+  const c = g.colonies[k]!;
+  const want = driftAimVec(odourVector(from, 4), g.recognition.params.tolerance, driftDirection(g.world!.seed, at.x, at.y, 4));
+  assert.deepEqual([...c.aimVec], [...want], "the aim is the helper's, from her landing");
+  assert.ok(
+    want.some((v, i) => Math.abs(v - from[i]!) > 1e-6),
+    "and it is not her mother's odour",
+  );
+  const other = driftDirection(g.world!.seed, at.x + 60, at.y, 4);
+  assert.notDeepEqual([...other], [...driftDirection(g.world!.seed, at.x, at.y, 4)], "another landing, another direction");
 });

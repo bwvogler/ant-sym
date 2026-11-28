@@ -493,8 +493,8 @@ export class Game {
           antCount: spec.antCount,
           nest: nestIdx,
           odour: spec.odour ?? (specs.length > 1 ? k / (specs.length - 1) : 0),
-          tolerance,
           ...this.#speciesParams(),
+          tolerance, // the game's (the species' own, scaled to the space, unless the game names one) wins over the species' raw param: fights read the per-ant tolerance
           ...spec.colony,
           odourAxes: this.recognition.params.odourAxes, // the game's: every colony of it has the same
         },

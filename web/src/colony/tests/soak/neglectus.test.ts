@@ -38,6 +38,10 @@ test("its tolerance reaches recognition, where fights are judged; the generic an
   const g4 = game(NEGLECTUS_ANT, { recognition: { odourAxes: 4 } });
   assert.equal(g4.recognition.params.tolerance, 2);
   assert.ok(g4.unity().gap <= g4.recognition.params.tolerance, "the start colonies, sqrt(4) apart, are one population");
+  assert.ok(
+    g4.colonies.every((c) => c.tolerance[0] === 2),
+    "and each ant's own tolerance is the game's, not the species' raw 1: fights read it",
+  );
   assert.equal(game().recognition.params.tolerance, 0.35);
   assert.equal(game(NEGLECTUS_ANT, { recognition: { tolerance: 0.5 } }).recognition.params.tolerance, 0.5, "a game's own wins");
   // At a tolerance of 1 every gap is within it: recognition is whole, not 0/0 (the unity score).
