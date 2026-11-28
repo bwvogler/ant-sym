@@ -47,7 +47,7 @@ for (const cells of [10, 100, 1000]) {
     for (const c of cs)
       for (let a = 0; a < c.n; a++) {
         if (!c.alive[a]) continue;
-        rec.look(c.odour[a], TOLERANCE);
+        rec.look(c.odour, a * K, TOLERANCE);
         cellOf(c.x[a], c.y[a]);
         s += rec.around(CELL[0], CELL[1], map);
       }

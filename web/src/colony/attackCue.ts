@@ -1,24 +1,21 @@
 import type { Colony } from "./colony.ts";
 import { CELL } from "./hex.ts";
-import { binCentre, binOf, STRANGER_EPS } from "./recognition.ts";
+import { binCentre, binOf, odourDistance, STRANGER_EPS } from "./recognition.ts";
 import { blocked } from "./world.ts";
 
 export type AttackCue = (colony: Colony, ant: number) => boolean;
 
 /** Snapshot before any colony moves, so each worker observes attacks declared on the previous tick. */
 export function snapshotAttackCue(colonies: readonly Colony[]): AttackCue {
-  const attackers: { x: number; y: number; layer: number; odour: number; owner: Colony; ant: number }[] = [];
+  const attackers: { x: number; y: number; layer: number; at: number; owner: Colony; ant: number }[] = [];
+  // Each attacker's band centre, K numbers apiece, at `at`: taken now, as the odours are before anyone moves.
+  const centres: number[] = [];
   for (const colony of colonies) {
+    const K = colony.odourAxes;
     for (let i = 0; i < colony.n; i++) {
       if (colony.alive[i] && colony.attackLayer[i] === colony.layer[i]) {
-        attackers.push({
-          x: colony.x[i],
-          y: colony.y[i],
-          layer: colony.layer[i],
-          odour: binCentre(binOf(colony.odour[i])),
-          owner: colony,
-          ant: i,
-        });
+        attackers.push({ x: colony.x[i], y: colony.y[i], layer: colony.layer[i], at: centres.length, owner: colony, ant: i });
+        for (let k = 0; k < K; k++) centres.push(binCentre(binOf(colony.odour[i * K + k])));
       }
     }
   }
@@ -32,7 +29,7 @@ export function snapshotAttackCue(colonies: readonly Colony[]): AttackCue {
         if (
           (other.owner === colony && other.ant === ant) ||
           other.layer !== colony.layer[ant] ||
-          Math.abs(other.odour - colony.odour[ant]) <= colony.tolerance[ant] + STRANGER_EPS
+          odourDistance(colony.odourAxes, centres, other.at, colony.odour, ant * colony.odourAxes) <= colony.tolerance[ant] + STRANGER_EPS
         )
           return false;
         const dx = other.x - x,

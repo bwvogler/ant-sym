@@ -38,13 +38,13 @@ test("odour bands: an ant counts in its odour's band; look() counts only the ban
   b.calm[1] = 0.75;
   const rec = new Recognition();
   rec.build([a, b]);
-  rec.look(0, 0.35);
+  rec.look([0], 0, 0.35);
   assert.ok(Math.abs(rec.get(10, 6) - 1.25) < 1e-6, "two strangers, one of them three-quarters calm");
-  rec.look(1, 0.35);
+  rec.look([1], 0, 0.35);
   assert.equal(rec.get(10, 6), 3);
-  rec.look(0.5, 0.35);
+  rec.look([0.5], 0, 0.35);
   assert.ok(Math.abs(rec.get(10, 6) - 4.25) < 1e-6, "halfway between, both colonies are strangers");
-  rec.look(0.5, 0.6);
+  rec.look([0.5], 0, 0.6);
   assert.equal(rec.get(10, 6), 0, "a wide enough tolerance: nobody is");
   assert.equal(rec.any(0, 0, 5, 5), false);
   assert.ok(Math.abs(binCentre(0) - 0.05) < 1e-9);
@@ -191,7 +191,7 @@ test("judged as an ant judges it (by band centre, in float32), a host at full sh
     c.odour[1] = n0 + MAX_MASK * (FUNGAL - n0);
     const rec = new Recognition();
     rec.build([c]);
-    rec.look(c.odour[0], c.tolerance[0]);
+    rec.look(c.odour, 0, c.tolerance[0]);
     assert.equal(rec.get(12, 6), 0, `nest ${n0}: host at ${c.odour[1]} (band ${binOf(c.odour[1])}) seen as a stranger`);
   }
 });

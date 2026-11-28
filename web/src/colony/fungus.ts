@@ -31,7 +31,7 @@ import {
   type Preset,
   type Reach,
 } from "./levers.ts";
-import { binCentre, binOf, STRANGER_EPS, type Recognition } from "./recognition.ts";
+import { bandDistance, STRANGER_EPS, type Recognition } from "./recognition.ts";
 import { CELL, cellOf, centreX, centreY, dirOf, discOffsets, E, keyX, keyY, nx, ny, NE, NW, SE, SW, W } from "./hex.ts";
 import { clampCol, clampRow, disc, inBounds, OPEN, rockAt, SOIL, type Bounds, type WorldMap } from "./world.ts";
 import {
@@ -987,7 +987,7 @@ export class Fungus {
           const ns = this.strains[strain] as Strain;
           const sit: FungalSituation = {
             arousal: this.#arousal(c, i),
-            touch: this.#touch(L, c, cx, cy, nb.ants - 1, rec, c.odour[i]),
+            touch: this.#touch(L, c, cx, cy, nb.ants - 1, rec, i),
             place: this.#place(L, layer, colonies, cx, cy),
             task: TASKS[Math.min(2, c.band(i))] ?? "forager",
             carrying: c.carrying[i] ? "food" : c.holdsBrood(i) ? "brood" : "nothing",
@@ -1123,7 +1123,7 @@ export class Fungus {
     const cy = clampRow(L.map, CELL[1]);
     const sit: FungalSituation = {
       arousal: "calm",
-      touch: this.#touch(L, c, cx, cy, nb.ants, rec, null),
+      touch: this.#touch(L, c, cx, cy, nb.ants, rec, -1),
       place: "queen",
       task: "queen",
       carrying: "nothing",
@@ -1195,16 +1195,16 @@ export class Fungus {
    * there smells of another colony (its odour further from the host colony's than the healthy tolerance: tolerated or
    * not, since whether they fight is arousal's), else a nestmate when any other ant is there, else none. By odour, not
    * by colony (PR #42 review, S4): as odours converge a foreign ant that smells like home reads as a nestmate, and an
-   * estranged nestmate as a foreigner. `others`: the ants around, not counting the host; `own`: the host's own odour
+   * estranged nestmate as a foreigner. `others`: the ants around, not counting the host; `own`: the host's slot
    * (an ant is in the bands it counts; the queen is not), so a host that smells foreign itself does not count itself.
    */
-  #touch(L: SporeLayer, c: Colony, cx: number, cy: number, others: number, rec: Recognition | null, own: number | null): FungalTouch {
+  #touch(L: SporeLayer, c: Colony, cx: number, cy: number, others: number, rec: Recognition | null, own: number): FungalTouch {
     let foreign = 0;
     if (rec) {
       const tol = rec.params.tolerance;
-      rec.look(c.nestOdour, tol);
+      rec.look(c.nestVec, 0, tol);
       foreign = rec.around(cx, cy, L.map, 1, true);
-      if (own !== null && Math.abs(binCentre(binOf(own)) - c.nestOdour) > tol + STRANGER_EPS) foreign -= 1;
+      if (own >= 0 && bandDistance(c.odour, own * c.odourAxes, c.nestVec, 0, c.odourAxes) > tol + STRANGER_EPS) foreign -= 1;
     }
     return foreign > 0.5 ? "foreigner" : others - foreign > 0.5 ? "nestmate" : "none";
   }

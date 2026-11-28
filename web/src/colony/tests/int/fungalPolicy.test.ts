@@ -319,7 +319,7 @@ test("cull bites from a high load: at 0.7 its own nestmates already take it for 
     const rec = new Recognition();
     rec.step([c], 0.1);
     rec.build([c]);
-    rec.look(c.odour[1], rec.params.tolerance);
+    rec.look(c.odour, 1, rec.params.tolerance);
     assert.ok(rec.around(20, 6, { x0: 0, size: { w: 40, h: 12 } }) >= 1, `load ${l}: odour ${c.odour[0].toFixed(3)} is a stranger's`);
   }
 });
