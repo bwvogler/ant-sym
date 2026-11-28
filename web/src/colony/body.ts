@@ -170,6 +170,9 @@ const BODY_CELLS = 512;
 const bodyKeys = new Float64Array(BODY_CELLS);
 const bodyMean = new Float64Array(BODY_CELLS);
 const bodyHunger = new Float64Array(BODY_CELLS);
+// Young ants and unheld brood contribute binary presence, fixed during this pass.
+const bodyYoung = new Int8Array(BODY_CELLS);
+const bodyBrood = new Int8Array(BODY_CELLS);
 
 /**
  * Energy and felt hunger, once a tick before the ants move (the side view; ja-xu6.1, hunger.ts). Every ant uses energy
@@ -309,6 +312,7 @@ export function body(col: Colony, dt: number): void {
       const slot = (Math.imul(cx, 0x9e3779b1) ^ Math.imul(cy, 0x85ebca6b)) & (BODY_CELLS - 1);
       if (bodyKeys[slot] !== key) {
         bodyKeys[slot] = key;
+        bodyYoung[slot] = -1;
         bodyMean[slot] = scentSum.mean(cx, cy);
         bodyHunger[slot] = felt.near(cx, cy);
       }
@@ -341,8 +345,12 @@ export function body(col: Colony, dt: number): void {
       // Meeting young nestmates (within a cell) and brood (smelt within BROOD_SMELL cells; ja-7r7x): the share of recent
       // time one was there, read by the old only.
       if (revert && col.band(i) === 2) {
-        col.youngMet[i] = col.youngMet[i] + (youngs.near(cx, cy) - col.youngMet[i]) * youngStep;
-        col.broodMet[i] = col.broodMet[i] + (broods.near(cx, cy, BROOD_SMELL) - col.broodMet[i]) * youngStep;
+        if (bodyYoung[slot] < 0) {
+          bodyYoung[slot] = youngs.near(cx, cy);
+          bodyBrood[slot] = broods.near(cx, cy, BROOD_SMELL);
+        }
+        col.youngMet[i] = col.youngMet[i] + (bodyYoung[slot] - col.youngMet[i]) * youngStep;
+        col.broodMet[i] = col.broodMet[i] + (bodyBrood[slot] - col.broodMet[i]) * youngStep;
       }
     }
     scent[i] = sc;

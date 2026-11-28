@@ -78,6 +78,22 @@ jobs:
             cat "$result"
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure consecutive full-population game segments
+        run: |
+          result="$RUNNER_TEMP/performance/sustained.jsonl"
+          for revision in baseline candidate; do
+            if [[ ! -f "$revision/web/src/experiments/workerTrial.ts" ]]; then continue; fi
+            if [[ "$revision" == baseline ]]; then
+              cp candidate/scripts/lab/sustained-pace.mjs baseline/scripts/lab/sustained-pace.mjs
+            fi
+            node "$revision/scripts/lab/sustained-pace.mjs" 17 | jq -c --arg rev "$revision" '. + {revision: $rev}' | tee -a "$result"
+          done
+          {
+            echo '## Seed 17 · 600 starting ants per colony · engine only'
+            echo '| Revision | Simulated seconds | Mean tick (ms) | Engine pace |'
+            echo '|---|---|---:|---:|'
+            jq -r '"| \(.revision) | \(.start)–\(.end) | \(.meanTickMs * 100 | round / 100) | \(.enginePace * 100 | round / 100)× |"' "$result"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Compare browser play and touch gestures
         env:
           PERF_RESULTS: ${{ runner.temp }}/performance/browser.json

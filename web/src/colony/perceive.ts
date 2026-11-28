@@ -1,7 +1,7 @@
 // Perceive (docs/refactor.md S3.4): the first stage of an ant's step in tick. Its three sensors read every channel, the alarm it smells is noted, and the nearest strangers in reach give a heading (and the odds against them). Moved out of Colony.tick verbatim but for `this` becoming `col`; what it found goes to the next stages through the step record.
 
 import type { Colony } from "./colony.ts";
-import { CELL, cellOf } from "./hex.ts";
+import { CELL } from "./hex.ts";
 import { freshReach } from "./grid.ts";
 import { enemyHeading, odds, sense } from "./sense.ts";
 import type { AntStep } from "./step.ts";
@@ -15,7 +15,7 @@ export function perceive(col: Colony, i: number, s: AntStep): void {
   const sn = col.s;
   const ch = Math.cos(h);
   const sh = Math.sin(h);
-  cellOf(col.x[i], col.y[i]);
+  col.antCell(i);
   const ax = CELL[0];
   const ay = CELL[1];
   freshReach(); // the three sensors share one search of the ground round the ant (inReachShared)
