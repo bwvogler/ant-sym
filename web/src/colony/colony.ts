@@ -50,7 +50,7 @@ import {
 } from "./tuning.ts";
 import { NO_CELL, SOIL_DUG, SOIL_FILL, cellKey, climb, planeMoundReach } from "./grid.ts";
 import { DEFAULT_COLONY, channelParams, type ColonyParams } from "./params.ts";
-import { odourVector } from "./recognition.ts";
+import { checkOdourWeights, odourVector } from "./recognition.ts";
 import { middenSmell, nestLife } from "./nestWork.ts";
 import { unbury } from "./dig.ts";
 import { placeOn, touch } from "./sense.ts";
@@ -456,6 +456,8 @@ export class Colony {
   enemies: CellCounts | null = null;
   /** how many numbers an odour is (params.odourAxes): ant i's odour is odour[i × odourAxes ..] */
   readonly odourAxes: number;
+  /** the weights this colony's ants measure an odour distance with (params.odourWeights, checked): null is every axis at 1, the plain distance; every comparison an ant of this colony makes passes it (S3, PRD §91) */
+  readonly odourW: Float64Array | null;
   /** the colony's odour, one number per axis: the nest's gestalt, which ants at the nest relax toward and newborns take */
   readonly nestVec: Float64Array;
   /** where a daughter colony's nest odour drifts to from her mother's (ja-lo8.9.1, recognition.ts driftAimVec), per axis; NaN: it doesn't drift */
@@ -673,6 +675,7 @@ export class Colony {
     const n = this.params.maxAnts;
     this.n = n;
     this.odourAxes = this.params.odourAxes;
+    this.odourW = checkOdourWeights(this.params.odourWeights, this.odourAxes);
     this.nestVec = odourVector(this.params.odour, this.odourAxes);
     this.aimVec = new Float64Array(this.odourAxes).fill(NaN);
     Object.assign(this, makeAntArrays(n, this.params));

@@ -29,7 +29,8 @@ export function snapshotAttackCue(colonies: readonly Colony[]): AttackCue {
         if (
           (other.owner === colony && other.ant === ant) ||
           other.layer !== colony.layer[ant] ||
-          odourDistance(colony.odourAxes, centres, other.at, colony.odour, ant * colony.odourAxes) <= colony.tolerance[ant] + STRANGER_EPS
+          odourDistance(colony.odourAxes, centres, other.at, colony.odour, ant * colony.odourAxes, colony.odourW) <=
+            colony.tolerance[ant] + STRANGER_EPS
         )
           return false;
         const dx = other.x - x,

@@ -209,7 +209,9 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number,
         }
         if (!clear) continue;
         for (const b of keys) {
-          const stranger = recognition ? keyDistance(b, c.odourAxes, c.odour, i * c.odourAxes) > c.tolerance[i] + STRANGER_EPS : b !== own;
+          const stranger = recognition
+            ? keyDistance(b, c.odourAxes, c.odour, i * c.odourAxes, c.odourW) > c.tolerance[i] + STRANGER_EPS
+            : b !== own;
           if (stranger) {
             let g = grids.get(b);
             if (!g) grids.set(b, (g = new SumGrid()));
@@ -272,7 +274,7 @@ function distancePressure(
       if (source.layer[i] !== victim.layer[ant] || (source === victim && i === ant)) continue;
       if (
         recognition
-          ? bandDistance(victim.odour, ant * K, source.odour, i * K, K) <= source.tolerance[i] + STRANGER_EPS
+          ? bandDistance(victim.odour, ant * K, source.odour, i * K, K, source.odourW) <= source.tolerance[i] + STRANGER_EPS
           : side === attacker.side
       )
         continue;
@@ -334,13 +336,13 @@ export function resolveFights(
           rec &&
           c.attackLayer[i] >= 0 &&
           c.attackLayer[i] === c.layer[i] &&
-          keyDistance(band, K, c.odour, i * K) > c.tolerance[i] + STRANGER_EPS
+          keyDistance(band, K, c.odour, i * K, c.odourW) > c.tolerance[i] + STRANGER_EPS
         )
           enemies = Math.max(0, enemies - (1 - c.calm[i]));
         enemies *= rec ? 1 - c.calm[i] : 1;
         if (enemies < 1e-6) continue;
       } else if (rec) {
-        rec.look(c.odour, i * c.odourAxes, rec.params.tolerance);
+        rec.look(c.odour, i * c.odourAxes, rec.params.tolerance, c.odourW);
         enemies = rec.around(cx, cy, map) * (1 - c.calm[i]);
         if (enemies < 1e-6) continue;
       } else {
