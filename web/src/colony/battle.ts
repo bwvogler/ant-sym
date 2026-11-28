@@ -148,6 +148,10 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
 // target bands (the bands some living ant is in, by key: recognition.ts bandKey), never a list of ant pairs.
 // Without recognition, target colonies (by index).
 const pressureCache = new WeakMap<Colony, Map<number, SumGrid>>();
+/** The most band grids the attack-pressure pool keeps beyond those in use (one axis never reaches it: BINS bands). */
+export const PRESSURE_POOL = 64;
+/** How many band grids colony c's attack-pressure pool holds (a test reads it: the pool is bounded). */
+export const pressurePoolSize = (c: Colony): number => pressureCache.get(c)?.size ?? 0;
 function attackPressure(colonies: Colony[], recognition: boolean, layer: number, reach: 0 | 1): Map<number, SumGrid> {
   if (!colonies.length) return new Map();
   let grids = pressureCache.get(colonies[0]);
@@ -171,6 +175,12 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number,
       }
     }
   } else for (let b = 0; b < colonies.length; b++) keys.push(b);
+  // The pool keeps the grids of bands no ant is in now (a tick on another layer reads other bands), but not without bound: with
+  // continuous odours at K axes the bands ants have passed through are many, so past PRESSURE_POOL it keeps only the bands in use.
+  if (grids.size > PRESSURE_POOL) {
+    const live = new Set(keys);
+    for (const key of grids.keys()) if (!live.has(key)) grids.delete(key);
+  }
   colonies.forEach((c, own) => {
     const on = layer < 0 ? null : c.layers[layer];
     if (layer >= 0 && !on) return; // a curtain of another line
