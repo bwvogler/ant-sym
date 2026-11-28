@@ -8346,7 +8346,7 @@ The K = 4 target (over 95% strangers to both start colonies) is met on every see
 - **Unity numbers (review N2):** the Lab's history chart says the gap starts at sqrt(axes) (2 at K = 4; 1 as before at K = 1) with its axis to match, the Codex's "drawing together" cue is 0.9 of that span (`UNITY_SEEN` x span: 1.8 at K = 4, 0.9 at K = 1), and the Unity card prints the span beside the gap when it is not 1 (`ui/odourScale.ts`).
 - **Saves (review N3):** a K = 1 save from before S2 has the same `SAVE_VERSION` as a K = 4 one, so Continue still lists it; the load refuses it and the page now says "That save was made with a different odour space (1 odour axis; this game's colonies smell in 4)" (`loadFailure`, `ui/saves.ts`) instead of the error's own words. `SAVE_VERSION` not bumped.
 - **Guard:** e2e section 20: two colonies that are strangers and agree on axis 0 are drawn in different colours on the field (stroke colours) and the minimap (dot colours), and the old axis-0 reading would have drawn one; a followed ant's card shows its four axes. Not done: the pixel guard (`ja-5n8b`, broken on main).
-- **S3 note:** the lens reads `odourDistance` unweighted; when S3 adds axis weights the lens and the colour should read the same weights.
+- **S3:** the lens reads `odourDistance` with the perceiver's weights (`Colony.odourW`); the colour is of the nest vector and does not use them.
 
 **Still open.**
 - **Owner:** `.9` (K = 4), `.10` (the learned foe) and `.11` (symmetric) are decided (above); no owner question is open, except the time-to-unity checkpoint in S2 built above (the alike time is 1.9 times K = 1's: accept, or choose among its options).

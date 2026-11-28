@@ -97,3 +97,16 @@ test("the odour's span is sqrt of its axes: 1 at one axis, 2 at the game's four,
   assert.ok(Math.abs(small().unity().gap - odourSpan(4)) < 1e-9);
   assert.ok(Math.abs(small(1).unity().gap - odourSpan(1)) < 1e-9);
 });
+
+test("a species that smells only axis 0 reads an ant 0.9 from its nest on axes 1-3 as a nestmate, on axis 0 as a stranger: the lens reads the perceiver's weights (S3)", () => {
+  const g = new Game(generateOneWorld(4, { plane: { size: { w: 120, h: 80 } } }), {}, mulberry32(4), [
+    { antCount: 20, colony: { odourWeights: [1, 0, 0, 0] } },
+    { antCount: 20, colony: { odourWeights: [1, 0, 0, 0] } },
+  ]);
+  const col = g.colonies[0]!;
+  const i = col.alive.findIndex((a) => a === 1);
+  for (let k = 1; k < 4; k++) col.odour[i * 4 + k] = 0.9;
+  assert.equal(antOdour(col, i).stranger, false, "axes it cannot smell");
+  col.odour[i * 4] = 0.6;
+  assert.equal(antOdour(col, i).stranger, true, "axis 0 is past the tolerance");
+});

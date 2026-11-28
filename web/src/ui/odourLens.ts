@@ -32,7 +32,7 @@ export function antOdour(col: Colony, i: number): OdourReadout {
   const tolerance = col.tolerance[i] as number;
   const axes: OdourAxisRow[] = [];
   for (let k = 0; k < K; k++) axes.push({ axis: k, value: col.odourAt(i, k), nest: col.nestVec[k] as number });
-  const distance = odourDistance(K, col.odour, i * K, col.nestVec, 0);
+  const distance = odourDistance(K, col.odour, i * K, col.nestVec, 0, col.odourW); // the perceiver's weights (S3)
   return { axes, distance, tolerance, stranger: isStranger(distance, tolerance) };
 }
 
@@ -59,7 +59,7 @@ export function colonyOdours(colonies: readonly Colony[], ks: readonly number[],
         gaps: ks.flatMap((o) => {
           const other = colonies[o];
           if (o === k || !other) return [];
-          const distance = odourDistance(K, c.nestVec, 0, other.nestVec, 0);
+          const distance = odourDistance(K, c.nestVec, 0, other.nestVec, 0, c.odourW); // colony k's own weights (S3)
           return [{ k: o, distance, stranger: isStranger(distance, tolerance) }];
         }),
       },
