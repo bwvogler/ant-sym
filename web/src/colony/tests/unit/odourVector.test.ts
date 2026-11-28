@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { CountGrid, occupancy, PRESSURE_POOL, pressurePoolSize, resolveFights } from "../../battle.ts";
 import { Colony } from "../../colony.ts";
 import { spawnHome } from "../../body.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
@@ -201,7 +202,9 @@ test("a recognition of another axis count refuses a save, and an axis count outs
 
 test("four axes: look() against a brute-force oracle, asymmetric odours, looks that differ only past axis 0 (the memo), every band centre", () => {
   const rand = mulberry32(77);
-  const cs = [0, 1].map((k) => new Colony(map, { antCount: 120, maxAnts: 120, nest: k, odour: [0.5, 0.5, 0.5, 0.5], odourAxes: 4 }, mulberry32(3 + k)));
+  const cs = [0, 1].map(
+    (k) => new Colony(map, { antCount: 120, maxAnts: 120, nest: k, odour: [0.5, 0.5, 0.5, 0.5], odourAxes: 4 }, mulberry32(3 + k)),
+  );
   const antCells: number[][] = [];
   for (const c of cs)
     for (let i = 0; i < c.n; i++) {
@@ -263,4 +266,33 @@ test("a NaN odour is band 0, never a NaN key", () => {
   assert.equal(bandKey([NaN, 0.95], 0, 2), 90);
   assert.equal(binOf(-3), 0);
   assert.equal(binOf(7), BINS - 1);
+});
+
+test("four axes: the attack-pressure pool is bounded, though the bands ants are in change every tick", () => {
+  const rand = mulberry32(31);
+  const cs = [0, 1].map((k) => new Colony(map, { antCount: 150, maxAnts: 150, nest: k, odour: k, odourAxes: 4 }, mulberry32(9 + k)));
+  const rec = new Recognition({ odourAxes: 4 });
+  let most = 0;
+  for (let tick = 0; tick < 150; tick++) {
+    for (const c of cs)
+      for (let i = 0; i < c.n; i++) {
+        c.x[i] = centreX(20 + (i % 10), 20 + (i % 3));
+        c.y[i] = centreY(20 + (i % 3));
+        for (let k = 0; k < 4; k++) c.odour[i * 4 + k] = rand(); // continuous odours: ~300 new bands a tick
+        c.attackLayer[i] = c.layer[i];
+      }
+    rec.build(cs);
+    resolveFights(
+      cs,
+      cs.map((c) => occupancy(c, new CountGrid())),
+      0.1,
+      () => 1,
+      { rate: 1, alarm: 1, intent: true },
+      rec,
+    );
+    most = Math.max(most, pressurePoolSize(cs[0] as Colony));
+  }
+  assert.ok(most > 0, "the pool is used");
+  assert.ok(most <= PRESSURE_POOL + 300, `at most the pool plus the bands in use, saw ${most}`);
+  assert.ok(pressurePoolSize(cs[0] as Colony) <= PRESSURE_POOL + 300);
 });
