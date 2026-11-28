@@ -6,7 +6,17 @@ import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
 import { generateCurtain, growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
-import { type BandsSave, driftAimVec, odourDistance, odourVector, Recognition, type RecognitionParams } from "./recognition.ts";
+import {
+  type BandsSave,
+  DEFAULT_RECOGNITION,
+  driftAimVec,
+  driftDirection,
+  odourDistance,
+  odourSalt,
+  odourVector,
+  Recognition,
+  type RecognitionParams,
+} from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, clampRow, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
@@ -316,10 +326,10 @@ export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
 const odourSpec = (v: ArrayLike<number>): number | number[] => (v.length === 1 ? (v[0] as number) : Array.from(v));
 
 /**
- * A wild site's odour, a pure hash of the site per axis (salt 101 + axis: axis 0 is the one scalar odour it always was; a number while the game has one axis). */
+ * A wild site's odour, a pure hash of the site per axis (odourSalt: axis 0 is salt 101, the one scalar odour it always was, the others a block of their own; a number while the game has one axis). */
 export function wildOdour(seed: number, rx: number, ry: number, K: number): number | number[] {
   if (K === 1) return hash01(seed, 101, rx, ry);
-  return Array.from({ length: K }, (_, k) => hash01(seed, 101 + k, rx, ry));
+  return Array.from({ length: K }, (_, k) => hash01(seed, odourSalt(k), rx, ry));
 }
 
 /**
@@ -451,7 +461,8 @@ export class Game {
     this.#rng = rng;
     // Fights are judged by the recognition's tolerance: a species' own (the invasive garden ant's one supercolony: ja-e668.3) unless the game
     // names one. Every colony of a game is its species, so the game takes it from there.
-    const tol = this.params.species.params.tolerance;
+    const axes = params.recognition?.odourAxes ?? DEFAULT_RECOGNITION.odourAxes;
+    const tol = this.params.species.neverStranger ? Math.sqrt(axes) : this.params.species.params.tolerance;
     const recognition = { ...(tol !== undefined ? { tolerance: tol } : {}), ...params.recognition };
     this.#recognition = recognition;
     this.recognition = new Recognition(recognition);
@@ -1234,7 +1245,9 @@ export class Game {
       c.founding = true;
       c.incipient = true;
       c.feed(f.reserve ?? FOUNDING_RESERVE);
-      c.aimVec.set(driftAimVec(odourVector(f.odour, c.odourAxes), this.recognition.params.tolerance));
+      // Its direction is a hash of the world's seed and where she landed (pure: the same on every load), 1.5 tolerances from her mother's odour.
+      const dir = c.odourAxes > 1 ? driftDirection(this.world.seed, f.x, f.y, c.odourAxes) : null;
+      c.aimVec.set(driftAimVec(odourVector(f.odour, c.odourAxes), this.recognition.params.tolerance, dir));
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
@@ -1495,8 +1508,9 @@ export class Game {
         living++;
         if (live.some((other) => other !== c && odourDistance(K, c.odour, i * K, other.nestVec, 0) <= tol)) near++;
       }
-    // With a tolerance of 1 (one supercolony) every gap is within it: recognition is whole.
-    const recognition = tol >= 1 ? 1 : Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
+    // With a tolerance of the space's diameter (one supercolony) every gap is within it: recognition is whole. The diameter is 1 with one axis.
+    const D = Math.sqrt(K);
+    const recognition = tol >= D ? 1 : Math.min(1, Math.max(0, (D - gap) / (D - tol)));
     const unified = gap <= tol && quiet >= QUIET && (met >= MET || this.#haveMet) && live.every((c) => !Game.beaten(c));
     return {
       gap,

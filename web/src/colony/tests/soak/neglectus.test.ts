@@ -32,7 +32,12 @@ test("the invasive garden ant is a species the page can name, with its own mode 
 });
 
 test("its tolerance reaches recognition, where fights are judged; the generic ant's and a game's own stay as they were", () => {
-  assert.equal(game(NEGLECTUS_ANT).recognition.params.tolerance, NEGLECTUS_TOLERANCE);
+  // The space's diameter, sqrt(K): 2 at the game's four axes, NEGLECTUS_TOLERANCE (1) with one (S2: the start colonies sit sqrt(K) apart).
+  assert.equal(game(NEGLECTUS_ANT).recognition.params.tolerance, Math.sqrt(game(NEGLECTUS_ANT).recognition.params.odourAxes));
+  assert.equal(game(NEGLECTUS_ANT, { recognition: { odourAxes: 1 } }).recognition.params.tolerance, NEGLECTUS_TOLERANCE);
+  const g4 = game(NEGLECTUS_ANT, { recognition: { odourAxes: 4 } });
+  assert.equal(g4.recognition.params.tolerance, 2);
+  assert.ok(g4.unity().gap <= g4.recognition.params.tolerance, "the start colonies, sqrt(4) apart, are one population");
   assert.equal(game().recognition.params.tolerance, 0.35);
   assert.equal(game(NEGLECTUS_ANT, { recognition: { tolerance: 0.5 } }).recognition.params.tolerance, 0.5, "a game's own wins");
   // At a tolerance of 1 every gap is within it: recognition is whole, not 0/0 (the unity score).
