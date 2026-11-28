@@ -154,3 +154,25 @@ test("the unity score's recognition share is 1 within the tolerance and falls to
   assert.equal(recognitionShare(0.35, 2, 2), 0);
   assert.ok(recognitionShare(0.35, 1, 0.5) < recognitionShare(0.35, 2, 0.5), "the same gap is further along a narrower space");
 });
+
+test("unity's score uses the species' weighted diameter: weights [1,0,0,0], gap 0.6, the score is recognitionShare(0.35, 1, 0.6), not the sqrt(K) one", () => {
+  const odours = [
+    [0.2, 0.5, 0.5, 0.5],
+    [0.8, 0.5, 0.5, 0.5],
+  ];
+  const sp = sniffer([1, 0, 0, 0]);
+  const saved = copy(small(sp, odours).save());
+  // Quiet for long enough and already met, so the score is the recognition share alone.
+  saved.time = 1e6;
+  (saved.private as { haveMet: boolean }).haveMet = true;
+  const b = small(sp, odours);
+  b.load(saved);
+  const u = b.unity();
+  assert.ok(Math.abs(u.gap - 0.6) < 1e-6, `gap ${u.gap}`);
+  const want = recognitionShare(0.35, 1, u.gap);
+  assert.ok(Math.abs(want - 0.6154) < 1e-3);
+  assert.ok(
+    Math.abs(u.score - want) < 1e-9,
+    `score ${u.score}, want ${want} (the sqrt(K) diameter gives ${recognitionShare(0.35, 2, u.gap)})`,
+  );
+});
