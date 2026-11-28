@@ -65,6 +65,29 @@ test("play, pause and speed changes go on without stopping the loop (no cancel, 
   assert.equal(clock.calls.request, 1 + 3, "the start's request and one per frame");
 });
 
+test("expensive simulation yields to frame listeners without carrying a backlog", () => {
+  const { game, clock, loop, frame } = make({ speed: 4 });
+  const wall = clock.env.now;
+  let spent = 0;
+  clock.env.now = () => wall() + spent;
+  const ticks = recordTicks(game);
+  const drawn: number[] = [];
+  // Include post-tick sight and journal work in the frame budget.
+  const stopCost = loop.onStep(() => (spent += 20));
+  frame.add(() => {
+    drawn.push(ticks.length);
+    spent = 0;
+  });
+  loop.start();
+  clock.frames(2, 50);
+  assert.deepEqual(drawn, [1, 2], "one expensive tick per frame");
+  assert.ok(ticks.every((dt) => dt <= MAX_STEP));
+  // After the costly subscriber stops, only the current frame's wall time is owed.
+  stopCost();
+  clock.frame(50);
+  assert.deepEqual(drawn, [1, 2, 8], "six ticks for the current frame only");
+});
+
 test("stop cancels the pending frame and stops the frames; start again goes on", () => {
   const { game, clock, loop } = make();
   loop.start();
