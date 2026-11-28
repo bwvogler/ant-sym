@@ -131,7 +131,7 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
 - **S3, the species weights (built, `ja-zg1u.5`; what was built and checked is in PRD §91).** `ColonyParams.odourWeights`, one number per axis, absent meaning all 1: `d = sqrt(sum w_k (a_k - b_k)^2)`, measured by the **perceiver**, in every consumer of the distance (fights by band, by distance and by contact, the attack cue, an ant's look at enemies, the fungus's touch, the queen's guard, raids, unity's mixing and allied contact). **Weights are held to 0..1**: the weighted distance then never exceeds the plain one, so the own-nest cap (`hostCap`, derived for the plain distance) and the diameter bound still hold without a new derivation, and a weight above 1 is only a smaller tolerance in disguise. The space's diameter under weights is `sqrt(sum w)`: the neglectus species' tolerance and unity's recognition share use it. A daughter's drift is taken in the weighted metric, over the axes the species smells (a zero-weight axis does not move). Martin et al. 2008 (§1: recognition rests on a few compounds) is the reason for the trait; no species is given weights yet (it would be design, not a measurement), the one-axis species of the tests stands for it. Weights are species config, derived at construction (`Colony.odourW`, left out of the save).
 - **S4, learned foe** behind `foeMemory` (off). **Gate:** the borderline-colony assay shows hysteresis (a pair that fought stays hostile at a gap where a pair that never met makes peace) without a runaway (no colony ends permanently at war with every neighbour, assay G and the long games).
 - **S5, optional:** the slow random walk of colony vectors (Drescher 2010); strain-specific fungal odour (two strains smell different; **design**).
-- **S6, Learn entry and the colour lens**, then strike the sense and gap rows.
+- **S6, Learn entry and the colour lens** (built, `ja-zg1u.8`; PRD §91), and the sense row updated (no gap row named it).
 
 ## Play
 
@@ -162,6 +162,10 @@ Cheapest first. All steering and body: **no Jev situation field, legend or quest
 - **Read in full this pass:** Bos et al. 2011 (numbers in §5), Bey preprint. **Abstract re-read, still unverified:** Newey, Gordon, Leonhardt, Thomas, Pedersen, Roux, Silverman & Liang, Buczkowski, Johnson, Liang et al., Martin & Drijfhout, Martin 2011. Their open copies exist (Leonhardt: the Konstanz repository; Roux: HAL; Buczkowski: Purdue) on hosts this container could not reach; the publisher pages are bot-walled.
 - **New sources found:** Cohen 2025, Walsh 2020 (§1), van Wilgenburg 2022 and Thomas 2006's closing inference (§6), Csata 2023 and Bey 2026 (§6). All abstract only except Cohen's quoted passages.
 - **Not changed:** the K = 4 choice (§1), the 0.35 tolerance, the Monte Carlo figures, the vision.md sense row.
+
+## What S6 built (`ja-zg1u.8`, 2026-11-28)
+
+- A fixed colour map of the four axes (a Lab line from ink to warn along their mean plus a fitted offset: `ui/field/colour.ts`), used on the field, minimap and cards; measured on the real world's wild colonies (PRD §91: about 91 % of stranger pairs drawn 12 CIEDE2000 apart, against 89 % / 75 % for the old one-axis tone; kin look alike in only about half of cases). A lens: the four numbers and the distance against the tolerance on an ant's card and in the Lab's Odour card. The Learn entry under "Strangers and battles". The unity numbers scale with sqrt(K); a save of another odour space is refused in plain words. Nothing in the research above changed.
 
 ## What this note has not read
 

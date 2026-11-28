@@ -132,6 +132,21 @@ export function readable(r: SaveRecord): boolean {
   return r.game?.version === SAVE_VERSION && r.game.world != null && Object.hasOwn(SPECIES, r.settings?.species ?? "");
 }
 
+/**
+ * What the page says when Game.load refuses a save it listed (useColony): in words a player can use, not the error's own. A save made with another number
+ * of odour axes carries the same SAVE_VERSION as this game's (a one-axis game from before the odour space has version 16 like a four-axis one), so the
+ * version check lets it through and the load refuses it: say that its odour space differs. `e` is whatever the load threw.
+ */
+export function loadFailure(e: unknown): string {
+  const text = e instanceof Error ? e.message : String(e);
+  const axes = /(\d+) odour axes, this game has (\d+)/.exec(text) ?? /(\d+) odour axes in a game of (\d+)/.exec(text);
+  if (axes)
+    return `That save was made with a different odour space (${axes[1]} odour ${axes[1] === "1" ? "axis" : "axes"}; this game's colonies smell in ${axes[2]}), so it can't be loaded. This is a fresh game of its world.`;
+  if (/^save: version /.test(text))
+    return "That save is from another version of the game and can't be loaded. This is a fresh game of its world.";
+  return `That save couldn't be loaded (${text}); this is a fresh game of its world.`;
+}
+
 /** The newest save this game can read, or null: what Continue offers. */
 export function newestReadable(list: readonly SaveRecord[]): SaveRecord | null {
   return list.find(readable) ?? null;

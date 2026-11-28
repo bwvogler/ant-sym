@@ -70,6 +70,8 @@ function setup(o: Over = {}) {
     home: PLANE,
     soilOut: 0,
     nestOdour: 0.25,
+    nestVec: [0.25],
+    odourAxes: 1,
     brood: { items: [] },
     params: { nest: 7 },
     corpses: [],

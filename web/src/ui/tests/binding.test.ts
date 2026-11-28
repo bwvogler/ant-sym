@@ -18,6 +18,8 @@ function setup(shown = PLANE) {
   const col = (id: string, has: boolean) => ({
     map: plane,
     nestOdour: id.length,
+    nestVec: [id.length],
+    odourAxes: 1,
     layers: [
       has ? { ph: { fields: { alarm: layer(`${id}.alarm`), food: layer(`${id}.food`), home: layer(`${id}.home`) } } } : undefined,
       undefined,
@@ -75,7 +77,7 @@ test("bind: the shown map, the spores and the scent of the colonies that have th
   assert.equal(b.strip, false);
   assert.equal(b.sensedLayer && (b.sensedLayer as never as { name: string }).name, "sensed0");
   assert.deepEqual(
-    b.trails.map((t) => t.odour),
+    b.trails.map((t) => t.nest.nestVec[0]),
     [1, 3],
     "a colony with no layer there is skipped",
   );

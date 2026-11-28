@@ -4,6 +4,7 @@
 
 import { type Colony, type ChunkLayer, type Fungus, isCurtainLayer, mapOfLayer, type OneWorld, type WorldMap } from "../../colony/index.ts";
 import type { SensedMap } from "../fungusSight.ts";
+import type { NestOdour } from "./colour.ts";
 import type { FieldCtx, FieldTheme } from "./ctx.ts";
 import type { FieldEnv, SpriteSets } from "./env.ts";
 import type { Ground } from "./ground.ts";
@@ -89,7 +90,7 @@ export class FieldBinding {
   spores: ChunkLayer<Float32Array>;
   strip = false;
   /** Each colony's trails on the shown layer; a cell shows them as strongly as a host sensed it lately (PRD §65). */
-  trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array>; odour: number }[] = [];
+  trails: { food: ChunkLayer<Float32Array>; home: ChunkLayer<Float32Array>; nest: NestOdour }[] = [];
   /** Smell vision (the builder's, PRD §73): every trail and alarm shown everywhere, each food trail in its colony's tone. */
   smellAll = false;
   sensedLayer: ChunkLayer<Float32Array> | null = null;
@@ -169,7 +170,7 @@ export class FieldBinding {
       const p = col.layers[lv]?.ph;
       if (!p) continue;
       this.alarms.push(p.fields.alarm);
-      this.trails.push({ food: p.fields.food, home: p.fields.home, odour: col.nestOdour });
+      this.trails.push({ food: p.fields.food, home: p.fields.home, nest: col });
     }
   }
 

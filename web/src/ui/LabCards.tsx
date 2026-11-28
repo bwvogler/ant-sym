@@ -7,10 +7,13 @@ import {
   NEST_ONLY,
   upgradeFor,
   MET,
-  type Game,
+  Game,
   DEFAULT_RECOGNITION,
   type Journal,
 } from "../colony/index.ts";
+import { colonyOdours } from "./odourLens.ts";
+import { OdourBars, OdourSwatch } from "./OdourBars.tsx";
+import { axesOf, odourSpan } from "./odourScale.ts";
 import { USD_PER_INPUT_TOKEN } from "../../shared/jev.ts";
 import type { KnownColonies } from "./fog/known.ts";
 import { foodView } from "./fog/knownView.ts";
@@ -203,7 +206,8 @@ export function JevCard() {
   );
 }
 
-export function FungusNumbers() {
+/** `axes`: how many numbers the game's odour is (odourScale.ts); the nests' gap starts at sqrt of it. */
+export function FungusNumbers({ axes = 1 }: { axes?: number }) {
   const stats = useStats(wholeStats);
   return (
     <Card
@@ -236,9 +240,9 @@ export function FungusNumbers() {
           </div>
           <Bar value={stats.unity.score} />
           <p className="mt-1 font-mono text-xs text-fg-3">
-            nests {stats.unity.gap.toFixed(2)} apart in odour · {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet{" "}
-            {Math.min(999, Math.floor(stats.unity.quiet))} s · {Math.round(100 * stats.unity.mixing)}% mixed · met{" "}
-            {(100 * stats.unity.met).toFixed(1)}% (needs {100 * MET}%)
+            nests {stats.unity.gap.toFixed(2)} apart in odour{odourSpan(axes) !== 1 ? ` (of ${odourSpan(axes).toFixed(2)} at most)` : ""} ·{" "}
+            {stats.unity.deathsPerMinute.toFixed(0)} fight deaths/min · quiet {Math.min(999, Math.floor(stats.unity.quiet))} s ·{" "}
+            {Math.round(100 * stats.unity.mixing)}% mixed · met {(100 * stats.unity.met).toFixed(1)}% (needs {100 * MET}%)
           </p>
           <p className="mt-1 text-xs text-fg-3">
             One colony when the nests smell alike (within {DEFAULT_RECOGNITION.tolerance}), their ants have met (on average over the last
@@ -247,6 +251,58 @@ export function FungusNumbers() {
           </p>
         </div>
       )}
+    </Card>
+  );
+}
+
+/**
+ * The odour lens (ja-zg1u.8): every colony's nest odour as the contact sense reads it, its four numbers and the colour the field draws it in, and how
+ * far each is from the others against the tolerance. The Lab's cards are omniscient, like its other numbers.
+ */
+export function OdourCard({ game }: { game: Game }) {
+  const rows = useGameRead(
+    () => {
+      const ks = game.colonies.flatMap((c, k) => (Game.beaten(c) ? [] : [k]));
+      return colonyOdours(game.colonies, ks, game.recognition.params.tolerance);
+    },
+    (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  );
+  const axes = axesOf(game);
+  const tol = game.recognition.params.tolerance;
+  return (
+    <Card
+      label="odour"
+      title={
+        <>
+          Odour, by contact <Help to={{ tab: "guide", id: "strangers" }} label="strangers" />
+        </>
+      }
+    >
+      <p className="mt-2 text-xs text-fg-3">
+        An ant reads another's odour on touch: {axes} numbers, 0 to 1, a stranger when they lie further than {tol} from its own nest's (at
+        most {odourSpan(axes).toFixed(2)} apart). The swatch is the colour the field draws it in.
+      </p>
+      <div className="mt-3 flex flex-col gap-3" aria-label="nest odours">
+        {rows.map((r) => {
+          const nearest = r.gaps.reduce<(typeof r.gaps)[number] | null>((m, g) => (m === null || g.distance < m.distance ? g : m), null);
+          const strangers = r.gaps.filter((g) => g.stranger).length;
+          return (
+            <div key={r.k} className="grid grid-cols-[auto_1fr] items-start gap-x-3 gap-y-1" data-colony={r.k}>
+              <span className="flex items-center gap-1.5 text-fg">
+                <OdourSwatch values={r.axes.map((a) => a.value)} label={`${colonyName(r.k)}'s colour`} />
+                <span className={colonyTone(r.k)}>{colonyName(r.k)}</span>
+              </span>
+              <OdourBars rows={r.axes} />
+              {nearest && (
+                <p className="col-span-2 font-mono text-xs text-fg-3">
+                  nearest {colonyName(nearest.k)}: {nearest.distance.toFixed(2)} apart ({nearest.stranger ? "strangers" : "alike"},
+                  tolerance {tol.toFixed(2)}) · a stranger to {strangers} of {r.gaps.length}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }

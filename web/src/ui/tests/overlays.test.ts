@@ -4,7 +4,7 @@ import { CELL, CURTAIN, PLANE, STRIP, cellAt, centreX, centreY, turnAt, type Fun
 import { badgeParts, nestBadge } from "../badges.ts";
 import type { Camera, Viewport } from "../camera.ts";
 import { toScreen } from "../camera.ts";
-import { odourColour } from "../field/colour.ts";
+import { nestColour } from "../field/colour.ts";
 import type { FieldCtx, FieldInputs, FieldPen, FieldTheme } from "../field/ctx.ts";
 import type { FieldEnv, SpriteSets } from "../field/env.ts";
 import { drawBends, drawHoleNames, drawLine, drawPen, drawStripAnts, label, pill } from "../field/overlays.ts";
@@ -277,7 +277,7 @@ test("drawStripAnts: the plane's live ants over the line are drawn level on the 
   const c: Camera = { x: centreX(s2, STRIP), y: centreY(STRIP), zoom: 20 };
   const x = (s: number) => toScreen(c, V, centreX(s, STRIP), centreY(STRIP))[0];
   const y = toScreen(c, V, 0, centreY(STRIP))[1];
-  const tone = (col: typeof c0) => odourColour(THEME.inkRgb, THEME.warnRgb, col.nestOdour);
+  const tone = (col: typeof c0) => nestColour(THEME.inkRgb, THEME.warnRgb, col);
   const rejects3 = (wx: number) => wx !== centreX(s3, STRIP);
   const { k, log, state } = field(g, CURTAIN, c);
   drawStripAnts(k, 8, 3, rejects3);

@@ -22,7 +22,7 @@ import {
 import { fogCarried } from "./fog/sources.ts";
 import { journalFromUrl } from "./journal.ts";
 import { pushToast } from "./toasts.ts";
-import type { GameSettings, SaveRecord } from "./saves.ts";
+import { loadFailure, type GameSettings, type SaveRecord } from "./saves.ts";
 import { landingOf } from "./landing.ts";
 import { worldFromUrl, worldOf, type WorldKind } from "./worldKind.ts";
 import { GameLoop, MAX_STEP } from "./gameLoop.ts";
@@ -202,12 +202,7 @@ export function useColony(initial: ColonyControls = DEFAULT_COLONY_CONTROLS) {
       } catch (e) {
         // A save this game can't read (another version, another shape): a fresh game of the same world rather than a
         // blank page (PR #42 review, B3). The notice waits until React has finished rendering.
-        queueMicrotask(() =>
-          pushToast(
-            `That save couldn't be loaded (${e instanceof Error ? e.message : String(e)}); this is a fresh game of its world.`,
-            "warn",
-          ),
-        );
+        queueMicrotask(() => pushToast(loadFailure(e), "warn"));
         return build();
       }
     }

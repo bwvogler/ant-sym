@@ -161,3 +161,26 @@ test("the game's numbers from the page's stats: the odours' gap only while two c
   assert.equal(codexNumbers({ ...st, sides: [side(40), side(0), side(12)] }).unityGap, 0.4, "a third colony still standing: two stand");
   assert.equal(codexNumbers({ ...st, evolution: null }).mutations, 0);
 });
+
+test("the unity cue scales with the odour space: the gap starts at sqrt(axes), and 0.9 of that, not 0.9, is drawing together (ja-zg1u.8)", () => {
+  const g = buildGame({ species: "generic", seed: 3, antCount: 30, rival: true, generation: 0 });
+  const K4 = { deaths: 0, mutations: 0, span: 2 };
+  assert.ok(!cues(g.colonies, { ...K4, unityGap: 2 }).has("unity"), "the start: the gap is the span");
+  assert.ok(!cues(g.colonies, { ...K4, unityGap: 1.81 }).has("unity"));
+  assert.ok(cues(g.colonies, { ...K4, unityGap: 1.8 }).has("unity"), "0.9 of 2");
+  // At the old reading (1 at the start, 0.9 to fire) a four-axis game's gap of 1.5 was already 'drawing together': 1.9 is not now.
+  assert.ok(!cues(g.colonies, { ...K4, unityGap: 1.9 }).has("unity"));
+  // One axis, with or without a span: as it was.
+  assert.ok(cues(g.colonies, { deaths: 0, mutations: 0, unityGap: 0.9, span: 1 }).has("unity"));
+  assert.ok(!cues(g.colonies, { deaths: 0, mutations: 0, unityGap: 0.91, span: 1 }).has("unity"));
+  assert.ok(cues(g.colonies, { ...calm, unityGap: UNITY_SEEN }).has("unity"));
+  assert.ok(!cues(g.colonies, { ...calm, unityGap: UNITY_SEEN + 0.01 }).has("unity"));
+});
+
+test("the Codex's numbers from the stats carry the span, and a lone colony's gap reads as the span (no cue), not 1", () => {
+  const side = (population: number, losses = 0) => ({ population, losses });
+  const st = { sides: [side(40), side(0, 30)], unity: { gap: 0 }, evolution: null };
+  assert.deepEqual(codexNumbers(null, 2), { deaths: 0, unityGap: 2, mutations: 0, span: 2 });
+  assert.equal(codexNumbers(st, 2).unityGap, 2, "a wipe-out is not the odours drawing together at four axes either");
+  assert.deepEqual(codexNumbers(st), { deaths: 30, unityGap: 1, mutations: 0 }, "one axis: no span key, as before");
+});
