@@ -40,7 +40,8 @@ export const FUNGAL = 0.5;
 export const MAX_MASK = 0.6;
 
 export function binOf(odour: number): number {
-  return Math.min(BINS - 1, Math.max(0, Math.floor(odour * BINS)));
+  // A NaN odour is band 0 (Math.min/max of NaN is NaN, which would index nothing and key a map by NaN).
+  return odour !== odour ? 0 : Math.min(BINS - 1, Math.max(0, Math.floor(odour * BINS)));
 }
 
 export function binCentre(b: number): number {

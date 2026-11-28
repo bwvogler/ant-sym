@@ -133,7 +133,7 @@ async function work() {
         const o = ring[cy & 1];
         let met = false;
         game.colonies.forEach((d, di) => {
-          if (met || di === ci || Math.abs(c.odour[i] - d.nestOdour) > tol) return;
+          if (met || di === ci || Math.abs(c.odourAt(i) - d.nestOdour) > tol) return;
           for (let j = 0; j < o.length && !met; j += 2) if (occ[l][di].get((cy + o[j + 1]) * 65536 + cx + o[j])) met = true;
         });
         if (met) contact[l] += 1;

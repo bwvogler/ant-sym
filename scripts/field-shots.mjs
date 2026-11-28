@@ -160,7 +160,7 @@ const markAnts = (page) =>
       for (let i = 0; i < c.n; i++) if (c.alive[i]) alive.push(i);
       let brood = 0;
       alive.forEach((i, n) => {
-        c.odour[i] = [0, 0.15, 0.4, 0.65, 0.9][n % 5];
+        c.odour[i * c.odourAxes] = [0, 0.15, 0.4, 0.65, 0.9][n % 5];
         const kind = n % 9;
         if (kind === 1) c.load[i] = 0.3;
         else if (kind === 2) c.load[i] = 1;
