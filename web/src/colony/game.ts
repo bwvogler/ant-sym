@@ -6,7 +6,7 @@ import { type Policy, SITUATION_SCHEMA } from "./vocab.ts";
 import { generateCurtain, growWorld, mainGround, type OneWorld, type WorldLine } from "./oneWorld.ts";
 import { isFed, LARVA, PUPA } from "./brood.ts";
 import { DEFAULT_MENU, Fungus, INFECTED, menuFor, type FungusParams } from "./fungus.ts";
-import { type BandsSave, driftAim, Recognition, type RecognitionParams } from "./recognition.ts";
+import { type BandsSave, driftAimVec, odourDistance, odourVector, Recognition, type RecognitionParams } from "./recognition.ts";
 import type { Responses } from "./responses.ts";
 import { GENERIC_ANT, speciesFollows, type Species } from "./species.ts";
 import { clampCol, clampRow, hash01, hash4, mulberry32, qualityLike, rockAt, type Nest, type Rng, type WorldMap } from "./world.ts";
@@ -75,9 +75,9 @@ export const DEFAULT_GAME: GameParams = {
 /**
  * Bump when what a save holds changes: an older save is refused, not misread. 5: one-world saves and the grids (U4b);
  * 6: the gate at the top of the shaft (ja-web: each ant's pass, the carriers down the hole, the raid counters); 7: each
- * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); 14: the rival check's clock is `nextRivalCheck`, and the strategist's fields are gone (S2.3b: a 13 save would load with no clock and never refresh `raidable`); 15: the params no longer carry the pair's three fields, the first colony's count, the rival flag and the rival's count (S4, docs/game-colonies.md: the colonies a game starts with are a list, never saved; a 14 save would bring the three back into `params`); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
+ * searching ant's point in its loops (ja-lp4.11); 8: each ant's remembered food spot (ja-lp4.15); 9: each ant's stored places and retrace state (ja-lp4.16); 10: the species' id (ja-fnd.5.3.3); 11: one wide cellKey for every packed cell (E1.3, ja-qpv.1.3); 12: mass flow's loads, patch sources and hole links, and each tip's idle rounds (ja-tgw9; a 11 save would load with flow on and no patch to feed); 13: the broodOdour channel's field and settings (ja-k4k.15.2; a 12 save has no settings for it and threw on its first tick: review of #192, B1); 14: the rival check's clock is `nextRivalCheck`, and the strategist's fields are gone (S2.3b: a 13 save would load with no clock and never refresh `raidable`); 15: the params no longer carry the pair's three fields, the first colony's count, the rival flag and the rival's count (S4, docs/game-colonies.md: the colonies a game starts with are a list, never saved; a 14 save would bring the three back into `params`); 16: the odour is a vector (S1 of the odour space, ja-zg1u.3: each colony saves `nestVec`, `aimVec` and `odourAxes`, the recognition its `odourAxes`, the bands by sparse key; a 15 save has a scalar nest odour and bands by index); older saves are not read (owner, 2026-11-10: nobody plays the game yet).
  */
-export const SAVE_VERSION = 15;
+export const SAVE_VERSION = 16;
 
 /** The game's parameters as a save holds them: the species is code (functions), so it is left out. */
 function withoutSpecies(p: GameParams): Omit<GameParams, "species"> {
@@ -117,7 +117,8 @@ export interface Founding {
   x: number;
   y: number;
   antCount: number;
-  odour: number;
+  /** a number is every axis; a list one per axis (a game of one axis, the only one so far, keeps its odours numbers) */
+  odour: number | readonly number[];
   maxAnts?: number;
   /** a daughter (ja-lo8.9): her mother's colony index; she founds alone on `reserve` food (and carries `fungus`, below) */
   mother?: number;
@@ -244,8 +245,8 @@ export interface ColonySpec {
   nest?: number;
   /** which line of the world its hole is on (default: the first: a world of one line, the only one until the endless world) */
   line?: number;
-  /** its nest odour (default: 0 for one colony, else k / (N - 1): 0 and 1 for two) */
-  odour?: number;
+  /** its nest odour (default: 0 for one colony, else k / (N - 1): 0 and 1 for two), a number for every axis or one per axis */
+  odour?: number | readonly number[];
   /** its colony params over the species', and over `nest` and `odour` */
   colony?: Partial<ColonyParams>;
   policy?: Policy;
@@ -311,6 +312,16 @@ export const LANDING = { offset: 3, radius: 1, spores: 3 };
 /** The app's old spore brush, per paint event (removed, ja-260): radius in cells, spores laid per cell, load dosed into each ant under it. Scripts replay it. */
 export const BRUSH = { radius: 3, spores: 2, dose: 0.15 } as const;
 
+/** A nest odour vector as a founding's `odour`: a number while the game has one axis, else a list. */
+const odourSpec = (v: ArrayLike<number>): number | number[] => (v.length === 1 ? (v[0] as number) : Array.from(v));
+
+/**
+ * A wild site's odour, a pure hash of the site per axis (salt 101 + axis: axis 0 is the one scalar odour it always was; a number while the game has one axis). */
+export function wildOdour(seed: number, rx: number, ry: number, K: number): number | number[] {
+  if (K === 1) return hash01(seed, 101, rx, ry);
+  return Array.from({ length: K }, (_, k) => hash01(seed, 101 + k, rx, ry));
+}
+
 /**
  * The colony c would raid, of any number: the nearest (hole to hole, or nest to nest on a top-down map) that is not
  * beaten and does not smell like kin (nest odours more than `tolerance` apart); null if there is none.
@@ -320,7 +331,7 @@ export function nearestRival(c: Colony, colonies: readonly Colony[], tolerance: 
   let target: Colony | null = null;
   let best = Infinity;
   for (const o of colonies) {
-    if (o === c || Game.beaten(o) || Math.abs(o.nestOdour - c.nestOdour) <= tolerance) continue;
+    if (o === c || Game.beaten(o) || odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0) <= tolerance) continue;
     const e = holeOf(o);
     const d = Math.hypot(e.x - at.x, e.y - at.y);
     if (d < best) {
@@ -474,6 +485,7 @@ export class Game {
           tolerance,
           ...this.#speciesParams(),
           ...spec.colony,
+          odourAxes: this.recognition.params.odourAxes, // the game's: every colony of it has the same
         },
         rng,
         spec.policy ?? this.params.species.policy ?? localPolicy,
@@ -617,7 +629,7 @@ export class Game {
       y: site.y,
       antCount: opts.ants ?? cap,
       maxAnts: Math.max(cap, opts.ants ?? 0),
-      odour: hash01(seed, 101, site.rx, site.ry),
+      odour: wildOdour(seed, site.rx, site.ry, this.recognition.params.odourAxes),
       wild: { rx: site.rx, ry: site.ry },
       rng: mulberry32(hash4(seed, 102, site.rx, site.ry)),
       spot: { end: "end", cell, line: this.world.lines.length, newLine: { heading: site.heading } },
@@ -1053,7 +1065,7 @@ export class Game {
       x: at.x,
       y: at.y,
       antCount: 0,
-      odour: mother.nestOdour,
+      odour: odourSpec(mother.nestVec),
       mother: f.mother,
       reserve: f.food,
       spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
@@ -1206,6 +1218,7 @@ export class Game {
         odour: f.odour,
         tolerance: this.recognition.params.tolerance,
         ...this.#choice,
+        odourAxes: this.recognition.params.odourAxes,
       },
       f.rng ?? this.#rng,
       this.params.species.policy ?? localPolicy,
@@ -1221,7 +1234,7 @@ export class Game {
       c.founding = true;
       c.incipient = true;
       c.feed(f.reserve ?? FOUNDING_RESERVE);
-      c.odourAim = driftAim(f.odour, this.recognition.params.tolerance);
+      c.aimVec.set(driftAimVec(odourVector(f.odour, c.odourAxes), this.recognition.params.tolerance));
     }
     this.colonies.push(c);
     for (const g of this.#grids) g.push(new CountGrid());
@@ -1277,7 +1290,7 @@ export class Game {
       k: this.addColony({
         ...at,
         antCount,
-        odour: (this.colonies[0] as Colony).nestOdour,
+        odour: odourSpec((this.colonies[0] as Colony).nestVec),
         spot: { cell: s.cell, end: s.end, line: s.line, ...(s.newLine ? { newLine: s.newLine } : {}) },
       }),
     };
@@ -1468,10 +1481,11 @@ export class Game {
     if (live.length < 2) return { gap: 0, deathsPerMinute, quiet, mixing: 0, met, alike: false, score: 0, unified: false };
     const tol = this.recognition.params.tolerance;
     // The widest gap between any two nests' odours: one colony when even that is within tolerance.
+    const K = this.recognition.params.odourAxes;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++)
-        gap = Math.max(gap, Math.abs((live[a] as Colony).nestOdour - (live[b] as Colony).nestOdour));
+        gap = Math.max(gap, odourDistance(K, (live[a] as Colony).nestVec, 0, (live[b] as Colony).nestVec, 0));
     // Mixing: each colony's ants within tolerance of another colony's nest odour (with two: the other one).
     let near = 0;
     let living = 0;
@@ -1479,8 +1493,7 @@ export class Game {
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         living++;
-        const o = c.odour[i];
-        if (live.some((other) => other !== c && Math.abs(o - other.nestOdour) <= tol)) near++;
+        if (live.some((other) => other !== c && odourDistance(K, c.odour, i * K, other.nestVec, 0) <= tol)) near++;
       }
     // With a tolerance of 1 (one supercolony) every gap is within it: recognition is whole.
     const recognition = tol >= 1 ? 1 : Math.min(1, Math.max(0, (1 - gap) / (1 - tol)));
@@ -1527,10 +1540,11 @@ export class Game {
     // Each ant meets the ants on its own layer: its grids and map.
     let l = 0;
     let map = this.layers[0] as WorldMap;
+    const K = this.recognition.params.odourAxes;
     let gap = 0;
     for (let a = 0; a < live.length; a++)
       for (let b = a + 1; b < live.length; b++)
-        gap = Math.max(gap, Math.abs((this.colonies[live[a]] as Colony).nestOdour - (this.colonies[live[b]] as Colony).nestOdour));
+        gap = Math.max(gap, odourDistance(K, (this.colonies[live[a]] as Colony).nestVec, 0, (this.colonies[live[b]] as Colony).nestVec, 0));
     this.colonies.forEach((c, k) => {
       // A sleeper's contact is held, not decayed: unity() still counts it, and it wakes where it stopped. So is an awake colony's while nobody awake
       // is left to meet (its partner sleeps), or unity().met would fall as its own memory decays toward a share of 0.
@@ -1542,14 +1556,13 @@ export class Game {
         for (let i = 0; i < c.n; i++) {
           if (!c.alive[i]) continue;
           living++;
-          const o = c.odour[i];
           // Its cell, once an ally is in question (a column can be negative: one world's curtain).
           let placed = false;
           let cx = 0;
           let cy = 0;
           for (const d of live) {
             if (d === k) continue;
-            if (Math.abs(o - (this.colonies[d] as Colony).nestOdour) > tol) continue;
+            if (odourDistance(K, c.odour, i * K, (this.colonies[d] as Colony).nestVec, 0) > tol) continue;
             if (!placed) {
               placed = true;
               c.antCell(i);
@@ -1653,7 +1666,11 @@ export class Game {
       // A colony whose nest smells like ours is no rival either: kin are not raided (after unification,
       // raiders swarmed the other nest with nobody there to fight).
       const tol = this.recognition.params.tolerance;
-      if (!this.colonies.some((o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && Math.abs(o.nestOdour - c.nestOdour) > tol)) {
+      if (
+        !this.colonies.some(
+          (o, j) => j !== k && !this.#frozen.has(j) && !Game.beaten(o) && odourDistance(c.odourAxes, o.nestVec, 0, c.nestVec, 0) > tol,
+        )
+      ) {
         c.raidable = false;
         // Nobody awake to raid: the pointers at a sleeper go too, so a fungus-bent ant does not read a scent that no longer fades (ja-xfny).
         // A thaw re-wires through the next #aimAll (#aimRaids). Only while something sleeps: a bounded game (awake rule off) keeps its pointers at a

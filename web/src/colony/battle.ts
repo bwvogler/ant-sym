@@ -3,7 +3,7 @@ import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import { type Colony, type Layer } from "./colony.ts";
 import { ENEMY } from "./vocab.ts";
 import { CELL, cellKey, centreX, centreY, discOffsets } from "./hex.ts";
-import { BINS, binCentre, binOf, STRANGER_EPS, SumGrid, type Recognition } from "./recognition.ts";
+import { bandDistance, bandKey, keyDistance, STRANGER_EPS, SumGrid, type Recognition } from "./recognition.ts";
 import { blocked, clampCol, clampRow, inBounds, type Bounds } from "./world.ts";
 import { touch } from "./sense.ts";
 
@@ -145,17 +145,42 @@ export function around(grid: CountGrid, map: Bounds, cx: number, cy: number, r =
 }
 
 // Reused across ticks and layers; only touched cells are cleared. Recognition uses
-// ten target bands, never a list of ant pairs. Without recognition, target colonies.
-const pressureCache = new WeakMap<Colony, SumGrid[]>();
-function attackPressure(colonies: Colony[], recognition: boolean, layer: number, reach: 0 | 1): SumGrid[] {
-  if (!colonies.length) return [];
-  const count = recognition ? BINS : colonies.length;
+// target bands (the bands some living ant is in, by key: recognition.ts bandKey), never a list of ant pairs.
+// Without recognition, target colonies (by index).
+const pressureCache = new WeakMap<Colony, Map<number, SumGrid>>();
+/** The most band grids the attack-pressure pool keeps beyond those in use (one axis never reaches it: BINS bands). */
+export const PRESSURE_POOL = 64;
+/** How many band grids colony c's attack-pressure pool holds (a test reads it: the pool is bounded). */
+export const pressurePoolSize = (c: Colony): number => pressureCache.get(c)?.size ?? 0;
+function attackPressure(colonies: Colony[], recognition: boolean, layer: number, reach: 0 | 1): Map<number, SumGrid> {
+  if (!colonies.length) return new Map();
   let grids = pressureCache.get(colonies[0]);
-  if (!grids || grids.length !== count) {
-    grids = Array.from({ length: count }, () => new SumGrid());
-    pressureCache.set(colonies[0], grids);
+  if (!grids) pressureCache.set(colonies[0], (grids = new Map()));
+  for (const g of grids.values()) g.reset();
+  // The bands a victim can be read in: those of the ants living on this layer (a band nobody is in is never read).
+  const keys: number[] = [];
+  if (recognition) {
+    const seen = new Set<number>();
+    for (const c of colonies) {
+      const on = layer < 0 ? null : c.layers[layer];
+      if (layer >= 0 && !on) continue;
+      const K = c.odourAxes;
+      for (let i = 0; i < c.n; i++) {
+        if (!c.alive[i] || (layer >= 0 && c.layer[i] !== layer)) continue;
+        const key = bandKey(c.odour, i * K, K);
+        if (!seen.has(key)) {
+          seen.add(key);
+          keys.push(key);
+        }
+      }
+    }
+  } else for (let b = 0; b < colonies.length; b++) keys.push(b);
+  // The pool keeps the grids of bands no ant is in now (a tick on another layer reads other bands), but not without bound: with
+  // continuous odours at K axes the bands ants have passed through are many, so past PRESSURE_POOL it keeps only the bands in use.
+  if (grids.size > PRESSURE_POOL) {
+    const live = new Set(keys);
+    for (const key of grids.keys()) if (!live.has(key)) grids.delete(key);
   }
-  for (const g of grids) g.reset();
   colonies.forEach((c, own) => {
     const on = layer < 0 ? null : c.layers[layer];
     if (layer >= 0 && !on) return; // a curtain of another line
@@ -183,9 +208,13 @@ function attackPressure(colonies: Colony[], recognition: boolean, layer: number,
           }
         }
         if (!clear) continue;
-        for (let b = 0; b < count; b++) {
-          const stranger = recognition ? Math.abs(binCentre(b) - c.odour[i]) > c.tolerance[i] + STRANGER_EPS : b !== own;
-          if (stranger) grids[b].add(x, y, weight);
+        for (const b of keys) {
+          const stranger = recognition ? keyDistance(b, c.odourAxes, c.odour, i * c.odourAxes) > c.tolerance[i] + STRANGER_EPS : b !== own;
+          if (stranger) {
+            let g = grids.get(b);
+            if (!g) grids.set(b, (g = new SumGrid()));
+            g.add(x, y, weight);
+          }
         }
       }
     }
@@ -227,7 +256,7 @@ function distancePressure(
   const x = victim.x[ant];
   const y = victim.y[ant];
   if (!buckets.size || blocked(map, x, y)) return 0;
-  const band = binCentre(binOf(victim.odour[ant]));
+  const K = victim.odourAxes;
   let pressure = 0;
   // Two rings cover every pair within one world unit, even across cell corners.
   const offsets = discOffsets(2)[cy & 1] as Int16Array;
@@ -241,7 +270,12 @@ function distancePressure(
       const source = attacker.colony,
         i = attacker.ant;
       if (source.layer[i] !== victim.layer[ant] || (source === victim && i === ant)) continue;
-      if (recognition ? Math.abs(band - source.odour[i]) <= source.tolerance[i] + STRANGER_EPS : side === attacker.side) continue;
+      if (
+        recognition
+          ? bandDistance(victim.odour, ant * K, source.odour, i * K, K) <= source.tolerance[i] + STRANGER_EPS
+          : side === attacker.side
+      )
+        continue;
       const sx = source.x[i],
         sy = source.y[i],
         dx = x - sx,
@@ -291,21 +325,22 @@ export function resolveFights(
         if (enemies < 1e-6) continue;
       } else if (pressure) {
         if (blocked(map, c.x[i], c.y[i])) continue;
-        const band = binOf(c.odour[i]);
-        enemies = pressure[rec ? band : k].get(cx, cy);
+        const K = c.odourAxes;
+        const band = rec ? bandKey(c.odour, i * K, K) : k;
+        enemies = pressure.get(band)?.get(cx, cy) ?? 0;
         // A very narrow tolerance can classify even its own coarse odour band as
         // strange. Other ants in that band may attack, but never this ant itself.
         if (
           rec &&
           c.attackLayer[i] >= 0 &&
           c.attackLayer[i] === c.layer[i] &&
-          Math.abs(binCentre(band) - c.odour[i]) > c.tolerance[i] + STRANGER_EPS
+          keyDistance(band, K, c.odour, i * K) > c.tolerance[i] + STRANGER_EPS
         )
           enemies = Math.max(0, enemies - (1 - c.calm[i]));
         enemies *= rec ? 1 - c.calm[i] : 1;
         if (enemies < 1e-6) continue;
       } else if (rec) {
-        rec.look(c.odour[i], rec.params.tolerance);
+        rec.look(c.odour, i * c.odourAxes, rec.params.tolerance);
         enemies = rec.around(cx, cy, map) * (1 - c.calm[i]);
         if (enemies < 1e-6) continue;
       } else {

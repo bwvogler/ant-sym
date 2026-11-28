@@ -155,7 +155,7 @@ export function inspectCell(
         carrying: !!c.carrying[i],
         quality: c.quality[i],
         infected: c.load[i] >= INFECTED,
-        odour: c.odour[i],
+        odour: c.odourAt(i),
         cargo: c.item(i),
       });
     }

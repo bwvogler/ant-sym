@@ -479,7 +479,7 @@ export function nestLife(col: Colony, dt: number): void {
     // Strangers at her side kill her (a raid that reaches the royal chamber).
     const g = col.enemies;
     if (g) {
-      g.look?.(col.nestOdour, p.tolerance);
+      g.look?.(col.nestVec, 0, p.tolerance);
       let strangers = 0;
       const o = discOffsets(1)[qy & 1] as Int16Array;
       for (let k = 0; k < o.length; k += 2) strangers += g.get(qx + o[k], qy + o[k + 1]);

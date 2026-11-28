@@ -47,7 +47,7 @@ export function placeNewborn(col: Colony, i: number): void {
   for (const [name, value] of spawnResets(col.params)) arrays[name]![i] = value;
   col.hand[i] = col.rng() < 0.5 ? -1 : 1;
   // A newborn smells of its colony as the colony smells now.
-  col.odour[i] = col.nestOdour;
+  for (let k = 0, K = col.odourAxes; k < K; k++) col.odour[i * K + k] = col.nestVec[k] as number;
   col.layer[i] = col.home; // born in the nest, on its layer
   col.lifespan[i] = col.housed || col.params.mortalWithoutQueen ? col.params.lifespan * (0.7 + 0.6 * col.rng()) : Infinity;
   col.gen[i] = (col.gen[i] + 1) >>> 0;

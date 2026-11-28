@@ -455,8 +455,10 @@ export interface ColonyParams {
    * `follow` (a stale answer, a rule that offers it) is read as explore. Its action set, not a choice: the policy chooses among the rest.
    */
   follows: boolean;
-  /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own */
-  odour: number;
+  /** the colony's odour at the start, 0..1 (recognition.ts): the game gives each colony its own. A number is every axis; a list is one per axis. */
+  odour: number | readonly number[];
+  /** how many numbers an odour is: the game's (RecognitionParams.odourAxes) sets it on every colony it builds; 1 for a colony built alone */
+  odourAxes: number;
   /** odours further apart than this are strangers, as a healthy ant perceives it */
   tolerance: number;
   /** cells round an ant it checks for enemies (the hex disc of this radius) */
@@ -592,6 +594,7 @@ export const DEFAULT_COLONY: ColonyParams = {
   middleShare: MIDDLE,
   mortalWithoutQueen: false,
   odour: 0,
+  odourAxes: 1,
   tolerance: TOLERANCE,
   enemyRange: 2,
   channels: Object.freeze({}),

@@ -237,7 +237,8 @@ function Fungal({ col, i, fungus, explain }: { col: Colony; i: number; fungus: F
         <span className="text-spore">
           {strain?.name ?? "fungus"} {Math.round(100 * load)}%
         </span>
-        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {col.odour[i].toFixed(2)} (its nest {col.nestOdour.toFixed(2)}
+        {resist >= 0.05 ? ` · resistance ${resist.toFixed(2)}` : ""} · odour {col.odourAt(i).toFixed(2)} (its nest{" "}
+        {col.nestOdour.toFixed(2)}
         ). The ant's situation above is what it perceives; its own policy chose.
       </p>
     </>

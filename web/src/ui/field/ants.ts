@@ -42,7 +42,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
   const lod = workerLod(c.zoom, d);
   // One stroke per odour band (most frames: one band per colony).
   let bands = 0;
-  for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === lv) bands |= 1 << binOf(col.odour[i]);
+  for (let i = 0; i < col.n; i++) if (col.alive[i] && col.layer[i] === lv) bands |= 1 << binOf(col.odourAt(i));
   for (let b = 0; b < BINS; b++) {
     if (!(bands & (1 << b))) continue;
     const colour = theme.inkRgb.map((ink, k) => Math.round(ink + ((theme.warnRgb[k] - ink) * b) / (BINS - 1)));
@@ -50,7 +50,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
     const spriteMix = sprite ? Math.min(1, (zoom - HEX_ZOOM) / 2) : 0;
     ctx.beginPath();
     for (let i = 0; i < col.n; i++) {
-      if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+      if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odourAt(i)) !== b || !inView(col.x[i], col.y[i])) continue;
       const [x, y] = toScreen(c, v, col.x[i], col.y[i]);
       if (sprite && spriteMix > 0) {
         ctx.globalAlpha = spriteMix * dim;
@@ -70,7 +70,7 @@ export function drawAnts(fc: FieldCtx, f: AntFrame, col: Colony): void {
     if (spriteMix < 1) {
       ctx.beginPath();
       for (let i = 0; i < col.n; i++) {
-        if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odour[i]) !== b || !inView(col.x[i], col.y[i])) continue;
+        if (!col.alive[i] || col.layer[i] !== lv || binOf(col.odourAt(i)) !== b || !inView(col.x[i], col.y[i])) continue;
         const [x, y] = toScreen(c, v, col.x[i], col.y[i]),
           co = Math.cos(col.heading[i]),
           si = Math.sin(col.heading[i]),

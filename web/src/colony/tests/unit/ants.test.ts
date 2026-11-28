@@ -4,7 +4,7 @@ import { ANT_FIELDS, makeAntArrays, NO_KEY } from "../../ants.ts";
 
 // The table that allocates the per-ant arrays (ants.ts): the fills are what a fresh ant starts with, and nothing else pins them.
 
-const P = { odour: 2, tolerance: 3, routeStep: 4, routeMax: 5 };
+const P = { odour: 2, odourAxes: 1, tolerance: 3, routeStep: 4, routeMax: 5 };
 
 test("the table has 143 per-ant arrays, each n long (routePlaces n × 2 × routeMax steps)", () => {
   const a = makeAntArrays(3, P);
@@ -32,7 +32,8 @@ test("a fresh ant starts with the fill its array declares: constants, NaN and In
   // the arrays that start as a parameter, and the zero-filled ones
   for (const [k, f] of Object.entries(ANT_FIELDS)) {
     const v = (a as unknown as Record<string, ArrayLike<number>>)[k]!;
-    if ("fillParam" in f) assert.equal(v[0], P[f.fillParam as keyof typeof P], `${k} starts as ${f.fillParam}`);
+    if ("fillAt" in f) assert.equal(v[0], P.odour, `${k} starts as the colony odour`);
+    else if ("fillParam" in f) assert.equal(v[0], P[f.fillParam as keyof typeof P], `${k} starts as ${f.fillParam}`);
     else if (!("fill" in f) && k !== "routePlaces") assert.equal(v[0], 0, `${k} starts at 0`);
   }
 });

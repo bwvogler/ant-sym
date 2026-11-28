@@ -77,6 +77,7 @@ function setup(ants: Ant[], o: Opts = {}) {
     y: ants.map((a) => a.y),
     heading: get((a) => a.heading, 0),
     odour: get((a) => a.odour, 0),
+    odourAt: (i: number) => ants[i]?.odour ?? 0,
     load: get((a) => a.load, 0),
     carrying: get((a) => a.carrying, 0),
     quality: get((a) => a.quality, 1),
