@@ -11,7 +11,7 @@
 // The rates are per game hour scaled up from `seconds` of play (default 600 s): a short game under-counts, since the fungus is still spreading.
 //
 // Usage: node scripts/wild-meetings.mjs [--seeds 1-4] [--region 4] [--density 1] [--seconds 600] [--ants 400] [--cap 6] [--contact 4] [--json out.json]
-import { Game, gameRng, generateEndlessWorld, STRAINS, PLANE, TOLERANCE } from "../web/src/colony/index.ts";
+import { Game, gameRng, generateEndlessWorld, odourDistance, STRAINS, PLANE, TOLERANCE } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 import { writeFileSync } from "node:fs";
 helpAndExit(import.meta.url);
@@ -91,7 +91,7 @@ function play(seed) {
   // odours further apart than the tolerance are strangers (recognition.ts); kin ally, so a kin wild colony is met but not fought (ja-s37s)
   const isStranger = (key) => {
     const [a, b] = key.split(":").map(Number);
-    return Math.abs(game.colonies[a].nestOdour - game.colonies[b].nestOdour) > TOLERANCE;
+    return odourDistance(game.colonies[a].odourAxes, game.colonies[a].nestVec, 0, game.colonies[b].nestVec, 0) > TOLERANCE;
   };
   const entryEp = new Map();
   let listed = 0;

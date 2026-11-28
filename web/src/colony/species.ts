@@ -14,6 +14,11 @@ export interface Species {
   /** The local rule set: what it lays, how it answers contact, leaving, alarm. The generic ant reuses `localResponses` itself (Colony compares its functions by identity). */
   responses: Responses;
   /**
+   * One population: no two odours in the space are ever strangers (L. neglectus, neglectus.ts). The Game then sets the tolerance to the space's diameter,
+   * sqrt(K) for K odour axes (1 with one axis, the `params.tolerance` it names), so a game of more axes keeps one population.
+   */
+  neverStranger?: boolean;
+  /**
    * The words the species asks Jev under, by lane (vocab.ts LaneWords: legend, criteria, version), so its answers are cached under its own
    * contexts (the lane rows take them as their `lane` argument). The fungus's lane has none yet (its words by host come with the fungus levers,
    * ja-rf5.7). A lane absent here is one the species does not have. The rows' `lane` argument is not that: absent there it means the generic ant's words, so a caller checks `lanes.mode` before it asks.

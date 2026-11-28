@@ -6,7 +6,7 @@
 import { type Colony, PLANE } from "./colony.ts";
 import { INFECTED, STRAINS } from "./fungus.ts";
 import { Game } from "./game.ts";
-import { binCentre, binOf } from "./recognition.ts";
+import { binCentre, binOf, GAME_ODOUR_AXES } from "./recognition.ts";
 import { generateOneWorld } from "./oneWorld.ts";
 
 import { type Assay, type Probe, type RunSpec } from "./harness.ts";
@@ -155,6 +155,9 @@ export const neglectusImmunisation: Assay = {
  * the generic tolerance (0.35).
  */
 export const N3_DISTANCES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7] as const;
+/** N3's odours differ along the first axis only, so a distance d is d at any number of axes: the base on every axis, plus d on the first. */
+const n3Odour = (d: number): number[] => Array.from({ length: GAME_ODOUR_AXES }, (_, k) => N3_BASE + (k === 0 ? d : 0));
+
 /** N3: the first colony's odour, a band's centre, so every distance lands on one too. */
 export const N3_BASE = binCentre(binOf(0.2));
 /** N3: trials per distance, each on its own world (owner, review of #228 D1: classed over repeated trials, as Ugelvig's pairs were). */
@@ -241,8 +244,8 @@ export const neglectusTolerance: Assay = {
       // A trial's distances share one world, so they are compared on the same ground; each trial is another world.
       map: () => generateOneWorld(1 + trial),
       colonies: [
-        { antCount: 60, colony: { odour: N3_BASE } },
-        { antCount: 60, colony: { odour: N3_BASE + d } },
+        { antCount: 60, colony: { odour: n3Odour(0) } },
+        { antCount: 60, colony: { odour: n3Odour(d) } },
       ],
       probes: [probe],
     };

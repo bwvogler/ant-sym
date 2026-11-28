@@ -3,7 +3,7 @@ import { BLOCK_BITS, ChunkLayer } from "./chunks.ts";
 import { TOLERANCE } from "./vocab.ts";
 import type { Colony, Layer } from "./colony.ts";
 import { CELL, cellOf, discOffsets } from "./hex.ts";
-import { clampCol, clampRow, inBounds, type Bounds } from "./world.ts";
+import { clampCol, clampRow, hash01, inBounds, type Bounds } from "./world.ts";
 
 // Recognition, pure (ja-t4d.3, docs/fungus-policy.md §4.B). Who is an enemy
 // is no longer "an ant of another colony" but "an ant whose odour differs
@@ -36,8 +36,18 @@ export const BINS = 10;
 /** The fungus's own odour: halfway between the colonies'. */
 export const FUNGAL = 0.5;
 
-/** The largest fungal share of a host's odour: at most MAX_MASK × 0.5 = 0.3 from its nest's, under any tolerance ≥ 0.3. */
+/** The largest fungal share of a host's odour: at most MAX_MASK × 0.5 = 0.3 from its nest's with one axis, under any tolerance ≥ 0.3 (more axes: hostCap). */
 export const MAX_MASK = 0.6;
+
+/**
+ * The farthest the fungus may move a host's odour from its nest's, Euclidean in the odour space (S2 of docs/odour-space.md, PRD §91): a host is never a
+ * stranger to its own nest. With one axis it is MAX_MASK × 0.5 = 0.3 (a corner nest at full share), which never binds; with K axes a corner nest sits
+ * sqrt(K) × 0.5 from the fungal point, so the share of the way would reach 0.30 × sqrt(K) and break the invariant (worst 0.70 at K = 4, O2 in PRD §91). The
+ * cap is the tolerance less the most the bands add on top, half a band's diagonal on every axis, sqrt(K) / (2 BINS): 0.25 at K = 4.
+ */
+export function hostCap(K: number): number {
+  return TOLERANCE - Math.sqrt(K) / (2 * BINS);
+}
 
 export function binOf(odour: number): number {
   // A NaN odour is band 0 (Math.min/max of NaN is NaN, which would index nothing and key a map by NaN).
@@ -55,6 +65,12 @@ export function binCentre(b: number): number {
  * this a host could be a stranger to its own nestmates.
  */
 export const STRANGER_EPS = 1e-6;
+
+/**
+ * The salt of a wild site's odour on axis k (Game.wakeSite, wildOdour): axis 0 keeps 101, the one it always had; the others a block of their own (201 up),
+ * which no other hash in the colony uses. Axis 1 used 102 before S2, which is wakeSite's rng stream (`hash4(seed, 102, rx, ry)`).
+ */
+export const odourSalt = (axis: number): number => (axis === 0 ? 101 : 200 + axis);
 
 /** The most axes an odour may have: a band's key (sum of band × BINS^axis) must stay an exact integer in a double. */
 export const MAX_AXES = 8;
@@ -217,11 +233,14 @@ export interface RecognitionParams {
   nestDrift: number;
   /** seconds between odour steps (Game.tick) */
   interval: number;
-  /** how many numbers an odour is, game-wide (1 axis: the scalar odour of every game so far; docs/odour-space.md, K = 4 is S2's); at most MAX_AXES */
+  /** how many numbers an odour is, game-wide (a Game's default is GAME_ODOUR_AXES; 1 is the scalar odour of every game before S2); at most MAX_AXES */
   odourAxes: number;
 }
 
 export const DEFAULT_RECOGNITION: RecognitionParams = { tolerance: TOLERANCE, nestDrift: 0.03, interval: 0.1, odourAxes: 1 };
+
+/** The odour axes a Game plays with unless its settings say otherwise (S2 of docs/odour-space.md, PRD §91; owner, 2026-11-25). A Recognition or Colony built alone keeps one, so the tests that pin the scalar rule still run it. */
+export const GAME_ODOUR_AXES = 4;
 
 /** Seconds for a daughter colony's odour to drift most of the way from her mother's (ja-lo8.9.1, Colony.odourAim). */
 export const ODOUR_DRIFT = 500;
@@ -237,10 +256,47 @@ export function driftAim(mother: number, tolerance: number): number {
   return mother <= 0.5 ? Math.min(1, mother + d) : Math.max(0, mother - d);
 }
 
-/** driftAim on every axis: where a daughter's odour vector drifts to from her mother's (S2 gives the direction its own rule). */
-export function driftAimVec(mother: ArrayLike<number>, tolerance: number): Float64Array {
-  const aim = new Float64Array(mother.length);
-  for (let k = 0; k < aim.length; k++) aim[k] = driftAim(mother[k], tolerance);
+/**
+ * The direction a daughter's odour drifts in: a unit vector of K axes from a hash of the world's seed and the site she lands at (pure: the same on every
+ * load and in every game, never the game's stream; S2 of docs/odour-space.md). Each axis a normal draw (Box-Muller over two hashes), so the direction is
+ * uniform on the sphere; salts 301 and up are this hash's alone.
+ */
+export function driftDirection(seed: number, x: number, y: number, K: number): Float64Array {
+  const u = new Float64Array(K);
+  const sx = Math.floor(x);
+  const sy = Math.floor(y);
+  let len = 0;
+  for (let k = 0; k < K; k++) {
+    const a = 1 - hash01(seed, 301 + 2 * k, sx, sy); // (0, 1]
+    const b = hash01(seed, 302 + 2 * k, sx, sy);
+    u[k] = Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b);
+    len += (u[k] as number) ** 2;
+  }
+  len = Math.sqrt(len);
+  if (len === 0) u[0] = 1;
+  else for (let k = 0; k < K; k++) u[k] = (u[k] as number) / len;
+  return u;
+}
+
+/**
+ * driftAim as a vector: where a daughter's odour vector drifts to from her mother's. One axis is driftAim (toward the middle). With more axes the aim sits
+ * 1.5 tolerances from the mother in `direction` (driftDirection: fixed by the seed and the site); a component that would leave the cube is turned about
+ * the mother (so the distance holds), and past that clamped to it.
+ */
+export function driftAimVec(mother: ArrayLike<number>, tolerance: number, direction: ArrayLike<number> | null = null): Float64Array {
+  const K = mother.length;
+  const aim = new Float64Array(K);
+  if (K === 1 || direction === null) {
+    for (let k = 0; k < K; k++) aim[k] = driftAim(mother[k] as number, tolerance);
+    return aim;
+  }
+  const d = 1.5 * tolerance;
+  for (let k = 0; k < K; k++) {
+    const m = mother[k] as number;
+    let v = m + d * (direction[k] as number);
+    if (v < 0 || v > 1) v = m - d * (direction[k] as number);
+    aim[k] = Math.min(1, Math.max(0, v));
+  }
   return aim;
 }
 
@@ -442,6 +498,7 @@ export class Recognition {
     const drift = 1 - Math.exp(-this.params.nestDrift * dt);
     const K = this.params.odourAxes;
     const sum = new Float64Array(K);
+    const unit = new Float64Array(K);
     let moving = false;
     // Nests first, from the odours before the step: each drifts toward the mean of the ants at it, axis by axis.
     for (const c of colonies) {
@@ -489,15 +546,23 @@ export class Recognition {
     // Then every ant: its nest's odour, with its fungal share of the fungus's own.
     for (const c of colonies) {
       const nest = c.nestVec;
+      // The line from the nest to the fungal point, once for the colony: its length and the unit direction along it.
+      let dist = 0;
+      for (let a = 0; a < K; a++) dist += (FUNGAL - nest[a]) ** 2;
+      dist = Math.sqrt(dist);
+      // One axis: the cap (0.3) never binds and the direction is the sign, today's arithmetic bit for bit.
+      const cap = K > 1 ? hostCap(K) : Infinity;
+      for (let a = 0; a < K; a++) unit[a] = dist > 0 ? (FUNGAL - nest[a]) / dist : 0;
       for (let i = 0; i < c.n; i++) {
         if (!c.alive[i]) continue;
         const f = Math.min(MAX_MASK, c.mask[i]);
+        // The fungus draws a host toward its own odour by a share of the way, its displacement from the nest at most hostCap in the space.
+        const shift = f * dist > cap ? cap / dist : f;
+        // The odour weapon (cull) pushes 0.5 × estrange away from the nest's odour: along the line through the fungal point and on past it.
         const push = c.estrange[i] * 0.5;
         for (let a = 0; a < K; a++) {
           const n0 = nest[a];
-          // The odour weapon (cull) pushes away from the nest's odour, toward the far side.
-          const away = push * (n0 < FUNGAL ? 1 : n0 > FUNGAL ? -1 : 0);
-          const o = Math.min(1, Math.max(0, n0 + f * (FUNGAL - n0) + away));
+          const o = Math.min(1, Math.max(0, n0 + shift * (FUNGAL - n0) + push * unit[a]));
           if (Math.abs(o - c.odour[i * K + a]) > 1e-7) moving = true;
           c.odour[i * K + a] = o;
         }

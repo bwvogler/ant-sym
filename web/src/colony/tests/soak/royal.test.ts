@@ -4,7 +4,7 @@ import { GYNE, GYNE_FOOD, LARVA, PUPA, WORKER } from "../../brood.ts";
 import { CURTAIN, NANITIC_AGE, PLANE, T_PUPA, type Colony } from "../../colony.ts";
 import { Game, FOUNDING_RESERVE, MET, QUIET } from "../../game.ts";
 import { INFECTED, STRAINS } from "../../fungus.ts";
-import { driftAim } from "../../recognition.ts";
+import { driftAim, odourDistance } from "../../recognition.ts";
 import { ALATE_RESERVE, ALATE_WAIT, CULL_CUE, GYNE_CUE, GYNE_SPACING, scentShare, type Flight } from "../../royal.ts";
 import { GENERIC_ANT, type Species } from "../../species.ts";
 import { CELL, cellOf, centreX, centreY } from "../../hex.ts";
@@ -210,7 +210,11 @@ test("an alate waits, walks out along the tunnels and flies; she founds a daught
   assert.equal(Game.beaten(d), false, "a queen founding alone isn't beaten");
   assert.ok(Math.abs(d.larder - FOUNDING_RESERVE) < 1e-9, `her reserve: ${d.larder}`);
   assert.equal(d.nestOdour, c.nestOdour, "kin at first");
-  assert.equal(d.odourAim, driftAim(c.nestOdour, g.recognition.params.tolerance));
+  // Her aim sits 1.5 tolerances from her mother's odour, in a direction fixed by the seed and where she landed (S2, PRD §91; one axis: driftAim).
+  const K = g.recognition.params.odourAxes;
+  const tol = g.recognition.params.tolerance;
+  assert.ok(Math.abs(odourDistance(K, d.aimVec, 0, c.nestVec, 0) - 1.5 * tol) < 1e-9, `aim ${[...d.aimVec]} from ${[...c.nestVec]}`);
+  if (K === 1) assert.equal(d.odourAim, driftAim(c.nestOdour, tol));
   // A solo world and a kin daughter are not "one colony": the world had only one of its own (ja-lo8.9).
   for (let k = 0; k < 30 * 65; k++) g.tick(DT);
   assert.equal(g.outcome(), "playing");
@@ -227,8 +231,8 @@ test("an alate waits, walks out along the tunnels and flies; she founds a daught
   // Her colony's odour drifts from her mother's until they are strangers.
   for (let k = 0; k < 30 * 600; k++) g.tick(DT);
   assert.ok(
-    Math.abs(d.nestOdour - c.nestOdour) > g.recognition.params.tolerance,
-    `apart: ${d.nestOdour.toFixed(2)} vs ${c.nestOdour.toFixed(2)}`,
+    odourDistance(K, d.nestVec, 0, c.nestVec, 0) > tol,
+    `apart: ${[...d.nestVec].map((x) => x.toFixed(2))} vs ${[...c.nestVec].map((x) => x.toFixed(2))}`,
   );
 });
 
@@ -448,7 +452,7 @@ test("a nanitic eclosing leaves the colony young", () => {
 });
 
 test("a queen founding alone doesn't hold unity at nothing: a colony with no ants has nobody to meet (ja-i0f, PR #47 review)", () => {
-  const g = new Game(smallOne(1), { autoFound: false }, mulberry32(7), [{ antCount: 20 }, { antCount: 20 }]);
+  const g = new Game(smallOne(1), { autoFound: false, recognition: { odourAxes: 1 } }, mulberry32(7), [{ antCount: 20 }, { antCount: 20 }]); // one axis: it sets scalar odours
   const [a, b] = g.colonies as [Colony, Colony];
   const e = planeHole(own(a)); // they meet on the plane at a's hole
   const meet = (seconds: number) => {

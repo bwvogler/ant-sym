@@ -322,8 +322,8 @@ test("one world: allied contact is counted per layer", () => {
     const g = game(20);
     const [a, b] = g.colonies as [Colony, Colony];
     // Kin: one odour, so they meet as allies (and don't fight).
-    b.nestOdour = a.nestOdour;
-    b.odour.fill(a.nestOdour);
+    b.nestVec.set(a.nestVec);
+    for (let i = 0; i < b.odour.length; i += b.odourAxes) b.odour.set(a.nestVec, i);
     const spot = g.world!.curtain.nests[0]!;
     for (let k = 0; k < 60; k++) {
       g.colonies.forEach((c, n) => {
@@ -480,7 +480,7 @@ test("one world: the nest odour drifts toward the ants in the royal chamber, not
     run(g, 10, () => {
       for (let i = 0; i < 10; i++) {
         c.putAnt(i, layer, q.x, q.y);
-        c.odour[i] = before < 0.5 ? before + 0.4 : before - 0.4; // strangers' odour
+        c.odour[i * c.odourAxes] = before < 0.5 ? before + 0.4 : before - 0.4; // strangers' odour, on the first axis
       }
     });
     return Math.abs(c.nestOdour - before);
