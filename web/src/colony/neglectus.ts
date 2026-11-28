@@ -11,7 +11,9 @@ import type { LaneWords, Mode, Policy } from "./vocab.ts";
 /**
  * Its tolerance: one supercolony (owner, 2026-11-15). Within one *L. neglectus* population nests don't fight at all, and nestmates are
  * unrelated (r = 0.02), so tolerance is not kinship (Cremer et al. 2008; Ugelvig et al. 2008, both full text). The game's colonies start as
- * far apart as odours go (0 and 1), so a tolerance of 1 keeps them one population: they never fight, and their nests already smell alike.
+ * far apart as odours go (0 and 1 on every axis: sqrt(K) apart in K axes), so a tolerance of the space's diameter keeps them one population: they never
+ * fight, and their nests already smell alike. That is 1 with one axis (this constant) and sqrt(K) in a game of K, which `neverStranger` has the Game
+ * set (S2 of the odour space, PRD §91: at K = 4 the start colonies are 2 apart, and a tolerance of 1 would make them fight).
  */
 export const NEGLECTUS_TOLERANCE = 1;
 
@@ -36,6 +38,7 @@ export const NEGLECTUS_ANT: Species = {
   id: "neglectus",
   name: "Invasive garden ant",
   params: { tolerance: NEGLECTUS_TOLERANCE },
+  neverStranger: true,
   responses: localResponses,
   lanes: { mode: NEGLECTUS_MODE_WORDS },
   policy: neglectusPolicy,

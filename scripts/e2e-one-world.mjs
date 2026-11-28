@@ -2645,7 +2645,7 @@ try {
         g.addColony({
           ...at,
           antCount: 10,
-          odour: g.colonies[0].nestOdour,
+          odour: Array.from(g.colonies[0].nestVec),
           spot: { cell: s.cell, end: s.end, line: s.line, newLine: s.newLine },
         });
         return g.world.lines.length;

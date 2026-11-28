@@ -11,13 +11,15 @@
 // --hash prints a hash of the whole game at the end (tests/saveHash.ts): a tick refactor must leave it unchanged.
 // --one is accepted and ignored: one world is the only game (S2.3d).
 //
-// Usage: node scripts/colony-bench.mjs [--page] [--hash] [ants per colony=1200] [sim seconds=60] [seed=1] [spores=0]
+// Usage: node scripts/colony-bench.mjs [--page] [--hash] [ants per colony=1200] [sim seconds=60] [seed=1] [spores=0] [--axes=N odour axes, default the game's]
 import { CURTAIN, PLANE, STRAINS, GAME_REGROW, Game, gameRng, generateOneWorld, mulberry32 } from "../web/src/colony/index.ts";
 import { helpAndExit } from "./lib/usage.mjs";
 helpAndExit(import.meta.url);
 
 const page = process.argv.includes("--page");
 const hash = process.argv.includes("--hash");
+const axes = Number(process.argv.find((a) => a.startsWith("--axes="))?.slice(7));
+const recognition = axes ? { recognition: { odourAxes: axes } } : {};
 const [ants = 1200, seconds = 60, seed = 1, spores = 0] = process.argv
   .slice(2)
   .filter((a) => !a.startsWith("--"))
@@ -31,8 +33,8 @@ for (const ground of [page ? "one world, two, as the page plays it" : "one world
   const size = map.plane.size;
   const pair = [{ antCount: ants }, { antCount: ants }];
   const game = page
-    ? new Game(map, { regrow: GAME_REGROW, autoFound: false }, gameRng(seed), pair)
-    : new Game(map, {}, mulberry32(seed * 31 + 7), pair);
+    ? new Game(map, { regrow: GAME_REGROW, autoFound: false, ...recognition }, gameRng(seed), pair)
+    : new Game(map, { ...recognition }, mulberry32(seed * 31 + 7), pair);
   if (page)
     game.land(
       0,
